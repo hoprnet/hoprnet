@@ -2,7 +2,10 @@
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -16,7 +19,7 @@ source "${mydir}/utils.sh"
 
 declare key_to_extract=".value.network"
 
-if [[ "${1:-}" = "--release" ]] ; then
+if [[ ${1:-} == "--release" ]]; then
   log "Getting the release id"
   key_to_extract=".key"
 else
@@ -28,7 +31,7 @@ declare branch=$(git rev-parse --abbrev-ref HEAD)
 
 declare network
 for git_ref in $(cat "${mydir}/../releases.json" | jq -r "to_entries[] | .value.git_ref" | uniq); do
-  if [[ "${branch}" =~ ${git_ref} ]]; then
+  if [[ ${branch} =~ ${git_ref} ]]; then
     network=$(cat "${mydir}/../releases.json" | jq -r "to_entries[] | select(.value.git_ref==\"${git_ref}\" and .value.default==true) | ${key_to_extract}")
     # if no default is set we take the first entry
     if [ -z "${network}" ]; then

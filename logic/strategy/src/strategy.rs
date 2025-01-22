@@ -18,9 +18,6 @@
 //!
 //! For details on default parameters see [MultiStrategyConfig].
 use async_trait::async_trait;
-use chain_actions::ChainActions;
-use core_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
-use hopr_internal_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display, Formatter},
@@ -28,6 +25,10 @@ use std::{
 };
 use tracing::{error, warn};
 use validator::Validate;
+
+use chain_actions::ChainActions;
+use hopr_internal_types::prelude::*;
+use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 
 use crate::aggregating::AggregatingStrategy;
 use crate::auto_funding::AutoFundingStrategy;
@@ -78,6 +79,11 @@ fn just_true() -> bool {
 }
 
 #[inline]
+fn sixty() -> u64 {
+    60
+}
+
+#[inline]
 fn empty_vector() -> Vec<Strategy> {
     vec![]
 }
@@ -103,6 +109,14 @@ pub struct MultiStrategyConfig {
     #[default = true]
     #[serde(default = "just_true")]
     pub allow_recursive: bool,
+
+    /// Execution interval of the configured strategies in seconds.
+    ///
+    /// Default is 60, minimum is 1.
+    #[default = 60]
+    #[serde(default = "sixty")]
+    #[validate(range(min = 1))]
+    pub execution_interval: u64,
 
     /// Configuration of individual sub-strategies.
     ///
@@ -214,7 +228,7 @@ impl SingularStrategy for MultiStrategy {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_tick().await {
                 if !self.cfg.on_fail_continue {
-                    warn!("{self} on_tick chain stopped at {strategy}");
+                    warn!(%self, %strategy, "on_tick chain stopped at strategy");
                     return Err(e);
                 }
             }
@@ -226,7 +240,7 @@ impl SingularStrategy for MultiStrategy {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_acknowledged_winning_ticket(ack).await {
                 if !self.cfg.on_fail_continue {
-                    warn!("{self} on_acknowledged_ticket chain stopped at {strategy}");
+                    warn!(%self, %strategy, "on_acknowledged_ticket chain stopped at strategy");
                     return Err(e);
                 }
             }
@@ -243,7 +257,7 @@ impl SingularStrategy for MultiStrategy {
         for strategy in self.strategies.iter() {
             if let Err(e) = strategy.on_own_channel_changed(channel, direction, change).await {
                 if !self.cfg.on_fail_continue {
-                    warn!("{self} on_channel_state_changed chain stopped at {strategy}");
+                    warn!(%self, "on_channel_state_changed chain stopped at strategy");
                     return Err(e);
                 }
             }
@@ -266,7 +280,7 @@ mod tests {
     use mockall::Sequence;
 
     #[async_std::test]
-    async fn test_multi_strategy_logical_or_flow() {
+    async fn test_multi_strategy_logical_or_flow() -> anyhow::Result<()> {
         let mut seq = Sequence::new();
 
         let mut s1 = MockSingularStrategy::new();
@@ -281,6 +295,7 @@ mod tests {
         let cfg = MultiStrategyConfig {
             on_fail_continue: true,
             allow_recursive: true,
+            execution_interval: 1,
             strategies: Vec::new(),
         };
 
@@ -288,7 +303,9 @@ mod tests {
             strategies: vec![Box::new(s1), Box::new(s2)],
             cfg,
         };
-        ms.on_tick().await.expect("on_tick should not fail");
+        ms.on_tick().await?;
+
+        Ok(())
     }
 
     #[async_std::test]
@@ -307,6 +324,7 @@ mod tests {
         let cfg = MultiStrategyConfig {
             on_fail_continue: false,
             allow_recursive: true,
+            execution_interval: 1,
             strategies: Vec::new(),
         };
 

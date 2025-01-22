@@ -1,6 +1,6 @@
 [package]
 name = "hopr-strategy"
-version = "0.11.1"
+version = "0.12.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains implementations of different HOPR strategies"
 edition = "2021"
@@ -14,21 +14,21 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-async-std = [
-  "core-protocol/runtime-async-std",
-  "hopr-db-sql/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
+  "hopr-db-sql/runtime-async-std",
+  "hopr-transport-protocol/runtime-async-std",
 ]
 runtime-tokio = [
-  "core-protocol/runtime-tokio",
-  "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
+  "hopr-db-sql/runtime-tokio",
+  "hopr-transport-protocol/runtime-tokio",
 ]
 prometheus = [
   "dep:hopr-metrics",
   "core-network/prometheus",
-  "core-protocol/prometheus",
   "chain-actions/prometheus",
   "hopr-db-sql/prometheus",
+  "hopr-transport-protocol/prometheus",
 ]
 
 [dependencies]
@@ -48,17 +48,18 @@ validator = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 core-network = { workspace = true }
-core-protocol = { workspace = true }
 chain-actions = { workspace = true }
 tracing = { workspace = true }
-hopr-platform = { workspace = true }
-hopr-metrics = { workspace = true, optional = true, default-features = false }
-hopr-internal-types = { workspace = true }
-hopr-primitive-types = { workspace = true }
-hopr-db-sql = { workspace = true }
 hopr-async-runtime = { workspace = true }
+hopr-db-sql = { workspace = true }
+hopr-internal-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true, default-features = false }
+hopr-platform = { workspace = true }
+hopr-primitive-types = { workspace = true }
+hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 chain-types = { workspace = true }
@@ -66,3 +67,4 @@ mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
 futures = { workspace = true }
+test-log = { workspace = true }

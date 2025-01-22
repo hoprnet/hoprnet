@@ -7,6 +7,15 @@ pub enum DbError {
     #[error("DB general error: {0}")]
     General(String),
 
+    #[error("log status not found")]
+    MissingLogStatus,
+
+    #[error("log not found")]
+    MissingLog,
+
+    #[error("addresses and topics used to fetch logs are inconsistent")]
+    InconsistentLogs,
+
     #[error("account entry for announcement not found")]
     MissingAccount,
 
@@ -16,7 +25,7 @@ pub enum DbError {
     #[error("ticket aggregation error: {0}")]
     TicketAggregationError(String),
 
-    #[error("ticket validation error for {0:?}")]
+    #[error("ticket validation error for {:?}: {}", 0.0, 0.1)]
     TicketValidationError(Box<(Ticket, String)>),
 
     #[error("logical error: {0}")]

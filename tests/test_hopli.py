@@ -1,45 +1,45 @@
-import random
 import json
 import logging
-import re
 import os
-from subprocess import run, Popen, PIPE, STDOUT, CalledProcessError
+import random
+from pathlib import Path
+from subprocess import CalledProcessError, run
 
 import pytest
 
-from .conftest import (
+from sdk.python.localcluster.constants import (
+    ANVIL_CONFIG_FILE,
+    IDENTITY_PREFIX,
+    CONTRACTS_ADDRESSES,
+    MAIN_DIR,
+    NETWORK,
     PASSWORD,
-    NETWORK1,
-    NETWORK2,
-    ANVIL_CFG_FILE,
-    ANVIL_LOG_FILE,
-    FIXTURES_PREFIX,
-    FIXTURES_DIR,
-    ANVIL_ENDPOINT,
-    DEPLOYMENTS_SUMMARY_FILE,
-    PWD,
-    barebone_nodes,
+    PORT_BASE,
 )
-from .test_integration import (
-    balance_str_to_int,
-)
-from .node import Node
+from sdk.python.localcluster.node import Node
+from sdk.python.localcluster.utils import load_private_key
 
-FIXTURES_PREFIX_NEW = "hopr-smoke-test-new"
+from .conftest import barebone_nodes, run_hopli_cmd
+
+FIXTURES_PREFIX_NEW = "hopr-node-new_"
 PASSWORD_NEW = "e2e-test-new"
 
+ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
 
-def run_hopli_cmd(cmd: list[str], custom_env):
-    env = os.environ | custom_env
-    proc = Popen(cmd, env=env, stdout=PIPE, stderr=STDOUT, bufsize=0)
-    # filter out ansi color codes
-    color_regex = re.compile(r"\x1b\[\d{,3}m")
-    with proc.stdout:
-        for line in iter(proc.stdout.readline, b""):
-            logging.info("[Hopli] %r", color_regex.sub("", line.decode("utf-8")[:-1]))
-    retcode = proc.wait()
-    if retcode:
-        raise CalledProcessError(retcode, cmd)
+
+def remove_identity(folder: Path, filename: str):
+    run(["rm", "-f", folder.joinpath(filename)], check=True, capture_output=True)
+
+
+def run_cast_cmd(cmd: str, params: list[str]):
+    cast_cmd = ["cast", cmd, "-r", ANVIL_ENDPOINT] + params
+    logging.info("Running cast command: %s", " ".join(cast_cmd))
+    try:
+        result = run(cast_cmd, check=True, capture_output=True)
+        return result
+    except CalledProcessError as e:
+        logging.error("Error executing cast command: %s", str(e))
+        raise
 
 
 def faucet(private_key: str, hopr_amount: str, native_amount: str):
@@ -53,11 +53,11 @@ def faucet(private_key: str, hopr_amount: str, native_amount: str):
         "hopli",
         "faucet",
         "--network",
-        NETWORK1,
+        NETWORK,
         "--identity-prefix",
-        FIXTURES_PREFIX,
+        IDENTITY_PREFIX,
         "--identity-directory",
-        FIXTURES_DIR,
+        MAIN_DIR,
         "--contracts-root",
         "./ethereum/contracts",
         "--hopr-amount",
@@ -70,7 +70,7 @@ def faucet(private_key: str, hopr_amount: str, native_amount: str):
     run_hopli_cmd(cmd, custom_env)
 
 
-def manager_deregsiter(private_key: str, node_addr: str):
+def manager_deregister(private_key: str, node_addr: str):
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
@@ -83,7 +83,7 @@ def manager_deregsiter(private_key: str, node_addr: str):
             "network-registry",
             "manager-deregister",
             "--network",
-            NETWORK1,
+            NETWORK,
             "--node-address",
             node_addr,
             "--contracts-root",
@@ -108,7 +108,7 @@ def manager_register(private_key: str, node_addr: str, safe_addr: str):
             "network-registry",
             "manager-register",
             "--network",
-            NETWORK1,
+            NETWORK,
             "--contracts-root",
             "./ethereum/contracts",
             "--node-address",
@@ -135,7 +135,7 @@ def manager_force_sync(private_key: str, safes: str, eligibility: str):
             "network-registry",
             "manager-force-sync",
             "--network",
-            NETWORK1,
+            NETWORK,
             "--safe-address",
             safes,
             "--contracts-root",
@@ -149,7 +149,7 @@ def manager_force_sync(private_key: str, safes: str, eligibility: str):
     )
 
 
-def new_identity():
+def new_identity(extra_prefix: str):
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
@@ -161,9 +161,9 @@ def new_identity():
             "identity",
             "create",
             "--identity-prefix",
-            FIXTURES_PREFIX_NEW,
+            FIXTURES_PREFIX_NEW + extra_prefix,
             "--identity-directory",
-            FIXTURES_DIR,
+            MAIN_DIR.joinpath("test_hopli"),
             "--number",
             "1",
         ],
@@ -171,7 +171,7 @@ def new_identity():
     )
 
 
-def read_identity(pwd: str):
+def read_identity(extra_prefix: str, pwd: str):
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": pwd,
@@ -183,9 +183,9 @@ def read_identity(pwd: str):
             "identity",
             "read",
             "--identity-prefix",
-            FIXTURES_PREFIX_NEW,
+            FIXTURES_PREFIX_NEW + extra_prefix,
             "--identity-directory",
-            FIXTURES_DIR,
+            MAIN_DIR.joinpath("test_hopli"),
         ],
         env=os.environ | custom_env,
         check=True,
@@ -198,7 +198,7 @@ def read_identity(pwd: str):
                 return p.split("]")[0]
 
 
-def update_identity(old_pwd: str, new_pwd: str):
+def update_identity(extra_prefix: str, old_pwd: str, new_pwd: str):
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": old_pwd,
@@ -211,15 +211,15 @@ def update_identity(old_pwd: str, new_pwd: str):
             "identity",
             "update",
             "--identity-prefix",
-            FIXTURES_PREFIX_NEW,
+            FIXTURES_PREFIX_NEW + extra_prefix,
             "--identity-directory",
-            FIXTURES_DIR,
+            MAIN_DIR.joinpath("test_hopli"),
         ],
         custom_env,
     )
 
 
-def create_safe_module(private_key: str, manager_private_key: str):
+def create_safe_module(extra_prefix: str, private_key: str, manager_private_key: str):
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
@@ -233,11 +233,11 @@ def create_safe_module(private_key: str, manager_private_key: str):
             "safe-module",
             "create",
             "--network",
-            NETWORK1,
+            NETWORK,
             "--identity-prefix",
-            FIXTURES_PREFIX_NEW,
+            FIXTURES_PREFIX_NEW + extra_prefix,
             "--identity-directory",
-            FIXTURES_DIR,
+            MAIN_DIR.joinpath("test_hopli"),
             "--contracts-root",
             "./ethereum/contracts",
             "--allowance",
@@ -266,6 +266,8 @@ def create_safe_module(private_key: str, manager_private_key: str):
 
 
 def migrate_safe_module(private_key: str, manager_private_key: str, safe: str, module: str):
+    new_network = "anvil-localhost2"
+
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
@@ -279,11 +281,11 @@ def migrate_safe_module(private_key: str, manager_private_key: str, safe: str, m
             "safe-module",
             "migrate",
             "--network",
-            NETWORK2,
+            new_network,
             "--identity-prefix",
             FIXTURES_PREFIX_NEW,
             "--identity-directory",
-            FIXTURES_DIR,
+            MAIN_DIR.joinpath("test_hopli"),
             "--contracts-root",
             "./ethereum/contracts",
             "--safe-address",
@@ -297,14 +299,55 @@ def migrate_safe_module(private_key: str, manager_private_key: str, safe: str, m
     )
 
 
+def manager_set_win_prob(private_key: str, win_prob: str):
+    custom_env = {
+        "ETHERSCAN_API_KEY": "anykey",
+        "PRIVATE_KEY": private_key,
+        "PATH": os.environ["PATH"],
+    }
+    run_hopli_cmd(
+        [
+            "hopli",
+            "win-prob",
+            "set",
+            "--network",
+            NETWORK,
+            "--winning-probability",
+            win_prob,
+            "--contracts-root",
+            "./ethereum/contracts",
+            "--provider-url",
+            ANVIL_ENDPOINT,
+        ],
+        custom_env,
+    )
+
+
+def get_win_prob():
+    custom_env = {
+        "PATH": os.environ["PATH"],
+    }
+    run_hopli_cmd(
+        [
+            "hopli",
+            "win-prob",
+            "get",
+            "--network",
+            NETWORK,
+            "--contracts-root",
+            "./ethereum/contracts",
+            "--provider-url",
+            ANVIL_ENDPOINT,
+        ],
+        custom_env,
+    )
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 @pytest.mark.xfail(reason="race-conditions lead to incorrect balances on nodes")
 async def test_hopli_should_be_able_to_fund_nodes(peer: str, swarm7: dict[str, Node]):
-    # READ AUTO_GENERATED PRIVATE-KEY FROM ANVIL CONFIGURATION
-    with open(ANVIL_CFG_FILE, "r") as file:
-        data: dict = json.load(file)
-        private_key = data.get("private_keys", [""])[0]
+    private_key = load_private_key(ANVIL_CONFIG_FILE)
 
     balance_before = await swarm7[peer].api.balances()
     logging.debug(f"balance_before of {peer} / {swarm7[peer].address}: {balance_before}")
@@ -317,48 +360,41 @@ async def test_hopli_should_be_able_to_fund_nodes(peer: str, swarm7: dict[str, N
 
     # Check if `hopli faucet` funds node to the desired amount
     # on the native token
-    if balance_str_to_int(balance_before.native) > 10 * 1e18:
-        assert balance_str_to_int(balance_after.native) == balance_str_to_int(balance_before.native)
+    if balance_before.native > 10 * 1e18:
+        assert balance_after.native == balance_before.native
     else:
-        assert balance_str_to_int(balance_after.native) == int(10 * 1e18)
+        assert balance_after.native == int(10 * 1e18)
 
     # on the HOPR token
-    if balance_str_to_int(balance_before.hopr) > 1 * 1e18:
-        assert balance_str_to_int(balance_after.hopr) == balance_str_to_int(balance_before.native)
+    if balance_before.hopr > 1 * 1e18:
+        assert balance_after.hopr == balance_before.native
     else:
-        assert balance_str_to_int(balance_after.hopr) == int(1 * 1e18)
+        assert balance_after.hopr == int(1 * 1e18)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: str, swarm7: dict[str, Node]):
-    # READ AUTO_GENERATED PRIVATE-KEY FROM ANVIL CONFIGURATION
-    with open(ANVIL_CFG_FILE, "r") as file:
-        data: dict = json.load(file)
-        private_key = data.get("private_keys", [""])[0]
+    private_key = load_private_key(ANVIL_CONFIG_FILE)
 
-    with open(DEPLOYMENTS_SUMMARY_FILE, "r") as file:
+    with open(CONTRACTS_ADDRESSES, "r") as file:
         address_data: dict = json.load(file)
-        network_registry_contract = address_data["networks"][NETWORK1]["addresses"]["network_registry"]
+        network_registry_contract = address_data["networks"][NETWORK]["addresses"]["network_registry"]
 
-    res_before = run(
-        ["cast", "call", network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address],
-        check=True,
-        capture_output=True,
+    res_before = run_cast_cmd(
+        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
     )
 
     # check the returned value is address safe
     assert res_before.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
 
     # remove node from the network registry
-    manager_deregsiter(private_key, swarm7[peer].address)
+    manager_deregister(private_key, swarm7[peer].address)
 
     # Check if nodes are removed from the network
-    run(["cast", "code", network_registry_contract], check=True, capture_output=True)
-    res_after_deregster = run(
-        ["cast", "call", network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address],
-        check=True,
-        capture_output=True,
+    run_cast_cmd("code", [network_registry_contract])
+    res_after_deregster = run_cast_cmd(
+        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
     )
 
     # check the returned value is address zero
@@ -371,24 +407,19 @@ async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: st
     manager_register(private_key, swarm7[peer].address, swarm7[peer].safe_address)
 
     # Check if nodes are removed from the network
-    run(["cast", "code", network_registry_contract], check=True, capture_output=True)
-    res_after_regsiter = run(
-        ["cast", "call", network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address],
-        check=True,
-        capture_output=True,
+    run_cast_cmd("code", [network_registry_contract])
+    res_after_register = run_cast_cmd(
+        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
     )
 
     # check the returned value is address safe
-    assert res_after_regsiter.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
+    assert res_after_register.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
 async def test_hopli_should_be_able_to_sync_eligibility_for_all_nodes(peer: str, swarm7: dict[str, Node]):
-    # READ AUTO_GENERATED PRIVATE-KEY FROM ANVIL CONFIGURATION
-    with open(ANVIL_CFG_FILE, "r") as file:
-        data: dict = json.load(file)
-        private_key = data.get("private_keys", [""])[0]
+    private_key = load_private_key(ANVIL_CONFIG_FILE)
 
     # remove all the nodes from the network registry
     manager_force_sync(private_key, swarm7[peer].safe_address, "true")
@@ -396,81 +427,86 @@ async def test_hopli_should_be_able_to_sync_eligibility_for_all_nodes(peer: str,
 
 @pytest.mark.asyncio
 async def test_hopli_create_update_read_identity():
+    extra_prefix = "one"
+
     # create a new identity
-    new_identity()
+    new_identity(extra_prefix)
 
     # read the identity
-    res_first_read = read_identity(PASSWORD)
+    res_first_read = read_identity(extra_prefix, PASSWORD)
 
     # udpate identtiy password
-    update_identity(PASSWORD, PASSWORD_NEW)
+    update_identity(extra_prefix, PASSWORD, PASSWORD_NEW)
 
     # still can read the identity
-    res_second_read = read_identity(PASSWORD_NEW)
+    res_second_read = read_identity(extra_prefix, PASSWORD_NEW)
 
     assert res_first_read == res_second_read
 
     # Remove the created identity
-    run(["rm", "-f", FIXTURES_DIR.joinpath(f"{FIXTURES_PREFIX_NEW}0.id")], check=True, capture_output=True)
+    remove_identity(MAIN_DIR.joinpath("test_hopli"), f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
 
 
 @pytest.mark.asyncio
-async def test_hopli_should_be_able_to_create_safe_module():
-    # STOP OLD LOCAL ANVIL SERVER
-    logging.info("Ensure local anvil server is not running")
-    run(["make", "kill-anvil"], cwd=PWD.parent, check=True)
-
-    # START NEW LOCAL ANVIL SERVER
-    logging.info("Starting and waiting for local anvil server to be up")
-    run(
-        f"./run-local-anvil.sh -l {ANVIL_LOG_FILE} -c {ANVIL_CFG_FILE}".split(),
-        check=True,
-        capture_output=True,
-        cwd=PWD.parent.joinpath("scripts"),
-    )
-    # DEPLOY A DIFFERENT LOCAL NETWORK
-    run(
-        f"make anvil-deploy-contracts network={NETWORK2} environment-type=local".split(),
-        cwd=PWD.parent.joinpath("ethereum/contracts"),
-        check=True,
-    )
-
-    # READ AUTO_GENERATED PRIVATE-KEY FROM ANVIL CONFIGURATION
-    with open(ANVIL_CFG_FILE, "r") as file:
-        data: dict = json.load(file)
-        manager_private_key = data.get("private_keys", [""])[0]
-        private_key = data.get("private_keys", [""])[1]
+async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node]):
+    manager_private_key = load_private_key(ANVIL_CONFIG_FILE)
+    private_key = load_private_key(ANVIL_CONFIG_FILE, 1)
+    extra_prefix = "two"
 
     # READ CONTRACT ADDRESS
-    with open(DEPLOYMENTS_SUMMARY_FILE, "r") as file:
+    with open(CONTRACTS_ADDRESSES, "r") as file:
         address_data: dict = json.load(file)
-        network_registry_contract_1 = address_data["networks"][NETWORK1]["addresses"]["network_registry"]
+        network_registry_contract_1 = address_data["networks"][NETWORK]["addresses"]["network_registry"]
         # network_registry_contract_2 = address_data["networks"][NETWORK2]["addresses"]["network_registry"]
 
     # create identity
-    new_identity()
+    new_identity(extra_prefix)
 
     # read the identity
-    new_node = read_identity(PASSWORD)
+    new_node = read_identity(extra_prefix, PASSWORD)
 
-    # create safe and module for
-    new_safe_module = create_safe_module(private_key, manager_private_key)
-    node_balance = run(["cast", "balance", new_node], check=True, capture_output=True)
-    logging.info(node_balance)
-    safe_code = run(["cast", "code", new_safe_module[0]], check=True, capture_output=True)
-    logging.info(safe_code)
-    module_code = run(["cast", "code", new_safe_module[1]], check=True, capture_output=True)
-    logging.info(module_code)
+    # create safe and module
+    safe_address, module_address = create_safe_module(extra_prefix, private_key, manager_private_key)
+    run_cast_cmd("balance", [new_node])
+    run_cast_cmd("code", [safe_address])
+    run_cast_cmd("code", [module_address])
 
     # Check the node node is registered with the new safe
-    res_check_created_safe_registration = run(
-        ["cast", "call", network_registry_contract_1, "nodeRegisterdToAccount(address)(address)", new_node],
-        check=True,
-        capture_output=True,
+    res_check_created_safe_registration = run_cast_cmd(
+        "call", [network_registry_contract_1, "nodeRegisterdToAccount(address)(address)", new_node]
     )
-    assert (
-        res_check_created_safe_registration.stdout.decode("utf-8").split("\n")[0].lower() == new_safe_module[0].lower()
-    )
+    res_registration = res_check_created_safe_registration.stdout.decode("utf-8").split("\n")[0].lower()
+    assert res_registration == safe_address.lower()
 
     # Remove the created identity
-    run(["rm", "-f", FIXTURES_DIR.joinpath(f"{FIXTURES_PREFIX_NEW}0.id")], check=True, capture_output=True)
+    remove_identity(MAIN_DIR.joinpath("test_hopli"), f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
+
+
+@pytest.mark.asyncio
+async def test_hopli_should_be_able_to_set_and_read_win_prob():
+    # READ CONTRACT ADDRESS
+    with open(CONTRACTS_ADDRESSES, "r") as file:
+        address_data: dict = json.load(file)
+        win_prob_oracle = address_data["networks"][NETWORK]["addresses"]["winning_probability_oracle"]
+
+    # get current win prob
+    get_win_prob()
+    old_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
+    logging.info("old_win_prob %s", old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
+    assert (
+        old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
+        == "0x00000000000000000000000000000000000000000000000000ffffffffffffff"
+    )
+
+    # set new win prob
+    private_key = load_private_key(ANVIL_CONFIG_FILE)
+    manager_set_win_prob(private_key, "0.5")
+
+    # get new win prob
+    get_win_prob()
+    new_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
+    logging.info("new_win_prob %s", new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
+    assert (
+        new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
+        == "0x000000000000000000000000000000000000000000000000007fffffffffffff"
+    )

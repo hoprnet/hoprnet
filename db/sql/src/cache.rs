@@ -12,7 +12,7 @@ use hopr_db_api::info::{IndexerData, SafeInfo};
 
 /// Enumerates all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for long term.
-#[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
+#[derive(Debug, Clone, PartialEq, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(Hash))]
 pub enum CachedValue {
     /// Cached [IndexerData].

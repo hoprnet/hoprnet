@@ -31,7 +31,13 @@ make -j deps && make -j build
 2. **Run the one-line setup script**: Proceed to run the following script.
 
 ```
-./scripts/ -i topologies/full_interconnected_cluster.sh
+./scripts/setup-local-cluster.sh -i topologies/full_interconnected_cluster.sh
+```
+
+If you want to enable authentication via API token on local cluster, run:
+
+```
+HOPRD_DISABLE_API_AUTHENTICATION=0 ./scripts/setup-local-cluster.sh -i topologies/full_interconnected_cluster.sh
 ```
 
 **Important**, make sure to have both `curl` and `jq` installed in your computer before running the script, as both are used.

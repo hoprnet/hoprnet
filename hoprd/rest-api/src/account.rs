@@ -7,11 +7,14 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::sync::Arc;
 
-use hopr_lib::{Address, Balance, BalanceType};
+use hopr_lib::{
+    errors::{HoprLibError, HoprStatusError},
+    Address, Balance, BalanceType, U256,
+};
 
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
         "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
@@ -41,14 +44,14 @@ pub(crate) struct AccountAddressesResponse {
     )]
 pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let addresses = AccountAddressesResponse {
-        native: state.hopr.me_onchain().to_string(),
+        native: state.hopr.me_onchain().to_checksum(),
         hopr: state.hopr.me_peer_id().to_string(),
     };
 
     (StatusCode::OK, Json(addresses)).into_response()
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "hopr": "2000000000000000000000",
         "native": "9999563581204904000",
@@ -118,8 +121,34 @@ pub(super) async fn balances(State(state): State<Arc<InternalState>>) -> impl In
     (StatusCode::OK, Json(account_balances)).into_response()
 }
 
+fn deserialize_u256_value_from_str<'de, D>(deserializer: D) -> Result<U256, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let s: &str = serde::de::Deserialize::deserialize(deserializer)?;
+    let v: u128 = s.parse().map_err(serde::de::Error::custom)?;
+    Ok(U256::from(v))
+}
+
+// #[deprecated(
+//     since = "3.2.0",
+//     note = "The `BalanceType` enum deserialization using all capitals is deprecated and will be removed in hoprd v3.0 REST API"
+// )]
+fn deserialize_balance_type<'de, D>(deserializer: D) -> Result<BalanceType, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let buf = <String as serde::Deserialize>::deserialize(deserializer)?;
+
+    match buf.as_str() {
+        "Native" | "NATIVE" => Ok(BalanceType::Native),
+        "HOPR" => Ok(BalanceType::HOPR),
+        _ => Err(serde::de::Error::custom("Unsupported balance type")),
+    }
+}
+
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
 #[schema(example = json!({
         "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
         "amount": "20000",
@@ -127,18 +156,19 @@ pub(super) async fn balances(State(state): State<Arc<InternalState>>) -> impl In
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WithdrawBodyRequest {
-    #[serde_as(as = "DisplayFromStr")]
+    // #[serde_as(as = "DisplayFromStr")]
+    #[serde(deserialize_with = "deserialize_balance_type")]
     #[schema(value_type = String)]
     currency: BalanceType,
-    #[serde_as(as = "DisplayFromStr")]
+    #[serde(deserialize_with = "deserialize_u256_value_from_str")]
     #[schema(value_type = String)]
-    amount: String,
+    amount: U256,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     address: Address,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Default, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "receipt": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     }))]
@@ -149,7 +179,7 @@ pub(crate) struct WithdrawResponse {
 
 /// Withdraw funds from this node to the ethereum wallet address.
 ///
-/// Both NATIVE or HOPR can be withdrawn using this method.
+/// Both Native or HOPR can be withdrawn using this method.
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/account/withdraw"),
@@ -159,6 +189,7 @@ pub(crate) struct WithdrawResponse {
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = WithdrawResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -173,10 +204,7 @@ pub(super) async fn withdraw(
 ) -> impl IntoResponse {
     match state
         .hopr
-        .withdraw(
-            req_data.address,
-            Balance::new_from_str(&req_data.amount, req_data.currency),
-        )
+        .withdraw(req_data.address, Balance::new(req_data.amount, req_data.currency))
         .await
     {
         Ok(receipt) => (
@@ -186,6 +214,39 @@ pub(super) async fn withdraw(
             }),
         )
             .into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
+
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use hopr_lib::Address;
+
+    use crate::account::WithdrawBodyRequest;
+
+    #[test]
+    fn withdraw_input_data_should_be_convertible_from_string() -> anyhow::Result<()> {
+        let expected = WithdrawBodyRequest {
+            currency: "HOPR".parse().unwrap(),
+            amount: 20000.into(),
+            address: Address::from_str("0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")?,
+        };
+
+        let actual: WithdrawBodyRequest = serde_json::from_str(
+            r#"{
+            "currency": "HOPR",
+            "amount": "20000",
+            "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe"}"#,
+        )?;
+
+        assert_eq!(actual, expected);
+
+        Ok(())
     }
 }

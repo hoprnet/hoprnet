@@ -6,13 +6,14 @@ set -Eeuo pipefail
 usage() {
   echo ""
   echo "Usage: $0 <release_name>"
-  echo ""
-  echo "$0 saint-louis"
   echo
 }
 
 # return early with help info when requested
-{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && {
+  usage
+  exit 0
+}
 
 # set mydir
 declare mydir
@@ -36,13 +37,13 @@ if [ -z "$(git status --porcelain)" ]; then
   git checkout master
   git pull
   git checkout -b "merge-back-release-${release_name}"
-  git merge "release/${release_name}" > /tmp/merge.log || true
+  git merge "release/${release_name}" >/tmp/merge.log || true
   cat /tmp/merge.log
 
   git commit -am "Merge branch 'master' into merge-back-release-${release_name}"
   git push --set-upstream origin "merge-back-release-${release_name}"
   echo "[INFO] Created remote branch merge-back-release-${release_name}"
-  today=`date +%Y-%m-%d`
+  today=$(date +%Y-%m-%d)
   echo "Creating github pull request using github cli"
   gh pr create --title "Merge back from ${release_name} - ${today}" --base master --label merge-back --reviewer hoprnet/hopr-development --body "The scope of this PR is to merge back to \`master\` all the changes from the release branch \`release/${release_name}\`"
 else

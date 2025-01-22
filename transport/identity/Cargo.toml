@@ -1,0 +1,21 @@
+[package]
+name = "hopr-transport-identity"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+description = "Identity related operations for the HOPR transport"
+edition = "2021"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+
+[dependencies]
+libp2p-identity = { workspace = true }
+multiaddr = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }

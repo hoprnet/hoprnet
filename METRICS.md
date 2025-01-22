@@ -2,7 +2,7 @@
 
 This file is documenting and tracking all the metrics which can be collected
 by a Prometheus server. The metrics can be scraped by Prometheus from
-the `api/v2/node/metrics` API endpoint.
+the `api/v4/node/metrics` API endpoint.
 
 ## Example Prometheus configuration
 
@@ -24,6 +24,7 @@ scrape_configs:
 
 - `hopr_packets_count`: Number of processed packets of different types (sent, received, forwarded), keys: `type`
 - `hopr_packets_per_peer_count`: Number of processed packets to/from distinct peers, keys: `peer`, `direction`
+- `hopr_replayed_packet_count`: The total count of replayed packets during the packet processing pipeline run
 - `hopr_rejected_tickets_count`: Number of rejected tickets
 - `hopr_mixer_queue_size`: Current mixer queue size
 - `hopr_mixer_average_packet_delay`: Average mixer packet delay averaged over a packet window
@@ -54,7 +55,6 @@ scrape_configs:
 - `hopr_transport_p2p_opened_connection_count`: Count of the currently active p2p connections as observed from the rust-libp2p events
 - `hopr_http_api_call_count`: Number of different REST API calls and their statuses, keys: `endpoint`, `method`, `status`
 - `hopr_http_api_call_timing_sec`: Timing of different REST API calls in seconds, keys: `endpoint`, `method`, buckets: 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0
-- `hopr_message_latency_sec`: Histogram of measured received message latencies in seconds, buckets: 0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0
 - `hopr_up`: The unix timestamp in seconds at which the process was started
 - `hopr_lib_version`: Executed version of hopr-lib, keys: `version`
 - `hopr_node_addresses`: Node on-chain and off-chain addresses, keys: `peerid`, `address`, `safe_address`, `module_address`
@@ -67,3 +67,16 @@ scrape_configs:
 - `hopr_indexer_checksum`: Contains an unsigned integer that represents the low 32-bits of the Indexer checksum.
 - `hopr_chain_actions_count`: Number of different chain actions and their results, keys: `action`, `result`
 - `hopr_indexer_contract_log_counters`: Counts of different HOPR contract logs processed by the Indexer, keys: `contract`
+- `hopr_tickets_incoming_statistics`: Ticket statistics for channels with incoming tickets, keys: `channel`, `statistic`
+- `hopr_session_num_active_session`: Number of currently active HOPR sessions
+- `hopr_session_received_error_counts`: Number of HOPR session errors received from an Exit node, keys: `kind`
+- `hopr_session_sent_error_counts`: Number of HOPR session errors sent to an Entry node, keys: `kind`
+- `hopr_session_established_sessions`: Number of sessions that were successfully established as an Exit node
+- `hopr_session_initiated_sessions`: Number of sessions that were successfully initiated as an Entry node
+- `hopr_session_hoprd_clients`: Number of clients connected at this Entry node, keys: `type`
+- `hopr_session_hoprd_target_connections`: Number of currently active HOPR session target connections from this Exit node, keys: `type`
+- `hopr_tickets_incoming_win_probability`: Observes the winning probabilities on incoming tickets, buckets: 0.0, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15, 0.25, 0.3, 0.5
+- `hopr_session_time_to_ack`: Time in seconds until a complete frame gets acknowledged by the recipient, buckets: 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0
+- `hopr_udp_ingress_packet_len`: UDP packet lengths on ingress per counterparty, keys: `counterparty`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
+- `hopr_udp_egress_packet_len`: UDP packet lengths on egress per counterparty, keys: `counterparty`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
+- `hopr_session_inner_sizes`: Sizes of data chunks fed from inner session to HOPR protocol, keys: `session_id`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0

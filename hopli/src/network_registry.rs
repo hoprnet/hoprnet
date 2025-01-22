@@ -1,4 +1,4 @@
-//! This module contains arguments and functions to interact with the Network Registry contract for a previledged account.
+//! This module contains arguments and functions to interact with the Network Registry contract for a privileged account.
 //! To participate in the HOPR network, a node must be included in the network registry contract.
 //! Nodes and the staking account (Safe) that manages them should be registered as a pair in the Network registry contrat.
 //! Nodes and safes can be registered by either a manager or by the staking account itself.
@@ -14,7 +14,7 @@
 //! Some sample commands:
 //! - Manager registers nodes:
 //! ```text
-//! hopli -- network-registry manager-register \
+//! hopli network-registry manager-register \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts" \
 //!     --identity-directory "./test" --password-path "./test/pwd" \
@@ -26,7 +26,7 @@
 //!
 //! - Manager deregisters nodes:
 //! ```text
-//! hopli -- network-registry manager-deregister \
+//! hopli network-registry manager-deregister \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts" \
 //!     --node-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
@@ -36,7 +36,7 @@
 //!
 //! - Manager syncs the eligibility of safes
 //! ```text
-//! hopli -- network-registry manager-force-sync \
+//! hopli network-registry manager-force-sync \
 //!     --network anvil-localhost \
 //!     --contracts-root "../ethereum/contracts" \
 //!     --safe-address 0x9e820e68f8c024779ebcb6cd2edda1885e1dbe1f,0xb3724772badf4d8fffa186a5ca0bea87693a6c2a \
@@ -167,10 +167,24 @@ impl NetworkRegistrySubcommands {
         // read all the node addresses
         let mut node_eth_addresses: Vec<H160> = Vec::new();
         if let Some(addresses) = node_address {
-            node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+            node_eth_addresses.extend(
+                addresses
+                    .split(',')
+                    .map(|addr| {
+                        H160::from_str(addr)
+                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
+        node_eth_addresses.extend(
+            local_identity
+                .to_addresses()
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .into_iter()
+                .map(H160::from),
+        );
 
         // read all the safe addresses
         let mut safe_eth_addresses: Vec<H160> = Vec::new();
@@ -178,7 +192,7 @@ impl NetworkRegistrySubcommands {
             safe_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
         }
 
-        // read private key. The provided env
+        // Read the private key from arguments or the "MANAGER_PRIVATE_KEY" environment variable
         let signer_private_key = private_key.read("MANAGER_PRIVATE_KEY")?;
 
         // get RPC provider for the given network and environment
@@ -216,10 +230,24 @@ impl NetworkRegistrySubcommands {
         // read all the node addresses
         let mut node_eth_addresses: Vec<H160> = Vec::new();
         if let Some(addresses) = node_address {
-            node_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+            node_eth_addresses.extend(
+                addresses
+                    .split(',')
+                    .map(|addr| {
+                        H160::from_str(addr)
+                            .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
         }
         // if local identity dirs/path is provided, read addresses from identity files
-        node_eth_addresses.extend(local_identity.to_addresses().unwrap().into_iter().map(H160::from));
+        node_eth_addresses.extend(
+            local_identity
+                .to_addresses()
+                .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
+                .into_iter()
+                .map(H160::from),
+        );
         info!(
             "Will deregister {:?} nodes from the network registry",
             node_eth_addresses.len()

@@ -82,8 +82,8 @@ stress-test-local-swarm: ## run stress tests on a local node swarm
 	source .venv/bin/activate && \
 		python3 -m pytest tests/test_stress.py \
 		--stress-request-count=3000 \
-		--stress-sources='[{"url": "localhost:19091", "token": "e2e-API-token^^"}]' \
-		--stress-target='{"url": "localhost:19093", "token": "e2e-API-token^^"}'
+		--stress-sources='[{"url": "localhost:3011", "token": "e2e-API-token^^"}]' \
+		--stress-target='{"url": "localhost:3031", "token": "e2e-API-token^^"}'
 
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
@@ -99,9 +99,14 @@ run-anvil-foreground: ## spinup a local anvil instance
 	./scripts/run-local-anvil.sh -f -s
 
 .PHONY: kill-anvil
+kill-anvil: port=8545
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	# may fail, we can ignore that
-	lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
+	lsof -i :$(port) -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
+
+.PHONY: localcluster
+localcluster: ## spin up the localcluster using the default configuration file
+	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected
 
 .PHONY: create-local-identity
 create-local-identity: id_dir=/tmp/
@@ -358,11 +363,11 @@ run-docker-dev: ## start a local development Docker container
 		develop
 
 .PHONY: run-hopr-admin
-run-hopr-admin: version=07aec21b
+run-hopr-admin: version=latest
 run-hopr-admin: port=3000
 run-hopr-admin: ## launches HOPR Admin in a Docker container, supports port= and version=, use http://host.docker.internal to access the host machine
-	docker run -p $(port):3000 --add-host=host.docker.internal:host-gateway \
-		gcr.io/hoprassociation/hopr-admin:$(version)
+	docker run -p $(port):80 --name hopr-admin --platform linux/amd64 \
+		europe-west3-docker.pkg.dev/hoprassociation/docker-images/hopr-admin:$(version)
 
 .PHONY: exec-script
 exec-script: ## execute given script= with the correct PATH set
@@ -374,7 +379,12 @@ endif
 .PHONY: generate-python-sdk
 generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the official swagger-codegen-cli as it does not offer a multiplatform image
 generate-python-sdk:
+ifeq (, $(shell which hoprd-api-schema))
 	$(cargo) run --bin hoprd-api-schema >| /tmp/openapi.spec.json
+else
+	hoprd-api-schema >| /tmp/openapi.spec.json
+endif
+
 	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(shell ./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
 
 	mkdir -p ./hoprd-sdk-python/
@@ -387,7 +397,7 @@ generate-python-sdk:
 		-c /tmp/python-sdk-config.json
 
 	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
-
+	
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

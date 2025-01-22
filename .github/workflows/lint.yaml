@@ -17,7 +17,7 @@ on:
       - ready_for_review
 
 concurrency:
-  group: ${{ github.head_ref }}-lint
+  group: ${{ github.ref }}-lint
   cancel-in-progress: true
 
 jobs:
@@ -32,7 +32,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == true
-        uses: cachix/install-nix-action@v27
+        uses: cachix/install-nix-action@v29
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 

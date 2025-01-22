@@ -1,28 +1,64 @@
-//! This Rust crate contains implementation common random number generation functions.
+//! This Rust crate contains implementation of common random number generation functions.
 //! All functions and types from this crate supply cryptographically secure random numbers.
 //!
 //! Instead of relying on external crates, all HOPR crates in this monorepo should
 //! exclusively rely on randomness functions only from this crate.
-//! Besides that, the `OsRng` type exported from this crate can be used, if a type implementing
-//! random traits is needed.
+//! Besides that, the `OsRng` type exported from this crate can be used if a type implementing
+//! random traits is necessary.
 
 use generic_array::{ArrayLength, GenericArray};
+use rand::CryptoRng;
 
-pub use rand::rngs::OsRng;
 pub use rand::{Rng, RngCore};
 
 /// Maximum random integer that can be generated.
 /// This is the last positive 64-bit value in the two's complement representation.
 pub const MAX_RANDOM_INTEGER: u64 = 9007199254740991;
 
+/// Gets the default cryptographically secure random number generator.
+///
+/// **WARNING** On debug builds with the ` fixed_rng ` feature enabled during
+/// compilation, this function will return an RNG with a fixed seed, which is *NOT SECURE*!
+/// This is reserved for deterministic testing.
+#[cfg(all(debug_assertions, feature = "fixed_rng"))]
+#[inline]
+pub fn rng() -> impl RngCore + CryptoRng {
+    use rand::SeedableRng;
+    rand::rngs::StdRng::from_seed([
+        0x5f, 0x57, 0xce, 0x2a, 0x84, 0x14, 0x7e, 0x88, 0x43, 0x56, 0x44, 0x56, 0x7f, 0x90, 0x4f, 0xb2, 0x04, 0x6b,
+        0x18, 0x42, 0x75, 0x69, 0xbe, 0x53, 0xb2, 0x29, 0x78, 0xbd, 0xf3, 0x0a, 0xda, 0xba,
+    ])
+}
+
+/// Gets the default cryptographically secure random number generator.
+#[cfg(any(not(debug_assertions), not(feature = "fixed_rng")))]
+#[inline]
+pub fn rng() -> impl RngCore + CryptoRng {
+    rand::rngs::OsRng
+}
+
+/// Returns `true` if the build is using an **insecure** RNG with a fixed seed.
+///
+/// See also [`rng`].
+#[inline]
+pub const fn is_rng_fixed() -> bool {
+    cfg!(debug_assertions) && cfg!(feature = "fixed_rng")
+}
+
 /// Generates a random float uniformly distributed between 0 (inclusive) and 1 (exclusive).
 #[inline]
 pub fn random_float() -> f64 {
-    OsRng.gen()
+    rng().gen()
 }
 
-/// Generates random unsigned integer which is at least `start` and optionally strictly less than `end`.
-/// If `end` is not given, `MAX_RANDOM_INTEGER` value is used.
+/// Generates a random float uniformly distributed in the given range.
+#[inline]
+pub fn random_float_in_range(range: std::ops::Range<f64>) -> f64 {
+    rng().gen_range(range)
+}
+
+/// Generates a random unsigned integer which is at least `start` and optionally strictly less than `end`.
+/// If `end` is not given, the ` MAX_RANDOM_INTEGER ` value is used.
 /// The caller must make sure that 0 <= `start` < `end` <= `MAX_RANDOM_INTEGER`, otherwise the function will panic.
 pub fn random_integer(start: u64, end: Option<u64>) -> u64 {
     let real_end = end.unwrap_or(MAX_RANDOM_INTEGER);
@@ -33,16 +69,16 @@ pub fn random_integer(start: u64, end: Option<u64>) -> u64 {
     );
 
     let bound = real_end - start;
-    start + OsRng.gen_range(0..bound)
+    start + rng().gen_range(0..bound)
 }
 
 /// Fills the specific number of bytes starting from the given offset in the given buffer.
 #[inline]
 pub fn random_fill(buffer: &mut [u8]) {
-    OsRng.fill_bytes(buffer);
+    rng().fill_bytes(buffer);
 }
 
-/// Allocates array of the given size and fills it with random bytes
+/// Allocates an array of the given size and fills it with random bytes
 pub fn random_bytes<const T: usize>() -> [u8; T] {
     let mut ret = [0u8; T];
     random_fill(&mut ret);
@@ -77,7 +113,7 @@ mod tests {
     #[test]
     fn test_random_fill() {
         let mut buffer = [0u8; 10];
-        // 7 bytes with indices 2,3,4,5,6,7,8 will be filled with random bytes, other stay zero
+        // 7 bytes with indices 2,3,4,5,6,7,8 will be filled with random bytes, the other stay zero
         random_fill(&mut buffer[2..9]);
         assert_eq!(0, buffer[0]);
         assert_eq!(0, buffer[1]);

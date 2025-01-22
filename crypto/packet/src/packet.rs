@@ -21,12 +21,6 @@ use crate::{
     por::POR_SECRET_LENGTH,
 };
 
-/// Currently used ciphersuite for Sphinx
-pub type CurrentSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
-
-/// Length of the packet including header and the payload
-pub const PACKET_LENGTH: usize = packet_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-
 /// Tag used to separate padding from data
 const PADDING_TAG: &[u8] = b"HOPR";
 
@@ -40,21 +34,30 @@ pub const fn packet_length<S: SphinxSuite>(
         + header_length::<S>(max_hops, additional_data_relayer_len, additional_data_last_hop_len)
         + SimpleMac::SIZE
         + PAYLOAD_SIZE
+        + PADDING_TAG.len()
 }
 
+// TODO: Make padding length prefixed in 3.0
+
 fn add_padding(msg: &[u8]) -> Box<[u8]> {
-    assert!(
-        msg.len() <= PAYLOAD_SIZE - PADDING_TAG.len(),
-        "message too long for padding"
-    );
-    let mut ret = vec![0u8; PAYLOAD_SIZE];
-    ret[PAYLOAD_SIZE - msg.len()..PAYLOAD_SIZE].copy_from_slice(msg);
-    ret[PAYLOAD_SIZE - msg.len() - PADDING_TAG.len()..PAYLOAD_SIZE - msg.len()].copy_from_slice(PADDING_TAG);
+    assert!(msg.len() <= PAYLOAD_SIZE, "message too long for padding");
+
+    let padded_len = PAYLOAD_SIZE + PADDING_TAG.len();
+    let mut ret = vec![0u8; padded_len];
+    ret[padded_len - msg.len()..padded_len].copy_from_slice(msg);
+
+    // Zeroes and the PADDING_TAG are prepended to the message to form padding
+    ret[padded_len - msg.len() - PADDING_TAG.len()..padded_len - msg.len()].copy_from_slice(PADDING_TAG);
     ret.into_boxed_slice()
 }
 
 fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
-    assert_eq!(PAYLOAD_SIZE, msg.len(), "padded message must be PAYLOAD_SIZE long");
+    assert_eq!(
+        PAYLOAD_SIZE + PADDING_TAG.len(),
+        msg.len(),
+        "padded message must be {} bytes long",
+        PAYLOAD_SIZE + PADDING_TAG.len()
+    );
     let pos = msg
         .windows(PADDING_TAG.len())
         .position(|window| window == PADDING_TAG)?;
@@ -129,15 +132,18 @@ pub enum ForwardedMetaPacket<S: SphinxSuite> {
 }
 
 impl<S: SphinxSuite> MetaPacket<S> {
-    /// Fixed length of the Sphinx packet header.
+    /// The fixed length of the Sphinx packet header.
     pub const HEADER_LEN: usize = header_length::<S>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
 
-    /// Creates a new outgoing packet with given payload `msg`, `path` and `shared_keys` computed along the path.
+    /// The fixed length of the padded packet.
+    pub const PACKET_LEN: usize = packet_length::<S>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+
+    /// Creates a new outgoing packet with the given payload `msg`, `path` and `shared_keys` computed along the path.
     ///
-    /// Size of the `msg` must be less or equal [PAYLOAD_SIZE], otherwise the
+    /// The size of the `msg` must be less or equal [PAYLOAD_SIZE], otherwise the
     /// constructor will panic. The caller **must** ensure the size is correct beforehand.
-    /// The `additional_data_relayer` contain the PoR challenges for the individual relayers along the path,
-    /// each of the challenges have the same size of `additional_relayer_data_len`.
+    /// The `additional_data_relayer` contains the PoR challenges for the individual relayers along the path,
+    /// each of the challenges has the same size of `additional_relayer_data_len`.
     ///
     /// Optionally, there could be some additional data (`additional_data_last_hop`) for the packet destination.
     /// This is reserved for the future use by SURBs.
@@ -182,7 +188,11 @@ impl<S: SphinxSuite> MetaPacket<S> {
             !routing_info.routing_information.is_empty(),
             "routing info must not be empty"
         );
-        assert_eq!(PAYLOAD_SIZE, payload.len(), "payload has incorrect length");
+        assert_eq!(
+            PAYLOAD_SIZE + PADDING_TAG.len(),
+            payload.len(),
+            "payload has incorrect length"
+        );
 
         let mut packet = Vec::with_capacity(Self::SIZE);
         packet.extend_from_slice(&alpha);
@@ -217,7 +227,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
     /// Returns the payload subslice from the packet data.
     fn payload(&self) -> &[u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE;
-        &self.packet[base..base + PAYLOAD_SIZE]
+        &self.packet[base..base + PAYLOAD_SIZE + PADDING_TAG.len()]
     }
 
     /// Attempts to remove the layer of encryption of this packet by using the given `node_keypair`.
@@ -302,14 +312,17 @@ impl<S: SphinxSuite> TryFrom<&[u8]> for MetaPacket<S> {
                 _s: PhantomData,
             })
         } else {
-            Err(GeneralError::ParseError)
+            Err(GeneralError::ParseError("MetaPacket".into()))
         }
     }
 }
 
 impl<S: SphinxSuite> BytesRepresentable for MetaPacket<S> {
-    const SIZE: usize =
-        <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE + PAYLOAD_SIZE;
+    const SIZE: usize = <S::G as GroupElement<S::E>>::AlphaLen::USIZE
+        + Self::HEADER_LEN
+        + SimpleMac::SIZE
+        + PAYLOAD_SIZE
+        + PADDING_TAG.len();
 }
 
 #[cfg(test)]
@@ -339,10 +352,10 @@ mod tests {
         assert_eq!(data, &unpadded.unwrap());
     }
 
-    fn generic_test_meta_packet<S: SphinxSuite>(keypairs: Vec<S::P>) {
+    fn generic_test_meta_packet<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<()> {
         let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
 
-        let shared_keys = S::new_shared_keys(&pubkeys).unwrap();
+        let shared_keys = S::new_shared_keys(&pubkeys)?;
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
 
         assert_eq!(shared_keys.secrets.len() - 1, por_strings.len());
@@ -358,6 +371,8 @@ mod tests {
             &por_strings.iter().map(|v| v.as_ref()).collect::<Vec<_>>(),
             None,
         );
+
+        assert!(mp.as_ref().len() < 1492, "metapacket too long {}", mp.as_ref().len());
 
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp
@@ -381,20 +396,22 @@ mod tests {
                 }
             }
         }
+
+        Ok(())
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
-    fn test_x25519_meta_packet(amount: usize) {
+    fn test_x25519_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_test_meta_packet::<X25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
-    fn test_ed25519_meta_packet(amount: usize) {
-        generic_test_meta_packet::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect());
+    fn test_ed25519_meta_packet(amount: usize) -> anyhow::Result<()> {
+        generic_test_meta_packet::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
     }
 
     #[parameterized(amount = { 4, 3, 2 })]
-    fn test_secp256k1_meta_packet(amount: usize) {
+    fn test_secp256k1_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_test_meta_packet::<Secp256k1Suite>((0..amount).map(|_| ChainKeypair::random()).collect())
     }
 }

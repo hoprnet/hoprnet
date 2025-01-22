@@ -92,7 +92,7 @@ impl AccountEntry {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use crate::account::{
         AccountEntry,
         AccountType::{Announced, NotAnnounced},
@@ -106,56 +106,59 @@ mod test {
     const CHAIN_ADDR: [u8; 20] = hex!("2cDD13ddB0346E0F620C8E5826Da5d7230341c6E");
 
     #[test]
-    fn test_account_entry_non_routable() {
-        let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::try_from(CHAIN_ADDR.as_ref()).unwrap();
+    fn test_account_entry_non_routable() -> anyhow::Result<()> {
+        let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY)?;
+        let chain_addr = Address::try_from(CHAIN_ADDR.as_ref())?;
 
         let ae1 = AccountEntry::new(
             pub_key,
             chain_addr,
             Announced {
-                multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
-                    .parse::<Multiaddr>()
-                    .unwrap(),
+                multiaddr: "/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk".parse::<Multiaddr>()?,
                 updated_block: 1,
             },
         );
 
         assert!(ae1.has_announced());
-        assert_eq!(1, ae1.updated_at().unwrap());
+        assert_eq!(1, ae1.updated_at().expect("should be present"));
         assert!(!ae1.contains_routing_info());
+
+        Ok(())
     }
 
     #[test]
-    fn test_account_entry_routable() {
-        let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::try_from(CHAIN_ADDR.as_ref()).unwrap();
+    fn test_account_entry_routable() -> anyhow::Result<()> {
+        let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY)?;
+        let chain_addr = Address::try_from(CHAIN_ADDR.as_ref())?;
 
         let ae1 = AccountEntry::new(
             pub_key,
             chain_addr,
             Announced {
                 multiaddr: "/ip4/34.65.237.196/tcp/9091/p2p/16Uiu2HAm3rUQdpCz53tK1MVUUq9NdMAU6mFgtcXrf71Ltw6AStzk"
-                    .parse::<Multiaddr>()
-                    .unwrap(),
+                    .parse::<Multiaddr>()?,
                 updated_block: 1,
             },
         );
 
         assert!(ae1.has_announced());
-        assert_eq!(1, ae1.updated_at().unwrap());
+        assert_eq!(1, ae1.updated_at().expect("should be present"));
         assert!(ae1.contains_routing_info());
+
+        Ok(())
     }
 
     #[test]
-    fn test_account_entry_not_announced() {
-        let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY).unwrap();
-        let chain_addr = Address::try_from(CHAIN_ADDR.as_ref()).unwrap();
+    fn test_account_entry_not_announced() -> anyhow::Result<()> {
+        let pub_key = OffchainPublicKey::from_privkey(&PRIVATE_KEY)?;
+        let chain_addr = Address::try_from(CHAIN_ADDR.as_ref())?;
 
         let ae1 = AccountEntry::new(pub_key, chain_addr, NotAnnounced);
 
         assert!(!ae1.has_announced());
         assert!(ae1.updated_at().is_none());
         assert!(!ae1.contains_routing_info());
+
+        Ok(())
     }
 }

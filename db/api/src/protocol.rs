@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use std::result::Result;
+use std::{fmt::Debug, result::Result};
 
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -24,6 +24,7 @@ pub trait HoprDbProtocolOperations {
         data: Box<[u8]>,
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
+        outgoing_ticket_win_prob: f64,
     ) -> Result<TransportPacketWithChainData, DbError>;
 
     /// Process the incoming packet into data
@@ -34,15 +35,25 @@ pub trait HoprDbProtocolOperations {
         me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
+        outgoing_ticket_win_prob: f64,
     ) -> crate::errors::Result<TransportPacketWithChainData>;
 }
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
-#[derive(Debug)]
 pub enum AckResult {
     Sender(HalfKeyChallenge),
     RelayerWinning(AcknowledgedTicket),
     RelayerLosing,
+}
+
+impl Debug for AckResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Sender(_) => f.debug_tuple("Sender").finish(),
+            Self::RelayerWinning(_) => f.debug_tuple("RelayerWinning").finish(),
+            Self::RelayerLosing => write!(f, "RelayerLosing"),
+        }
+    }
 }
 
 pub enum TransportPacketWithChainData {

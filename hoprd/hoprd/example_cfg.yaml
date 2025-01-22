@@ -45,6 +45,15 @@ hopr:
     # If set, will overwrite and re-initialize any existing database
     # in the given directory.
     force_initialize: false
+  # Global configuration of Session management
+  # session:
+  # How many seconds it takes before Session is considered idle and is closed automatically
+  # idle_timeout: 120
+  # How many retries are made to establish an outgoing Session
+  # establish_max_retries: 3
+  # How many seconds to wait between retries to establish an outgoing Session
+  # Random jitter is always added to this value for each retry.
+  # establish_retry_timeout: 2
   # Configuration of node's Safe
   safe_module:
     # Node's safe transaction provider
@@ -61,6 +70,8 @@ hopr:
     on_fail_continue: true
     # Allows nesting strategy chains via !MultiStrategy
     allow_recursive: false
+    # Sets the interval between strategy executions in seconds.
+    execution_interval: 60
     # Contains the actual chain of strategies to execute in the given order.
     # If left empty, the node will behave as if only `!Passive` strategy
     # was given.
@@ -97,10 +108,6 @@ hopr:
         #
         # If set, the strategy will redeem only aggregated tickets.
         redeem_only_aggregated: true
-        # The strategy will automatically redeem if there's a single ticket left when a channel
-        # transitions to `PendingToClose` and it has at least this value of HOPR.
-        # This happens regardless of the `redeem_only_aggregated` setting.
-        on_close_redeem_single_tickets_value_min: "90000000000000000 HOPR"
         #
         ############################################
         #
@@ -169,6 +176,8 @@ hopr:
   # Configuration of the heartbeat mechanism for probing
   # other nodes in the HOPR network.
   heartbeat:
+    # The maximum number of concurrent heartbeat probes
+    max_parallel_probes: 25
     # Interval in which the heartbeat is triggered in seconds
     interval: 60
     # The time interval for which to consider peer heartbeat renewal in seconds
@@ -184,15 +193,15 @@ hopr:
     # Maximum delay in seconds
     max_delay: 300
     # Quality threshold since a node is considered having "bad" connectivity
-    quality_bad_threshold: 0.2
+    quality_bad_threshold: 0.1
     # Quality threshold from which a node is considered available enough to be used
-    quality_offline_threshold: 0.5
+    quality_offline_threshold: 0.0
     # Quality step on failed/successful ping probe
     quality_step: 0.1
     # Size of the quality moving average window.
     quality_avg_window_size: 25
     # Indicates how long (in seconds) a node is considered "ignored"
-    ignore_timeframe: 600
+    ignore_timeframe: 120
     # Backoff exponent when probing nodes
     backoff_exponent: 1.5
     # Minimum backoff (in seconds) when probing nodes
@@ -209,19 +218,14 @@ hopr:
     prefer_local_addresses: false
   # Configuration of various HOPR sub-protocols.
   protocol:
-    # Message acknowledgement sub-protocol configuration.
-    ack:
-      # Timeout in seconds
-      timeout: 15
+    # Outgoing ticket winning probability.
+    # Should not be lower than the minimum ticket winning probability set on-chain
+    # outgoing_ticket_winning_prob: 1.0
     # Heartbeat sub-protocol configuration
     heartbeat:
       # Timeout in seconds
-      timeout: 15
+      timeout: 6
     # Message sub-protocol configuration
-    msg:
-      # Timeout in seconds
-      timeout: 15
-    # Ticket aggregation sub-protocol configuration
     ticket_aggregation:
       # Timeout in seconds
       timeout: 15
@@ -252,6 +256,7 @@ hopr:
             module_implementation: 0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0
             node_safe_registry: 0x0dcd1bf9a1b36ce34237eeafef220932846bcd82
             ticket_price_oracle: 0x7a2088a1bfc9d81c55368ae168c2c02570cb814f
+            winning_probability_oracle: 0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1
             announcements: 0x09635f643e140090a9a8dcd712ed6285858cebef
             node_stake_v2_factory: 0xb7f8bc63bbcad18155201308c8f3540b07f84f5e
           confirmations: 2
@@ -276,6 +281,18 @@ hopr:
     # when validating acknowledged tickets.
     # Strongly recommended to leave this enabled.
     check_unrealized_balance: true
+    # Configures whether the node will keep RPC logs after they were processed.
+    # By default (enabled), the node will clean such logs. If enabled, the node
+    # will keep logs which will require more disk space, however, it will allow
+    # the node to reconcile the state of the chain with the state of the node
+    # in future versions.
+    keep_logs: true
+    # Configures whether to use fast synchronization during node startup.
+    # When enabled, the node will process existing logs faster (approximately
+    # 10 minutes on Dufour network) but may consume more resources during
+    # the sync process. Recommended for initial setup or when recovering
+    # from a clean state.
+    fast_sync: true
 # HOPRd Message Inbox configuration
 inbox:
   # Capacity of messages in the Inbox, per message tag.
@@ -285,3 +302,24 @@ inbox:
   max_age: 900
   # Tags which are not allowed into the Inbox
   excluded_tags: [0]
+# Session Entry/Exit IP forwarding configuration for this node
+# This applies whenever the node is an Exit node of a Session.
+# session_ip_forwarding:
+#
+# List of IP address and port tuples (written as e.g.: "127.0.0.1:8080") which are allowed
+# to be targets of incoming Sessions.
+# If the value is not set, all targets are allowed (default).
+# For targets specifying a DNS name, the DNS resolution is performed first before the list is matched.
+# Production configuration should always use this allowlist, e.g.: target_allow_list: ["127.0.0.1:8080"]
+# target_allow_list:
+#
+# If the target is on TCP protocol, the Exit node can try to reach it this number of times.
+# max_tcp_target_retries: 10
+#
+# If a target on TCP protocol is retried to be reached, this is the delay in seconds between retries.
+# tcp_target_retry_delay: 2
+#
+# Specifies the default listen host for Session IP forwarding sockets.
+# This value is also used when the Session is opened with a partially specified listening host
+# to fill in the missing part.
+# default_entry_listen_host: 127.0.0.1:0

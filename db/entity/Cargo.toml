@@ -1,7 +1,7 @@
 [package]
 name = "hopr-db-entity"
 description = "Contains all HOPR database entities"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 homepage = "https://hoprnet.org/"
 repository = "https://github.com/hoprnet/hoprnet"
@@ -24,6 +24,7 @@ runtime-tokio = [
 sqlite = []
 
 [build-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true, optional = true }
 clap = { workspace = true }
 futures = { workspace = true }

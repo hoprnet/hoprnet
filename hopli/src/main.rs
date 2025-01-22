@@ -5,6 +5,7 @@ use crate::identity::IdentitySubcommands;
 use crate::network_registry::NetworkRegistrySubcommands;
 use crate::safe_module::SafeModuleSubcommands;
 use crate::utils::{Cmd, HelperErrors};
+use crate::win_prob::WinProbSubcommands;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::layer::SubscriberExt;
 pub mod environment_config;
@@ -15,6 +16,7 @@ pub mod methods;
 pub mod network_registry;
 pub mod safe_module;
 pub mod utils;
+pub mod win_prob;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -50,6 +52,13 @@ enum Commands {
         #[command(subcommand)]
         command: SafeModuleSubcommands,
     },
+
+    /// Commands around winning probability
+    #[command(visible_alias = "wp")]
+    WinProb {
+        #[command(subcommand)]
+        command: WinProbSubcommands,
+    },
 }
 
 #[async_std::main]
@@ -79,6 +88,9 @@ async fn main() -> Result<(), HelperErrors> {
             command.async_run().await?;
         }
         Commands::SafeModule { command } => {
+            command.async_run().await?;
+        }
+        Commands::WinProb { command } => {
             command.async_run().await?;
         }
     }

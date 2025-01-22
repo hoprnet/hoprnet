@@ -47,5 +47,6 @@ pub struct Api {
 
 #[inline]
 fn default_api_host() -> HostConfig {
-    HostConfig::from_str(format!("{DEFAULT_API_HOST}:{DEFAULT_API_PORT}").as_str()).unwrap()
+    HostConfig::from_str(format!("{DEFAULT_API_HOST}:{DEFAULT_API_PORT}").as_str())
+        .expect("default credentials should always work")
 }

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_lock::RwLock;
 use async_trait::async_trait;
-use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 use tracing::{debug, error};
 
 use core_network::{
@@ -12,6 +11,7 @@ use core_network::{
 };
 use core_path::channel_graph::ChannelGraph;
 use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 
 /// Implementor of the ping external API.
 ///
@@ -61,9 +61,14 @@ where
     async fn on_finished_ping(
         &self,
         peer: &PeerId,
-        result: std::result::Result<std::time::Duration, ()>,
+        result: &core_network::errors::Result<std::time::Duration>,
         version: String,
     ) {
+        let result = match &result {
+            Ok(duration) => Ok(*duration),
+            Err(_) => Err(()),
+        };
+
         match self
             .network
             .update(peer, result, result.is_ok().then_some(version))
@@ -76,7 +81,7 @@ where
                         .clone()
                         .try_send(NetworkTriggeredEvent::CloseConnection(peer))
                     {
-                        error!("Failed to emit a network event 'close connection': {}", e)
+                        error!(error = %e, "Failed to emit a network event 'close connection'")
                     }
                 }
                 NetworkTriggeredEvent::UpdateQuality(peer, quality) => {
@@ -85,19 +90,18 @@ where
                         let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
                         if let Ok(Some(chain_key)) = maybe_chain_key {
                             let mut g = self.channel_graph.write().await;
-                            let self_addr = g.my_address();
-                            g.update_channel_quality(self_addr, chain_key, quality);
-                            debug!("update channel {self_addr} -> {chain_key} with quality {quality}");
+                            g.update_node_quality(&chain_key, quality);
+                            debug!("update node {chain_key} with quality {quality}");
                         } else {
-                            error!("could not resolve chain key for '{peer}'");
+                            error!(%peer, "could not resolve chain key ");
                         }
                     } else {
-                        error!("encountered invalid peer id: '{peer}'");
+                        error!(%peer, "encountered invalid peer id:");
                     }
                 }
             },
             Ok(None) => debug!("No update necessary"),
-            Err(e) => error!("Encountered error on on updating the collected ping data: {e}"),
+            Err(e) => error!(error = %e, "Encountered error on on updating the collected ping data"),
         }
     }
 }

@@ -1,16 +1,17 @@
-use std::ops::Div;
-
+use async_stream::stream;
 use async_trait::async_trait;
 use futures::channel::mpsc::UnboundedSender;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
+use std::ops::Div;
 
 use tracing::{debug, warn};
 
 use hopr_async_runtime::prelude::timeout_fut;
 use hopr_platform::time::native::current_time;
 
+use crate::errors::{NetworkingError, Result};
 use crate::messaging::ControlMessage;
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -32,13 +33,9 @@ lazy_static::lazy_static! {
         ).unwrap();
 }
 
-/// The maximum number of pings that are allowed to run in parallel per `ping` call.
-pub const MAX_PARALLEL_PINGS: usize = 14;
-
 /// Trait for the ping operation itself.
-#[async_trait]
 pub trait Pinging {
-    async fn ping(&self, peers: Vec<PeerId>);
+    fn ping(&self, peers: Vec<PeerId>) -> impl Stream<Item = Result<std::time::Duration>>;
 }
 
 /// External behavior that will be triggered once a ping operation result is available
@@ -46,12 +43,7 @@ pub trait Pinging {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait PingExternalAPI {
-    async fn on_finished_ping(
-        &self,
-        peer: &PeerId,
-        result: std::result::Result<std::time::Duration, ()>,
-        version: String,
-    );
+    async fn on_finished_ping(&self, peer: &PeerId, result: &Result<std::time::Duration>, version: String);
 }
 
 /// Heartbeat send ping TX type
@@ -68,7 +60,7 @@ pub type HeartbeatSendPingTx = UnboundedSender<(PeerId, PingQueryReplier)>;
 #[derive(Debug, Clone, PartialEq, Eq, smart_default::SmartDefault)]
 pub struct PingConfig {
     /// The maximum total allowed concurrent heartbeat ping count
-    #[default = 14]
+    #[default = 25]
     pub max_parallel_pings: usize,
     /// The timeout duration for an indiviual ping
     #[default(std::time::Duration::from_secs(30))]
@@ -77,7 +69,7 @@ pub struct PingConfig {
 
 /// Ping query result type holding data about the ping duration and the string
 /// containg an optional version information of the pinged peer, if provided.
-pub type PingQueryResult = std::result::Result<(std::time::Duration, String), ()>;
+pub type PingQueryResult = Result<(std::time::Duration, String)>;
 
 /// Helper object allowing to send a ping query as a wrapped channel combination
 /// that can be filled up on the transport part and awaited locally by the `Pinger`.
@@ -115,38 +107,56 @@ impl PingQueryReplier {
                 .div(2u32);
             Ok((unidirectional_latency, version))
         } else {
-            Err(())
+            Err(NetworkingError::DecodingError)
         };
 
         if self.notifier.send(timed_result).is_err() {
-            warn!("Failed to notify the ping query result due to timeout");
+            warn!("Failed to notify the ping query result due to upper layer ping timeout");
         }
     }
 }
 
 /// Timeout-based future that will resolve to the result of the ping operation.
-#[tracing::instrument(level = "trace")]
+#[tracing::instrument(level = "trace", skip(sender, timeout))]
 pub fn to_active_ping(
     peer: PeerId,
     sender: HeartbeatSendPingTx,
     timeout: std::time::Duration,
-) -> impl std::future::Future<Output = (PeerId, std::result::Result<std::time::Duration, ()>, String)> {
+) -> impl std::future::Future<Output = (PeerId, Result<std::time::Duration>, String)> {
     let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
     let replier = PingQueryReplier::new(tx);
 
     if let Err(e) = sender.unbounded_send((peer, replier)) {
-        warn!("Failed to initiate a ping request to '{peer}': {e}");
+        warn!(%peer, error = %e, "Failed to initiate a ping request");
     }
 
     async move {
         match timeout_fut(timeout, rx).await {
             Ok(Ok(Ok((latency, version)))) => {
-                debug!(latency = latency.as_millis(), "Ping to '{peer}' ({version}) succeeded",);
+                debug!(latency = latency.as_millis(), %peer, %version, "Ping succeeded",);
                 (peer, Ok(latency), version)
             }
-            _ => {
-                debug!("Ping to '{peer}' failed");
-                (peer, Err(()), "unknown".into())
+            Ok(Ok(Err(e))) => {
+                let error = if let NetworkingError::DecodingError = e {
+                    NetworkingError::PingerError(peer, "incorrect pong response".into())
+                } else {
+                    e
+                };
+
+                debug!(%peer, %error, "Ping failed internally",);
+                (peer, Err(error), "unknown".into())
+            }
+            Ok(Err(_)) => {
+                debug!(%peer, "Ping canceled");
+                (
+                    peer,
+                    Err(NetworkingError::PingerError(peer, "canceled".into())),
+                    "unknown".into(),
+                )
+            }
+            Err(_) => {
+                debug!(%peer, "Ping failed due to timeout");
+                (peer, Err(NetworkingError::Timeout(timeout.as_secs())), "unknown".into())
             }
         }
     }
@@ -169,7 +179,7 @@ where
 {
     pub fn new(config: PingConfig, send_ping: HeartbeatSendPingTx, recorder: T) -> Self {
         let config = PingConfig {
-            max_parallel_pings: config.max_parallel_pings.min(MAX_PARALLEL_PINGS),
+            max_parallel_pings: config.max_parallel_pings,
             ..config
         };
 
@@ -185,7 +195,6 @@ where
     }
 }
 
-#[async_trait]
 impl<T> Pinging for Pinger<T>
 where
     T: PingExternalAPI + Send + Sync,
@@ -199,46 +208,49 @@ where
     /// # Arguments
     ///
     /// * `peers` - A vector of PeerId objects referencing the peers to be pinged
-    #[tracing::instrument(level = "info", skip(self))]
-    async fn ping(&self, peers: Vec<PeerId>) {
+    #[tracing::instrument(level = "info", skip(self, peers), fields(peers.count = peers.len()))]
+    fn ping(&self, mut peers: Vec<PeerId>) -> impl Stream<Item = Result<std::time::Duration>> {
         let start_all_peers = current_time();
-        let mut peers = peers;
 
-        if peers.is_empty() {
-            debug!("Received an empty peer list, not pinging any peers");
-            return;
-        }
+        stream! {
+            if !peers.is_empty() {
+                let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
+                let mut active_pings = peers
+                    .into_iter()
+                    .map(|peer| to_active_ping(peer, self.send_ping.clone(), self.config.timeout))
+                    .collect::<futures::stream::FuturesUnordered<_>>();
 
-        let remainder = peers.split_off(self.config.max_parallel_pings.min(peers.len()));
-        let mut active_pings = peers
-            .into_iter()
-            .map(|peer| to_active_ping(peer, self.send_ping.clone(), self.config.timeout))
-            .collect::<futures::stream::FuturesUnordered<_>>();
+                let mut waiting = std::collections::VecDeque::from(remainder);
 
-        let mut waiting = std::collections::VecDeque::from(remainder);
+                while let Some((peer, result, version)) = active_pings.next().await {
+                    self.recorder.on_finished_ping(&peer, &result, version).await;
 
-        while let Some((peer, result, version)) = active_pings.next().await {
-            self.recorder.on_finished_ping(&peer, result, version).await;
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    match &result {
+                        Ok(duration) => {
+                            METRIC_TIME_TO_PING.observe((duration.as_millis() as f64) / 1000.0); // precision for seconds
+                            METRIC_PING_COUNT.increment(&["true"]);
+                        }
+                        Err(_) => {
+                            METRIC_PING_COUNT.increment(&["false"]);
+                        }
+                    }
 
-            #[cfg(all(feature = "prometheus", not(test)))]
-            match result {
-                Ok(duration) => {
-                    METRIC_TIME_TO_PING.observe((duration.as_millis() as f64) / 1000.0); // precision for seconds
-                    METRIC_PING_COUNT.increment(&["true"]);
+                    if current_time().saturating_sub(start_all_peers) < self.config.timeout {
+                        if let Some(peer) = waiting.pop_front() {
+                            active_pings.push(to_active_ping(peer, self.send_ping.clone(), self.config.timeout));
+                        }
+                    }
+
+                    // TODO: we can make the error more specific if we allow to propagate the transport error upwards
+                    yield result;
+
+                    if active_pings.is_empty() && waiting.is_empty() {
+                        break;
+                    }
                 }
-                Err(_) => {
-                    METRIC_PING_COUNT.increment(&["false"]);
-                }
-            }
-
-            if current_time().saturating_sub(start_all_peers) < self.config.timeout {
-                if let Some(peer) = waiting.pop_front() {
-                    active_pings.push(to_active_ping(peer, self.send_ping.clone(), self.config.timeout));
-                }
-            }
-
-            if active_pings.is_empty() && waiting.is_empty() {
-                break;
+            } else {
+                debug!("Received an empty peer list, not pinging any peers");
             }
         }
     }
@@ -249,6 +261,7 @@ mod tests {
     use super::*;
     use crate::messaging::ControlMessage;
     use crate::ping::Pinger;
+    use futures::TryStreamExt;
     use hopr_primitive_types::traits::SaturatingSub;
     use mockall::*;
     use more_asserts::*;
@@ -261,37 +274,42 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge() {
+    async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge(
+    ) -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
         let challenge = replier.challenge.clone();
 
         replier.notify(
-            ControlMessage::generate_pong_response(&challenge.1).expect("valid challenge reply"),
+            ControlMessage::generate_pong_response(&challenge.1)?,
             "version".to_owned(),
         );
 
-        assert!(rx.await.unwrap().is_ok());
+        assert!(rx.await?.is_ok());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge() {
+    async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge(
+    ) -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
 
         replier.notify(
-            ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request())
-                .expect("valid challenge reply"),
+            ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request())?,
             "version".to_owned(),
         );
 
-        assert!(rx.await.unwrap().is_err());
+        assert!(rx.await?.is_err());
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn ping_query_replier_should_return_the_unidirectional_latency() {
+    async fn ping_query_replier_should_return_the_unidirectional_latency() -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
@@ -301,17 +319,22 @@ mod tests {
 
         async_std::task::sleep(delay).await;
         replier.notify(
-            ControlMessage::generate_pong_response(&challenge.1).expect("valid challenge reply"),
+            ControlMessage::generate_pong_response(&challenge.1)?,
             "version".to_owned(),
         );
 
-        let actual_latency = rx.await.unwrap().expect("should contain a result value").0;
+        let actual_latency = rx
+            .await?
+            .map_err(|_e| anyhow::anyhow!("should contain a result value"))?
+            .0;
         assert!(actual_latency > delay / 2);
         assert!(actual_latency < delay);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn ping_empty_vector_of_peers_should_not_do_any_api_calls() {
+    async fn ping_empty_vector_of_peers_should_not_do_any_api_calls() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let ideal_channel = async_std::task::spawn(async move {
@@ -330,13 +353,15 @@ mod tests {
 
         let pinger = Pinger::new(simple_ping_config(), tx, mock);
 
-        pinger.ping(vec![]).await;
+        assert!(pinger.ping(vec![]).try_collect::<Vec<_>>().await?.is_empty());
 
         ideal_channel.cancel().await;
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ping_peers_with_happy_path_should_trigger_the_desired_external_api_calls() {
+    async fn test_ping_peers_with_happy_path_should_trigger_the_desired_external_api_calls() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let ideal_channel = async_std::task::spawn(async move {
@@ -357,19 +382,21 @@ mod tests {
             .times(1)
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_ok()),
+                predicate::function(|x: &Result<std::time::Duration>| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
 
         let pinger = Pinger::new(simple_ping_config(), tx, mock);
-        pinger.ping(vec![peer]).await;
+        pinger.ping(vec![peer]).try_collect::<Vec<_>>().await?;
 
         ideal_channel.cancel().await;
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ping_should_invoke_a_failed_ping_reply_for_an_incorrect_reply() {
+    async fn test_ping_should_invoke_a_failed_ping_reply_for_an_incorrect_reply() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let failing_channel = async_std::task::spawn(async move {
@@ -389,19 +416,21 @@ mod tests {
             .times(1)
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_err()),
+                predicate::function(|x: &Result<std::time::Duration>| x.is_err()),
                 predicate::eq("unknown".to_owned()),
             )
             .return_const(());
 
         let pinger = Pinger::new(simple_ping_config(), tx, mock);
-        pinger.ping(vec![peer]).await;
+        assert!(pinger.ping(vec![peer]).try_collect::<Vec<_>>().await.is_err());
 
         failing_channel.cancel().await;
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ping_peer_times_out_on_the_pong() {
+    async fn test_ping_peer_returns_error_on_the_pong() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let delay = std::time::Duration::from_millis(10);
@@ -428,19 +457,21 @@ mod tests {
             .times(1)
             .with(
                 predicate::eq(peer),
-                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_err()),
+                predicate::function(|x: &Result<std::time::Duration>| x.is_err()),
                 predicate::eq("unknown".to_owned()),
             )
             .return_const(());
 
         let pinger = Pinger::new(ping_config, tx, mock);
-        pinger.ping(vec![peer]).await;
+        assert!(pinger.ping(vec![peer]).try_collect::<Vec<_>>().await.is_err());
 
         delaying_channel.cancel().await;
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() {
+    async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let ideal_channel = async_std::task::spawn(async move {
@@ -461,7 +492,7 @@ mod tests {
             .times(1)
             .with(
                 predicate::eq(peers[0]),
-                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_ok()),
+                predicate::function(|x: &Result<std::time::Duration>| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
@@ -469,19 +500,21 @@ mod tests {
             .times(1)
             .with(
                 predicate::eq(peers[1]),
-                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_ok()),
+                predicate::function(|x: &Result<std::time::Duration>| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
 
         let pinger = Pinger::new(simple_ping_config(), tx, mock);
-        pinger.ping(peers).await;
+        pinger.ping(peers).try_collect::<Vec<_>>().await?;
 
         ideal_channel.cancel().await;
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_ping_peers_should_ping_parallel_only_a_limited_number_of_peers() {
+    async fn test_ping_peers_should_ping_parallel_only_a_limited_number_of_peers() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let delay = 10u64;
@@ -505,7 +538,7 @@ mod tests {
             .times(1)
             .with(
                 predicate::eq(peers[0]),
-                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_ok()),
+                predicate::function(|x: &Result<std::time::Duration>| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
@@ -513,7 +546,7 @@ mod tests {
             .times(1)
             .with(
                 predicate::eq(peers[1]),
-                predicate::function(|x: &std::result::Result<std::time::Duration, ()>| x.is_ok()),
+                predicate::function(|x: &Result<std::time::Duration>| x.is_ok()),
                 predicate::eq("version".to_owned()),
             )
             .return_const(());
@@ -528,11 +561,13 @@ mod tests {
         );
 
         let start = current_time();
-        pinger.ping(peers).await;
+        pinger.ping(peers).try_collect::<Vec<_>>().await?;
         let end = current_time();
 
         assert_ge!(end.saturating_sub(start), std::time::Duration::from_millis(delay));
 
         ideal_delaying_channel.cancel().await;
+
+        Ok(())
     }
 }
