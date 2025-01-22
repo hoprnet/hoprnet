@@ -23,7 +23,7 @@ hex-literal = { workspace = true }
 rpassword = { workspace = true }
 
 bindings = { workspace = true }
-chain-api = { workspace = true, features = ["runtime-async-std"] }
+hopr-chain-api = { workspace = true, features = ["runtime-async-std"] }
 hopr-chain-types = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }

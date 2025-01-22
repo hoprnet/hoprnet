@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use chain_actions::action_queue::TransactionExecutor;
-use chain_actions::payload::PayloadGenerator;
 use hopr_async_runtime::prelude::sleep;
+use hopr_chain_actions::action_queue::TransactionExecutor;
+use hopr_chain_actions::payload::PayloadGenerator;
 use hopr_chain_rpc::errors::RpcError;
 use hopr_chain_rpc::{HoprRpcOperations, PendingTransaction};
 use hopr_chain_types::TypedTransaction;
@@ -123,32 +123,32 @@ where
     C: EthereumClient<T> + Clone + Sync + Send,
     PGen: PayloadGenerator<T> + Clone + Sync + Send,
 {
-    async fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> chain_actions::errors::Result<Hash> {
+    async fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.redeem_ticket(acked_ticket)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn fund_channel(&self, destination: Address, balance: Balance) -> chain_actions::errors::Result<Hash> {
+    async fn fund_channel(&self, destination: Address, balance: Balance) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.fund_channel(destination, balance)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn initiate_outgoing_channel_closure(&self, dst: Address) -> chain_actions::errors::Result<Hash> {
+    async fn initiate_outgoing_channel_closure(&self, dst: Address) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.initiate_outgoing_channel_closure(dst)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn finalize_outgoing_channel_closure(&self, dst: Address) -> chain_actions::errors::Result<Hash> {
+    async fn finalize_outgoing_channel_closure(&self, dst: Address) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.finalize_outgoing_channel_closure(dst)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn close_incoming_channel(&self, src: Address) -> chain_actions::errors::Result<Hash> {
+    async fn close_incoming_channel(&self, src: Address) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.close_incoming_channel(src)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> chain_actions::errors::Result<Hash> {
+    async fn withdraw(&self, recipient: Address, amount: Balance) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.transfer(recipient, amount)?;
 
         // Withdraw transaction is out-of-band from Indexer, so its confirmation
@@ -156,12 +156,12 @@ where
         Ok(self.client.post_transaction_and_await_confirmation(payload).await?)
     }
 
-    async fn announce(&self, data: AnnouncementData) -> chain_actions::errors::Result<Hash> {
+    async fn announce(&self, data: AnnouncementData) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.announce(data)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn register_safe(&self, safe_address: Address) -> chain_actions::errors::Result<Hash> {
+    async fn register_safe(&self, safe_address: Address) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.register_safe_by_node(safe_address)?;
         Ok(self.client.post_transaction(payload).await?)
     }

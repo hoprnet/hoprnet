@@ -1,5 +1,5 @@
 [package]
-name = "chain-api"
+name = "hopr-chain-api"
 version = "0.3.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR chain interface"
@@ -12,20 +12,20 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-async-std = [
-  "chain-actions/runtime-async-std",
+  "hopr-chain-actions/runtime-async-std",
   "hopr-chain-indexer/runtime-async-std",
   "hopr-db-sql/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
 ]
 runtime-tokio = [
-  "chain-actions/runtime-tokio",
+  "hopr-chain-actions/runtime-tokio",
   "hopr-chain-indexer/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
 ]
 prometheus = [
   "hopr-chain-rpc/prometheus",
-  "chain-actions/prometheus",
+  "hopr-chain-actions/prometheus",
   "hopr-chain-indexer/prometheus",
   "hopr-db-sql/prometheus",
 ]
@@ -44,7 +44,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
-chain-actions = { workspace = true }
+hopr-chain-actions = { workspace = true }
 hopr-chain-indexer = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }

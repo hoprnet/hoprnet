@@ -25,9 +25,9 @@ runtime-tokio = [
 ]
 prometheus = [
   "dep:hopr-metrics",
-  "hopr-transport-network/prometheus",
-  "chain-actions/prometheus",
+  "hopr-chain-actions/prometheus",
   "hopr-db-sql/prometheus",
+  "hopr-transport-network/prometheus",
   "hopr-transport-protocol/prometheus",
 ]
 
@@ -48,7 +48,7 @@ validator = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-transport-network = { workspace = true }
-chain-actions = { workspace = true }
+hopr-chain-actions = { workspace = true }
 tracing = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-db-sql = { workspace = true }

@@ -1,5 +1,5 @@
 [package]
-name = "chain-actions"
+name = "hopr-chain-actions"
 version = "0.7.3"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"

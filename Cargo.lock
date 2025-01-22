@@ -1280,67 +1280,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chain-actions"
-version = "0.7.3"
-dependencies = [
- "anyhow",
- "async-channel 2.3.1",
- "async-lock 3.4.0",
- "async-std",
- "async-trait",
- "bindings",
- "ethers",
- "futures",
- "futures-timer",
- "hex-literal",
- "hopr-async-runtime",
- "hopr-chain-rpc",
- "hopr-chain-types",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-db-sql",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-platform",
- "hopr-primitive-types",
- "lazy_static",
- "mockall",
- "multiaddr",
- "serde",
- "smart-default",
- "thiserror 2.0.11",
- "tracing",
-]
-
-[[package]]
-name = "chain-api"
-version = "0.3.1"
-dependencies = [
- "async-channel 2.3.1",
- "async-std",
- "async-trait",
- "chain-actions",
- "futures",
- "hopr-async-runtime",
- "hopr-chain-indexer",
- "hopr-chain-rpc",
- "hopr-chain-types",
- "hopr-crypto-types",
- "hopr-db-sql",
- "hopr-internal-types",
- "hopr-primitive-types",
- "semver 1.0.25",
- "serde",
- "serde_json",
- "serde_with",
- "smart-default",
- "strum",
- "thiserror 2.0.11",
- "tracing",
- "validator",
-]
-
-[[package]]
 name = "chrono"
 version = "0.4.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4079,12 +4018,12 @@ dependencies = [
  "anyhow",
  "async-std",
  "bindings",
- "chain-api",
  "clap",
  "env_logger",
  "ethers",
  "hex",
  "hex-literal",
+ "hopr-chain-api",
  "hopr-chain-rpc",
  "hopr-chain-types",
  "hopr-crypto-random",
@@ -4109,6 +4048,67 @@ version = "0.1.0"
 dependencies = [
  "async-std",
  "tokio",
+]
+
+[[package]]
+name = "hopr-chain-actions"
+version = "0.7.3"
+dependencies = [
+ "anyhow",
+ "async-channel 2.3.1",
+ "async-lock 3.4.0",
+ "async-std",
+ "async-trait",
+ "bindings",
+ "ethers",
+ "futures",
+ "futures-timer",
+ "hex-literal",
+ "hopr-async-runtime",
+ "hopr-chain-rpc",
+ "hopr-chain-types",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-db-sql",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-platform",
+ "hopr-primitive-types",
+ "lazy_static",
+ "mockall",
+ "multiaddr",
+ "serde",
+ "smart-default",
+ "thiserror 2.0.11",
+ "tracing",
+]
+
+[[package]]
+name = "hopr-chain-api"
+version = "0.3.1"
+dependencies = [
+ "async-channel 2.3.1",
+ "async-std",
+ "async-trait",
+ "futures",
+ "hopr-async-runtime",
+ "hopr-chain-actions",
+ "hopr-chain-indexer",
+ "hopr-chain-rpc",
+ "hopr-chain-types",
+ "hopr-crypto-types",
+ "hopr-db-sql",
+ "hopr-internal-types",
+ "hopr-primitive-types",
+ "semver 1.0.25",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "smart-default",
+ "strum",
+ "thiserror 2.0.11",
+ "tracing",
+ "validator",
 ]
 
 [[package]]
@@ -4419,14 +4419,14 @@ dependencies = [
  "async-trait",
  "atomic_enum",
  "backon",
- "chain-actions",
- "chain-api",
  "const_format",
  "ethers",
  "futures",
  "futures-timer",
  "hex-literal",
  "hopr-async-runtime",
+ "hopr-chain-actions",
+ "hopr-chain-api",
  "hopr-chain-indexer",
  "hopr-chain-rpc",
  "hopr-chain-types",
@@ -4583,10 +4583,10 @@ dependencies = [
  "async-lock 3.4.0",
  "async-std",
  "async-trait",
- "chain-actions",
  "futures",
  "hex-literal",
  "hopr-async-runtime",
+ "hopr-chain-actions",
  "hopr-chain-types",
  "hopr-crypto-random",
  "hopr-crypto-types",
