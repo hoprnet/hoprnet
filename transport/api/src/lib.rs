@@ -40,7 +40,6 @@ use std::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-use core_path::{path::TransportPath, selectors::dfs::DfsPathSelectorConfig};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_db_sql::{
     accounts::ChainOrPacketKey,
@@ -48,6 +47,7 @@ use hopr_db_sql::{
     HoprDbAllOperations,
 };
 use hopr_internal_types::prelude::*;
+use hopr_path::{path::TransportPath, selectors::dfs::DfsPathSelectorConfig};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_network::{
@@ -204,7 +204,7 @@ where
         me: &OffchainKeypair,
         cfg: HoprTransportConfig,
         db: T,
-        channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+        channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {
         let process_packet_send = Arc::new(OnceLock::new());

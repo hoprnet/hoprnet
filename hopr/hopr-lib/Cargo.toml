@@ -68,7 +68,6 @@ chain-actions = { workspace = true }
 chain-api = { workspace = true }
 chain-indexer = { workspace = true }
 chain-types = { workspace = true }
-core-path = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }
@@ -77,6 +76,7 @@ hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
+hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-strategy = { workspace = true }

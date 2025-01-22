@@ -20,7 +20,7 @@ pub enum HoprTransportError {
     Database(#[from] hopr_db_sql::errors::DbSqlError),
 
     #[error("Path error: {0}")]
-    Path(#[from] core_path::errors::PathError),
+    Path(#[from] hopr_path::errors::PathError),
 
     #[error("Protocol error: {0}")]
     Protocol(#[from] hopr_transport_protocol::errors::ProtocolError),

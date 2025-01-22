@@ -69,10 +69,10 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
 use tracing::error;
 
-use core_path::path::TransportPath;
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
+use hopr_path::path::TransportPath;
 use hopr_transport_identity::PeerId;
 
 pub use msg::processor::DEFAULT_PRICE_PER_PACKET;

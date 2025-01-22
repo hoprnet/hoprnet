@@ -199,7 +199,7 @@ chain-api = { path = "chain/api", default-features = false }
 chain-indexer = { path = "chain/indexer", default-features = false }
 chain-types = { path = "chain/types", default-features = false }
 hopr-transport-network = { path = "transport/network" }
-core-path = { path = "logic/path", default-features = false }
+hopr-path = { path = "logic/path" }
 
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-chain-rpc = { path = "chain/rpc", default-features = false }

@@ -12,7 +12,7 @@ crate-type = ["rlib"]
 default = []
 runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
-prometheus = ["dep:hopr-metrics", "core-path/prometheus"]
+prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
 
 [dependencies]
 async-trait = { workspace = true }
@@ -37,7 +37,7 @@ hopr-crypto-packet = { workspace = true }
 hopr-db-api = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
-core-path = { workspace = true }
+hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport-identity = { workspace = true }

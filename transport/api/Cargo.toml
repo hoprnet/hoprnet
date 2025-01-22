@@ -33,7 +33,7 @@ runtime-tokio = [
 prometheus = [
   "dep:hopr-metrics",
   "hopr-transport-network/prometheus",
-  "core-path/prometheus",
+  "hopr-path/prometheus",
   "hopr-db-sql/prometheus",
   "hopr-network-types/prometheus",
   "hopr-transport-mixer/prometheus",
@@ -61,9 +61,7 @@ tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng"] }
 validator = { workspace = true }
 
-hopr-transport-network = { workspace = true }
 chain-types = { workspace = true }
-core-path = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
@@ -73,8 +71,10 @@ hopr-metrics = { workspace = true, optional = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["serde"] }
+hopr-path = { workspace = true }
 hopr-transport-identity = { workspace = true }
 hopr-transport-mixer = { workspace = true }
+hopr-transport-network = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }

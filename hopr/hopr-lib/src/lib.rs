@@ -47,7 +47,6 @@ use chain_api::{
 };
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
-use core_path::channel_graph::ChannelGraph;
 use errors::{HoprLibError, HoprStatusError};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_chain_rpc::HoprRpcOperations;
@@ -62,6 +61,7 @@ use hopr_db_sql::{
     prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
     HoprDbAllOperations, HoprDbGeneralModelOperations,
 };
+use hopr_path::channel_graph::ChannelGraph;
 use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 use hopr_transport::{
@@ -73,9 +73,9 @@ pub use {
     chain_api::config::{
         Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
     },
-    core_path::channel_graph::GraphExportConfig,
     hopr_internal_types::prelude::*,
     hopr_network_types::prelude::{IpProtocol, RoutingOptions},
+    hopr_path::channel_graph::GraphExportConfig,
     hopr_primitive_types::prelude::*,
     hopr_strategy::Strategy,
     hopr_transport::{
@@ -209,7 +209,7 @@ pub async fn chain_events_to_transport_events<StreamIn, Db>(
     me_onchain: Address,
     db: Db,
     multi_strategy: Arc<MultiStrategy>,
-    channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+    channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     indexer_action_tracker: Arc<IndexerActionTracker>,
 ) -> impl Stream<Item = PeerDiscovery> + Send + 'static
 where
@@ -361,7 +361,7 @@ pub struct Hopr {
     // objects that could be removed pending architectural cleanup ========
     db: HoprDb,
     chain_cfg: ChainNetworkConfig,
-    channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+    channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     multistrategy: Arc<MultiStrategy>,
     rx_indexer_significant_events: async_channel::Receiver<SignificantChainEvent>,
 }

@@ -1713,34 +1713,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
-name = "core-path"
-version = "0.5.0"
-dependencies = [
- "anyhow",
- "async-std",
- "async-trait",
- "futures",
- "hex-literal",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-db-api",
- "hopr-db-sql",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-primitive-types",
- "lazy_static",
- "libp2p-identity",
- "petgraph",
- "regex",
- "serde",
- "serde_with",
- "smart-default",
- "test-log",
- "thiserror 2.0.11",
- "tracing",
-]
-
-[[package]]
 name = "core2"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4239,7 +4211,6 @@ dependencies = [
  "anyhow",
  "async-std",
  "async-trait",
- "core-path",
  "criterion",
  "hex",
  "hex-literal",
@@ -4248,6 +4219,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-db-api",
  "hopr-internal-types",
+ "hopr-path",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
@@ -4452,7 +4424,6 @@ dependencies = [
  "chain-indexer",
  "chain-types",
  "const_format",
- "core-path",
  "ethers",
  "futures",
  "futures-timer",
@@ -4466,6 +4437,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-strategy",
@@ -4552,6 +4524,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-path"
+version = "0.5.0"
+dependencies = [
+ "anyhow",
+ "async-std",
+ "async-trait",
+ "futures",
+ "hex-literal",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-db-sql",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-primitive-types",
+ "lazy_static",
+ "libp2p-identity",
+ "petgraph",
+ "regex",
+ "serde",
+ "serde_with",
+ "smart-default",
+ "test-log",
+ "thiserror 2.0.11",
+ "tracing",
+]
+
+[[package]]
 name = "hopr-platform"
 version = "0.2.1"
 dependencies = [
@@ -4619,7 +4619,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "chain-types",
- "core-path",
  "futures",
  "futures-concurrency",
  "hopr-async-runtime",
@@ -4629,6 +4628,7 @@ dependencies = [
  "hopr-internal-types",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-identity",
@@ -4746,7 +4746,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "bytesize",
- "core-path",
  "criterion",
  "futures",
  "hex-literal",
@@ -4758,6 +4757,7 @@ dependencies = [
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
  "hopr-transport-identity",
