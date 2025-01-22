@@ -18,9 +18,7 @@ hopr:
       - !Aggregating
         aggregation_threshold: 100
         unrealized_balance_ratio: 0.9
-        aggregation_timeout: 60
         aggregate_on_channel_close: true
       - !AutoRedeeming
         redeem_only_aggregated: true
         minimum_redeem_ticket_value: "0 HOPR"
-        on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"

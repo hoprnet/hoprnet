@@ -282,7 +282,7 @@ Either setup `nix` and `flake` to use the nix environment, or [install Rust tool
 
 ### Nix environment setup
 
-Install `nix`` from the official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html).
+Install `nix` from the official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html).
 
 Create a nix configuration file at `~/.config/nix/nix.conf` with the following content:
 
