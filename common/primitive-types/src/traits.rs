@@ -17,11 +17,11 @@ pub trait ToHex {
 ///
 /// Differences between [BytesEncodable] and [BytesRepresentable]:
 /// - [BytesRepresentable] is already internally carrying the encoded representation of the type,
-/// so no additional encoding or allocation is required to represent the type as a byte array.
+///   so no additional encoding or allocation is required to represent the type as a byte array.
 /// - [BytesEncodable] requires additional transformation and allocation to represent the type as a fixed size
-/// byte array.
+///   byte array.
 /// - [BytesEncodable] is the strict superset of [BytesRepresentable]: meaning the former can be possibly implemented
-/// for a type that already implements the latter, but it is not possible vice versa.
+///   for a type that already implements the latter, but it is not possible vice versa.
 pub trait BytesEncodable<const N: usize, E = GeneralError>:
     Into<[u8; N]> + for<'a> TryFrom<&'a [u8], Error = E>
 {
@@ -71,10 +71,10 @@ impl<T: BytesRepresentable> ToHex for T {
             };
 
             hex::decode(data)
-                .map_err(|_| ParseError)
+                .map_err(|e| ParseError(e.to_string()))
                 .and_then(|bytes| T::try_from(&bytes))
         } else {
-            Err(ParseError)
+            Err(ParseError("invalid hex length".into()))
         }
     }
 }

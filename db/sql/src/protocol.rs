@@ -10,7 +10,7 @@ use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::ops::Sub;
-use tracing::{debug, instrument, trace, warn};
+use tracing::{instrument, trace, warn};
 
 use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
@@ -21,9 +21,19 @@ use crate::{HoprDbGeneralModelOperations, OptTx};
 
 use hopr_parallelize::cpu::spawn_fifo_blocking;
 
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_INCOMING_WIN_PROB: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
+            "hopr_tickets_incoming_win_probability",
+            "Observes the winning probabilities on incoming tickets",
+            vec![0.0, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15, 0.25, 0.3, 0.5],
+        ).unwrap();
+}
+
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
-    #[instrument(level = "trace", skip(self))]
+    #[instrument(level = "trace", skip(self, ack, me), ret)]
     async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair) -> Result<AckResult> {
         let myself = self.clone();
         let me_ckp = me.clone();
@@ -39,14 +49,14 @@ impl HoprDbProtocolOperations for HoprDb {
                         .remove(&ack.ack_challenge())
                         .await
                         .ok_or_else(|| {
-                            crate::errors::DbSqlError::AcknowledgementValidationError(format!(
+                            DbSqlError::AcknowledgementValidationError(format!(
                                 "received unexpected acknowledgement for half key challenge {} - half key {}",
                                 ack.ack_challenge().to_hex(),
                                 ack.ack_key_share.to_hex()
                             ))
                         })? {
                         PendingAcknowledgement::WaitingAsSender => {
-                            trace!("received acknowledgement as sender: first relayer has processed the packet.");
+                            trace!("received acknowledgement as sender: first relayer has processed the packet");
 
                             Ok(ResolvedAcknowledgement::Sending(ack.ack_challenge()))
                         }
@@ -64,32 +74,36 @@ impl HoprDbProtocolOperations for HoprDb {
                                     c.channel_epoch.as_u32() != unacknowledged.verified_ticket().channel_epoch
                                 })
                             {
-                                return Err(crate::errors::DbSqlError::LogicalError(format!(
+                                return Err(DbSqlError::LogicalError(format!(
                                     "no channel found for  address '{}'",
                                     unacknowledged.ticket.verified_issuer()
                                 )));
                             }
 
-                            let domain_separator =
-                                myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                                    crate::errors::DbSqlError::LogicalError("domain separator missing".into())
-                                })?;
+                            let domain_separator = myself
+                                .get_indexer_data(Some(tx))
+                                .await?
+                                .channels_dst
+                                .ok_or_else(|| DbSqlError::LogicalError("domain separator missing".into()))?;
 
-                            // This explicitly checks whether the acknowledgement
-                            // solves the challenge on the ticket. It must be done before we
-                            // check that the ticket is winning, which is a lengthy operation
-                            // and should not be done for bogus unacknowledged tickets
-                            let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share)?;
+                            hopr_parallelize::cpu::spawn_blocking(move || {
+                                // This explicitly checks whether the acknowledgement
+                                // solves the challenge on the ticket. It must be done before we
+                                // check that the ticket is winning, which is a lengthy operation
+                                // and should not be done for bogus unacknowledged tickets
+                                let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share)?;
 
-                            if ack_ticket.is_winning(&me_ckp, &domain_separator) {
-                                debug!(ticket = tracing::field::display(&ack_ticket), "winning ticket");
-                                Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
-                            } else {
-                                trace!(ticket = tracing::field::display(&ack_ticket), "losing ticket");
-                                Ok(ResolvedAcknowledgement::RelayingLoss(
-                                    ack_ticket.ticket.verified_ticket().channel_id,
-                                ))
-                            }
+                                if ack_ticket.is_winning(&me_ckp, &domain_separator) {
+                                    trace!("Found a winning ticket");
+                                    Ok(ResolvedAcknowledgement::RelayingWin(ack_ticket))
+                                } else {
+                                    trace!("Found a losing ticket");
+                                    Ok(ResolvedAcknowledgement::RelayingLoss(
+                                        ack_ticket.ticket.verified_ticket().channel_id,
+                                    ))
+                                }
+                            })
+                            .await
                         }
                     }
                 })
@@ -138,51 +152,57 @@ impl HoprDbProtocolOperations for HoprDb {
         data: Box<[u8]>,
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
+        outgoing_ticket_win_prob: f64,
     ) -> Result<TransportPacketWithChainData> {
         let myself = self.clone();
         let next_peer = myself.resolve_chain_key(&path[0]).await?.ok_or_else(|| {
-            crate::errors::DbSqlError::LogicalError(format!(
-                "failed to find channel key for packet key {} on previous hop",
+            DbSqlError::LogicalError(format!(
+                "failed to find chain key for packet key {} on previous hop",
                 path[0].to_peerid_str()
             ))
         })?;
 
-        let components = self
-            .begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let domain_separator = myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                        crate::errors::DbSqlError::LogicalError("failed to fetch the domain separator".into())
-                    })?;
+        let components =
+            self.begin_transaction()
+                .await?
+                .perform(|tx| {
+                    Box::pin(async move {
+                        let domain_separator =
+                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                                DbSqlError::LogicalError("failed to fetch the domain separator".into())
+                            })?;
 
-                    // Decide whether to create 0-hop or multihop ticket
-                    let next_ticket = if path.len() == 1 {
-                        TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_peer)
-                    } else {
-                        myself
-                            .create_multihop_ticket(Some(tx), me.public().to_address(), next_peer, path.len() as u8)
-                            .await?
-                    };
+                        // Decide whether to create 0-hop or multihop ticket
+                        let next_ticket = if path.len() == 1 {
+                            TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_peer)
+                        } else {
+                            myself
+                                .create_multihop_ticket(
+                                    Some(tx),
+                                    me.public().to_address(),
+                                    next_peer,
+                                    path.len() as u8,
+                                    outgoing_ticket_win_prob,
+                                )
+                                .await?
+                        };
 
-                    // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
-                    spawn_fifo_blocking(move || {
-                        ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator).map_err(
-                            |e| {
-                                crate::errors::DbSqlError::LogicalError(format!(
-                                    "failed to construct chain components for a packet: {e}"
-                                ))
-                            },
-                        )
+                        spawn_fifo_blocking(move || {
+                            ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator)
+                                .map_err(|e| {
+                                    DbSqlError::LogicalError(format!(
+                                        "failed to construct chain components for a packet: {e}"
+                                    ))
+                                })
+                        })
+                        .await
                     })
-                    .await
                 })
-            })
-            .await?;
+                .await?;
 
         match components {
             ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {
-                Err(crate::errors::DbSqlError::LogicalError("Must contain an outgoing packet type".into()).into())
+                Err(DbSqlError::LogicalError("Must contain an outgoing packet type".into()).into())
             }
             ChainPacketComponents::Outgoing {
                 packet,
@@ -195,16 +215,21 @@ impl HoprDbProtocolOperations for HoprDb {
                     .insert(ack_challenge, PendingAcknowledgement::WaitingAsSender)
                     .await;
 
-                let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
-                payload.extend_from_slice(packet.as_ref());
+                let payload = spawn_fifo_blocking(move || {
+                    let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
+                    payload.extend_from_slice(packet.as_ref());
 
-                let ticket_bytes: [u8; Ticket::SIZE] = ticket.into();
-                payload.extend_from_slice(ticket_bytes.as_ref());
+                    let ticket_bytes: [u8; Ticket::SIZE] = ticket.into();
+                    payload.extend_from_slice(ticket_bytes.as_ref());
+
+                    payload.into_boxed_slice()
+                })
+                .await;
 
                 Ok(TransportPacketWithChainData::Outgoing {
                     next_hop,
                     ack_challenge,
-                    data: payload.into_boxed_slice(),
+                    data: payload,
                 })
             }
         }
@@ -217,14 +242,13 @@ impl HoprDbProtocolOperations for HoprDb {
         me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
+        outgoing_ticket_win_prob: f64,
     ) -> Result<TransportPacketWithChainData> {
         let offchain_keypair = pkt_keypair.clone();
 
-        // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
         let packet = spawn_fifo_blocking(move || {
-            ChainPacketComponents::from_incoming(&data, &offchain_keypair, sender).map_err(|e| {
-                crate::errors::DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}"))
-            })
+            ChainPacketComponents::from_incoming(&data, &offchain_keypair, sender)
+                .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
         })
         .await?;
 
@@ -236,7 +260,8 @@ impl HoprDbProtocolOperations for HoprDb {
                 plain_text,
                 ..
             } => {
-                let ack = Acknowledgement::new(ack_key, pkt_keypair);
+                let offchain_keypair = pkt_keypair.clone();
+                let ack = spawn_fifo_blocking(move || Acknowledgement::new(ack_key, &offchain_keypair)).await;
 
                 Ok(TransportPacketWithChainData::Final {
                     packet_tag,
@@ -279,13 +304,6 @@ impl HoprDbProtocolOperations for HoprDb {
                         Box::pin(async move {
                             let chain_data = myself.get_indexer_data(Some(tx)).await?;
 
-                            let domain_separator = chain_data.channels_dst.ok_or_else(|| {
-                                DbSqlError::LogicalError("failed to fetch the domain separator".into())
-                            })?;
-                            let ticket_price = chain_data
-                                .ticket_price
-                                .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the ticket price".into()))?;
-
                             let channel = myself
                                 .get_channel_by_parties(Some(tx), &previous_hop_addr, &myself.me_onchain, true)
                                 .await?
@@ -299,18 +317,27 @@ impl HoprDbProtocolOperations for HoprDb {
                                 .balance
                                 .sub(myself.ticket_manager.unrealized_value((&channel).into()).await?);
 
+                            let domain_separator = chain_data.channels_dst.ok_or_else(|| {
+                                DbSqlError::LogicalError("failed to fetch the domain separator".into())
+                            })?;
+
+                            let ticket_price = chain_data
+                                .ticket_price
+                                .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the ticket price".into()))?;
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_INCOMING_WIN_PROB.observe(ticket.win_prob());
+
                             // Here also the signature on the ticket gets validated,
                             // so afterward we are sure the source of the `channel`
                             // (which is equal to `previous_hop_addr`) has issued this
                             // ticket.
-                            //
-                            // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
                             let ticket = spawn_fifo_blocking(move || {
                                 validate_unacknowledged_ticket(
                                     ticket,
                                     &channel,
                                     ticket_price,
-                                    TICKET_WIN_PROB,
+                                    chain_data.minimum_incoming_ticket_winning_prob,
                                     remaining_balance,
                                     &domain_separator,
                                 )
@@ -330,7 +357,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 )
                                 .await;
 
-                            // Check that the calculated path position from the ticket matches value from the packet header
+                            // Check that the calculated path position from the ticket matches the value from the packet header
                             let ticket_path_pos = ticket.get_path_position(ticket_price.amount())?;
                             if !ticket_path_pos.eq(&path_pos) {
                                 return Err(DbSqlError::LogicalError(format!(
@@ -342,8 +369,17 @@ impl HoprDbProtocolOperations for HoprDb {
                             let ticket_builder = if ticket_path_pos == 1 {
                                 TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_hop_addr)
                             } else {
+                                // We currently take the maximum of the win prob on the ticket
+                                // and the one configured on this node.
+                                // Therefore, the winning probability can only increase on the path.
                                 myself
-                                    .create_multihop_ticket(Some(tx), myself.me_onchain, next_hop_addr, ticket_path_pos)
+                                    .create_multihop_ticket(
+                                        Some(tx),
+                                        myself.me_onchain,
+                                        next_hop_addr,
+                                        ticket_path_pos,
+                                        outgoing_ticket_win_prob.max(ticket.win_prob()),
+                                    )
                                     .await?
                             };
 
@@ -365,9 +401,9 @@ impl HoprDbProtocolOperations for HoprDb {
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {
                         let (rejected_ticket, error) = *boxed_error;
                         let rejected_value = rejected_ticket.amount;
-                        warn!("encountered validation error during forwarding for {rejected_ticket} with value: {rejected_value}");
+                        warn!(?rejected_ticket, %rejected_value, erorr = ?error, "failure to validate during forwarding");
 
-                        self.mark_ticket_rejected(&rejected_ticket).await.map_err(|e| {
+                        self.mark_unsaved_ticket_rejected(&rejected_ticket).await.map_err(|e| {
                             DbSqlError::TicketValidationError(Box::new((
                                 rejected_ticket.clone(),
                                 format!("during validation error '{error}' update another error occurred: {e}"),
@@ -379,19 +415,25 @@ impl HoprDbProtocolOperations for HoprDb {
                     Err(e) => Err(e),
                 }?;
 
-                let ack = Acknowledgement::new(ack_key, pkt_keypair);
+                let offchain_keypair = pkt_keypair.clone();
+                let (ack, payload) = spawn_fifo_blocking(move || {
+                    let ack = Acknowledgement::new(ack_key, &offchain_keypair);
 
-                let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
-                payload.extend_from_slice(packet.as_ref());
+                    let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
+                    payload.extend_from_slice(packet.as_ref());
 
-                let ticket_bytes = verified_ticket.leak().into_encoded();
-                payload.extend_from_slice(ticket_bytes.as_ref());
+                    let ticket_bytes = verified_ticket.leak().into_encoded();
+                    payload.extend_from_slice(ticket_bytes.as_ref());
+
+                    (ack, payload.into_boxed_slice())
+                })
+                .await;
 
                 Ok(TransportPacketWithChainData::Forwarded {
                     packet_tag,
                     previous_hop,
                     next_hop,
-                    data: payload.into_boxed_slice(),
+                    data: payload,
                     ack,
                 })
             }
@@ -409,6 +451,7 @@ impl HoprDb {
         me_onchain: Address,
         destination: Address,
         path_pos: u8,
+        winning_prob: f64,
     ) -> crate::errors::Result<TicketBuilder> {
         let myself = self.clone();
         let (channel, ticket_price): (ChannelEntry, U256) = self
@@ -436,13 +479,13 @@ impl HoprDb {
                 })
             })
             .await?
-            .ok_or(crate::errors::DbSqlError::LogicalError(format!(
+            .ok_or(DbSqlError::LogicalError(format!(
                 "channel to '{destination}' not found",
             )))?;
 
         let amount = Balance::new(
-            ticket_price.div_f64(TICKET_WIN_PROB).map_err(|e| {
-                crate::errors::DbSqlError::LogicalError(format!(
+            ticket_price.div_f64(winning_prob).map_err(|e| {
+                DbSqlError::LogicalError(format!(
                     "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
                 ))
             })? * U256::from(path_pos - 1),
@@ -450,7 +493,7 @@ impl HoprDb {
         );
 
         if channel.balance.lt(&amount) {
-            return Err(crate::errors::DbSqlError::LogicalError(format!(
+            return Err(DbSqlError::LogicalError(format!(
                 "out of funds: {} with counterparty {destination} has balance {} < {amount}",
                 channel.get_id(),
                 channel.balance
@@ -462,53 +505,9 @@ impl HoprDb {
             .balance(amount)
             .index(self.increment_outgoing_ticket_index(channel.get_id()).await?)
             .index_offset(1) // unaggregated always have index_offset == 1
-            .win_prob(TICKET_WIN_PROB)
+            .win_prob(winning_prob)
             .channel_epoch(channel.channel_epoch.as_u32());
 
         Ok(ticket_builder)
     }
 }
-
-// TODO: think about incorporating these tests
-// #[async_std::test]
-// async fn test_ticket_workflow() {
-//     let mut db = CoreEthereumDb::new(
-//         DB::new(CurrentDbShim::new_in_memory().await),
-//         SENDER_PRIV_KEY.public().to_address(),
-//     );
-
-//     let hkc = HalfKeyChallenge::new(&random_bytes::<{ HalfKeyChallenge::SIZE }>());
-//     let unack = UnacknowledgedTicket::new(
-//         create_valid_ticket(),
-//         HalfKey::new(&random_bytes::<{ HalfKey::SIZE }>()),
-//         SENDER_PRIV_KEY.public().to_address(),
-//     );
-
-//     db.store_pending_acknowledgment(hkc, PendingAcknowledgement::WaitingAsRelayer(unack))
-//         .await
-//         .unwrap();
-//     let num_tickets = db.get_tickets(None).await.unwrap();
-//     assert_eq!(1, num_tickets.len(), "db should find one ticket");
-
-//     let pending = db
-//         .get_pending_acknowledgement(&hkc)
-//         .await
-//         .unwrap()
-//         .expect("db should contain pending ack");
-//     match pending {
-//         PendingAcknowledgement::WaitingAsSender => panic!("must not be pending as sender"),
-//         PendingAcknowledgement::WaitingAsRelayer(ticket) => {
-//             let ack = ticket
-//                 .acknowledge(&HalfKey::default(), &TARGET_PRIV_KEY, &Hash::default())
-//                 .unwrap();
-//             db.replace_unack_with_ack(&hkc, ack).await.unwrap();
-
-//             let num_tickets = db.get_tickets(None).await.unwrap().len();
-//             let num_unack = db.get_unacknowledged_tickets(None).await.unwrap().len();
-//             let num_ack = db.get_acknowledged_tickets(None).await.unwrap().len();
-//             assert_eq!(1, num_tickets, "db should find one ticket");
-//             assert_eq!(0, num_unack, "db should not contain any unacknowledged tickets");
-//             assert_eq!(1, num_ack, "db should contain exactly one acknowledged ticket");
-//         }
-//     }
-// }

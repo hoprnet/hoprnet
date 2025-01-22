@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.1.0"
+version = "0.4.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -13,25 +13,44 @@ crate-type = ["rlib"]
 
 [features]
 default = ["serde"]
-serde = ["dep:serde", "dep:serde_with"]
+serde = [
+  "dep:serde",
+  "dep:serde_with",
+  "dep:bincode",
+  "hopr-network-types/serde",
+]
 runtime-async-std = ["hopr-network-types/runtime-async-std"]
-runtime-tokio = ["hopr-network-types/runtime-tokio"]
+runtime-tokio = ["hopr-network-types/runtime-tokio", "dep:tokio"]
+prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
+aquamarine = { workspace = true }
+arrayvec = { workspace = true }
 async-trait = { workspace = true }
+bincode = { workspace = true, optional = true }
 futures = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
-ringbuffer = { workspace = true }
+moka = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
+smart-default = { workspace = true }
+strum = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true, optional = true }
 
+hopr-async-runtime = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-async-std"] }
 mockall = { workspace = true }
+test-log = { workspace = true }

@@ -1,5 +1,6 @@
 { buildDocs ? false
 , CARGO_PROFILE ? "release"
+, cargoExtraArgs ? ""
 , cargoToml
 , craneLib
 , curl
@@ -7,6 +8,7 @@
 , foundryBin
 , git
 , html-tidy
+, isCross ? false
 , lib
 , libiconv
 , makeSetupHook
@@ -15,6 +17,7 @@
 , pkg-config
 , pkgs
 , postInstall ? null
+, rev
 , runClippy ? false
 , runTests ? false
 , solcDefault
@@ -26,6 +29,13 @@ let
   # `buildPlatform` is the platform we are compiling on
   buildPlatform = stdenv.buildPlatform;
   hostPlatform = stdenv.hostPlatform;
+
+  # The target interpreter is used to patch the interpreter in the binary
+  targetInterpreter =
+    if hostPlatform.isLinux && hostPlatform.isx86_64 then "/lib64/ld-linux-x86-64.so.2"
+    else if hostPlatform.isLinux && hostPlatform.isAarch64 then "/lib64/ld-linux-aarch64.so.1"
+    else if hostPlatform.isLinux && hostPlatform.isArmv7 then "/lib64/ld-linux-armhf.so.3"
+    else "";
 
   # The hook is used when building on darwin for non-darwin, where the flags
   # need to be cleaned up.
@@ -41,6 +51,9 @@ let
 
   crateInfo = craneLib.crateNameFromCargoToml { inherit cargoToml; };
   pname = crateInfo.pname;
+  pnameSuffix =
+    if CARGO_PROFILE == "release" then ""
+    else "-${CARGO_PROFILE}";
   version = lib.strings.concatStringsSep "." (lib.lists.take 3 (builtins.splitVersion crateInfo.version));
 
   isDarwinForDarwin = buildPlatform.isDarwin && hostPlatform.isDarwin;
@@ -59,7 +72,7 @@ let
       [ setupHookDarwin ] else [ ];
 
   sharedArgsBase = {
-    inherit pname version CARGO_PROFILE;
+    inherit pname pnameSuffix version CARGO_PROFILE;
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
@@ -67,16 +80,25 @@ let
     buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     CARGO_HOME = ".cargo";
-    cargoExtraArgs = "--offline -p ${pname} ";
+    RUST_MIN_STACK = "16777216"; # 16MB required to run the tests and compilation
+    cargoExtraArgs = "--offline -p ${pname} ${cargoExtraArgs}";
+    # this env var is used by utoipa-swagger-ui to prevent internet access
+    CARGO_FEATURE_VENDORED = "true";
     cargoVendorDir = "vendor/cargo";
     # disable running tests automatically for now
     doCheck = false;
     # prevent nix from changing config.sub files under vendor/cargo
     dontUpdateAutotoolsGnuConfigScripts = true;
+    # set to the revision because during build the Git info is not available
+    VERGEN_GIT_SHA = rev;
   };
 
   sharedArgs =
-    if runTests then sharedArgsBase // { doCheck = true; }
+    if runTests then sharedArgsBase // {
+      # exclude hopr-socks-server because it requires access to the internet
+      cargoTestExtraArgs = "--workspace -F runtime-async-std -F runtime-tokio --exclude hopr-socks-server";
+      doCheck = true;
+    }
     else if runClippy then sharedArgsBase // { cargoClippyExtraArgs = "-- -Dwarnings"; }
     else sharedArgsBase;
 
@@ -124,7 +146,15 @@ builder (args // {
     export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
     echo "# placeholder" > vendor/cargo/config.toml
     sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-      ethereum/contracts/foundry.toml.in > \
+      ethereum/contracts/foundry.in.toml > \
       ethereum/contracts/foundry.toml
+  '';
+
+  preFixup = lib.optionalString (isCross && targetInterpreter != "") ''
+    for f in `find $out/bin/ -type f`; do
+      echo "patching interpreter for $f to ${targetInterpreter}"
+      patchelf --set-interpreter ${targetInterpreter} --output $f.patched $f
+      mv $f.patched $f
+    done
   '';
 })

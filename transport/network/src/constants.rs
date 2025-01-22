@@ -8,3 +8,6 @@ pub const DEFAULT_HEARTBEAT_THRESHOLD: std::time::Duration = std::time::Duration
 /// Randomization of the heartbeat interval to make sure not
 /// all the nodes start their interval at the same time
 pub const DEFAULT_HEARTBEAT_INTERVAL_VARIANCE: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// The maximum number of parallel probes the heartbeat performs
+pub const DEFAULT_MAX_PARALLEL_PINGS: usize = 25;

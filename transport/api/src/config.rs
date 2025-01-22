@@ -1,16 +1,26 @@
+use proc_macro_regex::regex;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::fmt::{Display, Formatter};
+use std::net::ToSocketAddrs;
 use std::num::ParseIntError;
 use std::str::FromStr;
-
-use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use validator::{Validate, ValidationError};
 
 pub use core_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
-pub use core_protocol::config::ProtocolConfig;
+use hopr_transport_identity::Multiaddr;
+pub use hopr_transport_protocol::config::ProtocolConfig;
 
-use std::net::ToSocketAddrs;
+use crate::errors::HoprTransportError;
 
-use proc_macro_regex::regex;
+pub struct HoprTransportConfig {
+    pub transport: TransportConfig,
+    pub network: core_network::config::NetworkConfig,
+    pub protocol: hopr_transport_protocol::config::ProtocolConfig,
+    pub heartbeat: core_network::heartbeat::HeartbeatConfig,
+    pub session: SessionGlobalConfig,
+}
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
 
@@ -22,7 +32,7 @@ pub fn looks_like_domain(s: &str) -> bool {
 
 /// Check whether the string is an actual reachable domain.
 pub fn is_reachable_domain(host: &str) -> bool {
-    host.to_socket_addrs().map_or(false, |i| i.into_iter().next().is_some())
+    host.to_socket_addrs().is_ok_and(|i| i.into_iter().next().is_some())
 }
 
 /// Enumeration of possible host types.
@@ -44,7 +54,7 @@ impl Default for HostType {
 ///
 /// This is used for the P2P and REST API listeners.
 ///
-/// Intentionally has no default, because it depends on the use case.
+/// Intentionally has no default because it depends on the use case.
 #[derive(Debug, Serialize, Deserialize, Validate, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct HostConfig {
@@ -87,6 +97,33 @@ impl FromStr for HostConfig {
 impl Display for HostConfig {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}:{}", self.address, self.port)
+    }
+}
+
+#[cfg(not(feature = "transport-quic"))]
+fn default_multiaddr_transport(port: u16) -> String {
+    format!("tcp/{port}")
+}
+
+#[cfg(feature = "transport-quic")]
+fn default_multiaddr_transport(port: u16) -> String {
+    format!("udp/{port}/quic-v1")
+}
+
+impl TryFrom<&HostConfig> for Multiaddr {
+    type Error = HoprTransportError;
+
+    fn try_from(value: &HostConfig) -> Result<Self, Self::Error> {
+        match &value.address {
+            HostType::IPv4(ip) => Multiaddr::from_str(
+                format!("/ip4/{}/{}", ip.as_str(), default_multiaddr_transport(value.port)).as_str(),
+            )
+            .map_err(|e| HoprTransportError::Api(e.to_string())),
+            HostType::Domain(domain) => Multiaddr::from_str(
+                format!("/dns4/{}/{}", domain.as_str(), default_multiaddr_transport(value.port)).as_str(),
+            )
+            .map_err(|e| HoprTransportError::Api(e.to_string())),
+        }
     }
 }
 
@@ -134,6 +171,66 @@ pub struct TransportConfig {
     /// or in the same private IPv4 network
     #[serde(default)]
     pub prefer_local_addresses: bool,
+}
+
+const DEFAULT_SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(180);
+
+const SESSION_IDLE_MIN_TIMEOUT: Duration = Duration::from_secs(60);
+
+const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
+
+const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
+
+fn default_session_establish_max_retries() -> u32 {
+    DEFAULT_SESSION_ESTABLISH_MAX_RETRIES
+}
+
+fn default_session_idle_timeout() -> std::time::Duration {
+    DEFAULT_SESSION_IDLE_TIMEOUT
+}
+
+fn default_session_establish_retry_delay() -> std::time::Duration {
+    DEFAULT_SESSION_ESTABLISH_RETRY_DELAY
+}
+
+fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), ValidationError> {
+    if SESSION_IDLE_MIN_TIMEOUT <= *value {
+        Ok(())
+    } else {
+        Err(ValidationError::new("session idle timeout is too low"))
+    }
+}
+
+/// Global configuration of Sessions.
+#[serde_as]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Validate, smart_default::SmartDefault)]
+#[serde(deny_unknown_fields)]
+pub struct SessionGlobalConfig {
+    /// Maximum time before an idle Session is closed.
+    ///
+    /// Defaults to 3 minutes.
+    #[validate(custom(function = "validate_session_idle_timeout"))]
+    #[default(DEFAULT_SESSION_IDLE_TIMEOUT)]
+    #[serde(default = "default_session_idle_timeout")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub idle_timeout: std::time::Duration,
+
+    /// Maximum retries to attempt to establish the Session
+    /// Set 0 for no retries.
+    ///
+    /// Defaults to 3, maximum is 20.
+    #[validate(range(min = 0, max = 20))]
+    #[default(DEFAULT_SESSION_ESTABLISH_MAX_RETRIES)]
+    #[serde(default = "default_session_establish_max_retries")]
+    pub establish_max_retries: u32,
+
+    /// Delay between Session establishment retries.
+    ///
+    /// Default is 2 seconds.
+    #[default(DEFAULT_SESSION_ESTABLISH_RETRY_DELAY)]
+    #[serde(default = "default_session_establish_retry_delay")]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub establish_retry_timeout: std::time::Duration,
 }
 
 #[cfg(test)]

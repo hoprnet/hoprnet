@@ -1,10 +1,14 @@
-black==23.3.0
-pytest==7.2.1
-pytest-asyncio==0.21.0
-requests==2.28.2
-rlp==3.0.0
-ruff==0.0.261
-waiting==1.4.1
+aiohttp==3.8.4
+base58==2.1.1
+black==24.10.0
+cryptography==43.0.1
+PyNaCl==1.5.0
+pytest==8.3.3
+pytest-asyncio==0.24.0
+pytest-timeout==2.3.1 
+pyYAML==6.0.1
+requests==2.32.3
+ruff==0.7.0
+urllib3==2.2.3
 websocket-client==1.5.1
-websockets==11.0.1
-hoprd-sdk @ git+https://github.com/hoprnet/hoprd-sdk-python@kauki/2.1.0-rc-3-update-20240326
+websockets==13.1

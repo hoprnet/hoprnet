@@ -1,6 +1,6 @@
 [package]
 name = "hoprd"
-version = "2.2.0"
+version = "2.2.0-rc.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR node executable."
@@ -13,22 +13,29 @@ build = "build.rs"
 default = [
   "runtime-tokio",
   "prometheus",
+  "telemetry",
+  "explicit-path",
+  # "transport-quic", # TODO: re-enable this once properly tested
 ] # uses tokio by default because of axum
 prometheus = [
   "dep:hopr-metrics",
   "dep:lazy_static",
   "hopr-lib/prometheus",
   "hoprd-api/prometheus",
+  "hopr-network-types/prometheus",
 ]
 runtime-async-std = [
   "dep:async-std",
   "hopr-lib/runtime-async-std",
+  "hopr-network-types/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
   "opentelemetry_sdk?/rt-async-std",
 ]
 runtime-tokio = [
   "dep:tokio",
+  "dep:tokio-retry",
   "hopr-lib/runtime-tokio",
+  "hopr-network-types/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
   "opentelemetry_sdk?/rt-tokio",
 ]
@@ -38,54 +45,74 @@ telemetry = [
   "dep:opentelemetry_sdk",
   "dep:tracing-opentelemetry",
 ]
+transport-quic = ["hopr-lib/transport-quic"]
+explicit-path = ["hoprd-api/explicit-path"]
+# To use profiling:
+# 1. Set RUSTFLAGS="--cfg tokio_unstable" before building
+# 2. Enable the 'prof' feature: cargo build --feature prof
+prof = [
+  "dep:console-subscriber",
+] # must be built with 'tokio_unstable': https://github.com/tokio-rs/console/tree/main/console-subscriber
 
 [dependencies]
-async-broadcast = { workspace = true }
+anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }
 async-std = { workspace = true, features = [
   "attributes",
   "tokio1",
 ], optional = true }
-clap = { workspace = true }
 chrono = { workspace = true }
+clap = { workspace = true }
 futures = { workspace = true }
 home = "0.5.9"
 lazy_static = { workspace = true, optional = true }
-proc-macro-regex = "~1.1.0"
+proc-macro-regex = { workspace = true }
 serde = { workspace = true }
+serde_with = { workspace = true }
 serde_yaml = { workspace = true }
 serde_json = { workspace = true }
 signal-hook = { workspace = true }
+smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
+tokio-retry = { workspace = true, optional = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "json"] }
 validator = { workspace = true }
 
-opentelemetry = { version = "0.24.0", optional = true }
-opentelemetry-otlp = { version = "0.17.0", default-features = false, features = [
+console-subscriber = { workspace = true, optional = true }
+
+opentelemetry = { workspace = true, optional = true }
+opentelemetry-otlp = { workspace = true, default-features = false, features = [
   "trace",
   "reqwest-client",
   "tls-roots",
   "http-proto",
   "grpc-tonic",
 ], optional = true }
-opentelemetry_sdk = { version = "0.24.0", optional = true }
-tracing-opentelemetry = { version = "0.24.0", optional = true }
+opentelemetry_sdk = { workspace = true, optional = true }
+tracing-opentelemetry = { workspace = true, optional = true }
 
-hopr-lib = { workspace = true, features = ["runtime-tokio"] }
+hopr-lib = { workspace = true, features = [
+  "runtime-tokio",
+  "session-client",
+  "session-server",
+] }
+hoprd-db-api = { workspace = true }
 hoprd-api = { workspace = true }
 hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-network-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
+hopr-crypto-random = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
 
 [build-dependencies]
-vergen-gix = { version = "1.0.0", features = ["build"] }
+vergen-gix = { workspace = true, features = ["build"] }
 anyhow = { workspace = true }

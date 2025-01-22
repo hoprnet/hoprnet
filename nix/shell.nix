@@ -20,6 +20,7 @@ craneLib.devShell {
   packages = with pkgs; [
     openssl
     pkg-config
+    patchelf
     foundry-bin
     solcDefault
 
@@ -31,11 +32,18 @@ craneLib.devShell {
     gnumake
     which
 
+    # docs utilities
+    graphviz
+
     # github integration
     gh
 
     # test Github automation
     act
+
+    # documentation utilities
+    swagger-codegen3
+    vacuum-go
 
     # docker image inspection and handling
     dive
@@ -62,12 +70,19 @@ craneLib.devShell {
     autoPatchelf ./.venv
   '';
   preShellHook = ''
-    sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-      ethereum/contracts/foundry.toml.in > \
-      ethereum/contracts/foundry.toml
+    if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
+      echo "solc = \"${solcDefault}/bin/solc\""
+      echo "Generating foundry.toml file!"
+      sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+        ethereum/contracts/foundry.in.toml >| \
+        ethereum/contracts/foundry.toml
+    else
+      echo "foundry.toml file already exists!"
+    fi
   '';
   postShellHook = ''
     ${pre-commit-check.shellHook}
   '';
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
+  RUST_MIN_STACK = "16777216"; # 16MB required to run the tests and compilation
 }

@@ -36,6 +36,13 @@ pub enum RpcError {
 
     #[error(transparent)]
     ProviderError(#[from] ProviderError),
+
+    #[error("multicall Error: {0}")]
+    MulticallError(String),
+
+    /// Error occurred during data conversion
+    #[error("conversion error: {0}")]
+    ConversionError(String),
 }
 
 pub type Result<T> = std::result::Result<T, RpcError>;
@@ -60,7 +67,7 @@ where
 }
 
 /// Error abstraction for `HttpRequestor`.
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Clone, Debug, PartialEq)]
 pub enum HttpRequestError {
     #[error("connection timed out")]
     Timeout,

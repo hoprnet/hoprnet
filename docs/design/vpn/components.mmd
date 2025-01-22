@@ -1,0 +1,22 @@
+---
+Title: GnosisVPN Client-Server Interaction
+---
+graph TB
+    subgraph Client
+        hoprd["HOPRd Node"]
+        gnosisvpn["GnosisVPN App"]
+        wg["WireGuard Client"]
+        gnosisvpn -. configures peer .- wg
+    end
+    subgraph Server
+        ex_hoprd["HOPRd Node"]
+        ex_gnosisvpn["GnosisVPN Server"]
+        ex_wg["WireGuard Server"]
+        ex_gnosisvpn -. configures peer .- ex_wg
+    end
+    hopr_network(("HOPR Network"))
+    registry["GnosisVPN Registry"]
+    gnosisvpn == WG Session Setup ==> hoprd ==> hopr_network ==> ex_hoprd ==> ex_gnosisvpn
+    wg -- UDP Session --> hoprd --> hopr_network --> ex_hoprd --> ex_wg
+    gnosisvpn -. Fetch Available Exit Nodes .-> registry
+    ex_gnosisvpn -. Manual Registration .-> registry

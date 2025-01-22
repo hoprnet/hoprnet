@@ -7,6 +7,12 @@
 //!
 //! Both of these traits implemented and realized via the [RpcOperations](rpc::RpcOperations) type,
 //! so this represents the main entry point to all RPC related operations.
+use async_trait::async_trait;
+pub use ethers::types::transaction::eip2718::TypedTransaction;
+use futures::{FutureExt, Stream};
+use http_types::convert::Deserialize;
+use primitive_types::H256;
+use serde::Serialize;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
@@ -15,20 +21,12 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::time::Duration;
 
-use async_trait::async_trait;
-use futures::{FutureExt, Stream};
-use primitive_types::H256;
-use serde::Serialize;
-
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::RpcError::{ProviderError, TransactionDropped};
 use crate::errors::{HttpRequestError, Result};
 use crate::RetryAction::NoRetry;
-
-pub use ethers::types::transaction::eip2718::TypedTransaction;
-use http_types::convert::Deserialize;
 
 pub mod client;
 pub mod errors;
@@ -51,10 +49,14 @@ pub struct Log {
     pub tx_index: u64,
     /// Corresponding block number
     pub block_number: u64,
+    /// Corresponding block hash
+    pub block_hash: Hash,
     /// Corresponding transaction hash
     pub tx_hash: Hash,
     /// Log index
     pub log_index: U256,
+    /// Removed flag
+    pub removed: bool,
 }
 
 impl From<ethers::types::Log> for Log {
@@ -65,8 +67,10 @@ impl From<ethers::types::Log> for Log {
             data: Box::from(value.data.as_ref()),
             tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
             block_number: value.block_number.expect("block id must be present").as_u64(),
+            block_hash: value.block_hash.expect("block hash must be present").into(),
             log_index: value.log_index.expect("log index must be present"),
             tx_hash: value.transaction_hash.expect("tx hash must be present").into(),
+            removed: value.removed.expect("removed flag must be present"),
         }
     }
 }
@@ -80,11 +84,56 @@ impl From<Log> for ethers::abi::RawLog {
     }
 }
 
+impl From<SerializableLog> for Log {
+    fn from(value: SerializableLog) -> Self {
+        let topics = value
+            .topics
+            .into_iter()
+            .map(|topic| topic.into())
+            .collect::<Vec<Hash>>();
+
+        Self {
+            address: value.address,
+            topics,
+            data: Box::from(value.data.as_ref()),
+            tx_index: value.tx_index,
+            block_number: value.block_number,
+            block_hash: value.block_hash.into(),
+            log_index: value.log_index.into(),
+            tx_hash: value.tx_hash.into(),
+            removed: value.removed,
+        }
+    }
+}
+
+impl From<Log> for SerializableLog {
+    fn from(value: Log) -> Self {
+        SerializableLog {
+            address: value.address,
+            topics: value.topics.into_iter().map(|t| t.into()).collect(),
+            data: value.data.into_vec(),
+            tx_index: value.tx_index,
+            block_number: value.block_number,
+            block_hash: value.block_hash.into(),
+            tx_hash: value.tx_hash.into(),
+            log_index: value.log_index.as_u64(),
+            removed: value.removed,
+            // These fields stay empty for logs coming from the chain and will be populated by the
+            // indexer when processing the log.
+            processed: None,
+            processed_at: None,
+            checksum: None,
+        }
+    }
+}
+
 impl Display for Log {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "log in block #{} of {} with {} topics",
+            "log #{} in tx #{} in block #{} of address {} with {} topics",
+            self.log_index,
+            self.tx_index,
             self.block_number,
             self.address,
             self.topics.len()
@@ -199,8 +248,8 @@ pub trait HttpPostRequestor: Send + Sync {
 pub struct HttpPostRequestorConfig {
     /// Timeout for HTTP POST request
     ///
-    /// Defaults to 5 seconds.
-    #[default(Duration::from_secs(5))]
+    /// Defaults to 30 seconds.
+    #[default(Duration::from_secs(30))]
     pub http_request_timeout: Duration,
 
     /// Maximum number of HTTP redirects to follow
@@ -297,6 +346,21 @@ impl<'a> IntoFuture for PendingTransaction<'a> {
     }
 }
 
+/// Represents the on-chain status for the Node Safe module.
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+pub struct NodeSafeModuleStatus {
+    pub is_node_included_in_module: bool,
+    pub is_module_enabled_in_safe: bool,
+    pub is_safe_owner_of_module: bool,
+}
+
+impl NodeSafeModuleStatus {
+    /// Determines if the node passes all status checks.
+    pub fn should_pass(&self) -> bool {
+        self.is_node_included_in_module && self.is_module_enabled_in_safe && self.is_safe_owner_of_module
+    }
+}
+
 /// Trait defining a general set of operations an RPC provider
 /// must provide to the HOPR node.
 #[async_trait]
@@ -306,6 +370,9 @@ pub trait HoprRpcOperations {
 
     /// Retrieves the node's account balance of the given type.
     async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
+
+    /// Retrieves the node's eligibility status
+    async fn get_eligibility_status(&self, address: Address) -> Result<bool>;
 
     /// Retrieves info of the given node module's target.
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>>;
@@ -319,6 +386,9 @@ pub trait HoprRpcOperations {
     /// Retrieves the notice period of channel closure from the Channels contract.
     async fn get_channel_closure_notice_period(&self) -> Result<Duration>;
 
+    /// Retrieves the on-chain status of node, safe, and module.
+    async fn check_node_safe_module_status(&self, node_address: Address) -> Result<NodeSafeModuleStatus>;
+
     /// Sends transaction to the RPC provider.
     async fn send_transaction(&self, tx: TypedTransaction) -> Result<PendingTransaction>;
 }
@@ -329,7 +399,7 @@ pub struct BlockWithLogs {
     /// Block number
     pub block_id: u64,
     /// Filtered logs belonging to this block.
-    pub logs: BTreeSet<Log>,
+    pub logs: BTreeSet<SerializableLog>,
 }
 
 impl Display for BlockWithLogs {

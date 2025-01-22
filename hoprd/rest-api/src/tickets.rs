@@ -3,13 +3,17 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_crypto_types::types::Hash;
-use hopr_lib::{errors::HoprLibError, HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex};
 use serde::Deserialize;
 use serde_with::{serde_as, DisplayFromStr};
 use std::sync::Arc;
 
-use crate::{ApiErrorStatus, InternalState, BASE_PATH};
+use hopr_crypto_types::types::Hash;
+use hopr_lib::{
+    errors::{HoprLibError, HoprStatusError},
+    HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex,
+};
+
+use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -118,9 +122,9 @@ pub(super) async fn show_all_tickets() -> impl IntoResponse {
 #[schema(example = json!({
         "winning_count": 0,
         "neglectedValue": "0",
-        "redeemedValue": "100",
+        "redeemedValue": "1000000000000000000",
         "rejectedValue": "0",
-        "unredeemedValue": "200",
+        "unredeemedValue": "2000000000000000",
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NodeTicketStatisticsResponse {
@@ -166,6 +170,29 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
     }
 }
 
+/// Resets the ticket metrics.
+#[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
+        responses(
+            (status = 204, description = "Ticket statistics reset successfully."),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Tickets"
+    )]
+pub(super) async fn reset_ticket_statistics(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+    match hopr.reset_ticket_statistics().await {
+        Ok(()) => (StatusCode::NO_CONTENT, "").into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
 /// Starts redeeming of all tickets in all channels.
 ///
 /// **WARNING:** this should almost **never** be used as it can issue a large
@@ -176,6 +203,7 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
         responses(
             (status = 204, description = "Tickets redeemed successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -188,6 +216,9 @@ pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) 
     let hopr = state.hopr.clone();
     match hopr.redeem_all_tickets(false).await {
         Ok(()) => (StatusCode::NO_CONTENT, "").into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
     }
 }
@@ -207,6 +238,7 @@ pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) 
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Tickets were not found for that channel. That means that no messages were sent inside this channel yet.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
         security(
@@ -225,6 +257,9 @@ pub(super) async fn redeem_tickets_in_channel(
         Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, false).await {
             Ok(count) if count > 0 => (StatusCode::NO_CONTENT, "").into_response(),
             Ok(_) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+                (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+            }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
         },
         Err(_) => (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidChannelId).into_response(),

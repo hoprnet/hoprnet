@@ -63,7 +63,7 @@ hopli identity read \
 
 #### Update identities password
 
-To update some identites' password. Two [passwords](####Password) must be provided:
+To update the password for identities in a specified directory, 2 [passwords](####Password) must be provided:
 
 - an old (and valid) password to the identity files. Either provided as cli argument `--password-path` or as an env variable `IDENTITY_PASSWORD`
 - a new password to the identity files. Either provided as cli argument `--new-password-path` or as an env variable `NEW_IDENTITY_PASSWORD`
@@ -203,7 +203,7 @@ hopli safe-module create \
 
 #### Migrate: make safe and module compatible with a new network
 
-Migrate an exising set of node(d) with safe and module to a new network:
+Migrate an existing set of node(d) with safe and module to a new network:
 
 - add the Channel contract of the new network to the module as target and set default permissions.
 - add the Announcement contract as target to the module

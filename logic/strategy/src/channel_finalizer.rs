@@ -98,7 +98,7 @@ where
             })
             .map(|channel| async {
                 let channel_cpy = *channel;
-                info!("channel closure finalizer: finalizing closure of {channel_cpy}");
+                info!(channel = %channel_cpy, "channel closure finalizer: finalizing closure");
                 match self
                     .chain_actions
                     .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
@@ -108,7 +108,7 @@ where
                         // Currently, we're not interested in awaiting the Close transactions to confirmation
                         debug!("channel closure finalizer: finalizing closure of {channel_cpy}");
                     }
-                    Err(e) => error!("channel closure finalizer: failed to finalize closure of {channel_cpy}: {e}"),
+                    Err(e) => error!(%channel_cpy, error = %e, "channel closure finalizer: failed to finalize closure"),
                 }
             })
             .collect::<FuturesUnordered<_>>()
@@ -146,7 +146,7 @@ mod tests {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
             "492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775"
         ))
-        .unwrap();
+        .expect("lazy static keypair should be valid");
         static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = hex!("3798fa65d6326d3813a0d33489ac35377f4496ef").into();
         static ref CHARLIE: Address = hex!("250eefb2586ab0873befe90b905126810960ee7c").into();
@@ -179,8 +179,8 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() {
-        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await;
+    async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
 
         let max_closure_overdue = Duration::from_secs(600);
 
@@ -226,8 +226,7 @@ mod tests {
 
         let db_clone = db.clone();
         db.begin_transaction()
-            .await
-            .unwrap()
+            .await?
             .perform(|tx| {
                 Box::pin(async move {
                     db_clone.upsert_channel(Some(tx), c_open).await?;
@@ -236,8 +235,7 @@ mod tests {
                     db_clone.upsert_channel(Some(tx), c_pending_overdue).await
                 })
             })
-            .await
-            .unwrap();
+            .await?;
 
         let mut actions = MockChannelAct::new();
         actions
@@ -249,6 +247,8 @@ mod tests {
         let cfg = ClosureFinalizerStrategyConfig { max_closure_overdue };
 
         let strat = ClosureFinalizerStrategy::new(cfg, db.clone(), actions);
-        strat.on_tick().await.expect("tick must not fail")
+        strat.on_tick().await?;
+
+        Ok(())
     }
 }

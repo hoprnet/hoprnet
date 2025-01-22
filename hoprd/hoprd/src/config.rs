@@ -1,12 +1,20 @@
+use std::collections::HashSet;
+use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
+use std::time::Duration;
+
+use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
+use hopr_platform::file::native::read_to_string;
+use hoprd_api::config::{Api, Auth};
+use hoprd_inbox::config::MessageInboxConfiguration;
 
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use tracing::{debug, warn};
 use validator::{Validate, ValidationError};
 
-use hopr_lib::{config::HoprLibConfig, Address, HostConfig, ProtocolsConfig};
-use hoprd_api::config::{Api, Auth};
-use hoprd_inbox::config::MessageInboxConfiguration;
+use crate::errors::HoprdError;
 
 pub const DEFAULT_HOST: &str = "0.0.0.0";
 pub const DEFAULT_PORT: u16 = 9091;
@@ -15,8 +23,8 @@ pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transa
 
 // Validate that the path is a valid UTF-8 path.
 //
-// Also used to perform the identitify file existence check on the
-// specified path, which is now circumvented, but could
+// Also used to perform the identity file existence check on the
+// specified path, which is now circumvented but could
 // return in the future workflows of setting up a node.
 fn validate_file_path(_s: &str) -> Result<(), ValidationError> {
     Ok(())
@@ -105,6 +113,10 @@ pub struct HoprdConfig {
     #[validate(nested)]
     #[serde(default)]
     pub api: Api,
+    /// Configuration of the Session entry/exit node IP protocol forwarding.
+    #[validate(nested)]
+    #[serde(default)]
+    pub session_ip_forwarding: SessionIpForwardingConfig,
 }
 
 impl From<HoprdConfig> for HoprLibConfig {
@@ -113,16 +125,10 @@ impl From<HoprdConfig> for HoprLibConfig {
     }
 }
 
-use hopr_platform::file::native::read_to_string;
-
-use tracing::{debug, warn};
-
-use crate::errors::HoprdError;
-
 impl HoprdConfig {
     pub fn from_cli_args(cli_args: crate::cli::CliArgs, skip_validation: bool) -> crate::errors::Result<HoprdConfig> {
         let mut cfg: HoprdConfig = if let Some(cfg_path) = cli_args.configuration_file_path {
-            debug!("fetching configuration from file {cfg_path}");
+            debug!(cfg_path, "fetching configuration from file");
             let yaml_configuration =
                 read_to_string(cfg_path.as_str()).map_err(|e| crate::errors::HoprdError::ConfigError(e.to_string()))?;
             serde_yaml::from_str(&yaml_configuration)
@@ -143,6 +149,15 @@ impl HoprdConfig {
         }
         if cli_args.test_prefer_local_addresses > 0 {
             cfg.hopr.transport.prefer_local_addresses = true;
+        }
+
+        if let Some(host) = cli_args.default_session_listen_host {
+            cfg.session_ip_forwarding.default_entry_listen_host = match host.address {
+                HostType::IPv4(addr) => IpAddr::from_str(&addr)
+                    .map(|ip| std::net::SocketAddr::new(ip, host.port))
+                    .map_err(|_| HoprdError::ConfigError("invalid default session listen IP address".into())),
+                HostType::Domain(_) => Err(HoprdError::ConfigError("default session listen must be an IP".into())),
+            }?;
         }
 
         // db
@@ -260,15 +275,19 @@ impl HoprdConfig {
         }
 
         if let Some(x) = cli_args.max_block_range {
-            // Override all max_block_range setting in all networks
+            // Override all max_block_range settings in all networks
             for (_, n) in cfg.hopr.chain.protocols.networks.iter_mut() {
                 n.max_block_range = x;
             }
         }
 
-        if cli_args.check_unrealized_balance == 0 {
-            cfg.hopr.chain.check_unrealized_balance = true;
-        }
+        // The --no*/--disable* CLI flags are Count-based, therefore, if they equal to 0,
+        // it means they have not been specified on the CLI and thus the
+        // corresponding config value should be enabled.
+
+        cfg.hopr.chain.check_unrealized_balance = cli_args.no_check_unrealized_balance == 0;
+        cfg.hopr.chain.fast_sync = cli_args.no_fast_sync == 0;
+        cfg.hopr.chain.keep_logs = cli_args.no_keep_logs == 0;
 
         // safe module
         if let Some(x) = cli_args.safe_transaction_service_provider {
@@ -347,15 +366,67 @@ impl HoprdConfig {
     }
 }
 
+fn default_target_retry_delay() -> Duration {
+    Duration::from_secs(2)
+}
+
+fn default_entry_listen_host() -> SocketAddr {
+    "127.0.0.1:0".parse().unwrap()
+}
+
+fn default_max_tcp_target_retries() -> u32 {
+    10
+}
+
+/// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`]) and the Entry node.
+#[serde_as]
+#[derive(
+    Clone, Debug, Eq, PartialEq, smart_default::SmartDefault, serde::Deserialize, serde::Serialize, validator::Validate,
+)]
+pub struct SessionIpForwardingConfig {
+    /// If specified, enforces only the given target addresses (after DNS resolution).
+    /// If `None` is specified, allows all targets.
+    ///
+    /// Defaults to `None`.
+    #[serde(default)]
+    #[default(None)]
+    #[serde_as(as = "Option<HashSet<serde_with::DisplayFromStr>>")]
+    pub target_allow_list: Option<HashSet<SocketAddr>>,
+
+    /// Delay between retries in seconds to reach a TCP target.
+    ///
+    /// Defaults to 2 seconds.
+    #[serde(default = "default_target_retry_delay")]
+    #[default(default_target_retry_delay())]
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    pub tcp_target_retry_delay: Duration,
+
+    /// Maximum number of retries to reach a TCP target before giving up.
+    ///
+    /// Default is 10.
+    #[serde(default = "default_max_tcp_target_retries")]
+    #[default(default_max_tcp_target_retries())]
+    #[validate(range(min = 1))]
+    pub max_tcp_target_retries: u32,
+
+    /// Specifies the default `listen_host` for Session listening sockets
+    /// at an Entry node.
+    #[serde(default = "default_entry_listen_host")]
+    #[default(default_entry_listen_host())]
+    #[serde_as(as = "serde_with::DisplayFromStr")]
+    pub default_entry_listen_host: SocketAddr,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Context;
     use clap::{Args, Command, FromArgMatches};
     use hopr_lib::HostType;
     use std::io::{Read, Write};
     use tempfile::NamedTempFile;
 
-    pub fn example_cfg() -> HoprdConfig {
+    pub fn example_cfg() -> anyhow::Result<HoprdConfig> {
         let chain = hopr_lib::config::Chain {
             protocols: hopr_lib::ProtocolsConfig::from_str(
                 r#"
@@ -374,6 +445,7 @@ mod tests {
                               "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
                               "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
                               "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
+                              "winning_probability_oracle": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
                               "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
                               "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
                             },
@@ -402,7 +474,7 @@ mod tests {
                       }
                     "#,
             )
-            .expect("protocol config should be valid"),
+            .map_err(|e| anyhow::anyhow!(e))?,
             ..hopr_lib::config::Chain::default()
         };
 
@@ -413,8 +485,8 @@ mod tests {
 
         let safe_module = hopr_lib::config::SafeModule {
             safe_transaction_service_provider: "https:://provider.com/".to_owned(),
-            safe_address: Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
-            module_address: Address::from_str("0x0000000000000000000000000000000000000000").unwrap(),
+            safe_address: Address::from_str("0x0000000000000000000000000000000000000000")?,
+            module_address: Address::from_str("0x0000000000000000000000000000000000000000")?,
         };
 
         let identity = Identity {
@@ -428,7 +500,7 @@ mod tests {
             port: 9091,
         };
 
-        HoprdConfig {
+        Ok(HoprdConfig {
             hopr: HoprLibConfig {
                 host,
                 db,
@@ -438,12 +510,12 @@ mod tests {
             },
             identity,
             ..HoprdConfig::default()
-        }
+        })
     }
 
     #[test]
     fn test_config_should_be_serializable_into_string() -> Result<(), Box<dyn std::error::Error>> {
-        let cfg = example_cfg();
+        let cfg = example_cfg()?;
 
         let from_yaml: HoprdConfig = serde_yaml::from_str(include_str!("../example_cfg.yaml"))?;
 
@@ -457,7 +529,7 @@ mod tests {
         let mut config_file = NamedTempFile::new()?;
         let mut prepared_config_file = config_file.reopen()?;
 
-        let cfg = example_cfg();
+        let cfg = example_cfg()?;
         let yaml = serde_yaml::to_string(&cfg)?;
         config_file.write_all(yaml.as_bytes())?;
 
@@ -475,23 +547,27 @@ mod tests {
     /// version satisfies check
     #[test]
     #[ignore]
-    fn test_config_is_extractable_from_the_cli_arguments() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_config_is_extractable_from_the_cli_arguments() -> anyhow::Result<()> {
         let pwnd = "rpc://pawned!";
 
         let mut config_file = NamedTempFile::new()?;
 
-        let mut cfg = example_cfg();
+        let mut cfg = example_cfg()?;
         cfg.hopr.chain.provider = Some(pwnd.to_owned());
 
         let yaml = serde_yaml::to_string(&cfg)?;
         config_file.write_all(yaml.as_bytes())?;
-        let cfg_file_path = config_file.path().to_str().unwrap().to_string();
+        let cfg_file_path = config_file
+            .path()
+            .to_str()
+            .context("file path should have a string representation")?
+            .to_string();
 
         let cli_args = vec!["hoprd", "--configurationFilePath", cfg_file_path.as_str()];
 
         let mut cmd = Command::new("hoprd").version("0.0.0");
         cmd = crate::cli::CliArgs::augment_args(cmd);
-        let derived_matches = cmd.try_get_matches_from(cli_args).map_err(|e| e.to_string())?;
+        let derived_matches = cmd.try_get_matches_from(cli_args)?;
         let args = crate::cli::CliArgs::from_arg_matches(&derived_matches)?;
 
         // skipping validation
@@ -499,7 +575,7 @@ mod tests {
 
         assert!(cfg.is_ok());
 
-        let cfg = cfg.unwrap();
+        let cfg = cfg?;
 
         assert_eq!(cfg.hopr.chain.provider, Some(pwnd.to_owned()));
 

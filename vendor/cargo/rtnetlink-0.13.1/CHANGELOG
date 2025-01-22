@@ -1,0 +1,43 @@
+# Changelog
+## [0.13.1] - 2023-07-18
+### Breaking changes
+ - Deprecated `BondAddRequest::active_slave()` in the favor of
+   `BondAddRequest::active_port()`. (9b67c97, bf6dbf0)
+ - Deprecated `BondAddRequest::all_slaves_active()` in the favor of
+   `BondAddRequest::all_ports_active()`. (9b67c97, bf6dbf0)
+
+### New features
+ - Support bond port setting. (7afe563)
+ - Support VLAN QOS setting. (78a58db)
+
+### Bug fixes
+ - N/A
+
+## [0.13.0] - 2023-07-10
+### Breaking changes
+ - `TrafficFilterNewRequest::u32()` changed to return `Result`. (b7f8c73)
+ - `TrafficFilterNewRequest::redirect() changed to return `Result`. (b7f8c73)
+ - Deprecated `RouteAddRequest::table` in the favor of
+   `RouteAddRequest::table_id` in order to support table ID bigger than 255.
+   (0a8eddd)
+
+### New features
+ - Support route table ID bigger than 255. (0a8eddd)
+ - Support creating xfrm tunnel. (5252908)
+
+### Bug fixes
+ - Removed assers. (e6bcf3e)
+
+## [0.12.0] - 2023-01-29
+### Breaking changes
+ - Removed these reexports. (2d58a54)
+     * `rtnetlink::packet`
+     * `rtnetlink::proto`
+     * `rtnetlink::sys`
+
+### New features
+ - Allow adding macvtap on a link. (ad1207f)
+ - Support setting priority when adding rules. (b771ffd)
+
+### Bug fixes
+ - Fix ip_monitor example. (b12f061)

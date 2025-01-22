@@ -13,10 +13,10 @@ services:
     image: "${HOPRD_IMAGE}"
     restart: unless-stopped
     pull_policy: always
+    stop_signal: SIGINT
     platform: ${DOCKER_PLATFORM}
     container_name: hoprd
     hostname: hoprd
-    stop_signal: SIGINT
     networks:
       - hoprnet
     ports:
@@ -29,13 +29,11 @@ services:
       - "RUST_LOG=${HOPRD_LOG_LEVEL}"
       - RUST_BACKTRACE=full
       - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd.cfg.yaml
-      - HOPRD_API_PORT=3001
-      # - OPENTELEMETRY_COLLECTOR_URL=http://server.
+      - "HOPRD_USE_OPENTELEMETRY=${HOPRD_USE_OPENTELEMETRY}"
+      - "OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME}"
+      - "OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}"
     volumes:
-      - ./hoprd.cfg.yaml:/app/hoprd.cfg.yaml
-      - ./hopr.id:/app/hopr.id
-      - hoprd_data:/app/hoprd/
-      - '/var/run/docker.sock:/var/run/docker.sock'
+      - ./hoprd_data:/app
     deploy:
       resources:
         reservations:
@@ -53,11 +51,12 @@ services:
   hopr-admin:
     image: "${HOPR_ADMIN_IMAGE}"
     restart: unless-stopped
+    pull_policy: always
     platform: ${DOCKER_PLATFORM}
     container_name: admin
     hostname: admin
     ports:
-      - "${HOPR_ADMIN_PORT}:80"
+      - "${HOPR_ADMIN_PORT}:4677"
     networks:
       - hoprnet
     deploy:
@@ -68,6 +67,23 @@ services:
           memory: "${HOPR_ADMIN_MEM_LIMIT}"
     profiles:
       - admin-ui
+
+  jaeger:
+    image: "${JAEGER_IMAGE}"
+    restart: unless-stopped
+    platform: ${DOCKER_PLATFORM}
+    container_name: jaeger
+    hostname: jaeger
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "16686:16686"
+    networks:
+      - hoprnet
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    profiles:
+      - tracing
 
   cadvisor:
     image: "${METRICS_CADVISOR_IMAGE}"

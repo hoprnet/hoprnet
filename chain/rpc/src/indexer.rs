@@ -11,10 +11,9 @@ use async_stream::stream;
 use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, Middleware};
 use futures::stream::BoxStream;
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt};
 use std::pin::Pin;
-use tracing::{debug, info, warn};
-use tracing::{error, trace};
+use tracing::{debug, error, trace, warn};
 
 use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
@@ -63,7 +62,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     fn stream_logs(&self, filter: LogFilter, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
         let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
 
-        info!(
+        debug!(
             "polling logs from blocks #{from_block} - #{to_block} (via {:?} chunks)",
             (to_block - from_block) / self.cfg.max_block_range_fetch_size + 1
         );
@@ -71,14 +70,21 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         fetch_ranges
             .then(|subrange| {
                 let prov_clone = self.provider.clone();
+
                 async move {
+                    trace!(
+                        from = ?subrange.get_from_block(),
+                        to = ?subrange.get_to_block(),
+                        "fetching logs in block subrange"
+                    );
                     match prov_clone.get_logs(&subrange).await {
                         Ok(logs) => Ok(logs),
                         Err(e) => {
                             error!(
-                                "failed to fetch logs in block subrange {:?}-{:?}: {e}",
-                                subrange.get_from_block(),
-                                subrange.get_to_block()
+                                from = ?subrange.get_from_block(),
+                                to = ?subrange.get_to_block(),
+                                error = %e,
+                                "failed to fetch logs in block subrange"
                             );
                             Err(e)
                         }
@@ -129,7 +135,7 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                 from_block = latest_block;
                             } else if past_diff <= MAX_RPC_PAST_BLOCKS as u64 {
                                 // If we came here early (we tolerate only off-by MAX_RPC_PAST_BLOCKS), wait some more
-                                warn!("too early query, RPC provider still at block {latest_block}, diff to DB: {past_diff}");
+                                debug!(last_block = latest_block, start_block = start_block_number, blocks_diff = past_diff, "Indexer premature request. Block not found yet in RPC provider.");
                                 futures_timer::Delay::new(past_diff as u32 * self.cfg.expected_block_time / 3).await;
                                 continue;
                             } else {
@@ -140,25 +146,34 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                             }
                         }
 
+
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
                         let mut retrieved_logs = self.stream_logs(filter.clone(), from_block, latest_block);
 
+                        trace!(from_block, to_block = latest_block, "processing batch");
+
                         let mut current_block_log = BlockWithLogs { block_id: from_block, ..Default::default()};
-                        trace!("begin processing batch #{from_block} - #{latest_block}");
+
                         loop {
-                            match retrieved_logs.try_next().await {
-                                Ok(Some(log)) => {
+                            match retrieved_logs.next().await {
+                                Some(Ok(log)) => {
                                     // This in general should not happen, but handle such a case to be safe
                                     if log.block_number > latest_block {
-                                        warn!("got {log} that has not yet reached the finalized tip at {latest_block}");
+                                        warn!(%log, latest_block, "got log that has not yet reached the finalized tip");
                                         break;
                                     }
 
+                                    // This should not happen, thus panic.
+                                    if current_block_log.block_id > log.block_number {
+                                        error!(log_block_id = log.block_number, current_block_log.block_id, "received log from a previous block");
+                                        panic!("The on-chain logs are not ordered by block number. This is a critical error.");
+                                    }
+
                                     // This assumes the logs are arriving ordered by blocks when fetching a range
-                                    if current_block_log.block_id != log.block_number {
-                                        debug!("completed {current_block_log}");
+                                    if current_block_log.block_id < log.block_number {
+                                        debug!(block = %current_block_log, "completed block, moving to next");
                                         yield current_block_log;
 
                                         current_block_log = BlockWithLogs::default();
@@ -166,14 +181,13 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     }
 
                                     debug!("retrieved {log}");
-                                    current_block_log.logs.insert(log);
+                                    current_block_log.logs.insert(log.into());
                                 },
-                                Ok(None) => {
-                                    trace!("done processing batch #{from_block} - #{latest_block}");
+                                None => {
                                     break;
                                 },
-                                Err(e) => {
-                                    error!("failure when processing blocks from RPC: {e}");
+                                Some(Err(e)) => {
+                                    error!(error=%e, "failed to process blocks");
                                     count_failures += 1;
 
                                     if count_failures < MAX_LOOP_FAILURES {
@@ -185,8 +199,8 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                                     } else {
                                         panic!("!!! Cannot advance the chain indexing due to unrecoverable RPC errors.
 
-                                        The RPC provider does not seem to be working correctly. 
-                                        
+                                        The RPC provider does not seem to be working correctly.
+
                                         The last encountered error was: {e}");
                                     }
                                 }
@@ -194,13 +208,13 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
                         }
 
                         // Yield everything we've collected until this point
-                        debug!("completed {current_block_log}");
+                        debug!(block = %current_block_log, "completed block, processing batch finished");
                         yield current_block_log;
                         from_block = latest_block + 1;
                         count_failures = 0;
                     }
 
-                    Err(e) => error!("failed to obtain current block number from chain: {e}")
+                    Err(e) => error!(error = %e, "failed to obtain current block number from chain")
                 }
 
                 futures_timer::Delay::new(self.cfg.expected_block_time).await;
@@ -210,81 +224,85 @@ impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
+    use anyhow::Context;
     use async_std::prelude::FutureExt;
     use ethers::contract::EthEvent;
     use futures::StreamExt;
     use std::time::Duration;
+    use tracing::debug;
 
     use bindings::hopr_channels::*;
     use bindings::hopr_token::{ApprovalFilter, TransferFilter};
     use chain_types::{ContractAddresses, ContractInstances};
     use hopr_async_runtime::prelude::{sleep, spawn};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use tracing::debug;
 
     use crate::client::surf_client::SurfRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+    use crate::errors::RpcError;
     use crate::indexer::split_range;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 
-    fn filter_bounds(filter: &ethers::types::Filter) -> (u64, u64) {
-        (
+    fn filter_bounds(filter: &ethers::types::Filter) -> anyhow::Result<(u64, u64)> {
+        Ok((
             filter
                 .block_option
                 .get_from_block()
-                .unwrap()
+                .context("a value should be present")?
                 .as_number()
-                .unwrap()
+                .context("a value should be convertible")?
                 .as_u64(),
             filter
                 .block_option
                 .get_to_block()
-                .unwrap()
+                .context("a value should be present")?
                 .as_number()
-                .unwrap()
+                .context("a value should be convertible")?
                 .as_u64(),
-        )
+        ))
     }
 
     #[async_std::test]
-    async fn test_split_range() {
+    async fn test_split_range() -> anyhow::Result<()> {
         let ranges = split_range(LogFilter::default(), 0, 10, 2).collect::<Vec<_>>().await;
 
         assert_eq!(6, ranges.len());
-        assert_eq!((0, 1), filter_bounds(&ranges[0]));
-        assert_eq!((2, 3), filter_bounds(&ranges[1]));
-        assert_eq!((4, 5), filter_bounds(&ranges[2]));
-        assert_eq!((6, 7), filter_bounds(&ranges[3]));
-        assert_eq!((8, 9), filter_bounds(&ranges[4]));
-        assert_eq!((10, 10), filter_bounds(&ranges[5]));
+        assert_eq!((0, 1), filter_bounds(&ranges[0])?);
+        assert_eq!((2, 3), filter_bounds(&ranges[1])?);
+        assert_eq!((4, 5), filter_bounds(&ranges[2])?);
+        assert_eq!((6, 7), filter_bounds(&ranges[3])?);
+        assert_eq!((8, 9), filter_bounds(&ranges[4])?);
+        assert_eq!((10, 10), filter_bounds(&ranges[5])?);
 
         let ranges = split_range(LogFilter::default(), 0, 0, 2).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
-        assert_eq!((0, 0), filter_bounds(&ranges[0]));
+        assert_eq!((0, 0), filter_bounds(&ranges[0])?);
 
         let ranges = split_range(LogFilter::default(), 0, 0, 1).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
-        assert_eq!((0, 0), filter_bounds(&ranges[0]));
+        assert_eq!((0, 0), filter_bounds(&ranges[0])?);
 
         let ranges = split_range(LogFilter::default(), 0, 3, 1).collect::<Vec<_>>().await;
         assert_eq!(4, ranges.len());
-        assert_eq!((0, 0), filter_bounds(&ranges[0]));
-        assert_eq!((1, 1), filter_bounds(&ranges[1]));
-        assert_eq!((2, 2), filter_bounds(&ranges[2]));
-        assert_eq!((3, 3), filter_bounds(&ranges[3]));
+        assert_eq!((0, 0), filter_bounds(&ranges[0])?);
+        assert_eq!((1, 1), filter_bounds(&ranges[1])?);
+        assert_eq!((2, 2), filter_bounds(&ranges[2])?);
+        assert_eq!((3, 3), filter_bounds(&ranges[3])?);
 
         let ranges = split_range(LogFilter::default(), 0, 3, 10).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
-        assert_eq!((0, 3), filter_bounds(&ranges[0]));
+        assert_eq!((0, 3), filter_bounds(&ranges[0])?);
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_should_get_block_number() {
+    async fn test_should_get_block_number() -> anyhow::Result<()> {
         let expected_block_time = Duration::from_secs(1);
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
@@ -301,33 +319,33 @@ mod test {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
-        let b1 = rpc.block_number().await.expect("should get block number");
+        let b1 = rpc.block_number().await?;
 
         sleep(expected_block_time * 2).await;
 
-        let b2 = rpc.block_number().await.expect("should get block number");
+        let b2 = rpc.block_number().await?;
 
         assert!(b2 > b1, "block number should increase");
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() {
+    async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
 
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
-        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
 
         // Deploy contracts
         let contract_instances = {
             let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
-            ContractInstances::deploy_for_testing(client, &chain_key_0)
-                .await
-                .expect("could not deploy contracts")
+            ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
         let tokens_minted_at =
@@ -352,7 +370,7 @@ mod test {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.token, contract_addrs.channels],
@@ -367,77 +385,103 @@ mod test {
         debug!("{:#?}", contract_addrs);
         debug!("{:#?}", log_filter);
 
-        // Spawn channel funding
-        spawn(async move {
-            chain_types::utils::fund_channel(
-                chain_key_1.public().to_address(),
-                contract_instances.token,
-                contract_instances.channels,
-                1_u128.into(),
-            )
-            .delay(expected_block_time * 2)
-            .await;
-        });
-
         // Spawn stream
         let count_filtered_topics = log_filter.topics.len();
-        let retrieved_logs = rpc
-            .try_stream_logs(1, log_filter)
-            .expect("must create stream")
-            .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
-            .take(1)
-            .collect::<Vec<BlockWithLogs>>()
-            .timeout(Duration::from_secs(30))
-            .await
-            .expect("timeout"); // Everything must complete within 30 seconds
+        let retrieved_logs = spawn(async move {
+            Ok::<_, RpcError>(
+                rpc.try_stream_logs(1, log_filter)?
+                    .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
+                    .take(1)
+                    .collect::<Vec<BlockWithLogs>>()
+                    .await,
+            )
+        });
+
+        // Spawn channel funding
+        chain_types::utils::fund_channel(
+            chain_key_1.public().to_address(),
+            contract_instances.token,
+            contract_instances.channels,
+            1_u128.into(),
+        )
+        .await;
+
+        let retrieved_logs = retrieved_logs
+            .timeout(Duration::from_secs(30)) // Give up after 30 seconds
+            .await??;
 
         // The last block must contain all 4 events
-        let last_block_logs = retrieved_logs.last().unwrap().clone().logs;
+        let last_block_logs = retrieved_logs.last().context("a log should be present")?.clone().logs;
+        let channel_open_filter = ChannelOpenedFilter::signature();
+        let channel_balance_filter = ChannelBalanceIncreasedFilter::signature();
+        let approval_filter = ApprovalFilter::signature();
+        let transfer_filter = TransferFilter::signature();
+
+        debug!(
+            "channel_open_filter: {:?} - {:?}",
+            channel_open_filter,
+            channel_open_filter.as_ref().to_vec()
+        );
+        debug!(
+            "channel_balance_filter: {:?} - {:?}",
+            channel_balance_filter,
+            channel_balance_filter.as_ref().to_vec()
+        );
+        debug!(
+            "approval_filter: {:?} - {:?}",
+            approval_filter,
+            approval_filter.as_ref().to_vec()
+        );
+        debug!(
+            "transfer_filter: {:?} - {:?}",
+            transfer_filter,
+            transfer_filter.as_ref().to_vec()
+        );
+        debug!("logs: {:#?}", last_block_logs);
 
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_open_filter.into())),
             "must contain channel open"
         );
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log
-                    .topics
-                    .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
+            last_block_logs.iter().any(
+                |log| log.address == contract_addrs.channels && log.topics.contains(&channel_balance_filter.into())
+            ),
             "must contain channel balance increase"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == contract_addrs.token
-                    && log.topics.contains(&ApprovalFilter::signature().0.into())),
+                .any(|log| log.address == contract_addrs.token && log.topics.contains(&approval_filter.into())),
             "must contain token approval"
         );
         assert!(
             last_block_logs
                 .iter()
-                .any(|log| log.address == contract_addrs.token
-                    && log.topics.contains(&TransferFilter::signature().0.into())),
+                .any(|log| log.address == contract_addrs.token && log.topics.contains(&transfer_filter.into())),
             "must contain token transfer"
         );
+
+        Ok(())
     }
 
     #[async_std::test]
-    async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel() {
+    async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel(
+    ) -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
 
         let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
-        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref()).unwrap();
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+        let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
 
         // Deploy contracts
         let contract_instances = {
             let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
-            ContractInstances::deploy_for_testing(client, &chain_key_0)
-                .await
-                .expect("could not deploy contracts")
+            ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
         let tokens_minted_at =
@@ -463,7 +507,7 @@ mod test {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg).expect("failed to construct rpc");
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.channels],
@@ -476,44 +520,53 @@ mod test {
         debug!("{:#?}", contract_addrs);
         debug!("{:#?}", log_filter);
 
-        // Spawn channel funding
-        spawn(async move {
-            chain_types::utils::fund_channel(
-                chain_key_1.public().to_address(),
-                contract_instances.token,
-                contract_instances.channels,
-                1_u128.into(),
-            )
-            .delay(expected_block_time * 2)
-            .await;
-        });
-
         // Spawn stream
         let count_filtered_topics = log_filter.topics.len();
-        let retrieved_logs = rpc
-            .try_stream_logs(1, log_filter)
-            .expect("must create stream")
-            .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
-            .take(1)
-            .collect::<Vec<BlockWithLogs>>()
-            .timeout(Duration::from_secs(30))
-            .await
-            .expect("timeout"); // Everything must complete within 30 seconds
+        let retrieved_logs = spawn(async move {
+            Ok::<_, RpcError>(
+                rpc.try_stream_logs(1, log_filter)?
+                    .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
+                    .take(1)
+                    .collect::<Vec<BlockWithLogs>>()
+                    .await,
+            )
+        });
+
+        // Spawn channel funding
+        chain_types::utils::fund_channel(
+            chain_key_1.public().to_address(),
+            contract_instances.token,
+            contract_instances.channels,
+            1_u128.into(),
+        )
+        .await;
+
+        let retrieved_logs = retrieved_logs
+            .timeout(Duration::from_secs(30)) // Give up after 30 seconds
+            .await??;
 
         // The last block must contain all 2 events
-        let last_block_logs = retrieved_logs.first().unwrap().clone().logs;
+        let last_block_logs = retrieved_logs
+            .first()
+            .context("a value should be present")?
+            .clone()
+            .logs;
+        let channel_open_filter: [u8; 32] = ChannelOpenedFilter::signature().into();
+        let channel_balance_filter: [u8; 32] = ChannelBalanceIncreasedFilter::signature().into();
 
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log.topics.contains(&ChannelOpenedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_open_filter)),
             "must contain channel open"
         );
         assert!(
-            last_block_logs.iter().any(|log| log.address == contract_addrs.channels
-                && log
-                    .topics
-                    .contains(&ChannelBalanceIncreasedFilter::signature().0.into())),
+            last_block_logs
+                .iter()
+                .any(|log| log.address == contract_addrs.channels && log.topics.contains(&channel_balance_filter)),
             "must contain channel balance increase"
         );
+
+        Ok(())
     }
 }

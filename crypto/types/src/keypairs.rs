@@ -50,12 +50,8 @@ impl Keypair for OffchainKeypair {
     type Public = OffchainPublicKey;
 
     fn random() -> Self {
-        let mut kp = Self::from_secret(&random_bytes::<{ ed25519_dalek::SECRET_KEY_LENGTH }>()).unwrap();
-        // TODO: remove this loop once https://github.com/hoprnet/hoprnet/pull/5665 is merged
-        while kp.1.as_ref()[0] == 0xff {
-            kp = Self::from_secret(&random_bytes::<{ ed25519_dalek::SECRET_KEY_LENGTH }>()).unwrap();
-        }
-        kp
+        // Safe to unwrap here, as the random bytes length is exact
+        Self::from_secret(&random_bytes::<{ ed25519_dalek::SECRET_KEY_LENGTH }>()).unwrap()
     }
 
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
@@ -88,7 +84,7 @@ impl ConstantTimeEq for OffchainKeypair {
 
 impl From<&OffchainKeypair> for curve25519_dalek::scalar::Scalar {
     /// Transforms the secret to be equivalent with the EdDSA public key used for signing.
-    /// This is required, so that the secret keys used to generate Sphinx shared secrets
+    /// This is required so that the secret keys used to generate Sphinx shared secrets
     /// are corresponding to the public keys we obtain from the Ed25519 peer ids.
     fn from(value: &OffchainKeypair) -> Self {
         let mut h: Sha512 = Sha512::default();

@@ -9,14 +9,15 @@ env:
 
 # yamllint disable-line rule:truthy
 on:
-  push:
-    branches:
-      - master
-  workflow_dispatch:
   workflow_call:
+    inputs:
+      publish:
+        required: true
+        type: boolean
+        description: 'Publish the docs'
 
 concurrency:
-  group: ${{ github.head_ref }}-docs
+  group: ${{ github.ref }}-docs
   cancel-in-progress: true
 
 jobs:
@@ -31,7 +32,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == true
-        uses: cachix/install-nix-action@v27
+        uses: cachix/install-nix-action@v29
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -47,11 +48,11 @@ jobs:
         run: nix build .#docs -L
 
       - name: Increase git buffer size
-        if: github.ref == 'refs/heads/master'
+        if: inputs.publish
         run: git config --global http.postBuffer 524288000
 
       - name: Deploy
-        if: github.ref == 'refs/heads/master'
+        if: inputs.publish
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

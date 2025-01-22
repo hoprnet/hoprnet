@@ -1,5 +1,7 @@
-pub use core_protocol::errors::ProtocolError;
 use thiserror::Error;
+
+pub use core_network::errors::NetworkingError;
+pub use hopr_transport_protocol::errors::ProtocolError;
 
 /// Errors produced by the crate.
 #[derive(Error, Debug)]
@@ -13,11 +15,18 @@ pub enum HoprTransportError {
     #[error("Db error: {0}")]
     Db(#[from] hopr_db_sql::api::errors::DbError),
 
+    // TODO(20250114): Unify all Databse API functionality in the db_api crate and remove this error.
+    #[error("Db error: {0}")]
+    Database(#[from] hopr_db_sql::errors::DbSqlError),
+
     #[error("Path error: {0}")]
     Path(#[from] core_path::errors::PathError),
 
     #[error("Protocol error: {0}")]
-    Protocol(#[from] core_protocol::errors::ProtocolError),
+    Protocol(#[from] hopr_transport_protocol::errors::ProtocolError),
+
+    #[error("Transport session error: {0}")]
+    Session(#[from] hopr_transport_session::errors::TransportSessionError),
 
     #[error("Packet error: {0}")]
     Packet(#[from] hopr_crypto_packet::errors::PacketError),

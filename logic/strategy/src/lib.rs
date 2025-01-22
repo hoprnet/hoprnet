@@ -16,9 +16,9 @@
 //! There are two ways of configuring strategies in HOPRd: via CLI and via a YAML config file.
 //!
 //! The configuration through CLI allows only fairly primitive single-strategy setting, through the `defaultStrategy`
-//! parameter. It can be set to any of the above strategies, however the strategy parameters are not further
+//! parameter. It can be set to any of the above strategies, however, the strategy parameters are not further
 //! configurable via the CLI and will always have their default values.
-//! In addition, if `disableTicketAutoRedeem` CLI argument is `false`, the default Auto Redeem strategy is added to the
+//! In addition, if the ` disableTicketAutoRedeem ` CLI argument is `false`, the default Auto Redeem strategy is added to the
 //! strategy configured via the `defaultStrategy` argument (they execute together as Multi strategy).
 //!
 //! For more complex strategy configurations, the YAML configuration method is recommended via the `strategy` YAML section.
@@ -28,6 +28,7 @@
 //! strategy:
 //!   on_fail_continue: true
 //!   allow_recursive: true
+//!   execution_interval: 60
 //!   strategies:
 //!     - !Promiscuous
 //!       max_channels: 50
@@ -58,7 +59,7 @@ pub mod errors;
 pub mod promiscuous;
 pub mod strategy;
 
-/// Enumerates all possible strategies with their respective configurations.
+/// Lists all possible strategies with their respective configurations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 pub enum Strategy {
@@ -76,7 +77,7 @@ pub enum Strategy {
 /// ## Aggregation strategy
 ///  - aggregate every 100 tickets on all channels
 ///  - or when unredeemed value in the channel is more than 90% of channel's current balance
-///  - aggregate unredeemed tickets when channel transitions to `PendingToClose`
+///  - aggregate unredeemed tickets when a channel transitions to `PendingToClose`
 /// ## Auto-redeem Strategy
 /// - redeem only aggregated tickets
 /// - redeem single tickets on channel close if worth at least 2 HOPR
@@ -88,6 +89,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
     MultiStrategyConfig {
         on_fail_continue: true,
         allow_recursive: false,
+        execution_interval: 60,
         strategies: vec![
             /*AutoFunding(AutoFundingStrategyConfig {
                 min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
@@ -100,7 +102,8 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             }),
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: true,
-                on_close_redeem_single_tickets_value_min: Balance::new_from_str("90000000000000000", BalanceType::HOPR),
+                redeem_all_on_close: true,
+                minimum_redeem_ticket_value: Balance::new_from_str("90000000000000000", BalanceType::HOPR),
             }),
         ],
     }
@@ -112,5 +115,5 @@ impl Default for Strategy {
     }
 }
 
-/// An alias for strategy configuration type.
+/// An alias for the strategy configuration type.
 pub type StrategyConfig = MultiStrategyConfig;

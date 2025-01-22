@@ -7,7 +7,6 @@ pub mod executors;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-
 use tracing::{debug, error, info, warn};
 
 use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
@@ -15,15 +14,14 @@ use chain_actions::action_state::IndexerActionTracker;
 use chain_actions::payload::SafePayloadGenerator;
 use chain_actions::ChainActions;
 use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use chain_rpc::client::SimpleJsonRpcRetryPolicy;
-use chain_rpc::rpc::RpcOperations;
-use chain_rpc::rpc::RpcOperationsConfig;
-use chain_rpc::HoprRpcOperations;
 pub use chain_types::chain_events::SignificantChainEvent;
 use chain_types::ContractAddresses;
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use hopr_chain_rpc::client::SimpleJsonRpcRetryPolicy;
+use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
+use hopr_chain_rpc::HoprRpcOperations;
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::account::AccountEntry;
@@ -37,17 +35,18 @@ use crate::errors::{HoprChainError, Result};
 ///
 /// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
 #[cfg(feature = "runtime-async-std")]
-pub type DefaultHttpPostRequestor = chain_rpc::client::surf_client::SurfRequestor;
+pub type DefaultHttpPostRequestor = hopr_chain_rpc::client::surf_client::SurfRequestor;
 
 // Both features could be enabled during testing, therefore we only use tokio when its
 // exclusively enabled.
 #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-pub type DefaultHttpPostRequestor = chain_rpc::client::reqwest_client::ReqwestRequestor;
+pub type DefaultHttpPostRequestor = hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
 
 /// The default JSON RPC provider client
 ///
 /// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
-pub type JsonRpcClient = chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>;
+pub type JsonRpcClient =
+    hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>;
 
 /// Checks whether the node can be registered with the Safe in the NodeSafeRegistry
 pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
@@ -56,9 +55,7 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     rpc: &Rpc,
 ) -> Result<bool> {
     let target_address = rpc.get_module_target_address().await?;
-    debug!("-- node address: {me}");
-    debug!("-- safe address: {safe_address}");
-    debug!("-- module target address: {target_address}");
+    debug!(node_address = %me, %safe_address, %target_address, "can register with safe");
 
     if target_address != safe_address {
         // cannot proceed when the safe address is not the target/owner of given module
@@ -66,7 +63,7 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
     }
 
     let registered_address = rpc.get_safe_from_node_safe_registry(me).await?;
-    info!("currently registered Safe address in NodeSafeRegistry = {registered_address}");
+    info!(%registered_address, "currently registered Safe address in NodeSafeRegistry");
 
     if registered_address.is_zero() {
         info!("Node is not associated with a Safe in NodeSafeRegistry yet");
@@ -96,7 +93,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     while current_delay <= max_delay {
         match rpc.get_balance(address, min_balance.balance_type()).await {
             Ok(current_balance) => {
-                info!("current balance is {}", current_balance.to_formatted_string());
+                info!(balance = %current_balance, "balance status");
                 if current_balance.ge(&min_balance) {
                     info!("node is funded");
                     return Ok(());
@@ -104,7 +101,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
                     warn!("still unfunded, trying again soon");
                 }
             }
-            Err(e) => error!("failed to fetch balance from the chain: {e}"),
+            Err(e) => error!(error = %e, "failed to fetch balance from the chain"),
         }
 
         sleep(current_delay).await;
@@ -124,9 +121,11 @@ type ActionQueueType<T> = ActionQueue<
     T,
     IndexerActionTracker,
     EthereumTransactionExecutor<
-        chain_rpc::TypedTransaction,
+        hopr_chain_rpc::TypedTransaction,
         RpcEthereumClient<
-            RpcOperations<chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>>,
+            RpcOperations<
+                hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>,
+            >,
         >,
         SafePayloadGenerator,
     >,
@@ -167,7 +166,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
     ) -> Self {
         // TODO: extract this from the global config type
-        let mut rpc_http_config = chain_rpc::HttpPostRequestorConfig::default();
+        let mut rpc_http_config = hopr_chain_rpc::HttpPostRequestorConfig::default();
         if let Some(max_rpc_req) = chain_config.max_requests_per_sec {
             rpc_http_config.max_requests_per_sec = Some(max_rpc_req); // override the default if set
         }
@@ -183,6 +182,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             chain_id: chain_config.chain.chain_id as u64,
             contract_addrs: contract_addresses,
             module_address,
+            safe_address,
             expected_block_time: Duration::from_millis(chain_config.chain.block_time),
             tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
             finality: chain_config.confirmations,
@@ -340,5 +340,9 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
         Ok(self.rpc_operations.get_channel_closure_notice_period().await?)
+    }
+
+    pub async fn get_eligibility_status(&self) -> errors::Result<bool> {
+        Ok(self.rpc_operations.get_eligibility_status(self.me_onchain()).await?)
     }
 }

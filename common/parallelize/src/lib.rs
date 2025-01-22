@@ -39,13 +39,13 @@ pub mod cpu {
                 .unwrap_or_else(|_| unreachable!())
         });
         rx.await
-            .unwrap()
+            .expect("spawned blocking process should be awaitable")
             .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic))
     }
 
     /// Spawn an awaitable non-blocking execution of the given blocking function on a `rayon` CPU thread pool.
     ///
-    /// Executed tasks are loaded using a FIFO (First In First Out) (Last In First Out) scheduling policy.
+    /// Executed tasks are loaded using a FIFO (First In First Out) scheduling policy.
     #[cfg(feature = "rayon")]
     pub async fn spawn_fifo_blocking<R: Send + 'static>(f: impl FnOnce() -> R + Send + 'static) -> R {
         let (tx, rx) = futures::channel::oneshot::channel();
@@ -54,7 +54,7 @@ pub mod cpu {
                 .unwrap_or_else(|_| unreachable!())
         });
         rx.await
-            .unwrap()
+            .expect("spawned fifo blocking process should be awaitable")
             .unwrap_or_else(|caught_panic| std::panic::resume_unwind(caught_panic))
     }
 }

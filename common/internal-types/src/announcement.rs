@@ -73,9 +73,9 @@ pub fn decapsulate_multiaddress(multiaddr: Multiaddr) -> Multiaddr {
         .collect()
 }
 
-/// Structure containing data used for on-chain announcement.
+/// Structure containing data used for an on-chain announcement.
 /// That is the decapsulated multiaddress (with the /p2p/{peer_id} suffix removed) and
-/// optional `KeyBinding` (announcement can be done with key bindings or without)
+/// optional `KeyBinding` (an announcement can be done with key bindings or without)
 ///
 /// NOTE: This currently supports only announcing of a single multiaddress
 #[derive(Clone, Debug, PartialEq)]
@@ -96,7 +96,7 @@ impl AnnouncementData {
         }
 
         if let Some(binding) = &key_binding {
-            // Encapsulate first (if already encapsulated the operation verifies that peer id matches the given one)
+            // Encapsulate first (if already encapsulated, the operation verifies that peer id matches the given one)
             match multiaddress.with_p2p(binding.packet_key.into()) {
                 Ok(mut multiaddress) => {
                     // Now decapsulate again, because we store decapsulated multiaddress only (without the /p2p/<peer_id> suffix)
@@ -146,22 +146,23 @@ mod tests {
     use multiaddr::Multiaddr;
 
     lazy_static::lazy_static! {
-        static ref KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d")).unwrap();
-        static ref CHAIN_ADDR: Address = Address::try_from(hex!("78392d47e3522219e2802e7d6c45ee84b5d5c185").as_ref()).unwrap();
-        static ref SECOND_KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("c24bd833704dd2abdae3933fcc9962c2ac404f84132224c474147382d4db2299")).unwrap();
+        static ref KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d")).expect("lazy static keypair should be constructible");
+        static ref CHAIN_ADDR: Address = Address::try_from(hex!("78392d47e3522219e2802e7d6c45ee84b5d5c185").as_ref()).expect("lazy static address should be constructible");
+        static ref SECOND_KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("c24bd833704dd2abdae3933fcc9962c2ac404f84132224c474147382d4db2299")).expect("lazy static keypair should be constructible");
     }
 
     #[test]
-    fn test_key_binding() {
+    fn test_key_binding() -> anyhow::Result<()> {
         let kb_1 = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
-        let kb_2 = KeyBinding::from_parts(kb_1.chain_key, kb_1.packet_key, kb_1.signature.clone())
-            .expect("should verify correctly");
+        let kb_2 = KeyBinding::from_parts(kb_1.chain_key, kb_1.packet_key, kb_1.signature.clone())?;
 
         assert_eq!(kb_1, kb_2, "must be equal");
+
+        Ok(())
     }
 
     #[test]
-    fn test_announcement() {
+    fn test_announcement() -> anyhow::Result<()> {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
         let peer_id = KEY_PAIR.public().to_peerid_str();
 
@@ -187,51 +188,57 @@ mod tests {
                 "/ip4/127.0.0.1/udp/10000/quic".to_string(),
             ),
         ] {
-            let maddr: Multiaddr = ma_str.parse().unwrap();
+            let maddr: Multiaddr = ma_str.parse()?;
 
-            let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))
-                .expect("construction of announcement data should work");
+            let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))?;
             assert_eq!(decapsulated_ma_str, ad.multiaddress().to_string());
             assert_eq!(Some(key_binding.clone()), ad.key_binding);
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_announcement_no_keybinding() {
-        let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse().unwrap();
+    fn test_announcement_no_keybinding() -> anyhow::Result<()> {
+        let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse()?;
 
-        let ad = AnnouncementData::new(maddr, None).expect("construction of announcement data should work");
+        let ad = AnnouncementData::new(maddr, None)?;
 
         assert_eq!(None, ad.key_binding);
+
+        Ok(())
     }
 
     #[test]
-    fn test_announcement_decapsulated_ma() {
+    fn test_announcement_decapsulated_ma() -> anyhow::Result<()> {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
-        let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse().unwrap();
+        let maddr: Multiaddr = "/ip4/127.0.0.1/tcp/10000".to_string().parse()?;
 
-        let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))
-            .expect("construction of announcement data should work");
+        let ad = AnnouncementData::new(maddr, Some(key_binding.clone()))?;
         assert_eq!("/ip4/127.0.0.1/tcp/10000", ad.multiaddress().to_string());
         assert_eq!(Some(key_binding), ad.key_binding);
+
+        Ok(())
     }
 
     #[test]
-    fn test_announcement_wrong_peerid() {
+    fn test_announcement_wrong_peerid() -> anyhow::Result<()> {
         let key_binding = KeyBinding::new(*CHAIN_ADDR, &KEY_PAIR);
         let peer_id = SECOND_KEY_PAIR.public().to_peerid_str();
-        let maddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse().unwrap();
+        let maddr: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
 
         assert!(AnnouncementData::new(maddr, Some(key_binding.clone())).is_err());
+
+        Ok(())
     }
 
     #[test]
-    fn test_decapsulate_multiaddr() {
-        let maddr_1: Multiaddr = "/ip4/127.0.0.1/tcp/10000".parse().unwrap();
+    fn test_decapsulate_multiaddr() -> anyhow::Result<()> {
+        let maddr_1: Multiaddr = "/ip4/127.0.0.1/tcp/10000".parse()?;
         let maddr_2 = maddr_1
             .clone()
             .with_p2p(OffchainKeypair::random().public().into())
-            .unwrap();
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
         assert_eq!(maddr_1, decapsulate_multiaddress(maddr_2), "multiaddresses must match");
         assert_eq!(
@@ -239,5 +246,7 @@ mod tests {
             decapsulate_multiaddress(maddr_1.clone()),
             "decapsulation must be idempotent"
         );
+
+        Ok(())
     }
 }

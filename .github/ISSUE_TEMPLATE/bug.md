@@ -1,23 +1,23 @@
 ---
 name: Bug Template
 about: Create a bug report to help us improve
-title: ''
-labels: 'bug, status:new'
-assignees: ''
+title: ""
+labels: "bug, status:new"
+assignees: ""
 ---
 
 <!--- Please DO NOT remove the automatically added 'new issue' label -->
-<!--- Provide a general summary of the issue in the Title above -->
-
-## Expected Behavior
-
-<!--- Tell us what should happen -->
-
-(Write your answer here.)
+<!--- Provide a general summary of the issue in the Title -->
 
 ## Current Behavior
 
 <!--- Tell us what happens instead of the expected behavior -->
+
+(Write your answer here.)
+
+## Expected Behavior
+
+<!--- Tell us what should happen -->
 
 (Write your answer here.)
 
@@ -37,7 +37,7 @@ assignees: ''
 3.
 4.
 
-*Were you able to reproduce the bug using the above steps consistently each time?* **YES**/**NO**
+_Were you able to reproduce the bug using the above steps consistently each time?_ **YES**/**NO**
 
 ## Context (Environment)
 
@@ -47,25 +47,22 @@ assignees: ''
 
 (Write your answer here.)
 
-## Detailed Description
+## Environment Details (Required)
 
 <!--- Provide a detailed description of the change or addition you are proposing -->
-<!-- For example:
-- Device: [e.g. iPhone6]
-- OS: [e.g. iOS8.1]
-- Browser [e.g. stock browser, safari]
-- Version [e.g. 22] -->
+
+**Version:** <!-- e.g., v1.2.3 -->
+
+**Distribution:** <!-- Select one: [binary|docker|docker-compose|dappNode] -->
+
+**Network:** <!-- Select one: [dufour|rotsee|anvil] -->
+
+**Nodes Impacted:** <!-- List the affected node IDs or 'all' if system-wide -->
+
+**Configuration file**: <!-- Any remarkable configuration file attribute -->
 
 (Write your answer here.)
 
 ## Logs
-
-<!--- Obligatory if the bug occurred while running HOPR Chat, please attach to this issue the file named "log" or "log.txt" produced in your "hopr-chat" folder. -->
-
-(Write your answer here.)
-
-## (Optional) Possible Implementation
-
-<!--- Not obligatory, but suggest an idea for implementing addition or change -->
 
 (Write your answer here.)

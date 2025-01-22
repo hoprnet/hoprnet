@@ -22,6 +22,7 @@
   - [Install via Docker](#install-via-docker)
   - [Install via Nix package manager](#install-via-nix-package-manager)
 - [Usage](#usage)
+  - [Environment variables](#environment-variables)
   - [Example execution](#example-execution)
   - [Using Docker Compose with extended HOPR node monitoring](#using-docker-compose-with-extended-hopr-node-monitoring)
 - [Testnet accessibility](#testnet-accessibility)
@@ -41,6 +42,13 @@
     - [Running Tests Locally](#running-tests-locally)
       - [Testing environment](#testing-environment)
       - [Test execution](#test-execution)
+- [Using Fast Sync](#using-fast-sync)
+  - [Prerequisites](#prerequisites)
+  - [Database Files](#database-files)
+  - [Configuration Steps](#configuration-steps)
+  - [Post-sync Behavior](#post-sync-behavior)
+- [Profiling \& Instrumentation](#profiling--instrumentation)
+  - [`tokio` executor instrumentation](#tokio-executor-instrumentation)
 - [Contact](#contact)
 - [License](#license)
 
@@ -74,7 +82,7 @@ All releases and associated changelogs are located in the [official releases](ht
 The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
 
 - `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=saint-louis` to track the latest changes on the repository's `release/saint-louis` branch (2.1.X)
+- `export RELEASE=singapore` to track the latest changes on the repository's `release/singapore` branch (2.2.X)
 - `export RELEASE=<version>` to get a specific `<version>`
 
 Container image has the format
@@ -86,7 +94,7 @@ where:
 Pull the container image with `docker`:
 
 ```shell
-$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:saint-louis
+$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
@@ -192,11 +200,31 @@ Options:
           Print version
 ```
 
+### Environment variables
+
+On top of the default configuration options generated for the command line, the following environment variables can be used in order to tweak the node functionality:
+
+- `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
+- `HOPRD_USE_OPENTELEMETRY` - enable the opentelemetry output for this node
+- `OTEL_SERVICE_NAME` - the name of this node for the opentelemetry service
+- `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
+- `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
+- `HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS` - the maximum number of used yamux streams
+- `HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS` - the maximum number of used outbound and inbound streams for the `msg` and `ack` protocols
+- `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
+- `HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS` - cutoff duration from now to not retain the peers with older records in the peers database (e.g. after a restart)
+- `HOPR_INTERNAL_REST_API_MAX_CONCURRENT_WEBSOCKET_COUNT` - the maximum number of concurrent websocket opened through the REST API
+- `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
+- `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
+- `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
+- `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
+- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified).
+
 ### Example execution
 
 Running the node without any command-line argument might not work depending on the installation method used. Some command line arguments are required.
 
-A basic reasonable setup is that uses a custom identity and enabels a REST API of the `hoprd` could look like:
+Some basic reasonable setup uses a custom identity and enables the REST API of the `hoprd`:
 
 ```sh
 hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network doufur
@@ -226,18 +254,7 @@ Special care needs to given to the `network` argument, which defines the specifi
 
 ### Using Docker Compose with extended HOPR node monitoring
 
-An optional `docker compose` setup can be used to run the above containerized `hoprd` along with extension to observe the node's metrics using Prometheus + Grafana dashboard:
-
-```shell
-docker compose --file scripts/compose/docker-compose.yml up -d
-```
-
-Copy the `scripts/compose/default.env` to `scripts/compose/.env` and change the variables as desired.
-
-The composite setup will publish multiple additional services alongside the `hoprd`:
-
-- Admin UI at `localhost:3000`
-- Grafana with `hoprd` dashboards at `localhost:3030` (default user: `admin` and pass `hopr`)
+Please follow the documentation for [`docker compose` based deployment](./deploy/compose/README.md).
 
 ## Testnet accessibility
 
@@ -449,8 +466,60 @@ deactivate
 With the environment activated, execute the tests locally:
 
 ```shell
-make smoke-test-full
+make smoke-tests
 ```
+
+## Using Fast Sync
+
+Fast sync is a feature that allows the node to sync the blockchain state faster
+than the default sync mode by using a pre-built logs database.
+
+### Prerequisites
+
+To generate the logs database, you need:
+
+- A fully synced node
+- Node configured to keep logs in the database (enabled by default)
+  - Set `hopr -> chain -> keep_logs` in the configuration file
+
+### Database Files
+
+The following files in the node's database folder are required:
+
+- `hopr_logs.db` - Main logs database
+- `hopr_logs.db-shm` - Auxiliary file
+- `hopr_logs.db-wal` - Auxiliary file
+
+### Configuration Steps
+
+1. Place the pre-built logs database files in the node's database folder
+2. Enable fast sync mode (enabled by default):
+   - Set `hopr -> chain -> fast_sync` to `true` in the configuration file
+3. Remove any existing index data:
+
+   ```shell
+   rm hopr_index.db*
+   ```
+
+### Post-sync Behavior
+
+- If index data exists but is incomplete, the node will resume fast sync at the
+  last processed log
+- If index data exists and is complete, the node will skip fast sync and start in normal sync mode
+- After fast sync completes, the node automatically switches to normal sync mode
+
+## Profiling & Instrumentation
+
+Multiple layers of profiling and instrumentation can be used to debug the `hoprd`:
+
+### `tokio` executor instrumentation
+
+Requires a special build:
+
+1. Set `RUSTFLAGS="--cfg tokio_unstable"` before building
+2. Enable the `prof` feature on the `hoprd` package: `cargo build --feature prof`
+
+Once an instrumented tokio is built into hoprd, the application can be instrumented by `tokio_console` as described in the [official crate documentation](https://docs.rs/tokio-console/latest/tokio_console/#instrumenting-the-application).
 
 ## Contact
 

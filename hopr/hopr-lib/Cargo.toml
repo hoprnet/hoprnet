@@ -1,6 +1,6 @@
 [package]
 name = "hopr-lib"
-version = "2.2.0-rc.1"
+version = "3.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR library containing the entire functionality importable without the HOPRd daemon"
@@ -15,31 +15,34 @@ crate-type = ["rlib"]
 default = []
 session-client = []
 session-server = []
+transport-quic = ["hopr-transport/transport-quic"]
 runtime-async-std = [
   "chain-api/runtime-async-std",
-  "chain-rpc/runtime-async-std",
-  "core-transport/runtime-async-std",
-  "hopr-db-sql/runtime-async-std",
+  "hopr-chain-rpc/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
+  "hopr-db-sql/runtime-async-std",
   "hopr-network-types/runtime-async-std",
   "hopr-strategy/runtime-async-std",
+  "hopr-transport/runtime-async-std",
 ]
 runtime-tokio = [
   "chain-api/runtime-tokio",
-  "chain-rpc/runtime-tokio",
-  "core-transport/runtime-tokio",
-  "hopr-db-sql/runtime-tokio",
+  "hopr-chain-rpc/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
+  "hopr-db-sql/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-strategy/runtime-tokio",
+  "hopr-transport/runtime-tokio",
 ]
 prometheus = [
   "chain-api/prometheus",
   "chain-indexer/prometheus",
-  "chain-rpc/prometheus",
-  "core-transport/prometheus",
+  "hopr-chain-rpc/prometheus",
   "dep:hopr-metrics",
   "hopr-db-sql/prometheus",
+  "hopr-transport/prometheus",
+  "hopr-network-types/prometheus",
+  "hopr-strategy/prometheus",
 ]
 
 [dependencies]
@@ -47,38 +50,48 @@ async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
 atomic_enum = { workspace = true }
+backon = { workspace = true, default-features = false }
 const_format = { workspace = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true }
+futures-timer = { workspace = true }
 lazy_static = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
+serde_json = { workspace = true }
 strum = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
-core-path = { workspace = true }
-core-transport = { workspace = true }
 chain-actions = { workspace = true }
 chain-api = { workspace = true }
-chain-rpc = { workspace = true }
-chain-types = { workspace = true }
 chain-indexer = { workspace = true }
+chain-types = { workspace = true }
+core-path = { workspace = true }
+hopr-async-runtime = { workspace = true }
+hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-db-api = { workspace = true }
 hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-network-types = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-strategy = { workspace = true }
-hopr-network-types = { workspace = true }
-hopr-async-runtime = { workspace = true }
+hopr-transport = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }
 ethers = { workspace = true }
+hex-literal = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-crypto-random = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 serde_yaml = { workspace = true }
+test-log = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }

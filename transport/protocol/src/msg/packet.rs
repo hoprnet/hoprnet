@@ -1,9 +1,93 @@
 use hopr_db_api::protocol::TransportPacketWithChainData;
-use libp2p_identity::PeerId;
+use hopr_transport_identity::PeerId;
 
-use hopr_crypto_packet::errors::Result;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::protocol::Acknowledgement;
+
+use crate::errors::ProtocolError;
+
+pub enum IncomingPacket {
+    /// Packet is intended for us
+    Final {
+        packet_tag: PacketTag,
+        previous_hop: PeerId,
+        plain_text: Box<[u8]>,
+        ack: Acknowledgement,
+    },
+    /// Packet must be forwarded
+    Forwarded {
+        packet_tag: PacketTag,
+        previous_hop: PeerId,
+        next_hop: PeerId,
+        data: Box<[u8]>,
+        ack: Acknowledgement,
+    },
+}
+
+impl TryFrom<TransportPacketWithChainData> for IncomingPacket {
+    type Error = ProtocolError;
+
+    fn try_from(value: TransportPacketWithChainData) -> std::result::Result<Self, ProtocolError> {
+        match value {
+            TransportPacketWithChainData::Final {
+                packet_tag,
+                previous_hop,
+                plain_text,
+                ack,
+            } => Ok(IncomingPacket::Final {
+                packet_tag,
+                previous_hop: previous_hop.into(),
+                plain_text,
+                ack,
+            }),
+            TransportPacketWithChainData::Forwarded {
+                packet_tag,
+                previous_hop,
+                next_hop,
+                data,
+                ack,
+            } => Ok(IncomingPacket::Forwarded {
+                packet_tag,
+                previous_hop: previous_hop.into(),
+                next_hop: next_hop.into(),
+                data,
+                ack,
+            }),
+            TransportPacketWithChainData::Outgoing { .. } => Err(ProtocolError::Logic(
+                "Outgoing packet received when processing incoming packets".to_string(),
+            )),
+        }
+    }
+}
+
+/// Packet that is being sent out by us
+pub struct OutgoingPacket {
+    pub next_hop: PeerId,
+    pub ack_challenge: HalfKeyChallenge,
+    pub data: Box<[u8]>,
+}
+
+impl TryFrom<TransportPacketWithChainData> for OutgoingPacket {
+    type Error = ProtocolError;
+
+    fn try_from(value: TransportPacketWithChainData) -> std::result::Result<Self, Self::Error> {
+        match value {
+            TransportPacketWithChainData::Final { .. } | TransportPacketWithChainData::Forwarded { .. } => Err(
+                ProtocolError::Logic("Incoming packet received when processing outgoing packets".to_string()),
+            ),
+            TransportPacketWithChainData::Outgoing {
+                next_hop,
+                ack_challenge,
+                data,
+            } => Ok(OutgoingPacket {
+                next_hop: next_hop.into(),
+                ack_challenge,
+                data,
+            }),
+        }
+    }
+}
+
 pub enum TransportPacket {
     /// Packet is intended for us
     Final {
@@ -28,21 +112,21 @@ pub enum TransportPacket {
     },
 }
 
-impl From<TransportPacketWithChainData> for TransportPacket {
-    fn from(value: TransportPacketWithChainData) -> Self {
+impl From<IncomingPacket> for TransportPacket {
+    fn from(value: IncomingPacket) -> Self {
         match value {
-            TransportPacketWithChainData::Final {
+            IncomingPacket::Final {
                 packet_tag,
                 previous_hop,
                 plain_text,
                 ack,
             } => TransportPacket::Final {
                 packet_tag,
-                previous_hop: previous_hop.into(),
+                previous_hop,
                 plain_text,
                 ack,
             },
-            TransportPacketWithChainData::Forwarded {
+            IncomingPacket::Forwarded {
                 packet_tag,
                 previous_hop,
                 next_hop,
@@ -50,37 +134,21 @@ impl From<TransportPacketWithChainData> for TransportPacket {
                 ack,
             } => TransportPacket::Forwarded {
                 packet_tag,
-                previous_hop: previous_hop.into(),
-                next_hop: next_hop.into(),
+                previous_hop,
+                next_hop,
                 data,
                 ack,
-            },
-            TransportPacketWithChainData::Outgoing {
-                next_hop,
-                ack_challenge,
-                data,
-            } => TransportPacket::Outgoing {
-                next_hop: next_hop.into(),
-                ack_challenge,
-                data,
             },
         }
     }
 }
 
-#[async_trait::async_trait]
-pub trait PacketConstructing {
-    type Input;
-    type Packet;
-
-    #[allow(clippy::wrong_self_convention)]
-    async fn to_send(&self, data: Self::Input, path: Vec<OffchainPublicKey>) -> Result<Self::Packet>;
-
-    #[allow(clippy::wrong_self_convention)]
-    async fn from_recv(
-        &self,
-        data: Box<[u8]>,
-        node_keypair: &OffchainKeypair,
-        sender: OffchainPublicKey,
-    ) -> Result<Self::Packet>;
+impl From<OutgoingPacket> for TransportPacket {
+    fn from(value: OutgoingPacket) -> Self {
+        TransportPacket::Outgoing {
+            next_hop: value.next_hop,
+            ack_challenge: value.ack_challenge,
+            data: value.data,
+        }
+    }
 }

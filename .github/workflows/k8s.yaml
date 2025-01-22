@@ -41,16 +41,19 @@ jobs:
           base_branch="${{ github.event.pull_request.base.ref }}"
           # Identify parameters depending on branch
           if [[ "${base_branch}" =~ ^"release" ]]; then
-            network=dufour
+            network=${{ vars.HOPRD_NETWORK_MAINNET }}
+          elif [[ "${base_branch}" =~ ^"master" ]]; then
+            network=${{ vars.HOPRD_NETWORK_TESTNET }}
           else
-            network=rotsee
+            echo "Error: Deployment not supported for branch ${base_branch}"
+            exit 1
           fi
           cd ./hoprnet-ci
           pip install -r ./scripts/requirements.txt
           python3 ./scripts/sync-deployment.py -a deploy -n ${network} -v ${docker_tag}
 
       - name: Create Deploy Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           path: "./hoprnet-ci"
@@ -89,7 +92,7 @@ jobs:
           pip install -r ./scripts/requirements.txt
           python3 ./scripts/sync-deployment.py -a undeploy -v ${docker_tag}
       - name: Create Undeploy Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           path: "./hoprnet-ci"

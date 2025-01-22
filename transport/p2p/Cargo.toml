@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.4.0"
+version = "0.5.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -10,7 +10,11 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
+prometheus = [
+  "dep:lazy_static",
+  "dep:hopr-metrics",
+  "hopr-transport-protocol/prometheus",
+]
 runtime-async-std = ["libp2p/async-std"]
 runtime-tokio = ["libp2p/tokio"]
 
@@ -28,18 +32,18 @@ libp2p = { workspace = true, features = [
   "dns",
   "yamux",
 ] }
-libp2p-mplex = { workspace = true }
-multiaddr = { workspace = true }
+moka = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-void = "1.0.2" # needed for Behavior implementations from libp2p
+void = { workspace = true } # needed for Behavior implementations from libp2p
 
 core-network = { workspace = true }
-core-protocol = { workspace = true }
 hopr-internal-types = { workspace = true }
-hopr-crypto-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
+hopr-transport-identity = { workspace = true }
+hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]
+anyhow = { workspace = true }
 async-std = { workspace = true }

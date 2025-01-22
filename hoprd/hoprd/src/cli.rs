@@ -32,8 +32,8 @@ fn parse_api_token(mut s: &str) -> Result<String, String> {
 
     match (s.starts_with('\''), s.ends_with('\'')) {
         (true, true) => {
-            s = s.strip_prefix('\'').unwrap();
-            s = s.strip_suffix('\'').unwrap();
+            s = s.strip_prefix('\'').ok_or("failed to parse strip prefix part")?;
+            s = s.strip_suffix('\'').ok_or("failed to parse strip suffix part")?;
 
             Ok(s.into())
         }
@@ -118,6 +118,14 @@ pub struct CliArgs {
     pub api_port: Option<u16>,
 
     #[arg(
+        long,
+        env = "HOPRD_DEFAULT_SESSION_LISTEN_HOST",
+        help = "Default Session listening host for Session IP forwarding",
+        value_parser = ValueParser::new(parse_host),
+    )]
+    pub default_session_listen_host: Option<HostConfig>,
+
+    #[arg(
         long = "disableApiAuthentication",
         help = "Completely disables the token authentication for the API, overrides any apiToken if set",
         env = "HOPRD_DISABLE_API_AUTHENTICATION",
@@ -150,7 +158,23 @@ pub struct CliArgs {
         help = "Disables checking of unrealized balance before validating unacknowledged tickets.",
         action = ArgAction::Count
     )]
-    pub check_unrealized_balance: u8,
+    pub no_check_unrealized_balance: u8,
+
+    #[arg(
+        long = "noKeepLogs",
+        env = "HOPRD_INDEXER_DISABLE_KEEP_LOGS",
+        help = "Disables keeping RPC logs in the logs database after they were processed.",
+        action = ArgAction::Count
+    )]
+    pub no_keep_logs: u8,
+
+    #[arg(
+        long = "noFastSync",
+        env = "HOPRD_INDEXER_DISABLE_FAST_SYNC",
+        help = "Disables using fast sync at node start.",
+        action = ArgAction::Count
+    )]
+    pub no_fast_sync: u8,
 
     #[arg(
         long = "maxBlockRange",

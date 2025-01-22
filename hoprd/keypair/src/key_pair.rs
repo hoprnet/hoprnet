@@ -16,7 +16,7 @@ use serde::{ser::SerializeStruct, Serialize, Serializer};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
 use sha3::{digest::Update, Digest, Keccak256};
 use std::fmt::Debug;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 use typenum::Unsigned;
 use uuid::Uuid;
 
@@ -247,11 +247,9 @@ impl HoprKeys {
                             }
                             Ok(keys)
                         }
-                        Err(e) => {
-                            error!("{}", e.to_string());
-
-                            Err(KeyPairError::GeneralError(format!("An identity file is present at {} but the provided password <REDACTED> is not sufficient to decrypt it", id_path)))
-                        }
+                        Err(e) => Err(KeyPairError::GeneralError(
+                            format!("An identity file is present at {id_path} but the provided password <REDACTED> is not sufficient to decrypt it {e}"),
+                        )),
                     }
                 } else {
                     let keys = HoprKeys::random();
@@ -474,6 +472,7 @@ impl Debug for HoprKeys {
 mod tests {
     use std::fs;
 
+    use anyhow::Context;
     use hopr_crypto_types::prelude::*;
     use tempfile::tempdir;
     use uuid::Uuid;
@@ -488,48 +487,61 @@ mod tests {
     }
 
     #[test]
-    fn store_keys_and_read_them() {
-        let tmp = tempdir().unwrap();
+    fn store_keys_and_read_them() -> anyhow::Result<()> {
+        let tmp = tempdir()?;
 
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
 
         let keys = super::HoprKeys::random();
 
-        keys.write_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD)
-            .unwrap();
+        keys.write_eth_keystore(
+            identity_dir.to_str().context("should be convertible to string")?,
+            DEFAULT_PASSWORD,
+        )?;
 
-        let (deserialized, needs_migration) =
-            super::HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), DEFAULT_PASSWORD).unwrap();
+        let (deserialized, needs_migration) = super::HoprKeys::read_eth_keystore(
+            identity_dir.to_str().context("should be convertible to string")?,
+            DEFAULT_PASSWORD,
+        )?;
 
         assert!(!needs_migration);
         assert_eq!(deserialized, keys);
+
+        Ok(())
     }
 
     #[test]
-    fn test_migration() {
-        let tmp = tempdir().unwrap();
+    fn test_migration() -> anyhow::Result<()> {
+        let tmp = tempdir()?;
 
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
 
         let old_keystore_file = r#"{"id":"8e5fe142-6ef9-4fbb-aae8-5de32b680e31","version":3,"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"04141354edb9dfb0c65e6905a3a0b9dd"},"ciphertext":"74f12f72cf2d3d73ff09f783cb9b57995b3808f7d3f71aa1fa1968696aedfbdd","kdf":"scrypt","kdfparams":{"salt":"f5e3f04eaa0c9efffcb5168c6735d7e1fe4d96f48a636c4f00107e7c34722f45","n":1,"dklen":32,"p":1,"r":8},"mac":"d0daf0e5d14a2841f0f7221014d805addfb7609d85329d4c6424a098e50b6fbe"}}"#;
 
-        fs::write(identity_dir.to_str().unwrap(), old_keystore_file.as_bytes()).unwrap();
+        fs::write(
+            identity_dir.to_str().context("should be convertible to string")?,
+            old_keystore_file.as_bytes(),
+        )?;
 
-        let (deserialized, needs_migration) =
-            super::HoprKeys::read_eth_keystore(identity_dir.to_str().unwrap(), "local").unwrap();
+        let (deserialized, needs_migration) = super::HoprKeys::read_eth_keystore(
+            identity_dir.to_str().context("should be convertible to string")?,
+            "local",
+        )?;
 
         assert!(needs_migration);
         assert_eq!(
             deserialized.chain_key.public().0.to_address().to_string(),
             "0x826a1bf3d51fa7f402a1e01d1b2c8a8bac28e666"
         );
+
+        Ok(())
     }
 
     #[test]
-    fn test_auto_migration() {
-        let tmp = tempdir().unwrap();
+    fn test_auto_migration() -> anyhow::Result<()> {
+        let tmp = tempdir()?;
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
-        let identity_path: &str = identity_dir.to_str().unwrap();
+        let identity_path: &str = identity_dir.to_str().context("should be convertible to string")?;
 
         let old_keystore_file = r#"{"id":"8e5fe142-6ef9-4fbb-aae8-5de32b680e31","version":3,"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"04141354edb9dfb0c65e6905a3a0b9dd"},"ciphertext":"74f12f72cf2d3d73ff09f783cb9b57995b3808f7d3f71aa1fa1968696aedfbdd","kdf":"scrypt","kdfparams":{"salt":"f5e3f04eaa0c9efffcb5168c6735d7e1fe4d96f48a636c4f00107e7c34722f45","n":1,"dklen":32,"p":1,"r":8},"mac":"d0daf0e5d14a2841f0f7221014d805addfb7609d85329d4c6424a098e50b6fbe"}}"#;
         fs::write(identity_path, old_keystore_file.as_bytes()).unwrap();
@@ -547,15 +559,17 @@ mod tests {
             deserialized.chain_key.public().0.to_address().to_string(),
             "0x826a1bf3d51fa7f402a1e01d1b2c8a8bac28e666"
         );
+
+        Ok(())
     }
 
     #[test]
-    fn test_should_not_overwrite_existing() {
-        let tmp = tempdir().unwrap();
+    fn test_should_not_overwrite_existing() -> anyhow::Result<()> {
+        let tmp = tempdir()?;
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
-        let identity_path: &str = identity_dir.to_str().unwrap();
+        let identity_path: &str = identity_dir.to_str().context("should be convertible to string")?;
 
-        fs::write(identity_path, "".as_bytes()).unwrap();
+        fs::write(identity_path, "".as_bytes())?;
 
         // Overwriting existing keys must not be possible
         assert!(super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
@@ -563,7 +577,10 @@ mod tests {
             id_path: identity_path.into()
         })
         .is_err());
+
+        Ok(())
     }
+
     #[test]
     fn test_from_privatekey() {
         let private_key = "0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae";
@@ -602,10 +619,10 @@ mod tests {
     }
 
     #[test]
-    fn test_from_privatekey_into_file() {
-        let tmp = tempdir().unwrap();
+    fn test_from_privatekey_into_file() -> anyhow::Result<()> {
+        let tmp = tempdir()?;
         let identity_dir = tmp.path().join("hopr-unit-test-identity");
-        let identity_path = identity_dir.to_str().unwrap();
+        let identity_path = identity_dir.to_str().context("should be convertible to string")?;
         let id = Uuid::new_v4();
 
         let keys = HoprKeys::init(super::IdentityRetrievalModes::FromIdIntoFile {
@@ -630,5 +647,7 @@ mod tests {
             id
         })
         .is_err());
+
+        Ok(())
     }
 }
