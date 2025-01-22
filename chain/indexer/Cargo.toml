@@ -39,7 +39,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 bindings = { workspace = true }
-chain-types = { workspace = true }
+hopr-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }

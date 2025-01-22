@@ -67,9 +67,9 @@ validator = { workspace = true }
 chain-actions = { workspace = true }
 chain-api = { workspace = true }
 chain-indexer = { workspace = true }
-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-rpc = { workspace = true }
+hopr-chain-types = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-api = { workspace = true }
 hopr-db-sql = { workspace = true }

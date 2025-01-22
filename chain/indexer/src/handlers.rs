@@ -14,9 +14,9 @@ use bindings::{
     hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
     hopr_token::HoprTokenEvents, hopr_winning_probability_oracle::HoprWinningProbabilityOracleEvents,
 };
-use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
-use chain_types::ContractAddresses;
 use hopr_chain_rpc::{BlockWithLogs, Log};
+use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
+use hopr_chain_types::ContractAddresses;
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::prelude::{Hash, Keypair};
 use hopr_crypto_types::types::OffchainSignature;
@@ -889,14 +889,14 @@ mod tests {
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::{ApprovalFilter, TransferFilter},
     };
-    use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
-    use chain_types::ContractAddresses;
     use ethers::contract::EthEvent;
     use ethers::{
         abi::{encode, Address as EthereumAddress, Token},
         types::U256 as EthU256,
     };
     use hex_literal::hex;
+    use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
+    use hopr_chain_types::ContractAddresses;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::accounts::{ChainOrPacketKey, HoprDbAccountOperations};
     use hopr_db_sql::api::{info::DomainSeparator, tickets::HoprDbTicketOperations};

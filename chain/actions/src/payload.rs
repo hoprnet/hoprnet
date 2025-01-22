@@ -26,13 +26,13 @@ use bindings::{
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
     hopr_token::{ApproveCall, TransferCall},
 };
-use chain_types::ContractAddresses;
-use chain_types::{create_eip1559_transaction, TypedTransaction};
 use ethers::types::NameOrAddress;
 use ethers::{
     abi::AbiEncode,
     types::{H160, H256, U256},
 };
+use hopr_chain_types::ContractAddresses;
+use hopr_chain_types::{create_eip1559_transaction, TypedTransaction};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -600,9 +600,9 @@ mod tests {
     use multiaddr::Multiaddr;
     use std::str::FromStr;
 
-    use chain_types::ContractInstances;
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
     use hopr_chain_rpc::client::surf_client::SurfRequestor;
+    use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::{Balance, BalanceType};
@@ -614,7 +614,7 @@ mod tests {
     async fn test_announce() -> anyhow::Result<()> {
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56")?;
 
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
 
@@ -649,7 +649,7 @@ mod tests {
 
     #[async_std::test]
     async fn redeem_ticket() -> anyhow::Result<()> {
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
@@ -658,12 +658,12 @@ mod tests {
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice).await?;
 
         // Mint 1000 HOPR to Alice
-        chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+        hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
 
         let domain_separator: Hash = contract_instances.channels.domain_separator().call().await?.into();
 
         // Open channel Alice -> Bob
-        chain_types::utils::fund_channel(
+        hopr_chain_types::utils::fund_channel(
             (&chain_key_bob).into(),
             contract_instances.token.clone(),
             contract_instances.channels.clone(),
@@ -672,7 +672,7 @@ mod tests {
         .await;
 
         // Fund Bob's node
-        chain_types::utils::fund_node(
+        hopr_chain_types::utils::fund_node(
             (&chain_key_bob).into(),
             1000000000000000000_u128.into(),
             10_u128.into(),
@@ -709,7 +709,7 @@ mod tests {
 
     #[async_std::test]
     async fn withdraw_token() -> anyhow::Result<()> {
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
@@ -719,7 +719,7 @@ mod tests {
         let generator = BasicPayloadGenerator::new((&chain_key_alice).into(), (&contract_instances).into());
 
         // Mint 1000 HOPR to Alice
-        chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+        hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
 
         // Check balance is 1000 HOPR
         let balance: ethers::types::U256 = contract_instances

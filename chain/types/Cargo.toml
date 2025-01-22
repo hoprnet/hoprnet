@@ -1,5 +1,5 @@
 [package]
-name = "chain-types"
+name = "hopr-chain-types"
 version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"

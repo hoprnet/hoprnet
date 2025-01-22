@@ -3,9 +3,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
 
-use chain_types::chain_events::SignificantChainEvent;
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
+use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
@@ -43,7 +43,7 @@ lazy_static::lazy_static! {
 /// Indexer
 ///
 /// Accepts the RPC operational functionality [hopr_chain_rpc::HoprIndexerRpcOperations]
-/// and provides the indexing operation resulting in and output of [chain_types::chain_events::SignificantChainEvent]
+/// and provides the indexing operation resulting in and output of [hopr_chain_types::chain_events::SignificantChainEvent]
 /// streamed outside the indexer by the unbounded channel.
 ///
 /// The roles of the indexer:
@@ -539,8 +539,8 @@ mod tests {
     use std::pin::Pin;
 
     use bindings::hopr_announcements::AddressAnnouncementFilter;
-    use chain_types::chain_events::ChainEventType;
     use hopr_chain_rpc::BlockWithLogs;
+    use hopr_chain_types::chain_events::ChainEventType;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_crypto_types::prelude::ChainKeypair;
     use hopr_db_sql::accounts::HoprDbAccountOperations;

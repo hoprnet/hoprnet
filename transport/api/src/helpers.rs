@@ -3,7 +3,7 @@ use futures::channel::mpsc::Sender;
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
-use chain_types::chain_events::NetworkRegistryStatus;
+use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;

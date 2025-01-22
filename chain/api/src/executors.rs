@@ -7,10 +7,10 @@ use std::time::Duration;
 
 use chain_actions::action_queue::TransactionExecutor;
 use chain_actions::payload::PayloadGenerator;
-use chain_types::TypedTransaction;
 use hopr_async_runtime::prelude::sleep;
 use hopr_chain_rpc::errors::RpcError;
 use hopr_chain_rpc::{HoprRpcOperations, PendingTransaction};
+use hopr_chain_types::TypedTransaction;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;

@@ -61,8 +61,8 @@ tracing = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng"] }
 validator = { workspace = true }
 
-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
+hopr-chain-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-db-sql = { workspace = true }

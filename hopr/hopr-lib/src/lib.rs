@@ -45,11 +45,11 @@ use chain_api::{
     can_register_with_safe, config::ChainNetworkConfig, errors::HoprChainError, wait_for_funds, HoprChain,
     HoprChainProcess, SignificantChainEvent,
 };
-use chain_types::chain_events::ChainEventType;
-use chain_types::ContractAddresses;
 use errors::{HoprLibError, HoprStatusError};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_chain_rpc::HoprRpcOperations;
+use hopr_chain_types::chain_events::ChainEventType;
+use hopr_chain_types::ContractAddresses;
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{
@@ -283,8 +283,8 @@ where
                                     let peer_id = offchain_key.into();
 
                                     let res = match allowed {
-                                        chain_types::chain_events::NetworkRegistryStatus::Allowed => PeerDiscovery::Allow(peer_id),
-                                        chain_types::chain_events::NetworkRegistryStatus::Denied => PeerDiscovery::Ban(peer_id),
+                                        hopr_chain_types::chain_events::NetworkRegistryStatus::Allowed => PeerDiscovery::Allow(peer_id),
+                                        hopr_chain_types::chain_events::NetworkRegistryStatus::Denied => PeerDiscovery::Ban(peer_id),
                                     };
 
                                     Some(res)

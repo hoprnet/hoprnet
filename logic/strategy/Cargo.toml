@@ -62,7 +62,7 @@ hopr-transport-protocol = { workspace = true }
 anyhow = { workspace = true }
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
-chain-types = { workspace = true }
+hopr-chain-types = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
 hopr-crypto-random = { workspace = true }
