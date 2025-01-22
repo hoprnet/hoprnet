@@ -3,16 +3,16 @@ use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::time::Duration;
 
+use proc_macro_regex::regex;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use tracing::debug;
+use validator::{Validate, ValidationError};
+
 use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
 use hopr_platform::file::native::read_to_string;
 use hoprd_api::config::{Api, Auth};
 use hoprd_inbox::config::MessageInboxConfiguration;
-
-use proc_macro_regex::regex;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use tracing::{debug, warn};
-use validator::{Validate, ValidationError};
 
 use crate::errors::HoprdError;
 
