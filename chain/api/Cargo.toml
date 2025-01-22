@@ -13,20 +13,20 @@ crate-type = ["rlib"]
 default = []
 runtime-async-std = [
   "chain-actions/runtime-async-std",
-  "chain-indexer/runtime-async-std",
+  "hopr-chain-indexer/runtime-async-std",
   "hopr-db-sql/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
 ]
 runtime-tokio = [
   "chain-actions/runtime-tokio",
-  "chain-indexer/runtime-tokio",
+  "hopr-chain-indexer/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
 ]
 prometheus = [
   "hopr-chain-rpc/prometheus",
   "chain-actions/prometheus",
-  "chain-indexer/prometheus",
+  "hopr-chain-indexer/prometheus",
   "hopr-db-sql/prometheus",
 ]
 
@@ -45,7 +45,7 @@ tracing = { workspace = true }
 validator = { workspace = true }
 
 chain-actions = { workspace = true }
-chain-indexer = { workspace = true }
+hopr-chain-indexer = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-rpc = { workspace = true }

@@ -36,7 +36,7 @@ runtime-tokio = [
 ]
 prometheus = [
   "chain-api/prometheus",
-  "chain-indexer/prometheus",
+  "hopr-chain-indexer/prometheus",
   "hopr-chain-rpc/prometheus",
   "dep:hopr-metrics",
   "hopr-db-sql/prometheus",
@@ -66,8 +66,8 @@ validator = { workspace = true }
 
 chain-actions = { workspace = true }
 chain-api = { workspace = true }
-chain-indexer = { workspace = true }
 hopr-async-runtime = { workspace = true }
+hopr-chain-indexer = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-chain-types = { workspace = true }
 hopr-crypto-types = { workspace = true }

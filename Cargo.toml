@@ -196,7 +196,7 @@ zeroize = { version = "1.8.1" }
 bindings = { path = "ethereum/bindings", default-features = false }
 chain-actions = { path = "chain/actions", default-features = false }
 chain-api = { path = "chain/api", default-features = false }
-chain-indexer = { path = "chain/indexer", default-features = false }
+hopr-chain-indexer = { path = "chain/indexer", default-features = false }
 hopr-chain-types = { path = "chain/types", default-features = false }
 hopr-transport-network = { path = "transport/network" }
 hopr-path = { path = "logic/path" }

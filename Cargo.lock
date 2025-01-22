@@ -1320,9 +1320,9 @@ dependencies = [
  "async-std",
  "async-trait",
  "chain-actions",
- "chain-indexer",
  "futures",
  "hopr-async-runtime",
+ "hopr-chain-indexer",
  "hopr-chain-rpc",
  "hopr-chain-types",
  "hopr-crypto-types",
@@ -1338,39 +1338,6 @@ dependencies = [
  "thiserror 2.0.11",
  "tracing",
  "validator",
-]
-
-[[package]]
-name = "chain-indexer"
-version = "0.6.1"
-dependencies = [
- "anyhow",
- "async-channel 2.3.1",
- "async-std",
- "async-trait",
- "bindings",
- "ethers",
- "futures",
- "hex-literal",
- "hopr-async-runtime",
- "hopr-chain-rpc",
- "hopr-chain-types",
- "hopr-crypto-random",
- "hopr-crypto-types",
- "hopr-db-api",
- "hopr-db-entity",
- "hopr-db-sql",
- "hopr-internal-types",
- "hopr-metrics",
- "hopr-primitive-types",
- "lazy_static",
- "mockall",
- "multiaddr",
- "primitive-types",
- "smart-default",
- "test-log",
- "thiserror 2.0.11",
- "tracing",
 ]
 
 [[package]]
@@ -4145,6 +4112,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-chain-indexer"
+version = "0.6.1"
+dependencies = [
+ "anyhow",
+ "async-channel 2.3.1",
+ "async-std",
+ "async-trait",
+ "bindings",
+ "ethers",
+ "futures",
+ "hex-literal",
+ "hopr-async-runtime",
+ "hopr-chain-rpc",
+ "hopr-chain-types",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-db-entity",
+ "hopr-db-sql",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-primitive-types",
+ "lazy_static",
+ "mockall",
+ "multiaddr",
+ "primitive-types",
+ "smart-default",
+ "test-log",
+ "thiserror 2.0.11",
+ "tracing",
+]
+
+[[package]]
 name = "hopr-chain-rpc"
 version = "0.3.2"
 dependencies = [
@@ -4421,13 +4421,13 @@ dependencies = [
  "backon",
  "chain-actions",
  "chain-api",
- "chain-indexer",
  "const_format",
  "ethers",
  "futures",
  "futures-timer",
  "hex-literal",
  "hopr-async-runtime",
+ "hopr-chain-indexer",
  "hopr-chain-rpc",
  "hopr-chain-types",
  "hopr-crypto-random",
