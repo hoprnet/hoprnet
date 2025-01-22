@@ -49,7 +49,6 @@ reqwest = { workspace = true, optional = true, features = [
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-serde_with = { workspace = true }
 smart-default = { workspace = true }
 surf = { workspace = true, optional = true }
 surf-governor = { workspace = true, optional = true }

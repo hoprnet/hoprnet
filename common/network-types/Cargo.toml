@@ -42,7 +42,6 @@ libp2p-identity = { workspace = true }
 rand = { workspace = true }
 rand_distr = { workspace = true }
 serde = { workspace = true, optional = true }
-serde_with = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 socket2 = { workspace = true }
@@ -64,7 +63,7 @@ hopr-metrics = { workspace = true, optional = true }
 anyhow = { workspace = true }
 async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-stream = { workspace = true }
-ctor = "0.2.8"
+ctor = { workspace = true }
 criterion = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }

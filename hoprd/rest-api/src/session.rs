@@ -32,7 +32,7 @@ use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
 
 use crate::types::PeerOrAddress;
-use crate::{ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
+use crate::{ApiError, ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -813,7 +813,7 @@ pub(crate) async fn close_client(
     Ok::<_, (StatusCode, ApiErrorStatus)>((StatusCode::NO_CONTENT, "").into_response())
 }
 
-async fn try_restricted_bind<'a, F, S, Fut>(
+async fn try_restricted_bind<F, S, Fut>(
     addrs: Vec<std::net::SocketAddr>,
     range_str: &str,
     binder: F,
