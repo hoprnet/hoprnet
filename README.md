@@ -180,20 +180,6 @@ Options:
           Address of the node mangement module [env: HOPRD_MODULE_ADDRESS=]
       --protocolConfig <HOPRD_PROTOCOL_CONFIG_PATH>
           Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
-      --dryRun
-          DEPRECATED [env: HOPRD_DRY_RUN=]
-      --healthCheck
-          DEPRECATED
-      --healthCheckHost <HEALTH_CHECK_HOST>
-          DEPRECATED
-      --healthCheckPort <HEALTH_CHECK_PORT>
-          DEPRECATED
-      --defaultStrategy <DEFAULT_STRATEGY>
-          DEPRECATED [env: HOPRD_DEFAULT_STRATEGY=] [possible values: promiscuous, aggregating, auto_redeeming, auto_funding, closure_finalizer, multi, passive]
-      --maxAutoChannels <MAX_AUTO_CHANNELS>
-          DEPRECATED [env: HOPRD_MAX_AUTO_CHANNELS=]
-      --disableTicketAutoRedeem...
-          DEPRECATED [env: HOPRD_DISABLE_AUTO_REDEEEM_TICKETS=]
   -h, --help
           Print help
   -V, --version

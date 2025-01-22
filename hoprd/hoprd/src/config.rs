@@ -222,33 +222,6 @@ impl HoprdConfig {
             cfg.identity.private_key = Some(x)
         };
 
-        // TODO: strategy configuration from the CLI should be removed in 3.0!
-
-        // strategy
-        if cli_args.default_strategy.is_some() {
-            warn!(
-                "DEPRECATION: 'defaultStrategy' (HOPRD_DEFAULT_STRATEGY) option is now deprecated \
-            and has no effect. It will be removed in future releases, please use configuration file \
-            to configure strategies"
-            );
-        }
-
-        if cli_args.auto_redeem_tickets == 1 {
-            warn!(
-                "DEPRECATION: 'disableTicketAutoRedeem' (HOPRD_DISABLE_AUTO_REDEEM_TICKETS) \
-            option is now deprecated and has no effect. It will be removed in future releases, \
-            please use configuration file to configure strategies"
-            );
-        }
-
-        if cli_args.max_auto_channels.is_some() {
-            warn!(
-                "DEPRECATION: 'maxAutoChannels' (HOPRD_MAX_AUTO_CHANNELS) option is now deprecated \
-            and has no effect. It will be removed in future releases, please use configuration file \
-            to configure strategies"
-            );
-        }
-
         // chain
         if cli_args.announce > 0 {
             cfg.hopr.chain.announce = true;
