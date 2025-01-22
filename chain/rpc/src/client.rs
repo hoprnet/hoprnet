@@ -837,11 +837,9 @@ impl<R: HttpPostRequestor> HttpPostRequestor for &SnapshotRequestor<R> {
     }
 }
 
-type AnvilRpcClient<R> = std::sync::Arc<
-    ethers::middleware::SignerMiddleware<
-        ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
-        ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
-    >,
+type AnvilRpcClient<R> = ethers::middleware::SignerMiddleware<
+    ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
+    ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
 >;
 
 /// Used for testing. Creates Ethers RPC client to the local Anvil instance.

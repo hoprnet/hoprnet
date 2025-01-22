@@ -1,17 +1,28 @@
 use async_std::task::sleep;
-use chain_rpc::client::surf_client::SurfRequestor;
-use chain_rpc::client::{create_rpc_client_to_anvil, AnvilRpcClient};
 use chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
 };
 use chain_types::{ContractAddresses, ContractInstances};
 use ethers::utils::AnvilInstance;
+use hopr_chain_rpc::client::surf_client::SurfRequestor;
+use hopr_chain_rpc::client::{
+    create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
+};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
 use tracing::info;
 
+pub type AnvilRpcClient<R> = ethers::middleware::SignerMiddleware<
+    ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
+    ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
+>;
+
+/// Snapshot requestor used for testing.
+pub type Requestor = SnapshotRequestor<SurfRequestor>;
+
 /// Represents a HOPR environment deployment into Anvil.
+#[allow(unused)]
 pub struct TestChainEnv {
     /// Running Anvil instance
     pub anvil: AnvilInstance,
@@ -20,17 +31,17 @@ pub struct TestChainEnv {
     /// Chain keys of 9 possible HOPR nodes
     pub node_chain_keys: Vec<ChainKeypair>,
     /// Instances of deployed smart contracts
-    pub contract_instances: ContractInstances<AnvilRpcClient<SurfRequestor>>,
+    pub contract_instances: ContractInstances<AnvilRpcClient<Requestor>>,
     /// Addresses of deployed smart contracts
     pub contract_addresses: ContractAddresses,
 }
 
 /// Deploys Anvil and all HOPR smart contracts as a testing environment
-pub async fn deploy_test_environment(block_time: Duration, finality: u32) -> TestChainEnv {
+pub async fn deploy_test_environment(requestor: Requestor, block_time: Duration, finality: u32) -> TestChainEnv {
     let anvil = create_anvil(Some(block_time));
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-    let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+    let client = create_rpc_client_to_anvil(requestor, &anvil, &contract_deployer);
     info!("Deploying SCs to Anvil...");
     let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
         .await
@@ -55,13 +66,20 @@ pub async fn deploy_test_environment(block_time: Duration, finality: u32) -> Tes
     }
 }
 
+#[allow(unused)]
+#[derive(Clone, Copy, Default)]
+pub struct NodeSafeConfig {
+    pub safe_address: Address,
+    pub module_address: Address,
+}
+
 /// Onboards HOPR node by deploying its Safe and Module and funding them.
 pub async fn onboard_node(
     chain_env: &TestChainEnv,
     node_chain_key: &ChainKeypair,
     fund_native: U256,
     fund_hopr: U256,
-) -> (Address, Address) {
+) -> NodeSafeConfig {
     let client = chain_env.contract_instances.token.client();
 
     // Deploy Safe and Module for node
@@ -125,5 +143,8 @@ pub async fn onboard_node(
     .await
     .expect("could not approve channels to be a spender for safe");
 
-    (module, safe)
+    NodeSafeConfig {
+        safe_address: safe,
+        module_address: module,
+    }
 }
