@@ -20,7 +20,7 @@ hopr:
         max_closure_overdue: 300
   chain:
     network: dufour
-    provider: # NOTE: fill in value
+    provider: # NOTE: Fill in value. Using a local RPC provider, make sure to always include the http:// prefix, followed by the IP address or localhost.
     announce: true
     keep_logs: true
     fast_sync: true
