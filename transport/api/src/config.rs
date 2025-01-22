@@ -32,7 +32,7 @@ pub fn looks_like_domain(s: &str) -> bool {
 
 /// Check whether the string is an actual reachable domain.
 pub fn is_reachable_domain(host: &str) -> bool {
-    host.to_socket_addrs().map_or(false, |i| i.into_iter().next().is_some())
+    host.to_socket_addrs().is_ok_and(|i| i.into_iter().next().is_some())
 }
 
 /// Enumeration of possible host types.

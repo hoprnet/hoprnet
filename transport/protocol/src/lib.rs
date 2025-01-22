@@ -349,7 +349,7 @@ where
                                     _ => {}
                                 }
 
-                                error!(peer = %peer, "Failed to process received message: {e}");
+                                error!(peer = %peer, error = %e, "Failed to process the received message");
                                 // send random signed acknowledgement to give feedback to the sender
                                 internal_ack_send
                                     .send((

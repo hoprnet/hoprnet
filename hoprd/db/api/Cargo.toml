@@ -9,7 +9,6 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 runtime-async-std = [
   "hopr-async-runtime/runtime-async-std",
   "sea-orm/runtime-async-std",
@@ -24,7 +23,6 @@ runtime-tokio = [
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 sea-orm = { workspace = true }
 sqlx = { workspace = true }
@@ -33,7 +31,6 @@ tracing = { workspace = true }
 
 hoprd-db-entity = { workspace = true, features = ["serde"] }
 hoprd-db-migration = { workspace = true }
-hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-std = { workspace = true }

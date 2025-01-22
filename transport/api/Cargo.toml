@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR interface for the core library"
 edition = "2021"
@@ -50,7 +50,6 @@ async-lock = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }
-moka = { workspace = true }
 proc-macro-regex = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
@@ -68,7 +67,6 @@ core-path = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-crypto-random = { workspace = true }
 hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }

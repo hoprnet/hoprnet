@@ -61,9 +61,14 @@ where
     async fn on_finished_ping(
         &self,
         peer: &PeerId,
-        result: std::result::Result<std::time::Duration, ()>,
+        result: &core_network::errors::Result<std::time::Duration>,
         version: String,
     ) {
+        let result = match &result {
+            Ok(duration) => Ok(*duration),
+            Err(_) => Err(()),
+        };
+
         match self
             .network
             .update(peer, result, result.is_ok().then_some(version))

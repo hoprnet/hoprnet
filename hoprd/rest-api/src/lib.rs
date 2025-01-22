@@ -249,14 +249,12 @@ async fn build_api(
     };
 
     Router::new()
-        .nest(
-            "/",
+        .merge(
             Router::new()
                 .merge(SwaggerUi::new("/swagger-ui").url("/api-docs2/openapi.json", ApiDoc::openapi()))
                 .merge(Scalar::with_url("/scalar", ApiDoc::openapi())),
         )
-        .nest(
-            "/",
+        .merge(
             Router::new()
                 .route("/startedz", get(checks::startedz))
                 .route("/readyz", get(checks::readyz))
@@ -270,24 +268,24 @@ async fn build_api(
                 .route("/aliases", get(alias::aliases))
                 .route("/aliases", post(alias::set_alias))
                 .route("/aliases", delete(alias::clear_aliases))
-                .route("/aliases/:alias", get(alias::get_alias))
-                .route("/aliases/:alias", delete(alias::delete_alias))
+                .route("/aliases/{alias}", get(alias::get_alias))
+                .route("/aliases/{alias}", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
                 .route("/account/withdraw", post(account::withdraw))
-                .route("/peers/:destination", get(peers::show_peer_info))
+                .route("/peers/{destination}", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
-                .route("/channels/:channelId", get(channels::show_channel))
-                .route("/channels/:channelId/tickets", get(tickets::show_channel_tickets))
-                .route("/channels/:channelId", delete(channels::close_channel))
-                .route("/channels/:channelId/fund", post(channels::fund_channel))
+                .route("/channels/{channelId}", get(channels::show_channel))
+                .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets))
+                .route("/channels/{channelId}", delete(channels::close_channel))
+                .route("/channels/{channelId}/fund", post(channels::fund_channel))
                 .route(
-                    "/channels/:channelId/tickets/redeem",
+                    "/channels/{channelId}/tickets/redeem",
                     post(tickets::redeem_tickets_in_channel),
                 )
                 .route(
-                    "/channels/:channelId/tickets/aggregate",
+                    "/channels/{channelId}/tickets/aggregate",
                     post(tickets::aggregate_tickets_in_channel),
                 )
                 .route("/tickets", get(tickets::show_all_tickets))
@@ -310,11 +308,11 @@ async fn build_api(
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
                 .route("/node/graph", get(node::channel_graph))
-                .route("/peers/:destination/ping", post(peers::ping_peer))
+                .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/websocket", get(session::websocket))
-                .route("/session/:protocol", post(session::create_client))
-                .route("/session/:protocol", get(session::list_clients))
-                .route("/session/:protocol/:ip/:port", delete(session::close_client))
+                .route("/session/{protocol}", post(session::create_client))
+                .route("/session/{protocol}", get(session::list_clients))
+                .route("/session/{protocol}/{ip}/{port}", delete(session::close_client))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(
                     inner_state.clone(),
@@ -386,6 +384,7 @@ enum ApiErrorStatus {
     DatabaseError,
     UnsupportedFeature,
     Timeout,
+    PingError(String),
     Unauthorized,
     TooManyOpenWebsocketConnections,
     InvalidQuality,
