@@ -59,8 +59,8 @@ async-std-resolver = { version = "0.24.2" }
 async-stream = "0.3.6"
 async-trait = "0.1.85"
 atomic_enum = "0.3.0"
-axum = { version = "^0.8.0", features = ["ws", "http2"] }
-axum-extra = { version = "0.10.0", features = ["query"] }
+axum = { version = "0.8.2", features = ["ws", "http2"] }
+axum-extra = { version = "0.11.0", features = ["query"] }
 backon = { version = "1.3.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
