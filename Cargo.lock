@@ -4574,7 +4574,6 @@ dependencies = [
  "libp2p",
  "libp2p-identity",
  "more-asserts",
- "parameterized",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
@@ -4582,7 +4581,6 @@ dependencies = [
  "smart-default",
  "thiserror",
  "tracing",
- "tracing-test",
  "validator",
 ]
 

@@ -83,7 +83,7 @@ where
                 data.to_bytes(),
                 self.cfg.chain_keypair.clone(),
                 path?,
-                self.cfg.outgoing_ticket_win_prob,
+                self.determine_actual_outgoing_win_prob().await,
             )
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
@@ -115,7 +115,7 @@ where
                 self.cfg.chain_keypair.clone(),
                 &self.cfg.packet_keypair,
                 previous_hop,
-                self.cfg.outgoing_ticket_win_prob,
+                self.determine_actual_outgoing_win_prob().await,
             )
             .await
             .map_err(|e| match e {
@@ -194,6 +194,18 @@ where
         self.tbf
             .with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
             .await
+    }
+
+    async fn determine_actual_outgoing_win_prob(&self) -> f64 {
+        let maybe_preset_win_prob = self.cfg.outgoing_ticket_win_prob;
+        let network_win_prob = self.db.get_network_winning_probability().await.unwrap_or_else(|error| {
+            error!(%error, ?maybe_preset_win_prob, "failed to determine current network winning probability");
+            maybe_preset_win_prob.unwrap_or(1.0)
+        });
+
+        maybe_preset_win_prob
+            .map(|preset| preset.max(network_win_prob))
+            .unwrap_or(network_win_prob)
     }
 }
 
@@ -285,11 +297,15 @@ pub struct PacketInteractionConfig {
     pub packet_keypair: OffchainKeypair,
     pub chain_keypair: ChainKeypair,
     pub mixer: MixerConfig,
-    pub outgoing_ticket_win_prob: f64,
+    pub outgoing_ticket_win_prob: Option<f64>,
 }
 
 impl PacketInteractionConfig {
-    pub fn new(packet_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, outgoing_ticket_win_prob: f64) -> Self {
+    pub fn new(
+        packet_keypair: &OffchainKeypair,
+        chain_keypair: &ChainKeypair,
+        outgoing_ticket_win_prob: Option<f64>,
+    ) -> Self {
         Self {
             packet_keypair: packet_keypair.clone(),
             chain_keypair: chain_keypair.clone(),

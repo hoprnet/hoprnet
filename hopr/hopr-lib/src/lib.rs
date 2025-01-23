@@ -739,14 +739,11 @@ impl Hopr {
         // check if the winning probability is configured correctly.
         let network_min_win_prob = self.chain_api.get_minimum_winning_probability().await?;
         let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
-        if configured_win_prob < network_min_win_prob {
+        if configured_win_prob.is_some_and(|c| c < network_min_win_prob) {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
-                "configured outgoing ticket winning probability is lower than the network minimum winning probability: {configured_win_prob} < {network_min_win_prob}"
+                "configured outgoing ticket winning probability is lower than the network minimum winning probability: {configured_win_prob:?} < {network_min_win_prob}"
             ))));
         }
-
-        debug!(%configured_win_prob, %network_min_win_prob, "configuring winning probability");
-        let overridden_win_prob = configured_win_prob.max(network_min_win_prob);
 
         info!("Linking chain and packet keys");
         self.db
@@ -1038,7 +1035,6 @@ impl Hopr {
                 transport_output_tx,
                 indexer_peer_update_rx,
                 session_tx,
-                Some(overridden_win_prob),
             )
             .await
             .into_iter()

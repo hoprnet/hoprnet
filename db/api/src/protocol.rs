@@ -18,6 +18,9 @@ pub trait HoprDbProtocolOperations {
     async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair)
         -> crate::errors::Result<AckResult>;
 
+    /// Loads (presumably cached) value of the network winning probability from the DB.
+    async fn get_network_winning_probability(&self) -> crate::errors::Result<f64>;
+
     /// Process the data into an outgoing packet
     async fn to_send(
         &self,
