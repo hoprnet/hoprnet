@@ -1,13 +1,13 @@
 use async_std::task::sleep;
-use chain_types::utils::{
-    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
-};
-use chain_types::{ContractAddresses, ContractInstances};
 use ethers::utils::AnvilInstance;
 use hopr_chain_rpc::client::surf_client::SurfRequestor;
 use hopr_chain_rpc::client::{
     create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
 };
+use hopr_chain_types::utils::{
+    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
+};
+use hopr_chain_types::{ContractAddresses, ContractInstances};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::time::Duration;
@@ -48,7 +48,7 @@ pub async fn deploy_test_environment(requestor: Requestor, block_time: Duration,
         .expect("failed to deploy");
 
     // Mint some tokens
-    chain_types::utils::mint_tokens(contract_instances.token.clone(), 1_000_000_u128.into()).await;
+    hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), 1_000_000_u128.into()).await;
 
     sleep((1 + finality) * block_time).await;
 
@@ -83,7 +83,7 @@ pub async fn onboard_node(
     let client = chain_env.contract_instances.token.client();
 
     // Deploy Safe and Module for node
-    let (module, safe) = chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
+    let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
         &chain_env.contract_instances,
         client.clone(),
         &chain_env.contract_deployer,
@@ -121,10 +121,10 @@ pub async fn onboard_node(
     .expect("could not add announcement to module");
 
     // Fund the node's Safe with native tokens and HOPR token
-    chain_types::utils::fund_node(safe, fund_native, fund_hopr, chain_env.contract_instances.token.clone()).await;
+    hopr_chain_types::utils::fund_node(safe, fund_native, fund_hopr, chain_env.contract_instances.token.clone()).await;
 
     // Fund node's address with 10 native tokens
-    chain_types::utils::fund_node(
+    hopr_chain_types::utils::fund_node(
         node_chain_key.public().to_address(),
         fund_native,
         0.into(),

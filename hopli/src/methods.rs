@@ -1452,8 +1452,8 @@ mod tests {
     use std::vec;
 
     use bindings::{hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels};
-    use chain_types::ContractInstances;
     use hopr_chain_rpc::client::{create_rpc_client_to_anvil, surf_client::SurfRequestor};
+    use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::BytesRepresentable;
     use hopr_primitive_types::primitives::Address;
@@ -1564,7 +1564,7 @@ mod tests {
         let kp_address = Address::from(&kp);
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
@@ -1594,7 +1594,7 @@ mod tests {
         let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
@@ -1654,7 +1654,7 @@ mod tests {
         let desired_amount = vec![U256::from(42)];
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
@@ -1713,7 +1713,7 @@ mod tests {
         let desired_amount: Vec<U256> = Vec::new();
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
@@ -1754,7 +1754,7 @@ mod tests {
         let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -1795,7 +1795,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -1890,7 +1890,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -1988,7 +1988,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -2056,7 +2056,7 @@ mod tests {
         let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -2148,7 +2148,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -2228,7 +2228,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -2286,7 +2286,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let self_address: H160 = contract_deployer.public().to_address().into();
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
@@ -2379,7 +2379,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
@@ -2452,7 +2452,7 @@ mod tests {
         }
 
         // launch local anvil instance
-        let anvil = chain_types::utils::create_anvil(None);
+        let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)

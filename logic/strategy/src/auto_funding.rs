@@ -115,12 +115,12 @@ mod tests {
     use crate::auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig};
     use crate::strategy::SingularStrategy;
     use async_trait::async_trait;
-    use chain_types::actions::Action;
-    use chain_types::chain_events::ChainEventType;
     use futures::{future::ok, FutureExt};
     use hex_literal::hex;
     use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use hopr_chain_actions::channels::ChannelActions;
+    use hopr_chain_types::actions::Action;
+    use hopr_chain_types::chain_events::ChainEventType;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_internal_types::prelude::*;

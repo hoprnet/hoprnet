@@ -9,10 +9,6 @@ use hopr_crypto_random::{random_bytes, random_integer};
 use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 
-use core_path::{
-    channel_graph::ChannelGraph,
-    path::{Path, TransportPath},
-};
 use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{Hash, OffchainPublicKey},
@@ -22,6 +18,10 @@ use hopr_db_sql::{
     accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
 };
 use hopr_internal_types::prelude::*;
+use hopr_path::{
+    channel_graph::ChannelGraph,
+    path::{Path, TransportPath},
+};
 use hopr_primitive_types::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
