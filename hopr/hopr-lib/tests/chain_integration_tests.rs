@@ -158,7 +158,8 @@ async fn start_node_chain_logic(
         db.clone(),
     );
 
-    let mut indexer = Indexer::new(rpc_ops_in, chain_log_handler, db.clone(), indexer_cfg, sce_tx);
+    let indexer = Indexer::new(rpc_ops_in, chain_log_handler, db.clone(), indexer_cfg, sce_tx);
+    let _indexer = indexer.clone();
     indexer.start().await?;
 
     Ok(ChainNode {
@@ -166,7 +167,7 @@ async fn start_node_chain_logic(
         chain_key: chain_key.clone(),
         db,
         actions,
-        _indexer: indexer,
+        _indexer,
         node_tasks,
     })
 }
