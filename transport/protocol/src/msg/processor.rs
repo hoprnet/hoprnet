@@ -200,9 +200,11 @@ where
         let maybe_preset_win_prob = self.cfg.outgoing_ticket_win_prob;
         let network_win_prob = self.db.get_network_winning_probability().await.unwrap_or_else(|error| {
             error!(%error, ?maybe_preset_win_prob, "failed to determine current network winning probability");
-            maybe_preset_win_prob.unwrap_or(1.0)
+            // use win prob 1 if nothing was configured and no network value can be retrieved
+            maybe_preset_win_prob.unwrap_or(DEFAULT_OUTGOING_TICKET_WIN_PROB)
         });
 
+        // Otherwise, take the maximum of the configured value and the network value
         maybe_preset_win_prob
             .map(|preset| preset.max(network_win_prob))
             .unwrap_or(network_win_prob)
