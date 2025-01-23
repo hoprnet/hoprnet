@@ -2,17 +2,17 @@
 //!
 //! This used in unit and integration tests.
 use crate::{create_eip1559_transaction, ContractAddresses, ContractInstances, TypedTransaction};
-use bindings::{
-    hopr_channels::HoprChannels,
-    hopr_node_management_module::{IncludeNodeCall, ScopeTargetTokenCall},
-    hopr_node_stake_factory::NewHoprNodeStakeModuleFilter,
-    hopr_token::{ApproveCall, HoprToken},
-};
 use ethers::abi::{encode_packed, AbiEncode, RawLog, Token};
 use ethers::core::k256::ecdsa::SigningKey;
 use ethers::prelude::*;
 use ethers::utils::keccak256;
 use hex_literal::hex;
+use hopr_bindings::{
+    hopr_channels::HoprChannels,
+    hopr_node_management_module::{IncludeNodeCall, ScopeTargetTokenCall},
+    hopr_node_stake_factory::NewHoprNodeStakeModuleFilter,
+    hopr_token::{ApproveCall, HoprToken},
+};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::{Address, U256};
 use std::str::FromStr;

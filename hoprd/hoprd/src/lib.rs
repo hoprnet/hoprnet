@@ -36,12 +36,6 @@
 //!           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
 //!       --password <PASSWORD>
 //!           A password to encrypt your keys [env: HOPRD_PASSWORD=]
-//!       --defaultStrategy <DEFAULT_STRATEGY>
-//!           Default channel strategy to use after node starts up [env: HOPRD_DEFAULT_STRATEGY=] [possible values: promiscuous, aggregating, auto_redeeming, auto_funding, multi, passive]
-//!       --maxAutoChannels <MAX_AUTO_CHANNELS>
-//!           Maximum number of channel a strategy can open. If not specified, square root of number of available peers is used. [env: HOPRD_MAX_AUTO_CHANNELS=]
-//!       --disableTicketAutoRedeem
-//!           Disables automatic redeeming of winning tickets. [env: HOPRD_DISABLE_AUTO_REDEEEM_TICKETS=]
 //!       --disableUnrealizedBalanceCheck
 //!           Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK=]
 //!       --provider <PROVIDER>
@@ -72,14 +66,6 @@
 //!           Address of the node mangement module [env: HOPRD_MODULE_ADDRESS=]
 //!       --protocolConfig <HOPRD_PROTOCOL_CONFIG_PATH>
 //!           Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
-//!       --dryRun
-//!           DEPRECATED [env: HOPRD_DRY_RUN=]
-//!       --healthCheck
-//!           DEPRECATED
-//!       --healthCheckHost <HEALTH_CHECK_HOST>
-//!           DEPRECATED
-//!       --healthCheckPort <HEALTH_CHECK_PORT>
-//!           DEPRECATED
 //!   -h, --help
 //!           Print help
 //!   -V, --version

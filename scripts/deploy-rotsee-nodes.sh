@@ -68,7 +68,6 @@ run_node() {
       --data /app/hoprd-db \
       --password '${IDENTITY_PASSWORD}' \
       --apiHost "0.0.0.0" --apiToken "${API_TOKEN}" \
-      --healthCheck --healthCheckHost "0.0.0.0" \
       --heartbeatInterval 20000 --heartbeatThreshold 60000 \
       \${safe_args}
 EOF

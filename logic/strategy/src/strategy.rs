@@ -26,7 +26,7 @@ use std::{
 use tracing::{error, warn};
 use validator::Validate;
 
-use chain_actions::ChainActions;
+use hopr_chain_actions::ChainActions;
 use hopr_internal_types::prelude::*;
 use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 
@@ -141,7 +141,7 @@ impl MultiStrategy {
     pub fn new<Db>(
         cfg: MultiStrategyConfig,
         db: Db,
-        chain_actions: ChainActions<Db>,
+        hopr_chain_actions: ChainActions<Db>,
         ticket_aggregator: Arc<dyn TicketAggregatorTrait + Send + Sync + 'static>,
     ) -> Self
     where
@@ -164,7 +164,7 @@ impl MultiStrategy {
                 Strategy::Promiscuous(sub_cfg) => strategies.push(Box::new(PromiscuousStrategy::new(
                     sub_cfg.clone(),
                     db.clone(),
-                    chain_actions.clone(),
+                    hopr_chain_actions.clone(),
                 ))),
                 Strategy::Aggregating(sub_cfg) => strategies.push(Box::new(AggregatingStrategy::new(
                     *sub_cfg,
@@ -174,15 +174,15 @@ impl MultiStrategy {
                 Strategy::AutoRedeeming(sub_cfg) => strategies.push(Box::new(AutoRedeemingStrategy::new(
                     *sub_cfg,
                     db.clone(),
-                    chain_actions.clone(),
+                    hopr_chain_actions.clone(),
                 ))),
                 Strategy::AutoFunding(sub_cfg) => {
-                    strategies.push(Box::new(AutoFundingStrategy::new(*sub_cfg, chain_actions.clone())))
+                    strategies.push(Box::new(AutoFundingStrategy::new(*sub_cfg, hopr_chain_actions.clone())))
                 }
                 Strategy::ClosureFinalizer(sub_cfg) => strategies.push(Box::new(ClosureFinalizerStrategy::new(
                     *sub_cfg,
                     db.clone(),
-                    chain_actions.clone(),
+                    hopr_chain_actions.clone(),
                 ))),
                 Strategy::Multi(sub_cfg) => {
                     if cfg.allow_recursive {
@@ -192,7 +192,7 @@ impl MultiStrategy {
                         strategies.push(Box::new(Self::new(
                             cfg_clone,
                             db.clone(),
-                            chain_actions.clone(),
+                            hopr_chain_actions.clone(),
                             ticket_aggregator.clone(),
                         )))
                     } else {

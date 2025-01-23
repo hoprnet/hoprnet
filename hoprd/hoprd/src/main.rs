@@ -192,14 +192,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Node public identifiers"
     );
 
-    // TODO: the following check can be removed once [PR](https://github.com/hoprnet/hoprnet/pull/5665) is merged
-    if hopr_lib::Keypair::public(&hopr_keys.packet_key)
-        .to_string()
-        .starts_with("0xff")
-    {
-        warn!("This node uses an invalid packet key type and will not be able to become an effective relay node, please create a new identity!");
-    }
-
     // Create the node instance
     info!("Creating the HOPRd node instance from hopr-lib");
     let node = Arc::new(hopr_lib::Hopr::new(

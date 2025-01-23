@@ -3,16 +3,16 @@ use futures::channel::mpsc::Sender;
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
-use chain_types::chain_events::NetworkRegistryStatus;
-use core_path::{
-    path::TransportPath,
-    selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
-    selectors::PathSelector,
-};
+use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;
 use hopr_network_types::prelude::RoutingOptions;
+use hopr_path::{
+    path::TransportPath,
+    selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
+    selectors::PathSelector,
+};
 use hopr_primitive_types::primitives::Address;
 use hopr_transport_identity::PeerId;
 use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
@@ -60,7 +60,7 @@ pub struct TicketStatistics {
 #[derive(Clone)]
 pub(crate) struct PathPlanner<T> {
     db: T,
-    channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+    channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     selector: DfsPathSelector<RandomizedEdgeWeighting>,
 }
 
@@ -71,7 +71,7 @@ where
     pub(crate) fn new(
         db: T,
         path_selector_cfg: DfsPathSelectorConfig,
-        channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+        channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     ) -> Self {
         Self {
             db,
@@ -80,7 +80,7 @@ where
         }
     }
 
-    pub(crate) fn channel_graph(&self) -> Arc<RwLock<core_path::channel_graph::ChannelGraph>> {
+    pub(crate) fn channel_graph(&self) -> Arc<RwLock<hopr_path::channel_graph::ChannelGraph>> {
         self.channel_graph.clone()
     }
 
@@ -137,7 +137,7 @@ where
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            use core_path::path::Path;
+            use hopr_path::path::Path;
             hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.hops().len() - 1) as f64);
         }
 

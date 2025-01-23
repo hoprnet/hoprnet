@@ -1,22 +1,22 @@
 //! This module adds functionality of tracking the action results via expectations.
 //!
 //! It contains implementation of types necessary to perform tracking the
-//! on-chain state of [Actions](chain_types::actions::Action).
-//! Once an [Action](chain_types::actions::Action) is submitted to the chain, an [IndexerExpectation]
+//! on-chain state of [Actions](hopr_chain_types::actions::Action).
+//! Once an [Action](hopr_chain_types::actions::Action) is submitted to the chain, an [IndexerExpectation]
 //! can be created and registered in an object implementing the [ActionState] trait.
 //! The expectation typically consists of a required transaction hash and a predicate of [ChainEventType]
 //! that must match on any chain event log in a block containing the given transaction hash.
 //!
 //! ### Example
-//! Once the [RegisterSafe(`0x0123..ef`)](chain_types::actions::Action) action that has been submitted via [ActionQueue](crate::action_queue::ActionQueue)
+//! Once the [RegisterSafe(`0x0123..ef`)](hopr_chain_types::actions::Action) action that has been submitted via [ActionQueue](crate::action_queue::ActionQueue)
 //! in a transaction with hash `0xabcd...00`.
 //! The [IndexerExpectation] is such that whatever block that will contain the TX hash `0xabcd..00` must also contain
 //! a log that matches [NodeSafeRegistered(`0x0123..ef`)](ChainEventType) event type.
 //! If such event is never encountered by the Indexer, the safe registration action naturally times out.
 use async_lock::RwLock;
 use async_trait::async_trait;
-use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use futures::{channel, FutureExt, TryFutureExt};
+use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use hopr_crypto_types::types::Hash;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ use crate::errors::{ChainActionsError, Result};
 /// Also allows mocking in tests.
 pub type ExpectationResolver = Pin<Box<dyn Future<Output = Result<SignificantChainEvent>> + Send>>;
 
-/// Allows tracking state of an [Action](chain_types::actions::Action) via registering [IndexerExpectations](IndexerExpectation) on
+/// Allows tracking state of an [Action](hopr_chain_types::actions::Action) via registering [IndexerExpectations](IndexerExpectation) on
 /// [SignificantChainEvents](SignificantChainEvent) coming from the Indexer and resolving them as they are
 /// matched. Once expectations are matched, they are automatically unregistered.
 #[cfg_attr(test, mockall::automock)]
@@ -167,8 +167,8 @@ mod tests {
     use crate::errors::ChainActionsError;
     use anyhow::Context;
     use async_std::prelude::FutureExt;
-    use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hex_literal::hex;
+    use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_primitive_types::prelude::*;

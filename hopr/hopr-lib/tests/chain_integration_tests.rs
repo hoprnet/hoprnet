@@ -5,21 +5,21 @@ use hex_literal::hex;
 use std::time::Duration;
 use tracing::info;
 
-use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
-use chain_actions::action_state::{ActionState, IndexerActionTracker};
-use chain_actions::channels::ChannelActions;
-use chain_actions::node::NodeActions;
-use chain_actions::payload::SafePayloadGenerator;
-use chain_actions::redeem::TicketRedeemActions;
-use chain_actions::ChainActions;
-use chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use chain_types::chain_events::ChainEventType;
-use chain_types::utils::create_anvil;
 use hopr_async_runtime::prelude::{cancel_join_handle, sleep, spawn, JoinHandle};
+use hopr_chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
+use hopr_chain_actions::action_state::{ActionState, IndexerActionTracker};
+use hopr_chain_actions::channels::ChannelActions;
+use hopr_chain_actions::node::NodeActions;
+use hopr_chain_actions::payload::SafePayloadGenerator;
+use hopr_chain_actions::redeem::TicketRedeemActions;
+use hopr_chain_actions::ChainActions;
+use hopr_chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
+use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
 use hopr_chain_rpc::client::surf_client::SurfRequestor;
 use hopr_chain_rpc::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor};
 use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
+use hopr_chain_types::chain_events::ChainEventType;
+use hopr_chain_types::utils::create_anvil;
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;
@@ -158,7 +158,8 @@ async fn start_node_chain_logic(
         db.clone(),
     );
 
-    let mut indexer = Indexer::new(rpc_ops_in, chain_log_handler, db.clone(), indexer_cfg, sce_tx);
+    let indexer = Indexer::new(rpc_ops_in, chain_log_handler, db.clone(), indexer_cfg, sce_tx);
+    let _indexer = indexer.clone();
     indexer.start().await?;
 
     Ok(ChainNode {
@@ -166,7 +167,7 @@ async fn start_node_chain_logic(
         chain_key: chain_key.clone(),
         db,
         actions,
-        _indexer: indexer,
+        _indexer,
         node_tasks,
     })
 }

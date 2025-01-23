@@ -55,9 +55,9 @@ surf-governor = { workspace = true, optional = true }
 thiserror = { workspace = true }
 validator = { workspace = true }
 
-bindings = { workspace = true }
+hopr-bindings = { workspace = true }
 hopr-crypto-types = { workspace = true }
-chain-types = { workspace = true }
+hopr-chain-types = { workspace = true }
 tracing = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }

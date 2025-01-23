@@ -106,14 +106,14 @@ use crate::{
     },
     utils::{Cmd, HelperErrors},
 };
-use bindings::{
-    hopr_network_registry::HoprNetworkRegistry, hopr_node_safe_registry::HoprNodeSafeRegistry,
-    hopr_node_stake_factory::HoprNodeStakeFactory, hopr_token::HoprToken,
-};
 use clap::{builder::RangedU64ValueParser, Parser};
 use ethers::{
     types::{H160, U256},
     utils::parse_units,
+};
+use hopr_bindings::{
+    hopr_network_registry::HoprNetworkRegistry, hopr_node_safe_registry::HoprNodeSafeRegistry,
+    hopr_node_stake_factory::HoprNodeStakeFactory, hopr_token::HoprToken,
 };
 use hopr_crypto_types::keypairs::Keypair;
 use safe_singleton::SafeSingleton;

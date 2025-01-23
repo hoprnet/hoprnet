@@ -17,8 +17,8 @@ use std::time::Duration;
 use tracing::debug;
 use validator::Validate;
 
-use bindings::hopr_node_management_module::HoprNodeManagementModule;
-use chain_types::{ContractAddresses, ContractInstances};
+use hopr_bindings::hopr_node_management_module::HoprNodeManagementModule;
+use hopr_chain_types::{ContractAddresses, ContractInstances};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::prelude::*;
 
@@ -332,11 +332,11 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
 mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, PendingTransaction};
-    use chain_types::{ContractAddresses, ContractInstances};
     use ethers::contract::ContractError;
     use ethers::providers::Middleware;
     use ethers::types::{Bytes, Eip1559TransactionRequest};
     use hex_literal::hex;
+    use hopr_chain_types::{ContractAddresses, ContractInstances};
     use primitive_types::H160;
     use std::sync::Arc;
     use std::time::Duration;
@@ -393,7 +393,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let cfg = RpcOperationsConfig {
@@ -420,7 +420,10 @@ mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(chain_types::utils::create_native_transfer(*RANDY, 1000000_u32.into()))
+            .send_transaction(hopr_chain_types::utils::create_native_transfer(
+                *RANDY,
+                1000000_u32.into(),
+            ))
             .await?;
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
@@ -433,7 +436,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let cfg = RpcOperationsConfig {
@@ -463,11 +466,14 @@ mod tests {
 
         // Send 1 ETH to some random address
         futures::future::join_all((0..txs_count).map(|_| async {
-            rpc.send_transaction(chain_types::utils::create_native_transfer(*RANDY, send_amount.into()))
-                .await
-                .expect("tx should be sent")
-                .await
-                .expect("tx should resolve")
+            rpc.send_transaction(hopr_chain_types::utils::create_native_transfer(
+                *RANDY,
+                send_amount.into(),
+            ))
+            .await
+            .expect("tx should be sent")
+            .await
+            .expect("tx should resolve")
         }))
         .await;
 
@@ -486,7 +492,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let cfg = RpcOperationsConfig {
@@ -513,7 +519,7 @@ mod tests {
 
         // Send 1 ETH to some random address
         let tx_hash = rpc
-            .send_transaction(chain_types::utils::create_native_transfer(*RANDY, 1_u32.into()))
+            .send_transaction(hopr_chain_types::utils::create_native_transfer(*RANDY, 1_u32.into()))
             .await?;
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
@@ -529,7 +535,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         // Deploy contracts
@@ -548,7 +554,7 @@ mod tests {
         };
 
         let amount = 1024_u64;
-        chain_types::utils::mint_tokens(contract_instances.token, amount.into()).await;
+        hopr_chain_types::utils::mint_tokens(contract_instances.token, amount.into()).await;
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
@@ -572,7 +578,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
-        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         // Deploy contracts
@@ -583,7 +589,7 @@ mod tests {
             // deploy MULTICALL contract to anvil
             deploy_multicall3_to_anvil(client.clone()).await?;
 
-            let (module, safe) = chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
+            let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
                 &instances,
                 client.clone(),
                 &chain_key_0,
@@ -632,7 +638,7 @@ mod tests {
         );
 
         // including node to the module
-        chain_types::utils::include_node_to_module_by_safe(
+        hopr_chain_types::utils::include_node_to_module_by_safe(
             contract_instances.channels.client().clone(),
             safe,
             module,

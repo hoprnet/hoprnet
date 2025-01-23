@@ -242,7 +242,6 @@ where
                         }
                     }
 
-                    // TODO: we can make the error more specific if we allow to propagate the transport error upwards
                     yield result;
 
                     if active_pings.is_empty() && waiting.is_empty() {
