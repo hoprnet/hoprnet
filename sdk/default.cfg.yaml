@@ -22,3 +22,5 @@ hopr:
       - !AutoRedeeming
         redeem_only_aggregated: true
         minimum_redeem_ticket_value: "0 HOPR"
+  protocol:
+    outgoing_ticket_winning_prob: 1.0
