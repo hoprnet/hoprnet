@@ -99,7 +99,7 @@ where
         self
     }
 
-    pub async fn start(&mut self) -> Result<JoinHandle<()>>
+    pub async fn start(mut self) -> Result<JoinHandle<()>>
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
@@ -638,7 +638,7 @@ mod tests {
             .withf(move |x: &u64, _y: &hopr_chain_rpc::LogFilter| *x == 0)
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
-        let mut indexer = Indexer::new(
+        let indexer = Indexer::new(
             rpc,
             handlers,
             db.clone(),
@@ -701,7 +701,7 @@ mod tests {
         assert!(db.set_logs_processed(Some(latest_block), Some(0)).await.is_ok());
         assert!(db.update_logs_checksums().await.is_ok());
 
-        let mut indexer = Indexer::new(
+        let indexer = Indexer::new(
             rpc,
             handlers,
             db.clone(),
@@ -763,7 +763,7 @@ mod tests {
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
 
-        let mut indexer =
+        let indexer =
             Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0).without_panic_on_completion();
         let _ = join!(indexer.start(), async move {
             async_std::task::sleep(std::time::Duration::from_millis(200)).await;
@@ -826,8 +826,7 @@ mod tests {
                 start_block_number: 0,
                 fast_sync: true,
             };
-            let mut indexer =
-                Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
+            let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
                 async_std::task::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
@@ -898,8 +897,7 @@ mod tests {
                 start_block_number: 0,
                 fast_sync: true,
             };
-            let mut indexer =
-                Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
+            let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
                 async_std::task::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
@@ -969,7 +967,7 @@ mod tests {
             });
 
         let (tx_events, rx_events) = async_channel::unbounded();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events).without_panic_on_completion();
+        let indexer = Indexer::new(rpc, handlers, db.clone(), cfg, tx_events).without_panic_on_completion();
         indexer.start().await?;
 
         // At this point we expect 2 events to arrive. The third event, which was generated first,
@@ -1048,7 +1046,7 @@ mod tests {
         };
 
         let (tx_events, _) = async_channel::unbounded();
-        let mut indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
+        let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
         indexer.start().await?;
 
         Ok(())

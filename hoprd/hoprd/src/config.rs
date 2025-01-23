@@ -3,16 +3,16 @@ use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::time::Duration;
 
+use proc_macro_regex::regex;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use tracing::debug;
+use validator::{Validate, ValidationError};
+
 use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
 use hopr_platform::file::native::read_to_string;
 use hoprd_api::config::{Api, Auth};
 use hoprd_inbox::config::MessageInboxConfiguration;
-
-use proc_macro_regex::regex;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use tracing::{debug, warn};
-use validator::{Validate, ValidationError};
 
 use crate::errors::HoprdError;
 
@@ -221,33 +221,6 @@ impl HoprdConfig {
         if let Some(x) = cli_args.private_key {
             cfg.identity.private_key = Some(x)
         };
-
-        // TODO: strategy configuration from the CLI should be removed in 3.0!
-
-        // strategy
-        if cli_args.default_strategy.is_some() {
-            warn!(
-                "DEPRECATION: 'defaultStrategy' (HOPRD_DEFAULT_STRATEGY) option is now deprecated \
-            and has no effect. It will be removed in future releases, please use configuration file \
-            to configure strategies"
-            );
-        }
-
-        if cli_args.auto_redeem_tickets == 1 {
-            warn!(
-                "DEPRECATION: 'disableTicketAutoRedeem' (HOPRD_DISABLE_AUTO_REDEEM_TICKETS) \
-            option is now deprecated and has no effect. It will be removed in future releases, \
-            please use configuration file to configure strategies"
-            );
-        }
-
-        if cli_args.max_auto_channels.is_some() {
-            warn!(
-                "DEPRECATION: 'maxAutoChannels' (HOPRD_MAX_AUTO_CHANNELS) option is now deprecated \
-            and has no effect. It will be removed in future releases, please use configuration file \
-            to configure strategies"
-            );
-        }
 
         // chain
         if cli_args.announce > 0 {
