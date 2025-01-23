@@ -197,17 +197,22 @@ where
     }
 
     async fn determine_actual_outgoing_win_prob(&self) -> f64 {
-        let maybe_preset_win_prob = self.cfg.outgoing_ticket_win_prob;
-        let network_win_prob = self.db.get_network_winning_probability().await.unwrap_or_else(|error| {
-            error!(%error, ?maybe_preset_win_prob, "failed to determine current network winning probability");
-            // use win prob 1 if nothing was configured and no network value can be retrieved
-            maybe_preset_win_prob.unwrap_or(DEFAULT_OUTGOING_TICKET_WIN_PROB)
-        });
+        // This operation hits the cache unless the new value is fetched for the first time
+        let network_win_prob = self
+            .db
+            .get_network_winning_probability()
+            .await
+            .inspect_err(|error| error!(%error, "failed to determine current network winning probability"))
+            .ok();
 
-        // Otherwise, take the maximum of the configured value and the network value
-        maybe_preset_win_prob
-            .map(|preset| preset.max(network_win_prob))
-            .unwrap_or(network_win_prob)
+        // If no explicit winning probability is configured, use the network value
+        // or 1 if the network value was not determined.
+        // This code does not take the max from those, as it is the upper layer's responsibility
+        // to ensure the configured value is not smaller than the network value.
+        self.cfg
+            .outgoing_ticket_win_prob
+            .or(network_win_prob)
+            .unwrap_or(DEFAULT_OUTGOING_TICKET_WIN_PROB)
     }
 }
 
