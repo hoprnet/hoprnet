@@ -17,7 +17,7 @@ use std::time::Duration;
 use tracing::debug;
 use validator::Validate;
 
-use bindings::hopr_node_management_module::HoprNodeManagementModule;
+use hopr_bindings::hopr_node_management_module::HoprNodeManagementModule;
 use hopr_chain_types::{ContractAddresses, ContractInstances};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::prelude::*;

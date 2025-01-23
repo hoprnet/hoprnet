@@ -538,7 +538,7 @@ mod tests {
     use std::collections::BTreeSet;
     use std::pin::Pin;
 
-    use bindings::hopr_announcements::AddressAnnouncementFilter;
+    use hopr_bindings::hopr_announcements::AddressAnnouncementFilter;
     use hopr_chain_rpc::BlockWithLogs;
     use hopr_chain_types::chain_events::ChainEventType;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};

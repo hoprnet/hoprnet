@@ -1,6 +1,6 @@
-use bindings::hopr_channels::RedeemTicketCall;
 use ethers::contract::EthCall;
 use hex_literal::hex;
+use hopr_bindings::hopr_channels::RedeemTicketCall;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};

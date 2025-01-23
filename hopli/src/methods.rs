@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::{ops::Add, str::FromStr};
 use tracing::{debug, info};
 
-use bindings::{
+use hopr_bindings::{
     hopr_network_registry::HoprNetworkRegistry,
     hopr_node_management_module::{
         AddChannelsAndTokenTargetCall, HoprNodeManagementModule, IncludeNodeCall, RemoveNodeCall, ScopeTargetTokenCall,
@@ -1451,7 +1451,7 @@ mod tests {
     use ethers::types::TransactionRequest;
     use std::vec;
 
-    use bindings::{hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels};
+    use hopr_bindings::{hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels};
     use hopr_chain_rpc::client::{create_rpc_client_to_anvil, surf_client::SurfRequestor};
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};

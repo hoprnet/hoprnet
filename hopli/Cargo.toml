@@ -22,7 +22,7 @@ async-std = { workspace = true, features = ["attributes"] }
 hex-literal = { workspace = true }
 rpassword = { workspace = true }
 
-bindings = { workspace = true }
+hopr-bindings = { workspace = true }
 hopr-chain-api = { workspace = true, features = ["runtime-async-std"] }
 hopr-chain-types = { workspace = true }
 hopr-chain-rpc = { workspace = true }

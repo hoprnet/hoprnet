@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
 
-use bindings::{
+use hopr_bindings::{
     hopr_announcements::HoprAnnouncementsEvents, hopr_channels::HoprChannelsEvents,
     hopr_network_registry::HoprNetworkRegistryEvents, hopr_node_management_module::HoprNodeManagementModuleEvents,
     hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
@@ -874,8 +874,14 @@ mod tests {
 
     use super::ContractEventHandlers;
     use anyhow::{anyhow, Context};
-    use bindings::hopr_winning_probability_oracle_events::WinProbUpdatedFilter;
-    use bindings::{
+    use ethers::contract::EthEvent;
+    use ethers::{
+        abi::{encode, Address as EthereumAddress, Token},
+        types::U256 as EthU256,
+    };
+    use hex_literal::hex;
+    use hopr_bindings::hopr_winning_probability_oracle_events::WinProbUpdatedFilter;
+    use hopr_bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
         hopr_channels::{
             ChannelBalanceDecreasedFilter, ChannelBalanceIncreasedFilter, ChannelClosedFilter, ChannelOpenedFilter,
@@ -889,12 +895,6 @@ mod tests {
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
         hopr_token::{ApprovalFilter, TransferFilter},
     };
-    use ethers::contract::EthEvent;
-    use ethers::{
-        abi::{encode, Address as EthereumAddress, Token},
-        types::U256 as EthU256,
-    };
-    use hex_literal::hex;
     use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
     use hopr_chain_types::ContractAddresses;
     use hopr_crypto_types::prelude::*;

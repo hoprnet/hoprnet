@@ -951,15 +951,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bindings"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "ethers",
- "serde",
-]
-
-[[package]]
 name = "bit-vec"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4017,12 +4008,12 @@ version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-std",
- "bindings",
  "clap",
  "env_logger",
  "ethers",
  "hex",
  "hex-literal",
+ "hopr-bindings",
  "hopr-chain-api",
  "hopr-chain-rpc",
  "hopr-chain-types",
@@ -4051,6 +4042,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-bindings"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "ethers",
+ "serde",
+]
+
+[[package]]
 name = "hopr-chain-actions"
 version = "0.7.3"
 dependencies = [
@@ -4059,12 +4059,12 @@ dependencies = [
  "async-lock 3.4.0",
  "async-std",
  "async-trait",
- "bindings",
  "ethers",
  "futures",
  "futures-timer",
  "hex-literal",
  "hopr-async-runtime",
+ "hopr-bindings",
  "hopr-chain-rpc",
  "hopr-chain-types",
  "hopr-crypto-random",
@@ -4119,11 +4119,11 @@ dependencies = [
  "async-channel 2.3.1",
  "async-std",
  "async-trait",
- "bindings",
  "ethers",
  "futures",
  "hex-literal",
  "hopr-async-runtime",
+ "hopr-bindings",
  "hopr-chain-rpc",
  "hopr-chain-types",
  "hopr-crypto-random",
@@ -4152,7 +4152,6 @@ dependencies = [
  "async-std",
  "async-stream",
  "async-trait",
- "bindings",
  "env_logger",
  "ethers",
  "futures",
@@ -4160,6 +4159,7 @@ dependencies = [
  "governor 0.8.0",
  "hex-literal",
  "hopr-async-runtime",
+ "hopr-bindings",
  "hopr-chain-types",
  "hopr-crypto-types",
  "hopr-metrics",
@@ -4189,10 +4189,10 @@ dependencies = [
 name = "hopr-chain-types"
 version = "0.8.0"
 dependencies = [
- "bindings",
  "ethers",
  "hex",
  "hex-literal",
+ "hopr-bindings",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-primitive-types",
@@ -4388,12 +4388,12 @@ dependencies = [
  "anyhow",
  "aquamarine",
  "bincode",
- "bindings",
  "bloomfilter",
  "cbor4ii 1.0.0",
  "criterion",
  "ethers",
  "hex-literal",
+ "hopr-bindings",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-primitive-types",

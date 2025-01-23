@@ -232,9 +232,9 @@ mod tests {
     use std::time::Duration;
     use tracing::debug;
 
-    use bindings::hopr_channels::*;
-    use bindings::hopr_token::{ApprovalFilter, TransferFilter};
     use hopr_async_runtime::prelude::{sleep, spawn};
+    use hopr_bindings::hopr_channels::*;
+    use hopr_bindings::hopr_token::{ApprovalFilter, TransferFilter};
     use hopr_chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 

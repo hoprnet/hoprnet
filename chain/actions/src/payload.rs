@@ -10,11 +10,13 @@
 //! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the
 //!   SAFE transaction. This is currently the main mode of HOPR node operation.
 //!
-use crate::errors::{
-    ChainActionsError::{InvalidArguments, InvalidState},
-    Result,
+use ethers::types::NameOrAddress;
+use ethers::{
+    abi::AbiEncode,
+    types::{H160, H256, U256},
 };
-use bindings::{
+
+use hopr_bindings::{
     hopr_announcements::{AnnounceCall, AnnounceSafeCall, BindKeysAnnounceCall, BindKeysAnnounceSafeCall},
     hopr_channels::{
         CloseIncomingChannelCall, CloseIncomingChannelSafeCall, CompactSignature, FinalizeOutgoingChannelClosureCall,
@@ -26,16 +28,16 @@ use bindings::{
     hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
     hopr_token::{ApproveCall, TransferCall},
 };
-use ethers::types::NameOrAddress;
-use ethers::{
-    abi::AbiEncode,
-    types::{H160, H256, U256},
-};
 use hopr_chain_types::ContractAddresses;
 use hopr_chain_types::{create_eip1559_transaction, TypedTransaction};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+
+use crate::errors::{
+    ChainActionsError::{InvalidArguments, InvalidState},
+    Result,
+};
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
