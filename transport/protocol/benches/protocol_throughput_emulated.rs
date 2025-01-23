@@ -1,15 +1,15 @@
 #[path = "../tests/common/mod.rs"]
 mod common;
-
 use common::{create_dbs, create_minimal_topology, random_packets_of_count, resolve_mock_path, PEERS, PEERS_CHAIN};
-use core_path::path::TransportPath;
-use criterion::{async_executor::AsyncExecutor, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
+use criterion::{async_executor::AsyncExecutor, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::StreamExt;
+use libp2p::PeerId;
+
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
+use hopr_path::path::TransportPath;
 use hopr_transport_protocol::msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
-use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 20;
 
