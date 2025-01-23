@@ -746,9 +746,7 @@ impl Hopr {
         }
 
         debug!(%configured_win_prob, %network_min_win_prob, "configuring winning probability");
-
-        // TODO: too late to override here
-        //cfg.protocol.outgoing_ticket_winning_prob = configured_win_prob.max(network_min_win_prob);
+        let overridden_win_prob = configured_win_prob.max(network_min_win_prob);
 
         info!("Linking chain and packet keys");
         self.db
@@ -1040,6 +1038,7 @@ impl Hopr {
                 transport_output_tx,
                 indexer_peer_update_rx,
                 session_tx,
+                Some(overridden_win_prob),
             )
             .await
             .into_iter()

@@ -289,6 +289,7 @@ where
         on_transport_output: UnboundedSender<ApplicationData>,
         transport_updates: UnboundedReceiver<PeerDiscovery>,
         new_session_notifier: UnboundedSender<IncomingSession>,
+        outgoing_ticket_win_prob_override: Option<f64>,
     ) -> HashMap<HoprTransportProcess, JoinHandle<()>> {
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
 
@@ -380,7 +381,7 @@ where
         let packet_cfg = PacketInteractionConfig::new(
             &self.me,
             &self.me_onchain,
-            self.cfg.protocol.outgoing_ticket_winning_prob,
+            outgoing_ticket_win_prob_override.unwrap_or(self.cfg.protocol.outgoing_ticket_winning_prob),
         );
 
         let (tx_from_protocol, rx_from_protocol) = futures::channel::mpsc::unbounded::<ApplicationData>();
