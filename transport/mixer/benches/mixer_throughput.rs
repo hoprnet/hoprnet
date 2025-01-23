@@ -69,7 +69,7 @@ fn send_continuous_channel_load_through_sink_pipe(
     item: &'static str,
     iterations: usize,
     cfg: MixerConfig,
-) -> BoxFuture<'_, ()> {
+) -> BoxFuture<'static, ()> {
     Box::pin(async move {
         let (o_tx, o_rx) = futures::channel::mpsc::unbounded();
         let (tx, mut rx) = channel(cfg);

@@ -5,7 +5,6 @@ use hopr_db_api::protocol::TransportPacketWithChainData;
 use hopr_transport_identity::PeerId;
 use tracing::error;
 
-use core_path::path::{Path, TransportPath};
 use hopr_async_runtime::prelude::sleep;
 use hopr_crypto_packet::errors::{
     PacketError::{TagReplay, TransportError},
@@ -14,6 +13,7 @@ use hopr_crypto_packet::errors::{
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
+use hopr_path::path::{Path, TransportPath};
 use hopr_primitive_types::prelude::*;
 
 use super::packet::OutgoingPacket;

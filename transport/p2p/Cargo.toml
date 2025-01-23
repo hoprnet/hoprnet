@@ -38,10 +38,10 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 void = { workspace = true } # needed for Behavior implementations from libp2p
 
-core-network = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-transport-identity = { workspace = true }
+hopr-transport-network = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]

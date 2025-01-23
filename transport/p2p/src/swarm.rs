@@ -5,12 +5,12 @@ use libp2p::{request_response::OutboundRequestId, request_response::ResponseChan
 use std::{num::NonZeroU8, sync::Arc};
 use tracing::{debug, error, info, trace, warn};
 
-use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_internal_types::prelude::*;
 use hopr_transport_identity::{
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
     Multiaddr, PeerId,
 };
+use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_transport_protocol::{
     config::ProtocolConfig,
     ticket_aggregation::processor::{

@@ -33,12 +33,12 @@ use libp2p::{swarm::NetworkBehaviour, StreamProtocol};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-use core_network::messaging::ControlMessage;
-use core_network::network::NetworkTriggeredEvent;
-use core_network::ping::PingQueryReplier;
 use hopr_internal_types::legacy;
 use hopr_internal_types::protocol::Acknowledgement;
 use hopr_transport_identity::PeerId;
+use hopr_transport_network::messaging::ControlMessage;
+use hopr_transport_network::network::NetworkTriggeredEvent;
+use hopr_transport_network::ping::PingQueryReplier;
 use hopr_transport_protocol::PeerDiscovery;
 
 use crate::constants::{

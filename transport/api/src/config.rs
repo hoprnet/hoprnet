@@ -8,17 +8,17 @@ use std::str::FromStr;
 use std::time::Duration;
 use validator::{Validate, ValidationError};
 
-pub use core_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
 use hopr_transport_identity::Multiaddr;
+pub use hopr_transport_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
 pub use hopr_transport_protocol::config::ProtocolConfig;
 
 use crate::errors::HoprTransportError;
 
 pub struct HoprTransportConfig {
     pub transport: TransportConfig,
-    pub network: core_network::config::NetworkConfig,
+    pub network: hopr_transport_network::config::NetworkConfig,
     pub protocol: hopr_transport_protocol::config::ProtocolConfig,
-    pub heartbeat: core_network::heartbeat::HeartbeatConfig,
+    pub heartbeat: hopr_transport_network::heartbeat::HeartbeatConfig,
     pub session: SessionGlobalConfig,
 }
 

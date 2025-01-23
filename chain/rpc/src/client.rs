@@ -866,10 +866,10 @@ pub fn create_rpc_client_to_anvil<R: HttpPostRequestor>(
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
-    use chain_types::utils::create_anvil;
-    use chain_types::{ContractAddresses, ContractInstances};
     use ethers::providers::JsonRpcClient;
     use hopr_async_runtime::prelude::sleep;
+    use hopr_chain_types::utils::create_anvil;
+    use hopr_chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
     use serde::Serialize;

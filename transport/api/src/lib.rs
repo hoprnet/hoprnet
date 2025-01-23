@@ -40,11 +40,6 @@ use std::{
 };
 use tracing::{debug, error, info, trace, warn};
 
-use core_network::{
-    heartbeat::Heartbeat,
-    ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
-};
-use core_path::{path::TransportPath, selectors::dfs::DfsPathSelectorConfig};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_db_sql::{
     accounts::ChainOrPacketKey,
@@ -52,8 +47,13 @@ use hopr_db_sql::{
     HoprDbAllOperations,
 };
 use hopr_internal_types::prelude::*;
+use hopr_path::{path::TransportPath, selectors::dfs::DfsPathSelectorConfig};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
+use hopr_transport_network::{
+    heartbeat::Heartbeat,
+    ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
+};
 use hopr_transport_p2p::{
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
     HoprSwarm,
@@ -73,7 +73,6 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::types::transfer_session;
 pub use {
-    core_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
@@ -81,6 +80,7 @@ pub use {
     hopr_internal_types::protocol::ApplicationData,
     hopr_network_types::prelude::RoutingOptions,
     hopr_transport_identity::{Multiaddr, PeerId},
+    hopr_transport_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_transport_protocol::{execute_on_tick, PeerDiscovery},
     hopr_transport_session::types::{ServiceId, SessionTarget},
     hopr_transport_session::{
@@ -204,7 +204,7 @@ where
         me: &OffchainKeypair,
         cfg: HoprTransportConfig,
         db: T,
-        channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+        channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self {
         let process_packet_send = Arc::new(OnceLock::new());
@@ -420,7 +420,7 @@ where
                 .get()
                 .expect("Ping should be initialized at this point")
                 .clone(),
-            core_network::heartbeat::HeartbeatExternalInteractions::new(self.network.clone()),
+            hopr_transport_network::heartbeat::HeartbeatExternalInteractions::new(self.network.clone()),
             Box::new(|dur| Box::pin(sleep(dur))),
         );
 

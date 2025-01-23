@@ -29,12 +29,12 @@ use crate::{
     methods::{get_native_and_token_balances, transfer_native_tokens, transfer_or_mint_tokens},
     utils::{Cmd, HelperErrors},
 };
-use bindings::hopr_token::HoprToken;
 use clap::Parser;
 use ethers::{
     types::{H160, U256},
     utils::parse_units,
 };
+use hopr_bindings::hopr_token::HoprToken;
 // use ethers::types::Address;
 use std::{ops::Sub, str::FromStr};
 use tracing::info;

@@ -202,11 +202,11 @@ pub fn forward(
 mod tests {
     use super::ChainPacketComponents;
     use async_trait::async_trait;
-    use core_path::channel_graph::ChannelGraph;
-    use core_path::path::TransportPath;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
+    use hopr_path::channel_graph::ChannelGraph;
+    use hopr_path::path::TransportPath;
     use hopr_primitive_types::prelude::*;
     use libp2p_identity::PeerId;
     use parameterized::parameterized;
@@ -354,7 +354,7 @@ mod tests {
             keypairs_onchain.iter().map(|kp| kp.public().to_address()).collect(),
         ))?;
 
-        let path = core_path::path::Path::hops(&path)
+        let path = hopr_path::path::Path::hops(&path)
             .iter()
             .map(|v| OffchainPublicKey::try_from(v))
             .collect::<hopr_primitive_types::errors::Result<Vec<_>>>()?;

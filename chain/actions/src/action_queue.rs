@@ -1,13 +1,13 @@
 //! Defines the main FIFO MPSC queue for actions - the [ActionQueue] type.
 //!
-//! The [ActionQueue] acts as a MPSC queue of [Actions](chain_types::actions::Action) which are executed one-by-one
+//! The [ActionQueue] acts as a MPSC queue of [Actions](hopr_chain_types::actions::Action) which are executed one-by-one
 //! as they are being popped up from the queue by a runner task.
 use async_channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
-use chain_types::actions::Action;
-use chain_types::chain_events::ChainEventType;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt};
+use hopr_chain_types::actions::Action;
+use hopr_chain_types::chain_events::ChainEventType;
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;

@@ -28,10 +28,10 @@ smart-contracts:
   - changed-files:
       - any-glob-to-any-file:
           - "ethereum/contracts/**"
-crate:core-path:
+crate:hopr-path:
   - changed-files:
       - any-glob-to-any-file: logic/path/**
-crate:core-strategy:
+crate:hopr-strategy:
   - changed-files:
       - any-glob-to-any-file: logic/strategy/**
 crate:hopr-internal-types:
@@ -73,34 +73,34 @@ crate:hopr-metrics:
 crate:hopr-platform:
   - changed-files:
       - any-glob-to-any-file: misc/platform/**
-crate:chain-actions:
+crate:hopr-chain-actions:
   - changed-files:
       - any-glob-to-any-file: chain/actions/**
-crate:chain-api:
+crate:hopr-chain-api:
   - changed-files:
       - any-glob-to-any-file: chain/api/**
-crate:chain-indexer:
+crate:hopr-chain-indexer:
   - changed-files:
       - any-glob-to-any-file: chain/indexer/**
-crate:chain-rpc:
+crate:hopr-chain-rpc:
   - changed-files:
       - any-glob-to-any-file: chain/rpc/**
-crate:chain-types:
+crate:hopr-chain-types:
   - changed-files:
       - any-glob-to-any-file: chain/types/**
-crate:bindings:
+crate:hopr-bindings:
   - changed-files:
       - any-glob-to-any-file: ethereum/bindings/**
-crate:core-transport:
+crate:hopr-transport:
   - changed-files:
       - any-glob-to-any-file: transport/api/**
-crate:core-network:
+crate:hopr-transport-network:
   - changed-files:
       - any-glob-to-any-file: transport/network/**
-crate:core-p2p:
+crate:hopr-transport-p2p:
   - changed-files:
       - any-glob-to-any-file: transport/p2p/**
-crate:core-protocol:
+crate:hopr-transport-protocol:
   - changed-files:
       - any-glob-to-any-file: transport/protocol/**
 crate:hoprd:
