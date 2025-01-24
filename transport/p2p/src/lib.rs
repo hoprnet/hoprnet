@@ -133,7 +133,7 @@ impl HoprNetworkBehavior {
                     .with_max_concurrent_streams(
                         std::env::var("HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS")
                             .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                            .unwrap_or(1024),
+                            .unwrap_or(1024 * 10),
                     ),
             ),
             ack: libp2p::request_response::cbor::Behaviour::<Acknowledgement, ()>::new(
@@ -146,7 +146,7 @@ impl HoprNetworkBehavior {
                     .with_max_concurrent_streams(
                         std::env::var("HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS")
                             .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                            .unwrap_or(1024),
+                            .unwrap_or(1024 * 10),
                     ),
             ),
             ticket_aggregation: libp2p::request_response::cbor::Behaviour::<
