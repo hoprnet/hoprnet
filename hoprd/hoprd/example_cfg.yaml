@@ -107,7 +107,7 @@ hopr:
         # If set, all tickets will be redeemed on channel closure.
         redeem_all_on_close: true
         # Sets the minimum value of a ticket to be able to redeem it.
-        minimum_redeem_ticket_value: "90000000000000000 HOPR"
+        minimum_redeem_ticket_value: "2500000000000000000 HOPR"
         #
         ############################################
         #

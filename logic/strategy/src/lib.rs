@@ -41,6 +41,7 @@
 
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use strum::{Display, EnumString, VariantNames};
 
 use crate::aggregating::AggregatingStrategyConfig;
@@ -49,7 +50,7 @@ use crate::auto_redeeming::AutoRedeemingStrategyConfig;
 use crate::channel_finalizer::ClosureFinalizerStrategyConfig;
 use crate::promiscuous::PromiscuousStrategyConfig;
 use crate::strategy::MultiStrategyConfig;
-use crate::Strategy::{Aggregating, AutoRedeeming};
+use crate::Strategy::{Aggregating, AutoFunding, AutoRedeeming, ClosureFinalizer};
 
 pub mod aggregating;
 pub mod auto_funding;
@@ -80,11 +81,9 @@ pub enum Strategy {
 ///  - aggregate unredeemed tickets when a channel transitions to `PendingToClose`
 /// ## Auto-redeem Strategy
 /// - redeem only aggregated tickets
-/// - redeem single tickets on channel close if worth at least 2 HOPR
-/// ## Auto-funding Strategy
-/// - funding amount: 10 HOPR
-/// - lower limit: 1 HOPR
-/// - the strategy will fund channels which fall below the lower limit with the funding amount
+/// - redeem single tickets on channel close if worth at least 2.5 wxHOPR
+/// ## Channel closure finalizer Strategy
+/// - maximum channel closure overdue: 1 hour
 pub fn hopr_default_strategies() -> MultiStrategyConfig {
     MultiStrategyConfig {
         on_fail_continue: true,
@@ -103,7 +102,10 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: true,
                 redeem_all_on_close: true,
-                minimum_redeem_ticket_value: Balance::new_from_str("90000000000000000", BalanceType::HOPR),
+                minimum_redeem_ticket_value: Balance::new_from_str("2500000000000000000", BalanceType::HOPR),
+            }),
+            ClosureFinalizer(ClosureFinalizerStrategyConfig {
+                max_closure_overdue: Duration::from_secs(3600),
             }),
         ],
     }
