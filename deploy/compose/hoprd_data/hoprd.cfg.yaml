@@ -15,12 +15,12 @@ hopr:
         aggregate_on_channel_close: true
       - !AutoRedeeming
         redeem_only_aggregated: true
-        on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"
+        minimum_redeem_ticket_value: "2000000000000000000 HOPR"
       - !ClosureFinalizer
         max_closure_overdue: 60
   chain:
     network: dufour
-    provider: # NOTE: fill in value
+    provider: # NOTE: Fill in value. Using a local RPC provider, make sure to always include the http:// prefix, followed by the IP address or localhost.
     announce: true
     check_unrealized_balance: true
     keep_logs: true

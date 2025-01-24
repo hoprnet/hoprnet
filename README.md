@@ -32,6 +32,7 @@
     - [Nix flake outputs](#nix-flake-outputs)
     - [Code Formatting](#code-formatting)
     - [Code Linting](#code-linting)
+    - [Generate the Python SDK](#generate-the-python-sdk)
   - [Local node with safe staking service (local network)](#local-node-with-safe-staking-service-local-network)
   - [Local node with safe staking service (dufour network)](#local-node-with-safe-staking-service-dufour-network)
 - [Local cluster](#local-cluster)
@@ -82,7 +83,7 @@ All releases and associated changelogs are located in the [official releases](ht
 The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
 
 - `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=saint-louis` to track the latest changes on the repository's `release/saint-louis` branch (2.1.X)
+- `export RELEASE=singapore` to track the latest changes on the repository's `release/singapore` branch (2.2.X)
 - `export RELEASE=<version>` to get a specific `<version>`
 
 Container image has the format
@@ -94,7 +95,7 @@ where:
 Pull the container image with `docker`:
 
 ```shell
-$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:saint-louis
+$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
@@ -281,7 +282,7 @@ Either setup `nix` and `flake` to use the nix environment, or [install Rust tool
 
 ### Nix environment setup
 
-Install `nix`` from the official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html).
+Install `nix` from the official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html).
 
 Create a nix configuration file at `~/.config/nix/nix.conf` with the following content:
 
@@ -335,6 +336,19 @@ nix run .#lint
 ```
 
 This will in particular run `clippy` for the entire Rust codebase.
+
+#### Generate the Python SDK
+
+No Python SDK is available to connect to the HOPRd API. However, you can generate one using the [generate-python-sdk.sh](/scripts/generate-python-sdk.sh) script.
+
+Prerequisites:
+
+- swagger-codegen3
+- build the repository to get the `hoprd-api-schema` generated
+
+The generated SDK will be available in the `/tmp/hoprd-sdk-python/` directory. Modify the script to generate SDKs for different programming languages supported by swagger-codegen3.
+
+For usage examples of the generated SDK, refer to the generated README.md file in the SDK directory.
 
 ### Local node with safe staking service (local network)
 

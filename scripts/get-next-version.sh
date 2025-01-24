@@ -16,7 +16,10 @@ usage() {
 }
 
 # return early with help info when requested
-{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && { usage; exit 0; }
+{ [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; } && {
+  usage
+  exit 0
+}
 
 # set mydir
 declare mydir
@@ -30,7 +33,7 @@ if [ -z "${release_type:-}" ]; then
   exit 1
 fi
 
-if [[ ! "${release_type}" =~ (Build|ReleaseCandidate|Patch|Minor|Major) ]]; then
+if [[ ! ${release_type} =~ (Build|ReleaseCandidate|Patch|Minor|Major) ]]; then
   echo "Error: Parameter <release_type> contains unsupported value"
   usage
   exit 1
@@ -40,12 +43,12 @@ current_version="$(cat ${mydir}/../hopr/hopr-lib/Cargo.toml | grep "^version = .
 
 # Set dash as the delimiter to read current_version to get release candidate
 IFS='-'
-read -a current_version_splitted <<< "${current_version}"
+read -a current_version_splitted <<<"${current_version}"
 
 current_version_prefix="${current_version_splitted[0]}"
 if [ "${#current_version_splitted[*]}" = "2" ]; then
   # Get Release Candidate Number
-  pre_release="${current_version_splitted[1]/rc\.}"
+  pre_release="${current_version_splitted[1]/rc\./}"
 elif [ "${release_type}" = "ReleaseCandidate" ]; then
   # Reset the release candidate for new release name
   pre_release=0
@@ -53,7 +56,7 @@ fi
 
 # Set dot as the delimiter to read parts of the version format
 IFS='.'
-read -a current_version_splitted <<< "${current_version_prefix}"
+read -a current_version_splitted <<<"${current_version_prefix}"
 major_version="${current_version_splitted[0]}"
 minor_version="${current_version_splitted[1]}"
 patch_version="${current_version_splitted[2]}"
@@ -63,24 +66,24 @@ unset IFS
 
 # Increase version according to Release Type
 case "${release_type}" in
-  ReleaseCandidate)
-    pre_release=$((pre_release+1))
-    ;;
-  Patch)
-    if [ -z ${pre_release} ]; then
-      patch_version=$((patch_version+1))
-    fi
-    unset pre_release
-    ;;
-  Minor)
-    patch_version=0
-    minor_version=$((minor_version+1))
-    ;;
-  Major)
-    patch_version=0
-    minor_version=0
-    major_version=$((major_version+1))
-    ;;
+ReleaseCandidate)
+  pre_release=$((pre_release + 1))
+  ;;
+Patch)
+  if [ -z ${pre_release} ]; then
+    patch_version=$((patch_version + 1))
+  fi
+  unset pre_release
+  ;;
+Minor)
+  patch_version=0
+  minor_version=$((minor_version + 1))
+  ;;
+Major)
+  patch_version=0
+  minor_version=0
+  major_version=$((major_version + 1))
+  ;;
 esac
 
 # Sets default version
@@ -93,8 +96,8 @@ fi
 
 # Adds Build information if needed
 if [ "${release_type}" = "Build" ]; then
-    short_sha=$(git rev-parse --short "${COMMIT_SHA:-HEAD}")
-    new_version="${new_version}+commit.${short_sha}"
+  short_sha=$(git rev-parse --short "${COMMIT_SHA:-HEAD}")
+  new_version="${new_version}+commit.${short_sha}"
 fi
 
 # Print results

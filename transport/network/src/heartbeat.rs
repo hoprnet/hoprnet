@@ -146,7 +146,6 @@ pub type AsyncSleepFn =
 ///
 /// This object provides a single public method that can be polled. Once triggered, it will never
 /// return and will only terminate with an unresolvable error or a panic.
-
 pub struct Heartbeat<T: Pinging, API: HeartbeatExternalApi> {
     config: HeartbeatConfig,
     pinger: T,

@@ -52,8 +52,8 @@ use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::Auth;
-use crate::session::SessionTargetSpec;
-use hopr_lib::{errors::HoprLibError, ApplicationData, Hopr};
+use crate::session::StoredSessionEntry;
+use hopr_lib::{errors::HoprLibError, Address, ApplicationData, Hopr};
 use hopr_network_types::prelude::IpProtocol;
 
 pub(crate) const BASE_PATH: &str = "/api/v3";
@@ -68,8 +68,7 @@ pub type MessageEncoder = fn(&[u8]) -> Box<[u8]>;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ListenerId(pub IpProtocol, pub std::net::SocketAddr);
 
-pub type ListenerJoinHandles =
-    Arc<RwLock<HashMap<ListenerId, (SessionTargetSpec, hopr_async_runtime::prelude::JoinHandle<()>)>>>;
+pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, StoredSessionEntry>>>;
 
 #[derive(Clone)]
 pub(crate) struct InternalState {
@@ -92,8 +91,10 @@ pub(crate) struct InternalState {
         account::balances,
         account::withdraw,
         alias::aliases,
+        alias::aliases_addresses,
         alias::set_alias,
         alias::get_alias,
+        alias::get_alias_address,
         alias::delete_alias,
         alias::clear_aliases,
         channels::close_channel,
@@ -146,9 +147,9 @@ pub(crate) struct InternalState {
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportRequest,
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery,
             peers::NodePeerInfoResponse, peers::PingResponse,
-            session::SessionClientRequest, session::SessionClientResponse, session::SessionCloseClientRequest,
+            session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
         )
     ),
@@ -280,9 +281,11 @@ async fn build_api(
             BASE_PATH,
             Router::new()
                 .route("/aliases", get(alias::aliases))
+                .route("/aliases_addresses", get(alias::aliases_addresses))
                 .route("/aliases", post(alias::set_alias))
                 .route("/aliases", delete(alias::clear_aliases))
                 .route("/aliases/:alias", get(alias::get_alias))
+                .route("/aliases_addresses/:alias", get(alias::get_alias_address))
                 .route("/aliases/:alias", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
@@ -327,7 +330,7 @@ async fn build_api(
                 .route("/session/websocket", get(session::websocket))
                 .route("/session/:protocol", post(session::create_client))
                 .route("/session/:protocol", get(session::list_clients))
-                .route("/session/:protocol", delete(session::close_client))
+                .route("/session/:protocol/:ip/:port", delete(session::close_client))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(
                     inner_state.clone(),
@@ -353,6 +356,18 @@ async fn build_api(
                 .layer(ValidateRequestHeaderLayer::accept("application/json"))
                 .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
         )
+}
+
+fn checksum_address_serializer<S: serde::Serializer>(a: &Address, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_str(&a.to_checksum())
+}
+
+fn option_checksum_address_serializer<S: serde::Serializer>(a: &Option<Address>, s: S) -> Result<S::Ok, S::Error> {
+    if let Some(addr) = a {
+        s.serialize_some(&addr.to_checksum())
+    } else {
+        s.serialize_none()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -387,10 +402,12 @@ enum ApiErrorStatus {
     DatabaseError,
     UnsupportedFeature,
     Timeout,
+    PingError(String),
     Unauthorized,
     TooManyOpenWebsocketConnections,
     InvalidQuality,
     NotReady,
+    ListenHostAlreadyUsed,
     #[strum(serialize = "INVALID_PATH")]
     InvalidPath(String),
     #[strum(serialize = "UNKNOWN_FAILURE")]
@@ -418,7 +435,7 @@ impl IntoResponse for ApiErrorStatus {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (StatusCode::INTERNAL_SERVER_ERROR, self).into_response()
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(self)).into_response()
     }
 }
 
@@ -439,5 +456,24 @@ where
             status: ApiErrorStatus::UnknownFailure("unknown error".to_string()).to_string(),
             error: Some(value.to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ApiError;
+
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    #[test]
+    fn test_api_error_to_response() {
+        let error = ApiError {
+            status: StatusCode::INTERNAL_SERVER_ERROR.to_string(),
+            error: Some("Invalid value passed in parameter 'XYZ'".to_string()),
+        };
+
+        let response = error.into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

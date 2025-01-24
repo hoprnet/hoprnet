@@ -82,8 +82,8 @@ stress-test-local-swarm: ## run stress tests on a local node swarm
 	source .venv/bin/activate && \
 		python3 -m pytest tests/test_stress.py \
 		--stress-request-count=3000 \
-		--stress-sources='[{"url": "localhost:19091", "token": "e2e-API-token^^"}]' \
-		--stress-target='{"url": "localhost:19093", "token": "e2e-API-token^^"}'
+		--stress-sources='[{"url": "localhost:3011", "token": "e2e-API-token^^"}]' \
+		--stress-target='{"url": "localhost:3031", "token": "e2e-API-token^^"}'
 
 .PHONY: smart-contract-test
 smart-contract-test: # forge test smart contracts
@@ -103,6 +103,10 @@ kill-anvil: port=8545
 kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	# may fail, we can ignore that
 	lsof -i :$(port) -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
+
+.PHONY: localcluster
+localcluster: ## spin up the localcluster using the default configuration file
+	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected
 
 .PHONY: create-local-identity
 create-local-identity: id_dir=/tmp/
@@ -371,29 +375,7 @@ ifeq ($(script),)
 	echo "parameter <script> missing" >&2 && exit 1
 endif
 	bash "${script}"
-
-.PHONY: generate-python-sdk
-generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the official swagger-codegen-cli as it does not offer a multiplatform image
-generate-python-sdk:
-ifeq (, $(shell which hoprd-api-schema))
-	$(cargo) run --bin hoprd-api-schema >| /tmp/openapi.spec.json
-else
-	hoprd-api-schema >| /tmp/openapi.spec.json
-endif
-
-	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(shell ./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
-
-	mkdir -p ./hoprd-sdk-python/
-	rm -rf ./hoprd-sdk-python/*
-
-	swagger-codegen3 generate \
-		-l python \
-		-o hoprd-sdk-python \
-		-i /tmp/openapi.spec.json \
-		-c /tmp/python-sdk-config.json
-
-	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
-
+	
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

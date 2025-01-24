@@ -48,8 +48,8 @@ pub struct NetworkConfig {
     pub quality_avg_window_size: u32,
 
     #[serde_as(as = "DurationSeconds<u64>")]
-    #[serde(default = "duration_4_min")]
-    #[default(duration_4_min())]
+    #[serde(default = "duration_2_min")]
+    #[default(duration_2_min())]
     pub ignore_timeframe: Duration,
 
     #[serde(default = "backoff_exponent")]
@@ -161,8 +161,8 @@ fn quality_average_window_size() -> u32 {
 }
 
 #[inline]
-fn duration_4_min() -> Duration {
-    Duration::from_secs(4 * 60)
+fn duration_2_min() -> Duration {
+    Duration::from_secs(2 * 60)
 }
 
 #[inline]

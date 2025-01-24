@@ -2,7 +2,10 @@
 
 # prevent sourcing of this script, only allow execution
 $(return >/dev/null 2>&1)
-test "$?" -eq "0" && { echo "This script should only be executed." >&2; exit 1; }
+test "$?" -eq "0" && {
+  echo "This script should only be executed." >&2
+  exit 1
+}
 
 # exit on errors, undefined variables, ensure errors in pipes are not hidden
 set -Eeuo pipefail
@@ -28,10 +31,17 @@ usage() {
 }
 
 # return early with help info when requested
-([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && { usage; exit 0; }
+([ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]) && {
+  usage
+  exit 0
+}
 
 # verify and set parameters
-test -z "${HOPRD_API_TOKEN:-}" && { msg "Missing HOPRD_API_TOKEN"; usage; exit 1; }
+test -z "${HOPRD_API_TOKEN:-}" && {
+  msg "Missing HOPRD_API_TOKEN"
+  usage
+  exit 1
+}
 
 declare endpoints="$@"
 declare api_token=${HOPRD_API_TOKEN}
@@ -57,7 +67,7 @@ done
 declare -A peers
 declare -A peer_addrs
 declare -a endpoints_arr
-endpoints_arr=( ${endpoints} )
+endpoints_arr=(${endpoints})
 
 for endpoint in ${endpoints}; do
   declare peer_id peer_addr
@@ -82,7 +92,7 @@ for endpoint in ${endpoints}; do
     # only perform operation if endpoints differ
     if [ "${endpoint}" != "${other_endpoint}" ]; then
       log "${endpoint} ping other node at ${other_endpoint}"
-      result=$(api_ping "${endpoint}" "${peers["${other_endpoint}"]}" "\"latency\":")
+      result=$(api_ping "${endpoint}" "${peers["${other_endpoint}"]}" '"latency":')
       log "-- ${result}"
     fi
   done

@@ -1,6 +1,6 @@
 use ethers::contract::EthEvent;
 use ethers::types::{Filter, H256};
-use futures::{stream, StreamExt};
+use futures::{stream, FutureExt, StreamExt};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
@@ -22,25 +22,29 @@ use crate::{
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleGauge;
-
-#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_INDEXER_CURRENT_BLOCK: SimpleGauge =
-        SimpleGauge::new(
+    static ref METRIC_INDEXER_CURRENT_BLOCK: hopr_metrics::metrics::SimpleGauge =
+        hopr_metrics::metrics::SimpleGauge::new(
             "hopr_indexer_block_number",
             "Current last processed block number by the indexer",
     ).unwrap();
-    static ref METRIC_INDEXER_CHECKSUM: SimpleGauge =
-        SimpleGauge::new(
+    static ref METRIC_INDEXER_CHECKSUM: hopr_metrics::metrics::SimpleGauge =
+        hopr_metrics::metrics::SimpleGauge::new(
             "hopr_indexer_checksum",
             "Contains an unsigned integer that represents the low 32-bits of the Indexer checksum"
     ).unwrap();
-    static ref METRIC_INDEXER_SYNC_PROGRESS: SimpleGauge =
-        SimpleGauge::new(
+    static ref METRIC_INDEXER_SYNC_PROGRESS: hopr_metrics::metrics::SimpleGauge =
+        hopr_metrics::metrics::SimpleGauge::new(
             "hopr_indexer_sync_progress",
-            " Sync progress of the historical data by the indexer",
+            "Sync progress of the historical data by the indexer",
     ).unwrap();
+    static ref METRIC_INDEXER_SYNC_SOURCE: hopr_metrics::metrics::MultiGauge =
+        hopr_metrics::metrics::MultiGauge::new(
+            "hopr_indexer_data_source",
+            "Current data source of the Indexer",
+            &["source"],
+    ).unwrap();
+
 }
 
 /// Indexer
@@ -61,7 +65,7 @@ pub struct Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
     U: ChainLogHandler + Send + 'static,
-    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
     rpc: Option<T>,
     db_processor: Option<U>,
@@ -77,7 +81,7 @@ impl<T, U, Db> Indexer<T, U, Db>
 where
     T: HoprIndexerRpcOperations + Sync + Send + 'static,
     U: ChainLogHandler + Send + Sync + 'static,
-    Db: HoprDbGeneralModelOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
     pub fn new(
         rpc: T,
@@ -106,7 +110,7 @@ where
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
-        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + 'static,
+        Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
     {
         if self.rpc.is_none() || self.db_processor.is_none() {
             return Err(CoreEthereumIndexerError::ProcessError(
@@ -124,6 +128,14 @@ where
 
         let log_filters = Self::generate_log_filters(&logs_handler);
 
+        let is_synced = Arc::new(AtomicBool::new(false));
+        let chain_head = Arc::new(AtomicU64::new(0));
+
+        // update the chain head once at startup to get a reference for initial syncing
+        // progress calculation
+        debug!("Updating chain head at indexer startup");
+        Self::update_chain_head(&rpc, chain_head.clone()).await;
+
         // First, check whether fast sync is enabled and can be performed.
         // If so:
         //   1. Delete the existing indexed data
@@ -133,14 +145,19 @@ where
         let fast_sync_configured = self.cfg.fast_sync;
         let index_empty = self.db.index_is_empty().await?;
 
+        #[derive(PartialEq, Eq)]
+        enum FastSyncMode {
+            None,
+            FromScratch,
+            Continue,
+        }
+        let mut will_perform_fast_sync = FastSyncMode::None;
+
         match (fast_sync_configured, index_empty) {
             (true, false) => {
                 info!("Fast sync is enabled, but the index database is not empty. Fast sync will continue on existing unprocessed logs.");
 
-                let log_block_numbers = self.db.get_logs_block_numbers(None, None, Some(false)).await?;
-                for block_number in log_block_numbers {
-                    Self::process_block_by_id(&db, &logs_handler, block_number).await?;
-                }
+                will_perform_fast_sync = FastSyncMode::Continue;
             }
             (false, true) => {
                 info!("Fast sync is disabled, but the index database is empty. Doing a full re-sync.");
@@ -157,16 +174,44 @@ where
                 self.db.clear_index_db(None).await?;
                 self.db.set_logs_unprocessed(None, None).await?;
 
-                // Now fast-sync can start
-                let log_block_numbers = self.db.get_logs_block_numbers(None, None, None).await?;
-                for block_number in log_block_numbers {
-                    Self::process_block_by_id(&db, &logs_handler, block_number).await?;
-                }
+                will_perform_fast_sync = FastSyncMode::FromScratch;
+            }
+        }
+
+        let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
+
+        // Perform the fast-sync if requested
+        if FastSyncMode::None != will_perform_fast_sync {
+            let processed = match will_perform_fast_sync {
+                FastSyncMode::FromScratch => None,
+                FastSyncMode::Continue => Some(false),
+                _ => unreachable!(),
+            };
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            {
+                METRIC_INDEXER_SYNC_SOURCE.set(&["fast-sync"], 1.0);
+                METRIC_INDEXER_SYNC_SOURCE.set(&["rpc"], 0.0);
+            }
+
+            let log_block_numbers = self.db.get_logs_block_numbers(None, None, processed).await?;
+            let first_log_block_number = log_block_numbers.first().copied().unwrap_or(0);
+            for block_number in log_block_numbers {
+                Self::process_block_by_id(&db, &logs_handler, block_number).await?;
+                Self::calculate_sync_process(
+                    "fast-sync",
+                    block_number,
+                    &rpc,
+                    chain_head.clone(),
+                    is_synced.clone(),
+                    first_log_block_number,
+                    None,
+                )
+                .await;
             }
         }
 
         info!("Building rpc indexer background process");
-        let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
         let next_block_to_process = if let Some(last_log) = self.db.get_last_checksummed_log().await? {
             info!(
@@ -188,13 +233,15 @@ where
         info!(next_block_to_process, "Indexer start point");
 
         let indexing_proc = spawn(async move {
-            let is_synced = Arc::new(AtomicBool::new(false));
-            let chain_head = Arc::new(AtomicU64::new(0));
-
-            // update the chain head once at startup to get a reference for initial synching
-            // progress calculation
+            // Update the chain head once again
             debug!("Updating chain head at indexer startup");
             Self::update_chain_head(&rpc, chain_head.clone()).await;
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            {
+                METRIC_INDEXER_SYNC_SOURCE.set(&["fast-sync"], 0.0);
+                METRIC_INDEXER_SYNC_SOURCE.set(&["rpc"], 1.0);
+            }
 
             let event_stream = rpc
                 .try_stream_logs(next_block_to_process, log_filters, is_synced.load(Ordering::Relaxed))
@@ -204,7 +251,7 @@ where
 
                     Self::calculate_sync_process(
                         "rpc",
-                        block.clone(),
+                        block.block_id,
                         &rpc,
                         db,
                         chain_head.clone(),
@@ -214,6 +261,7 @@ where
                         logs_handler.safe_address(),
                         logs_handler.contract_addresses_map().channels,
                     )
+                    .map(|_| block)
                 })
                 .filter_map(|block| {
                     let db = db.clone();
@@ -488,7 +536,7 @@ where
     /// * `rpc` - The RPC operations handler.
     /// * `chain_head` - The current chain head block number.
     /// * `is_synced` - A boolean indicating whether the indexer is synced.
-    /// * `next_block_to_process` - The next block number to process.
+    /// * `start_block` - The first block number to process.
     /// * `tx` - A sender channel for synchronization notifications.
     ///
     /// # Returns
@@ -496,7 +544,7 @@ where
     /// The block which was provided as input.
     async fn calculate_sync_process(
         prefix: &str,
-        block: BlockWithLogs,
+        current_block: u64,
         rpc: &T,
         db: Db,
         chain_head: Arc<AtomicU64>,
@@ -510,7 +558,6 @@ where
         T: HoprIndexerRpcOperations + 'static,
         Db: HoprDbInfoOperations + Clone + Send + Sync + 'static,
     {
-        let current_block = block.block_id;
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             METRIC_INDEXER_CURRENT_BLOCK.set(current_block as f64);
@@ -518,23 +565,23 @@ where
 
         let mut head = chain_head.load(Ordering::Relaxed);
 
-        // We only print out sync progress if we are not yet synced. Once synched, we don't print
-        // out progress anymore.
+        // We only print out sync progress if we are not yet synced.
+        // Once synced, we don't print out progress anymore.
         if !is_synced.load(Ordering::Relaxed) {
-            let mut block_difference = head.saturating_sub(next_block_to_process);
+            let mut block_difference = head.saturating_sub(start_block);
 
             let progress = if block_difference == 0 {
                 // Before we call the sync complete, we check the chain again.
                 head = Self::update_chain_head(rpc, chain_head.clone()).await;
-                block_difference = head.saturating_sub(next_block_to_process);
+                block_difference = head.saturating_sub(start_block);
 
                 if block_difference == 0 {
                     1_f64
                 } else {
-                    (current_block - next_block_to_process) as f64 / block_difference as f64
+                    (current_block - start_block) as f64 / block_difference as f64
                 }
             } else {
-                (current_block - next_block_to_process) as f64 / block_difference as f64
+                (current_block - start_block) as f64 / block_difference as f64
             };
 
             info!(
@@ -581,8 +628,6 @@ where
                 }
             }
         }
-
-        block
     }
 }
 
@@ -685,7 +730,15 @@ mod tests {
         let mut rpc = MockHoprIndexerOps::new();
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        handlers.expect_contract_addresses().return_const(vec![]);
+        let addr = Address::new(b"my address 123456789");
+        let topic = Hash::create(&[b"my topic"]);
+        db.ensure_logs_origin(vec![(addr, topic)]).await?;
+
+        handlers.expect_contract_addresses().return_const(vec![addr]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![topic.into()]);
 
         let head_block = 1000;
         rpc.expect_block_number().return_once(move || Ok(head_block));
@@ -722,7 +775,15 @@ mod tests {
         let head_block = 1000;
         let latest_block = 15u64;
 
-        handlers.expect_contract_addresses().return_const(vec![]);
+        let addr = Address::new(b"my address 123456789");
+        let topic = Hash::create(&[b"my topic"]);
+
+        handlers.expect_contract_addresses().return_const(vec![addr]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![topic.into()]);
+        db.ensure_logs_origin(vec![(addr, topic)]).await?;
 
         rpc.expect_block_number().return_once(move || Ok(head_block));
 
@@ -779,7 +840,12 @@ mod tests {
 
         let cfg = IndexerConfig::default();
 
-        handlers.expect_contract_addresses().return_const(vec![]);
+        let addr = Address::new(b"my address 123456789");
+        handlers.expect_contract_addresses().return_const(vec![addr]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![Hash::create(&[b"my topic"]).into()]);
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -821,6 +887,9 @@ mod tests {
     async fn test_indexer_fast_sync_full_with_resume() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
+        let addr = Address::new(b"my address 123456789");
+        let topic = Hash::create(&[b"my topic"]);
+
         // Run 1: Fast sync enabled, index empty
         {
             let logs = vec![
@@ -830,6 +899,8 @@ mod tests {
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
+
+            assert!(db.ensure_logs_origin(vec![(addr, topic)]).await.is_ok());
 
             for log in logs {
                 assert!(db.store_log(log).await.is_ok());
@@ -850,7 +921,11 @@ mod tests {
                 .return_once(move |_, _, _| Ok(Box::pin(rx)));
 
             let mut handlers = MockChainLogHandler::new();
-            handlers.expect_contract_addresses().return_const(vec![]);
+            handlers.expect_contract_addresses().return_const(vec![addr]);
+            handlers
+                .expect_contract_address_topics()
+                .withf(move |x| x == &addr)
+                .return_const(vec![topic.into()]);
             handlers
                 .expect_collect_log_event()
                 .times(2)
@@ -896,6 +971,8 @@ mod tests {
             .flatten()
             .collect::<Vec<_>>();
 
+            assert!(db.ensure_logs_origin(vec![(addr, topic)]).await.is_ok());
+
             for log in logs {
                 assert!(db.store_log(log).await.is_ok());
             }
@@ -915,7 +992,12 @@ mod tests {
                 .return_once(move |_, _, _| Ok(Box::pin(rx)));
 
             let mut handlers = MockChainLogHandler::new();
-            handlers.expect_contract_addresses().return_const(vec![]);
+            handlers.expect_contract_addresses().return_const(vec![addr]);
+            handlers
+                .expect_contract_address_topics()
+                .withf(move |x| x == &addr)
+                .return_const(vec![topic.into()]);
+
             handlers
                 .expect_collect_log_event()
                 .times(2)
@@ -949,8 +1031,13 @@ mod tests {
 
         let cfg = IndexerConfig::default();
 
-        // Set to be an empty list because we don't want to index anything really
-        handlers.expect_contract_addresses().return_const(vec![]);
+        // We don't want to index anything really
+        let addr = Address::new(b"my address 123456789");
+        handlers.expect_contract_addresses().return_const(vec![addr]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![Hash::create(&[b"my topic"]).into()]);
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         // Expected to be called once starting at 0 and yield the respective blocks
@@ -1012,6 +1099,10 @@ mod tests {
 
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
+        let addr = Address::new(b"my address 123456789");
+        let topic = Hash::create(&[b"my topic"]);
+        assert!(db.ensure_logs_origin(vec![(addr, topic)]).await.is_ok());
+
         // insert and process latest block
         let log_1 = SerializableLog {
             address: Address::new(b"my address 123456789"),
@@ -1039,7 +1130,7 @@ mod tests {
             .return_once(move |_, _, _| Ok(Box::pin(rx)));
 
         rpc.expect_block_number()
-            .times(2)
+            .times(3)
             .returning(move || Ok(last_processed_block + 1));
 
         let block = BlockWithLogs {
@@ -1055,7 +1146,11 @@ mod tests {
         tx.start_send(block)?;
 
         let mut handlers = MockChainLogHandler::new();
-        handlers.expect_contract_addresses().return_const(vec![]);
+        handlers.expect_contract_addresses().return_const(vec![addr]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![topic.into()]);
 
         let indexer_cfg = IndexerConfig {
             start_block_number: 0,

@@ -286,7 +286,7 @@ mod tests {
         let price_per_packet: U256 = 10000000000000000u128.into(); // 0.01 HOPR
 
         Ok(TicketBuilder::default()
-            .addresses(counterparty, &ALICE)
+            .addresses(counterparty, &*ALICE)
             .amount(price_per_packet.div_f64(1.0f64)? * 5u32)
             .index(idx)
             .index_offset(1)

@@ -90,9 +90,6 @@ hopr:
         # The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
         # This condition is independent of `aggregation_threshold`.
         unrealized_balance_ratio: 0.9
-        # Maximum time to wait for the ticket aggregation to complete.
-        # This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
-        aggregation_timeout: 60
         # If set, the strategy will automatically aggregate tickets in channel that has transitioned
         # to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
         # or `unrealized_balance_ratio` thresholds are met on that channel.
@@ -105,19 +102,12 @@ hopr:
         # a winning acknowledged ticket
         #
       - !AutoRedeeming
-        #
         # If set, the strategy will redeem only aggregated tickets.
         redeem_only_aggregated: true
-        #
-        # The strategy will only redeem an acknowledged winning ticket if it has at least this value of HOPR.
-        # If 0 is given, the strategy will redeem tickets regardless of their value.
-        # This is not used for cases where `on_close_redeem_single_tickets_value_min` applies.
-        # minimum_redeem_ticket_value: "90000000000000000 HOPR"
-        #
-        # The strategy will automatically redeem if there's a single ticket left when a channel
-        # transitions to `PendingToClose` and it has at least this value of HOPR.
-        # This happens regardless of the `redeem_only_aggregated` setting.
-        on_close_redeem_single_tickets_value_min: "2000000000000000000 HOPR"
+        # If set, all tickets will be redeemed on channel closure.
+        redeem_all_on_close: true
+        # Sets the minimum value of a ticket to be able to redeem it.
+        minimum_redeem_ticket_value: "90000000000000000 HOPR"
         #
         ############################################
         #
@@ -187,7 +177,7 @@ hopr:
   # other nodes in the HOPR network.
   heartbeat:
     # The maximum number of concurrent heartbeat probes
-    max_parallel_probes: 14
+    max_parallel_probes: 25
     # Interval in which the heartbeat is triggered in seconds
     interval: 60
     # The time interval for which to consider peer heartbeat renewal in seconds
@@ -211,7 +201,7 @@ hopr:
     # Size of the quality moving average window.
     quality_avg_window_size: 25
     # Indicates how long (in seconds) a node is considered "ignored"
-    ignore_timeframe: 240
+    ignore_timeframe: 120
     # Backoff exponent when probing nodes
     backoff_exponent: 1.5
     # Minimum backoff (in seconds) when probing nodes
@@ -234,7 +224,7 @@ hopr:
     # Heartbeat sub-protocol configuration
     heartbeat:
       # Timeout in seconds
-      timeout: 15
+      timeout: 6
     # Message sub-protocol configuration
     ticket_aggregation:
       # Timeout in seconds
