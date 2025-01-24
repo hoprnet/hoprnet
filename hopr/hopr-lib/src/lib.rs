@@ -739,7 +739,7 @@ impl Hopr {
         // check if the winning probability is configured correctly.
         let network_min_win_prob = self.chain_api.get_minimum_winning_probability().await?;
         let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
-        if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v == "true")
+        if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
             && configured_win_prob.is_some_and(|c| c < network_min_win_prob)
         {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
