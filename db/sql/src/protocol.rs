@@ -146,6 +146,13 @@ impl HoprDbProtocolOperations for HoprDb {
         Ok(result.into())
     }
 
+    async fn get_network_winning_probability(&self) -> Result<f64> {
+        Ok(self
+            .get_indexer_data(None)
+            .await
+            .map(|data| data.minimum_incoming_ticket_winning_prob)?)
+    }
+
     #[tracing::instrument(level = "trace", skip(self, data, me, path))]
     async fn to_send(
         &self,

@@ -570,6 +570,7 @@ class HoprdAPI:
                 while not ready:
                     try:
                         ready = (await s.get(url, timeout=0.3)).status == 200
+                        await asyncio.sleep(0.5)
                     except Exception:
                         await asyncio.sleep(0.2)
 
