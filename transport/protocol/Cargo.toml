@@ -46,6 +46,4 @@ anyhow = { workspace = true }
 async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 more-asserts = { workspace = true }
-parameterized = { workspace = true }
 serial_test = { workspace = true }
-tracing-test = { workspace = true }

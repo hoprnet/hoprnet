@@ -13,3 +13,5 @@ hopr:
     allow_recursive: false
     execution_interval: 1
     strategies: []
+  protocol:
+    outgoing_ticket_winning_prob: 1.0
