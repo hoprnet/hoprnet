@@ -50,7 +50,7 @@ async fn build_p2p_network(
         {
             let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
                 .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                .unwrap_or(1024);
+                .unwrap_or(5120);
 
             let mut cfg = libp2p::yamux::Config::default();
             cfg.set_max_num_streams(num_streams);
@@ -117,7 +117,7 @@ async fn build_p2p_network(
             )
             .with_max_negotiating_inbound_streams(
                 std::env::var("HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT")
-                    .map(|v| v.trim().parse::<usize>().unwrap_or(128))
+                    .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
                     .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
             )
             .with_idle_connection_timeout(
