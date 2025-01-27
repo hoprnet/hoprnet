@@ -157,12 +157,12 @@ jobs:
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
-          mkdir -p /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/smoke_test_snapshot/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot --recursive
+          mkdir -p /tmp/hopr-localcluster/
+          gcloud storage rsync gs://hoprnet-test-artifacts/snapshot /tmp/hopr-localcluster/snapshot --recursive
         continue-on-error: true
 
       - name: Check snapshot
-        run: ls -lR /tmp/hopr-smoke-test/test_websocket_api/snapshot || echo "no snapshot found"
+        run: ls -lR /tmp/hopr-localcluster/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests websocket
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
@@ -171,8 +171,8 @@ jobs:
         uses: "google-github-actions/upload-cloud-storage@v2"
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
-          path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          destination: hoprnet-test-artifacts/smoke_test_snapshot
+          path: /tmp/hopr-localcluster/snapshot
+          destination: hoprnet-test-artifacts/
           gzip: false
 
       - name: Compress test logs
@@ -246,12 +246,12 @@ jobs:
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
-          mkdir -p /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/smoke_test_snapshot/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot --recursive
+          mkdir -p /tmp/hopr-localcluster/
+          gcloud storage rsync gs://hoprnet-test-artifacts/snapshot /tmp/hopr-localcluster/ --recursive
         continue-on-error: true
 
       - name: Check snapshot
-        run: ls -lR /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot || echo "no snapshot found"
+        run: ls -lR /tmp/hopr-localcluster/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests ${{ matrix.suite }}
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
@@ -260,8 +260,8 @@ jobs:
         uses: "google-github-actions/upload-cloud-storage@v2"
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
-          path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
-          destination: hoprnet-test-artifacts/smoke_test_snapshot
+          path: /tmp/hopr-localcluster/snapshot
+          destination: hoprnet-test-artifacts/
           gzip: false
 
       - name: Compress test logs
