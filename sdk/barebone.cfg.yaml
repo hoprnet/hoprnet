@@ -17,3 +17,5 @@ hopr:
   protocol:
     heartbeat:
       timeout: 5
+    outgoing_ticket_winning_prob: 1.0
+
