@@ -375,6 +375,10 @@ pub trait HoprRpcOperations {
     /// calling the network's winning probability oracle.
     async fn get_minimum_network_winning_probability(&self) -> Result<f64>;
 
+    /// Retrieves the minimum ticket prices by directly calling the network's
+    /// ticket price oracle.
+    async fn get_minimum_network_ticket_price(&self) -> Result<Balance>;
+
     /// Retrieves the node's eligibility status
     async fn get_eligibility_status(&self, address: Address) -> Result<bool>;
 

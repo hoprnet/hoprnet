@@ -202,6 +202,17 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
         }
     }
 
+    async fn get_minimum_network_ticket_price(&self) -> Result<Balance> {
+        match self.contract_instances.price_oracle.current_ticket_price().call().await {
+            Ok(ticket_price) => Ok(BalanceType::HOPR.balance(ticket_price)),
+            Err(e) => Err(ContractError(
+                "PriceOracle".to_string(),
+                "current_ticket_price".to_string(),
+                e.to_string(),
+            )),
+        }
+    }
+
     async fn get_eligibility_status(&self, address: Address) -> Result<bool> {
         match self
             .contract_instances

@@ -737,14 +737,10 @@ impl Hopr {
 
         // Once we are able to query the chain,
         // check if the ticket price is configured correctly.
-        let network_min_ticket_price = self
-            .chain_api
-            .ticket_price()
-            .await
-            .and_then(|price| price.ok_or(HoprChainError::Api("network does not set the ticket price".into())))?;
+        let network_min_ticket_price = self.chain_api.get_minimum_ticket_price().await?;
 
         let configured_ticket_price = self.cfg.protocol.outgoing_ticket_price;
-        if configured_ticket_price.is_some_and(|c| c.amount() < network_min_ticket_price) {
+        if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
                 "configured outgoing ticket price is lower than the network minimum ticket price: {configured_ticket_price:?} < {network_min_ticket_price}"
             ))));
