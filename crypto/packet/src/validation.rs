@@ -76,7 +76,7 @@ pub fn validate_unacknowledged_ticket(
         });
     }
 
-    // Ensure sender has enough funds
+    // Ensure that sender has enough funds
     if inner_ticket.amount.gt(&unrealized_balance) {
         return Err(TicketValidationError {
             reason: format!(
