@@ -83,6 +83,7 @@ where
                 self.cfg.chain_keypair.clone(),
                 path?,
                 self.determine_actual_outgoing_win_prob().await,
+                self.determine_actual_outgoing_ticket_price().await?,
             )
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
@@ -115,6 +116,7 @@ where
                 &self.cfg.packet_keypair,
                 previous_hop,
                 self.determine_actual_outgoing_win_prob().await,
+                self.determine_actual_outgoing_ticket_price().await?,
             )
             .await
             .map_err(|e| match e {
@@ -193,6 +195,18 @@ where
         self.tbf
             .with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
             .await
+    }
+
+    // NOTE: as opposed to the winning probability, the ticket price does not have
+    // a reasonable default and therefore the operation fails
+    async fn determine_actual_outgoing_ticket_price(&self) -> Result<Balance> {
+        // This operation hits the cache unless the new value is fetched for the first time
+        let network_ticket_price =
+            self.db.get_network_ticket_price().await.map_err(|e| {
+                PacketError::LogicError(format!("failed to determine current network ticket price: {e}"))
+            })?;
+
+        Ok(self.cfg.outgoing_ticket_price.unwrap_or(network_ticket_price))
     }
 
     async fn determine_actual_outgoing_win_prob(&self) -> f64 {
@@ -305,10 +319,11 @@ where
 /// Configuration parameters for the packet interaction.
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {
-    pub check_unrealized_balance: bool,
     pub packet_keypair: OffchainKeypair,
     pub chain_keypair: ChainKeypair,
-    pub outgoing_ticket_win_prob: f64,
+    pub mixer: MixerConfig,
+    pub outgoing_ticket_win_prob: Option<f64>,
+    pub outgoing_ticket_price: Option<Balance>,
 }
 
 impl PacketInteractionConfig {
@@ -316,12 +331,13 @@ impl PacketInteractionConfig {
         packet_keypair: &OffchainKeypair,
         chain_keypair: &ChainKeypair,
         outgoing_ticket_win_prob: Option<f64>,
+        outgoing_ticket_price: Option<Balance>,
     ) -> Self {
         Self {
             packet_keypair: packet_keypair.clone(),
             chain_keypair: chain_keypair.clone(),
-            check_unrealized_balance: true,
             outgoing_ticket_win_prob,
+            outgoing_ticket_price,
         }
     }
 }
