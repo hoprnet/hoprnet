@@ -29,12 +29,18 @@ craneLib.devShell {
     yq-go
     curl
     bash
+
+    # anvil
     gnumake
+    lsof
+    coreutils
     which
+    findutils
+    time
 
     # docs utilities
     graphviz
-
+    
     # github integration
     gh
 
