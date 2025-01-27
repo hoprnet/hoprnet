@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use std::{fmt::Debug, result::Result};
 
+use crate::prelude::DbError;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-
-use crate::prelude::DbError;
+use hopr_primitive_types::prelude::Balance;
 
 /// Trait defining all DB functionality needed by packet/acknowledgement processing pipeline.
 #[async_trait]
@@ -18,8 +18,11 @@ pub trait HoprDbProtocolOperations {
     async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair)
         -> crate::errors::Result<AckResult>;
 
-    /// Loads (presumably cached) value of the network winning probability from the DB.
+    /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
     async fn get_network_winning_probability(&self) -> crate::errors::Result<f64>;
+
+    /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
+    async fn get_network_ticket_price(&self) -> crate::errors::Result<Balance>;
 
     /// Process the data into an outgoing packet
     async fn to_send(
@@ -28,6 +31,7 @@ pub trait HoprDbProtocolOperations {
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
         outgoing_ticket_win_prob: f64,
+        outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData, DbError>;
 
     /// Process the incoming packet into data
@@ -39,6 +43,7 @@ pub trait HoprDbProtocolOperations {
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: f64,
+        outgoing_ticket_price: Balance,
     ) -> crate::errors::Result<TransportPacketWithChainData>;
 }
 

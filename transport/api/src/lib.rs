@@ -381,6 +381,7 @@ where
             &self.me,
             &self.me_onchain,
             self.cfg.protocol.outgoing_ticket_winning_prob,
+            self.cfg.protocol.outgoing_ticket_price,
         );
 
         let (tx_from_protocol, rx_from_protocol) = futures::channel::mpsc::unbounded::<ApplicationData>();
