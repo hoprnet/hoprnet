@@ -84,7 +84,7 @@ hopr:
         # Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
         # in that channel when exceeded.
         # This condition is independent of `unrealized_balance_ratio`.
-        aggregation_threshold: 100
+        aggregation_threshold: 1000
         # Percentage of unrealized balance in unaggregated tickets in a channel
         # that triggers the ticket aggregation when exceeded.
         # The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
@@ -107,7 +107,7 @@ hopr:
         # If set, all tickets will be redeemed on channel closure.
         redeem_all_on_close: true
         # Sets the minimum value of a ticket to be able to redeem it.
-        minimum_redeem_ticket_value: "2500000000000000000 HOPR"
+        minimum_redeem_ticket_value: "1500000000000000000 HOPR"
         #
         ############################################
         #

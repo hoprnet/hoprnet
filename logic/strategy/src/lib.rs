@@ -76,12 +76,12 @@ pub enum Strategy {
 /// Default HOPR node strategies (in order).
 ///
 /// ## Aggregation strategy
-///  - aggregate every 100 tickets on all channels
+///  - aggregate every 1000 tickets on all channels
 ///  - or when unredeemed value in the channel is more than 90% of channel's current balance
 ///  - aggregate unredeemed tickets when a channel transitions to `PendingToClose`
 /// ## Auto-redeem Strategy
 /// - redeem only aggregated tickets
-/// - redeem single tickets on channel close if worth at least 2.5 wxHOPR
+/// - redeem single tickets on channel close if worth at least 1.5 wxHOPR
 /// ## Channel closure finalizer Strategy
 /// - maximum channel closure overdue: 1 hour
 pub fn hopr_default_strategies() -> MultiStrategyConfig {
@@ -95,14 +95,14 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
                 funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
             }),*/
             Aggregating(AggregatingStrategyConfig {
-                aggregation_threshold: Some(100),
+                aggregation_threshold: Some(1000),
                 unrealized_balance_ratio: Some(0.9),
                 aggregate_on_channel_close: true,
             }),
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: true,
                 redeem_all_on_close: true,
-                minimum_redeem_ticket_value: Balance::new_from_str("2500000000000000000", BalanceType::HOPR),
+                minimum_redeem_ticket_value: Balance::new_from_str("1500000000000000000", BalanceType::HOPR),
             }),
             ClosureFinalizer(ClosureFinalizerStrategyConfig {
                 max_closure_overdue: Duration::from_secs(3600),
