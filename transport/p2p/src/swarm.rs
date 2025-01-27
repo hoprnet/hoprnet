@@ -112,7 +112,7 @@ where
             )
             .with_max_negotiating_inbound_streams(
                 std::env::var("HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT")
-                    .map(|v| v.trim().parse::<usize>().unwrap_or(128))
+                    .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
                     .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
             )
             .with_idle_connection_timeout(
