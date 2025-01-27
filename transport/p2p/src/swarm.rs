@@ -13,9 +13,7 @@ use hopr_transport_identity::{
 use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_transport_protocol::{
     config::ProtocolConfig,
-    ticket_aggregation::processor::{
-        TicketAggregationActions, TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
-    },
+    ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationFinalizer, TicketAggregationProcessed},
     PeerDiscovery,
 };
 
@@ -35,18 +33,16 @@ lazy_static::lazy_static! {
 /// Build objects comprising the p2p network.
 ///
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
-async fn build_p2p_network<U>(
+async fn build_p2p_network<T, U>(
     me: libp2p::identity::Keypair,
     network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
     indexer_update_input: U,
     heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
-    ticket_aggregation_interactions: TicketAggregationInteraction<
-        TicketAggregationResponseType,
-        TicketAggregationRequestType,
-    >,
+    ticket_aggregation_interactions: T,
     protocol_cfg: ProtocolConfig,
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>>
 where
+    T: Stream<Item = crate::behavior::ticket_aggregation::Event> + Send + 'static,
     U: Stream<Item = PeerDiscovery> + Send + 'static,
 {
     let me_peerid: PeerId = me.public().into();
@@ -125,24 +121,26 @@ where
         .build())
 }
 
+pub type TicketAggregationWriter =
+    TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>;
+pub type TicketAggregationEvent = crate::behavior::ticket_aggregation::Event;
+
 pub struct HoprSwarm {
     pub(crate) swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
 impl HoprSwarm {
-    pub async fn new<U>(
+    pub async fn new<U, T>(
         identity: libp2p::identity::Keypair,
         network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
         indexer_update_input: U,
         heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
-        ticket_aggregation_interactions: TicketAggregationInteraction<
-            TicketAggregationResponseType,
-            TicketAggregationRequestType,
-        >,
+        ticket_aggregation_interactions: T,
         my_multiaddresses: Vec<Multiaddr>,
         protocol_cfg: ProtocolConfig,
     ) -> Self
     where
+        T: Stream<Item = TicketAggregationEvent> + Send + 'static,
         U: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         let mut swarm = build_p2p_network(
@@ -209,10 +207,7 @@ impl HoprSwarm {
         ack_received: AR,
         msg_to_send: MS,
         msg_received: MR,
-        ticket_aggregation_writer: TicketAggregationActions<
-            TicketAggregationResponseType,
-            TicketAggregationRequestType,
-        >,
+        ticket_aggregation_writer: TicketAggregationWriter,
     ) -> HoprSwarmWithProcessors<MS, MR, AS, AR>
     where
         AR: futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static + std::marker::Unpin,
