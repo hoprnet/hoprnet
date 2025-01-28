@@ -1,3 +1,4 @@
+use hopr_primitive_types::prelude::Balance;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
@@ -9,6 +10,8 @@ pub struct ProtocolConfig {
     /// If not set, the network value is used.
     #[validate(range(min = 0.0, max = 1.0))]
     pub outgoing_ticket_winning_prob: Option<f64>,
+    /// Possible override of the network outgoing ticket price.
+    pub outgoing_ticket_price: Option<Balance>,
     /// `heartbeat` protocol config
     #[serde(default)]
     pub heartbeat: crate::heartbeat::config::HeartbeatProtocolConfig,
