@@ -63,5 +63,5 @@ class Anvil:
 
     @classmethod
     def kill(cls):
-        logging.info("Stop all local anvil server running")
+        logging.info("Stop all local anvil servers running")
         run(f"make -s kill-anvil port={PORT_BASE}".split(), cwd=PWD, check=True)
