@@ -46,12 +46,6 @@ The update DAppNode release workflow is triggered after the open release workflo
 
 Please refer to the individual workflow files for more detailed information about each workflow.
 
-## Generate SDK Python Workflow
-
-The Generate SDK Python workflow is triggered after the open release workflow. It generates a Python SDK for the current release and creates a new PR named `Update Python SDK for release <RELEASE_NUMBER>`. This workflow is defined in [generate-sdk.yaml](./generate-sdk.yaml).
-
-Please refer to the individual workflow file for more detailed information about this workflow.
-
 ## Load Testing Workflow
 
 The Load Testing workflow is triggered manually. It is used to run load tests against the current release to ensure that it can handle the expected load. This workflow is defined in [load-tests.yaml](./load-tests.yaml).
