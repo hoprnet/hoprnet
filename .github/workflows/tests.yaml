@@ -246,8 +246,8 @@ jobs:
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
-          mkdir -p /tmp/hopr-localcluster/
-          gcloud storage rsync gs://hoprnet-test-artifacts/snapshot /tmp/hopr-localcluster/ --recursive
+          mkdir -p /tmp/hopr-localcluster/snapshot
+          gcloud storage rsync gs://hoprnet-test-artifacts/snapshot /tmp/hopr-localcluster/snapshot --recursive
         continue-on-error: true
 
       - name: Check snapshot
