@@ -14,6 +14,8 @@ pub const DEFAULT_NETWORK_QUALITY_AVERAGE_WINDOW_SIZE: u32 = 25;
 pub const DEFAULT_NETWORK_BACKOFF_EXPONENT: f64 = 1.5;
 pub const DEFAULT_NETWORK_BACKOFF_MIN: f64 = 2.0;
 
+pub const DEFAULT_AUTO_PATH_QUALITY_THRESHOLD: f64 = 0.95;
+
 /// Configuration for the [`crate::network::Network`] object
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, SmartDefault, PartialEq)]
@@ -38,6 +40,10 @@ pub struct NetworkConfig {
     #[serde(default = "quality_offline_threshold")]
     #[default(quality_offline_threshold())]
     pub quality_offline_threshold: f64,
+
+    #[serde(default = "quality_auto_path_threshold")]
+    #[default(quality_auto_path_threshold())]
+    pub quality_auto_path_threshold: f64,
 
     #[serde(default = "quality_step")]
     #[default(quality_step())]
@@ -148,6 +154,11 @@ fn quality_bad_threshold() -> f64 {
 #[inline]
 fn quality_offline_threshold() -> f64 {
     DEFAULT_NETWORK_OFFLINE_QUALITY_THRESHOLD
+}
+
+#[inline]
+fn quality_auto_path_threshold() -> f64 {
+    DEFAULT_AUTO_PATH_QUALITY_THRESHOLD
 }
 
 #[inline]
