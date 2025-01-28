@@ -90,6 +90,13 @@ impl Validate for NetworkConfig {
             );
         }
 
+        if !(0.0..=1.0).contains(&self.quality_auto_path_threshold) {
+            errors.add(
+                "quality_auto_path_threshold",
+                validator::ValidationError::new("quality_auto_path_threshold must be between 0 and 1"),
+            );
+        }
+
         // #[validate(range(min = 0.0, max = 1.0))]
         if !(0.0..=1.0).contains(&self.quality_offline_threshold) {
             errors.add(
