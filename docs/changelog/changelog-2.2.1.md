@@ -8,3 +8,4 @@ Below there is a list with the contents of this release
 - #6807 - Allow dynamic setting of outgoing ticket winning probability
 - #6805 - Allow high traffic throughput communication for VPN like traffic
 - #6791 - Fix network issues
+- #6823 - Make auto-path finding quality threshold configurable
