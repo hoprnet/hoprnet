@@ -225,7 +225,7 @@ where
             path_planner: PathPlanner::new(
                 db.clone(),
                 DfsPathSelectorConfig {
-                    quality_threshold: cfg.network.quality_bad_threshold,
+                    quality_threshold: cfg.network.quality_auto_path_threshold,
                     ..Default::default()
                 },
                 channel_graph.clone(),
