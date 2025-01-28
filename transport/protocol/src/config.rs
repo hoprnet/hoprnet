@@ -1,8 +1,10 @@
 use hopr_primitive_types::prelude::Balance;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use validator::Validate;
 
 /// Configuration of the P2P protocols.
+#[serde_as]
 #[derive(Debug, smart_default::SmartDefault, Serialize, Deserialize, Validate, Copy, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ProtocolConfig {
@@ -10,6 +12,7 @@ pub struct ProtocolConfig {
     /// If not set, the network value is used.
     #[validate(range(min = 0.0, max = 1.0))]
     pub outgoing_ticket_winning_prob: Option<f64>,
+    #[serde_as(as = "Option<DisplayFromStr>")]
     /// Possible override of the network outgoing ticket price.
     pub outgoing_ticket_price: Option<Balance>,
     /// `heartbeat` protocol config
