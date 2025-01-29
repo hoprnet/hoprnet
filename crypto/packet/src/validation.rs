@@ -18,7 +18,7 @@ pub fn validate_unacknowledged_ticket(
 ) -> Result<VerifiedTicket, TicketValidationError> {
     debug!(source = %channel.source, "validating unack ticket");
 
-    // ticket signer MUST be the sender
+    // The ticket signer MUST be the sender
     let verified_ticket = ticket
         .verify(&channel.source, domain_separator)
         .map_err(|ticket| TicketValidationError {
@@ -28,7 +28,7 @@ pub fn validate_unacknowledged_ticket(
 
     let inner_ticket = verified_ticket.verified_ticket();
 
-    // ticket amount MUST be greater or equal to minTicketAmount
+    // The ticket amount MUST be greater or equal to min_ticket_amount
     if !inner_ticket.amount.ge(&min_ticket_amount) {
         return Err(TicketValidationError {
             reason: format!(
@@ -39,7 +39,7 @@ pub fn validate_unacknowledged_ticket(
         });
     }
 
-    // ticket must have at least required winning probability
+    // The ticket must have at least the required winning probability
     if !f64_approx_eq(
         verified_ticket.win_prob(),
         required_win_prob,
@@ -55,7 +55,7 @@ pub fn validate_unacknowledged_ticket(
         });
     }
 
-    // channel MUST be open or pending to close
+    // The channel MUST be open or pending to close
     if channel.status == ChannelStatus::Closed {
         return Err(TicketValidationError {
             reason: format!("payment channel {} is not opened or pending to close", channel.get_id()),
@@ -63,7 +63,7 @@ pub fn validate_unacknowledged_ticket(
         });
     }
 
-    // ticket's channelEpoch MUST match the current channel's epoch
+    // The ticket's channelEpoch MUST match the current channel's epoch
     if !channel.channel_epoch.eq(&inner_ticket.channel_epoch.into()) {
         return Err(TicketValidationError {
             reason: format!(
@@ -76,7 +76,7 @@ pub fn validate_unacknowledged_ticket(
         });
     }
 
-    // ensure sender has enough funds
+    // Ensure that sender has enough funds
     if inner_ticket.amount.gt(&unrealized_balance) {
         return Err(TicketValidationError {
             reason: format!(

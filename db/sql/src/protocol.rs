@@ -9,7 +9,7 @@ use hopr_db_api::protocol::{
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::ops::Sub;
+use std::ops::{Mul, Sub};
 use tracing::{instrument, trace, warn};
 
 use crate::channels::HoprDbChannelOperations;
@@ -153,6 +153,13 @@ impl HoprDbProtocolOperations for HoprDb {
             .map(|data| data.minimum_incoming_ticket_winning_prob)?)
     }
 
+    async fn get_network_ticket_price(&self) -> Result<Balance> {
+        Ok(self.get_indexer_data(None).await.and_then(|data| {
+            data.ticket_price
+                .ok_or(DbSqlError::LogicalError("missing ticket price".into()))
+        })?)
+    }
+
     #[tracing::instrument(level = "trace", skip(self, data, me, path))]
     async fn to_send(
         &self,
@@ -160,6 +167,7 @@ impl HoprDbProtocolOperations for HoprDb {
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
         outgoing_ticket_win_prob: f64,
+        outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData> {
         let myself = self.clone();
         let next_peer = myself.resolve_chain_key(&path[0]).await?.ok_or_else(|| {
@@ -179,7 +187,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 DbSqlError::LogicalError("failed to fetch the domain separator".into())
                             })?;
 
-                        // Decide whether to create 0-hop or multihop ticket
+                        // Decide whether to create a 0-hop or multihop ticket
                         let next_ticket = if path.len() == 1 {
                             TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_peer)
                         } else {
@@ -190,6 +198,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                     next_peer,
                                     path.len() as u8,
                                     outgoing_ticket_win_prob,
+                                    outgoing_ticket_price,
                                 )
                                 .await?
                         };
@@ -250,6 +259,7 @@ impl HoprDbProtocolOperations for HoprDb {
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: f64,
+        outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData> {
         let offchain_keypair = pkt_keypair.clone();
 
@@ -328,9 +338,12 @@ impl HoprDbProtocolOperations for HoprDb {
                                 DbSqlError::LogicalError("failed to fetch the domain separator".into())
                             })?;
 
-                            let ticket_price = chain_data
+                            // The ticket price from the oracle times my node's position on the
+                            // path is the acceptable minimum
+                            let minimum_ticket_price = chain_data
                                 .ticket_price
-                                .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the ticket price".into()))?;
+                                .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the ticket price".into()))?
+                                .mul(U256::from(path_pos));
 
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_INCOMING_WIN_PROB.observe(ticket.win_prob());
@@ -343,7 +356,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 validate_unacknowledged_ticket(
                                     ticket,
                                     &channel,
-                                    ticket_price,
+                                    minimum_ticket_price,
                                     chain_data.minimum_incoming_ticket_winning_prob,
                                     remaining_balance,
                                     &domain_separator,
@@ -364,16 +377,13 @@ impl HoprDbProtocolOperations for HoprDb {
                                 )
                                 .await;
 
-                            // Check that the calculated path position from the ticket matches the value from the packet header
-                            let ticket_path_pos = ticket.get_path_position(ticket_price.amount())?;
-                            if !ticket_path_pos.eq(&path_pos) {
-                                return Err(DbSqlError::LogicalError(format!(
-                                    "path position mismatch: from ticket {ticket_path_pos}, from packet {path_pos}"
-                                )));
-                            }
+                            // NOTE: that the path position according to the ticket value
+                            // may no longer match the path position from the packet header,
+                            // because the price of the ticket may be set higher be the ticket
+                            // issuer.
 
                             // Create the next ticket for the packet
-                            let ticket_builder = if ticket_path_pos == 1 {
+                            let ticket_builder = if path_pos == 1 {
                                 TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_hop_addr)
                             } else {
                                 // We currently take the maximum of the win prob on the ticket
@@ -384,8 +394,9 @@ impl HoprDbProtocolOperations for HoprDb {
                                         Some(tx),
                                         myself.me_onchain,
                                         next_hop_addr,
-                                        ticket_path_pos,
+                                        path_pos,
                                         outgoing_ticket_win_prob.max(ticket.win_prob()),
+                                        outgoing_ticket_price,
                                     )
                                     .await?
                             };
@@ -457,45 +468,28 @@ impl HoprDb {
         tx: OptTx<'a>,
         me_onchain: Address,
         destination: Address,
-        path_pos: u8,
+        current_path_pos: u8,
         winning_prob: f64,
+        ticket_price: Balance,
     ) -> crate::errors::Result<TicketBuilder> {
-        let myself = self.clone();
-        let (channel, ticket_price): (ChannelEntry, U256) = self
-            .nest_transaction(tx)
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    Ok::<_, DbSqlError>(
-                        if let Some(channel) = myself
-                            .get_channel_by_parties(Some(tx), &me_onchain, &destination, true)
-                            .await?
-                        {
-                            let ticket_price = myself.get_indexer_data(Some(tx)).await?.ticket_price;
-
-                            Some((
-                                channel,
-                                ticket_price
-                                    .ok_or(DbSqlError::LogicalError("missing ticket price".into()))?
-                                    .amount(),
-                            ))
-                        } else {
-                            None
-                        },
-                    )
-                })
-            })
+        let channel = self
+            .get_channel_by_parties(tx, &me_onchain, &destination, true)
             .await?
             .ok_or(DbSqlError::LogicalError(format!(
                 "channel to '{destination}' not found",
             )))?;
 
+        // The next ticket is worth: price * remaining hop count / winning probability
         let amount = Balance::new(
-            ticket_price.div_f64(winning_prob).map_err(|e| {
-                DbSqlError::LogicalError(format!(
-                    "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
-                ))
-            })? * U256::from(path_pos - 1),
+            ticket_price
+                .amount()
+                .mul(U256::from(current_path_pos - 1))
+                .div_f64(winning_prob)
+                .map_err(|e| {
+                    DbSqlError::LogicalError(format!(
+                        "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
+                    ))
+                })?,
             BalanceType::HOPR,
         );
 

@@ -74,12 +74,12 @@ pub enum Strategy {
 /// Default HOPR node strategies (in order).
 ///
 /// ## Aggregation strategy
-///  - aggregate every 100 tickets on all channels
+///  - aggregate every 1000 tickets on all channels
 ///  - or when unredeemed value in the channel is more than 90% of channel's current balance
 ///  - aggregate unredeemed tickets when a channel transitions to `PendingToClose`
 /// ## Auto-redeem Strategy
 /// - redeem only aggregated tickets
-/// - redeem single tickets on channel close if worth at least 2.5 wxHOPR
+/// - redeem single tickets on channel close if worth at least 1.5 wxHOPR
 /// ## Channel closure finalizer Strategy
 /// - maximum channel closure overdue: 1 hour
 pub fn hopr_default_strategies() -> MultiStrategyConfig {
