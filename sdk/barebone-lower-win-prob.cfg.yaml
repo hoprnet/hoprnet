@@ -2,6 +2,7 @@
 hopr:
   # run heartbeats more frequently
   heartbeat:
+    max_parallel_probes: 10
     interval: 10
     threshold: 10
     variance: 1
@@ -15,3 +16,5 @@ hopr:
     strategies: []
   protocol:
     outgoing_ticket_winning_prob: 0.1
+    heartbeat:
+      timeout: 5
