@@ -250,7 +250,7 @@ where
             path_planner: PathPlanner::new(
                 db.clone(),
                 DfsPathSelectorConfig {
-                    quality_threshold: cfg.network.quality_bad_threshold,
+                    quality_threshold: cfg.network.quality_auto_path_threshold,
                     ..Default::default()
                 },
                 channel_graph.clone(),
@@ -381,6 +381,7 @@ where
             &self.me,
             &self.me_onchain,
             self.cfg.protocol.outgoing_ticket_winning_prob,
+            self.cfg.protocol.outgoing_ticket_price,
         );
 
         let (tx_from_protocol, rx_from_protocol) = futures::channel::mpsc::unbounded::<ApplicationData>();
