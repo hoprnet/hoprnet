@@ -39,9 +39,7 @@
 //!       aggregation_threshold: 1000
 //! ```
 
-use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use strum::{Display, EnumString, VariantNames};
 
 use crate::aggregating::AggregatingStrategyConfig;
@@ -86,28 +84,13 @@ pub enum Strategy {
 /// - maximum channel closure overdue: 1 hour
 pub fn hopr_default_strategies() -> MultiStrategyConfig {
     MultiStrategyConfig {
-        on_fail_continue: true,
-        allow_recursive: false,
-        execution_interval: 60,
         strategies: vec![
-            /*AutoFunding(AutoFundingStrategyConfig {
-                min_stake_threshold: Balance::new_from_str("1000000000000000000", BalanceType::HOPR),
-                funding_amount: Balance::new_from_str("10000000000000000000", BalanceType::HOPR),
-            }),*/
-            Aggregating(AggregatingStrategyConfig {
-                aggregation_threshold: Some(100),
-                unrealized_balance_ratio: Some(0.9),
-                aggregate_on_channel_close: true,
-            }),
-            AutoRedeeming(AutoRedeemingStrategyConfig {
-                redeem_only_aggregated: true,
-                redeem_all_on_close: true,
-                minimum_redeem_ticket_value: Balance::new_from_str("2500000000000000000", BalanceType::HOPR),
-            }),
-            ClosureFinalizer(ClosureFinalizerStrategyConfig {
-                max_closure_overdue: Duration::from_secs(3600),
-            }),
+            // AutoFunding(Default::default()),
+            Aggregating(Default::default()),
+            AutoRedeeming(Default::default()),
+            ClosureFinalizer(Default::default()),
         ],
+        ..Default::default()
     }
 }
 
