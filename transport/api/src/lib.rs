@@ -519,7 +519,7 @@ where
         // initiate the msg-ack protocol stack over the wire transport
         let packet_cfg = PacketInteractionConfig::new(
             &self.me,
-            &self.me_onchain,
+            me_onchain,
             self.cfg.protocol.outgoing_ticket_winning_prob,
             self.cfg.protocol.outgoing_ticket_price,
         );

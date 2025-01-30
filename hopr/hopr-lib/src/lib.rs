@@ -646,7 +646,7 @@ impl Hopr {
 
         // Once we are able to query the chain,
         // check if the ticket price is configured correctly.
-        let network_min_ticket_price = self.chain_api.get_minimum_ticket_price().await?;
+        let network_min_ticket_price = self.hopr_chain_api.get_minimum_ticket_price().await?;
 
         let configured_ticket_price = self.cfg.protocol.outgoing_ticket_price;
         if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
@@ -657,7 +657,7 @@ impl Hopr {
 
         // Once we are able to query the chain,
         // check if the winning probability is configured correctly.
-        let network_min_win_prob = self.chain_api.get_minimum_winning_probability().await?;
+        let network_min_win_prob = self.hopr_chain_api.get_minimum_winning_probability().await?;
         let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
         if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
             && configured_win_prob.is_some_and(|c| c < network_min_win_prob)

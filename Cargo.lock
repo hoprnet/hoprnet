@@ -4085,7 +4085,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-api"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "async-channel 2.3.1",
  "async-std",
@@ -4146,7 +4146,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-rpc"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4162,6 +4162,7 @@ dependencies = [
  "hopr-bindings",
  "hopr-chain-types",
  "hopr-crypto-types",
+ "hopr-internal-types",
  "hopr-metrics",
  "hopr-primitive-types",
  "http-types",
@@ -4765,7 +4766,6 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "more-asserts",
- "parameterized",
  "rust-stream-ext-concurrent",
  "serde",
  "serde_with",

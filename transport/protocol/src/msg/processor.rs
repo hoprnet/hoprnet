@@ -321,7 +321,6 @@ where
 pub struct PacketInteractionConfig {
     pub packet_keypair: OffchainKeypair,
     pub chain_keypair: ChainKeypair,
-    pub mixer: MixerConfig,
     pub outgoing_ticket_win_prob: Option<f64>,
     pub outgoing_ticket_price: Option<Balance>,
 }
