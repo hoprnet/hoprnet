@@ -34,14 +34,19 @@ pub fn random_free_local_ipv4_port() -> Option<u16> {
 pub(crate) struct Interface {
     pub me: PeerId,
     pub address: Multiaddr,
+    #[allow(dead_code)]
     pub update_from_network: futures::channel::mpsc::Sender<NetworkTriggeredEvent>,
     pub update_from_announcements: futures::channel::mpsc::UnboundedSender<PeerDiscovery>,
+    #[allow(dead_code)]
     pub send_heartbeat: futures::channel::mpsc::UnboundedSender<(PeerId, PingQueryReplier)>,
+    #[allow(dead_code)]
     pub send_ticket_aggregation: futures::channel::mpsc::UnboundedSender<TicketAggregationEvent>,
     // ---
     pub send_msg: futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
     pub recv_msg: futures::channel::mpsc::UnboundedReceiver<(PeerId, Box<[u8]>)>,
+    #[allow(dead_code)]
     pub send_ack: futures::channel::mpsc::UnboundedSender<(PeerId, Acknowledgement)>,
+    #[allow(dead_code)]
     pub recv_ack: futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
 }
 pub(crate) enum Announcement {
@@ -89,7 +94,7 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     let (ack_send_tx, ack_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
     let (ack_recv_tx, ack_recv_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
 
-    let (taa_tx, taa_rx) = futures::channel::mpsc::channel::<
+    let (taa_tx, _taa_rx) = futures::channel::mpsc::channel::<
         TicketAggregationToProcess<TicketAggregationResponseType, TicketAggregationRequestType>,
     >(100);
     let _taa =
@@ -118,14 +123,14 @@ const RANDOM_GIBBERISH: &str = "abcdferjskdiq7LGuzjfXMEI2tTCUIZsCDsHnfycUbPcA1Iv
 
 pub fn generate_packets_of_hopr_payload_size(count: usize) -> Vec<Box<[u8]>> {
     let mut packets = Vec::with_capacity(count);
-    for i in 0..count {
+    for _ in 0..count {
         packets.push(Box::from(RANDOM_GIBBERISH.as_bytes()));
     }
     packets
 }
 
 pub struct SelfClosingJoinHandle {
-    handle: JoinHandle<()>,
+    handle: Option<JoinHandle<()>>,
 }
 
 impl SelfClosingJoinHandle {
@@ -133,23 +138,30 @@ impl SelfClosingJoinHandle {
     where
         F: std::future::Future<Output = ()> + Send + 'static,
     {
-        Self { handle: spawn(f) }
+        Self { handle: Some(spawn(f)) }
     }
 }
 
 impl Drop for SelfClosingJoinHandle {
+    #[cfg(feature = "runtime-async-std")]
     fn drop(&mut self) {
-        #[cfg(feature = "runtime-async-std")]
-        block_on(self.handle.cancel());
-        #[cfg(feature = "runtime-tokio")]
-        self.handle.abort()
+        if let Some(handle) = self.handle.take() {
+            block_on(handle.cancel());
+        }
+    }
+    
+    #[cfg(feature = "runtime-tokio")]
+    fn drop(&mut self) {
+        if let Some(handle) = self.handle.take() {
+            handle.abort();
+        }
     }
 }
 
 #[cfg(feature = "runtime-async-std")]
 use async_std::{
-    future::time::{sleep, timeout},
-    task::{block_on, spawn, JoinHandle},
+    future::{timeout},
+    task::{sleep, block_on, spawn, JoinHandle},
 };
 
 #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
@@ -165,10 +177,10 @@ use tokio::{
 )]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
-    let (mut api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
+    let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
 
-    let sjh1 = SelfClosingJoinHandle::new(swarm1.run("1.0.0".into()));
-    let sjh2 = SelfClosingJoinHandle::new(swarm2.run("1.0.0".into()));
+    let _sjh1 = SelfClosingJoinHandle::new(swarm1.run("1.0.0".into()));
+    let _sjh2 = SelfClosingJoinHandle::new(swarm2.run("1.0.0".into()));
 
     // Announce nodes to each other
     api1.update_from_announcements
