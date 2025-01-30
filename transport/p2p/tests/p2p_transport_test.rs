@@ -142,51 +142,22 @@ impl SelfClosingJoinHandle {
     }
 }
 
+#[cfg(feature = "runtime-async-std")]
 impl Drop for SelfClosingJoinHandle {
-    #[cfg_attr(
-        all(feature = "runtime-async-std", not(feature = "runtime-tokio")),
-        test_log::test(tokio::test)
-    )]
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
             block_on(handle.cancel());
         }
     }
-
-    #[cfg_attr(
-        all(feature = "runtime-tokio", not(feature = "runtime-async-std")),
-        test_log::test(tokio::test)
-    )]
-    fn drop(&mut self) {
-        if let Some(handle) = self.handle.take() {
-            handle.abort();
-        }
-    }
 }
 
-#[cfg_attr(
-    all(feature = "runtime-async-std", not(feature = "runtime-tokio")),
-    test_log::test(tokio::test)
-)]
+#[cfg(feature = "runtime-async-std")]
 use async_std::{
     future::timeout,
     task::{block_on, sleep, spawn, JoinHandle},
 };
 
-#[cfg_attr(
-    all(feature = "runtime-tokio", not(feature = "runtime-async-std")),
-    test_log::test(tokio::test)
-)]
-use tokio::{
-    task::{spawn, JoinHandle},
-    time::{sleep, timeout},
-};
-
 #[cfg_attr(feature = "runtime-async-std", test_log::test(async_std::test))]
-#[cfg_attr(
-    all(feature = "runtime-tokio", not(feature = "runtime-async-std")),
-    test_log::test(tokio::test)
-)]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
     let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
