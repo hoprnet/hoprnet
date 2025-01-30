@@ -74,7 +74,7 @@ pub(super) async fn eligiblez(State(state): State<Arc<AppState>>) -> impl IntoRe
             // The "division by zero" error is caused by the self-registration,
             // which is forbidden to the public and thus returns false
             let err_str = e.to_string();
-            if err_str.to_lowercase().contains("division by zero") {
+            if err_str.to_lowercase().contains("division or modulo by zero") {
                 (StatusCode::PRECONDITION_FAILED, "Node not eligible").into_response()
             } else {
                 (StatusCode::INTERNAL_SERVER_ERROR, err_str).into_response()

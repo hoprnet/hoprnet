@@ -333,4 +333,12 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     pub async fn get_eligibility_status(&self) -> errors::Result<bool> {
         Ok(self.rpc_operations.get_eligibility_status(self.me_onchain()).await?)
     }
+
+    pub async fn get_minimum_winning_probability(&self) -> errors::Result<f64> {
+        Ok(self.rpc_operations.get_minimum_network_winning_probability().await?)
+    }
+
+    pub async fn get_minimum_ticket_price(&self) -> errors::Result<Balance> {
+        Ok(self.rpc_operations.get_minimum_network_ticket_price().await?)
+    }
 }

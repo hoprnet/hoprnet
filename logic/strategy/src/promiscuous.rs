@@ -106,32 +106,56 @@ impl Display for ChannelDecision {
     }
 }
 
+#[inline]
+fn ten_hopr() -> Balance {
+    Balance::new_from_str("10000000000000000000", BalanceType::HOPR)
+}
+
+#[inline]
+fn default_network_quality_threshold() -> f64 {
+    0.5
+}
+
+#[inline]
+fn default_network_size_samples() -> u32 {
+    10
+}
+
+#[inline]
+fn just_true() -> bool {
+    true
+}
+
 /// Configuration of [PromiscuousStrategy].
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
     #[validate(range(min = 0_f64, max = 1.0_f64))]
-    #[default = 0.5]
+    #[serde(default = "default_network_quality_threshold")]
+    #[default(default_network_quality_threshold())]
     pub network_quality_threshold: f64,
 
     /// Minimum number of network quality samples before the strategy can start making decisions.
     #[validate(range(min = 1_u32))]
-    #[default = 10]
+    #[serde(default = "default_network_size_samples")]
+    #[default(default_network_size_samples())]
     pub min_network_size_samples: u32,
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
     ///
     /// Defaults to 10 HOPR
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
+    #[serde(default = "ten_hopr")]
+    #[default(ten_hopr())]
     pub new_channel_stake: Balance,
 
     /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
     ///
     /// Defaults to 10 HOPR
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
+    #[serde(default = "ten_hopr")]
+    #[default(ten_hopr())]
     pub minimum_node_balance: Balance,
 
     /// Maximum number of opened channels the strategy should maintain.
@@ -143,6 +167,7 @@ pub struct PromiscuousStrategyConfig {
     /// If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
     /// if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
     /// `max_channels` limit.
+    #[serde(default = "just_true")]
     #[default = true]
     pub enforce_max_channels: bool,
 

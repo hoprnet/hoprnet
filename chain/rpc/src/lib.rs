@@ -345,16 +345,24 @@ pub trait HoprRpcOperations {
     /// Retrieves the HOPR token allowance for the given owner and spender.
     async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance>;
 
+    /// Retrieves the minimum incoming ticket winning probability by directly
+    /// calling the network's winning probability oracle.
+    async fn get_minimum_network_winning_probability(&self) -> Result<f64>;
+
+    /// Retrieves the minimum ticket prices by directly calling the network's
+    /// ticket price oracle.
+    async fn get_minimum_network_ticket_price(&self) -> Result<Balance>;
+
     /// Retrieves the node's eligibility status
     async fn get_eligibility_status(&self, address: Address) -> Result<bool>;
 
-    /// Retrieves info of the given node module's target.
+    /// Retrieves information of the given node module's target.
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>>;
 
-    /// Retrieves safe address of the given node address from the registry.
+    /// Retrieves the safe address of the given node address from the registry.
     async fn get_safe_from_node_safe_registry(&self, node: Address) -> Result<Address>;
 
-    /// Retrieves target address of the node module.
+    /// Retrieves the target address of the node module.
     async fn get_module_target_address(&self) -> Result<Address>;
 
     /// Retrieves the notice period of channel closure from the Channels contract.
