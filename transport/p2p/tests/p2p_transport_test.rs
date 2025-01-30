@@ -149,7 +149,7 @@ impl Drop for SelfClosingJoinHandle {
             block_on(handle.cancel());
         }
     }
-    
+
     #[cfg(feature = "runtime-tokio")]
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
@@ -158,13 +158,19 @@ impl Drop for SelfClosingJoinHandle {
     }
 }
 
-#[cfg(feature = "runtime-async-std")]
+#[cfg_attr(
+    all(feature = "runtime-toasync-stdkio", not(feature = "runtime-tokio")),
+    test_log::test(tokio::test)
+)]
 use async_std::{
-    future::{timeout},
-    task::{sleep, block_on, spawn, JoinHandle},
+    future::timeout,
+    task::{block_on, sleep, spawn, JoinHandle},
 };
 
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+#[cfg_attr(
+    all(feature = "runtime-tokio", not(feature = "runtime-async-std")),
+    test_log::test(tokio::test)
+)]
 use tokio::{
     task::{spawn, JoinHandle},
     time::{sleep, timeout},
