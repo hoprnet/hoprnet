@@ -159,7 +159,7 @@ impl Drop for SelfClosingJoinHandle {
 }
 
 #[cfg_attr(
-    all(feature = "runtime-toasync-stdkio", not(feature = "runtime-tokio")),
+    all(feature = "runtime-async-std", not(feature = "runtime-tokio")),
     test_log::test(tokio::test)
 )]
 use async_std::{
