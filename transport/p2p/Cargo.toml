@@ -19,10 +19,7 @@ runtime-async-std = [
   "libp2p/async-std",
   "hopr-transport-protocol/runtime-async-std",
 ]
-runtime-tokio = [
-  "libp2p/tokio",
-  "hopr-transport-protocol/runtime-tokio",
-]
+runtime-tokio = ["libp2p/tokio", "hopr-transport-protocol/runtime-tokio"]
 
 [dependencies]
 futures = { workspace = true }
@@ -57,3 +54,4 @@ async-trait = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true }
 hopr-crypto-types = { workspace = true }
+hopr-platform = { workspace = true }

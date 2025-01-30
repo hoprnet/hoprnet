@@ -9,6 +9,7 @@ use libp2p::{Multiaddr, PeerId};
 
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_internal_types::protocol::Acknowledgement;
+use hopr_platform::time::native::current_time;
 use hopr_transport_network::{network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_transport_p2p::{
     swarm::{
@@ -44,7 +45,6 @@ pub(crate) struct Interface {
     pub recv_ack: futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
 }
 pub(crate) enum Announcement {
-    TCP,
     QUIC,
 }
 
@@ -69,7 +69,6 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
         futures::channel::mpsc::unbounded::<TicketAggregationEvent>();
 
     let multiaddress = match announcement {
-        Announcement::TCP => format!("/ip4/127.0.0.1/tcp/{random_port}"),
         Announcement::QUIC => format!("/ip4/127.0.0.1/udp/{random_port}/quic-v1"),
     };
     let multiaddress = Multiaddr::from_str(&multiaddress).context("failed to create a valid multiaddress")?;
@@ -149,14 +148,14 @@ impl Drop for SelfClosingJoinHandle {
 
 #[cfg(feature = "runtime-async-std")]
 use async_std::{
-    future::time::timeout,
+    future::time::{sleep, timeout},
     task::{block_on, spawn, JoinHandle},
 };
 
 #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use tokio::{
     task::{spawn, JoinHandle},
-    time::timeout,
+    time::{sleep, timeout},
 };
 
 #[cfg_attr(feature = "runtime-async-std", test_log::test(async_std::test))]
@@ -164,14 +163,12 @@ use tokio::{
     all(feature = "runtime-tokio", not(feature = "runtime-async-std")),
     test_log::test(tokio::test)
 )]
-async fn p2p_only_communication_tcp() -> anyhow::Result<()> {
-    let (api1, swarm1) = build_p2p_swarm(Announcement::TCP).await?;
-    let (mut api2, swarm2) = build_p2p_swarm(Announcement::TCP).await?;
+async fn p2p_only_communication_quic() -> anyhow::Result<()> {
+    let (api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
+    let (mut api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
 
     let sjh1 = SelfClosingJoinHandle::new(swarm1.run("1.0.0".into()));
     let sjh2 = SelfClosingJoinHandle::new(swarm2.run("1.0.0".into()));
-
-    std::thread::sleep(std::time::Duration::from_secs(5));
 
     // Announce nodes to each other
     api1.update_from_announcements
@@ -187,30 +184,30 @@ async fn p2p_only_communication_tcp() -> anyhow::Result<()> {
         .unbounded_send(PeerDiscovery::Allow(api1.me))
         .context("failed to send announcement")?;
 
-    api1.send_msg
-        .unbounded_send((api2.me, Box::from(RANDOM_GIBBERISH.as_bytes())))
-        .context("failed to send message")?;
+    // Wait for node listen_on and announcements
+    sleep(std::time::Duration::from_secs(3)).await;
 
-    timeout(std::time::Duration::from_secs(3), api2.recv_msg.next())
-        .await?
-        .context("failed to receive message")?
-        .1
-        .as_ref()
-        .iter()
-        .zip(RANDOM_GIBBERISH.as_bytes())
-        .for_each(|(a, b)| assert_eq!(a, b));
+    let start = current_time();
 
-    Ok(())
-}
+    // ~10MB of data
+    let packet_count: usize = 2 * 1024 * 10;
+    for _ in 0..packet_count {
+        api1.send_msg
+            .unbounded_send((api2.me, Box::from(RANDOM_GIBBERISH.as_bytes())))
+            .context("failed to send message")?;
+    }
 
-#[cfg_attr(feature = "runtime-async-std", test_log::test(async_std::test))]
-#[cfg_attr(
-    all(feature = "runtime-tokio", not(feature = "runtime-async-std")),
-    test_log::test(tokio::test)
-)]
-async fn p2p_only_communication_quic() -> anyhow::Result<()> {
-    let (api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
-    let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
+    timeout(
+        std::time::Duration::from_secs(60),
+        api2.recv_msg.take(packet_count).collect::<Vec<_>>(),
+    )
+    .await?;
+
+    let speed_in_mbytes_s =
+        (RANDOM_GIBBERISH.len() * packet_count) as f64 / (start.elapsed()?.as_millis() as f64 * 1000f64);
+    tracing::info!("The measured speed for data transfer is ~{speed_in_mbytes_s}MB/s",);
+
+    assert!(speed_in_mbytes_s > 1.0f64);
 
     Ok(())
 }

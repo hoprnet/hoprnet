@@ -4727,6 +4727,7 @@ dependencies = [
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-platform",
  "hopr-transport-identity",
  "hopr-transport-network",
  "hopr-transport-protocol",
