@@ -490,7 +490,7 @@ where
                                             if let Some(replier) = Arc::<PingQueryReplier>::into_inner(replier) {
                                                 replier.notify(response.0, response.1)
                                             } else {
-                                                warn!(%peer, %request_id, "Failed to notify with replier, multiple instances exist")
+                                                debug!(%peer, %request_id, "Failed to notify with replier, multiple instances exist")
                                             }
                                         } else {
                                             debug!(%peer, %request_id, "Failed to find heartbeat replier");
@@ -558,7 +558,7 @@ where
                                         if let Some(finalizer) = Arc::<TicketAggregationFinalizer>::into_inner(finalizer) {
                                             finalizer.finalize();
                                         } else {
-                                            warn!(%peer, request_id = %request, "Failed to finalize ticket aggregation, multiple instances of request exist")
+                                            debug!(%peer, request_id = %request, "Failed to finalize ticket aggregation, multiple instances of request exist")
                                         }
                                     },
                                     None => {
