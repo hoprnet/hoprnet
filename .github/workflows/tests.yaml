@@ -27,6 +27,7 @@ jobs:
     if: github.event.pull_request.draft == false
     env:
       needs_nix_setup: false
+      CI: "true"
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -46,7 +47,8 @@ jobs:
           USER: runner
 
       - name: Run unit tests
-        run: nix build -L .#hopr-test
+        run: |
+          nix build .#hopr-test
 
   tests-unit-nightly:
     runs-on: self-hosted-hoprnet-bigger
@@ -54,6 +56,7 @@ jobs:
     if: github.event.pull_request.draft == false
     env:
       needs_nix_setup: false
+      CI: "true"
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -80,8 +83,9 @@ jobs:
         env:
           USER: runner
 
-      - name: Run unit tests
-        run: nix build -L .#hopr-test-nightly
+      - name: Run unit tests nightly
+        run: |
+          nix build .#hopr-test-nightly
 
   tests-smart-contracts:
     runs-on: self-hosted-hoprnet-bigger

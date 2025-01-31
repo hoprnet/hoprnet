@@ -4722,10 +4722,13 @@ version = "0.5.4"
 dependencies = [
  "anyhow",
  "async-std",
+ "async-trait",
  "futures",
  "futures-concurrency",
+ "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
+ "hopr-platform",
  "hopr-transport-identity",
  "hopr-transport-network",
  "hopr-transport-protocol",
@@ -4733,7 +4736,9 @@ dependencies = [
  "libp2p",
  "moka",
  "serde",
+ "test-log",
  "thiserror 2.0.11",
+ "tokio",
  "tracing",
  "void",
 ]

@@ -111,7 +111,7 @@ impl PingQueryReplier {
         };
 
         if self.notifier.send(timed_result).is_err() {
-            warn!("Failed to notify the ping query result due to upper layer ping timeout");
+            debug!("Failed to notify the ping query result due to upper layer ping timeout");
         }
     }
 }
