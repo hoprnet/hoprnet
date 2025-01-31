@@ -206,10 +206,10 @@ pub async fn peer_setup_for(
         let opk: &OffchainKeypair = &PEERS[i];
         let ock: &ChainKeypair = &PEERS_CHAIN[i];
         let packet_cfg = PacketInteractionConfig {
-            check_unrealized_balance: true,
             packet_keypair: opk.clone(),
             chain_keypair: ock.clone(),
-            outgoing_ticket_win_prob: 1.0,
+            outgoing_ticket_win_prob: Some(1.0),
+            outgoing_ticket_price: Some(BalanceType::HOPR.balance(100)),
         };
 
         db.start_ticket_processing(Some(received_ack_tickets_tx))?;

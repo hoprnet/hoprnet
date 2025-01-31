@@ -148,6 +148,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
     }
 
+    if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
+        warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
+    }
+
     let args = <CliArgs as clap::Parser>::parse();
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
 

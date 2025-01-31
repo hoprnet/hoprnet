@@ -20,6 +20,7 @@ use validator::Validate;
 use hopr_bindings::hopr_node_management_module::HoprNodeManagementModule;
 use hopr_chain_types::{ContractAddresses, ContractInstances};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_internal_types::prelude::{win_prob_to_f64, EncodedWinProb};
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::RpcError::ContractError;
@@ -183,6 +184,32 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
                     e.to_string(),
                 )),
             },
+        }
+    }
+
+    async fn get_minimum_network_winning_probability(&self) -> Result<f64> {
+        match self.contract_instances.win_prob_oracle.current_win_prob().call().await {
+            Ok(encoded_win_prob) => {
+                let mut encoded: EncodedWinProb = Default::default();
+                encoded.copy_from_slice(&encoded_win_prob.to_be_bytes()[1..]);
+                Ok(win_prob_to_f64(&encoded))
+            }
+            Err(e) => Err(ContractError(
+                "WinProbOracle".to_string(),
+                "current_win_prob".to_string(),
+                e.to_string(),
+            )),
+        }
+    }
+
+    async fn get_minimum_network_ticket_price(&self) -> Result<Balance> {
+        match self.contract_instances.price_oracle.current_ticket_price().call().await {
+            Ok(ticket_price) => Ok(BalanceType::HOPR.balance(ticket_price)),
+            Err(e) => Err(ContractError(
+                "PriceOracle".to_string(),
+                "current_ticket_price".to_string(),
+                e.to_string(),
+            )),
         }
     }
 
