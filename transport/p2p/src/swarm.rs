@@ -2,7 +2,7 @@ use futures::{pin_mut, select, SinkExt, Stream, StreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p::{request_response::OutboundRequestId, request_response::ResponseChannel, swarm::SwarmEvent};
 
-use std::{num::NonZeroU8, sync::Arc};
+use std::num::NonZeroU8;
 use tracing::{debug, error, info, trace, warn};
 
 use hopr_internal_types::prelude::*;
@@ -301,13 +301,13 @@ where
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.swarm.into();
 
         // NOTE: an improvement would be a forgetting cache for the active requests
-        let active_pings: moka::future::Cache<libp2p::request_response::OutboundRequestId, Arc<PingQueryReplier>> =
+        let active_pings: moka::future::Cache<libp2p::request_response::OutboundRequestId, PingQueryReplier> =
             moka::future::CacheBuilder::new(1000)
                 .time_to_live(std::time::Duration::from_secs(40))
                 .build();
         let active_aggregation_requests: moka::future::Cache<
             libp2p::request_response::OutboundRequestId,
-            Arc<TicketAggregationFinalizer>,
+            TicketAggregationFinalizer,
         > = moka::future::CacheBuilder::new(1000)
             .time_to_live(std::time::Duration::from_secs(40))
             .build();
@@ -487,11 +487,7 @@ where
                                         if let Some(replier) = active_pings.remove(&request_id).await {
                                             active_pings.run_pending_tasks().await;     // needed to remove the invalidated, but still present instance of Arc inside
                                             trace!(%peer, %request_id, "Processing manual ping response");
-                                            if let Some(replier) = Arc::<PingQueryReplier>::into_inner(replier) {
-                                                replier.notify(response.0, response.1)
-                                            } else {
-                                                debug!(%peer, %request_id, "Failed to notify with replier, multiple instances exist")
-                                            }
+                                            replier.notify(response.0, response.1)
                                         } else {
                                             debug!(%peer, %request_id, "Failed to find heartbeat replier");
                                         }
@@ -543,7 +539,7 @@ where
                                 let ack_tkt_count = acked_tickets.len();
                                 let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
                                 debug!(%peer, %request_id, "Sending request to aggregate {ack_tkt_count} tickets");
-                                active_aggregation_requests.insert(request_id, Arc::new(finalizer)).await;
+                                active_aggregation_requests.insert(request_id, finalizer).await;
                             },
                             TicketAggregationProcessed::Reply(peer, ticket, response) => {
                                 debug!(%peer, "Enqueuing a response'");
@@ -554,12 +550,8 @@ where
                             TicketAggregationProcessed::Receive(peer, _, request) => {
                                 match active_aggregation_requests.remove(&request).await {
                                     Some(finalizer) => {
-                                        active_aggregation_requests.run_pending_tasks().await;     // needed to remove the invalidated, but still present instance of Arc inside
-                                        if let Some(finalizer) = Arc::<TicketAggregationFinalizer>::into_inner(finalizer) {
-                                            finalizer.finalize();
-                                        } else {
-                                            debug!(%peer, request_id = %request, "Failed to finalize ticket aggregation, multiple instances of request exist")
-                                        }
+                                        active_aggregation_requests.run_pending_tasks().await;
+                                        finalizer.finalize();
                                     },
                                     None => {
                                         warn!(%peer, request_id = %request, "Response already handled")
@@ -575,7 +567,7 @@ where
                         match event {
                             crate::behavior::heartbeat::Event::ToProbe((peer, replier)) => {
                                 let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(replier.challenge()));
-                                active_pings.insert(req_id, Arc::new(replier)).await;
+                                active_pings.insert(req_id, replier).await;
                             },
                         }
                     }
