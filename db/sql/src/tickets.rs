@@ -9,7 +9,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::TryStreamExt;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
 use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use tracing::{debug, error, info, trace, warn};
 
@@ -43,6 +43,9 @@ lazy_static::lazy_static! {
         &["channel", "statistic"]
     ).unwrap();
 }
+
+/// The maximum number of tickets that can sent for aggregation in a single request.
+const MAX_TICKETS_TO_AGGREGATE_BATCH: u64 = 10_000;
 
 /// The type is necessary solely to allow
 /// implementing the [`IntoCondition`] trait for [`TicketSelector`]
@@ -842,6 +845,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .filter(ticket::Column::State.ne(AcknowledgedTicketStatus::BeingAggregated as u8))
                         .filter(ticket::Column::WinningProbability.gte(encoded_min_win_prob.to_vec()))
                         .order_by_asc(ticket::Column::Index)// tickets must be sorted by indices in ascending order
+                        .limit(MAX_TICKETS_TO_AGGREGATE_BATCH)
                         .all(tx.as_ref())
                         .await?;
 
@@ -940,7 +944,7 @@ impl HoprDbTicketOperations for HoprDb {
             .update_ticket_states(selector, AcknowledgedTicketStatus::Untouched)
             .await?;
 
-        debug!(
+        info!(
             "rollback happened for ticket aggregation in '{channel}' with {reverted} tickets rolled back as a result",
         );
         Ok(())
