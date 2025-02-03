@@ -206,13 +206,13 @@ pub(crate) fn filter_satisfying_ticket_models(
         // and there are at least two tickets
         if unaggregated_balance.ge(&diminished_balance) {
             if to_be_agg_count > 1 {
-                info!(channel = %channel_id, count = ?to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check OK: less unrealized than diminished balance");
+                info!(channel = %channel_id, count = to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check OK: less unrealized than diminished balance");
                 return Ok(to_be_aggregated);
             } else {
-                debug!(channel = %channel_id, count = ?to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: more unrealized than diminished balance");
+                debug!(channel = %channel_id, count = to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: more unrealized than diminished balance");
             }
         } else {
-            debug!(channel = %channel_id, count = ?to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: less unrealized than diminished balance");
+            debug!(channel = %channel_id, count = to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: less unrealized than diminished balance");
         }
     }
 
