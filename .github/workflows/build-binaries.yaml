@@ -108,7 +108,7 @@ jobs:
 
       - name: Install Nix
         if: steps.vars.outputs.runner_needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@v29
+        uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           nix_path: nixpkgs=channel:nixos-24.05
