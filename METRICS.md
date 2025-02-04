@@ -70,7 +70,7 @@ scrape_configs:
 - `hopr_chain_actions_count`: Number of different chain actions and their results, keys: `action`, `result`
 - `hopr_indexer_contract_log_counters`: Counts of different HOPR contract logs processed by the Indexer, keys: `contract`
 - `hopr_tickets_incoming_statistics`: Ticket statistics for channels with incoming tickets, keys: `channel`, `statistic`
-- `hopr_session_num_active_session`: Number of currently active HOPR sessions
+- `hopr_session_num_active_sessions`: Number of currently active HOPR sessions
 - `hopr_session_received_error_counts`: Number of HOPR session errors received from an Exit node, keys: `kind`
 - `hopr_session_sent_error_counts`: Number of HOPR session errors sent to an Entry node, keys: `kind`
 - `hopr_session_established_sessions`: Number of sessions that were successfully established as an Exit node

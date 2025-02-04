@@ -19,7 +19,7 @@ use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
-        "hopr_session_num_active_session",
+        "hopr_session_num_active_sessions",
         "Number of currently active HOPR sessions"
     ).unwrap();
     static ref METRIC_NUM_ESTABLISHED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
@@ -129,12 +129,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
             }
             .boxed()
         }
-        _ => {
-            #[cfg(all(feature = "prometheus", not(test)))]
-            METRIC_ACTIVE_SESSIONS.decrement(1.0);
-
-            futures::future::ready(()).boxed()
-        }
+        _ => futures::future::ready(()).boxed()
     }
 }
 
@@ -642,7 +637,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     error = ?err.reason,
                     "failed to initialize a session",
                 );
-                // Currently, we don't distinguish between individual error types
+                // Currently, we do not distinguish between individual error types
                 // and just discard the initiation attempt and pass on the error.
                 if let Some(tx_est) = self.session_initiations.remove(&err.challenge).await {
                     if let Err(e) = tx_est.unbounded_send(Err(err)) {
@@ -703,6 +698,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             // Closing the data sender on the session will cause the Session to terminate
             session_data.session_tx.close_channel();
             trace!(?session_id, "data tx channel closed on session");
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_ACTIVE_SESSIONS.decrement(1.0);
             Ok(true)
         } else {
             // Do not treat this as an error
