@@ -14,7 +14,7 @@ use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::debug;
+use tracing::{debug, info};
 use validator::Validate;
 
 use hopr_bindings::hopr_node_management_module::HoprNodeManagementModule;
@@ -790,7 +790,7 @@ mod tests {
         // Deploy contracts
         let (contract_instances, module, safe) = {
             let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
-            let instances = ContractInstances::deploy_for_testing_debug(client.clone(), &chain_key_0).await?;
+            let instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0).await?;
 
             // deploy MULTICALL contract to anvil
             deploy_multicall3_to_anvil(client.clone()).await?;
@@ -829,8 +829,7 @@ mod tests {
         let rpc = RpcOperations::new(client.clone(), &chain_key_0, cfg)?;
 
         // check the eligibility status (before registering in the NetworkRegistry contract)
-        let result_before_register_in_the_network_registry =
-            rpc.get_eligibility_status(node_address.clone().into()).await?;
+        let result_before_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).await?;
 
         assert!(
             !result_before_register_in_the_network_registry,
@@ -838,10 +837,20 @@ mod tests {
         );
 
         // register the node
+        match &rpc.contract_instances.network_registry_proxy {
+            NetworkRegistryProxy::Dummy(e) => {
+                let _ = e.owner_add_account(cfg.safe_address.into()).send().await?.await?;
+            }
+            NetworkRegistryProxy::Safe(e) => {}
+        };
+
         let _ = rpc
             .contract_instances
             .network_registry
-            .manager_register(vec![cfg.safe_address.into()], vec![node_address.clone()]);
+            .manager_register(vec![cfg.safe_address.into()], vec![node_address])
+            .send()
+            .await?
+            .await?;
 
         // check the eligibility status (after registering in the NetworkRegistry contract)
         let result_after_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).await?;
