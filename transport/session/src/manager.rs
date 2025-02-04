@@ -129,7 +129,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
             }
             .boxed()
         }
-        _ => futures::future::ready(()).boxed()
+        _ => futures::future::ready(()).boxed(),
     }
 }
 
