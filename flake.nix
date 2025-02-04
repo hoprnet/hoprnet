@@ -336,10 +336,14 @@
               ./ethereum/contracts/foundry.in.toml
               ./ethereum/contracts/remappings.txt
               ./ethereum/contracts/Makefile
+              ./scripts/protocol-config-anvil.json
               ./scripts/run-local-anvil.sh
               ./scripts/run-local-cluster.sh
               ./scripts/utils.sh
               ./sdk/python
+              ./sdk/identities
+              ./target/debug/hopli
+              ./target/debug/hoprd
               ./tests/requirements.txt
               ./Makefile
               (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
@@ -389,11 +393,21 @@
                 's|../../vendor/|/vendor/|g' \
                 /ethereum/contracts/remappings.txt
 
-              ${pkgs.foundry-bin}/bin/forge build
+              # unlink all linked files/directories, because forge does
+              # not work well with those
+              cp -R -L /ethereum/contracts /ethereum/contracts-unlinked
+              rm -rf /ethereum/contracts
+              mv /ethereum/contracts-unlinked /ethereum/contracts
+
+              # need to point to the contracts directory for forge to work
+              ${pkgs.foundry-bin}/bin/forge build --root /ethereum/contracts
+
+              export PATH="/target/debug/:$PATH"
 
               mkdir /tmp/
               mkdir /tmp/hopr-localcluster
               mkdir /tmp/hopr-localcluster/anvil
+
             '';
             config = {
               Cmd = [
