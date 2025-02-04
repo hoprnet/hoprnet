@@ -29,12 +29,14 @@ lazy_static::lazy_static! {
         SimpleCounter::new("hopr_strategy_auto_redeem_redeem_count", "Count of initiated automatic redemptions").unwrap();
 }
 
+#[inline]
 fn just_true() -> bool {
     true
 }
 
+#[inline]
 fn min_redeem_hopr() -> Balance {
-    Balance::new_from_str("90000000000000000", BalanceType::HOPR)
+    Balance::new_from_str("2500000000000000000", BalanceType::HOPR)
 }
 
 /// Configuration object for the `AutoRedeemingStrategy`
@@ -59,12 +61,11 @@ pub struct AutoRedeemingStrategyConfig {
 
     /// The strategy will only redeem an acknowledged winning ticket if it has at least this value of HOPR.
     /// If 0 is given, the strategy will redeem tickets regardless of their value.
-    /// This is not used for cases where `on_close_redeem_single_tickets_value_min` applies.
     ///
-    /// Default is 0.09 HOPR.
+    /// Default is 2.5 wxHOPR.
     #[serde(default = "min_redeem_hopr")]
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("90000000000000000", BalanceType::HOPR))]
+    #[default(min_redeem_hopr())]
     pub minimum_redeem_ticket_value: Balance,
 }
 

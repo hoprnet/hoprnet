@@ -79,6 +79,11 @@ fn just_true() -> bool {
 }
 
 #[inline]
+fn just_false() -> bool {
+    false
+}
+
+#[inline]
 fn sixty() -> u64 {
     60
 }
@@ -105,15 +110,15 @@ pub struct MultiStrategyConfig {
 
     /// Indicate whether the `MultiStrategy` can contain another `MultiStrategy`.
     ///
-    /// Default is true.
-    #[default = true]
-    #[serde(default = "just_true")]
+    /// Default is false.
+    #[default = false]
+    #[serde(default = "just_false")]
     pub allow_recursive: bool,
 
     /// Execution interval of the configured strategies in seconds.
     ///
     /// Default is 60, minimum is 1.
-    #[default = 60]
+    #[default(sixty())]
     #[serde(default = "sixty")]
     #[validate(range(min = 1))]
     pub execution_interval: u64,
