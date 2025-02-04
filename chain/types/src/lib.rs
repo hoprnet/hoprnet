@@ -230,6 +230,100 @@ impl<M: Middleware> ContractInstances<M> {
             module_implementation,
         })
     }
+
+    /// Deploys debugging environment for testing purpose (with safe network registry proxy) via the given provider.
+    pub async fn deploy_for_testing_debug(provider: Arc<M>, deployer: &ChainKeypair) -> Result<Self, ContractError<M>> {
+        {
+            // Fund 1820 deployer and deploy ERC1820Registry
+            let mut tx = Eip1559TransactionRequest::new();
+            tx = tx.to(H160::from_str(crate::utils::ERC_1820_DEPLOYER).expect("deployer address should be valid"));
+            tx = tx.value(crate::utils::ETH_VALUE_FOR_ERC1820_DEPLOYER);
+
+            provider
+                .send_transaction(tx, None)
+                .await
+                .map_err(|e| ContractError::MiddlewareError { e })?
+                .await?;
+
+            provider
+                .send_raw_transaction(Bytes::from_static(&*ERC_1820_REGISTRY_DEPLOY_CODE))
+                .await
+                .map_err(|e| ContractError::MiddlewareError { e })?
+                .await?;
+        }
+
+        // Get deployer address
+        let self_address: types::Address = deployer.public().to_address().into();
+
+        let stake_factory = HoprNodeStakeFactory::deploy(provider.clone(), ())?.send().await?;
+        let module_implementation = HoprNodeManagementModule::deploy(provider.clone(), ())?.send().await?;
+        let safe_registry = HoprNodeSafeRegistry::deploy(provider.clone(), ())?.send().await?;
+        let price_oracle = HoprTicketPriceOracle::deploy(
+            provider.clone(),
+            (self_address, ethers::types::U256::from(100000000000000000_u128)),
+        )?
+        .send()
+        .await?;
+        let win_prob_oracle = HoprWinningProbabilityOracle::deploy(
+            provider.clone(),
+            (self_address, ethers::types::U256::from(72057594037927935_u128)), // 0xFFFFFFFFFFFFFF
+        )?
+        .send()
+        .await?;
+        let token = HoprToken::deploy(provider.clone(), ())?.send().await?;
+        let network_registry_proxy = HoprSafeProxyForNetworkRegistry::deploy(
+            provider.clone(),
+            Token::Tuple(vec![
+                Token::Address(self_address),
+                Token::Address(self_address),
+                Token::Uint(0_u32.into()),
+                Token::Uint(0_u32.into()),
+                Token::Address(safe_registry.address()),
+                Token::Address(token.address()),
+            ]),
+        )?
+        .send()
+        .await?;
+        let channels = HoprChannels::deploy(
+            provider.clone(),
+            Token::Tuple(vec![
+                Token::Address(token.address()),
+                Token::Uint(1_u32.into()),
+                Token::Address(safe_registry.address()),
+            ]),
+        )?
+        .send()
+        .await?;
+        let announcements = HoprAnnouncements::deploy(provider.clone(), Token::Address(safe_registry.address()))?
+            .send()
+            .await?;
+        let network_registry = HoprNetworkRegistry::deploy(
+            provider.clone(),
+            (
+                ethers::types::Address::from(network_registry_proxy.address()),
+                self_address,
+                self_address,
+            ),
+        )?
+        .send()
+        .await?;
+
+        // Disable network registry in local environment
+        network_registry.disable_registry().send().await?.await?;
+
+        Ok(Self {
+            token,
+            channels,
+            announcements,
+            network_registry,
+            network_registry_proxy: NetworkRegistryProxy::Safe(network_registry_proxy),
+            safe_registry,
+            price_oracle,
+            win_prob_oracle,
+            stake_factory,
+            module_implementation,
+        })
+    }
 }
 
 impl<M: Middleware> From<&ContractInstances<M>> for ContractAddresses {
