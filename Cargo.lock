@@ -1644,7 +1644,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "core-network"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4228,7 +4228,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.11.1"
+version = "0.11.3"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4295,7 +4295,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "2.2.1"
+version = "2.2.2"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -4453,7 +4453,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4527,7 +4527,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4551,7 +4551,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4586,7 +4586,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "aquamarine",
