@@ -1237,7 +1237,7 @@ impl HoprDbTicketOperations for HoprDb {
     }
 
     async fn get_unrealized_balance(&self, channel_entry: &ChannelEntry) -> Result<Balance> {
-        self.ticket_manager.unrealized_value(channel_entry.into())
+        Ok(self.ticket_manager.unrealized_value(channel_entry.into()).await?)
     }
 }
 

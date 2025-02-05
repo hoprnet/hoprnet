@@ -38,6 +38,7 @@ use crate::errors::Result;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
 
+use crate::rel_auto_funding::RelativeAutoFundingStrategy;
 use hopr_db_sql::HoprDbAllOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {hopr_metrics::metrics::MultiGauge, strum::VariantNames};
@@ -205,6 +206,11 @@ impl MultiStrategy {
                     cfg: Default::default(),
                     strategies: Vec::new(),
                 })),
+                Strategy::RelativeAutoFunding(sub_cfg) => strategies.push(Box::new(RelativeAutoFundingStrategy::new(
+                    *sub_cfg,
+                    db.clone(),
+                    chain_actions.clone(),
+                ))),
             }
 
             #[cfg(all(feature = "prometheus", not(test)))]

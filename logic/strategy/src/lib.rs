@@ -57,8 +57,8 @@ pub mod auto_redeeming;
 mod channel_finalizer;
 pub mod errors;
 pub mod promiscuous;
-pub mod strategy;
 pub mod rel_auto_funding;
+pub mod strategy;
 
 /// Lists all possible strategies with their respective configurations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, VariantNames)]
