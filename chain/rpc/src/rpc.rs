@@ -110,6 +110,7 @@ impl<P: JsonRpcClient> Clone for RpcOperations<P> {
     }
 }
 
+#[cfg_attr(test, mockall::automock)]
 impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);
@@ -186,6 +187,19 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             },
         }
     }
+  
+    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance> {
+        match self
+            .contract_instances
+            .token
+            .allowance(owner.into(), spender.into())
+            .call()
+            .await
+        {
+            Ok(token_allowance) => Ok(Balance::new(token_allowance, BalanceType::HOPR)),
+            Err(e) => Err(ContractError(
+                "HoprToken".to_string(),
+                "allowance".to_string(),
 
     async fn get_minimum_network_winning_probability(&self) -> Result<f64> {
         match self.contract_instances.win_prob_oracle.current_win_prob().call().await {

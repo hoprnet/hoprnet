@@ -14,10 +14,12 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-async-std = [
+  "hopr-chain-rpc/runtime-async-std",
   "hopr-db-sql/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
 ]
 runtime-tokio = [
+  "hopr-chain-rpc/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
 ]
