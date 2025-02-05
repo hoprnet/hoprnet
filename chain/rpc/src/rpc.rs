@@ -14,11 +14,11 @@ use primitive_types::H160;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, info};
+use tracing::debug;
 use validator::Validate;
 
 use bindings::hopr_node_management_module::HoprNodeManagementModule;
-use chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
+use chain_types::{utils::DIV_BY_ZERO, ContractAddresses, ContractInstances, NetworkRegistryProxy};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_internal_types::prelude::{win_prob_to_f64, EncodedWinProb};
 use hopr_primitive_types::prelude::*;
@@ -272,8 +272,9 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
                     // The "division by zero" error is caused by the self-registration,
                     // which is forbidden to the public and thus returns false
                     // therefore the eligibility check should be ignored
-                    let err_str = e.to_string();
-                    if err_str.to_lowercase().contains("division or modulo by zero") {
+                    // In EVM it returns `Panic(0x12)` error
+                    // https://docs.soliditylang.org/en/v0.8.12/control-structures.html#panic-via-assert-and-error-via-require
+                    if e.to_string().contains(DIV_BY_ZERO) {
                         // let stake_threshold = result_token_vec[0].unwrap_or(Token::Uint(U256::zero()));
                         let stake_threshold = result_token_vec[0]
                             .clone()
@@ -294,11 +295,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
                             .into_address()
                             .unwrap_or(H160::zero());
 
-                        if stake_threshold.is_zero() && !registered_account.is_zero() {
-                            Ok(true)
-                        } else {
-                            Ok(false)
-                        }
+                        Ok(stake_threshold.is_zero() && !registered_account.is_zero())
                     } else {
                         // return a definite error
                         Err(RpcError::MulticallError(format!(
