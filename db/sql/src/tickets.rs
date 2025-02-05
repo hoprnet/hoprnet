@@ -45,7 +45,7 @@ lazy_static::lazy_static! {
 }
 
 /// The maximum number of tickets that can sent for aggregation in a single request.
-const MAX_TICKETS_TO_AGGREGATE_BATCH: u64 = 10_000;
+const MAX_TICKETS_TO_AGGREGATE_BATCH: u64 = 500;
 
 /// The type is necessary solely to allow
 /// implementing the [`IntoCondition`] trait for [`TicketSelector`]
