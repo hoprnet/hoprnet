@@ -216,13 +216,14 @@ where
             let first_log_block_number = log_block_numbers.first().copied().unwrap_or(0);
             let head = chain_head.load(Ordering::Relaxed);
             for block_number in log_block_numbers {
+                // Do not pollute the logs with the fast-sync progress
                 Self::process_block_by_id(&db, &logs_handler, block_number).await?;
-                let progress = (block_number - first_log_block_number) as f64 / (head - first_log_block_number) as f64;
-
-                // Do not pollute the logs with the fast-sync progress, because it is too fast
-
                 #[cfg(all(feature = "prometheus", not(test)))]
-                METRIC_INDEXER_SYNC_PROGRESS.set(progress);
+                {
+                    let progress =
+                        (block_number - first_log_block_number) as f64 / (head - first_log_block_number) as f64;
+                    METRIC_INDEXER_SYNC_PROGRESS.set(progress);
+                }
             }
         }
 
