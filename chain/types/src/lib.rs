@@ -148,6 +148,7 @@ impl<M: Middleware> ContractInstances<M> {
         }
     }
 
+    #[cfg(test)]
     /// Deploys testing environment (with dummy network registry proxy) via the given provider.
     pub async fn deploy_for_testing(provider: Arc<M>, deployer: &ChainKeypair) -> Result<Self, ContractError<M>> {
         {
@@ -232,6 +233,7 @@ impl<M: Middleware> ContractInstances<M> {
         })
     }
 
+    #[cfg(test)]
     /// Deploys debugging environment for testing purpose (with safe network registry proxy) via the given provider.
     pub async fn deploy_for_testing_debug(provider: Arc<M>, deployer: &ChainKeypair) -> Result<Self, ContractError<M>> {
         {
