@@ -47,6 +47,7 @@ use crate::auto_funding::AutoFundingStrategyConfig;
 use crate::auto_redeeming::AutoRedeemingStrategyConfig;
 use crate::channel_finalizer::ClosureFinalizerStrategyConfig;
 use crate::promiscuous::PromiscuousStrategyConfig;
+use crate::rel_auto_funding::RelativeAutoFundingStrategyConfig;
 use crate::strategy::MultiStrategyConfig;
 use crate::Strategy::{Aggregating, AutoRedeeming, ClosureFinalizer};
 
@@ -57,6 +58,7 @@ mod channel_finalizer;
 pub mod errors;
 pub mod promiscuous;
 pub mod strategy;
+pub mod rel_auto_funding;
 
 /// Lists all possible strategies with their respective configurations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, VariantNames)]
@@ -66,6 +68,7 @@ pub enum Strategy {
     Aggregating(AggregatingStrategyConfig),
     AutoRedeeming(AutoRedeemingStrategyConfig),
     AutoFunding(AutoFundingStrategyConfig),
+    RelativeAutoFunding(RelativeAutoFundingStrategyConfig),
     ClosureFinalizer(ClosureFinalizerStrategyConfig),
     Multi(MultiStrategyConfig),
     Passive,

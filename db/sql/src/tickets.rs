@@ -1235,6 +1235,10 @@ impl HoprDbTicketOperations for HoprDb {
             .build_signed(me, &domain_separator)
             .map_err(DbSqlError::from)?)
     }
+
+    async fn get_unrealized_balance(&self, channel_entry: &ChannelEntry) -> Result<Balance> {
+        self.ticket_manager.unrealized_value(channel_entry.into())
+    }
 }
 
 impl HoprDb {

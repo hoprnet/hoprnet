@@ -356,7 +356,7 @@ pub trait HoprDbTicketOperations {
     /// Prepare a viable collection of tickets to be aggregated.
     ///
     /// Some preconditions for tickets apply. This callback will collect the aggregatable
-    /// tickets and marks them as being aggregated.
+    /// tickets and mark them as being aggregated.
     async fn prepare_aggregation_in_channel(
         &self,
         channel: &Hash,
@@ -384,6 +384,9 @@ pub trait HoprDbTicketOperations {
         acked_tickets: Vec<TransferableWinningTicket>,
         me: &ChainKeypair,
     ) -> Result<VerifiedTicket>;
+
+    /// Gets unrealized balance for the given channel.
+    async fn get_unrealized_balance(&self, channel_entry: &ChannelEntry) -> Result<Balance>;
 }
 
 /// Can contain ticket statistics for a channel or aggregated ticket statistics for all channels.
