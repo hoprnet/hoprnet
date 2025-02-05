@@ -219,12 +219,7 @@ where
                 Self::process_block_by_id(&db, &logs_handler, block_number).await?;
                 let progress = (block_number - first_log_block_number) as f64 / (head - first_log_block_number) as f64;
 
-                info!(
-                    progress = progress * 100_f64,
-                    block = block_number,
-                    head,
-                    "Fast-sync progress to last known head"
-                );
+                // Do not pollute the logs with the fast-sync progress, because it is too fast
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_INDEXER_SYNC_PROGRESS.set(progress);
