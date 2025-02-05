@@ -179,7 +179,12 @@ impl MultiStrategy {
                 ))),
                 Strategy::AutoFunding(sub_cfg) => {
                     strategies.push(Box::new(AutoFundingStrategy::new(*sub_cfg, chain_actions.clone())))
-                }
+                },
+                Strategy::RelativeAutoFunding(sub_cfg) => strategies.push(Box::new(RelativeAutoFundingStrategy::new(
+                    *sub_cfg,
+                    db.clone(),
+                    chain_actions.clone(),
+                ))),
                 Strategy::ClosureFinalizer(sub_cfg) => strategies.push(Box::new(ClosureFinalizerStrategy::new(
                     *sub_cfg,
                     db.clone(),
@@ -206,11 +211,6 @@ impl MultiStrategy {
                     cfg: Default::default(),
                     strategies: Vec::new(),
                 })),
-                Strategy::RelativeAutoFunding(sub_cfg) => strategies.push(Box::new(RelativeAutoFundingStrategy::new(
-                    *sub_cfg,
-                    db.clone(),
-                    chain_actions.clone(),
-                ))),
             }
 
             #[cfg(all(feature = "prometheus", not(test)))]
