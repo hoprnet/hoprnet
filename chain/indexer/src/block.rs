@@ -170,32 +170,31 @@ where
             FromScratch,
             Continue,
         }
-        let mut will_perform_fast_sync = FastSyncMode::None;
 
-        match (fast_sync_configured, index_empty) {
+        let will_perform_fast_sync = match (fast_sync_configured, index_empty) {
             (true, false) => {
                 info!("Fast sync is enabled, but the index database is not empty. Fast sync will continue on existing unprocessed logs.");
-
-                will_perform_fast_sync = FastSyncMode::Continue;
+                FastSyncMode::Continue
             }
             (false, true) => {
                 info!("Fast sync is disabled, but the index database is empty. Doing a full re-sync.");
                 // Clean the last processed log from the Log DB, to allow full resync
                 self.db.clear_index_db(None).await?;
                 self.db.set_logs_unprocessed(None, None).await?;
+                FastSyncMode::None
             }
             (false, false) => {
-                info!("Fast sync is disabled and the index database is not empty. Continuing normal sync.")
+                info!("Fast sync is disabled and the index database is not empty. Continuing normal sync.");
+                FastSyncMode::None
             }
             (true, true) => {
                 info!("Fast sync is enabled, starting the fast sync process");
                 // To ensure a proper state, reset any auxiliary data in the database
                 self.db.clear_index_db(None).await?;
                 self.db.set_logs_unprocessed(None, None).await?;
-
-                will_perform_fast_sync = FastSyncMode::FromScratch;
+                FastSyncMode::FromScratch
             }
-        }
+        };
 
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
@@ -215,18 +214,20 @@ where
 
             let log_block_numbers = self.db.get_logs_block_numbers(None, None, processed).await?;
             let first_log_block_number = log_block_numbers.first().copied().unwrap_or(0);
+            let head = chain_head.load(Ordering::Relaxed);
             for block_number in log_block_numbers {
                 Self::process_block_by_id(&db, &logs_handler, block_number).await?;
-                Self::calculate_sync_process(
-                    "fast-sync",
-                    block_number,
-                    &rpc,
-                    chain_head.clone(),
-                    is_synced.clone(),
-                    first_log_block_number,
-                    None,
-                )
-                .await;
+                let progress = (block_number - first_log_block_number) as f64 / (head - first_log_block_number) as f64;
+
+                info!(
+                    progress = progress * 100_f64,
+                    block = block_number,
+                    head,
+                    "Fast-sync progress to last known head"
+                );
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_INDEXER_SYNC_PROGRESS.set(progress);
             }
         }
 
@@ -267,13 +268,12 @@ where
                 .expect("block stream should be constructible")
                 .then(|block| {
                     Self::calculate_sync_process(
-                        "rpc",
                         block.block_id,
                         &rpc,
                         chain_head.clone(),
                         is_synced.clone(),
                         next_block_to_process,
-                        tx.clone().into(),
+                        tx.clone(),
                     )
                     .map(|_| block)
                 })
@@ -510,13 +510,12 @@ where
     ///
     /// The block which was provided as input.
     async fn calculate_sync_process(
-        prefix: &str,
         current_block: u64,
         rpc: &T,
         chain_head: Arc<AtomicU64>,
         is_synced: Arc<AtomicBool>,
         start_block: u64,
-        mut tx: Option<futures::channel::mpsc::Sender<()>>,
+        mut tx: futures::channel::mpsc::Sender<()>,
     ) where
         T: HoprIndexerRpcOperations + 'static,
     {
@@ -547,7 +546,6 @@ where
             };
 
             info!(
-                indexer = prefix,
                 progress = progress * 100_f64,
                 block = current_block,
                 head,
@@ -558,12 +556,10 @@ where
             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
             if current_block >= head {
-                info!(prefix, "indexer sync completed successfully");
+                info!("indexer sync completed successfully");
                 is_synced.store(true, Ordering::Relaxed);
-                if let Some(mut tx) = tx.take() {
-                    if let Err(e) = tx.try_send(()) {
-                        error!(prefix, error = %e, "failed to notify about achieving indexer synchronization")
-                    }
+                if let Err(e) = tx.try_send(()) {
+                    error!(error = %e, "failed to notify about achieving indexer synchronization")
                 }
             }
         }
