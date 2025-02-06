@@ -30,12 +30,19 @@ impl HoprServerIpForwardingReactor {
     }
 
     fn all_ips_allowed(&self, addrs: &[SocketAddr]) -> bool {
-        addrs.iter().all(|addr| {
-            self.cfg
+        for addr in addrs {
+            if !self
+                .cfg
                 .target_allow_list
                 .as_ref()
-                .map_or(true, |list| list.contains(addr))
-        })
+                .map_or(true, |allowlist| allowlist.contains(addr))
+            {
+                tracing::error!(%addr, "address not allowed by the target allow list, denying the target");
+                return false;
+            }
+            tracing::debug!(%addr, "address allowed by the target allow list, accepting the target");
+        }
+        true
     }
 }
 
