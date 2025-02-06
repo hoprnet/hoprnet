@@ -33,6 +33,9 @@ lazy_static::lazy_static! {
     static ref SAFE_DIAMOND_PROXY_SINGLETON_DEPLOY_CODE: [u8; 169] = hex!("f8a78085174876e800830186a08080b853604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf382f4f5a00dc4d1d21b308094a30f5f93da35e4d72e99115378f135f2295bea47301a3165a0636b822daad40aa8c52dd5132f378c0c0e6d83b4898228c7e21c84e631a0b891");
 }
 
+/// `Panic(0x12)` division by zero https://docs.soliditylang.org/en/v0.8.12/control-structures.html#panic-via-assert-and-error-via-require
+pub const DIV_BY_ZERO: &str = "4e487b710000000000000000000000000000000000000000000000000000000000000012";
+
 /// ERC1820 deployer wallet
 pub const ERC_1820_DEPLOYER: &str = "a990077c3205cbDf861e17Fa532eeB069cE9fF96";
 
