@@ -4,7 +4,7 @@ use std::time::Duration;
 pub struct MixerConfig {
     #[default(Duration::from_millis(0u64))]
     min_delay: Duration,
-    #[default(Duration::from_millis(200u64))]
+    #[default(Duration::from_millis(1u64))]
     max_delay: Duration,
     #[default = 10]
     pub metric_delay_window: u64,
