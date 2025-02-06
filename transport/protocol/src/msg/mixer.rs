@@ -28,6 +28,11 @@ impl MixerConfig {
         }
     }
 
+    /// Returns the minimum and maximum delay.
+    pub fn delay_range(&self) -> (u64, u64) {
+        (self.min_delay.as_millis() as u64, self.max_delay.as_millis() as u64)
+    }
+
     /// Get a random delay duration from the specified minimum and maximum delay available
     /// inside the configuration.
     pub fn random_delay(&self) -> Duration {
