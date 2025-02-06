@@ -832,7 +832,7 @@ mod tests {
             NetworkRegistryProxy::Dummy(e) => {
                 let _ = e.owner_add_account(cfg.safe_address.into()).send().await?.await?;
             }
-            NetworkRegistryProxy::Safe(e) => {}
+            NetworkRegistryProxy::Safe(_) => {}
         };
 
         let _ = rpc
