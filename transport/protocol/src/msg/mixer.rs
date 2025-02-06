@@ -28,7 +28,7 @@ impl MixerConfig {
         }
     }
 
-    /// Returns the minimum and maximum delay.
+    /// Returns the minimum and maximum delay in milliseconds.
     pub fn delay_range(&self) -> (u64, u64) {
         (self.min_delay.as_millis() as u64, self.max_delay.as_millis() as u64)
     }
