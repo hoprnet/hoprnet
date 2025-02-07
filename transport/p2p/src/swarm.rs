@@ -343,34 +343,34 @@ where
                             libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
                                 peer,
                                 message,
-                                ..
+                                connection_id
                             } => match message {
                                 libp2p::request_response::Message::<Box<[u8]>, ()>::Request {
                                     request_id, request, channel
                                 } => {
-                                    trace!(%peer, %request_id, "Received a message");
+                                    trace!(%peer, %request_id, %connection_id, "Received a message");
 
                                     if let Err(_e) = self.msg_received.send((peer, request)).await {
-                                        error!(%peer, %request_id, transport="libp2p", protocol="/hopr/msg/0.1.0", error = "Failed to enqueue a received message", "Failed to process incoming message");
+                                        error!(%peer, %request_id, %connection_id, transport="libp2p", protocol="/hopr/msg/0.1.0", error = "Failed to enqueue a received message", "Failed to process incoming message");
                                     };
 
                                     if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
-                                        error!(%peer, %request_id, transport="libp2p", protocol="/hopr/msg/0.1.0", "Failed to confirm receiving a message, likely a timeout");
+                                        error!(%peer, %request_id, %connection_id, transport="libp2p", protocol="/hopr/msg/0.1.0", "Failed to confirm receiving a message, likely a timeout");
                                     };
                                 },
                                 libp2p::request_response::Message::<Box<[u8]>, ()>::Response {
                                     request_id, ..
                                 } => {
-                                    trace!(%peer, %request_id, "Message reception confirmed");
+                                    trace!(%peer, %request_id, %connection_id, "Message reception confirmed");
                                 }
                             }
                             libp2p::request_response::Event::<Box<[u8]>, ()>::OutboundFailure {
-                                peer, error, ..
+                                peer, error, connection_id, ..
                             } => {
-                                error!(%peer, %error,  "Failed to send a message");
+                                error!(%peer, %error, %connection_id, "Failed to send a message");
                             },
-                            libp2p::request_response::Event::<Box<[u8]>, ()>::InboundFailure {peer, request_id, error, ..} => {
-                                warn!(%peer, %request_id, error = %error, "Failed to receive a message");
+                            libp2p::request_response::Event::<Box<[u8]>, ()>::InboundFailure {peer, request_id, error, connection_id} => {
+                                warn!(%peer, %request_id, %connection_id, error = %error, "Failed to receive a message");
                             }
                             libp2p::request_response::Event::<Box<[u8]>, ()>::ResponseSent {..} => {
                                 // trace!("Discarded messages not relevant for the protocol!");
@@ -383,19 +383,19 @@ where
                             libp2p::request_response::Event::<Acknowledgement,()>::Message {
                                 peer,
                                 message,
-                                ..
+                                connection_id
                             } => match message {
                                 libp2p::request_response::Message::<Acknowledgement,()>::Request {
                                     request_id, request, channel
                                 } => {
-                                    trace!(%peer, %request_id, "Received an acknowledgment");
+                                    trace!(%peer, %request_id, %connection_id, "Received an acknowledgment");
 
                                     if let Err(_e) = self.ack_received.send((peer, request)).await {
-                                        error!(%peer, %request_id, transport="libp2p", protocol="/hopr/ack/0.1.0", error = "Failed to enqueue a received ack", "Failed to process incoming ack");
+                                        error!(%peer, %request_id, %connection_id, transport="libp2p", protocol="/hopr/ack/0.1.0", error = "Failed to enqueue a received ack", "Failed to process incoming ack");
                                     }
 
                                     if swarm.behaviour_mut().ack.send_response(channel, ()).is_err() {
-                                        error!(%peer, %request_id, transport="libp2p", protocol="/hopr/ack/0.1.0", "Failed to confirm receiving an acknowledgement, likely a timeout");
+                                        error!(%peer, %request_id, %connection_id, transport="libp2p", protocol="/hopr/ack/0.1.0", "Failed to confirm receiving an acknowledgement, likely a timeout");
                                     };
                                 },
                                 libp2p::request_response::Message::<Acknowledgement,()>::Response {
@@ -405,12 +405,12 @@ where
                                 }
                             },
                             libp2p::request_response::Event::<Acknowledgement,()>::OutboundFailure {
-                                peer, error, request_id, ..
+                                peer, error, request_id, connection_id
                             } => {
-                                error!(%peer, %request_id, %error, "Failed to send an acknowledgement");
+                                error!(%peer, %request_id, %connection_id, %error, "Failed to send an acknowledgement");
                             },
-                            libp2p::request_response::Event::<Acknowledgement,()>::InboundFailure {peer, request_id, error, ..} => {
-                                warn!(%peer, %request_id, %error, "Failed to receive an acknowledgement");
+                            libp2p::request_response::Event::<Acknowledgement,()>::InboundFailure {peer, request_id, error, connection_id} => {
+                                warn!(%peer, %request_id, %connection_id, %error, "Failed to receive an acknowledgement");
                             }
                             libp2p::request_response::Event::<Acknowledgement,()>::ResponseSent {..} => {
                                 // trace!("Discarded messages not relevant for the protocol!");
@@ -423,37 +423,37 @@ where
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::Message {
                                 peer,
                                 message,
-                                ..
+                                connection_id
                             } => {
                                 match message {
                                     libp2p::request_response::Message::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::Request {
                                         request_id, request, channel
                                     } => {
-                                        trace!(%peer, %request_id, "Received a ticket aggregation request");
+                                        trace!(%peer, %request_id, %connection_id, "Received a ticket aggregation request");
 
                                         let request = request.into_iter().map(TransferableWinningTicket::from).collect::<Vec<_>>();
                                         if let Err(e) = aggregation_writer.receive_aggregation_request(peer, request, channel) {
-                                            error!(%peer, %request_id, error = %e, "Failed to process a ticket aggregation request");
+                                            error!(%peer, %request_id, %connection_id, error = %e, "Failed to process a ticket aggregation request");
                                         }
                                     },
                                     libp2p::request_response::Message::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket, String>>::Response {
                                         request_id, response
                                     } => {
                                         if let Err(e) = aggregation_writer.receive_ticket(peer, response.map(|t| t.0), request_id) {
-                                            error!(%peer, %request_id,error = %e,  "Failed to receive aggregated ticket");
+                                            error!(%peer, %request_id, %connection_id, error = %e,  "Failed to receive aggregated ticket");
                                         }
                                     }
                                 }
                             },
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::OutboundFailure {
-                                peer, request_id, error, ..
+                                peer, request_id, error, connection_id
                             } => {
-                                error!(%peer, %request_id, %error, "Failed to send an aggregation request");
+                                error!(%peer, %request_id, %connection_id, %error, "Failed to send an aggregation request");
                             },
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::InboundFailure {
-                                peer, request_id, error, ..
+                                peer, request_id, error, connection_id
                             } => {
-                                warn!(%peer, %request_id, %error, "Failed to receive an aggregated ticket");
+                                warn!(%peer, %request_id, %connection_id, %error, "Failed to receive an aggregated ticket");
                             },
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::ResponseSent {..} => {
                                 // trace!("Discarded messages not relevant for the protocol!");
@@ -466,18 +466,18 @@ where
                             libp2p::request_response::Event::<Ping,Pong>::Message {
                                 peer,
                                 message,
-                                ..
+                                connection_id
                             } => {
                                 match message {
                                     libp2p::request_response::Message::<Ping,Pong>::Request {
                                         request_id, request, channel
                                     } => {
-                                        trace!(%peer, %request_id, "Received a heartbeat Ping");
+                                        trace!(%peer, %request_id, %connection_id, "Received a heartbeat Ping");
 
                                         if let Ok(challenge_response) = ControlMessage::generate_pong_response(&request.0)
                                         {
                                             if swarm.behaviour_mut().heartbeat.send_response(channel, Pong(challenge_response, version.clone())).is_err() {
-                                                error!(%peer, %request_id, "Failed to reply to a Ping request");
+                                                error!(%peer, %request_id, %connection_id, "Failed to reply to a Ping request");
                                             };
                                         }
                                     },
@@ -495,19 +495,19 @@ where
                                 }
                             },
                             libp2p::request_response::Event::<Ping,Pong>::OutboundFailure {
-                                peer, request_id, error, ..
+                                peer, request_id, error, connection_id
                             } => {
                                 active_pings.invalidate(&request_id).await;
                                 if matches!(error, libp2p::request_response::OutboundFailure::DialFailure) {
-                                    trace!(%peer, %request_id, %error, "Peer is offline");
+                                    trace!(%peer, %request_id, %connection_id, %error, "Peer is offline");
                                 } else {
-                                    error!(%peer, %request_id, %error, "Failed heartbeat protocol on outbound");
+                                    error!(%peer, %request_id, %connection_id, %error, "Failed heartbeat protocol on outbound");
                                 }
                             },
                             libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
-                                peer, request_id, error, ..
+                                peer, request_id, error, connection_id
                             } => {
-                                warn!(%peer, %request_id, "Failed to receive a Pong request: {error}");
+                                warn!(%peer, %request_id, %connection_id, "Failed to receive a Pong request: {error}");
                             },
                             libp2p::request_response::Event::<Ping,Pong>::ResponseSent {..} => {
                                 // trace!("Discarded messages not relevant for the protocol!");
@@ -574,13 +574,13 @@ where
                     SwarmEvent::ConnectionEstablished {
                         peer_id,
                         connection_id,
+                        num_established,
+                        established_in,
                         ..
-                        // endpoint,
-                        // num_established,
                         // concurrent_dial_errors,
-                        // established_in,
+                        // endpoint,
                     } => {
-                        debug!(%peer_id, connection_id = %connection_id, transport="libp2p", "connection established");
+                        debug!(%peer_id, %connection_id, num_established, established_in_ms = established_in.as_millis(), transport="libp2p", "connection established");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
@@ -591,11 +591,11 @@ where
                         peer_id,
                         connection_id,
                         cause,
+                        num_established,
                         ..
                         // endpoint,
-                        // num_established,
                     } => {
-                        debug!(%peer_id, connection_id = %connection_id, transport="libp2p", "connection closed: {cause:?}");
+                        debug!(%peer_id, %connection_id, num_established, transport="libp2p", "connection closed: {cause:?}");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
@@ -607,7 +607,7 @@ where
                         local_addr,
                         send_back_addr,
                     } => {
-                        trace!(local_addr = %local_addr, send_back_addr = %send_back_addr, connection_id = %connection_id, transport="libp2p",  "incoming connection");
+                        trace!(%local_addr, %send_back_addr, %connection_id, transport="libp2p",  "incoming connection");
                     }
                     SwarmEvent::IncomingConnectionError {
                         local_addr,
@@ -615,39 +615,39 @@ where
                         error,
                         send_back_addr,
                     } => {
-                        error!(local_addr = %local_addr, send_back_addr = %send_back_addr, connection_id = %connection_id, transport="libp2p", %error, "incoming connection error")
+                        error!(%local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error")
                     }
                     SwarmEvent::OutgoingConnectionError {
                         connection_id,
                         error,
                         peer_id
                     } => {
-                        error!(peer = ?peer_id, connection_id = %connection_id, transport="libp2p", %error, "outgoing connection error")
+                        error!(peer = ?peer_id, %connection_id, transport="libp2p", %error, "outgoing connection error")
                     }
                     SwarmEvent::NewListenAddr {
                         listener_id,
                         address,
                     } => {
-                        debug!(listener_id = %listener_id, address = %address, transport="libp2p", "new listen address")
+                        debug!(%listener_id, %address, transport="libp2p", "new listen address")
                     }
                     SwarmEvent::ExpiredListenAddr {
                         listener_id,
                         address,
                     } => {
-                        debug!(listener_id = %listener_id, address = %address, transport="libp2p", "expired listen address")
+                        debug!(%listener_id, %address, transport="libp2p", "expired listen address")
                     }
                     SwarmEvent::ListenerClosed {
                         listener_id,
                         addresses,
                         reason,
                     } => {
-                        debug!(listener_id = %listener_id, addresses = tracing::field::debug(addresses), transport="libp2p", "listener closed: {reason:?}", )
+                        debug!(%listener_id, addresses = tracing::field::debug(addresses), ?reason, transport="libp2p", "listener closed", )
                     }
                     SwarmEvent::ListenerError {
                         listener_id,
                         error,
                     } => {
-                        debug!(listener_id = %listener_id, transport="libp2p", "listener error: {error}")
+                        debug!(%listener_id, transport="libp2p", %error, "listener error")
                     }
                     SwarmEvent::Dialing {
                         peer_id,
