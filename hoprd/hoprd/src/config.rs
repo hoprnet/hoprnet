@@ -378,20 +378,33 @@ fn default_max_tcp_target_retries() -> u32 {
     10
 }
 
+fn just_true() -> bool {
+    true
+}
+
 /// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`]) and the Entry node.
 #[serde_as]
 #[derive(
     Clone, Debug, Eq, PartialEq, smart_default::SmartDefault, serde::Deserialize, serde::Serialize, validator::Validate,
 )]
 pub struct SessionIpForwardingConfig {
-    /// If specified, enforces only the given target addresses (after DNS resolution).
-    /// If `None` is specified, allows all targets.
+    /// Controls whether allowlisting should be done via `target_allow_list`.
+    /// If set to `false`, the node will act as an Exit node for any target.
     ///
-    /// Defaults to `None`.
+    /// Defaults to `true`.
+    #[serde(default = "just_true")]
+    #[default(true)]
+    pub use_target_allow_list: bool,
+
+    /// Enforces only the given target addresses (after DNS resolution).
+    ///
+    /// This is used only if `use_target_allow_list` is set to `true`.
+    /// If left empty (and `use_target_allow_list` is `true`), the node will not act as an Exit node.
+    ///
+    /// Defaults to empty.
     #[serde(default)]
-    #[default(None)]
-    #[serde_as(as = "Option<HashSet<serde_with::DisplayFromStr>>")]
-    pub target_allow_list: Option<HashSet<SocketAddr>>,
+    #[serde_as(as = "HashSet<serde_with::DisplayFromStr>")]
+    pub target_allow_list: HashSet<SocketAddr>,
 
     /// Delay between retries in seconds to reach a TCP target.
     ///
