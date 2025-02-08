@@ -981,6 +981,7 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::prelude::LOWEST_POSSIBLE_WINNING_PROB;
     use crate::tickets::AcknowledgedTicket;
     use hex_literal::hex;
     use hopr_crypto_types::{
@@ -1031,6 +1032,15 @@ pub mod tests {
         assert_eq!(test_bit_string, super::f64_to_win_prob(0.125f64)?);
 
         Ok(())
+    }
+
+    #[test]
+    pub fn test_win_prob_approx_eq() {
+        let wp_0 = win_prob_to_f64(&hex!("0020C49BBFFFFF"));
+        let wp_1 = win_prob_to_f64(&hex!("0020C49BA5E34F"));
+
+        assert_ne!(wp_0, wp_1);
+        assert!(f64_approx_eq(wp_0, wp_1, LOWEST_POSSIBLE_WINNING_PROB));
     }
 
     #[test]

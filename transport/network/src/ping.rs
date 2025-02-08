@@ -73,14 +73,14 @@ pub type PingQueryResult = Result<(std::time::Duration, String)>;
 
 /// Helper object allowing to send a ping query as a wrapped channel combination
 /// that can be filled up on the transport part and awaited locally by the `Pinger`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PingQueryReplier {
-    notifier: futures::channel::oneshot::Sender<PingQueryResult>,
+    notifier: UnboundedSender<PingQueryResult>,
     challenge: Box<(u64, ControlMessage)>,
 }
 
 impl PingQueryReplier {
-    pub fn new(notifier: futures::channel::oneshot::Sender<PingQueryResult>) -> Self {
+    pub fn new(notifier: UnboundedSender<PingQueryResult>) -> Self {
         Self {
             notifier,
             challenge: Box::new((
@@ -110,8 +110,8 @@ impl PingQueryReplier {
             Err(NetworkingError::DecodingError)
         };
 
-        if self.notifier.send(timed_result).is_err() {
-            debug!("Failed to notify the ping query result due to upper layer ping timeout");
+        if self.notifier.unbounded_send(timed_result).is_err() {
+            warn!("Failed to notify the ping query result due to upper layer ping timeout");
         }
     }
 }
@@ -123,7 +123,7 @@ pub fn to_active_ping(
     sender: HeartbeatSendPingTx,
     timeout: std::time::Duration,
 ) -> impl std::future::Future<Output = (PeerId, Result<std::time::Duration>, String)> {
-    let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
+    let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
     let replier = PingQueryReplier::new(tx);
 
     if let Err(e) = sender.unbounded_send((peer, replier)) {
@@ -131,12 +131,12 @@ pub fn to_active_ping(
     }
 
     async move {
-        match timeout_fut(timeout, rx).await {
-            Ok(Ok(Ok((latency, version)))) => {
+        match timeout_fut(timeout, rx.next()).await {
+            Ok(Some(Ok((latency, version)))) => {
                 debug!(latency = latency.as_millis(), %peer, %version, "Ping succeeded",);
                 (peer, Ok(latency), version)
             }
-            Ok(Ok(Err(e))) => {
+            Ok(Some(Err(e))) => {
                 let error = if let NetworkingError::DecodingError = e {
                     NetworkingError::PingerError(peer, "incorrect pong response".into())
                 } else {
@@ -146,7 +146,7 @@ pub fn to_active_ping(
                 debug!(%peer, %error, "Ping failed internally",);
                 (peer, Err(error), "unknown".into())
             }
-            Ok(Err(_)) => {
+            Ok(None) => {
                 debug!(%peer, "Ping canceled");
                 (
                     peer,
@@ -275,7 +275,7 @@ mod tests {
     #[async_std::test]
     async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge(
     ) -> anyhow::Result<()> {
-        let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
         let challenge = replier.challenge.clone();
@@ -285,7 +285,7 @@ mod tests {
             "version".to_owned(),
         );
 
-        assert!(rx.await?.is_ok());
+        assert!(rx.next().await.is_some_and(|r| r.is_ok()));
 
         Ok(())
     }
@@ -293,7 +293,7 @@ mod tests {
     #[async_std::test]
     async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge(
     ) -> anyhow::Result<()> {
-        let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
 
@@ -302,14 +302,14 @@ mod tests {
             "version".to_owned(),
         );
 
-        assert!(rx.await?.is_err());
+        assert!(rx.next().await.is_some_and(|r| r.is_err()));
 
         Ok(())
     }
 
     #[async_std::test]
     async fn ping_query_replier_should_return_the_unidirectional_latency() -> anyhow::Result<()> {
-        let (tx, rx) = futures::channel::oneshot::channel::<PingQueryResult>();
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
         let challenge = replier.challenge.clone();
@@ -323,7 +323,9 @@ mod tests {
         );
 
         let actual_latency = rx
-            .await?
+            .next()
+            .await
+            .ok_or_else(|| anyhow::anyhow!("should contain a result value"))?
             .map_err(|_e| anyhow::anyhow!("should contain a result value"))?
             .0;
         assert!(actual_latency > delay / 2);
