@@ -70,7 +70,7 @@ use crate::{
 
 use crate::helpers::PathPlanner;
 
-use core_path::selectors::dfs::DfsPathSelectorConfig;
+use core_path::selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::types::transfer_session;
 pub use {
@@ -193,6 +193,8 @@ pub struct HoprTransportConfig {
     pub session: config::SessionGlobalConfig,
 }
 
+type CurrentPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
+
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport, as well as off-chain ticket manipulation.
 pub struct HoprTransport<T>
@@ -207,11 +209,11 @@ where
     ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
     process_packet_send: Arc<OnceLock<MsgSender>>,
-    path_planner: PathPlanner<T>,
+    path_planner: PathPlanner<T, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    smgr: SessionManager<helpers::MessageSender<T>>,
+    smgr: SessionManager<helpers::MessageSender<T, CurrentPathSelector>>,
 }
 
 // Needs lazy-static, since Duration multiplication by a constant is yet not a const-operation.
@@ -249,11 +251,15 @@ where
             process_packet_send,
             path_planner: PathPlanner::new(
                 db.clone(),
-                DfsPathSelectorConfig {
-                    quality_threshold: cfg.network.quality_auto_path_threshold,
-                    ..Default::default()
-                },
+                CurrentPathSelector::new(
+                    channel_graph.clone(),
+                    DfsPathSelectorConfig {
+                        quality_threshold: cfg.network.quality_auto_path_threshold,
+                        ..Default::default()
+                    },
+                ),
                 channel_graph.clone(),
+                me_onchain.public().to_address(),
             ),
             db,
             my_multiaddresses,

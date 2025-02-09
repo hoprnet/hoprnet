@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use hopr_crypto_random::random_float;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -117,16 +118,22 @@ pub struct DfsPathSelectorConfig {
 }
 
 /// Path selector using depth-first search of the channel graph.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct DfsPathSelector<CW> {
+    graph: std::sync::Arc<async_lock::RwLock<ChannelGraph>>,
     cfg: DfsPathSelectorConfig,
     _cw: PhantomData<CW>,
 }
 
 impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
-    /// Creates new path selector with the given [config](DfsPathSelectorConfig).
-    pub fn new(cfg: DfsPathSelectorConfig) -> Self {
-        Self { cfg, _cw: PhantomData }
+    /// Creates a new path selector with the given [config](DfsPathSelectorConfig) and
+    /// [`ChannelGraph`].
+    pub fn new(graph: std::sync::Arc<async_lock::RwLock<ChannelGraph>>, cfg: DfsPathSelectorConfig) -> Self {
+        Self {
+            graph,
+            cfg,
+            _cw: PhantomData,
+        }
     }
 
     /// Determines whether a `next_hop` node is considered "interesting".
@@ -196,9 +203,10 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
     }
 }
 
-impl<CW> PathSelector<CW> for DfsPathSelector<CW>
+#[async_trait]
+impl<CW> PathSelector for DfsPathSelector<CW>
 where
-    CW: EdgeWeighting<U256>,
+    CW: EdgeWeighting<U256> + Send + Sync,
 {
     /// Attempts to find a path with at least `min_hops` hops and at most `max_hops` hops
     /// that goes from `source` to `destination`. There does not need to be
@@ -207,9 +215,8 @@ where
     /// The function implements a randomized best-first search through the path space. The graph
     /// traversal is bounded by `self.max_iterations` to prevent from long-running path
     /// selection runs.
-    fn select_path(
+    async fn select_path(
         &self,
-        graph: &ChannelGraph,
         source: Address,
         destination: Address,
         min_hops: usize,
@@ -220,6 +227,8 @@ where
         if !(1..=INTERMEDIATE_HOPS).contains(&max_hops) || !(1..=max_hops).contains(&min_hops) {
             return Err(GeneralError::InvalidInput.into());
         }
+
+        let graph = self.graph.read().await;
 
         // Populate the queue with possible initial path offsprings
         let mut queue = graph
@@ -297,11 +306,13 @@ pub type DefaultPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 mod tests {
     use super::*;
 
+    use crate::path::Path;
+    use async_lock::RwLock;
     use core::panic;
     use regex::Regex;
+    use std::ops::Deref;
     use std::str::FromStr;
-
-    use crate::path::Path;
+    use std::sync::Arc;
 
     lazy_static::lazy_static! {
         static ref ADDRESSES: [Address; 6] = [
@@ -440,147 +451,179 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_should_not_find_path_if_isolated() {
-        let isolated = define_graph("", ADDRESSES[0], |_| 1.0, |_, _| 0.0);
+    #[async_std::test]
+    async fn test_should_not_find_path_if_isolated() {
+        let graph = Arc::new(RwLock::new(define_graph("", ADDRESSES[0], |_| 1.0, |_, _| 0.0)));
 
-        let selector = DfsPathSelector::<TestWeights>::default();
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 2)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 2)
+            .await
             .expect_err("should not find a path");
     }
 
-    #[test]
-    fn test_should_not_find_zero_weight_path() {
-        let isolated = define_graph("0 [0] -> 1", ADDRESSES[0], |_| 1.0, |_, _| 0.0);
+    #[async_std::test]
+    async fn test_should_not_find_zero_weight_path() {
+        let graph = Arc::new(RwLock::new(define_graph(
+            "0 [0] -> 1",
+            ADDRESSES[0],
+            |_| 1.0,
+            |_, _| 0.0,
+        )));
 
-        let selector = DfsPathSelector::<TestWeights>::default();
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .await
             .expect_err("should not find a path");
     }
 
-    #[test]
-    fn test_should_not_find_one_hop_path_when_unrelated_channels_are_in_the_graph() {
-        let isolated = define_graph("1 [1] -> 2", ADDRESSES[0], |_| 1.0, |_, _| 0.0);
+    #[async_std::test]
+    async fn test_should_not_find_one_hop_path_when_unrelated_channels_are_in_the_graph() {
+        let graph = Arc::new(RwLock::new(define_graph(
+            "1 [1] -> 2",
+            ADDRESSES[0],
+            |_| 1.0,
+            |_, _| 0.0,
+        )));
 
-        let selector = DfsPathSelector::<TestWeights>::default();
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .await
             .expect_err("should not find a path");
     }
 
-    #[test]
-    fn test_should_not_find_one_hop_path_in_empty_graph() {
-        let isolated = define_graph("", ADDRESSES[0], |_| 1.0, |_, _| 0.0);
+    #[async_std::test]
+    async fn test_should_not_find_one_hop_path_in_empty_graph() {
+        let graph = Arc::new(RwLock::new(define_graph("", ADDRESSES[0], |_| 1.0, |_, _| 0.0)));
 
-        let selector = DfsPathSelector::<TestWeights>::default();
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .await
             .expect_err("should not find a path");
     }
 
-    #[test]
-    fn test_should_not_find_path_with_unreliable_node() {
-        let isolated = define_graph("0 [1] -> 1", ADDRESSES[0], |_| 0_f64, |_, _| 0.0);
+    #[async_std::test]
+    async fn test_should_not_find_path_with_unreliable_node() {
+        let graph = Arc::new(RwLock::new(define_graph(
+            "0 [1] -> 1",
+            ADDRESSES[0],
+            |_| 0_f64,
+            |_, _| 0.0,
+        )));
 
-        let selector = DfsPathSelector::<TestWeights>::default();
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 1, 1)
+            .await
             .expect_err("should not find a path");
     }
 
-    #[test]
-    fn test_should_not_find_loopback_path() {
-        let isolated = define_graph("0 [1] <-> [1] 1", ADDRESSES[0], |_| 1_f64, |_, _| 0.0);
+    #[async_std::test]
+    async fn test_should_not_find_loopback_path() {
+        let graph = Arc::new(RwLock::new(define_graph(
+            "0 [1] <-> [1] 1",
+            ADDRESSES[0],
+            |_| 1_f64,
+            |_, _| 0.0,
+        )));
 
-        let selector = DfsPathSelector::<TestWeights>::default();
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(&isolated, ADDRESSES[0], ADDRESSES[5], 2, 2)
+            .select_path(ADDRESSES[0], ADDRESSES[5], 2, 2)
+            .await
             .expect_err("should not find a path");
     }
 
-    #[test]
-    fn test_should_not_include_destination_in_path() {
-        let isolated = define_graph("0 [1] -> 1", ADDRESSES[0], |_| 1_f64, |_, _| 0.0);
+    #[async_std::test]
+    async fn test_should_not_include_destination_in_path() {
+        let graph = Arc::new(RwLock::new(define_graph(
+            "0 [1] -> 1",
+            ADDRESSES[0],
+            |_| 1_f64,
+            |_, _| 0.0,
+        )));
 
-        let selector = DfsPathSelector::<TestWeights>::default();
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         selector
-            .select_path(&isolated, ADDRESSES[0], ADDRESSES[1], 1, 1)
+            .select_path(ADDRESSES[0], ADDRESSES[1], 1, 1)
+            .await
             .expect_err("should not find a path");
     }
 
-    #[test]
-    fn test_should_find_path_in_reliable_star() -> anyhow::Result<()> {
-        let star = define_graph(
+    #[async_std::test]
+    async fn test_should_find_path_in_reliable_star() -> anyhow::Result<()> {
+        let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] <-> [2] 1, 0 [1] <-> [3] 2, 0 [1] <-> [4] 3, 0 [1] <-> [5] 4",
             ADDRESSES[1],
             |_| 1_f64,
             |_, _| 0.0,
-        );
+        )));
 
-        let selector = DfsPathSelector::<TestWeights>::default();
-        let path = selector.select_path(&star, ADDRESSES[1], ADDRESSES[5], 1, 2)?;
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
+        let path = selector.select_path(ADDRESSES[1], ADDRESSES[5], 1, 2).await?;
 
-        check_path(&path, &star, ADDRESSES[5])?;
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
         assert_eq!(2, path.length(), "should have 2 hops");
 
         Ok(())
     }
 
-    #[test]
-    fn test_should_find_path_in_reliable_arrow_with_lower_weight() -> anyhow::Result<()> {
-        let arrow = define_graph(
+    #[async_std::test]
+    async fn test_should_find_path_in_reliable_arrow_with_lower_weight() -> anyhow::Result<()> {
+        let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] -> 1, 1 [1] -> 2, 2 [1] -> 3, 1 [1] -> 3",
             ADDRESSES[0],
             |_| 1_f64,
             |_, _| 0.0,
-        );
-        let selector = DfsPathSelector::<TestWeights>::default();
+        )));
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
-        let path = selector.select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)?;
-        check_path(&path, &arrow, ADDRESSES[5])?;
+        let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
         assert_eq!(3, path.length(), "should have 3 hops");
 
         Ok(())
     }
 
-    #[test]
-    fn test_should_find_path_in_reliable_arrow_with_higher_weight() -> anyhow::Result<()> {
-        let arrow = define_graph(
+    #[async_std::test]
+    async fn test_should_find_path_in_reliable_arrow_with_higher_weight() -> anyhow::Result<()> {
+        let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] -> 1, 1 [2] -> 2, 2 [3] -> 3, 1 [2] -> 3",
             ADDRESSES[0],
             |_| 1_f64,
             |_, _| 0.0,
-        );
-        let selector = DfsPathSelector::<TestWeights>::default();
+        )));
+        let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
-        let path = selector.select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)?;
-        check_path(&path, &arrow, ADDRESSES[5])?;
+        let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
         assert_eq!(3, path.length(), "should have 3 hops");
 
         Ok(())
     }
 
-    #[test]
-    fn test_should_find_path_in_reliable_arrow_with_random_weight() -> anyhow::Result<()> {
-        let arrow = define_graph(
+    #[async_std::test]
+    async fn test_should_find_path_in_reliable_arrow_with_random_weight() -> anyhow::Result<()> {
+        let graph = Arc::new(RwLock::new(define_graph(
             "0 [29] -> 1, 1 [5] -> 2, 2 [31] -> 3, 1 [2] -> 3",
             ADDRESSES[0],
             |_| 1_f64,
             |_, _| 0.0,
-        );
-        let selector = DfsPathSelector::<RandomizedEdgeWeighting>::default();
+        )));
+        let selector = DfsPathSelector::<RandomizedEdgeWeighting>::new(graph.clone(), Default::default());
 
-        let path = selector.select_path(&arrow, ADDRESSES[0], ADDRESSES[5], 3, 3)?;
-        check_path(&path, &arrow, ADDRESSES[5])?;
+        let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
         assert_eq!(3, path.length(), "should have 3 hops");
 
         Ok(())
