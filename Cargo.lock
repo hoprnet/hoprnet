@@ -1685,9 +1685,10 @@ dependencies = [
 
 [[package]]
 name = "core-path"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
+ "async-lock 3.4.0",
  "async-std",
  "async-trait",
  "futures",
@@ -1698,7 +1699,6 @@ dependencies = [
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",
- "hopr-platform",
  "hopr-primitive-types",
  "lazy_static",
  "libp2p-identity",
@@ -1707,7 +1707,6 @@ dependencies = [
  "serde",
  "serde_with",
  "smart-default",
- "test-log",
  "thiserror 1.0.68",
  "tracing",
 ]
@@ -4338,7 +4337,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "2.2.2"
+version = "2.2.3"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -4532,10 +4531,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.8.3"
+version = "0.8.4"
 dependencies = [
  "async-lock 3.4.0",
- "async-std",
  "async-trait",
  "chain-types",
  "core-network",
@@ -4543,7 +4541,6 @@ dependencies = [
  "futures",
  "hopr-async-runtime",
  "hopr-crypto-packet",
- "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-db-sql",
  "hopr-internal-types",
@@ -4556,9 +4553,7 @@ dependencies = [
  "hopr-transport-session",
  "lazy_static",
  "libp2p",
- "moka",
  "proc-macro-regex",
- "rust-stream-ext-concurrent",
  "serde",
  "serde_with",
  "smart-default",
