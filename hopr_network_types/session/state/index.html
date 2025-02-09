@@ -1,0 +1,69 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="`Session` protocol state machine"><title>hopr_network_types::session::state - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-46132b98.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="hopr_network_types" data-themes="" data-resource-suffix="" data-rustdoc-version="1.85.0-nightly (a224f3807 2024-12-09)" data-channel="nightly" data-search-js="search-92e6798f.js" data-settings-js="settings-0f613d39.js" ><script src="../../../static.files/storage-59e33391.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../hopr_network_types/index.html">hopr_<wbr>network_<wbr>types</a><span class="version">0.5.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module state</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#session-protocol-state-machine" title="`Session` protocol state machine"><code>Session</code> protocol state machine</a><ul><li><a href="#instantiation" title="Instantiation">Instantiation</a></li><li><a href="#passing-data-between-the-protocol-and-the-upper-layer" title="Passing data between the protocol and the upper layer">Passing data between the protocol and the upper layer</a></li><li><a href="#passing-of-data-between-the-protocol-and-the-lower-layer" title="Passing of data between the protocol and the lower layer">Passing of data between the protocol and the lower layer</a></li><li><a href="#protocol-features" title="Protocol features">Protocol features</a></li><li><a href="#frame-reassembly" title="Frame reassembly">Frame reassembly</a></li><li><a href="#frame-acknowledgement" title="Frame acknowledgement">Frame acknowledgement</a></li><li><a href="#segment-retransmission" title="Segment retransmission">Segment retransmission</a></li></ul></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In hopr_<wbr>network_<wbr>types::<wbr>session</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><span class="rustdoc-breadcrumbs"><a href="../../index.html">hopr_network_types</a>::<wbr><a href="../index.html">session</a></span><h1>Module <span>state</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/hopr_network_types/session/state.rs.html#1-1526">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="session-protocol-state-machine"><a class="doc-anchor" href="#session-protocol-state-machine">§</a><code>Session</code> protocol state machine</h2>
+<p>The protocol always forms a middle layer between a <em>lower layer</em> transport (such as an unreliable
+UDP-like network) and any upstream protocol.
+The communication with the <em>lower layer</em> is done via <a href="struct.SessionState.html" title="struct hopr_network_types::session::state::SessionState"><code>SessionState</code></a>;
+the <em>upper layer</em> is using the <a href="struct.SessionSocket.html" title="struct hopr_network_types::session::state::SessionSocket"><code>SessionSocket</code></a> to pass data with the
+<code>Session</code> protocol.</p>
+<h3 id="instantiation"><a class="doc-anchor" href="#instantiation">§</a>Instantiation</h3>
+<p>The instantiation of the protocol state machine is done by creating the <a href="struct.SessionSocket.html" title="struct hopr_network_types::session::state::SessionSocket"><code>SessionSocket</code></a>
+object, by <a href="struct.SessionSocket.html#method.new" title="associated function hopr_network_types::session::state::SessionSocket::new">providing it</a> an underlying transport writer and its MTU <code>C</code>.
+The protocol can be instantiated over any transport that implements [<code>AsyncWrite</code>] + [<code>AsyncRead</code>]
+for sending and receiving raw data packets.</p>
+<h3 id="passing-data-between-the-protocol-and-the-upper-layer"><a class="doc-anchor" href="#passing-data-between-the-protocol-and-the-upper-layer">§</a>Passing data between the protocol and the upper layer</h3>
+<p>The <a href="struct.SessionSocket.html" title="struct hopr_network_types::session::state::SessionSocket"><code>SessionSocket</code></a> exposes as [<code>AsyncRead</code>] +
+[<code>AsyncWrite</code>] and can be used to read and write arbitrary data
+to the protocol. If the writer is <a href="AsyncWrite::poll_close">closed</a>, the session is closed
+as well.</p>
+<h3 id="passing-of-data-between-the-protocol-and-the-lower-layer"><a class="doc-anchor" href="#passing-of-data-between-the-protocol-and-the-lower-layer">§</a>Passing of data between the protocol and the lower layer</h3>
+<p>As long as the underlying transport implements [<code>AsyncRead</code>] + [<code>AsyncWrite</code>],
+the <a href="struct.SessionSocket.html" title="struct hopr_network_types::session::state::SessionSocket"><code>SessionSocket</code></a> automatically polls data from the underlying transport,
+and sends the data to the underlying transport as needed.</p>
+<h3 id="protocol-features"><a class="doc-anchor" href="#protocol-features">§</a>Protocol features</h3><h4 id="data-segmentation"><a class="doc-anchor" href="#data-segmentation">§</a>Data segmentation</h4>
+<p>Once data is written to the <a href="struct.SessionSocket.html" title="struct hopr_network_types::session::state::SessionSocket"><code>SessionSocket</code></a>, it is segmented and written
+automatically to the underlying transport. Every writing to the <code>SessionSocket</code> corresponds to
+a <a href="../struct.Frame.html" title="struct hopr_network_types::session::Frame"><code>Frame</code></a>.</p>
+<h3 id="frame-reassembly"><a class="doc-anchor" href="#frame-reassembly">§</a>Frame reassembly</h3>
+<p>The receiving side performs frame reassembly and sequencing of the frames.
+Frames are never emitted to the upper layer transport out of order, but frames
+can be skipped if they exceed the <a href="struct.SessionConfig.html" title="struct hopr_network_types::session::state::SessionConfig"><code>frame_expiration_age</code></a>.</p>
+<h3 id="frame-acknowledgement"><a class="doc-anchor" href="#frame-acknowledgement">§</a>Frame acknowledgement</h3>
+<p>The recipient can acknowledge frames to the sender once all its segments have been received.
+This is done with a <a href="../protocol/struct.FrameAcknowledgements.html" title="struct hopr_network_types::session::protocol::FrameAcknowledgements"><code>FrameAcknowledgements</code></a> message sent back
+to the sender.</p>
+<h3 id="segment-retransmission"><a class="doc-anchor" href="#segment-retransmission">§</a>Segment retransmission</h3>
+<p>There are two means of segment retransmission:</p>
+<h4 id="recipient-requested-retransmission"><a class="doc-anchor" href="#recipient-requested-retransmission">§</a>Recipient requested retransmission</h4>
+<p>This is useful in situations when the recipient has received only some segments of a frame.
+At this point, the recipient knows which segments are missing in a frame and can initiate
+<a href="../protocol/struct.SegmentRequest.html" title="struct hopr_network_types::session::protocol::SegmentRequest"><code>SegmentRequest</code></a> sent back to the sender.
+This method is more targeted, as it requests only those segments of a frame that are needed.
+Once the sender receives the segment request, it will retransmit the segments in question
+over to the receiver.
+The recipient can make repeating requests on retransmission, based on the network reliability.
+However, retransmission requests decay with an exponential backoff given by <code>backoff_base</code>
+and <code>rto_base_receiver</code> timeout in <a href="struct.SessionConfig.html" title="struct hopr_network_types::session::state::SessionConfig"><code>SessionConfig</code></a> up
+until the <code>frame_expiration_age</code>.</p>
+<h4 id="sender-initiated-retransmission"><a class="doc-anchor" href="#sender-initiated-retransmission">§</a>Sender initiated retransmission</h4>
+<p>The frame sender can also automatically retransmit entire frames (= all their segments)
+to the recipient. This happens if the sender (within a time period) did not receive the
+frame acknowledgement <em>and</em> the recipient also did not request retransmission of any segment in
+that frame.
+This is useful in situations when the recipient did not receive any segment of a frame. Once
+the recipient receives at least one segment of a frame, the recipient requested retransmission
+is the preferred way.</p>
+<p>The sender can make repeating frame retransmissions, based on the network reliability.
+However, retransmissions decay with an exponential backoff given by <code>backoff_base</code>
+and <code>rto_base_sender</code> timeout in <a href="struct.SessionConfig.html" title="struct hopr_network_types::session::state::SessionConfig"><code>SessionConfig</code></a> up until
+the <code>frame_expiration_age</code>.
+The retransmissions of a frame by the sender stop if the frame has been acknowledged by the
+recipient <em>or</em> the recipient started requesting segment retransmission.</p>
+<h4 id="retransmission-timing"><a class="doc-anchor" href="#retransmission-timing">§</a>Retransmission timing</h4>
+<p>Both retransmission methods will work up until <code>frame_expiration_age</code>. Since the
+recipient-request-based method is more targeted, at least one should be allowed to happen
+before the sender-initiated retransmission kicks in. Therefore, it is recommended to set
+the <code>rto_base_sender</code> at least twice the <code>rto_base_receiver</code>.</p>
+<p>The above protocol features can be enabled by setting <a href="enum.SessionFeature.html" title="enum hopr_network_types::session::state::SessionFeature">SessionFeature</a> options in the configuration
+during <a href="struct.SessionSocket.html" title="struct hopr_network_types::session::state::SessionSocket">SessionSocket</a> construction.</p>
+<p><strong>For diagrams of individual retransmission situations, see the docs on the <a href="struct.SessionSocket.html" title="struct hopr_network_types::session::state::SessionSocket"><code>SessionSocket</code></a> object.</strong></p>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="struct" href="struct.SessionConfig.html" title="struct hopr_network_types::session::state::SessionConfig">Session<wbr>Config</a></div><div class="desc docblock-short">Configuration of Session protocol.</div></li><li><div class="item-name"><a class="struct" href="struct.SessionSocket.html" title="struct hopr_network_types::session::state::SessionSocket">Session<wbr>Socket</a></div><div class="desc docblock-short">Represents a socket for a session between two nodes bound by the
+underlying <a href="AsyncWrite">network transport</a> and the maximum transmission unit (MTU) of <code>C</code>.</div></li><li><div class="item-name"><a class="struct" href="struct.SessionState.html" title="struct hopr_network_types::session::state::SessionState">Session<wbr>State</a></div><div class="desc docblock-short">Contains the cloneable state of the session bound to a <a href="struct.SessionSocket.html" title="struct hopr_network_types::session::state::SessionSocket"><code>SessionSocket</code></a>.</div></li></ul><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="enum" href="enum.SessionFeature.html" title="enum hopr_network_types::session::state::SessionFeature">Session<wbr>Feature</a></div><div class="desc docblock-short">Represents individual Session protocol features that can be enabled.</div></li></ul></section></div></main></body></html>

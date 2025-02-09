@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ForwardedMetaPacket"],"fn":["packet_length"],"struct":["MetaPacket"]};

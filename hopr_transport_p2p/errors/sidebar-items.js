@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["P2PError"],"type":["Result"]};

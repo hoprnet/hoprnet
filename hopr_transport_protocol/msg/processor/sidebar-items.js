@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["RecvOperation"],"struct":["DEFAULT_PRICE_PER_PACKET","MsgSender","PacketInteractionConfig","PacketProcessor","PacketSendAwaiter","PacketSendFinalizer","SendAck","SendPkt"],"trait":["PacketUnwrapping","PacketWrapping"],"type":["SendMsgInput"]};
