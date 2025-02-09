@@ -1,8 +1,8 @@
 use async_trait::async_trait;
-use hopr_crypto_random::{random_float_in_range};
+use hopr_crypto_random::random_float;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::cmp::{max, Ordering};
+use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::marker::PhantomData;
 use tracing::trace;
@@ -78,9 +78,6 @@ impl Ord for WeightedChannelPath {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RandomizedEdgeWeighting;
 
-/// Minimum multiplication coefficient used in [`RandomizedEdgeWeighting`].
-pub const RANDOMIZED_COEFF_MIN: f64 = 0.001;
-
 impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
     /// Multiply channel stake with a random float in the interval [[`RANDOMIZED_COEFF_MIN`],1).
     /// Given that the floats are uniformly distributed, nodes with higher
@@ -89,14 +86,12 @@ impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
     /// Sorting the list of weights thus moves nodes with higher stakes more
     /// often to the front.
     fn calculate_weight(edge: &ChannelEdge) -> U256 {
-        max(
-            U256::one(),
-            edge.channel
-                .balance
-                .amount()
-                .mul_f64(random_float_in_range(RANDOMIZED_COEFF_MIN..1.0))
-                .expect("Could not multiply edge weight with float"),
-        )
+        edge.channel
+            .balance
+            .amount()
+            .mul_f64(random_float())
+            .expect("Could not multiply edge weight with float")
+            .max(1.into())
     }
 }
 
