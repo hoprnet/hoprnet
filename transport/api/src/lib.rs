@@ -193,6 +193,7 @@ pub struct HoprTransportConfig {
     pub session: config::SessionGlobalConfig,
 }
 
+/// Currently used implementation of [`PathSelector`](core_path::selectors::PathSelector).
 type CurrentPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on

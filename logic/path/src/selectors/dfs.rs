@@ -79,7 +79,7 @@ impl Ord for WeightedChannelPath {
 pub struct RandomizedEdgeWeighting;
 
 impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
-    /// Multiply channel stake with a random float in the interval [[`RANDOMIZED_COEFF_MIN`],1).
+    /// Multiply channel stake with a random float in the interval [0,1).
     /// Given that the floats are uniformly distributed, nodes with higher
     /// stake have a higher probability of reaching a higher value.
     ///
