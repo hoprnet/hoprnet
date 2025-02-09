@@ -4528,9 +4528,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-path"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
+ "async-lock 3.4.0",
  "async-std",
  "async-trait",
  "futures",
@@ -4549,7 +4550,6 @@ dependencies = [
  "serde",
  "serde_with",
  "smart-default",
- "test-log",
  "thiserror 2.0.12",
  "tracing",
 ]
@@ -4616,10 +4616,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.9.1"
+version = "0.9.2"
 dependencies = [
  "async-lock 3.4.0",
- "async-std",
  "async-trait",
  "futures",
  "futures-concurrency",
@@ -4641,6 +4640,7 @@ dependencies = [
  "hopr-transport-protocol",
  "hopr-transport-session",
  "lazy_static",
+ "libp2p",
  "proc-macro-regex",
  "rust-stream-ext-concurrent",
  "serde",

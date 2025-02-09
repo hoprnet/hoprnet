@@ -434,6 +434,7 @@ impl Hopr {
 
         let hopr_transport_api = HoprTransport::new(
             me,
+            me_onchain,
             HoprTransportConfig {
                 transport: cfg.transport.clone(),
                 network: cfg.network_options.clone(),

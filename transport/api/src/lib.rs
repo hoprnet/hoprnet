@@ -47,7 +47,7 @@ use hopr_db_sql::{
     HoprDbAllOperations,
 };
 use hopr_internal_types::prelude::*;
-use hopr_path::{path::TransportPath, selectors::dfs::DfsPathSelectorConfig};
+use hopr_path::path::TransportPath;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_network::{
@@ -70,6 +70,9 @@ use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfi
 #[cfg(feature = "mixer-stream")]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
+use crate::helpers::PathPlanner;
+
+use hopr_path::selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::types::transfer_session;
 pub use {
@@ -94,7 +97,6 @@ use crate::{
         RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT, SESSION_INITIATION_TIMEOUT_BASE,
     },
     errors::HoprTransportError,
-    helpers::PathPlanner,
 };
 
 pub use crate::{
@@ -176,6 +178,9 @@ where
     }
 }
 
+/// Currently used implementation of [`PathSelector`](hopr_path::selectors::PathSelector).
+type CurrentPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
+
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport, as well as off-chain ticket manipulation.
 pub struct HoprTransport<T>
@@ -189,11 +194,11 @@ where
     ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
     process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
-    path_planner: PathPlanner<T>,
+    path_planner: PathPlanner<T, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    smgr: SessionManager<helpers::MessageSender<T>>,
+    smgr: SessionManager<helpers::MessageSender<T, CurrentPathSelector>>,
 }
 
 impl<T> HoprTransport<T>
@@ -202,6 +207,7 @@ where
 {
     pub fn new(
         me: &OffchainKeypair,
+        me_onchain: &ChainKeypair,
         cfg: HoprTransportConfig,
         db: T,
         channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
@@ -224,11 +230,15 @@ where
             process_packet_send,
             path_planner: PathPlanner::new(
                 db.clone(),
-                DfsPathSelectorConfig {
-                    quality_threshold: cfg.network.quality_auto_path_threshold,
-                    ..Default::default()
-                },
+                CurrentPathSelector::new(
+                    channel_graph.clone(),
+                    DfsPathSelectorConfig {
+                        quality_threshold: cfg.network.quality_auto_path_threshold,
+                        ..Default::default()
+                    },
+                ),
                 channel_graph.clone(),
+                me_onchain.public().to_address(),
             ),
             db,
             my_multiaddresses,
