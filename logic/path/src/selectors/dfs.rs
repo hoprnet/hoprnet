@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use hopr_crypto_random::random_float;
+use hopr_crypto_random::{random_float_in_range};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::cmp::{max, Ordering};
@@ -21,7 +21,8 @@ struct WeightedChannelPath {
 }
 
 impl WeightedChannelPath {
-    pub fn extend<CW: EdgeWeighting<U256>>(mut self, edge: &ChannelEdge) -> Self {
+    /// Extend this path with another [`ChannelEdge`] and return a new [`WeightedChannelPath`].
+    fn extend<CW: EdgeWeighting<U256>>(mut self, edge: &ChannelEdge) -> Self {
         if !self.fully_explored {
             self.path.push(edge.channel.destination);
             self.weight += CW::calculate_weight(edge);
@@ -70,14 +71,18 @@ impl Ord for WeightedChannelPath {
 }
 
 /// Assigns each channel a weight.
-/// The weight is randomized such that not always the same
-/// nodes get selected. This is necessary to achieve privacy.
+/// The weight is randomized such that the same
+/// nodes get not always selected.
+/// This is necessary to achieve privacy.
 /// It also favors nodes with higher stake.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RandomizedEdgeWeighting;
 
+/// Minimum multiplication coefficient used in [`RandomizedEdgeWeighting`].
+pub const RANDOMIZED_COEFF_MIN: f64 = 0.001;
+
 impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
-    /// Multiply channel stake with a random float in the interval [0,1).
+    /// Multiply channel stake with a random float in the interval [[`RANDOMIZED_COEFF_MIN`],1).
     /// Given that the floats are uniformly distributed, nodes with higher
     /// stake have a higher probability of reaching a higher value.
     ///
@@ -89,7 +94,7 @@ impl EdgeWeighting<U256> for RandomizedEdgeWeighting {
             edge.channel
                 .balance
                 .amount()
-                .mul_f64(random_float())
+                .mul_f64(random_float_in_range(RANDOMIZED_COEFF_MIN..1.0))
                 .expect("Could not multiply edge weight with float"),
         )
     }
@@ -166,7 +171,7 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
             return false;
         }
 
-        // We cannot use `final_destination` as last intermediate hop as
+        // We cannot use `final_destination` as the last intermediate hop as
         // this would be a loopback that does not give any privacy
         if next_hop.address.eq(final_destination) {
             trace!(%next_hop, "destination loopback not allowed");
@@ -179,7 +184,7 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
             return false;
         }
 
-        // Edges which have score and is below the threshold won't be considered
+        // Edges which have score and is below the threshold will not be considered
         if edge.score.is_some_and(|score| score < self.cfg.score_threshold) {
             trace!(%next_hop, "channel score threshold not satisfied");
             return false;
@@ -297,10 +302,6 @@ where
         ))
     }
 }
-
-/// DFS path selector with channel weighting function
-/// that uses randomized channel stakes as edge weights.
-pub type DefaultPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 
 #[cfg(test)]
 mod tests {
