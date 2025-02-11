@@ -77,7 +77,7 @@ jobs:
         id: options
         run: |
           nix_debug_option="-debug"
-          if [[ ${{ inputs.production }} || ${{ contains(steps.pr-labels.outputs.labels, ' docker-production-build ') }} ]]; then
+          if [[ "${{ inputs.production }}" = "true" || -n "${GITHUB_PR_LABEL_DOCKER_PRODUCTION_BUILD}" ]]; then
             nix_debug_option=""
           fi
           declare docker_tag docker_tag_pr docker_release_latest_tag
@@ -112,33 +112,33 @@ jobs:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Build and push ${{ inputs.package }} docker image - Commit
-        run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG }}
 
       - name: Build and push ${{ inputs.package }} docker image - PR
-        run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG_PR }}
 
       - name: Build and push ${{ inputs.package }} docker image - latest
-        run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         if: inputs.production && github.event.pull_request.base.ref == 'master'
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:latest
 
       - name: Build and push ${{ inputs.package }} docker image - release-latest
-        run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         if: inputs.production
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}
 
       - name: Trigger deploy workflow if needed
-        if: (contains(github.event.pull_request.labels.*.name, 'deploy_nodes') || inputs.production ) && contains(inputs.package,'hoprd' && vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true')
+        if: (env.GITHUB_PR_LABEL_DEPLOY_NODES || inputs.production ) && contains(inputs.package,'hoprd') && vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true'
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
