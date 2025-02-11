@@ -61,7 +61,6 @@ fn main() -> anyhow::Result<()> {
     let bindings_codegen_path_str = bindings_codegen_path
         .to_str()
         .context("must be convertible to string")?;
-    println!("Bindings codegen path: {bindings_codegen_path_str}");
     assert!(Command::new("forge")
         .args([
             "bind",
