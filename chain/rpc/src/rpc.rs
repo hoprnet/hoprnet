@@ -195,6 +195,13 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
                 encoded.copy_from_slice(&encoded_win_prob.to_be_bytes()[1..]);
                 Ok(win_prob_to_f64(&encoded))
             }
+            Err(e) => Err(ContractError(
+                "WinProbOracle".to_string(),
+                "current_win_prob".to_string(),
+                e.to_string(),
+            )),
+        }
+    }
 
     async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance> {
         match self
@@ -208,23 +215,6 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             Err(e) => Err(ContractError(
                 "HoprToken".to_string(),
                 "allowance".to_string(),
-                e.to_string(),
-            )),
-        }
-    }
-
-    async fn get_eligibility_status(&self, address: Address) -> Result<bool> {
-        match self
-            .contract_instances
-            .network_registry
-            .is_node_registered_and_eligible(address.into())
-            .call()
-            .await
-        {
-            Ok(eligible) => Ok(eligible),
-            Err(e) => Err(ContractError(
-                "WinProbOracle".to_string(),
-                "current_win_prob".to_string(),
                 e.to_string(),
             )),
         }

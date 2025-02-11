@@ -1,6 +1,6 @@
 use ethers::contract::EthEvent;
 use ethers::types::{Filter, H256};
-use futures::{stream, StreamExt};
+use futures::{stream, FutureExt, StreamExt};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
@@ -332,7 +332,7 @@ where
     // (3) for the token contract which filters transfer events to our safe.
     // (4) for the token contract which filters approval events involving our safe and the channels
     // contract.
-    async fn generate_log_filters(db: &Db, logs_handler: &U) -> FilterSet {
+    async fn generate_log_filters(db: &Db, logs_handler: &U) -> FilterSet
     where
         U: ChainLogHandler + 'static,
         Db: HoprDbLogOperations + 'static,
@@ -540,7 +540,6 @@ where
     ///
     /// # Arguments
     ///
-    /// * `prefix` - A string prefix for logging purposes.
     /// * `block` - The block with logs to process.
     /// * `rpc` - The RPC operations handler.
     /// * `chain_head` - The current chain head block number.
@@ -606,15 +605,15 @@ where
                 info!("indexer sync completed successfully");
                 is_synced.store(true, Ordering::Relaxed);
 
-                info!(prefix, "updating safe balance from chain after indexer sync completed");
+                info!("updating safe balance from chain after indexer sync completed");
                 match rpc.get_balance(safe_address, BalanceType::HOPR).await {
                     Ok(balance) => {
                         if let Err(error) = db.set_safe_hopr_balance(None, balance).await {
-                            error!(prefix, %error, "failed to update safe balance from chain after indexer sync completed");
+                            error!(%error, "failed to update safe balance from chain after indexer sync completed");
                         }
                     }
                     Err(error) => {
-                        error!(prefix, %error, "failed to fetch safe balance from chain after indexer sync completed");
+                        error!(%error, "failed to fetch safe balance from chain after indexer sync completed");
                     }
                 }
 
@@ -622,16 +621,16 @@ where
                 match rpc.get_allowance(channels_address, safe_address).await {
                     Ok(allowance) => {
                         if let Err(error) = db.set_safe_hopr_allowance(None, allowance).await {
-                            error!(prefix, %error, "failed to update safe allowance from chain after indexer sync completed");
+                            error!(%error, "failed to update safe allowance from chain after indexer sync completed");
                         }
                     }
                     Err(error) => {
-                        error!(prefix, %error, "failed to fetch safe allowance from chain after indexer sync completed");
+                        error!(%error, "failed to fetch safe allowance from chain after indexer sync completed");
                     }
                 }
 
                 if let Err(error) = tx.try_send(()) {
-                    error!(prefix, %error, "failed to notify about achieving indexer synchronization")
+                    error!(%error, "failed to notify about achieving indexer synchronization")
                 }
             }
         }
