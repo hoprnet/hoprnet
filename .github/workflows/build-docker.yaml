@@ -66,7 +66,7 @@ jobs:
         id: options
         run: |
           nix_debug_option="-debug"
-          if [[ ${{ inputs.production }} || ${{ contains(steps.pr-labels.outputs.labels, ' docker-production-build ') }} ]]; then
+          if [[ "${{ inputs.production }}" = "true" || "${{ contains(steps.pr-labels.outputs.labels, ' docker-production-build ') }}" = "true" ]]; then
             nix_debug_option=""
           fi
           declare docker_tag docker_tag_pr docker_release_latest_tag
