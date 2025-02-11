@@ -4818,7 +4818,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd"
-version = "2.2.0-rc.1"
+version = "2.2.3"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
