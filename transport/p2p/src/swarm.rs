@@ -565,6 +565,11 @@ impl HoprSwarmWithProcessors {
                     } => {
                         debug!(%peer_id, %connection_id, num_established, established_in_ms = established_in.as_millis(), transport="libp2p", "connection established");
 
+                        let network_info = swarm.network_info();
+                        let num_peers = network_info.num_peers();
+                        let connection_counters = network_info.connection_counters();
+                        trace!(num_peers, ?connection_counters, "swarm network status after connection established");
+
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.increment(1.0);
@@ -580,6 +585,11 @@ impl HoprSwarmWithProcessors {
                     } => {
                         debug!(%peer_id, %connection_id, num_established, transport="libp2p", "connection closed: {cause:?}");
 
+                        let network_info = swarm.network_info();
+                        let num_peers = network_info.num_peers();
+                        let connection_counters = network_info.connection_counters();
+                        trace!(num_peers, ?connection_counters, "swarm network status after connection closed");
+
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.decrement(1.0);
@@ -591,6 +601,11 @@ impl HoprSwarmWithProcessors {
                         send_back_addr,
                     } => {
                         trace!(%local_addr, %send_back_addr, %connection_id, transport="libp2p",  "incoming connection");
+
+                        let network_info = swarm.network_info();
+                        let num_peers = network_info.num_peers();
+                        let connection_counters = network_info.connection_counters();
+                        trace!(num_peers, ?connection_counters, "swarm network status after incoming connection")
                     }
                     SwarmEvent::IncomingConnectionError {
                         local_addr,
@@ -598,14 +613,24 @@ impl HoprSwarmWithProcessors {
                         error,
                         send_back_addr,
                     } => {
-                        error!(%local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error")
+                        error!(%local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error");
+
+                        let network_info = swarm.network_info();
+                        let num_peers = network_info.num_peers();
+                        let connection_counters = network_info.connection_counters();
+                        trace!(num_peers, ?connection_counters, "swarm network status after incoming connection error")
                     }
                     SwarmEvent::OutgoingConnectionError {
                         connection_id,
                         error,
                         peer_id
                     } => {
-                        error!(peer = ?peer_id, %connection_id, transport="libp2p", %error, "outgoing connection error")
+                        error!(peer = ?peer_id, %connection_id, transport="libp2p", %error, "outgoing connection error");
+
+                        let network_info = swarm.network_info();
+                        let num_peers = network_info.num_peers();
+                        let connection_counters = network_info.connection_counters();
+                        trace!(num_peers, ?connection_counters, "swarm network status after outgoing connection error")
                     }
                     SwarmEvent::NewListenAddr {
                         listener_id,
@@ -636,7 +661,12 @@ impl HoprSwarmWithProcessors {
                         peer_id,
                         connection_id,
                     } => {
-                        debug!(peer = tracing::field::debug(peer_id), connection_id = %connection_id, transport="libp2p", "dialing")
+                        debug!(peer = tracing::field::debug(peer_id), connection_id = %connection_id, transport="libp2p", "dialing");
+
+                        let network_info = swarm.network_info();
+                        let num_peers = network_info.num_peers();
+                        let connection_counters = network_info.connection_counters();
+                        trace!(num_peers, ?connection_counters, "swarm network status after dialing")
                     }
                     _ => error!(transport="libp2p", "unimplemented message type in p2p processing chain encountered")
                 }
