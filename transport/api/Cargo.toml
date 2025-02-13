@@ -1,8 +1,8 @@
 [package]
 name = "hopr-transport"
-version = "0.8.3"
+version = "0.8.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
-description = "Implements the main HOPR interface for the core library"
+description = "Implements the main HOPR transport interface for the core library"
 edition = "2021"
 license = "GPL-3.0-only"
 
@@ -47,9 +47,7 @@ async-lock = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["request-response"] }
-moka = { workspace = true }
 proc-macro-regex = { workspace = true }
-rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
@@ -63,7 +61,6 @@ chain-types = { workspace = true }
 core-path = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-crypto-random = { workspace = true }
 hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
@@ -76,7 +73,6 @@ hopr-transport-session = { workspace = true }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
-async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 core-network = { workspace = true, features = ["runtime-async-std"] }
 hopr-transport-protocol = { workspace = true, features = ["runtime-async-std"] }

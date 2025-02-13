@@ -2,7 +2,7 @@
 //! This strategy listens for channel state change events to check whether a channel has dropped below `min_stake_threshold` HOPR.
 //! If this happens, the strategy issues a **fund channel** transaction to re-stake the channel with `funding_amount` HOPR.
 //!
-//! For details on default parameters see [AutoFundingStrategyConfig].
+//! For details on default parameters, see [AutoFundingStrategyConfig].
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
 use hopr_internal_types::prelude::*;
@@ -26,6 +26,16 @@ lazy_static::lazy_static! {
         SimpleCounter::new("hopr_strategy_auto_funding_funding_count", "Count of initiated automatic fundings").unwrap();
 }
 
+#[inline]
+fn default_funding_amount() -> Balance {
+    Balance::new_from_str("10000000000000000000", BalanceType::HOPR)
+}
+
+#[inline]
+fn default_min_stake_threshold() -> Balance {
+    Balance::new_from_str("1000000000000000000", BalanceType::HOPR)
+}
+
 /// Configuration for `AutoFundingStrategy`
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
@@ -34,14 +44,16 @@ pub struct AutoFundingStrategyConfig {
     ///
     /// Default is 1 HOPR
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("1000000000000000000", BalanceType::HOPR))]
+    #[serde(default = "default_min_stake_threshold")]
+    #[default(default_min_stake_threshold())]
     pub min_stake_threshold: Balance,
 
     /// Funding amount.
     ///
     /// Defaults to 10 HOPR.
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
+    #[serde(default = "default_funding_amount")]
+    #[default(default_funding_amount())]
     pub funding_amount: Balance,
 }
 

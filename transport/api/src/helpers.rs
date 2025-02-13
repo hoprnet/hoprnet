@@ -4,11 +4,7 @@ use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
 use chain_types::chain_events::NetworkRegistryStatus;
-use core_path::{
-    path::TransportPath,
-    selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
-    selectors::PathSelector,
-};
+use core_path::{path::TransportPath, selectors::PathSelector};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;
@@ -62,25 +58,29 @@ pub struct TicketStatistics {
 }
 
 #[derive(Clone)]
-pub(crate) struct PathPlanner<T> {
+pub(crate) struct PathPlanner<T, S> {
     db: T,
     channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
-    selector: DfsPathSelector<RandomizedEdgeWeighting>,
+    selector: S,
+    me: Address,
 }
 
-impl<T> PathPlanner<T>
+impl<T, S> PathPlanner<T, S>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
+    S: PathSelector + Send + Sync,
 {
     pub(crate) fn new(
         db: T,
-        path_selector_cfg: DfsPathSelectorConfig,
+        selector: S,
         channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+        me: Address,
     ) -> Self {
         Self {
             db,
             channel_graph,
-            selector: DfsPathSelector::new(path_selector_cfg),
+            me,
+            selector,
         }
     }
 
@@ -121,11 +121,10 @@ where
                     .map_err(hopr_db_sql::api::errors::DbError::from)?
                 {
                     let target_chain_key: Address = chain_key.try_into()?;
-                    let cp = {
-                        let cg = self.channel_graph.read().await;
-                        self.selector
-                            .select_path(&cg, cg.my_address(), target_chain_key, hops.into(), hops.into())?
-                    };
+                    let cp = self
+                        .selector
+                        .select_path(self.me, target_chain_key, hops.into(), hops.into())
+                        .await?;
 
                     let full_path = cp.into_path(&self.db, target_chain_key).await?;
                     trace!(%full_path, "resolved automatic path");
@@ -150,16 +149,17 @@ where
 }
 
 #[derive(Clone)]
-pub(crate) struct MessageSender<T> {
+pub(crate) struct MessageSender<T, S> {
     pub process_packet_send: Arc<OnceLock<MsgSender>>,
-    pub resolver: PathPlanner<T>,
+    pub resolver: PathPlanner<T, S>,
 }
 
-impl<T> MessageSender<T>
+impl<T, S> MessageSender<T, S>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
+    S: PathSelector + Send + Sync,
 {
-    pub fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T>) -> Self {
+    pub fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T, S>) -> Self {
         Self {
             process_packet_send,
             resolver,
@@ -168,9 +168,10 @@ where
 }
 
 #[async_trait::async_trait]
-impl<T> SendMsg for MessageSender<T>
+impl<T, S> SendMsg for MessageSender<T, S>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
+    S: PathSelector + Send + Sync,
 {
     #[tracing::instrument(level = "debug", skip(self, data))]
     async fn send_message(

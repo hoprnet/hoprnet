@@ -1,9 +1,8 @@
+use futures::channel::mpsc;
+use futures::channel::mpsc::UnboundedSender;
 use futures::stream::{Stream, StreamExt};
 use futures::{
-    channel::{
-        mpsc::{channel, Receiver, Sender},
-        oneshot,
-    },
+    channel::mpsc::{channel, Receiver, Sender},
     future::{poll_fn, Either},
     pin_mut,
 };
@@ -140,41 +139,41 @@ where
 
 #[derive(Debug)]
 pub struct TicketAggregationAwaiter {
-    rx: oneshot::Receiver<()>,
+    rx: mpsc::UnboundedReceiver<()>,
 }
 
-impl From<oneshot::Receiver<()>> for TicketAggregationAwaiter {
-    fn from(value: oneshot::Receiver<()>) -> Self {
+impl From<mpsc::UnboundedReceiver<()>> for TicketAggregationAwaiter {
+    fn from(value: mpsc::UnboundedReceiver<()>) -> Self {
         Self { rx: value }
     }
 }
 
 impl TicketAggregationAwaiter {
-    pub async fn consume_and_wait(self, until_timeout: std::time::Duration) -> Result<()> {
+    pub async fn consume_and_wait(mut self, until_timeout: std::time::Duration) -> Result<()> {
         let timeout = sleep(until_timeout);
-        let resolve = self.rx;
+        let resolve = self.rx.next();
 
         pin_mut!(resolve, timeout);
         match futures::future::select(resolve, timeout).await {
-            Either::Left((result, _)) => result.map_err(|_| TransportError("Canceled".to_owned())),
+            Either::Left((result, _)) => result.ok_or(TransportError("Canceled".to_owned())),
             Either::Right(_) => Err(TransportError("Timed out on sending a packet".to_owned())),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TicketAggregationFinalizer {
-    tx: Option<oneshot::Sender<()>>,
+    tx: Option<UnboundedSender<()>>,
 }
 
 impl TicketAggregationFinalizer {
-    pub fn new(tx: oneshot::Sender<()>) -> Self {
+    pub fn new(tx: UnboundedSender<()>) -> Self {
         Self { tx: Some(tx) }
     }
 
     pub fn finalize(mut self) {
         if let Some(sender) = self.tx.take() {
-            if sender.send(()).is_err() {
+            if sender.unbounded_send(()).is_err() {
                 error!("Failed to notify the awaiter about the successful ticket aggregation")
             }
         } else {
@@ -193,7 +192,7 @@ pub struct TicketAggregationActions<T, U> {
 pub type BasicTicketAggregationActions<T> = TicketAggregationActions<ResponseChannel<T>, OutboundRequestId>;
 
 impl<T, U> Clone for TicketAggregationActions<T, U> {
-    /// Generic type requires handwritten clone function
+    /// Generic type requires a handwritten clone function
     fn clone(&self) -> Self {
         Self {
             queue: self.queue.clone(),
@@ -228,7 +227,7 @@ impl<T, U> TicketAggregationActions<T, U> {
         channel: &Hash,
         prerequisites: AggregationPrerequisites,
     ) -> Result<TicketAggregationAwaiter> {
-        let (tx, rx) = oneshot::channel::<()>();
+        let (tx, rx) = mpsc::unbounded::<()>();
 
         self.process(TicketAggregationToProcess::ToSend(
             *channel,
@@ -246,7 +245,7 @@ impl<T, U> TicketAggregationActions<T, U> {
             } else if e.is_disconnected() {
                 TransportError("queue is closed".to_string())
             } else {
-                TransportError(format!("Unknown error: {}", e))
+                TransportError(format!("Unknown error: {e}"))
             }
         })
     }
@@ -296,25 +295,28 @@ where
                         let opk: std::result::Result<OffchainPublicKey, hopr_primitive_types::errors::GeneralError> =
                             destination.try_into();
                         match opk {
-                            Ok(opk) => match db.aggregate_tickets(opk, acked_tickets, &chain_key).await {
-                                Ok(ticket) => Some(TicketAggregationProcessed::Reply(
-                                    destination,
-                                    Ok(ticket.leak()),
-                                    response,
-                                )),
-                                Err(DbError::TicketAggregationError(e)) => {
-                                    // forward error to counterparty
-                                    Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
-                                }
-                                Err(e) => {
-                                    error!(error = %e, "Dropping tickets aggregation request due to an error");
-                                    None
+                            Ok(opk) => {
+                                let count = acked_tickets.len();
+                                match db.aggregate_tickets(opk, acked_tickets, &chain_key).await {
+                                    Ok(ticket) => Some(TicketAggregationProcessed::Reply(
+                                        destination,
+                                        Ok(ticket.leak()),
+                                        response,
+                                    )),
+                                    Err(DbError::TicketAggregationError(e)) => {
+                                        // forward error to counterparty
+                                        Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
+                                    }
+                                    Err(e) => {
+                                        error!(error = %e, %destination, count, "Dropping tickets aggregation request due to an error");
+                                        None
+                                    }
                                 }
                             },
                             Err(e) => {
                                 error!(
-                                    ?destination, error = %e,
-                                    "Failed to deserialize the destination to an offchain public key"
+                                    %destination, error = %e,
+                                    "Failed to aggregate tickets due to destination deserialization error from an offchain public key"
                                 );
                                 None
                             }
@@ -328,12 +330,12 @@ where
                                     Some(TicketAggregationProcessed::Receive(destination, acked_ticket, request))
                                 }
                                 Err(e) => {
-                                    error!(error = %e, "Error while handling aggregated ticket");
+                                    error!(error = %e, counterparty = %destination, "Error while handling aggregated ticket");
                                     None
                                 }
                             },
                             Err(e) => {
-                                warn!(error = %e, "Counterparty refused to aggregate tickets");
+                                warn!(error = %e, counterparty = %destination, "Counterparty refused to aggregate tickets");
                                 None
                             }
                         }

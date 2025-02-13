@@ -7,7 +7,7 @@
     nixpkgs.url = github:NixOS/nixpkgs/release-24.11;
     rust-overlay.url = github:oxalica/rust-overlay/master;
     # using a fork with an added source filter
-    crane.url = github:hoprnet/crane/tb/20240117-find-filter;
+    crane.url = github:hoprnet/crane/tb/20240117-find-filter-2;
     # pin it to a version which we are compatible with
     foundry.url = github:shazow/foundry.nix/e4c79767b4d2e51179d1975a9f0553ef30d82711;
     # use change to add solc 0.8.24
@@ -16,11 +16,9 @@
     treefmt-nix.url = github:numtide/treefmt-nix;
     flake-root.url = github:srid/flake-root;
 
-    crane.inputs.nixpkgs.follows = "nixpkgs";
     flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
     foundry.inputs.flake-utils.follows = "flake-utils";
     foundry.inputs.nixpkgs.follows = "nixpkgs";
-    pre-commit.inputs.nixpkgs-stable.follows = "nixpkgs";
     pre-commit.inputs.nixpkgs.follows = "nixpkgs";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
     solc.inputs.flake-utils.follows = "flake-utils";

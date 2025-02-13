@@ -121,6 +121,8 @@ lazy_static::lazy_static! {
     .unwrap();
 }
 
+const ENV_MIXER_PACKET_MAX_DELAY_MILLIS: &str = "HOPR_INTERNAL_MIXER_PACKET_MAX_DELAY_MILLIS";
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ProtocolProcesses {
     AckIn,
@@ -248,6 +250,15 @@ where
     );
 
     let msg_to_send_tx = wire_msg.0.clone();
+
+    let mixer_cfg = msg::mixer::MixerConfig::new(
+        0,
+        std::env::var(ENV_MIXER_PACKET_MAX_DELAY_MILLIS)
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or_else(|| msg::mixer::MixerConfig::default().delay_range().1),
+    );
+
     processes.insert(
         ProtocolProcesses::MsgOut,
         spawn(async move {
@@ -282,28 +293,24 @@ where
                 })
                 .filter_map(|v| async move { v })
                 // delay purposefully isolated into a separate concurrent task
-                .then_concurrent(|v| {
-                    let cfg = msg::mixer::MixerConfig::default();
+                .then_concurrent(|v| async move {
+                    let random_delay = mixer_cfg.random_delay();
+                    trace!(delay_in_ms = random_delay.as_millis(), "Created random mixer delay",);
 
-                    async move {
-                        let random_delay = cfg.random_delay();
-                        trace!(delay_in_ms = random_delay.as_millis(), "Created random mixer delay",);
+                    sleep(random_delay).await;
 
-                        sleep(random_delay).await;
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        METRIC_QUEUE_SIZE.decrement(1.0f64);
 
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        {
-                            METRIC_QUEUE_SIZE.decrement(1.0f64);
-
-                            let weight = 1.0f64 / cfg.metric_delay_window as f64;
-                            METRIC_MIXER_AVERAGE_DELAY.set(
-                                (weight * random_delay.as_millis() as f64)
-                                    + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
-                            );
-                        }
-
-                        v
+                        let weight = 1.0f64 / mixer_cfg.metric_delay_window as f64;
+                        METRIC_MIXER_AVERAGE_DELAY.set(
+                            (weight * random_delay.as_millis() as f64)
+                                + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
+                        );
                     }
+
+                    v
                 })
                 .map(Ok)
                 .forward(wire_msg.0)

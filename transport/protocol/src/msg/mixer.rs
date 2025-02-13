@@ -4,7 +4,7 @@ use std::time::Duration;
 pub struct MixerConfig {
     #[default(Duration::from_millis(0u64))]
     min_delay: Duration,
-    #[default(Duration::from_millis(200u64))]
+    #[default(Duration::from_millis(50u64))]
     max_delay: Duration,
     #[default = 10]
     pub metric_delay_window: u64,
@@ -26,6 +26,11 @@ impl MixerConfig {
             max_delay: Duration::from_millis(max_delay),
             metric_delay_window: 10u64,
         }
+    }
+
+    /// Returns the minimum and maximum delay in milliseconds.
+    pub fn delay_range(&self) -> (u64, u64) {
+        (self.min_delay.as_millis() as u64, self.max_delay.as_millis() as u64)
     }
 
     /// Get a random delay duration from the specified minimum and maximum delay available

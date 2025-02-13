@@ -56,18 +56,34 @@ lazy_static::lazy_static! {
 
 use hopr_platform::time::native::current_time;
 
+#[inline]
+fn default_aggregation_threshold() -> Option<u32> {
+    Some(1000)
+}
+
+#[inline]
+fn just_true() -> bool {
+    true
+}
+
+#[inline]
+fn default_unrealized_balance_ratio() -> Option<f32> {
+    Some(0.9)
+}
+
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
 pub struct AggregatingStrategyConfig {
-    /// Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
+    /// The number of acknowledged winning tickets in a channel that triggers the ticket aggregation
     /// in that channel when exceeded.
     ///
     /// This condition is independent of `unrealized_balance_ratio`.
     ///
-    /// Default is 100.
+    /// Default is 1000.
     #[validate(range(min = 2))]
-    #[default(Some(100))]
+    #[serde(default = "default_aggregation_threshold")]
+    #[default(default_aggregation_threshold())]
     pub aggregation_threshold: Option<u32>,
 
     /// Percentage of unrealized balance in unaggregated tickets in a channel
@@ -78,16 +94,18 @@ pub struct AggregatingStrategyConfig {
     ///
     /// Default is 0.9
     #[validate(range(min = 0_f32, max = 1.0_f32))]
-    #[default(Some(0.9))]
+    #[serde(default = "default_unrealized_balance_ratio")]
+    #[default(default_unrealized_balance_ratio())]
     pub unrealized_balance_ratio: Option<f32>,
 
-    /// If set, the strategy will automatically aggregate tickets in channel that has transitioned
+    /// If set, the strategy will automatically aggregate tickets in a channel that has transitioned
     /// to the `PendingToClose` state.
     ///
     /// This happens regardless if `aggregation_threshold` or `unrealized_balance_ratio` thresholds are met on that channel.
     /// If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
     ///
     /// Default is true.
+    #[serde(default = "just_true")]
     #[default = true]
     pub aggregate_on_channel_close: bool,
 }

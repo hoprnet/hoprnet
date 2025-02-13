@@ -323,7 +323,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (hopr_socket, hopr_processes) = node
         .run(HoprServerIpForwardingReactor::new(
             hopr_keys.packet_key.clone(),
-            Default::default(),
+            cfg.session_ip_forwarding,
         ))
         .await?;
 

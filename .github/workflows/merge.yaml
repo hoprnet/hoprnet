@@ -66,6 +66,8 @@ jobs:
           - hopli
           - hoprd
     name: Build ${{ matrix.package }}
+    # only run build and tag if the PR is merged, not if its closed
+    if: github.event.pull_request.merged == true
     uses: ./.github/workflows/build-docker.yaml
     with:
       branch: ${{ github.event.pull_request.base.ref }}
@@ -215,16 +217,6 @@ jobs:
     needs:
       - create_release
     uses: ./.github/workflows/generate-dappnode-pr.yaml
-    with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
-    secrets: inherit
-
-  generate_sdk:
-    name: Generate SDK
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs:
-      - create_release
-    uses: ./.github/workflows/generate-sdk.yaml
     with:
       base_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
