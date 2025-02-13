@@ -45,7 +45,7 @@ lazy_static::lazy_static! {
 }
 
 /// The maximum number of tickets that can sent for aggregation in a single request.
-const MAX_TICKETS_TO_AGGREGATE_BATCH: u64 = 500;
+pub const MAX_TICKETS_TO_AGGREGATE_BATCH: u64 = 500;
 
 /// The type is necessary solely to allow
 /// implementing the [`IntoCondition`] trait for [`TicketSelector`]
@@ -866,7 +866,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .await?;
 
                     // Filter the list of tickets according to the prerequisites
-                    let mut to_be_aggregated =
+                    let mut to_be_aggregated: Vec<TransferableWinningTicket> =
                         filter_satisfying_ticket_models(prerequisites, to_be_aggregated, &channel_entry, min_win_prob)?
                             .into_iter()
                             .map(|model| {
