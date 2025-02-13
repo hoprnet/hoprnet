@@ -43,13 +43,13 @@ semver = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 validator = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 core-network = { workspace = true }
 chain-actions = { workspace = true }
-tracing = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }

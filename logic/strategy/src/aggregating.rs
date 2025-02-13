@@ -56,9 +56,11 @@ lazy_static::lazy_static! {
 
 use hopr_platform::time::native::current_time;
 
+const MAX_AGGREGATABLE_TICKET_COUNT: u32 = hopr_db_sql::tickets::MAX_TICKETS_TO_AGGREGATE_BATCH as u32;
+
 #[inline]
 fn default_aggregation_threshold() -> Option<u32> {
-    Some(1000)
+    Some(100)
 }
 
 #[inline]
@@ -80,8 +82,8 @@ pub struct AggregatingStrategyConfig {
     ///
     /// This condition is independent of `unrealized_balance_ratio`.
     ///
-    /// Default is 1000.
-    #[validate(range(min = 2))]
+    /// Default is 100.
+    #[validate(range(min = 2, max = MAX_AGGREGATABLE_TICKET_COUNT))]
     #[serde(default = "default_aggregation_threshold")]
     #[default(default_aggregation_threshold())]
     pub aggregation_threshold: Option<u32>,
