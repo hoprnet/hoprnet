@@ -300,6 +300,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::aggregating::{default_aggregation_threshold, MAX_AGGREGATABLE_TICKET_COUNT};
     use crate::strategy::SingularStrategy;
     use anyhow::Context;
     use async_std::prelude::FutureExt as AsyncStdFutureExt;
@@ -324,6 +325,13 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use tracing::{debug, error};
+
+    #[test]
+    fn default_ticket_aggregation_count_is_lower_than_maximum_allowed_ticket_count() -> anyhow::Result<()> {
+        assert!(default_aggregation_threshold().unwrap() < MAX_AGGREGATABLE_TICKET_COUNT);
+
+        Ok(())
+    }
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![
