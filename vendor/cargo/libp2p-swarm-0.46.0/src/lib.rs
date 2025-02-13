@@ -440,9 +440,9 @@ where
 
         tracing::trace!(
             %connection_id,
-            %peer_id,
+            ?peer_id,
             %should_dial,
-            %condition,
+            ?condition,
             "checking whether to dial peer"
         );
 
