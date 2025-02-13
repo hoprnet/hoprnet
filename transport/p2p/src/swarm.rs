@@ -158,17 +158,17 @@ impl HoprSwarm {
             match resolve_dns_if_any(multiaddress) {
                 Ok(ma) => {
                     if let Err(e) = swarm.listen_on(ma.clone()) {
-                        warn!(%multiaddress, error = %e, "Failed to listen_on");
+                        warn!(%multiaddress, listen_on=%ma, error = %e, "Failed to listen_on, will try to use an unspecified address");
 
                         match replace_transport_with_unspecified(&ma) {
                             Ok(ma) => {
                                 if let Err(e) = swarm.listen_on(ma.clone()) {
-                                    warn!(multiaddress = %ma, error = %e, "Failed to listen_on also using the unspecified multiaddress",);
+                                    warn!(multiaddress = %ma, error = %e, "Failed to listen_on using the unspecified multiaddress",);
                                 } else {
                                     info!(
                                         listen_on = ?ma,
                                         multiaddress = ?multiaddress,
-                                        "Listening for p2p connections)"
+                                        "Listening for p2p connections"
                                     );
                                     swarm.add_external_address(multiaddress.clone());
                                 }
@@ -181,7 +181,7 @@ impl HoprSwarm {
                         info!(
                             listen_on = ?ma,
                             multiaddress = ?multiaddress,
-                            "Listening for p2p connections)"
+                            "Listening for p2p connections"
                         );
                         swarm.add_external_address(multiaddress.clone());
                     }
