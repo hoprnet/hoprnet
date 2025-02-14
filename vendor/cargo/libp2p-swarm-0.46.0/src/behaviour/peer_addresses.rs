@@ -31,10 +31,11 @@ impl PeerAddresses {
                 error: DialError::Transport(errors),
                 ..
             }) => {
-                for (addr, _error) in errors {
-                    self.remove(peer_id, addr);
-                }
-                true
+                // FIXME: not removing the multiaddr as a workaround for now
+                // for (addr, _error) in errors {
+                //     self.remove(peer_id, addr);
+                // }
+                false
             }
             _ => false,
         }
@@ -287,10 +288,7 @@ mod tests {
         assert_eq!(cached, expected);
     }
 
-    fn prepare_expected_addrs(
-        peer_id: PeerId,
-        addrs: impl Iterator<Item = Multiaddr>,
-    ) -> Vec<Multiaddr> {
+    fn prepare_expected_addrs(peer_id: PeerId, addrs: impl Iterator<Item = Multiaddr>) -> Vec<Multiaddr> {
         let mut addrs = addrs
             .filter_map(|a| a.with_p2p(peer_id).ok())
             .collect::<Vec<Multiaddr>>();
@@ -318,18 +316,13 @@ mod tests {
             .map(|addr| {
                 (
                     addr.clone(),
-                    TransportError::Other(io::Error::new(
-                        io::ErrorKind::Other,
-                        MemoryTransportError::Unreachable,
-                    )),
+                    TransportError::Other(io::Error::new(io::ErrorKind::Other, MemoryTransportError::Unreachable)),
                 )
             })
             .collect();
         errors
     }
 
-    static MEMORY_ADDR_1000: Lazy<Multiaddr> =
-        Lazy::new(|| Multiaddr::empty().with(Protocol::Memory(1000)));
-    static MEMORY_ADDR_2000: Lazy<Multiaddr> =
-        Lazy::new(|| Multiaddr::empty().with(Protocol::Memory(2000)));
+    static MEMORY_ADDR_1000: Lazy<Multiaddr> = Lazy::new(|| Multiaddr::empty().with(Protocol::Memory(1000)));
+    static MEMORY_ADDR_2000: Lazy<Multiaddr> = Lazy::new(|| Multiaddr::empty().with(Protocol::Memory(2000)));
 }
