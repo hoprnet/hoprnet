@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use futures::stream::{BoxStream, Stream, StreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p::{
-    swarm::{dummy::ConnectionHandler, CloseConnection, NetworkBehaviour, ToSwarm},
+    swarm::{dial_opts::DialOpts, dummy::ConnectionHandler, CloseConnection, NetworkBehaviour, ToSwarm},
     Multiaddr, PeerId,
 };
 
@@ -194,6 +194,7 @@ impl NetworkBehaviour for Behaviour {
                                 peer_id: peer,
                                 address: multiaddress.clone(),
                             });
+                            self.pending_events.push_back(ToSwarm::Dial { opts: DialOpts::peer_id(peer).addresses(multiaddresses).build()});
                         }
                     }
                 }
