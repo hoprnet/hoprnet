@@ -84,8 +84,9 @@ pub struct HoprNetworkBehavior {
         Vec<legacy::AcknowledgedTicket>,
         std::result::Result<legacy::Ticket, String>,
     >,
-    // WARNING: order is important, this must be the last member, because the request_response components
-    // remove the peer from its address, and the discovery readds that.
+    // WARNING: the order of struct members is important, `discovery` must be the last member,
+    // because the request_response components remove the peer from its peer store after a failed
+    // dial operation and the discovery mechanism is responsible for populating all peer stores.
     discovery: behavior::discovery::Behaviour,
 }
 
