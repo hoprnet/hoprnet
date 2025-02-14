@@ -75,7 +75,6 @@ pub struct Pong(pub ControlMessage, pub String);
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
-    discovery: behavior::discovery::Behaviour,
     heartbeat_generator: behavior::heartbeat::Behaviour,
     ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour,
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
@@ -85,6 +84,9 @@ pub struct HoprNetworkBehavior {
         Vec<legacy::AcknowledgedTicket>,
         std::result::Result<legacy::Ticket, String>,
     >,
+    // WARNING: order is important, this must be the last member, because the request_response components
+    // remove the peer from its address, and the discovery readds that.
+    discovery: behavior::discovery::Behaviour,
 }
 
 impl Debug for HoprNetworkBehavior {
