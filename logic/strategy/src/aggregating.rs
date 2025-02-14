@@ -60,7 +60,7 @@ const MAX_AGGREGATABLE_TICKET_COUNT: u32 = hopr_db_sql::tickets::MAX_TICKETS_TO_
 
 #[inline]
 fn default_aggregation_threshold() -> Option<u32> {
-    Some(100)
+    Some(250)
 }
 
 #[inline]
@@ -82,7 +82,7 @@ pub struct AggregatingStrategyConfig {
     ///
     /// This condition is independent of `unrealized_balance_ratio`.
     ///
-    /// Default is 100.
+    /// Default is 250.
     #[validate(range(min = 2, max = MAX_AGGREGATABLE_TICKET_COUNT))]
     #[serde(default = "default_aggregation_threshold")]
     #[default(default_aggregation_threshold())]
