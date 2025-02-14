@@ -1,5 +1,6 @@
 pub mod skip_queue;
 
+use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::sync::atomic::AtomicUsize;
@@ -14,6 +15,7 @@ use rand::distributions::Bernoulli;
 use rand::prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng};
 use rand_distr::Normal;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
+use crate::prelude::FrameId;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct RetryToken {
@@ -239,6 +241,12 @@ pub fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, 
 #[derive(Debug)]
 pub(crate) struct OffloadedRbProducer<T>(UnboundedSender<T>);
 
+impl<T> Clone for OffloadedRbProducer<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 impl<T> OffloadedRbProducer<T> {
     pub fn push(&self, item: T) -> bool {
         self.0.unbounded_send(item).is_ok()
@@ -283,6 +291,60 @@ pub(crate) fn offloaded_ringbuffer<T: Send + 'static>(
     }));
 
     (OffloadedRbProducer(rb_tx), OffloadedRbConsumer(rb))
+}
+
+#[derive(Debug, Copy, Clone, Eq)]
+pub(crate) struct RetriedFrameId {
+    pub frame_id: FrameId,
+    pub retry_count: u32,
+}
+
+impl From<FrameId> for RetriedFrameId {
+    fn from(value: FrameId) -> Self {
+        Self::new(value)
+    }
+}
+
+impl RetriedFrameId {
+    pub fn new(frame_id: FrameId) -> Self {
+        Self {
+            frame_id,
+            retry_count: 0,
+        }
+    }
+    pub fn next(self, max_retries: u32) -> Option<Self> {
+        if self.retry_count < max_retries {
+            Some(Self {
+                frame_id: self.frame_id,
+                retry_count: self.retry_count + 1,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn at(&self) -> std::time::Instant {
+        // TODO: add backoff impl here
+        std::time::Instant::now()
+    }
+}
+
+impl PartialEq<Self> for RetriedFrameId {
+    fn eq(&self, other: &Self) -> bool {
+        self.frame_id.eq(&other.frame_id)
+    }
+}
+
+impl PartialOrd<Self> for RetriedFrameId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for RetriedFrameId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.frame_id.cmp(&other.frame_id)
+    }
 }
 
 #[cfg(test)]
