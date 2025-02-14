@@ -674,7 +674,7 @@ where
             error,
         }: DialFailure,
     ) {
-        tracing::trace!(?peer_id, %connection_id, %error, "on dial failure");
+        tracing::error!(?peer_id, %connection_id, %error, "dial failure");
 
         if let Some(peer) = peer_id {
             // If there are pending outgoing requests when a dial failure occurs,

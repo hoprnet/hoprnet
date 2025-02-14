@@ -568,7 +568,7 @@ impl HoprSwarmWithProcessors {
                         let network_info = swarm.network_info();
                         let num_peers = network_info.num_peers();
                         let connection_counters = network_info.connection_counters();
-                        trace!(num_peers, ?connection_counters, "swarm network status after connection established");
+                        info!(num_peers, ?connection_counters, "swarm network status after connection established");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
@@ -588,7 +588,7 @@ impl HoprSwarmWithProcessors {
                         let network_info = swarm.network_info();
                         let num_peers = network_info.num_peers();
                         let connection_counters = network_info.connection_counters();
-                        trace!(num_peers, ?connection_counters, "swarm network status after connection closed");
+                        info!(num_peers, ?connection_counters, "swarm network status after connection closed");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
@@ -605,7 +605,7 @@ impl HoprSwarmWithProcessors {
                         let network_info = swarm.network_info();
                         let num_peers = network_info.num_peers();
                         let connection_counters = network_info.connection_counters();
-                        trace!(num_peers, ?connection_counters, "swarm network status after incoming connection")
+                        info!(num_peers, ?connection_counters, "swarm network status after incoming connection")
                     }
                     SwarmEvent::IncomingConnectionError {
                         local_addr,
@@ -618,7 +618,7 @@ impl HoprSwarmWithProcessors {
                         let network_info = swarm.network_info();
                         let num_peers = network_info.num_peers();
                         let connection_counters = network_info.connection_counters();
-                        trace!(num_peers, ?connection_counters, "swarm network status after incoming connection error")
+                        info!(num_peers, ?connection_counters, "swarm network status after incoming connection error")
                     }
                     SwarmEvent::OutgoingConnectionError {
                         connection_id,
@@ -630,7 +630,7 @@ impl HoprSwarmWithProcessors {
                         let network_info = swarm.network_info();
                         let num_peers = network_info.num_peers();
                         let connection_counters = network_info.connection_counters();
-                        trace!(num_peers, ?connection_counters, "swarm network status after outgoing connection error")
+                        info!(num_peers, ?connection_counters, "swarm network status after outgoing connection error")
                     }
                     SwarmEvent::NewListenAddr {
                         listener_id,
@@ -666,7 +666,7 @@ impl HoprSwarmWithProcessors {
                         let network_info = swarm.network_info();
                         let num_peers = network_info.num_peers();
                         let connection_counters = network_info.connection_counters();
-                        trace!(num_peers, ?connection_counters, "swarm network status after dialing")
+                        info!(num_peers, ?connection_counters, "swarm network status after dialing")
                     }
                     _ => error!(transport="libp2p", "unimplemented message type in p2p processing chain encountered")
                 }

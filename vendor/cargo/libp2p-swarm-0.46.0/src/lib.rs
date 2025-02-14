@@ -438,7 +438,7 @@ where
             }
         };
 
-        tracing::trace!(
+        tracing::info!(
             %connection_id,
             ?peer_id,
             %should_dial,
