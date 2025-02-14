@@ -1,20 +1,19 @@
 mod state;
 
-use futures::StreamExt;
 use asynchronous_codec::Framed;
 use futures::{pin_mut, SinkExt, TryStreamExt};
+use futures::{AsyncReadExt, StreamExt};
 use futures_concurrency::stream::Merge;
+use state::SocketState;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use state::SocketState;
 
 use crate::prelude::errors::SessionError;
-use crate::prelude::protocol::{SessionCodec, SessionMessage};
 use crate::prelude::frame_reconstructor_with_inspector;
+use crate::prelude::protocol::{SessionCodec, SessionMessage};
 use crate::session::segmenter::Segmenter;
-use crate::session::socket::state::{SocketStateEvent, SocketStateQueue, StateManager};
-
+use crate::session::socket::state::{SocketStateEvent, StateManager};
 
 pub struct SessionSocket<const C: usize> {
     // This is where upstream writes frame data to
@@ -23,17 +22,17 @@ pub struct SessionSocket<const C: usize> {
     downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
 }
 
-
 impl<const C: usize> SessionSocket<C> {
     pub fn new<T, S>(transport: T, state: S) -> Self
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
-        S: for<'a> SocketState<'a, C> + Send + Sync + 'static, <<S as SocketStateQueue<C>>::EventsIn as futures::Sink<SocketStateEvent<C>>>::Error: std::fmt::Display
+        S: for<'a> SocketState<'a, C> + Send + Sync + 'static,
     {
         let sid = state.session_id().to_owned();
 
         // Downstream Segments get reconstructed into Frames
-        let (downstream_segment_in, downstream_frames_out, frame_inspector) = frame_reconstructor_with_inspector(Duration::from_secs(10), 1024);
+        let (downstream_segment_in, downstream_frames_out, frame_inspector) =
+            frame_reconstructor_with_inspector(Duration::from_secs(10), 1024);
 
         // Upstream frames get segmented and are yielded by the data_rx stream
         let (upstream_frames_in, segmented_data_rx) = Segmenter::<C, 1500>::new(1024);
@@ -71,8 +70,7 @@ impl<const C: usize> SessionSocket<C> {
                 .into_async_read(),
         );
 
-        let (packets_out, packets_in) =
-            StreamExt::split::<SessionMessage<C>>(Framed::new(transport, SessionCodec::<C>));
+        let (packets_out, packets_in) = Framed::new(transport, SessionCodec::<C>).split();
 
         // Messages incoming from Upstream and from the State go downstream as Packets
         let ctl_rx = state_mgr.control_stream().unwrap_or(futures::stream::empty().boxed());
@@ -80,22 +78,21 @@ impl<const C: usize> SessionSocket<C> {
         let session_id = sid.clone();
         hopr_async_runtime::prelude::spawn(
             (
-                ctl_rx, // TODO: refactor
-                segmented_data_rx
-                    .then(move |s| {
-                        let mut state_events = state_events.clone();
-                        let session_id = session_id.clone();
-                        async move {
-                            if let Err(error) = state_events.send(SocketStateEvent::SegmentSent(s.clone())).await {
-                                tracing::error!(session_id, %error, "failed to notify sent segment to the state");
-                            }
-                            SessionMessage::<C>::Segment(s)
+                ctl_rx,
+                segmented_data_rx.then(move |s| {
+                    let mut state_events = state_events.clone();
+                    let session_id = session_id.clone();
+                    async move {
+                        if let Err(error) = state_events.send(SocketStateEvent::SegmentSent(s.clone())).await {
+                            tracing::error!(session_id, %error, "failed to notify sent segment to the state");
                         }
-                    }),
+                        SessionMessage::<C>::Segment(s)
+                    }
+                }),
             )
-            .merge()
-            .map(Ok)
-            .forward(packets_out),
+                .merge()
+                .map(Ok)
+                .forward(packets_out),
         );
 
         // Packets incoming from Downstream
@@ -108,7 +105,9 @@ impl<const C: usize> SessionSocket<C> {
                     let session_id = session_id.clone();
                     async move {
                         if let Err(error) = state_events
-                            .send(SocketStateEvent::MessageReceived(packet.clone())).await {
+                            .send(SocketStateEvent::MessageReceived(packet.clone()))
+                            .await
+                        {
                             tracing::error!(session_id, %error, "cannot dispatch incoming message to the state");
                             Err(SessionError::ProcessingError(error.to_string()))
                         } else {
@@ -120,7 +119,7 @@ impl<const C: usize> SessionSocket<C> {
                         }
                     }
                 })
-                .forward(downstream_segment_in)
+                .forward(downstream_segment_in),
         );
 
         Self {

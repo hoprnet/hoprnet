@@ -1,32 +1,27 @@
+use futures::channel::mpsc::UnboundedSender;
+use futures::stream::BoxStream;
+use futures::{Sink, Stream, StreamExt};
+use governor::prelude::StreamRateLimitExt;
+use governor::{Quota, RateLimiter};
+use pin_project::pin_project;
 use std::num::NonZeroU32;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use futures::{Sink, Stream, StreamExt};
-use futures::stream::BoxStream;
-use governor::{Quota, RateLimiter};
-use governor::prelude::StreamRateLimitExt;
-use pin_project::pin_project;
 
 use crate::prelude::errors::SessionError;
 use crate::prelude::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::prelude::{FrameId, Segment, SegmentId};
 use crate::session::frame::SeqNum;
-use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer, OffloadedRbProducer, RetriedFrameId};
 use crate::session::utils::skip_queue::{skip_delay_channel, DelayedItem, SkipDelayReceiver, SkipDelaySender};
-
-pub trait SocketStateQueue<const C: usize> {
-    type EventsIn: Sink<SocketStateEvent<C>> + Clone + Send + Unpin;
-    type EventsOut: Stream<Item = SocketStateEvent<C>> + Send;
-
-    fn queue() -> (Self::EventsIn, Self::EventsOut);
-}
+use crate::session::utils::{offloaded_ringbuffer, OffloadedRbConsumer, OffloadedRbProducer, RetriedFrameId};
 
 /// Abstraction of the [SessionSocket] state.
-pub trait SocketState<'a, const C: usize>: SocketStateQueue<C> {
-
+pub trait SocketState<'a, const C: usize> {
     /// Gets ID of this Session.
     fn session_id(&self) -> &str;
+
+    fn event_subscriptions(&self) -> Vec<SocketStateEventDiscriminants>;
 
     fn control_stream(&self) -> Option<BoxStream<'a, SessionMessage<C>>>;
 
@@ -50,7 +45,7 @@ pub trait SocketState<'a, const C: usize>: SocketStateQueue<C> {
     fn segment_sent(&mut self, segment: Segment) -> Result<(), SessionError>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, strum::EnumDiscriminants)]
 pub enum SocketStateEvent<const C: usize> {
     MessageReceived(SessionMessage<C>),
     FrameReceived(FrameId),
@@ -58,31 +53,26 @@ pub enum SocketStateEvent<const C: usize> {
     SegmentSent(Segment),
 }
 
-pub(crate) struct StateManager<'a, const C: usize, S: SocketState<'a, C>> {
-    state_events_in: S::EventsIn,
+pub(crate) struct StateManager<'a, const C: usize> {
+    state_events_in: UnboundedSender<SocketStateEvent<C>>,
     ctl_msg_out: Option<BoxStream<'a, SessionMessage<C>>>,
 }
 
-impl<'a, const C: usize, S> StateManager<'a, C, S>
-where S: SocketState<'a, C> + Send + 'static {
-    pub fn new(state: S) -> Self {
-        let (state_events_in, state_events_out) = S::queue();
+impl<'a, const C: usize> StateManager<'a, C> {
+    pub fn new<S: SocketState<'a, C> + Send + 'static>(state: S) -> Self {
+        let (state_events_in, state_events_out) = futures::channel::mpsc::unbounded();
         let ctl_msg_out = state.control_stream();
 
         // Pass all the socket state events into the SocketState
-        hopr_async_runtime::prelude::spawn(
-            state_events_out
-                .map(Ok)
-                .forward(StateSink(state))
-        );
+        hopr_async_runtime::prelude::spawn(state_events_out.map(Ok).forward(StateSink(state)));
 
         Self {
             state_events_in,
-            ctl_msg_out
+            ctl_msg_out,
         }
     }
 
-    pub fn state_events(&self) -> S::EventsIn {
+    pub fn state_events(&self) -> UnboundedSender<SocketStateEvent<C>> {
         self.state_events_in.clone()
     }
 
@@ -96,18 +86,16 @@ where S: SocketState<'a, C> + Send + 'static {
 #[derive(Clone)]
 pub struct Stateless<const C: usize>(String);
 
-impl<const C: usize> SocketStateQueue<C> for Stateless<C> {
-    type EventsIn = futures::sink::Drain<SocketStateEvent<C>>;
-    type EventsOut = futures::stream::Empty<SocketStateEvent<C>>;
-
-    fn queue() -> (Self::EventsIn, Self::EventsOut) {
-        (futures::sink::drain(), futures::stream::empty())
-    }
-}
-
 impl<'a, const C: usize> SocketState<'a, C> for Stateless<C> {
     fn session_id(&self) -> &str {
         &self.0
+    }
+
+    fn event_subscriptions(&self) -> Vec<SocketStateEventDiscriminants> {
+        vec![
+            SocketStateEventDiscriminants::FrameReceived,
+            SocketStateEventDiscriminants::FrameDiscarded,
+        ]
     }
 
     fn control_stream(&self) -> Option<BoxStream<'a, SessionMessage<C>>> {
@@ -115,17 +103,14 @@ impl<'a, const C: usize> SocketState<'a, C> for Stateless<C> {
     }
 
     fn incoming_segment(&mut self, id: &SegmentId, _segment_count: SeqNum) -> Result<(), SessionError> {
-        tracing::trace!(session_id = self.session_id(), %id, "RECEIVED: segment");
         Ok(())
     }
 
     fn incoming_retransmission_request(&mut self, _request: SegmentRequest<C>) -> Result<(), SessionError> {
-        tracing::warn!(session_id = self.0, "RECEIVED: segment request in a session that does not support acknowledgements");
         Ok(())
     }
 
     fn incoming_acknowledged_frames(&mut self, _ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
-        tracing::warn!(session_id = self.0, "RECEIVED: frame acknowledgements in a session that does not support acknowledgements");
         Ok(())
     }
 
@@ -140,10 +125,8 @@ impl<'a, const C: usize> SocketState<'a, C> for Stateless<C> {
     }
 
     fn segment_sent(&mut self, segment: Segment) -> Result<(), SessionError> {
-        tracing::trace!(session_id = self.session_id(), frame_id = %segment.frame_id, seq_id = %segment.seq_idx, "segment sent");
         Ok(())
     }
-
 }
 
 /// Wraps a [`SocketState`] into a [`futures::Sink`] that consumes [`SocketStateEvent`]
@@ -161,7 +144,9 @@ impl<'a, const C: usize, S: SocketState<'a, C>> Sink<SocketStateEvent<C>> for St
     fn start_send(self: Pin<&mut Self>, item: SocketStateEvent<C>) -> Result<(), Self::Error> {
         let this = self.project();
         match item {
-            SocketStateEvent::MessageReceived(SessionMessage::Segment(s)) => this.0.incoming_segment(&s.id(), s.seq_len),
+            SocketStateEvent::MessageReceived(SessionMessage::Segment(s)) => {
+                this.0.incoming_segment(&s.id(), s.seq_len)
+            }
             SocketStateEvent::MessageReceived(SessionMessage::Request(r)) => this.0.incoming_retransmission_request(r),
             SocketStateEvent::MessageReceived(SessionMessage::Acknowledge(a)) => this.0.incoming_acknowledged_frames(a),
             SocketStateEvent::FrameReceived(id) => this.0.frame_received(id),
@@ -180,9 +165,7 @@ impl<'a, const C: usize, S: SocketState<'a, C>> Sink<SocketStateEvent<C>> for St
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct AcknowledgementStateConfig {
-
-}
+pub struct AcknowledgementStateConfig {}
 
 /// Represents a Session socket state is able to process acknowledgements.
 #[derive(Clone)]
@@ -197,7 +180,11 @@ pub struct AcknowledgementState<const C: usize> {
 }
 
 impl<const C: usize> AcknowledgementState<C> {
-    pub fn new<I: std::fmt::Display>(session_id: I, ctl_tx: futures::channel::mpsc::UnboundedSender<SessionMessage<C>>,cfg: AcknowledgementStateConfig) -> Self {
+    pub fn new<I: std::fmt::Display>(
+        session_id: I,
+        ctl_tx: futures::channel::mpsc::UnboundedSender<SessionMessage<C>>,
+        cfg: AcknowledgementStateConfig,
+    ) -> Self {
         let id = session_id.to_string();
 
         let (incoming_frame_retries_tx, incoming_frame_retries_rx) = skip_delay_channel();
@@ -280,10 +267,10 @@ impl<const C: usize> AcknowledgementState<C> {
                 .flat_map(move |frame_id|
                     // Find out all the segments of that frame to be retransmitted
                     futures::stream::iter(rb_rx_clone.find(|s: &Segment| s.id().0 == frame_id))
-                        .map(|s| Ok(SessionMessage::<C>::Segment(s)))
-                )
+                        .map(|s| Ok(SessionMessage::<C>::Segment(s))))
                 .forward(ctl_tx_clone) // Retransmit all the segments
-                .await {
+                .await
+            {
                 tracing::error!(%error, "error while processing outgoing frame retries");
             } else {
                 tracing::trace!("outgoing frame retries processing done");
@@ -302,18 +289,19 @@ impl<const C: usize> AcknowledgementState<C> {
     }
 }
 
-impl<const C: usize> SocketStateQueue<C> for AcknowledgementState<C> {
-    type EventsIn = futures::channel::mpsc::UnboundedSender<SocketStateEvent<C>>;
-    type EventsOut = futures::channel::mpsc::UnboundedReceiver<SocketStateEvent<C>>;
-
-    fn queue() -> (Self::EventsIn, Self::EventsOut) {
-        futures::channel::mpsc::unbounded()
-    }
-}
-
 impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
     fn session_id(&self) -> &str {
         &self.id
+    }
+
+    fn event_subscriptions(&self) -> Vec<SocketStateEventDiscriminants> {
+        // TODO: make this config specific
+        vec![
+            SocketStateEventDiscriminants::FrameReceived,
+            SocketStateEventDiscriminants::FrameDiscarded,
+            SocketStateEventDiscriminants::SegmentSent,
+            SocketStateEventDiscriminants::MessageReceived,
+        ]
     }
 
     fn control_stream(&self) -> Option<BoxStream<'a, SessionMessage<C>>> {
@@ -339,8 +327,11 @@ impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
         let segments = self.rb_rx.find(|s| missing.contains(&s.id()));
 
         // Partially acknowledged frames will not need to be fully resent in the future
-        if let Err(error) = self.outgoing_frame_retries_tx
-            .send_many(missing.into_iter().map(|seg_id| (RetriedFrameId::new(seg_id.0), Duration::from_secs(1)).into())) {
+        if let Err(error) = self.outgoing_frame_retries_tx.send_many(
+            missing
+                .into_iter()
+                .map(|seg_id| (RetriedFrameId::new(seg_id.0), Duration::from_secs(1)).into()),
+        ) {
             tracing::error!(%error, "failed to cancel frame resend of partially acknowledged frames");
         }
 
@@ -352,10 +343,11 @@ impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
 
     fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
         // Frame acknowledged, we will not need to resend it
-        if let Err(error)= self.outgoing_frame_retries_tx.send_many(ack
-            .into_iter()
-            .inspect(|frame_id| tracing::trace!(frame_id, "frame acknowledged"))
-            .map(|frame_id| DelayedItem::Cancel(RetriedFrameId::new(frame_id)))) {
+        if let Err(error) = self.outgoing_frame_retries_tx.send_many(
+            ack.into_iter()
+                .inspect(|frame_id| tracing::trace!(frame_id, "frame acknowledged"))
+                .map(|frame_id| DelayedItem::Cancel(RetriedFrameId::new(frame_id))),
+        ) {
             tracing::error!(%error, "failed to cancel frame resend");
         }
 

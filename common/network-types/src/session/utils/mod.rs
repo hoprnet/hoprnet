@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
+use crate::prelude::FrameId;
 use futures::channel::mpsc::UnboundedSender;
 use futures::stream::BoxStream;
 use futures::{AsyncRead, AsyncWrite, StreamExt};
@@ -15,7 +16,6 @@ use rand::distributions::Bernoulli;
 use rand::prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng};
 use rand_distr::Normal;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
-use crate::prelude::FrameId;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct RetryToken {

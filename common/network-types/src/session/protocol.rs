@@ -50,16 +50,16 @@
 //! per message. If more frames need to be acknowledged, more messages need to be sent.
 //! If the message contains fewer entries, it is padded with zeros (0 is not a valid frame ID).
 //!
+use crate::errors::NetworkTypeError;
+use crate::session::errors::SessionError;
+use crate::session::frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum};
 use asynchronous_codec::BytesMut;
+use bitvec::prelude::BitVec;
 use bytes::{Buf, BufMut};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::mem;
-use bitvec::prelude::BitVec;
-use crate::errors::NetworkTypeError;
-use crate::session::errors::SessionError;
-use crate::session::frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum};
 
 /// Holds the Segment Retransmission Request message.
 /// That is an ordered map of frame IDs and a bitmap of missing segments in each frame.
@@ -126,8 +126,16 @@ impl<const C: usize> IntoIterator for SegmentRequest<C> {
 }
 
 impl<const C: usize> FromIterator<(FrameId, BitVec)> for SegmentRequest<C> {
-    fn from_iter<T: IntoIterator<Item=(FrameId, BitVec)>>(iter: T) -> Self {
-        Self(iter.into_iter().flat_map(|(fid, v)| v.into_iter().enumerate().filter_map(move |(i, b)| b.then_some((fid, i as SeqNum)))).collect())
+    fn from_iter<T: IntoIterator<Item = (FrameId, BitVec)>>(iter: T) -> Self {
+        Self(
+            iter.into_iter()
+                .flat_map(|(fid, v)| {
+                    v.into_iter()
+                        .enumerate()
+                        .filter_map(move |(i, b)| b.then_some((fid, i as SeqNum)))
+                })
+                .collect(),
+        )
     }
 }
 
