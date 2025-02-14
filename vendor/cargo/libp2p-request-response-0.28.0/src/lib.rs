@@ -90,8 +90,8 @@ use libp2p_identity::PeerId;
 use libp2p_swarm::{
     behaviour::{AddressChange, ConnectionClosed, DialFailure, FromSwarm},
     dial_opts::DialOpts,
-    ConnectionDenied, ConnectionHandler, ConnectionId, NetworkBehaviour, NotifyHandler,
-    PeerAddresses, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
+    ConnectionDenied, ConnectionHandler, ConnectionId, NetworkBehaviour, NotifyHandler, PeerAddresses, THandler,
+    THandlerInEvent, THandlerOutEvent, ToSwarm,
 };
 use smallvec::SmallVec;
 
@@ -360,8 +360,7 @@ where
     /// The protocol codec for reading and writing requests and responses.
     codec: TCodec,
     /// Pending events to return from `poll`.
-    pending_events:
-        VecDeque<ToSwarm<Event<TCodec::Request, TCodec::Response>, OutboundMessage<TCodec>>>,
+    pending_events: VecDeque<ToSwarm<Event<TCodec::Request, TCodec::Response>, OutboundMessage<TCodec>>>,
     /// The currently connected peers, their pending outbound and inbound responses and their
     /// known, reachable addresses, if any.
     connected: HashMap<PeerId, SmallVec<[Connection; 2]>>,
@@ -444,10 +443,7 @@ where
             self.pending_events.push_back(ToSwarm::Dial {
                 opts: DialOpts::peer_id(*peer).build(),
             });
-            self.pending_outbound_requests
-                .entry(*peer)
-                .or_default()
-                .push(request);
+            self.pending_outbound_requests.entry(*peer).or_default().push(request);
         }
 
         request_id
@@ -508,10 +504,7 @@ where
         let est_conn = self
             .connected
             .get(peer)
-            .map(|cs| {
-                cs.iter()
-                    .any(|c| c.pending_outbound_responses.contains(request_id))
-            })
+            .map(|cs| cs.iter().any(|c| c.pending_outbound_responses.contains(request_id)))
             .unwrap_or(false);
         // Check if request is still pending to be sent.
         let pen_conn = self
@@ -529,10 +522,7 @@ where
     pub fn is_pending_inbound(&self, peer: &PeerId, request_id: &InboundRequestId) -> bool {
         self.connected
             .get(peer)
-            .map(|cs| {
-                cs.iter()
-                    .any(|c| c.pending_inbound_responses.contains(request_id))
-            })
+            .map(|cs| cs.iter().any(|c| c.pending_inbound_responses.contains(request_id)))
             .unwrap_or(false)
     }
 
@@ -546,11 +536,7 @@ where
     /// Tries to send a request by queueing an appropriate event to be
     /// emitted to the `Swarm`. If the peer is not currently connected,
     /// the given request is return unchanged.
-    fn try_send_request(
-        &mut self,
-        peer: &PeerId,
-        request: OutboundMessage<TCodec>,
-    ) -> Option<OutboundMessage<TCodec>> {
+    fn try_send_request(&mut self, peer: &PeerId, request: OutboundMessage<TCodec>) -> Option<OutboundMessage<TCodec>> {
         if let Some(connections) = self.connected.get_mut(peer) {
             if connections.is_empty() {
                 return Some(request);
@@ -603,11 +589,7 @@ where
 
     /// Returns a mutable reference to the connection in `self.connected`
     /// corresponding to the given [`PeerId`] and [`ConnectionId`].
-    fn get_connection_mut(
-        &mut self,
-        peer: &PeerId,
-        connection_id: ConnectionId,
-    ) -> Option<&mut Connection> {
+    fn get_connection_mut(&mut self, peer: &PeerId, connection_id: ConnectionId) -> Option<&mut Connection> {
         self.connected
             .get_mut(peer)
             .and_then(|connections| connections.iter_mut().find(|c| c.id == connection_id))
@@ -689,9 +671,11 @@ where
         DialFailure {
             peer_id,
             connection_id,
-            ..
+            error,
         }: DialFailure,
     ) {
+        tracing::trace!(?peer_id, %connection_id, %error, "on dial failure");
+
         if let Some(peer) = peer_id {
             // If there are pending outgoing requests when a dial failure occurs,
             // it is implied that we are not connected to the peer, since pending
@@ -726,9 +710,7 @@ where
 
         if let Some(pending_requests) = self.pending_outbound_requests.remove(&peer) {
             for request in pending_requests {
-                connection
-                    .pending_outbound_responses
-                    .insert(request.request_id);
+                connection.pending_outbound_responses.insert(request.request_id);
                 handler.on_behaviour_event(request);
             }
         }
@@ -803,12 +785,7 @@ where
             self.config.max_concurrent_streams,
         );
 
-        self.preload_new_handler(
-            &mut handler,
-            peer,
-            connection_id,
-            Some(remote_address.clone()),
-        );
+        self.preload_new_handler(&mut handler, peer, connection_id, Some(remote_address.clone()));
 
         Ok(handler)
     }
@@ -817,9 +794,7 @@ where
         self.addresses.on_swarm_event(&event);
         match event {
             FromSwarm::ConnectionEstablished(_) => {}
-            FromSwarm::ConnectionClosed(connection_closed) => {
-                self.on_connection_closed(connection_closed)
-            }
+            FromSwarm::ConnectionClosed(connection_closed) => self.on_connection_closed(connection_closed),
             FromSwarm::AddressChange(address_change) => self.on_address_change(address_change),
             FromSwarm::DialFailure(dial_failure) => self.on_dial_failure(dial_failure),
             _ => {}
@@ -833,61 +808,47 @@ where
         event: THandlerOutEvent<Self>,
     ) {
         match event {
-            handler::Event::Response {
-                request_id,
-                response,
-            } => {
-                let removed =
-                    self.remove_pending_outbound_response(&peer, connection_id, request_id);
-                debug_assert!(
-                    removed,
-                    "Expect request_id to be pending before receiving response.",
-                );
+            handler::Event::Response { request_id, response } => {
+                let removed = self.remove_pending_outbound_response(&peer, connection_id, request_id);
+                debug_assert!(removed, "Expect request_id to be pending before receiving response.",);
 
-                let message = Message::Response {
-                    request_id,
-                    response,
-                };
-                self.pending_events
-                    .push_back(ToSwarm::GenerateEvent(Event::Message {
-                        peer,
-                        connection_id,
-                        message,
-                    }));
+                let message = Message::Response { request_id, response };
+                self.pending_events.push_back(ToSwarm::GenerateEvent(Event::Message {
+                    peer,
+                    connection_id,
+                    message,
+                }));
             }
             handler::Event::Request {
                 request_id,
                 request,
                 sender,
-            } => match self.get_connection_mut(&peer, connection_id) {
-                Some(connection) => {
-                    let inserted = connection.pending_inbound_responses.insert(request_id);
-                    debug_assert!(inserted, "Expect id of new request to be unknown.");
+            } => {
+                match self.get_connection_mut(&peer, connection_id) {
+                    Some(connection) => {
+                        let inserted = connection.pending_inbound_responses.insert(request_id);
+                        debug_assert!(inserted, "Expect id of new request to be unknown.");
 
-                    let channel = ResponseChannel { sender };
-                    let message = Message::Request {
-                        request_id,
-                        request,
-                        channel,
-                    };
-                    self.pending_events
-                        .push_back(ToSwarm::GenerateEvent(Event::Message {
+                        let channel = ResponseChannel { sender };
+                        let message = Message::Request {
+                            request_id,
+                            request,
+                            channel,
+                        };
+                        self.pending_events.push_back(ToSwarm::GenerateEvent(Event::Message {
                             peer,
                             connection_id,
                             message,
                         }));
+                    }
+                    None => {
+                        tracing::debug!("Connection ({connection_id}) closed after `Event::Request` ({request_id}) has been emitted.");
+                    }
                 }
-                None => {
-                    tracing::debug!("Connection ({connection_id}) closed after `Event::Request` ({request_id}) has been emitted.");
-                }
-            },
+            }
             handler::Event::ResponseSent(request_id) => {
-                let removed =
-                    self.remove_pending_inbound_response(&peer, connection_id, request_id);
-                debug_assert!(
-                    removed,
-                    "Expect request_id to be pending before response is sent."
-                );
+                let removed = self.remove_pending_inbound_response(&peer, connection_id, request_id);
+                debug_assert!(removed, "Expect request_id to be pending before response is sent.");
 
                 self.pending_events
                     .push_back(ToSwarm::GenerateEvent(Event::ResponseSent {
@@ -897,12 +858,8 @@ where
                     }));
             }
             handler::Event::ResponseOmission(request_id) => {
-                let removed =
-                    self.remove_pending_inbound_response(&peer, connection_id, request_id);
-                debug_assert!(
-                    removed,
-                    "Expect request_id to be pending before response is omitted.",
-                );
+                let removed = self.remove_pending_inbound_response(&peer, connection_id, request_id);
+                debug_assert!(removed, "Expect request_id to be pending before response is omitted.",);
 
                 self.pending_events
                     .push_back(ToSwarm::GenerateEvent(Event::InboundFailure {
@@ -913,12 +870,8 @@ where
                     }));
             }
             handler::Event::OutboundTimeout(request_id) => {
-                let removed =
-                    self.remove_pending_outbound_response(&peer, connection_id, request_id);
-                debug_assert!(
-                    removed,
-                    "Expect request_id to be pending before request times out."
-                );
+                let removed = self.remove_pending_outbound_response(&peer, connection_id, request_id);
+                debug_assert!(removed, "Expect request_id to be pending before request times out.");
 
                 self.pending_events
                     .push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
@@ -929,12 +882,8 @@ where
                     }));
             }
             handler::Event::OutboundUnsupportedProtocols(request_id) => {
-                let removed =
-                    self.remove_pending_outbound_response(&peer, connection_id, request_id);
-                debug_assert!(
-                    removed,
-                    "Expect request_id to be pending before failing to connect.",
-                );
+                let removed = self.remove_pending_outbound_response(&peer, connection_id, request_id);
+                debug_assert!(removed, "Expect request_id to be pending before failing to connect.",);
 
                 self.pending_events
                     .push_back(ToSwarm::GenerateEvent(Event::OutboundFailure {
@@ -945,8 +894,7 @@ where
                     }));
             }
             handler::Event::OutboundStreamFailed { request_id, error } => {
-                let removed =
-                    self.remove_pending_outbound_response(&peer, connection_id, request_id);
+                let removed = self.remove_pending_outbound_response(&peer, connection_id, request_id);
                 debug_assert!(removed, "Expect request_id to be pending upon failure");
 
                 self.pending_events
@@ -958,8 +906,7 @@ where
                     }))
             }
             handler::Event::InboundTimeout(request_id) => {
-                let removed =
-                    self.remove_pending_inbound_response(&peer, connection_id, request_id);
+                let removed = self.remove_pending_inbound_response(&peer, connection_id, request_id);
 
                 if removed {
                     self.pending_events
@@ -971,14 +918,11 @@ where
                         }));
                 } else {
                     // This happens when timeout is emitted before `read_request` finishes.
-                    tracing::debug!(
-                        "Inbound request timeout for an unknown request_id ({request_id})"
-                    );
+                    tracing::debug!("Inbound request timeout for an unknown request_id ({request_id})");
                 }
             }
             handler::Event::InboundStreamFailed { request_id, error } => {
-                let removed =
-                    self.remove_pending_inbound_response(&peer, connection_id, request_id);
+                let removed = self.remove_pending_inbound_response(&peer, connection_id, request_id);
 
                 if removed {
                     self.pending_events
