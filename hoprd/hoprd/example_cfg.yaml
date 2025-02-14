@@ -84,7 +84,7 @@ hopr:
         # Number of acknowledged winning tickets in a channel that triggers the ticket aggregation
         # in that channel when exceeded.
         # This condition is independent of `unrealized_balance_ratio`.
-        aggregation_threshold: 100
+        aggregation_threshold: 250
         # Percentage of unrealized balance in unaggregated tickets in a channel
         # that triggers the ticket aggregation when exceeded.
         # The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
