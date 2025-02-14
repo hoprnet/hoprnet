@@ -2,7 +2,6 @@ use async_stream::stream;
 use async_trait::async_trait;
 use futures::channel::mpsc::UnboundedSender;
 use futures::{Stream, StreamExt};
-use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
 use std::ops::Div;
 
@@ -10,6 +9,7 @@ use tracing::{debug, warn};
 
 use hopr_async_runtime::prelude::timeout_fut;
 use hopr_platform::time::native::current_time;
+use hopr_primitive_types::traits::SaturatingSub;
 
 use crate::errors::{NetworkingError, Result};
 use crate::messaging::ControlMessage;

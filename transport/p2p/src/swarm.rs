@@ -505,10 +505,15 @@ impl HoprSwarmWithProcessors {
                         match event {
                             crate::behavior::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
                                 info!(%peer, address = %multiaddress, "New record");
+                                // We add the multiaddr before the first dial
                                 swarm.add_peer_address(peer, multiaddress.clone());
 
                                 if let Err(e) = swarm.dial(peer) {
                                     error!(%peer, address = %multiaddress, error = %e, "Failed to dial the peer");
+
+                                    // If the dial fails we need to re-add the multiaddr to ensure
+                                    // the next dial attempt could work.
+                                    swarm.add_peer_address(peer, multiaddress.clone());
                                 }
                             },
                         }
@@ -549,6 +554,9 @@ impl HoprSwarmWithProcessors {
                         trace!(event = tracing::field::debug(&event), "Received a heartbeat event");
                         match event {
                             crate::behavior::heartbeat::Event::ToProbe((peer, replier)) => {
+                                // Need to add the peer to the swarm to ensure the dialing works
+                                // swarm.add_peer_address(peer, multiaddress.clone());
+
                                 let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(replier.challenge()));
                                 active_pings.insert(req_id, replier).await;
                             },
