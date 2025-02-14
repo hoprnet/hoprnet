@@ -498,21 +498,7 @@ impl HoprSwarmWithProcessors {
                         }
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::KeepAlive(_)) => {}
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(event)) => {
-                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior", behavior="discovery");
-
-                        trace!(event = tracing::field::debug(&event), "Received a discovery event");
-                        match event {
-                            crate::behavior::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
-                                info!(%peer, address = %multiaddress, "New record");
-                                swarm.add_peer_address(peer, multiaddress.clone());
-
-                                if let Err(e) = swarm.dial(peer) {
-                                    error!(%peer, address = %multiaddress, error = %e, "Failed to dial the peer");
-                                }
-                            },
-                        }
-                    }
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(_)) => {}
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregationBehavior(event)) => {
                         let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior", behavior="ticket aggregation");
 
