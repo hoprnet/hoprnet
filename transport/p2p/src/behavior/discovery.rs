@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use futures::stream::{BoxStream, Stream, StreamExt};
 use futures_concurrency::stream::Merge;
 use libp2p::{
-    swarm::{dummy::ConnectionHandler, CloseConnection, NetworkBehaviour, ToSwarm},
+    swarm::{dial_opts::DialOpts, dummy::ConnectionHandler, CloseConnection, NetworkBehaviour, ToSwarm},
     Multiaddr, PeerId,
 };
 
@@ -20,9 +20,7 @@ pub enum DiscoveryInput {
 }
 
 #[derive(Debug)]
-pub enum Event {
-    NewPeerMultiddress(PeerId, Multiaddr),
-}
+pub enum Event {}
 
 pub struct Behaviour {
     me: PeerId,
@@ -33,6 +31,7 @@ pub struct Behaviour {
             <<Self as NetworkBehaviour>::ConnectionHandler as libp2p::swarm::ConnectionHandler>::FromBehaviour,
         >,
     >,
+    all_peers: HashMap<PeerId, Multiaddr>,
     allowed_peers: HashSet<PeerId>,
     connected_peers: HashMap<PeerId, usize>,
 }
@@ -53,6 +52,7 @@ impl Behaviour {
                     .merge()
                     .fuse(),
             ),
+            all_peers: HashMap::new(),
             pending_events: VecDeque::new(),
             allowed_peers: HashSet::new(),
             connected_peers: HashMap::new(),
@@ -113,6 +113,19 @@ impl NetworkBehaviour for Behaviour {
                     *v -= 1;
                 };
             }
+            libp2p::swarm::FromSwarm::DialFailure(failure) => {
+                // NOTE: libp2p swarm in the current version removes the (PeerId, Multiaddr) from the cache on a dial failure,
+                // therefore it needs to be readded back to the swarm on every dial failure, for now we want to mirror the entire
+                // announcement back to the swarm
+                if let Some(peer_id) = failure.peer_id {
+                    if let Some(multiaddress) = self.all_peers.get(&peer_id) {
+                        self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
+                            peer_id,
+                            address: multiaddress.clone(),
+                        });
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -151,6 +164,13 @@ impl NetworkBehaviour for Behaviour {
                 PeerDiscovery::Allow(peer) => {
                     debug!(peer = %peer, "p2p - discovery - Network registry allow");
                     let _ = self.allowed_peers.insert(peer);
+
+                    if let Some(multiaddress) = self.all_peers.get(&peer) {
+                        self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
+                            peer_id: peer,
+                            address: multiaddress.clone(),
+                        });
+                    }
                 }
                 PeerDiscovery::Ban(peer) => {
                     debug!(peer = %peer, "p2p - discovery - Network registry ban");
@@ -167,9 +187,18 @@ impl NetworkBehaviour for Behaviour {
                 PeerDiscovery::Announce(peer, multiaddresses) => {
                     if peer != self.me {
                         debug!(peer = %peer, addresses = tracing::field::debug(&multiaddresses), "p2p - discovery - Announcement");
-                        for multiaddress in multiaddresses.into_iter() {
-                            self.pending_events
-                                .push_back(ToSwarm::GenerateEvent(Event::NewPeerMultiddress(peer, multiaddress)));
+                        if let Some(multiaddress) = multiaddresses.last() {
+                            self.all_peers.insert(peer, multiaddress.clone());
+
+                            self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
+                                peer_id: peer,
+                                address: multiaddress.clone(),
+                            });
+
+                            // the dial is important to create a first connection some time before the heartbeat mechanism
+                            // kicks in, otherwise the heartbeat is likely to fail on the first try due to dial and protocol
+                            // negotiation taking longer than the request response timeout
+                            self.pending_events.push_back(ToSwarm::Dial { opts: DialOpts::peer_id(peer).addresses(multiaddresses).build()});
                         }
                     }
                 }
