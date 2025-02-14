@@ -624,7 +624,7 @@ impl HoprSwarmWithProcessors {
                     } => {
                         debug!(peer = tracing::field::debug(peer_id), connection_id = %connection_id, transport="libp2p", "dialing")
                     }
-                    _ => error!(transport="libp2p", "unimplemented message type in p2p processing chain encountered")
+                    _ => trace!(transport="libp2p", "unimplemented message type in p2p processing chain encountered")
                 }
             }
         }
