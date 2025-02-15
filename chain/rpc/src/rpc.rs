@@ -187,7 +187,7 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             },
         }
     }
-  
+
     async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance> {
         match self
             .contract_instances
@@ -200,6 +200,10 @@ impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
             Err(e) => Err(ContractError(
                 "HoprToken".to_string(),
                 "allowance".to_string(),
+                e.to_string(),
+            )),
+        }
+    }
 
     async fn get_minimum_network_winning_probability(&self) -> Result<f64> {
         match self.contract_instances.win_prob_oracle.current_win_prob().call().await {

@@ -9,7 +9,6 @@ use bindings::hopr_token::{ApprovalFilter, TransferFilter};
 use chain_types::chain_events::SignificantChainEvent;
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_chain_rpc::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations};
-use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
 use hopr_db_sql::HoprDbGeneralModelOperations;
@@ -202,9 +201,12 @@ where
                     "fast-sync",
                     block_number,
                     &rpc,
+                    db.clone(),
                     chain_head.clone(),
                     is_synced.clone(),
                     first_log_block_number,
+                    tx.clone(),
+                    None,
                     None,
                 )
                 .await;
@@ -258,8 +260,8 @@ where
                         is_synced.clone(),
                         next_block_to_process,
                         tx.clone(),
-                        logs_handler.safe_address(),
-                        logs_handler.contract_addresses_map().channels,
+                        logs_handler.safe_address().into(),
+                        logs_handler.contract_addresses_map().channels.into(),
                     )
                     .map(|_| block)
                 })
@@ -491,9 +493,9 @@ where
                     let last_log = block.logs.into_iter().last().unwrap();
                     let log = db.get_log(block_id, last_log.tx_index, last_log.log_index).await.ok()?;
 
-                    Self::print_indexer_state(block_id, log_count, log.checksum.unwrap()).await
+                    //Self::print_indexer_state(block_id, log_count, log.checksum.unwrap()).await
                 } else {
-                    Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
+                    //Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
                 }
             }
             Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
@@ -551,10 +553,9 @@ where
         is_synced: Arc<AtomicBool>,
         next_block_to_process: u64,
         mut tx: futures::channel::mpsc::Sender<()>,
-        safe_address: Address,
-        channels_address: Address,
-    ) -> BlockWithLogs
-    where
+        safe_address: Option<Address>,
+        channels_address: Option<Address>,
+    ) where
         T: HoprIndexerRpcOperations + 'static,
         Db: HoprDbInfoOperations + Clone + Send + Sync + 'static,
     {
@@ -568,20 +569,20 @@ where
         // We only print out sync progress if we are not yet synced.
         // Once synced, we don't print out progress anymore.
         if !is_synced.load(Ordering::Relaxed) {
-            let mut block_difference = head.saturating_sub(start_block);
+            let mut block_difference = head.saturating_sub(next_block_to_process);
 
             let progress = if block_difference == 0 {
                 // Before we call the sync complete, we check the chain again.
                 head = Self::update_chain_head(rpc, chain_head.clone()).await;
-                block_difference = head.saturating_sub(start_block);
+                block_difference = head.saturating_sub(next_block_to_process);
 
                 if block_difference == 0 {
                     1_f64
                 } else {
-                    (current_block - start_block) as f64 / block_difference as f64
+                    (current_block - next_block_to_process) as f64 / block_difference as f64
                 }
             } else {
-                (current_block - start_block) as f64 / block_difference as f64
+                (current_block - next_block_to_process) as f64 / block_difference as f64
             };
 
             info!(
@@ -599,27 +600,31 @@ where
                 info!(prefix, "indexer sync completed successfully");
                 is_synced.store(true, Ordering::Relaxed);
 
-                info!(prefix, "updating safe balance from chain after indexer sync completed");
-                match rpc.get_balance(safe_address, BalanceType::HOPR).await {
-                    Ok(balance) => {
-                        if let Err(error) = db.set_safe_hopr_balance(None, balance).await {
-                            error!(prefix, %error, "failed to update safe balance from chain after indexer sync completed");
+                if let Some(safe_address) = safe_address {
+                    info!(prefix, "updating safe balance from chain after indexer sync completed");
+                    match rpc.get_balance(safe_address, BalanceType::HOPR).await {
+                        Ok(balance) => {
+                            if let Err(error) = db.set_safe_hopr_balance(None, balance).await {
+                                error!(prefix, %error, "failed to update safe balance from chain after indexer sync completed");
+                            }
                         }
-                    }
-                    Err(error) => {
-                        error!(prefix, %error, "failed to fetch safe balance from chain after indexer sync completed");
+                        Err(error) => {
+                            error!(prefix, %error, "failed to fetch safe balance from chain after indexer sync completed");
+                        }
                     }
                 }
 
-                info!("updating safe allowance from chain after indexer sync completed");
-                match rpc.get_allowance(channels_address, safe_address).await {
-                    Ok(allowance) => {
-                        if let Err(error) = db.set_safe_hopr_allowance(None, allowance).await {
-                            error!(prefix, %error, "failed to update safe allowance from chain after indexer sync completed");
+                if let Some((channels_address, safe_address)) = channels_address.zip(safe_address) {
+                    info!("updating safe allowance from chain after indexer sync completed");
+                    match rpc.get_allowance(channels_address, safe_address).await {
+                        Ok(allowance) => {
+                            if let Err(error) = db.set_safe_hopr_allowance(None, allowance).await {
+                                error!(prefix, %error, "failed to update safe allowance from chain after indexer sync completed");
+                            }
                         }
-                    }
-                    Err(error) => {
-                        error!(prefix, %error, "failed to fetch safe allowance from chain after indexer sync completed");
+                        Err(error) => {
+                            error!(prefix, %error, "failed to fetch safe allowance from chain after indexer sync completed");
+                        }
                     }
                 }
 
