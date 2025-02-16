@@ -257,8 +257,6 @@ impl<T> OffloadedRbProducer<T> {
     }
 }
 
-
-
 #[derive(Debug)]
 pub(crate) struct OffloadedRbConsumer<T>(Arc<std::sync::Mutex<AllocRingBuffer<T>>>);
 
