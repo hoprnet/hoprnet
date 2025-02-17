@@ -183,11 +183,23 @@ impl<T> SkipDelaySender<T> {
 
             // Check if the last holders are this instance and (potentially) the receiver
             if count_holders == 2 {
-                queue.clear_poison();
-                let mut queue = queue.lock().expect("cannot panic because poison is cleared");
-                queue.is_closed = true;
-                queue.rx_waker = None;
+                Self::finalize_closure(queue);
             }
+        }
+    }
+
+    fn finalize_closure(queue: Arc<std::sync::Mutex<SkipDelayQueue<T>>>) {
+        tracing::trace!("SkipDelayQueueSender::finalize_closure");
+        queue.clear_poison();
+        let mut queue = queue.lock().expect("cannot panic because poison is cleared");
+        queue.is_closed = true;
+        queue.rx_waker = None;
+    }
+
+    /// Forces closure of the queue (regardless of any remaining senders).
+    pub fn force_close(&mut self) {
+        if let Some(queue)  = self.0.take() {
+            Self::finalize_closure(queue);
         }
     }
 }

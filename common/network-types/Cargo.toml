@@ -30,6 +30,8 @@ aquamarine = { workspace = true }
 arrayvec = { workspace = true }
 async-std-resolver = { workspace = true, optional = true }
 asynchronous-codec = "0.7.0"
+async-lock = { workspace = true }
+async-trait = { workspace = true }
 bitvec = { workspace = true }
 bytes = "1"
 crossbeam-queue = { workspace = true }

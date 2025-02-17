@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use crate::prelude::FrameId;
 use futures::channel::mpsc::{SendError, UnboundedSender};
 use futures::stream::BoxStream;
-use futures::{AsyncRead, AsyncWrite, StreamExt};
+use futures::{pin_mut, AsyncRead, AsyncWrite, StreamExt};
 use rand::distributions::Bernoulli;
 use rand::prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng};
 use rand_distr::Normal;
@@ -239,15 +239,15 @@ pub fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, 
 }
 
 #[derive(Debug)]
-pub(crate) struct OffloadedRbProducer<T>(UnboundedSender<T>);
+pub(crate) struct RingBufferProducer<T>(UnboundedSender<T>);
 
-impl<T> Clone for OffloadedRbProducer<T> {
+impl<T> Clone for RingBufferProducer<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<T> OffloadedRbProducer<T> {
+impl<T> RingBufferProducer<T> {
     pub fn push(&self, item: T) -> bool {
         self.0.unbounded_send(item).is_ok()
     }
@@ -258,19 +258,19 @@ impl<T> OffloadedRbProducer<T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct OffloadedRbConsumer<T>(Arc<std::sync::Mutex<AllocRingBuffer<T>>>);
+pub(crate) struct RingBufferView<T>(Arc<async_lock::RwLock<AllocRingBuffer<T>>>);
 
-impl<T> Clone for OffloadedRbConsumer<T> {
+impl<T> Clone for RingBufferView<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<T: Clone> OffloadedRbConsumer<T> {
-    pub fn find<F: Fn(&T) -> bool>(&self, predicate: F) -> Vec<T> {
+impl<T: Clone> RingBufferView<T> {
+    pub async fn find<F: Fn(&T) -> bool>(&self, predicate: F) -> Vec<T> {
         self.0
-            .lock()
-            .unwrap()
+            .read()
+            .await
             .iter()
             .filter(|item| predicate(item))
             .cloned()
@@ -278,19 +278,21 @@ impl<T: Clone> OffloadedRbConsumer<T> {
     }
 }
 
-pub(crate) fn offloaded_ringbuffer<T: Send + 'static>(
+pub(crate) fn searchable_ringbuffer<T: Send + Sync + 'static>(
     capacity: usize,
-) -> (OffloadedRbProducer<T>, OffloadedRbConsumer<T>) {
+) -> (RingBufferProducer<T>, RingBufferView<T>) {
     let (rb_tx, rb_rx) = futures::channel::mpsc::unbounded();
-    let rb = Arc::new(std::sync::Mutex::new(AllocRingBuffer::new(capacity)));
+    let rb = Arc::new(async_lock::RwLock::new(AllocRingBuffer::new(capacity)));
 
     let rb_clone = rb.clone();
-    hopr_async_runtime::prelude::spawn(rb_rx.for_each(move |item| {
-        rb_clone.lock().unwrap().push(item);
-        futures::future::ready(())
-    }));
+    hopr_async_runtime::prelude::spawn(async move {
+        pin_mut!(rb_rx);
+        while let Some(item) = rb_rx.next().await {
+            rb_clone.write().await.push(item);
+        }
+    });
 
-    (OffloadedRbProducer(rb_tx), OffloadedRbConsumer(rb))
+    (RingBufferProducer(rb_tx), RingBufferView(rb))
 }
 
 #[derive(Debug, Copy, Clone, Eq)]
