@@ -16,11 +16,10 @@ use hopr_bindings::hopr_safe_proxy_for_network_registry::HoprSafeProxyForNetwork
 use hopr_bindings::hopr_ticket_price_oracle::HoprTicketPriceOracle;
 use hopr_bindings::hopr_token::HoprToken;
 use hopr_bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
-use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-use hopr_primitive_types::primitives::Address;
 
 use ethers::abi::Token;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_primitive_types::primitives::Address;
 use std::str::FromStr;
 
 pub mod actions;
