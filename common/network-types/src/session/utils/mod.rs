@@ -2,8 +2,9 @@ pub mod skip_queue;
 
 use std::cmp::Ordering;
 use std::collections::VecDeque;
+use std::num::NonZeroU32;
 use std::pin::Pin;
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -12,6 +13,8 @@ use crate::prelude::FrameId;
 use futures::channel::mpsc::{SendError, UnboundedSender};
 use futures::stream::BoxStream;
 use futures::{pin_mut, AsyncRead, AsyncWrite, StreamExt};
+use governor::prelude::StreamRateLimitExt;
+use governor::{Quota, RateLimiter};
 use rand::distributions::Bernoulli;
 use rand::prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng};
 use rand_distr::Normal;
@@ -239,7 +242,7 @@ pub fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, 
 }
 
 #[derive(Debug)]
-pub(crate) struct RingBufferProducer<T>(UnboundedSender<T>);
+pub(crate) struct RingBufferProducer<T>(futures::channel::mpsc::Sender<T>);
 
 impl<T> Clone for RingBufferProducer<T> {
     fn clone(&self) -> Self {
@@ -248,8 +251,8 @@ impl<T> Clone for RingBufferProducer<T> {
 }
 
 impl<T> RingBufferProducer<T> {
-    pub fn push(&self, item: T) -> bool {
-        self.0.unbounded_send(item).is_ok()
+    pub fn push(&mut self, item: T) -> bool {
+        self.0.try_send(item).is_ok()
     }
 
     pub fn is_open(&self) -> bool {
@@ -258,7 +261,7 @@ impl<T> RingBufferProducer<T> {
 }
 
 #[derive(Debug)]
-pub(crate) struct RingBufferView<T>(Arc<async_lock::RwLock<AllocRingBuffer<T>>>);
+pub(crate) struct RingBufferView<T>(Arc<parking_lot::FairMutex<AllocRingBuffer<T>>>);
 
 impl<T> Clone for RingBufferView<T> {
     fn clone(&self) -> Self {
@@ -267,30 +270,22 @@ impl<T> Clone for RingBufferView<T> {
 }
 
 impl<T: Clone> RingBufferView<T> {
-    pub async fn find<F: Fn(&T) -> bool>(&self, predicate: F) -> Vec<T> {
-        self.0
-            .read()
-            .await
-            .iter()
-            .filter(|item| predicate(item))
-            .cloned()
-            .collect()
+    pub fn find<F: Fn(&T) -> bool>(&self, predicate: F) -> Vec<T> {
+        self.0.lock().iter().filter(|item| predicate(item)).cloned().collect()
     }
 }
 
 pub(crate) fn searchable_ringbuffer<T: Send + Sync + 'static>(
     capacity: usize,
 ) -> (RingBufferProducer<T>, RingBufferView<T>) {
-    let (rb_tx, rb_rx) = futures::channel::mpsc::unbounded();
-    let rb = Arc::new(async_lock::RwLock::new(AllocRingBuffer::new(capacity)));
+    let (rb_tx, rb_rx) = futures::channel::mpsc::channel(capacity * 2);
+    let rb = Arc::new(parking_lot::FairMutex::new(AllocRingBuffer::new(capacity)));
 
     let rb_clone = rb.clone();
-    hopr_async_runtime::prelude::spawn(async move {
-        pin_mut!(rb_rx);
-        while let Some(item) = rb_rx.next().await {
-            rb_clone.write().await.push(item);
-        }
-    });
+    hopr_async_runtime::prelude::spawn(rb_rx.for_each(move |s| {
+        rb_clone.lock().push(s);
+        futures::future::ready(())
+    }));
 
     (RingBufferProducer(rb_tx), RingBufferView(rb))
 }

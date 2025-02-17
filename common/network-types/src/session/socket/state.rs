@@ -4,10 +4,10 @@ use crate::prelude::{FrameId, Segment, SegmentId};
 use crate::session::frame::SeqNum;
 use crate::session::reassembly::FrameInspector;
 use crate::session::utils::skip_queue::{skip_delay_channel, DelayedItem, Skip, SkipDelaySender};
-use crate::session::utils::{searchable_ringbuffer, RingBufferView, RingBufferProducer, RetriedFrameId};
+use crate::session::utils::{searchable_ringbuffer, RetriedFrameId, RingBufferProducer, RingBufferView};
 use futures::channel::mpsc::UnboundedSender;
 use futures::FutureExt;
-use futures::{StreamExt};
+use futures::StreamExt;
 use governor::prelude::StreamRateLimitExt;
 use governor::{Quota, RateLimiter};
 use std::num::NonZeroU32;
@@ -141,7 +141,7 @@ impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
     fn run(&mut self, socket_components: SocketComponents<C>) -> Result<(), SessionError> {
         if self.context.is_some() {
             tracing::warn!(session_id = self.session_id(), "state is already running");
-            return Ok(())
+            return Ok(());
         }
 
         let (incoming_frame_retries_tx, incoming_frame_retries_rx) = skip_delay_channel();
@@ -234,19 +234,14 @@ impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
                     }
                     frame_id
                 })
-                .then(move |frame_id| {
-                    let rb_rx_clone = rb_rx_clone.clone();
-                    async move {
+                .flat_map(move |frame_id| {
                         // Find out all the segments of that frame to be retransmitted
                         futures::stream::iter(
                             rb_rx_clone.find(|s: &Segment| s.id().0 == frame_id)
-                                .await
                                 .into_iter()
                                 .map(|s| Ok(SessionMessage::<C>::Segment(s)))
                         )
-                    }
                 })
-                .flatten()
                 .forward(ctl_tx_clone) // Retransmit all the segments
                 .map(move |res| match res {
                    Ok(_) => tracing::trace!(session_id = sid_2, "outgoing frame retries processing done"),
@@ -284,11 +279,11 @@ impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
     }
 
     fn incoming_retransmission_request(&mut self, request: SegmentRequest<C>) -> Result<(), SessionError> {
-        /*if let Some(mut ctx) = &mut self.context {
+        if let Some(ref mut ctx) = &mut self.context {
             let missing = request.into_iter().collect::<Vec<_>>();
 
             // Perform a single find to lock the RB only once
-            let segments = ctx.rb_rx.find(|s| missing.contains(&s.id())).await;
+            let segments = ctx.rb_rx.find(|s| missing.contains(&s.id()));
 
             // Partially acknowledged frames will not need to be fully resent in the future
             if let Err(error) = ctx.outgoing_frame_retries_tx.send_many(
@@ -305,8 +300,7 @@ impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
                 .map_err(|e| SessionError::ProcessingError(e.to_string()))
         } else {
             Err(SessionError::ProcessingError("state is not running".into()))
-        }*/
-        todo!()
+        }
     }
 
     fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
@@ -323,7 +317,6 @@ impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
         } else {
             Err(SessionError::ProcessingError("state is not running".into()))
         }
-
     }
 
     fn frame_received(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
@@ -332,7 +325,10 @@ impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
             if let Err(error) = ctx.ack_tx.try_send(frame_id) {
                 tracing::error!(session_id, frame_id, %error, "failed to acknowledge frame");
             }
-            if let Err(error) = ctx.incoming_frame_retries_tx.send_one((RetriedFrameId::new(frame_id), Skip)) {
+            if let Err(error) = ctx
+                .incoming_frame_retries_tx
+                .send_one((RetriedFrameId::new(frame_id), Skip))
+            {
                 tracing::error!(session_id, frame_id, %error, "failed to cancel retry of acknowledged frame");
             }
             Ok(())
@@ -361,7 +357,10 @@ impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
             if segment.is_last() {
                 // TODO: retry token period should be set dynamic based on s.seq_len
                 let first_retry = Duration::from_secs(1);
-                if let Err(error) = ctx.outgoing_frame_retries_tx.send_one((RetriedFrameId::new(segment.frame_id), first_retry)) {
+                if let Err(error) = ctx
+                    .outgoing_frame_retries_tx
+                    .send_one((RetriedFrameId::new(segment.frame_id), first_retry))
+                {
                     tracing::trace!(session_id = self.session_id(), frame_id = segment.frame_id, %error, "failed to insert outgoing retry of a frame");
                 }
             }
