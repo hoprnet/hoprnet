@@ -198,7 +198,7 @@ impl<T> SkipDelaySender<T> {
 
     /// Forces closure of the queue (regardless of any remaining senders).
     pub fn force_close(&mut self) {
-        if let Some(queue)  = self.0.take() {
+        if let Some(queue) = self.0.take() {
             Self::finalize_closure(queue);
         }
     }
