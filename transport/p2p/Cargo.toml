@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.5.4"
+version = "0.5.5"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
