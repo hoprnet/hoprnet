@@ -99,7 +99,6 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamP
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
     streams: libp2p_stream::Behaviour,
-    discovery: behavior::discovery::Behaviour,
     heartbeat_generator: behavior::heartbeat::Behaviour,
     ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour,
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
@@ -107,6 +106,10 @@ pub struct HoprNetworkBehavior {
         Vec<legacy::AcknowledgedTicket>,
         std::result::Result<legacy::Ticket, String>,
     >,
+    // WARNING: the order of struct members is important, `discovery` must be the last member,
+    // because the request_response components remove the peer from its peer store after a failed
+    // dial operation and the discovery mechanism is responsible for populating all peer stores.
+    discovery: behavior::discovery::Behaviour,
 }
 
 impl Debug for HoprNetworkBehavior {

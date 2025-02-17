@@ -379,25 +379,10 @@ impl HoprSwarmWithProcessors {
                         }
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::KeepAlive(_)) => {}
-                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(event)) => {
-                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior", behavior="discovery");
-
-                        trace!(event = tracing::field::debug(&event), "Received a discovery event");
-                        match event {
-                            crate::behavior::discovery::Event::NewPeerMultiddress(peer, multiaddress) => {
-                                info!(%peer, address = %multiaddress, "New record");
-                                swarm.add_peer_address(peer, multiaddress.clone());
-
-                                if let Err(e) = swarm.dial(peer) {
-                                    error!(%peer, address = %multiaddress, error = %e, "Failed to dial the peer");
-                                }
-                            },
-                        }
-                    }
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(_)) => {}
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregationBehavior(event)) => {
                         let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior", behavior="ticket aggregation");
 
-                        trace!(event = tracing::field::debug(&event), "Received a ticket aggregation event");
                         match event {
                             TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
                                 let ack_tkt_count = acked_tickets.len();
@@ -505,7 +490,7 @@ impl HoprSwarmWithProcessors {
                         addresses,
                         reason,
                     } => {
-                        debug!(%listener_id, addresses = tracing::field::debug(addresses), ?reason, transport="libp2p", "listener closed", )
+                        debug!(%listener_id, ?addresses, ?reason, transport="libp2p", "listener closed", )
                     }
                     SwarmEvent::ListenerError {
                         listener_id,
@@ -517,9 +502,23 @@ impl HoprSwarmWithProcessors {
                         peer_id,
                         connection_id,
                     } => {
-                        debug!(peer = tracing::field::debug(peer_id), connection_id = %connection_id, transport="libp2p", "dialing")
+                        debug!(peer = ?peer_id, %connection_id, transport="libp2p", "dialing")
                     }
-                    _ => error!(transport="libp2p", "unimplemented message type in p2p processing chain encountered")
+                    SwarmEvent::NewExternalAddrCandidate {
+                        ..  // address: Multiaddr
+                    } => {}
+                    SwarmEvent::ExternalAddrConfirmed {
+                        ..  // address: Multiaddr
+                    } => {}
+                    SwarmEvent::ExternalAddrExpired {
+                        ..  // address: Multiaddr
+                    } => {}
+                    SwarmEvent::NewExternalAddrOfPeer {
+                        peer_id, address
+                    } => {
+                        trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "New peer stored in swarm")
+                    },
+                    _ => trace!(transport="libp2p", "Unsupported enum option detected")
                 }
             }
         }
