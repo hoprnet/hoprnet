@@ -1,6 +1,6 @@
 use futures::{select, Stream, StreamExt};
+use libp2p::swarm::NetworkInfo;
 use libp2p::{request_response::OutboundRequestId, request_response::ResponseChannel, swarm::SwarmEvent};
-
 use std::num::NonZeroU8;
 use tracing::{debug, error, info, trace, warn};
 
@@ -210,6 +210,17 @@ impl HoprSwarm {
             ticket_aggregation_writer,
         }
     }
+}
+
+fn print_network_info(network_info: NetworkInfo, event: &str) {
+    let num_peers = network_info.num_peers();
+    let connection_counters = network_info.connection_counters();
+    let num_incoming = connection_counters.num_established_incoming();
+    let num_outgoing = connection_counters.num_established_outgoing();
+    info!(
+        num_peers,
+        num_incoming, num_outgoing, "swarm network status after {event}"
+    );
 }
 
 impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
@@ -431,6 +442,8 @@ impl HoprSwarmWithProcessors {
                     } => {
                         debug!(%peer_id, %connection_id, num_established, established_in_ms = established_in.as_millis(), transport="libp2p", "connection established");
 
+                        print_network_info(swarm.network_info(), "connection established");
+
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
                             METRIC_TRANSPORT_P2P_OPEN_CONNECTION_COUNT.increment(1.0);
@@ -445,6 +458,8 @@ impl HoprSwarmWithProcessors {
                         // endpoint,
                     } => {
                         debug!(%peer_id, %connection_id, num_established, transport="libp2p", "connection closed: {cause:?}");
+
+                        print_network_info(swarm.network_info(), "connection closed");
 
                         #[cfg(all(feature = "prometheus", not(test)))]
                         {
@@ -464,14 +479,18 @@ impl HoprSwarmWithProcessors {
                         error,
                         send_back_addr,
                     } => {
-                        error!(%local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error")
+                        error!(%local_addr, %send_back_addr, %connection_id, transport="libp2p", %error, "incoming connection error");
+
+                        print_network_info(swarm.network_info(), "incoming connection error");
                     }
                     SwarmEvent::OutgoingConnectionError {
                         connection_id,
                         error,
                         peer_id
                     } => {
-                        error!(peer = ?peer_id, %connection_id, transport="libp2p", %error, "outgoing connection error")
+                        error!(peer = ?peer_id, %connection_id, transport="libp2p", %error, "outgoing connection error");
+
+                        print_network_info(swarm.network_info(), "outgoing connection error");
                     }
                     SwarmEvent::NewListenAddr {
                         listener_id,
