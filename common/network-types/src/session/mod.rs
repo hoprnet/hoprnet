@@ -32,10 +32,8 @@ pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId}
 
 pub use segmenter::Segmenter;
 
-#[cfg(feature = "testing")]
-pub use utils::{FaultyNetwork, FaultyNetworkConfig};
-
-pub use utils::linear_half_normal_shuffle;
+#[cfg(any(test, feature = "testing"))]
+pub use utils::test as testing;
 
 fn build_reconstructor(
     reassembler: reassembly::Reassembler,

@@ -691,7 +691,7 @@ impl Sink<Segment> for FrameReassembler {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::session::utils::{linear_half_normal_shuffle, sample_index};
+    use crate::session::utils::test::{linear_half_normal_shuffle, sample_index};
     use async_stream::stream;
     use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
     use hex_literal::hex;

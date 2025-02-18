@@ -5,7 +5,8 @@ use rayon::prelude::{IndexedParallelIterator, ParallelIterator, ParallelSlice};
 use std::collections::VecDeque;
 use std::time::Duration;
 
-use hopr_network_types::prelude::{frame_reconstructor, linear_half_normal_shuffle, Frame, Segment};
+use hopr_network_types::prelude::{frame_reconstructor, Frame, Segment};
+use hopr_network_types::session::utils::test::linear_half_normal_shuffle;
 use hopr_network_types::session::FrameId;
 
 async fn send_one_way(segments: &Vec<Segment>) {

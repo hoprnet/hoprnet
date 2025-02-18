@@ -48,14 +48,12 @@ impl<const C: usize> SessionSocket<C> {
         // Segmented data coming from Upstream go out right away.
         let mut st = state.clone();
         let mut st_2 = state.clone();
-        let sid_1 = state.session_id().to_string();
-        let sid_2 = state.session_id().to_string();
         hopr_async_runtime::prelude::spawn(
             (
                 ctl_rx,
                 segmented_data_rx.map(move |s| {
                     if let Err(error) = st.segment_sent(&s) {
-                        tracing::debug!(session_id = sid_1, %error, "outgoing segment state update failed");
+                        tracing::debug!(session_id = st.session_id(), %error, "outgoing segment state update failed");
                     }
                     SessionMessage::<C>::Segment(s)
                 }),
@@ -64,9 +62,9 @@ impl<const C: usize> SessionSocket<C> {
                 .map(Ok)
                 .forward(packets_out)
                 .map(move |result| match st_2.stop().and(result) {
-                    Ok(_) => tracing::debug!(session_id = sid_2, "outgoing packet processing done"),
+                    Ok(_) => tracing::debug!(session_id = st_2.session_id(), "outgoing packet processing done"),
                     Err(error) => {
-                        tracing::error!(session_id = sid_2, %error, "error while processing outgoing packets")
+                        tracing::error!(session_id = st_2.session_id(), %error, "error while processing outgoing packets")
                     }
                 }),
         );
@@ -76,8 +74,6 @@ impl<const C: usize> SessionSocket<C> {
         // - Packets that represent Segments (filtered out) are passed to the Reconstructor
         let mut st = state.clone();
         let mut st_2 = state.clone();
-        let sid_1 = state.session_id().to_string();
-        let sid_2 = state.session_id().to_string();
         hopr_async_runtime::prelude::spawn(
             packets_in
                 .try_filter_map(move |packet| {
@@ -86,20 +82,19 @@ impl<const C: usize> SessionSocket<C> {
                         SessionMessage::Request(r) => st.incoming_retransmission_request(r.clone()),
                         SessionMessage::Acknowledge(a) => st.incoming_acknowledged_frames(a.clone()),
                     } {
-                        tracing::debug!(session_id = sid_1, %error, "incoming message state update failed");
+                        tracing::debug!(session_id = st.session_id(), %error, "incoming message state update failed");
                     }
                     future::ok(packet.try_as_segment())
                 })
                 .forward(downstream_segment_in)
                 .map(move |result| match st_2.stop().and(result) {
-                    Ok(_) => tracing::debug!(session_id = sid_2, "incoming packet processing done"),
+                    Ok(_) => tracing::debug!(session_id = st_2.session_id(), "incoming packet processing done"),
                     Err(error) => {
-                        tracing::error!(session_id = sid_2, %error, "error while processing incoming packets")
+                        tracing::error!(session_id = st_2.session_id(), %error, "error while processing incoming packets")
                     }
                 }),
         );
 
-        let sid = state.session_id().to_string();
         Self {
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out: Box::pin(
@@ -109,14 +104,14 @@ impl<const C: usize> SessionSocket<C> {
                         future::ready(match maybe_frame {
                             Ok(frame) => {
                                 if let Err(error) = state.frame_received(frame.frame_id) {
-                                    tracing::debug!(session_id = sid, %error, "frame received state update failed");
+                                    tracing::debug!(session_id = state.session_id(), %error, "frame received state update failed");
                                 }
                                 Some(Ok(frame))
                             }
                             Err(SessionError::FrameDiscarded(frame_id))
                             | Err(SessionError::IncompleteFrame(frame_id)) => {
                                 if let Err(error) = state.frame_discarded(frame_id) {
-                                    tracing::debug!(session_id = sid, %error, "frame discarded state update failed");
+                                    tracing::debug!(session_id = state.session_id(), %error, "frame discarded state update failed");
                                 }
                                 None // Downstream skips discarded frames
                             }
@@ -154,5 +149,24 @@ impl<const C: usize> futures::io::AsyncWrite for SessionSocket<C> {
         let inner = &mut self.upstream_frames_in;
         pin_mut!(inner);
         inner.poll_close(cx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::session::socket::state::Stateless;
+    use crate::utils::DuplexIO;
+
+    use crate::session::testing::*;
+
+    const MTU: usize = 462;
+
+    #[async_std::test]
+    async fn stateless_socket_bidirectional_should_work() -> anyhow::Result<()> {
+        let mut alice_socket = SessionSocket::<MTU>::new(DuplexIO(alice_reader, bob_writer), Stateless::new("alice"));
+        let mut bob_socket = SessionSocket::<MTU>::new(DuplexIO(bob_reader, alice_writer), Stateless::new("bob"));
+
+        Ok(())
     }
 }

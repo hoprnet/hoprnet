@@ -316,6 +316,8 @@ impl<T: Ord> futures::Sink<DelayedItem<T>> for SkipDelaySender<T> {
 /// The items are internally sorted based on their deadline.
 /// In a case when two items have equal deadlines, they are sorted according
 /// to their values; therefore, items must implement [`Ord`].
+///
+/// If equal items are inserted, the deadline of the earlier one inserted is updated.
 pub fn skip_delay_channel<T: Ord>() -> (SkipDelaySender<T>, SkipDelayReceiver<T>) {
     let queue = Arc::new(std::sync::Mutex::new(SkipDelayQueue::new()));
     (SkipDelaySender(Some(queue.clone())), SkipDelayReceiver(queue))

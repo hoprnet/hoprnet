@@ -1,11 +1,7 @@
 use std::collections::VecDeque;
 use std::pin::Pin;
-use std::sync::atomic::AtomicU32;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
-
-use bitvec::bitvec;
-use bitvec::prelude::BitVec;
 
 use crate::prelude::errors::SessionError;
 use crate::prelude::{Frame, FrameId, Segment};
@@ -17,7 +13,7 @@ pub struct FrameInspector(std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>
 
 #[cfg(feature = "frame-inspector")]
 impl FrameInspector {
-    pub fn missing_segments(&self, frame_id: &FrameId) -> Option<BitVec> {
+    pub fn missing_segments(&self, frame_id: &FrameId) -> Option<bitvec::prelude::BitVec> {
         self.0.get(frame_id).map(|f| f.as_missing())
     }
 }
