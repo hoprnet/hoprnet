@@ -52,6 +52,8 @@ impl<const C: usize> SessionSocket<C> {
             (
                 ctl_rx,
                 segmented_data_rx.map(move |s| {
+                    // The segment_sent event is raised only for segments coming from Upstream,
+                    // not for the segments from the Control stream (= segment resends).
                     if let Err(error) = st.segment_sent(&s) {
                         tracing::debug!(session_id = st.session_id(), %error, "outgoing segment state update failed");
                     }
@@ -61,7 +63,7 @@ impl<const C: usize> SessionSocket<C> {
                 .merge()
                 .map(Ok)
                 .forward(packets_out)
-                .map(move |result| match st_2.stop().and(result) {
+                .map(move |result| match result { // TODO: figure out if the State needs to be also closed here
                     Ok(_) => tracing::debug!(session_id = st_2.session_id(), "outgoing packet processing done"),
                     Err(error) => {
                         tracing::error!(session_id = st_2.session_id(), %error, "error while processing outgoing packets")
@@ -87,7 +89,7 @@ impl<const C: usize> SessionSocket<C> {
                     future::ok(packet.try_as_segment())
                 })
                 .forward(downstream_segment_in)
-                .map(move |result| match st_2.stop().and(result) {
+                .map(move |result| match st_2.stop().and(result) { // Also close the state
                     Ok(_) => tracing::debug!(session_id = st_2.session_id(), "incoming packet processing done"),
                     Err(error) => {
                         tracing::error!(session_id = st_2.session_id(), %error, "error while processing incoming packets")
@@ -160,7 +162,7 @@ mod tests {
 
     use crate::session::testing::*;
 
-    const MTU: usize = 462;
+    const MTU: usize = 466;
 
     #[async_std::test]
     async fn stateless_socket_bidirectional_should_work() -> anyhow::Result<()> {

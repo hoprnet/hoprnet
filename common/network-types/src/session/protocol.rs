@@ -205,7 +205,7 @@ impl<const C: usize> From<SegmentRequest<C>> for Vec<u8> {
 pub struct FrameAcknowledgements<const C: usize>(BTreeSet<FrameId>);
 
 impl<const C: usize> FrameAcknowledgements<C> {
-    /// Maximum number of [frame IDs](FrameId) that can be accommodated.
+    /// Maximum number of [`FrameIds`](FrameId) that can be accommodated.
     pub const MAX_ACK_FRAMES: usize = Self::SIZE / mem::size_of::<FrameId>();
 
     pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
@@ -234,6 +234,22 @@ impl<const C: usize> FrameAcknowledgements<C> {
     #[inline]
     pub fn is_full(&self) -> bool {
         self.0.len() == Self::MAX_ACK_FRAMES
+    }
+
+    /// Creates a vector of [`FrameAcknowledgements`] from the given iterator
+    /// of acknowledged [`FrameIds`](FrameId).
+    pub fn new_multiple<T: IntoIterator<Item = FrameId>>(items: T) -> Vec<Self> {
+        let mut out = Vec::with_capacity(2);
+        let mut frame_ack = Self::default();
+        for frame_id in items {
+            if frame_ack.push(frame_id) {
+                if frame_ack.is_full() {
+                    out.push(frame_ack);
+                    frame_ack = Self::default();
+                }
+            }
+        }
+        out
     }
 }
 

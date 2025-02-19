@@ -134,6 +134,10 @@ pub(crate) fn searchable_ringbuffer<T: Send + Sync + 'static>(
     (RingBufferProducer(rb_tx), RingBufferView(rb))
 }
 
+pub(crate) fn next_deadline_with_backoff(n: usize, base: f64, duration: Duration) -> Instant {
+    Instant::now() + duration.mul_f64(base.powi(n as i32 + 1))
+}
+
 #[derive(Debug, Copy, Clone, Eq)]
 pub(crate) struct RetriedFrameId {
     pub frame_id: FrameId,
@@ -142,7 +146,15 @@ pub(crate) struct RetriedFrameId {
 }
 
 impl RetriedFrameId {
-    pub fn new(frame_id: FrameId, max_retries: usize) -> Self {
+    pub fn new(frame_id: FrameId) -> Self {
+        Self {
+            frame_id,
+            retry_count: 0,
+            max_retries: 0,
+        }
+    }
+
+    pub fn with_retries(frame_id: FrameId, max_retries: usize) -> Self {
         Self {
             frame_id,
             retry_count: 0,
@@ -159,11 +171,6 @@ impl RetriedFrameId {
         } else {
             None
         }
-    }
-
-    pub fn at(&self) -> std::time::Instant {
-        // TODO: add backoff impl here
-        std::time::Instant::now()
     }
 }
 
