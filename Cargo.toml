@@ -1,7 +1,5 @@
 [workspace]
 
-exclude = ["vendor/cargo/scale-info-2.10.0"]
-
 resolver = "2"
 
 members = [
