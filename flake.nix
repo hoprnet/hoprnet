@@ -56,7 +56,6 @@
           depsSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
-              ./vendor/cargo
               ./.cargo/config.toml
               ./Cargo.lock
               (fs.fileFilter (file: file.name == "Cargo.toml") ./.)
@@ -65,7 +64,6 @@
           src = fs.toSource {
             root = ./.;
             fileset = fs.unions [
-              ./vendor/cargo
               ./.cargo/config.toml
               ./Cargo.lock
               ./README.md
@@ -382,7 +380,7 @@
               # remove existing crate entries (to remove old crates)
               yq 'with_entries(select(.key != "crate:*"))' .github/labeler.yml > labeler.yml.new
               # add new crate entries for known crates
-              for f in `find . -mindepth 2 -name "Cargo.toml" -type f ! -path "./vendor/*" -printf '%P\n'`; do
+              for f in `find . -mindepth 2 -name "Cargo.toml" -type f -printf '%P\n'`; do
               	env \
               		name="crate:`yq '.package.name' $f`" \
               		dir="`dirname $f`/**" \
