@@ -3,6 +3,9 @@ use sea_orm_migration::prelude::*;
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
+const IDX_NAME_CLOSURE_TIME: &str = "idx_channel_closure_time";
+const IDX_NAME_CHANNEL_STATUS: &str = "idx_channel_status";
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -10,7 +13,7 @@ impl MigrationTrait for Migration {
             .create_index(
                 sea_query::Index::create()
                     .if_not_exists()
-                    .name("idx_channel_closure_time")
+                    .name(IDX_NAME_CLOSURE_TIME)
                     .table(Channel::Table)
                     .col((Channel::ClosureTime, IndexOrder::Asc))
                     .to_owned(),
@@ -21,7 +24,7 @@ impl MigrationTrait for Migration {
             .create_index(
                 sea_query::Index::create()
                     .if_not_exists()
-                    .name("idx_channel_status")
+                    .name(IDX_NAME_CHANNEL_STATUS)
                     .table(Channel::Table)
                     .col((Channel::Status, IndexOrder::Asc))
                     .to_owned(),
@@ -31,11 +34,11 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(Index::drop().name("idx_channel_closure_time").to_owned())
+            .drop_index(Index::drop().name(IDX_NAME_CLOSURE_TIME).to_owned())
             .await?;
 
         manager
-            .drop_index(Index::drop().name("idx_channel_status").to_owned())
+            .drop_index(Index::drop().name(IDX_NAME_CHANNEL_STATUS).to_owned())
             .await
     }
 }
@@ -44,20 +47,6 @@ impl MigrationTrait for Migration {
 #[derive(DeriveIden)]
 enum Channel {
     Table,
-    #[allow(dead_code)]
-    Id,
-    #[allow(dead_code)]
-    ChannelId,
-    #[allow(dead_code)]
-    Source,
-    #[allow(dead_code)]
-    Destination,
     Status,
-    #[allow(dead_code)]
-    Balance,
-    #[allow(dead_code)]
-    TicketIndex,
-    #[allow(dead_code)]
-    Epoch,
     ClosureTime,
 }
