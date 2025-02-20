@@ -150,32 +150,31 @@ where
             FromScratch,
             Continue,
         }
-        let mut will_perform_fast_sync = FastSyncMode::None;
 
-        match (fast_sync_configured, index_empty) {
+        let will_perform_fast_sync = match (fast_sync_configured, index_empty) {
             (true, false) => {
                 info!("Fast sync is enabled, but the index database is not empty. Fast sync will continue on existing unprocessed logs.");
-
-                will_perform_fast_sync = FastSyncMode::Continue;
+                FastSyncMode::Continue
             }
             (false, true) => {
                 info!("Fast sync is disabled, but the index database is empty. Doing a full re-sync.");
                 // Clean the last processed log from the Log DB, to allow full resync
                 self.db.clear_index_db(None).await?;
                 self.db.set_logs_unprocessed(None, None).await?;
+                FastSyncMode::None
             }
             (false, false) => {
-                info!("Fast sync is disabled and the index database is not empty. Continuing normal sync.")
+                info!("Fast sync is disabled and the index database is not empty. Continuing normal sync.");
+                FastSyncMode::None
             }
             (true, true) => {
                 info!("Fast sync is enabled, starting the fast sync process");
                 // To ensure a proper state, reset any auxiliary data in the database
                 self.db.clear_index_db(None).await?;
                 self.db.set_logs_unprocessed(None, None).await?;
-
-                will_perform_fast_sync = FastSyncMode::FromScratch;
+                FastSyncMode::FromScratch
             }
-        }
+        };
 
         let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
@@ -194,22 +193,18 @@ where
             }
 
             let log_block_numbers = self.db.get_logs_block_numbers(None, None, processed).await?;
-            let first_log_block_number = log_block_numbers.first().copied().unwrap_or(0);
+            let _first_log_block_number = log_block_numbers.first().copied().unwrap_or(0);
+            let _head = chain_head.load(Ordering::Relaxed);
             for block_number in log_block_numbers {
+                // Do not pollute the logs with the fast-sync progress
                 Self::process_block_by_id(&db, &logs_handler, block_number).await?;
-                Self::calculate_sync_process(
-                    "fast-sync",
-                    block_number,
-                    &rpc,
-                    db.clone(),
-                    chain_head.clone(),
-                    is_synced.clone(),
-                    first_log_block_number,
-                    tx.clone(),
-                    None,
-                    None,
-                )
-                .await;
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    let progress =
+                        (block_number - _first_log_block_number) as f64 / (_head - _first_log_block_number) as f64;
+                    METRIC_INDEXER_SYNC_PROGRESS.set(progress);
+                }
             }
         }
 
@@ -252,7 +247,6 @@ where
                     let db = db.clone();
 
                     Self::calculate_sync_process(
-                        "rpc",
                         block.block_id,
                         &rpc,
                         db,
@@ -533,7 +527,6 @@ where
     ///
     /// # Arguments
     ///
-    /// * `prefix` - A string prefix for logging purposes.
     /// * `block` - The block with logs to process.
     /// * `rpc` - The RPC operations handler.
     /// * `chain_head` - The current chain head block number.
@@ -545,7 +538,6 @@ where
     ///
     /// The block which was provided as input.
     async fn calculate_sync_process(
-        prefix: &str,
         current_block: u64,
         rpc: &T,
         db: Db,
@@ -586,7 +578,6 @@ where
             };
 
             info!(
-                indexer = prefix,
                 progress = progress * 100_f64,
                 block = current_block,
                 head,
@@ -597,19 +588,19 @@ where
             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
             if current_block >= head {
-                info!(prefix, "indexer sync completed successfully");
+                info!("indexer sync completed successfully");
                 is_synced.store(true, Ordering::Relaxed);
 
                 if let Some(safe_address) = safe_address {
-                    info!(prefix, "updating safe balance from chain after indexer sync completed");
+                    info!("updating safe balance from chain after indexer sync completed");
                     match rpc.get_balance(safe_address, BalanceType::HOPR).await {
                         Ok(balance) => {
                             if let Err(error) = db.set_safe_hopr_balance(None, balance).await {
-                                error!(prefix, %error, "failed to update safe balance from chain after indexer sync completed");
+                                error!(%error, "failed to update safe balance from chain after indexer sync completed");
                             }
                         }
                         Err(error) => {
-                            error!(prefix, %error, "failed to fetch safe balance from chain after indexer sync completed");
+                            error!(%error, "failed to fetch safe balance from chain after indexer sync completed");
                         }
                     }
                 }
@@ -619,17 +610,17 @@ where
                     match rpc.get_allowance(channels_address, safe_address).await {
                         Ok(allowance) => {
                             if let Err(error) = db.set_safe_hopr_allowance(None, allowance).await {
-                                error!(prefix, %error, "failed to update safe allowance from chain after indexer sync completed");
+                                error!(%error, "failed to update safe allowance from chain after indexer sync completed");
                             }
                         }
                         Err(error) => {
-                            error!(prefix, %error, "failed to fetch safe allowance from chain after indexer sync completed");
+                            error!(%error, "failed to fetch safe allowance from chain after indexer sync completed");
                         }
                     }
                 }
 
                 if let Err(error) = tx.try_send(()) {
-                    error!(prefix, %error, "failed to notify about achieving indexer synchronization")
+                    error!(%error, "failed to notify about achieving indexer synchronization")
                 }
             }
         }
