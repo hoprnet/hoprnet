@@ -9,6 +9,9 @@ pub enum SessionError {
     #[error("socket is in invalid state: {0}")]
     InvalidState(String),
 
+    #[error("socket state is not running")]
+    StateNotRunning,
+
     #[error("failed to parse session message")]
     ParseError,
 

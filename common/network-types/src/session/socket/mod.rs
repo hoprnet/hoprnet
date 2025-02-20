@@ -10,10 +10,21 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use crate::prelude::errors::SessionError;
-use crate::prelude::frame_reconstructor_with_inspector;
+use crate::prelude::{frame_reconstructor, frame_reconstructor_with_inspector};
 use crate::prelude::protocol::{SessionCodec, SessionMessage};
+use crate::session::reassembly::FrameInspector;
 use crate::session::segmenter::Segmenter;
 use crate::session::socket::state::SocketComponents;
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, smart_default::SmartDefault)]
+pub struct SessionSocketConfig {
+    #[default(1500)]
+    pub frame_size: usize,
+    #[default(Duration::from_secs(4))]
+    pub frame_timeout: Duration,
+    #[default(false)]
+    pub with_frame_inspector: bool,
+}
 
 pub struct SessionSocket<const C: usize> {
     // This is where upstream writes the to-be-segmented frame data to
@@ -22,31 +33,38 @@ pub struct SessionSocket<const C: usize> {
     downstream_frames_out: Pin<Box<dyn futures::io::AsyncRead + Send>>,
 }
 
+const RECONSTRUCTOR_CAPACITY: usize = 1024;
+
 impl<const C: usize> SessionSocket<C> {
-    pub fn new<T, S>(transport: T, mut state: S) -> Self
+    pub fn new<T, S>(transport: T, mut state: S, cfg: SessionSocketConfig) -> Result<Self, SessionError>
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
-        S: for<'a> SocketState<'a, C> + Clone + Send + 'static,
+        S: for<'a> SocketState<'a, C> + Clone + Send + 'static
     {
         // Downstream Segments get reconstructed into Frames
-        let (downstream_segment_in, downstream_frames_out, frame_inspector) =
-            frame_reconstructor_with_inspector(Duration::from_secs(10), 1024);
+        let (downstream_segment_in, downstream_frames_out, inspector) = if cfg.with_frame_inspector {
+            let reconstructor = frame_reconstructor_with_inspector(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
+            (reconstructor.0, reconstructor.1, Some(reconstructor.2))
+        } else {
+            let reconstructor = frame_reconstructor(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
+            (reconstructor.0, reconstructor.1, Option::<FrameInspector>::None)
+        };
 
         // Upstream frames get segmented and are yielded by the data_rx stream
-        let (upstream_frames_in, segmented_data_rx) = Segmenter::<C, 1500>::new(1024);
+        let (upstream_frames_in, segmented_data_rx) = Segmenter::<C>::new(cfg.frame_size, RECONSTRUCTOR_CAPACITY);
 
         // Downstream transport
         let (packets_out, packets_in) = Framed::new(transport, SessionCodec::<C>).split();
 
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
         state.run(SocketComponents {
-            inspector: frame_inspector,
+            inspector,
             ctl_tx,
-        });
+        })?;
 
         // Messages incoming from Upstream and from the State go downstream as Packets
         // Segmented data coming from Upstream go out right away.
-        let mut st = state.clone();
+        let mut st_1 = state.clone();
         let mut st_2 = state.clone();
         hopr_async_runtime::prelude::spawn(
             (
@@ -54,8 +72,8 @@ impl<const C: usize> SessionSocket<C> {
                 segmented_data_rx.map(move |s| {
                     // The segment_sent event is raised only for segments coming from Upstream,
                     // not for the segments from the Control stream (= segment resends).
-                    if let Err(error) = st.segment_sent(&s) {
-                        tracing::debug!(session_id = st.session_id(), %error, "outgoing segment state update failed");
+                    if let Err(error) = st_1.segment_sent(&s) {
+                        tracing::debug!(session_id = st_1.session_id(), %error, "outgoing segment state update failed");
                     }
                     SessionMessage::<C>::Segment(s)
                 }),
@@ -63,7 +81,7 @@ impl<const C: usize> SessionSocket<C> {
                 .merge()
                 .map(Ok)
                 .forward(packets_out)
-                .map(move |result| match result { // TODO: figure out if the State needs to be also closed here
+                .map(move |result| match result {
                     Ok(_) => tracing::debug!(session_id = st_2.session_id(), "outgoing packet processing done"),
                     Err(error) => {
                         tracing::error!(session_id = st_2.session_id(), %error, "error while processing outgoing packets")
@@ -74,17 +92,17 @@ impl<const C: usize> SessionSocket<C> {
         // Packets incoming from Downstream:
         // - if the State requires it, packets passed (cloned) into the State
         // - Packets that represent Segments (filtered out) are passed to the Reconstructor
-        let mut st = state.clone();
+        let mut st_1 = state.clone();
         let mut st_2 = state.clone();
         hopr_async_runtime::prelude::spawn(
             packets_in
                 .try_filter_map(move |packet| {
                     if let Err(error) = match &packet {
-                        SessionMessage::Segment(s) => st.incoming_segment(&s.id(), s.seq_len),
-                        SessionMessage::Request(r) => st.incoming_retransmission_request(r.clone()),
-                        SessionMessage::Acknowledge(a) => st.incoming_acknowledged_frames(a.clone()),
+                        SessionMessage::Segment(s) => st_1.incoming_segment(&s.id(), s.seq_len),
+                        SessionMessage::Request(r) => st_1.incoming_retransmission_request(r.clone()),
+                        SessionMessage::Acknowledge(a) => st_1.incoming_acknowledged_frames(a.clone()),
                     } {
-                        tracing::debug!(session_id = st.session_id(), %error, "incoming message state update failed");
+                        tracing::debug!(session_id = st_1.session_id(), %error, "incoming message state update failed");
                     }
                     future::ok(packet.try_as_segment())
                 })
@@ -97,7 +115,7 @@ impl<const C: usize> SessionSocket<C> {
                 }),
         );
 
-        Self {
+        Ok(Self {
             upstream_frames_in: Box::pin(upstream_frames_in),
             downstream_frames_out: Box::pin(
                 downstream_frames_out
@@ -122,7 +140,7 @@ impl<const C: usize> SessionSocket<C> {
                     })
                     .into_async_read(),
             ),
-        }
+        })
     }
 }
 
@@ -148,6 +166,7 @@ impl<const C: usize> futures::io::AsyncWrite for SessionSocket<C> {
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        // TODO: terminate the state here as well
         let inner = &mut self.upstream_frames_in;
         pin_mut!(inner);
         inner.poll_close(cx)
