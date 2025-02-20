@@ -92,7 +92,7 @@ pub trait HoprDbChannelOperations {
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Incoming, my_node)`
     async fn get_incoming_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
-    /// Fetches all channels that are `Incoming` to this node.
+    /// Fetches all channels that are `Outgoing` from this node.
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Outgoing, my_node)`
     async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
