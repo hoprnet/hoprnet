@@ -37,7 +37,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
-use validator::Validate;
 
 use crate::errors::Result;
 use crate::errors::StrategyError::CriteriaNotSatisfied;
@@ -124,22 +123,19 @@ const MIN_AUTO_DETECTED_MAX_AUTO_CHANNELS: usize = 10;
 
 /// Configuration of [PromiscuousStrategy].
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
-    #[validate(range(min = 0_f64, max = 1.0_f64))]
     #[serde(default = "default_network_quality_threshold")]
     #[default(default_network_quality_threshold())]
     pub network_quality_open_threshold: f64,
 
     /// A quality threshold between 0 and 1 used to determine whether the strategy should close channel with the peer.
-    #[validate(range(min = 0_f64, max = 1.0_f64))]
     #[serde(default = "default_network_quality_threshold")]
     #[default(default_network_quality_threshold())]
     pub network_quality_close_threshold: f64,
 
     /// Number of heartbeats sent to the peer before it is considered for selection.
-    #[validate(range(min = 1))]
     #[serde(default = "default_minimum_pings")]
     #[default(default_minimum_pings())]
     pub minimum_peer_pings: u32,
@@ -163,7 +159,6 @@ pub struct PromiscuousStrategyConfig {
     /// Maximum number of opened channels the strategy should maintain.
     ///
     /// Defaults to square-root of the sampled network size, minimum is 10.
-    #[validate(range(min = 1))]
     pub max_channels: Option<usize>,
 
     /// If set, the strategy will aggressively close channels
@@ -180,6 +175,69 @@ pub struct PromiscuousStrategyConfig {
     #[serde_as(as = "DisplayFromStr")]
     #[default(">=2.1.0".parse().expect("should be valid default version"))]
     pub minimum_peer_version: semver::VersionReq,
+}
+
+impl validator::Validate for PromiscuousStrategyConfig {
+    fn validate(&self) -> std::result::Result<(), validator::ValidationErrors> {
+        let mut errors = validator::ValidationErrors::new();
+
+        if !(0.0..=1.0).contains(&self.network_quality_open_threshold) {
+            errors.add(
+                "network_quality_open_threshold",
+                validator::ValidationError::new("must be in [0..1]"),
+            );
+        }
+
+        if !(0.0..=1.0).contains(&self.network_quality_close_threshold) {
+            errors.add(
+                "network_quality_close_threshold",
+                validator::ValidationError::new("must be in [0..1]"),
+            );
+        }
+
+        if self.network_quality_open_threshold < self.network_quality_close_threshold {
+            errors.add(
+                "network_quality_open_threshold,network_quality_close_threshold",
+                validator::ValidationError::new(
+                    "network_quality_open_threshold must be greater than network_quality_close_threshold",
+                ),
+            );
+        }
+
+        if self.minimum_peer_pings == 0 {
+            errors.add(
+                "minimum_peer_pings",
+                validator::ValidationError::new("must be greater than 0"),
+            );
+        }
+
+        if self.new_channel_stake.is_zero() {
+            errors.add(
+                "new_channel_stake",
+                validator::ValidationError::new("must be greater than 0"),
+            );
+        }
+
+        if self.max_channels.is_some_and(|m| m == 0) {
+            errors.add(
+                "max_channels",
+                validator::ValidationError::new("must be greater than 0"),
+            );
+        }
+
+        if semver::VersionReq::parse(self.minimum_peer_version.to_string().as_str()).is_err() {
+            errors.add(
+                "minimum_peer_version",
+                validator::ValidationError::new("must be a valid semver expression"),
+            );
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 /// This strategy opens outgoing channels to peers, which have quality above a given threshold.
