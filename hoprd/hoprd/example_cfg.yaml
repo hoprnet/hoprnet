@@ -135,7 +135,10 @@ hopr:
         # max_channels: 10
         #
         # # A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
-        # network_quality_threshold: 0.5
+        # network_quality_open_threshold: 0.5
+        #
+        # # A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
+        # network_quality_close_threshold: 0.5
         #
         # # A stake of tokens that should be allocated to a channel opened by the strategy.
         # new_channel_stake: "1000000 HOPR"

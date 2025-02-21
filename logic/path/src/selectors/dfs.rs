@@ -5,6 +5,7 @@ use hopr_primitive_types::prelude::*;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::marker::PhantomData;
+use std::time::Duration;
 use tracing::trace;
 
 use crate::channel_graph::{ChannelEdge, ChannelGraph, Node};
@@ -109,6 +110,10 @@ pub struct DfsPathSelectorConfig {
     /// Default is 0
     #[default(0.0)]
     pub score_threshold: f64,
+    /// The maximum latency of the first hop
+    /// Default is 100 ms
+    #[default(Some(Duration::from_millis(100)))]
+    pub max_first_hop_latency: Option<Duration>,
     /// If true, include paths with payment channels, which have no
     /// funds in it. By default, that option is set to `false` to
     /// prevent tickets being dropped immediately.
@@ -182,6 +187,13 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
         // Edges which have score and is below the threshold will not be considered
         if edge.score.is_some_and(|score| score < self.cfg.score_threshold) {
             trace!(%next_hop, "channel score threshold not satisfied");
+            return false;
+        }
+
+        // If this is the first hop, check if the latency is not too high
+        if current_path.is_empty() && self.cfg.max_first_hop_latency
+            .is_some_and(|limit| next_hop.latency.average().is_some_and(|avg_latency| avg_latency > limit)) {
+            trace!(%next_hop, "first hop latency too high");
             return false;
         }
 
