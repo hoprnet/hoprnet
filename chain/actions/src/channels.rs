@@ -44,7 +44,8 @@ pub trait ChannelActions {
     /// Funds the given channel with the given `amount`
     async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<PendingAction>;
 
-    /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that channel.
+    /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that channel,
+    /// in case the `direction` is [`ChannelDirection::Incoming`].
     async fn close_channel(
         &self,
         counterparty: Address,
@@ -200,7 +201,7 @@ where
                         }
                     }
                     ChannelStatus::Open => {
-                        if redeem_before_close {
+                        if redeem_before_close && direction == ChannelDirection::Incoming {
                             // TODO: trigger aggregation
                             // Do not await the redemption, just submit it to the queue
                             let redeemed = self.redeem_tickets_in_channel(&channel, false).await?.len();
