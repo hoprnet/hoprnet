@@ -75,7 +75,7 @@ where
             if let Ok(Some(chain_key)) = maybe_chain_key {
                 let mut g = self.channel_graph.write().await;
                 g.update_node_score(&chain_key, result.into());
-                debug!(%chain_key, ?result, "update node with node score result");
+                debug!(%chain_key, ?result, "update node score for peer");
             } else {
                 error!(%peer, "could not resolve chain key ");
             }

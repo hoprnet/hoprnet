@@ -398,15 +398,9 @@ mod tests {
                 ),
             ));
 
-            let src_quality = quality(src);
-            let dst_quality = quality(dest);
+            graph.update_node_score(&src, NodeScoreUpdate::Initialize(Duration::from_millis(10), quality(src)));
+            graph.update_node_score(&dest, NodeScoreUpdate::Initialize(Duration::from_millis(10), quality(dest)));
 
-            while graph.get_node(&src).unwrap().node_score < src_quality {
-                graph.update_node_score(&src, NodeScoreUpdate::Reachable(Duration::from_millis(10)));
-            }
-            while graph.get_node(&dest).unwrap().node_score < dst_quality {
-                graph.update_node_score(&dest, NodeScoreUpdate::Reachable(Duration::from_millis(10)));
-            }
             graph.update_channel_score(&src, &dest, score(src, dest));
         };
 
