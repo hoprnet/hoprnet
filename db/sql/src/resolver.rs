@@ -53,7 +53,7 @@ mod tests {
     {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        let packet = OffchainKeypair::random().public().clone();
+        let packet = *OffchainKeypair::random().public();
 
         let actual_ck = db.resolve_chain_key(&packet).await?;
         assert_eq!(actual_ck, None, "chain key should not be present");
@@ -67,7 +67,7 @@ mod tests {
         // Inserting to the table directly to avoid cache
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
         let account_1 = hopr_db_entity::account::ActiveModel {
             chain_key: Set(chain_1.to_hex()),
             packet_key: Set(packet_1.to_hex()),
@@ -75,7 +75,7 @@ mod tests {
         };
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
+        let packet_2 = *OffchainKeypair::random().public();
         let account_2 = hopr_db_entity::account::ActiveModel {
             chain_key: Set(chain_2.to_hex()),
             packet_key: Set(packet_2.to_hex()),
@@ -98,12 +98,12 @@ mod tests {
         // Inserting to the table via API to insert into cache as well
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
         db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
             .await?;
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
+        let packet_2 = *OffchainKeypair::random().public();
         db.insert_account(None, AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced))
             .await?;
 
@@ -119,7 +119,7 @@ mod tests {
         // Inserting to the table directly to avoid cache
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
         let account_1 = hopr_db_entity::account::ActiveModel {
             chain_key: Set(chain_1.to_hex()),
             packet_key: Set(packet_1.to_hex()),
@@ -127,7 +127,7 @@ mod tests {
         };
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
+        let packet_2 = *OffchainKeypair::random().public();
         let account_2 = hopr_db_entity::account::ActiveModel {
             chain_key: Set(chain_2.to_hex()),
             packet_key: Set(packet_2.to_hex()),
@@ -151,12 +151,12 @@ mod tests {
         // Inserting to the table via API to insert into cache as well
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
         db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
             .await?;
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
+        let packet_2 = *OffchainKeypair::random().public();
         db.insert_account(None, AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced))
             .await?;
 

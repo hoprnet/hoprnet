@@ -186,7 +186,7 @@ pub struct CliArgs {
 
     #[arg(
         long = "maxRequestsPerSec",
-        help = "Maximum number of RPC requestes that can be performed per second.",
+        help = "Maximum number of RPC requests that can be performed per second.",
         env = "HOPRD_MAX_RPC_REQUESTS_PER_SEC",
         value_name = "MAX_RPC_REQUESTS_PER_SEC",
         value_parser = clap::value_parser ! (u32)
@@ -318,7 +318,7 @@ pub struct CliArgs {
     #[arg(
         long = "moduleAddress",
         value_name = "HOPRD_MODULE_ADDR",
-        help = "Address of the node mangement module",
+        help = "Address of the node management module",
         env = "HOPRD_MODULE_ADDRESS"
     )]
     pub module_address: Option<String>,

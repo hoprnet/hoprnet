@@ -1096,8 +1096,8 @@ mod tests {
             })
             .unzip();
 
-        let (alice_reader, alice_writer) = FaultyNetwork::<MTU>::new(network_cfg.clone(), alice_stats).split();
-        let (bob_reader, bob_writer) = FaultyNetwork::<MTU>::new(network_cfg.clone(), bob_stats).split();
+        let (alice_reader, alice_writer) = FaultyNetwork::<MTU>::new(network_cfg, alice_stats).split();
+        let (bob_reader, bob_writer) = FaultyNetwork::<MTU>::new(network_cfg, bob_stats).split();
 
         let alice_to_bob = SessionSocket::new("alice", DuplexIO(alice_reader, bob_writer), cfg.clone());
         let bob_to_alice = SessionSocket::new("bob", DuplexIO(bob_reader, alice_writer), cfg.clone());

@@ -643,7 +643,7 @@ mod tests {
         }
         .segment(MTU - SessionMessage::<MTU>::HEADER_SIZE - Segment::HEADER_SIZE)?
         .into_iter()
-        .map(|s| SessionMessage::<MTU>::Segment(s))
+        .map(SessionMessage::<MTU>::Segment)
         .collect::<Vec<_>>();
 
         let frame_info = FrameInfo {
@@ -665,8 +665,7 @@ mod tests {
             messages_1
                 .iter()
                 .cloned()
-                .map(|m| m.into_encoded().into_vec())
-                .flatten()
+                .flat_map(|m| m.into_encoded().into_vec())
                 .chain(std::iter::repeat(0).take(10))
                 .collect::<Vec<u8>>(),
         );
@@ -687,7 +686,7 @@ mod tests {
         }
         .segment(MTU - SessionMessage::<MTU>::HEADER_SIZE - Segment::HEADER_SIZE)?
         .into_iter()
-        .map(|s| SessionMessage::<MTU>::Segment(s))
+        .map(SessionMessage::<MTU>::Segment)
         .collect::<Vec<_>>();
 
         assert_eq!(4, messages.len());
@@ -695,8 +694,7 @@ mod tests {
         let data = messages
             .iter()
             .cloned()
-            .map(|m| m.into_encoded().into_vec())
-            .flatten()
+            .flat_map(|m| m.into_encoded().into_vec())
             .chain(std::iter::repeat(0u8).take(10))
             .collect::<Vec<_>>();
 
@@ -723,7 +721,7 @@ mod tests {
         }
         .segment(MTU - SessionMessage::<MTU>::HEADER_SIZE - Segment::HEADER_SIZE)?
         .into_iter()
-        .map(|s| SessionMessage::<MTU>::Segment(s))
+        .map(SessionMessage::<MTU>::Segment)
         .collect::<Vec<_>>();
 
         assert_eq!(4, messages.len());
@@ -732,14 +730,13 @@ mod tests {
             .iter()
             .cloned()
             .enumerate()
-            .map(|(i, m)| {
+            .flat_map(|(i, m)| {
                 if i == 2 {
                     Vec::from(hopr_crypto_random::random_bytes::<MTU>())
                 } else {
                     m.into_encoded().into_vec()
                 }
             })
-            .flatten()
             .collect::<Vec<_>>();
 
         let mut iter = SessionMessageIter::<MTU>::from(data);
