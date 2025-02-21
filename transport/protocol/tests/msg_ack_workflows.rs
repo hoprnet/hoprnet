@@ -315,7 +315,7 @@ async fn resolve_mock_path(me: Address, peers_offchain: Vec<PeerId>, peers_oncha
         })
         .collect::<Vec<_>>();
 
-    let mut cg = ChannelGraph::new(me);
+    let mut cg = ChannelGraph::new(me, Default::default());
     let mut last_addr = cg.my_address();
     for (_, addr) in peers_addrs.iter() {
         let c = ChannelEntry::new(

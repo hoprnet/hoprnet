@@ -11,14 +11,16 @@ use serde_with::serde_as;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::time::Duration;
 use tracing::{debug, warn};
 
+use hopr_primitive_types::prelude::SMA;
+use hopr_primitive_types::sma::SingleSumSMA;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_internal_types::channels::ChannelDirection, hopr_metrics::metrics::MultiGauge,
     hopr_primitive_types::traits::ToHex,
 };
-use hopr_primitive_types::sma::SingleSumSMA;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -40,8 +42,8 @@ lazy_static::lazy_static! {
 pub struct ChannelEdge {
     /// Underlying channel
     pub channel: ChannelEntry,
-    /// Optional scoring of the edge, that might be used for path planning.
-    pub score: Option<f64>,
+    /// Optional scoring of the edge that might be used for path planning.
+    pub edge_score: Option<f64>,
 }
 
 impl std::fmt::Display for ChannelEdge {
@@ -49,7 +51,7 @@ impl std::fmt::Display for ChannelEdge {
         write!(
             f,
             "{}; stake={}; score={:?}",
-            self.channel, self.channel.balance, self.score
+            self.channel, self.channel.balance, self.edge_score
         )
     }
 }
@@ -62,14 +64,92 @@ pub struct Node {
     /// Node's on-chain address.
     pub address: Address,
     /// Liveness of the node.
-    pub quality: f64,
+    pub node_score: f64,
     /// Average node latency
-    pub latency: SingleSumSMA<std::time::Duration, u32>
+    pub latency: SingleSumSMA<std::time::Duration, u32>,
+}
+
+impl Node {
+    pub fn new(address: Address, latency_window_length: usize) -> Self {
+        Self {
+            address,
+            node_score: 0.0,
+            latency: SingleSumSMA::new(latency_window_length),
+        }
+    }
+
+    /// Update the score using the [`NodeScoreUpdate`] and [`ChannelGraphConfig`].
+    ///
+    /// The function will ensure additive (slow) ramp-up, but exponential (fast)
+    /// ramp-down of the node's score, depending on whether it was reachable or not.
+    /// The ramp-down has a cut-off at `offline_node_score_threshold`, below which
+    /// is the score set to zero.
+    pub fn update_score(&mut self, score_update: NodeScoreUpdate, cfg: ChannelGraphConfig) -> f64 {
+        match score_update {
+            NodeScoreUpdate::Reachable(latency) => {
+                self.node_score = 1.0_f64.min(self.node_score + cfg.node_score_step_up);
+                self.latency.push(latency);
+            }
+            NodeScoreUpdate::Unreachable => {
+                self.node_score /= cfg.node_score_decay;
+                self.latency.clear();
+                if self.node_score < cfg.offline_node_score_threshold {
+                    self.node_score = 0.0;
+                }
+            }
+            NodeScoreUpdate::Initialize(latency, node_score) => {
+                self.latency.clear();
+                self.latency.push(latency);
+                self.node_score = node_score;
+            }
+        }
+        self.node_score
+    }
 }
 
 impl std::fmt::Display for Node {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}; q={}", self.address, self.quality)
+        write!(f, "{}; q={}", self.address, self.node_score)
+    }
+}
+
+/// Configuration for the [`ChannelGraph`].
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, smart_default::SmartDefault)]
+pub struct ChannelGraphConfig {
+    /// Length of the Simple Moving Average window for node latencies.
+    #[default(20)]
+    pub latency_sma_window_length: usize,
+    /// Additive node score modifier when the node is reachable.
+    #[default(0.1)]
+    pub node_score_step_up: f64,
+    /// Node score divisor when the node is unreachable.
+    #[default(4.0)]
+    pub node_score_decay: f64,
+    /// If a node is unreachable and because of that it reaches a score
+    /// lower than this threshold, it is considered offline (and in some situations
+    /// can be removed from the graph).
+    #[default(0.1)]
+    pub offline_node_score_threshold: f64,
+}
+
+/// Describes an update of the [`Node`]'s score.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+pub enum NodeScoreUpdate {
+    /// Node is reachable with the given latency.
+    Reachable(Duration),
+    /// Node is unreachable.
+    Unreachable,
+    /// Initializes a node's score to the given latency and quality.
+    /// This is useful during loading data from the persistent storage.
+    Initialize(Duration, f64),
+}
+
+impl<T> From<Result<Duration, T>> for NodeScoreUpdate {
+    fn from(result: Result<Duration, T>) -> Self {
+        match result {
+            Ok(duration) => NodeScoreUpdate::Reachable(duration),
+            Err(_) => NodeScoreUpdate::Unreachable,
+        }
     }
 }
 
@@ -84,7 +164,7 @@ impl std::fmt::Display for Node {
 ///
 /// Using this structure is much faster than querying the DB and therefore
 /// is preferred for per-packet path-finding computations.
-/// Per default, the graph does not track channels in `Closed` state, and therefore
+/// Per default, the graph does not track channels in the `Closed` state and therefore
 /// cannot detect channel re-openings.
 ///
 /// When a node reaches zero [quality](Node) and there are no edges (channels) containing this node,
@@ -96,14 +176,15 @@ pub struct ChannelGraph {
     #[serde_as(as = "Vec<(_, _)>")]
     indices: HashMap<Address, u32>,
     graph: StableDiGraph<Node, ChannelEdge>,
+    cfg: ChannelGraphConfig,
 }
 
 impl ChannelGraph {
-    /// The maximum number of intermediate hops the automatic path finding algorithm will look for.
+    /// The maximum number of intermediate hops the automatic path-finding algorithm will look for.
     pub const INTERMEDIATE_HOPS: usize = 3;
 
     /// Creates a new instance with the given self `Address`.
-    pub fn new(me: Address) -> Self {
+    pub fn new(me: Address, cfg: ChannelGraphConfig) -> Self {
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             lazy_static::initialize(&METRIC_NUMBER_OF_CHANNELS);
@@ -111,6 +192,7 @@ impl ChannelGraph {
 
         let mut ret = Self {
             me,
+            cfg,
             indices: HashMap::new(),
             graph: StableDiGraph::default(),
         };
@@ -119,7 +201,11 @@ impl ChannelGraph {
             ret.graph
                 .add_node(Node {
                     address: me,
-                    quality: 1.0,
+                    node_score: 1.0,
+                    latency: SingleSumSMA::new_with_samples(
+                        cfg.latency_sma_window_length,
+                        vec![Duration::ZERO; cfg.latency_sma_window_length],
+                    ),
                 })
                 .index() as u32,
         );
@@ -182,7 +268,7 @@ impl ChannelGraph {
             .map(|e| (&self.graph[e.target()], e.weight()))
     }
 
-    /// Checks whether there's any path via Open channels that connects `source` and `destination`
+    /// Checks whether there is any path via Open channels that connects `source` and `destination`
     /// This does not need to be necessarily a multi-hop path.
     pub fn has_path(&self, source: &Address, destination: &Address) -> bool {
         let only_open_graph = EdgeFiltered::from_fn(&self.graph, |e| e.weight().channel.status == ChannelStatus::Open);
@@ -270,23 +356,20 @@ impl ChannelGraph {
             // Otherwise, create a new edge and add the nodes with 0 quality if they don't yet exist
             let src = *self.indices.entry(channel.source).or_insert_with(|| {
                 self.graph
-                    .add_node(Node {
-                        address: channel.source,
-                        quality: 0.0,
-                    })
+                    .add_node(Node::new(channel.source, self.cfg.latency_sma_window_length))
                     .index() as u32
             });
 
             let dst = *self.indices.entry(channel.destination).or_insert_with(|| {
                 self.graph
-                    .add_node(Node {
-                        address: channel.destination,
-                        quality: 0.0,
-                    })
+                    .add_node(Node::new(channel.destination, self.cfg.latency_sma_window_length))
                     .index() as u32
             });
 
-            let weighted = ChannelEdge { channel, score: None };
+            let weighted = ChannelEdge {
+                channel,
+                edge_score: None,
+            };
 
             self.graph.add_edge(src.into(), dst.into(), weighted);
             debug!("new {channel}");
@@ -296,68 +379,74 @@ impl ChannelGraph {
     }
 
     /// Updates the quality of a node (inserting it into the graph if it does not exist yet).
-    /// The given quality value must always be non-negative.
-    pub fn update_node_quality(&mut self, address: &Address, quality: f64) {
-        assert!(quality >= 0_f64, "quality must be non-negative");
+    /// based on the given [`NodeScoreUpdate`].
+    pub fn update_node_score(&mut self, address: &Address, score_update: NodeScoreUpdate) {
         if !self.me.eq(address) {
             match self.indices.entry(*address) {
-                // The node exists and we're updating to greater-than-zero quality
+                // The node exists
                 Entry::Occupied(existing) => {
                     let existing_idx: NodeIndex = (*existing.get()).into();
-                    // NOTE: we cannot remove bad quality nodes that still have edges,
+                    // NOTE: we cannot remove offline nodes that still have edges,
                     // as we would lose the ability to track changes on those edges if they
                     // were removed early.
-                    if quality > 0.0 || self.graph.neighbors_undirected(existing_idx).count() > 0 {
+                    if score_update != NodeScoreUpdate::Unreachable
+                        || self.graph.neighbors_undirected(existing_idx).count() > 0
+                    {
+                        // We are for sure updating to a greater-than-zero score
                         if let Some(node) = self.graph.node_weight_mut(existing_idx) {
-                            node.quality = quality;
-                            debug!("updated quality of {address} to {quality}");
+                            let updated_quality = node.update_score(score_update, self.cfg);
+                            debug!(%address, updated_quality, "updated node quality");
                         } else {
-                            warn!("removed dangling node {address} in channel graph");
+                            // This should not happen
+                            warn!(%address, "removed dangling node index from channel graph");
                             existing.remove();
                         }
                     } else {
-                        // If the node has no neighbors and 0 quality, remove it from the graph
-                        self.graph.remove_node(existing.remove().into());
-                        debug!("removed solitary node {address} with zero quality");
+                        // If the node has no neighbors, is unreachable, and reached very low
+                        // score, just remove it from the graph
+                        if self
+                            .graph
+                            .node_weight_mut(existing_idx)
+                            .map(|node| node.update_score(score_update, self.cfg))
+                            .is_some_and(|updated_quality| updated_quality < self.cfg.offline_node_score_threshold)
+                        {
+                            self.graph.remove_node(existing.remove().into());
+                            debug!(%address, "removed offline node with no channels");
+                        }
                     }
                 }
-                // The node does not exist, and we're updating to greater-than-zero quality
-                Entry::Vacant(new_node) if quality > 0_f64 => {
-                    new_node.insert(
-                        self.graph
-                            .add_node(Node {
-                                address: *address,
-                                quality,
-                            })
-                            .index() as u32,
-                    );
-                    debug!("added node {address} with {quality}");
+                // The node does not exist, and we are updating to greater-than-zero quality
+                Entry::Vacant(new_node) if score_update != NodeScoreUpdate::Unreachable => {
+                    let mut inserted_node = Node::new(*address, self.cfg.latency_sma_window_length);
+                    let updated_quality = inserted_node.update_score(score_update, self.cfg);
+                    new_node.insert(self.graph.add_node(inserted_node).index() as u32);
+                    debug!(%address, updated_quality, "added new node");
                 }
-                // Do nothing otherwise.
+                // We do not want to add unreachable nodes to the graph, so do nothing otherwise
                 Entry::Vacant(_) => {}
             }
         }
     }
 
     /// Updates the score value of network connection between `source` and `destination`
-    /// The given quality value must always be non-negative.
+    /// The given score value must always be non-negative.
     pub fn update_channel_score(&mut self, source: &Address, destination: &Address, score: f64) {
-        assert!(score >= 0_f64, "quality must be non-negative");
+        assert!(score >= 0_f64, "score must be non-negative");
         let maybe_edge_id = self.get_edge(source, destination).map(|e| e.id());
         if let Some(channel) = maybe_edge_id.and_then(|id| self.graph.edge_weight_mut(id)) {
-            if score != channel.score.unwrap_or(-1_f64) {
-                channel.score = Some(score);
+            if score != channel.edge_score.unwrap_or(-1_f64) {
+                channel.edge_score = Some(score);
                 debug!("updated score of {} to {score}", channel.channel);
             }
         }
     }
 
-    /// Gets quality of the given channel. Returns `None` if no such channel exists or no
+    /// Gets quality of the given channel. Returns `None` if no such channel exists, or no
     /// quality has been set for that channel.
     pub fn get_channel_score(&self, source: &Address, destination: &Address) -> Option<f64> {
         self.get_edge(source, destination)
             .and_then(|e| self.graph.edge_weight(e.id()))
-            .and_then(|e| e.score)
+            .and_then(|e| e.edge_score)
     }
 
     /// Checks whether the given channel is in the graph already.
@@ -381,7 +470,7 @@ impl ChannelGraph {
             Dot::new(&NodeFiltered::from_fn(&self.graph, |n| {
                 // Include only nodes that have non-zero quality,
                 // and there is a path to them in an Open channel graph
-                self.graph.node_weight(n).is_some_and(|n| n.quality > 0_f64)
+                self.graph.node_weight(n).is_some_and(|n| n.node_score > 0_f64)
                     && has_path_connecting(&only_open_graph, me_idx, n, None)
             }))
             .to_string()
@@ -421,7 +510,7 @@ mod tests {
     use super::*;
 
     use crate::channel_graph::ChannelGraph;
-    use anyhow::Context;
+    use anyhow::{anyhow, Context};
     use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
@@ -459,7 +548,7 @@ mod tests {
 
     #[test]
     fn channel_graph_self_addr() {
-        let cg = ChannelGraph::new(ADDRESSES[0]);
+        let cg = ChannelGraph::new(ADDRESSES[0], Default::default());
         assert_eq!(ADDRESSES[0], cg.my_address(), "must produce correct self address");
 
         assert!(cg.contains_node(&ADDRESSES[0]), "must contain self address");
@@ -468,7 +557,11 @@ mod tests {
             cg.get_node(&ADDRESSES[0]).cloned(),
             Some(Node {
                 address: ADDRESSES[0],
-                quality: 1.0
+                node_score: 1.0,
+                latency: SingleSumSMA::new_with_samples(
+                    cg.cfg.latency_sma_window_length,
+                    vec![Duration::ZERO; cg.cfg.latency_sma_window_length]
+                )
             }),
             "must contain self node with quality 1"
         );
@@ -476,7 +569,7 @@ mod tests {
 
     #[test]
     fn channel_graph_has_path() {
-        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+        let mut cg = ChannelGraph::new(ADDRESSES[0], Default::default());
 
         let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
         cg.update_channel(c);
@@ -496,81 +589,107 @@ mod tests {
     }
 
     #[test]
-    fn channel_graph_update_node_quality() {
-        let mut cg = ChannelGraph::new(ADDRESSES[0]);
-
-        cg.update_node_quality(&ADDRESSES[1], 0.5);
-        assert_eq!(
-            cg.get_node(&ADDRESSES[1]).cloned(),
-            Some(Node {
-                address: ADDRESSES[1],
-                quality: 0.5
-            })
+    fn channel_graph_update_node_quality() -> anyhow::Result<()> {
+        let mut cg = ChannelGraph::new(
+            ADDRESSES[0],
+            ChannelGraphConfig {
+                node_score_step_up: 0.1,
+                node_score_decay: 4.0,
+                offline_node_score_threshold: 0.1,
+                ..Default::default()
+            },
         );
 
-        cg.update_node_quality(&ADDRESSES[1], 0.3);
-        assert_eq!(
-            cg.get_node(&ADDRESSES[1]).cloned(),
-            Some(Node {
-                address: ADDRESSES[1],
-                quality: 0.3
-            })
-        );
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Reachable(Duration::from_millis(100)));
+        let node = cg.get_node(&ADDRESSES[1]).cloned().ok_or(anyhow!("node must exist"))?;
+        assert_eq!(node.node_score, 0.1);
+        assert_eq!(node.latency.average(), Some(Duration::from_millis(100)));
 
         assert!(!cg.has_path(&ADDRESSES[0], &ADDRESSES[1]));
 
-        cg.update_node_quality(&ADDRESSES[1], 0.0);
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Reachable(Duration::from_millis(50)));
+        let node = cg.get_node(&ADDRESSES[1]).cloned().ok_or(anyhow!("node must exist"))?;
+        assert_eq!(node.node_score, 0.2);
+        assert_eq!(node.latency.average(), Some(Duration::from_millis(75)));
+
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Reachable(Duration::from_millis(30)));
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Reachable(Duration::from_millis(20)));
+
+        let node = cg.get_node(&ADDRESSES[1]).cloned().ok_or(anyhow!("node must exist"))?;
+        assert_eq!(node.node_score, 0.4);
+        assert_eq!(node.latency.average(), Some(Duration::from_millis(50)));
+
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Unreachable);
+        let node = cg.get_node(&ADDRESSES[1]).cloned().ok_or(anyhow!("node must exist"))?;
+        assert_eq!(node.node_score, 0.1);
+        assert!(node.latency.average().is_none());
+
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Unreachable);
+
+        // At this point the node will be removed because there are no channels with it
         assert_eq!(cg.get_node(&ADDRESSES[1]), None);
+
+        Ok(())
     }
 
     #[test]
-    fn channel_graph_update_node_quality_should_not_remove_nodes_with_zero_quality_and_path() {
-        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+    fn channel_graph_update_node_quality_should_not_remove_nodes_with_zero_quality_and_path() -> anyhow::Result<()> {
+        let mut cg = ChannelGraph::new(
+            ADDRESSES[0],
+            ChannelGraphConfig {
+                node_score_step_up: 0.1,
+                node_score_decay: 4.0,
+                offline_node_score_threshold: 0.1,
+                ..Default::default()
+            },
+        );
 
         let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
         cg.update_channel(c);
 
-        assert_eq!(
-            cg.get_node(&ADDRESSES[1]).cloned(),
-            Some(Node {
-                address: ADDRESSES[1],
-                quality: 0.0
-            })
-        );
+        let node = cg.get_node(&ADDRESSES[1]).cloned().ok_or(anyhow!("node must exist"))?;
+        assert_eq!(node.address, ADDRESSES[1]);
+        assert_eq!(node.node_score, 0.0);
+        assert!(node.latency.is_empty());
 
-        cg.update_node_quality(&ADDRESSES[1], 0.5);
-        assert_eq!(
-            cg.get_node(&ADDRESSES[1]).cloned(),
-            Some(Node {
-                address: ADDRESSES[1],
-                quality: 0.5
-            })
-        );
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Reachable(Duration::from_millis(50)));
 
-        cg.update_node_quality(&ADDRESSES[1], 0.3);
-        assert_eq!(
-            cg.get_node(&ADDRESSES[1]).cloned(),
-            Some(Node {
-                address: ADDRESSES[1],
-                quality: 0.3
-            })
-        );
+        let node = cg.get_node(&ADDRESSES[1]).cloned().ok_or(anyhow!("node must exist"))?;
+        assert_eq!(node.address, ADDRESSES[1]);
+        assert_eq!(node.node_score, 0.1);
+
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Reachable(Duration::from_millis(50)));
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Reachable(Duration::from_millis(50)));
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Reachable(Duration::from_millis(50)));
+
+        let node = cg.get_node(&ADDRESSES[1]).cloned().ok_or(anyhow!("node must exist"))?;
+        assert_eq!(node.address, ADDRESSES[1]);
+        assert_eq!(node.node_score, 0.4);
 
         assert!(cg.has_path(&ADDRESSES[0], &ADDRESSES[1]));
 
-        cg.update_node_quality(&ADDRESSES[1], 0.0);
-        assert_eq!(
-            cg.get_node(&ADDRESSES[1]).cloned(),
-            Some(Node {
-                address: ADDRESSES[1],
-                quality: 0.0
-            })
-        );
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Unreachable);
+
+        let node = cg.get_node(&ADDRESSES[1]).cloned().ok_or(anyhow!("node must exist"))?;
+        assert_eq!(node.address, ADDRESSES[1]);
+        assert_eq!(node.node_score, 0.1);
+
+        assert!(cg.has_path(&ADDRESSES[0], &ADDRESSES[1]));
+
+        cg.update_node_score(&ADDRESSES[1], NodeScoreUpdate::Unreachable);
+
+        let node = cg.get_node(&ADDRESSES[1]).cloned().ok_or(anyhow!("node must exist"))?;
+        assert_eq!(node.address, ADDRESSES[1]);
+        assert_eq!(node.node_score, 0.0);
+
+        assert!(cg.has_path(&ADDRESSES[0], &ADDRESSES[1]));
+
+        Ok(())
     }
 
     #[test]
     fn channel_graph_update_channel_score() -> anyhow::Result<()> {
-        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+        let mut cg = ChannelGraph::new(ADDRESSES[0], Default::default());
 
         let c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
         cg.update_channel(c);
@@ -593,7 +712,7 @@ mod tests {
 
     #[test]
     fn channel_graph_is_own_channel() {
-        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+        let mut cg = ChannelGraph::new(ADDRESSES[0], Default::default());
 
         let c1 = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
         let c2 = dummy_channel(ADDRESSES[1], ADDRESSES[2], ChannelStatus::Open);
@@ -606,7 +725,7 @@ mod tests {
 
     #[test]
     fn channel_graph_update_changes() -> anyhow::Result<()> {
-        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+        let mut cg = ChannelGraph::new(ADDRESSES[0], Default::default());
 
         let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Open);
 
@@ -652,7 +771,7 @@ mod tests {
 
     #[test]
     fn channel_graph_update_changes_on_close() -> anyhow::Result<()> {
-        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+        let mut cg = ChannelGraph::new(ADDRESSES[0], Default::default());
 
         let ts = SystemTime::now().add(Duration::from_secs(10));
         let mut c = dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::PendingToClose(ts));
@@ -700,7 +819,7 @@ mod tests {
 
     #[test]
     fn channel_graph_update_should_not_allow_closed_channels() {
-        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+        let mut cg = ChannelGraph::new(ADDRESSES[0], Default::default());
         let changes = cg.update_channel(dummy_channel(ADDRESSES[0], ADDRESSES[1], ChannelStatus::Closed));
         assert!(changes.is_none(), "must not produce changes for a closed channel");
 
@@ -710,7 +829,7 @@ mod tests {
 
     #[test]
     fn channel_graph_update_should_allow_pending_to_close_channels() -> anyhow::Result<()> {
-        let mut cg = ChannelGraph::new(ADDRESSES[0]);
+        let mut cg = ChannelGraph::new(ADDRESSES[0], Default::default());
         let ts = SystemTime::now().add(Duration::from_secs(10));
         let changes = cg.update_channel(dummy_channel(
             ADDRESSES[0],

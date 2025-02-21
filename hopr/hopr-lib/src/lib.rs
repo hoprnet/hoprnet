@@ -48,7 +48,7 @@ use chain_api::{
 };
 use chain_types::chain_events::ChainEventType;
 use chain_types::ContractAddresses;
-use core_path::channel_graph::ChannelGraph;
+use core_path::channel_graph::{ChannelGraph, ChannelGraphConfig, NodeScoreUpdate};
 use errors::HoprStatusError;
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_chain_rpc::HoprRpcOperations;
@@ -519,7 +519,10 @@ impl Hopr {
 
         let (tx_indexer_events, rx_indexer_events) = async_channel::unbounded::<SignificantChainEvent>();
 
-        let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
+        let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(
+            me_onchain.public().to_address(),
+            ChannelGraphConfig::default(),
+        )));
 
         let hopr_transport_api = HoprTransport::new(
             me,
@@ -965,17 +968,22 @@ impl Hopr {
                 }
             }
 
-            // Sync all the qualities there too
+            // Sync node latencies to the channel graph:
+            // Only those nodes that we know that had a good quality
+            // Other nodes will be repopulated into the channel graph during heartbeat
+            // rounds.
             info!("Syncing peer qualities from the previous runs");
             let mut peer_stream = self
                 .db
                 .get_network_peers(Default::default(), false)
                 .await
-                .map_err(hopr_db_sql::api::errors::DbError::from)?;
+                .map_err(hopr_db_sql::api::errors::DbError::from)?
+                .filter(|status| futures::future::ready(status.quality > 0.9));
 
             while let Some(peer) = peer_stream.next().await {
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
-                    cg.update_node_quality(&key, peer.get_quality());
+                    // For nodes that had a good quality, we assign a perfect score
+                    cg.update_node_score(&key, NodeScoreUpdate::Initialize(peer.last_seen_latency, 1.0));
                 } else {
                     error!(peer = %peer.id.1, "could not translate peer info:");
                 }

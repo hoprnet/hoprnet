@@ -286,7 +286,7 @@ mod tests {
     }
 
     fn create_graph_and_resolver_entries(me: Address) -> (ChannelGraph, Vec<(OffchainPublicKey, Address)>) {
-        let mut cg = ChannelGraph::new(me);
+        let mut cg = ChannelGraph::new(me, Default::default());
         let addrs = PEERS_PRIVS
             .iter()
             .map(|p| {

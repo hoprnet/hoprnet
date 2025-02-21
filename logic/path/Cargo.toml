@@ -1,6 +1,6 @@
 [package]
 name = "core-path"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Contains mixnet path construction and path selection logic"

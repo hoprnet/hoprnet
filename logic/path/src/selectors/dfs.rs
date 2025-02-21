@@ -179,20 +179,24 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
         }
 
         // Only use nodes that have shown to be somewhat reliable
-        if next_hop.quality < self.cfg.quality_threshold {
+        if next_hop.node_score < self.cfg.quality_threshold {
             trace!(%next_hop, "node quality threshold not satisfied");
             return false;
         }
 
         // Edges which have score and is below the threshold will not be considered
-        if edge.score.is_some_and(|score| score < self.cfg.score_threshold) {
+        if edge.edge_score.is_some_and(|score| score < self.cfg.score_threshold) {
             trace!(%next_hop, "channel score threshold not satisfied");
             return false;
         }
 
         // If this is the first hop, check if the latency is not too high
-        if current_path.is_empty() && self.cfg.max_first_hop_latency
-            .is_some_and(|limit| next_hop.latency.average().is_some_and(|avg_latency| avg_latency > limit)) {
+        if current_path.is_empty()
+            && self
+                .cfg
+                .max_first_hop_latency
+                .is_some_and(|limit| next_hop.latency.average().is_none_or(|avg_latency| avg_latency > limit))
+        {
             trace!(%next_hop, "first hop latency too high");
             return false;
         }
@@ -314,6 +318,7 @@ where
 mod tests {
     use super::*;
 
+    use crate::channel_graph::NodeScoreUpdate;
     use crate::path::Path;
     use async_lock::RwLock;
     use core::panic;
@@ -367,7 +372,7 @@ mod tests {
         Q: Fn(Address) -> f64,
         S: Fn(Address, Address) -> f64,
     {
-        let mut graph = ChannelGraph::new(me);
+        let mut graph = ChannelGraph::new(me, Default::default());
 
         if def.is_empty() {
             return graph;
@@ -393,8 +398,15 @@ mod tests {
                 ),
             ));
 
-            graph.update_node_quality(&src, quality(src));
-            graph.update_node_quality(&dest, quality(dest));
+            let src_quality = quality(src);
+            let dst_quality = quality(dest);
+
+            while graph.get_node(&src).unwrap().node_score < src_quality {
+                graph.update_node_score(&src, NodeScoreUpdate::Reachable(Duration::from_millis(10)));
+            }
+            while graph.get_node(&dest).unwrap().node_score < dst_quality {
+                graph.update_node_score(&dest, NodeScoreUpdate::Reachable(Duration::from_millis(10)));
+            }
             graph.update_channel_score(&src, &dest, score(src, dest));
         };
 
