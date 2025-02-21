@@ -834,11 +834,7 @@ impl Hopr {
 
             // Sync all the qualities there too
             info!("Syncing peer qualities from the previous runs");
-            let mut peer_stream = self
-                .db
-                .get_network_peers(Default::default(), false)
-                .await
-                .map_err(hopr_db_sql::api::errors::DbError::from)?;
+            let mut peer_stream = self.db.get_network_peers(Default::default(), false).await?;
 
             while let Some(peer) = peer_stream.next().await {
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {

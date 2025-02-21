@@ -10,7 +10,9 @@ use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
 use hopr_db_sql::HoprDbGeneralModelOperations;
-use hopr_primitive_types::prelude::*;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_primitive_types::prelude::ToHex;
 
 use crate::{
     errors::{CoreEthereumIndexerError, Result},
@@ -279,7 +281,7 @@ where
                     async move {
                         debug!(%block, "storing logs from block");
                         let logs = block.logs.clone();
-                        let logs_vec = logs.into_iter().map(SerializableLog::from).collect();
+                        let logs_vec = logs.into_iter().collect();
                         match db.store_logs(logs_vec).await {
                             Ok(store_results) => {
                                 if let Some(error) = store_results

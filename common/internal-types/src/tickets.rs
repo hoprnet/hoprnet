@@ -688,7 +688,7 @@ pub fn win_prob_to_f64(encoded_win_prob: &EncodedWinProb) -> f64 {
     // project interval [0x0fffffffffffff, 0x0000000000000f] to [0x00000000000010, 0x10000000000000]
     let significand: u64 = tmp + 1;
 
-    f64::from_bits(1023u64 << 52 | significand >> 4) - 1.0
+    f64::from_bits((1023u64 << 52) | (significand >> 4)) - 1.0
 }
 
 /// Encodes [0.0f64, 1.0f64] to [0x00000000000000, 0xffffffffffffff]

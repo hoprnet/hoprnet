@@ -1364,7 +1364,6 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let tickets: Vec<AcknowledgedTicket> = (0..count_tickets)
-            .into_iter()
             .map(|i| generate_random_ack_ticket(&BOB, &ALICE, i, 1, 1.0))
             .collect::<anyhow::Result<Vec<AcknowledgedTicket>>>()?;
 
@@ -2018,7 +2017,6 @@ mod tests {
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
-            .into_iter()
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
@@ -2060,7 +2058,6 @@ mod tests {
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
-            .into_iter()
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
@@ -2094,7 +2091,6 @@ mod tests {
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
-            .into_iter()
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
@@ -2127,7 +2123,6 @@ mod tests {
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
-            .into_iter()
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
@@ -2158,7 +2153,6 @@ mod tests {
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
-            .into_iter()
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
@@ -2189,7 +2183,6 @@ mod tests {
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
-            .into_iter()
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
@@ -2220,7 +2213,6 @@ mod tests {
         );
 
         let dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
-            .into_iter()
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
@@ -2251,7 +2243,6 @@ mod tests {
         );
 
         let mut dummy_tickets: Vec<ticket::Model> = (0..TICKET_COUNT)
-            .into_iter()
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
         dummy_tickets[0].index_offset = 2; // Make this ticket aggregated
@@ -2406,10 +2397,7 @@ mod tests {
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await?;
 
-        assert_eq!(
-            actual,
-            Some((BOB_OFFCHAIN.public().clone(), tickets, Default::default()))
-        );
+        assert_eq!(actual, Some((*BOB_OFFCHAIN.public(), tickets, Default::default())));
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
@@ -2463,10 +2451,7 @@ mod tests {
 
         // We expect the first ticket to be removed
         tickets.remove(0);
-        assert_eq!(
-            actual,
-            Some((BOB_OFFCHAIN.public().clone(), tickets, Default::default()))
-        );
+        assert_eq!(actual, Some((*BOB_OFFCHAIN.public(), tickets, Default::default())));
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
@@ -2507,10 +2492,7 @@ mod tests {
             .await?;
 
         tickets.remove(0);
-        assert_eq!(
-            actual,
-            Some((BOB_OFFCHAIN.public().clone(), tickets, Default::default()))
-        );
+        assert_eq!(actual, Some((*BOB_OFFCHAIN.public(), tickets, Default::default())));
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
@@ -2545,10 +2527,7 @@ mod tests {
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, constraints)
             .await?;
 
-        assert_eq!(
-            actual,
-            Some((BOB_OFFCHAIN.public().clone(), tickets, Default::default()))
-        );
+        assert_eq!(actual, Some((*BOB_OFFCHAIN.public(), tickets, Default::default())));
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
@@ -2598,7 +2577,7 @@ mod tests {
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
 
-        assert_eq!(tickets.len(), COUNT_TICKETS as usize);
+        assert_eq!(tickets.len(), { COUNT_TICKETS });
 
         let existing_channel_with_multiple_tickets = channel.get_id();
 
@@ -2695,7 +2674,7 @@ mod tests {
         let aggregated_ticket = TicketBuilder::default()
             .addresses(&*BOB, &*ALICE)
             .amount(
-                &tickets
+                tickets
                     .iter()
                     .fold(U256::zero(), |acc, v| acc + v.ticket.amount.amount()),
             )
@@ -2716,10 +2695,7 @@ mod tests {
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await?;
 
-        assert_eq!(
-            actual,
-            Some((BOB_OFFCHAIN.public().clone(), tickets, Default::default()))
-        );
+        assert_eq!(actual, Some((*BOB_OFFCHAIN.public(), tickets, Default::default())));
 
         let agg_ticket = aggregated_ticket.clone();
 
@@ -2774,10 +2750,7 @@ mod tests {
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await?;
 
-        assert_eq!(
-            actual,
-            Some((BOB_OFFCHAIN.public().clone(), tickets, Default::default()))
-        );
+        assert_eq!(actual, Some((*BOB_OFFCHAIN.public(), tickets, Default::default())));
 
         assert!(db
             .process_received_aggregated_ticket(aggregated_ticket.leak(), &ALICE)
@@ -2819,10 +2792,7 @@ mod tests {
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
             .await?;
 
-        assert_eq!(
-            actual,
-            Some((BOB_OFFCHAIN.public().clone(), tickets, Default::default()))
-        );
+        assert_eq!(actual, Some((*BOB_OFFCHAIN.public(), tickets, Default::default())));
 
         assert!(db
             .process_received_aggregated_ticket(aggregated_ticket.leak(), &ALICE)
@@ -2868,7 +2838,6 @@ mod tests {
         let db = init_db_with_channel(channel).await?;
 
         let tickets = (0..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
@@ -2958,7 +2927,6 @@ mod tests {
         let offset = 10_usize;
 
         let mut tickets = (1..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, (i + offset) as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
@@ -3063,7 +3031,6 @@ mod tests {
         let db = init_db_with_channel(channel).await?;
 
         let mut tickets = (0..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
@@ -3098,7 +3065,6 @@ mod tests {
         let db = init_db_with_channel(channel).await?;
 
         let tickets = (0..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
@@ -3128,7 +3094,6 @@ mod tests {
         let db = init_db_with_channel(channel).await?;
 
         let tickets = (0..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
@@ -3158,7 +3123,6 @@ mod tests {
         let db = init_db_with_channel(channel).await?;
 
         let mut tickets = (0..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
@@ -3191,7 +3155,6 @@ mod tests {
         let db = init_db_with_channel(channel).await?;
 
         let tickets = (0..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
@@ -3221,7 +3184,6 @@ mod tests {
         let db = init_db_with_channel(channel).await?;
 
         let mut tickets = (0..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
@@ -3253,7 +3215,6 @@ mod tests {
         let db = init_db_with_channel(channel).await?;
 
         let mut tickets = (0..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
@@ -3286,7 +3247,6 @@ mod tests {
         let db = init_db_with_channel(channel).await?;
 
         let tickets = (0..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, if i > 0 { 1.0 } else { 0.9 })
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))
@@ -3316,7 +3276,6 @@ mod tests {
         let db = init_db_with_channel(channel).await?;
 
         let mut tickets = (0..COUNT_TICKETS)
-            .into_iter()
             .map(|i| {
                 generate_random_ack_ticket(&BOB, &ALICE, i as u64, 1, 1.0)
                     .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))

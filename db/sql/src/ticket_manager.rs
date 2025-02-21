@@ -392,7 +392,7 @@ mod tests {
             4_u32.into(),
         );
 
-        db.upsert_channel(None, channel.clone()).await?;
+        db.upsert_channel(None, channel).await?;
 
         assert_eq!(
             Balance::zero(BalanceType::HOPR),
