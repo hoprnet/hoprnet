@@ -6,8 +6,7 @@
     flake-parts.url = github:hercules-ci/flake-parts;
     nixpkgs.url = github:NixOS/nixpkgs/release-24.11;
     rust-overlay.url = github:oxalica/rust-overlay/master;
-    # using a fork with an added source filter
-    crane.url = github:hoprnet/crane/tb/20240117-find-filter-2;
+    crane.url = github:ipetkov/crane/v0.20.1;
     # pin it to a version which we are compatible with
     foundry.url = github:shazow/foundry.nix/e4c79767b4d2e51179d1975a9f0553ef30d82711;
     # use change to add solc 0.8.24

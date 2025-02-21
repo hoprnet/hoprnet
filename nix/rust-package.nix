@@ -79,11 +79,11 @@ let
     nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
     buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
-    CARGO_HOME = ".cargo";
-    RUST_MIN_STACK = "16777216"; # 16MB required to run the tests and compilation
-    cargoExtraArgs = "--offline -p ${pname} ${cargoExtraArgs}";
+    cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
     # this env var is used by utoipa-swagger-ui to prevent internet access
-    CARGO_FEATURE_VENDORED = "true";
+    # CARGO_FEATURE_VENDORED = "true";
+    strictDeps = true;
+    # cargoVendorDir = null;
     # disable running tests automatically for now
     doCheck = false;
     # set to the revision because during build the Git info is not available
@@ -100,7 +100,7 @@ let
 
   docsArgs = {
     cargoArtifacts = null;
-    cargoExtraArgs = "--offline"; # overwrite the default to build all docs
+    cargoExtraArgs = ""; # overwrite the default to build all docs
     cargoDocExtraArgs = "--workspace --no-deps";
     RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
     CARGO_TARGET_DIR = "target/";
@@ -118,8 +118,6 @@ let
   defaultArgs = {
     cargoArtifacts = craneLib.buildDepsOnly (sharedArgs // {
       src = depsSrc;
-      extraDummyScript = ''
-      '';
     });
   };
 
