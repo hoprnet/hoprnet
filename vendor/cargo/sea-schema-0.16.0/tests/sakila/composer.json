@@ -1,5 +1,0 @@
-{
-    "require": {
-        "doctrine/dbal": "^3.0"
-    }
-}
