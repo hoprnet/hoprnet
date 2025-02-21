@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["__abi"],"static":["MULTISEND_ABI"],"struct":["MultiSend","MultiSendCall"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"derive":["Type"],"enum":["JsonValue"],"mod":["chrono","time","uuid"],"struct":["BigDecimal","Decimal","Json","JsonRawValue","Text","Uuid"],"trait":["Type"]};
