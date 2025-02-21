@@ -4580,7 +4580,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
