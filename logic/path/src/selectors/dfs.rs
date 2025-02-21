@@ -103,13 +103,13 @@ pub struct DfsPathSelectorConfig {
     #[default(100)]
     pub max_iterations: usize,
     /// Peer quality threshold for a node to be taken into account.
-    /// Default is 0.2
-    #[default(0.2)]
-    pub quality_threshold: f64,
+    /// Default is 0.5
+    #[default(0.5)]
+    pub node_score_threshold: f64,
     /// Channel score threshold for a channel to be taken into account.
     /// Default is 0
     #[default(0.0)]
-    pub score_threshold: f64,
+    pub edge_score_threshold: f64,
     /// The maximum latency of the first hop
     /// Default is 100 ms
     #[default(Some(Duration::from_millis(100)))]
@@ -179,13 +179,16 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
         }
 
         // Only use nodes that have shown to be somewhat reliable
-        if next_hop.node_score < self.cfg.quality_threshold {
+        if next_hop.node_score < self.cfg.node_score_threshold {
             trace!(%next_hop, "node quality threshold not satisfied");
             return false;
         }
 
         // Edges which have score and is below the threshold will not be considered
-        if edge.edge_score.is_some_and(|score| score < self.cfg.score_threshold) {
+        if edge
+            .edge_score
+            .is_some_and(|score| score < self.cfg.edge_score_threshold)
+        {
             trace!(%next_hop, "channel score threshold not satisfied");
             return false;
         }
@@ -398,8 +401,14 @@ mod tests {
                 ),
             ));
 
-            graph.update_node_score(&src, NodeScoreUpdate::Initialize(Duration::from_millis(10), quality(src)));
-            graph.update_node_score(&dest, NodeScoreUpdate::Initialize(Duration::from_millis(10), quality(dest)));
+            graph.update_node_score(
+                &src,
+                NodeScoreUpdate::Initialize(Duration::from_millis(10), quality(src)),
+            );
+            graph.update_node_score(
+                &dest,
+                NodeScoreUpdate::Initialize(Duration::from_millis(10), quality(dest)),
+            );
 
             graph.update_channel_score(&src, &dest, score(src, dest));
         };
