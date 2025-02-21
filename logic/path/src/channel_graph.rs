@@ -100,7 +100,7 @@ impl Node {
             NodeScoreUpdate::Initialize(latency, node_score) => {
                 self.latency.clear();
                 self.latency.push(latency);
-                self.node_score = node_score;
+                self.node_score = node_score.max(0.0).min(1.0);
             }
         }
         self.node_score
@@ -378,7 +378,7 @@ impl ChannelGraph {
         }
     }
 
-    /// Updates the quality of a node (inserting it into the graph if it does not exist yet).
+    /// Updates the quality of a node (inserting it into the graph if it does not exist yet),
     /// based on the given [`NodeScoreUpdate`].
     pub fn update_node_score(&mut self, address: &Address, score_update: NodeScoreUpdate) {
         if !self.me.eq(address) {

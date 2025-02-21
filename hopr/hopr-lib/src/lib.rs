@@ -968,7 +968,7 @@ impl Hopr {
                 }
             }
 
-            // Sync node latencies to the channel graph:
+            // Initialize node latencies and scores in the channel graph:
             // Only those nodes that we know that had a good quality
             // Other nodes will be repopulated into the channel graph during heartbeat
             // rounds.
