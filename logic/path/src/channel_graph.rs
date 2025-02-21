@@ -18,6 +18,7 @@ use {
     hopr_internal_types::channels::ChannelDirection, hopr_metrics::metrics::MultiGauge,
     hopr_primitive_types::traits::ToHex,
 };
+use hopr_primitive_types::sma::SingleSumSMA;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -56,12 +57,14 @@ impl std::fmt::Display for ChannelEdge {
 /// Represents a node in the Channel Graph.
 /// This is typically represented by an on-chain address and ping quality, which
 /// represents some kind of node's liveness as perceived by us.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Node {
     /// Node's on-chain address.
     pub address: Address,
     /// Liveness of the node.
     pub quality: f64,
+    /// Average node latency
+    pub latency: SingleSumSMA<std::time::Duration, u32>
 }
 
 impl std::fmt::Display for Node {

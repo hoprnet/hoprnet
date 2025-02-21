@@ -69,6 +69,20 @@ where
             Err(_) => Err(()),
         };
 
+        // Update the channel graph
+        if let Ok(pk) = OffchainPublicKey::try_from(peer) {
+            let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
+            if let Ok(Some(chain_key)) = maybe_chain_key {
+                let mut g = self.channel_graph.write().await;
+                g.update_node_quality(&chain_key, quality);
+                debug!("update node {chain_key} with quality {quality}");
+            } else {
+                error!(%peer, "could not resolve chain key ");
+            }
+        } else {
+            error!(%peer, "encountered invalid peer id:");
+        }
+
         match self
             .network
             .update(peer, result, result.is_ok().then_some(version))
@@ -86,18 +100,6 @@ where
                 }
                 NetworkTriggeredEvent::UpdateQuality(peer, quality) => {
                     debug!("'{peer}' changed quality to '{quality}'");
-                    if let Ok(pk) = OffchainPublicKey::try_from(peer) {
-                        let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
-                        if let Ok(Some(chain_key)) = maybe_chain_key {
-                            let mut g = self.channel_graph.write().await;
-                            g.update_node_quality(&chain_key, quality);
-                            debug!("update node {chain_key} with quality {quality}");
-                        } else {
-                            error!(%peer, "could not resolve chain key ");
-                        }
-                    } else {
-                        error!(%peer, "encountered invalid peer id:");
-                    }
                 }
             },
             Ok(None) => debug!("No update necessary"),
