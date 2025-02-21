@@ -153,7 +153,7 @@ Options:
       --maxBlockRange <MAX_BLOCK_RANGE>
           Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
       --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>
-          Maximum number of RPC requestes that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
+          Maximum number of RPC requests that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
       --init...
@@ -177,7 +177,7 @@ Options:
       --safeAddress <HOPRD_SAFE_ADDR>
           Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
       --moduleAddress <HOPRD_MODULE_ADDR>
-          Address of the node mangement module [env: HOPRD_MODULE_ADDRESS=]
+          Address of the node management module [env: HOPRD_MODULE_ADDRESS=]
       --protocolConfig <HOPRD_PROTOCOL_CONFIG_PATH>
           Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
   -h, --help

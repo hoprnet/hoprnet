@@ -63,7 +63,7 @@
 //!       --safeAddress <HOPRD_SAFE_ADDR>
 //!           Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
 //!       --moduleAddress <HOPRD_MODULE_ADDR>
-//!           Address of the node mangement module [env: HOPRD_MODULE_ADDRESS=]
+//!           Address of the node management module [env: HOPRD_MODULE_ADDRESS=]
 //!       --protocolConfig <HOPRD_PROTOCOL_CONFIG_PATH>
 //!           Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
 //!   -h, --help
