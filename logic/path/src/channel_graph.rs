@@ -100,7 +100,7 @@ impl Node {
             NodeScoreUpdate::Initialize(latency, node_score) => {
                 self.latency.clear();
                 self.latency.push(latency);
-                self.node_score = node_score.clamp(0.0,1.0);
+                self.node_score = node_score.clamp(0.0, 1.0);
             }
         }
         self.node_score
