@@ -104,8 +104,6 @@ impl ChannelPath {
         Self { hops }
     }
 
-    // TODO: this method could be turned sync once the `PeerAddressResolver` is sync too.
-
     /// Resolves this on-chain `ChannelPath` into the off-chain [TransportPath] and adds the final hop
     /// to the given `destination` (which does not require an open channel).
     /// The given [resolver](HoprDbResolverOperations) is used for the mapping between `PeerId`s and `Address`es.
@@ -156,8 +154,8 @@ impl Display for ChannelPath {
 /// Represents an off-chain path of [PeerIds](PeerId).
 ///
 /// The path is never allowed to be empty and *always contains the destination*.
-/// In case of the direct path, this path contains only the destination.
-/// In case o multiple hops, it also must represent a valid [ChannelPath], therefore
+/// In the case of the direct path, this path contains only the destination.
+/// In the case of multiple hops, it also must represent a valid [ChannelPath], therefore,
 /// open channels must exist (at the time of construction) except for the last hop.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransportPath {

@@ -50,8 +50,11 @@ impl std::fmt::Display for ChannelEdge {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}; stake={}; score={:?}",
-            self.channel, self.channel.balance, self.edge_score
+            "{}; stake={}; score={:?}; status={};",
+            self.channel,
+            self.channel.balance,
+            self.edge_score,
+            self.channel.status.to_string().to_lowercase()
         )
     }
 }
@@ -109,7 +112,7 @@ impl Node {
 
 impl std::fmt::Display for Node {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}; q={}", self.address, self.node_score)
+        write!(f, "{}; score={}", self.address, self.node_score)
     }
 }
 
@@ -486,6 +489,21 @@ impl ChannelGraph {
                         .any(|e| e.weight().channel.status == ChannelStatus::Open)
             }))
             .to_string()
+        } else if cfg.only_3_hop_accessible_nodes {
+            // Keep only those nodes that are accessible from via less than 3 hop paths
+            let me_idx: NodeIndex = (*self.indices.get(&self.me).expect("graph must contain self")).into();
+            let distances = petgraph::algo::dijkstra(&self.graph, me_idx, None, |e| {
+                if e.weight().channel.status == ChannelStatus::Open {
+                    1
+                } else {
+                    100
+                }
+            });
+
+            Dot::new(&NodeFiltered::from_fn(&self.graph, |a| {
+                distances.get(&a).map(|d| *d <= 3).unwrap_or(false)
+            }))
+            .to_string()
         } else {
             Dot::new(&self.graph).to_string()
         }
@@ -503,6 +521,8 @@ pub struct GraphExportConfig {
     pub ignore_disconnected_components: bool,
     /// Do not export channels that are not in the [`ChannelStatus::Open`] state.
     pub ignore_non_opened_channels: bool,
+    /// Show only nodes that are accessible via 3-hops (via open channels) from this node.
+    pub only_3_hop_accessible_nodes: bool,
 }
 
 #[cfg(test)]

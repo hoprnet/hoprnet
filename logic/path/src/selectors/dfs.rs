@@ -155,6 +155,7 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
     /// * `initial_source`: the initial node on the path
     /// * `final_destination`: the desired destination node (will not be part of the path)
     /// * `current_path`: currently selected relayers
+    #[tracing::instrument(level = "trace", skip(self))]
     fn is_next_hop_usable(
         &self,
         next_hop: &Node,
@@ -167,20 +168,20 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
 
         // Looping back to self does not give any privacy
         if next_hop.address.eq(initial_source) {
-            trace!(%next_hop, "source loopback not allowed");
+            trace!("source loopback not allowed");
             return false;
         }
 
         // We cannot use `final_destination` as the last intermediate hop as
         // this would be a loopback that does not give any privacy
         if next_hop.address.eq(final_destination) {
-            trace!(%next_hop, "destination loopback not allowed");
+            trace!("destination loopback not allowed");
             return false;
         }
 
         // Only use nodes that have shown to be somewhat reliable
         if next_hop.node_score < self.cfg.node_score_threshold {
-            trace!(%next_hop, "node quality threshold not satisfied");
+            trace!("node quality threshold not satisfied");
             return false;
         }
 
@@ -189,7 +190,7 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
             .edge_score
             .is_some_and(|score| score < self.cfg.edge_score_threshold)
         {
-            trace!(%next_hop, "channel score threshold not satisfied");
+            trace!("channel score threshold not satisfied");
             return false;
         }
 
@@ -200,14 +201,14 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
                 .max_first_hop_latency
                 .is_some_and(|limit| next_hop.latency.average().is_none_or(|avg_latency| avg_latency > limit))
         {
-            trace!(%next_hop, "first hop latency too high");
+            trace!("first hop latency too high");
             return false;
         }
 
         // At the moment, we do not allow circles because they
         // do not give additional privacy
         if current_path.contains(&next_hop.address) {
-            trace!(%next_hop, "circles not allowed");
+            trace!("circles not allowed");
             return false;
         }
 
@@ -217,7 +218,7 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
             return false;
         }
 
-        trace!(%next_hop, ?current_path, "usable node");
+        trace!("usable node");
         true
     }
 }
