@@ -23,7 +23,7 @@
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::collections::HashMap;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use async_trait::async_trait;
 use chain_actions::channels::ChannelActions;
@@ -105,13 +105,18 @@ fn ten_hopr() -> Balance {
 }
 
 #[inline]
-fn default_network_quality_threshold() -> f64 {
-    0.5
+fn default_network_quality_open_threshold() -> f64 {
+    0.9
+}
+
+#[inline]
+fn default_network_quality_close_threshold() -> f64 {
+    0.2
 }
 
 #[inline]
 fn default_minimum_pings() -> u32 {
-    100
+    50
 }
 
 #[inline]
@@ -126,16 +131,23 @@ const MIN_AUTO_DETECTED_MAX_AUTO_CHANNELS: usize = 10;
 #[derive(Debug, Clone, PartialEq, smart_default::SmartDefault, Serialize, Deserialize)]
 pub struct PromiscuousStrategyConfig {
     /// A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
-    #[serde(default = "default_network_quality_threshold")]
-    #[default(default_network_quality_threshold())]
+    ///
+    /// Default is 0.9
+    #[serde(default = "default_network_quality_open_threshold")]
+    #[default(default_network_quality_open_threshold())]
     pub network_quality_open_threshold: f64,
 
     /// A quality threshold between 0 and 1 used to determine whether the strategy should close channel with the peer.
-    #[serde(default = "default_network_quality_threshold")]
-    #[default(default_network_quality_threshold())]
+    /// If set to 0, no channels will be closed.
+    ///
+    /// Default is 0.2
+    #[serde(default = "default_network_quality_close_threshold")]
+    #[default(default_network_quality_close_threshold())]
     pub network_quality_close_threshold: f64,
 
     /// Number of heartbeats sent to the peer before it is considered for selection.
+    ///
+    /// Default is 50.
     #[serde(default = "default_minimum_pings")]
     #[default(default_minimum_pings())]
     pub minimum_peer_pings: u32,
@@ -158,13 +170,15 @@ pub struct PromiscuousStrategyConfig {
 
     /// Maximum number of opened channels the strategy should maintain.
     ///
-    /// Defaults to square-root of the sampled network size, minimum is 10.
+    /// Defaults to square-root of the sampled network size, the minimum is 10.
     pub max_channels: Option<usize>,
 
     /// If set, the strategy will aggressively close channels
     /// (even with peers above the `network_quality_close_threshold`)
     /// if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
     /// `max_channels` limit.
+    ///
+    /// Default is true.
     #[serde(default = "just_true")]
     #[default(true)]
     pub enforce_max_channels: bool,
@@ -195,7 +209,7 @@ impl validator::Validate for PromiscuousStrategyConfig {
             );
         }
 
-        if self.network_quality_open_threshold < self.network_quality_close_threshold {
+        if self.network_quality_open_threshold <= self.network_quality_close_threshold {
             errors.add(
                 "network_quality_open_threshold,network_quality_close_threshold",
                 validator::ValidationError::new(
@@ -252,7 +266,7 @@ where
     cfg: PromiscuousStrategyConfig,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct NetworkStats {
     pub peers_with_quality: HashMap<Address, f64>,
     pub num_online_peers: usize,
@@ -286,14 +300,14 @@ where
                         num_online_peers += 1;
                         futures::future::ready(true)
                     } else {
-                        debug!(peer = %status.id.1, "peer is not online");
+                        trace!(peer = %status.id.1, "peer is not online");
                         futures::future::ready(false)
                     }
                 })
                 .filter_map(|status| async move {
                     // Assume only peers with enough heartbeat pings
                     if status.heartbeats_sent < self.cfg.minimum_peer_pings as u64 {
-                        debug!(peer = %status.id.1, pings_sent = status.heartbeats_sent, "peer has too few pings");
+                        trace!(peer = %status.id.1, pings_sent = status.heartbeats_sent, "peer has too few sent pings");
                         return None;
                     }
 
@@ -351,6 +365,7 @@ where
         );
 
         let network_stats = self.get_network_stats().await?;
+        debug!(?network_stats, "retrieved network stats");
 
         // Go through all the peer ids and their qualities
         // to find out which channels should be closed and
@@ -363,7 +378,7 @@ where
                 if *quality < self.cfg.network_quality_close_threshold {
                     // Need to close the channel, because quality has dropped
                     debug!(destination = %channel.destination, quality = %quality, threshold = self.cfg.network_quality_close_threshold,
-                        "strategy will close the channel"
+                        "strategy proposes to close the channel"
                     );
                     tick_decision.add_to_close(*channel);
                 }
@@ -371,7 +386,7 @@ where
                 // Try to open a channel with this peer, because it is high-quality,
                 // and we don't yet have a channel with it
                 debug!(destination = %address, quality = %quality, threshold = self.cfg.network_quality_open_threshold,
-                    "strategy will open a channel");
+                    "strategy proposes open a channel");
                 new_channel_candidates.push((*address, *quality));
             }
         }
