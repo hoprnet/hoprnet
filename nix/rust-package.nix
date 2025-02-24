@@ -79,11 +79,30 @@ let
     nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
     buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
+    cargoVendorDir = craneLib.vendorMultipleCargoDeps {
+      registries = {
+        "crates-io" = "sparse+https://cargo-registry.prod.hoprnet.link:443/api/v1/crates/";
+      };
+
+      cargoLockList = [
+        .././Cargo.lock
+
+        # # Unfortunately this approach requires IFD (import-from-derivation)
+        # # otherwise Nix will refuse to read the Cargo.lock from our toolchain
+        # # (unless we build with `--impure`).
+        # #
+        # # Another way around this is to manually copy the rustlib `Cargo.lock`
+        # # to the repo and import it with `./path/to/rustlib/Cargo.lock` which
+        # # will avoid IFD entirely but will require manually keeping the file
+        # # up to date!
+        # "${rustToolchain.passthru.availableComponents.rust-src}/lib/rustlib/src/rust/library/Cargo.lock"
+      ];
+    };
+
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
     # this env var is used by utoipa-swagger-ui to prevent internet access
     # CARGO_FEATURE_VENDORED = "true";
     strictDeps = true;
-    # cargoVendorDir = null;
     # disable running tests automatically for now
     doCheck = false;
     # set to the revision because during build the Git info is not available
