@@ -79,13 +79,15 @@ let
     nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
     buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
-    cargoVendorDir = craneLib.vendorCargoDeps {
-      registries = {
-        "crates-io" = "sparse+https://cargo-registry.prod.hoprnet.link:443/api/v1/crates/";
-      };
+    # cargoVendorDir = craneLib.vendorCargoDeps {
+    #   registries = {
+    #     "crates-io" = "sparse+https://cargo-registry.prod.hoprnet.link/api/v1/crates/";
+    #   };
+    #
+    #   cargoLock = ./../Cargo.lock;
+    # };
 
-      cargoLock = ./../Cargo.lock;
-    };
+    CARGO_HTTP_CHECK_REVOKE = "false";
 
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
     # this env var is used by utoipa-swagger-ui to prevent internet access
