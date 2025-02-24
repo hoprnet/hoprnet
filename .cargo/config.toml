@@ -8,9 +8,3 @@
 root = ".cargo"
 
 
-[source.hopr-cargo-registry-cache]
-# registry = "sparse+https://cargo-registry.prod.hoprnet.link:443/api/v1/cratesio/"
-registry = "sparse+https://cargo-registry.prod.hoprnet.link/api/v1/cratesio/"
-
-[source.crates-io]
-replace-with = "hopr-cargo-registry-cache"
