@@ -76,18 +76,19 @@ let
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
-    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
-    buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
-
-    # cargoVendorDir = craneLib.vendorCargoDeps {
-    #   registries = {
-    #     "crates-io" = "sparse+https://cargo-registry.prod.hoprnet.link/api/v1/crates/";
-    #   };
-    #
-    #   cargoLock = ./../Cargo.lock;
-    # };
-
-    CARGO_HTTP_CHECK_REVOKE = "false";
+    nativeBuildInputs = [ 
+      solcDefault 
+      foundryBin 
+      pkg-config 
+      pkgs.pkgsBuildHost.openssl 
+      libiconv 
+      pkgs.cacert   # for `cargo check` that fetches the index from registry using HTTPS
+    ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
+    
+    buildInputs = [ 
+      openssl 
+      pkgs.cacert   # for `cargo check` that fetches the index from registry using HTTPS
+    ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
     # this env var is used by utoipa-swagger-ui to prevent internet access
