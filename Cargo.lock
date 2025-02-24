@@ -4528,7 +4528,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-path"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4563,7 +4563,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4865,7 +4865,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.11.2"
+version = "3.12.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
