@@ -67,6 +67,18 @@ jobs:
         with:
           ref: ${{ steps.vars.outputs.GITHUB_REF_NAME }}
 
+      - name: Replace the crates.io registry with a private proxy registry
+        env:
+          PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
+        run: |
+          cat >> .cargo/config.toml<< EOF        
+          [source.hopr-cargo-registry-cache]
+          registry = "sparse+${PRIVATE_CARGO_REGISTRY_PROXY_URL}"
+
+          [source.crates-io]
+          replace-with = "hopr-cargo-registry-cache"
+          EOF
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
