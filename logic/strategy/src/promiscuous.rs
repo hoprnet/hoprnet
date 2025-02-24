@@ -378,7 +378,7 @@ where
                 if *quality < self.cfg.network_quality_close_threshold {
                     // Need to close the channel, because quality has dropped
                     debug!(destination = %channel.destination, quality = %quality, threshold = self.cfg.network_quality_close_threshold,
-                        "strategy proposes to close the channel"
+                        "strategy proposes to close existing channel"
                     );
                     tick_decision.add_to_close(*channel);
                 }
@@ -386,7 +386,7 @@ where
                 // Try to open a channel with this peer, because it is high-quality,
                 // and we don't yet have a channel with it
                 debug!(destination = %address, quality = %quality, threshold = self.cfg.network_quality_open_threshold,
-                    "strategy proposes open a channel");
+                    "strategy proposes to open a new channel");
                 new_channel_candidates.push((*address, *quality));
             }
         }
