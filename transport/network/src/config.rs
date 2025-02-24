@@ -16,6 +16,8 @@ pub const DEFAULT_NETWORK_BACKOFF_MIN: f64 = 2.0;
 
 pub const DEFAULT_AUTO_PATH_QUALITY_THRESHOLD: f64 = 0.95;
 
+pub const DEFAULT_MAX_FIRST_HOP_LATENCY_THRESHOLD: Duration = Duration::from_millis(100);
+
 /// Configuration for the [`crate::network::Network`] object
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, SmartDefault, PartialEq)]
@@ -41,9 +43,13 @@ pub struct NetworkConfig {
     #[default(quality_offline_threshold())]
     pub quality_offline_threshold: f64,
 
-    #[serde(default = "quality_auto_path_threshold")]
-    #[default(quality_auto_path_threshold())]
-    pub quality_auto_path_threshold: f64,
+    #[serde(default = "node_score_auto_path_threshold")]
+    #[default(node_score_auto_path_threshold())]
+    pub node_score_auto_path_threshold: f64,
+
+    #[serde(default = "max_first_hop_latency_threshold")]
+    #[default(max_first_hop_latency_threshold())]
+    pub max_first_hop_latency_threshold: Option<Duration>,
 
     #[serde(default = "quality_step")]
     #[default(quality_step())]
@@ -90,7 +96,7 @@ impl Validate for NetworkConfig {
             );
         }
 
-        if !(0.0..=1.0).contains(&self.quality_auto_path_threshold) {
+        if !(0.0..=1.0).contains(&self.node_score_auto_path_threshold) {
             errors.add(
                 "quality_auto_path_threshold",
                 validator::ValidationError::new("quality_auto_path_threshold must be between 0 and 1"),
@@ -164,8 +170,13 @@ fn quality_offline_threshold() -> f64 {
 }
 
 #[inline]
-fn quality_auto_path_threshold() -> f64 {
+fn node_score_auto_path_threshold() -> f64 {
     DEFAULT_AUTO_PATH_QUALITY_THRESHOLD
+}
+
+#[inline]
+fn max_first_hop_latency_threshold() -> Option<Duration> {
+    Some(DEFAULT_MAX_FIRST_HOP_LATENCY_THRESHOLD)
 }
 
 #[inline]

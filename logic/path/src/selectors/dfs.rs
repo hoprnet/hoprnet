@@ -5,6 +5,7 @@ use hopr_primitive_types::prelude::*;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::marker::PhantomData;
+use std::time::Duration;
 use tracing::trace;
 
 use crate::channel_graph::{ChannelEdge, ChannelGraph, Node};
@@ -102,13 +103,17 @@ pub struct DfsPathSelectorConfig {
     #[default(100)]
     pub max_iterations: usize,
     /// Peer quality threshold for a node to be taken into account.
-    /// Default is 0.2
-    #[default(0.2)]
-    pub quality_threshold: f64,
+    /// Default is 0.5
+    #[default(0.5)]
+    pub node_score_threshold: f64,
     /// Channel score threshold for a channel to be taken into account.
     /// Default is 0
     #[default(0.0)]
-    pub score_threshold: f64,
+    pub edge_score_threshold: f64,
+    /// The maximum latency of the first hop
+    /// Default is 100 ms
+    #[default(Some(Duration::from_millis(100)))]
+    pub max_first_hop_latency: Option<Duration>,
     /// If true, include paths with payment channels, which have no
     /// funds in it. By default, that option is set to `false` to
     /// prevent tickets being dropped immediately.
@@ -150,6 +155,7 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
     /// * `initial_source`: the initial node on the path
     /// * `final_destination`: the desired destination node (will not be part of the path)
     /// * `current_path`: currently selected relayers
+    #[tracing::instrument(level = "trace", skip(self))]
     fn is_next_hop_usable(
         &self,
         next_hop: &Node,
@@ -162,33 +168,47 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
 
         // Looping back to self does not give any privacy
         if next_hop.address.eq(initial_source) {
-            trace!(%next_hop, "source loopback not allowed");
+            trace!("source loopback not allowed");
             return false;
         }
 
         // We cannot use `final_destination` as the last intermediate hop as
         // this would be a loopback that does not give any privacy
         if next_hop.address.eq(final_destination) {
-            trace!(%next_hop, "destination loopback not allowed");
+            trace!("destination loopback not allowed");
             return false;
         }
 
         // Only use nodes that have shown to be somewhat reliable
-        if next_hop.quality < self.cfg.quality_threshold {
-            trace!(%next_hop, "node quality threshold not satisfied");
+        if next_hop.node_score < self.cfg.node_score_threshold {
+            trace!("node quality threshold not satisfied");
             return false;
         }
 
         // Edges which have score and is below the threshold will not be considered
-        if edge.score.is_some_and(|score| score < self.cfg.score_threshold) {
-            trace!(%next_hop, "channel score threshold not satisfied");
+        if edge
+            .edge_score
+            .is_some_and(|score| score < self.cfg.edge_score_threshold)
+        {
+            trace!("channel score threshold not satisfied");
+            return false;
+        }
+
+        // If this is the first hop, check if the latency is not too high
+        if current_path.is_empty()
+            && self
+                .cfg
+                .max_first_hop_latency
+                .is_some_and(|limit| next_hop.latency.average().is_none_or(|avg_latency| avg_latency > limit))
+        {
+            trace!("first hop latency too high");
             return false;
         }
 
         // At the moment, we do not allow circles because they
         // do not give additional privacy
         if current_path.contains(&next_hop.address) {
-            trace!(%next_hop, "circles not allowed");
+            trace!("circles not allowed");
             return false;
         }
 
@@ -198,7 +218,7 @@ impl<CW: EdgeWeighting<U256>> DfsPathSelector<CW> {
             return false;
         }
 
-        trace!(%next_hop, ?current_path, "usable node");
+        trace!("usable node");
         true
     }
 }
@@ -302,6 +322,7 @@ where
 mod tests {
     use super::*;
 
+    use crate::channel_graph::NodeScoreUpdate;
     use crate::path::Path;
     use async_lock::RwLock;
     use core::panic;
@@ -355,7 +376,7 @@ mod tests {
         Q: Fn(Address) -> f64,
         S: Fn(Address, Address) -> f64,
     {
-        let mut graph = ChannelGraph::new(me);
+        let mut graph = ChannelGraph::new(me, Default::default());
 
         if def.is_empty() {
             return graph;
@@ -381,8 +402,15 @@ mod tests {
                 ),
             ));
 
-            graph.update_node_quality(&src, quality(src));
-            graph.update_node_quality(&dest, quality(dest));
+            graph.update_node_score(
+                &src,
+                NodeScoreUpdate::Initialize(Duration::from_millis(10), quality(src)),
+            );
+            graph.update_node_score(
+                &dest,
+                NodeScoreUpdate::Initialize(Duration::from_millis(10), quality(dest)),
+            );
+
             graph.update_channel_score(&src, &dest, score(src, dest));
         };
 
