@@ -234,7 +234,8 @@ where
                 CurrentPathSelector::new(
                     channel_graph.clone(),
                     DfsPathSelectorConfig {
-                        quality_threshold: cfg.network.quality_auto_path_threshold,
+                        node_score_threshold: cfg.network.node_score_auto_path_threshold,
+                        max_first_hop_latency: cfg.network.max_first_hop_latency_threshold,
                         ..Default::default()
                     },
                 ),
