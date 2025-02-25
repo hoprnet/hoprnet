@@ -41,10 +41,11 @@ http-types = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 primitive-types = { workspace = true }
-reqwest = { workspace = true, optional = true, features = [
+reqwest = { workspace = true, features = [
   "brotli",
   "zstd",
   "gzip",
+  "json"
 ] }
 serde = { workspace = true }
 serde_json = { workspace = true }
