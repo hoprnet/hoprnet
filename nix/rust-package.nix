@@ -76,8 +76,8 @@ let
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
-    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
-    buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
+    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl pkgs.cacert libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
+    buildInputs = [ openssl pkgs.cacert ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
     # this env var is used by utoipa-swagger-ui to prevent internet access
