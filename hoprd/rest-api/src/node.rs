@@ -281,8 +281,12 @@ pub(crate) struct GraphExportQuery {
     #[schema(required = false)]
     #[serde(default)]
     pub ignore_non_opened_channels: bool,
+    /// Show only nodes that are accessible via 3-hops (via open channels) from this node.
+    #[schema(required = false)]
+    #[serde(default)]
+    pub only_3_hop_paths: bool,
     /// Export the entire graph in raw JSON format, that can be later
-    /// used to load the graph into e.g. a unit test.
+    /// used to load the graph into e.g., a unit test.
     ///
     /// Note that `ignore_disconnected_components` and `ignore_non_opened_channels` are ignored.
     #[schema(required = false)]
@@ -295,6 +299,7 @@ impl From<GraphExportQuery> for GraphExportConfig {
         Self {
             ignore_disconnected_components: value.ignore_disconnected_components,
             ignore_non_opened_channels: value.ignore_non_opened_channels,
+            only_3_hop_accessible_nodes: value.only_3_hop_paths,
         }
     }
 }
