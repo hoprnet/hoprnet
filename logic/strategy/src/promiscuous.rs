@@ -301,13 +301,11 @@ where
                 .db
                 .get_network_peers(PeerSelector::default(), false)
                 .await?
-                .filter(|status| {
+                .inspect(|status| {
                     if status.quality > 0.0 {
                         num_online_peers += 1;
-                        futures::future::ready(true)
                     } else {
                         trace!(peer = %status.id.1, "peer is not online");
-                        futures::future::ready(false)
                     }
                 })
                 .filter_map(|status| async move {
@@ -382,7 +380,7 @@ where
 
             if let Some(channel) = channel_with_peer {
                 if *quality < self.cfg.network_quality_close_threshold {
-                    // Need to close the channel, because quality has dropped
+                    // Need to close the channel because quality has dropped
                     debug!(destination = %channel.destination, quality = %quality, threshold = self.cfg.network_quality_close_threshold,
                         "strategy proposes to close existing channel"
                     );
