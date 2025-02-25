@@ -229,29 +229,41 @@ where
                 );
 
                 if let Some(channel_edits) = maybe_channel {
-                    // Incoming channel, so once closed. All unredeemed tickets just became invalid
-                    if channel_edits.entry().destination == self.chain_key.public().to_address() {
-                        self.db
-                            .mark_tickets_as(channel_edits.entry().into(), TicketMarker::Neglected)
-                            .await?;
-                    }
+                    let channel_id = channel_edits.entry().get_id();
+                    let orientation = channel_edits.entry().orientation(&self.chain_key.public().to_address());
 
-                    // set all channel fields like we do on-chain on close
-                    let channel = channel_edits
-                        .change_status(ChannelStatus::Closed)
-                        .change_balance(BalanceType::HOPR.zero())
-                        .change_ticket_index(0);
+                    // If the channel is our own (incoming or outgoing) reset its fields
+                    // and change its state to Closed.
+                    let updated_channel = if let Some((direction, _)) = orientation {
+                        // Set all channel fields like we do on-chain on close
+                        let channel_edits = channel_edits
+                            .change_status(ChannelStatus::Closed)
+                            .change_balance(BalanceType::HOPR.zero())
+                            .change_ticket_index(0);
 
-                    let updated_channel = self.db.finish_channel_update(tx.into(), channel).await?;
+                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits).await?;
 
-                    if updated_channel.source == self.chain_key.public().to_address()
-                        || updated_channel.destination == self.chain_key.public().to_address()
-                    {
-                        // Reset the current_ticket_index to zero
-                        self.db
-                            .reset_outgoing_ticket_index(channel_closed.channel_id.into())
-                            .await?;
-                    }
+                        // Perform additional tasks based on the channel's direction
+                        match direction {
+                            ChannelDirection::Incoming => {
+                                // On incoming channel, mark all unredeemed tickets as neglected
+                                self.db
+                                    .mark_tickets_as(updated_channel.into(), TicketMarker::Neglected)
+                                    .await?;
+                            }
+                            ChannelDirection::Outgoing => {
+                                // On outgoing channels, reset the current_ticket_index to zero
+                                self.db.reset_outgoing_ticket_index(channel_id).await?;
+                            }
+                        }
+                        updated_channel
+                    } else {
+                        // Closed channels that are not our own, we be safely removed
+                        // from the database
+                        let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits.delete()).await?;
+                        debug!(channel_id = %channel_id, "foreign closed closed channel was deleted");
+                        updated_channel
+                    };
 
                     Ok(Some(ChainEventType::ChannelClosed(updated_channel)))
                 } else {
@@ -1823,6 +1835,53 @@ mod tests {
         );
 
         assert!(closed_channel.balance.amount().eq(&U256::zero()));
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn on_foreign_channel_closed() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
+
+        let handlers = init_handlers(db.clone());
+
+        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR);
+
+        let channel = ChannelEntry::new(
+            Address::new(&hex!("B7397C218766eBe6A1A634df523A1a7e412e67eA")),
+            Address::new(&hex!("D4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1")),
+            starting_balance,
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::one(),
+        );
+
+        db.upsert_channel(None, channel).await?;
+
+        let channel_closed_log = SerializableLog {
+            address: handlers.addresses.channels.into(),
+            topics: vec![
+                ChannelClosedFilter::signature().into(),
+                H256::from_slice(channel.get_id().as_ref()).into(),
+            ],
+            data: encode(&[]).into(),
+            ..test_log()
+        };
+
+        let event_type = db
+            .begin_transaction()
+            .await?
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_closed_log.into()).await }))
+            .await?;
+
+        let closed_channel = db.get_channel_by_id(None, &channel.get_id()).await?;
+
+        assert_eq!(None, closed_channel, "foreign channel must be deleted");
+
+        assert!(
+            matches!(event_type, Some(ChainEventType::ChannelClosed(c)) if c.get_id() == channel.get_id()),
+            "must return the closed channel entry"
+        );
+
         Ok(())
     }
 
