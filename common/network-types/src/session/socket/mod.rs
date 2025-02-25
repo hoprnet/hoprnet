@@ -10,7 +10,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use crate::prelude::errors::SessionError;
-use crate::prelude::{frame_reconstructor, frame_reconstructor_with_inspector};
+use crate::prelude::frame_reconstructor_with_inspector;
 use crate::prelude::protocol::{SessionCodec, SessionMessage};
 use crate::session::reassembly::FrameInspector;
 use crate::session::segmenter::Segmenter;
@@ -22,8 +22,6 @@ pub struct SessionSocketConfig {
     pub frame_size: usize,
     #[default(Duration::from_secs(4))]
     pub frame_timeout: Duration,
-    #[default(false)]
-    pub with_frame_inspector: bool,
 }
 
 pub struct SessionSocket<const C: usize> {
@@ -42,13 +40,7 @@ impl<const C: usize> SessionSocket<C> {
         S: for<'a> SocketState<'a, C> + Clone + Send + 'static
     {
         // Downstream Segments get reconstructed into Frames
-        let (downstream_segment_in, downstream_frames_out, inspector) = if cfg.with_frame_inspector {
-            let reconstructor = frame_reconstructor_with_inspector(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
-            (reconstructor.0, reconstructor.1, Some(reconstructor.2))
-        } else {
-            let reconstructor = frame_reconstructor(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
-            (reconstructor.0, reconstructor.1, Option::<FrameInspector>::None)
-        };
+        let (downstream_segment_in, downstream_frames_out, inspector) =  frame_reconstructor_with_inspector(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
 
         // Upstream frames get segmented and are yielded by the data_rx stream
         let (upstream_frames_in, segmented_data_rx) = Segmenter::<C>::new(cfg.frame_size, RECONSTRUCTOR_CAPACITY);
@@ -65,7 +57,7 @@ impl<const C: usize> SessionSocket<C> {
         // Messages incoming from Upstream and from the State go downstream as Packets
         // Segmented data coming from Upstream go out right away.
         let mut st_1 = state.clone();
-        let mut st_2 = state.clone();
+        let st_2 = state.clone();
         hopr_async_runtime::prelude::spawn(
             (
                 ctl_rx,

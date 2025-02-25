@@ -15,7 +15,7 @@ use crate::session::utils::{
 };
 
 pub struct SocketComponents<const C: usize> {
-    pub inspector: Option<FrameInspector>,
+    pub inspector: FrameInspector,
     pub ctl_tx: UnboundedSender<SessionMessage<C>>,
 }
 
@@ -182,7 +182,7 @@ impl<'a, const C: usize> SocketState<'a, C> for AcknowledgementState<C> {
             outgoing_frame_retries_tx,
             ack_tx,
             ctl_tx: socket_components.ctl_tx,
-            inspector: socket_components.inspector.ok_or(SessionError::InvalidState("inspector is not available".into()))?,
+            inspector: socket_components.inspector,
         });
 
         if self.cfg.enable_partial_acknowledgements {
