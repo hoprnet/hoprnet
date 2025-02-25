@@ -53,6 +53,7 @@ smart-default = { workspace = true }
 surf = { workspace = true, optional = true }
 surf-governor = { workspace = true, optional = true }
 thiserror = { workspace = true }
+url = { workspace = true }
 validator = { workspace = true }
 
 hopr-bindings = { workspace = true }
