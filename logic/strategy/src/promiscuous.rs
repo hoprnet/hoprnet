@@ -191,7 +191,7 @@ pub struct PromiscuousStrategyConfig {
 
     /// Specifies a minimum version (in semver syntax) of the peer the strategy should open a channel to.
     ///
-    /// Default is ">=2.1.0"
+    /// Default is ">=2.2.1"
     #[serde_as(as = "DisplayFromStr")]
     #[default(">=2.2.1".parse().expect("should be valid default version"))]
     pub minimum_peer_version: semver::VersionReq,
