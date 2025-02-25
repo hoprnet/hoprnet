@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, Middleware};
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::pin::Pin;
 use tracing::{debug, error, trace, warn};
 
@@ -79,7 +80,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
         fetch_ranges
             .then(move |subrange_filters| async move {
                 let mut results = futures::stream::iter(subrange_filters)
-                    .then(|filter| async move {
+                    .then_concurrent(|filter| async move {
                         let prov_clone = self.provider.clone();
 
                         match prov_clone.get_logs(&filter).await {
