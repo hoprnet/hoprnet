@@ -4,7 +4,9 @@
 //! [RpcOperations] type, which is the main API exposed by this crate.
 use async_trait::async_trait;
 use ethers::contract::{abigen, Multicall, MULTICALL_ADDRESS};
-use ethers::middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware};
+use ethers::middleware::{
+    gas_oracle::GasOracleMiddleware, MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware,
+};
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::providers::{JsonRpcClient, Middleware, Provider};
@@ -25,6 +27,7 @@ use hopr_primitive_types::prelude::*;
 
 use crate::errors::RpcError::ContractError;
 use crate::errors::{Result, RpcError};
+use crate::middleware::GnosisScan;
 use crate::{HoprRpcOperations, NodeSafeModuleStatus, PendingTransaction};
 
 // define basic safe abi
@@ -85,7 +88,8 @@ pub struct RpcOperationsConfig {
     pub finality: u32,
 }
 
-pub(crate) type HoprMiddleware<P> = NonceManagerMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>>;
+pub(crate) type HoprMiddleware<P> =
+    NonceManagerMiddleware<GasOracleMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>, GnosisScan>>;
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug)]
@@ -113,11 +117,13 @@ impl<P: JsonRpcClient> Clone for RpcOperations<P> {
 impl<P: JsonRpcClient + 'static> RpcOperations<P> {
     pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);
+        let gas_oracle = GnosisScan::new();
 
         let provider = Arc::new(
             Provider::new(json_rpc)
                 .interval(cfg.tx_polling_interval)
                 .with_signer(wallet)
+                .gas_oracle(gas_oracle)
                 .nonce_manager(chain_key.public().to_address().into()),
         );
 
@@ -495,6 +501,49 @@ mod tests {
             .await
             .map_err(|e| ContractError::MiddlewareError { e })?
             .await?;
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_should_estimate_tx() -> anyhow::Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+
+        let cfg = RpcOperationsConfig {
+            chain_id: anvil.chain_id(),
+            tx_polling_interval: Duration::from_millis(10),
+            expected_block_time,
+            finality: 2,
+            ..RpcOperationsConfig::default()
+        };
+
+        let client = JsonRpcProviderClient::new(
+            &anvil.endpoint(),
+            SurfRequestor::default(),
+            SimpleJsonRpcRetryPolicy::default(),
+        );
+
+        // Wait until contracts deployments are final
+        sleep((1 + cfg.finality) * expected_block_time).await;
+
+        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
+
+        // call eth_gas_estimate
+        let (_, estimated_max_priority_fee) = rpc.provider.estimate_eip1559_fees(None).await?;
+        assert!(
+            estimated_max_priority_fee.ge(&U256::from(100_000_000)),
+            "estimated_max_priority_fee must be equal or greater than 0, 0.1 gwei"
+        );
+
+        let estimated_gas_price = rpc.provider.get_gas_price().await?;
+        assert!(
+            estimated_gas_price.ge(&U256::from(100_000_000)),
+            "estimated_max_fee must be greater than 0.1 gwei"
+        );
+
         Ok(())
     }
 

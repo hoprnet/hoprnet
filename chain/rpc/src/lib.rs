@@ -32,6 +32,7 @@ pub mod client;
 pub mod errors;
 mod helper;
 pub mod indexer;
+pub mod middleware;
 pub mod rpc;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
