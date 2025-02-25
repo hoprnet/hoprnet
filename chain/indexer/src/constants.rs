@@ -12,7 +12,6 @@ pub mod topics {
         },
         hopr_node_safe_registry::{DergisteredNodeSafeFilter, RegisteredNodeSafeFilter},
         hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
-        hopr_token::{ApprovalFilter, TransferFilter},
         hopr_winning_probability_oracle::WinProbUpdatedFilter,
     };
     use ethers::{contract::EthEvent, types::TxHash};
@@ -28,10 +27,6 @@ pub mod topics {
             DomainSeparatorUpdatedFilter::signature(),
             LedgerDomainSeparatorUpdatedFilter::signature(),
         ]
-    }
-
-    pub fn token() -> Vec<TxHash> {
-        vec![TransferFilter::signature(), ApprovalFilter::signature()]
     }
 
     pub fn network_registry() -> Vec<TxHash> {
