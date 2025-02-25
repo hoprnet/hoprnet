@@ -42,7 +42,7 @@ fn default_min_stake_threshold() -> Balance {
 pub struct AutoFundingStrategyConfig {
     /// Minimum stake that a channel's balance must not go below.
     ///
-    /// Default is 1 HOPR
+    /// Default is 1 wxHOPR
     #[serde_as(as = "DisplayFromStr")]
     #[serde(default = "default_min_stake_threshold")]
     #[default(default_min_stake_threshold())]
@@ -50,7 +50,7 @@ pub struct AutoFundingStrategyConfig {
 
     /// Funding amount.
     ///
-    /// Defaults to 10 HOPR.
+    /// Defaults to 10 wxHOPR.
     #[serde_as(as = "DisplayFromStr")]
     #[serde(default = "default_funding_amount")]
     #[default(default_funding_amount())]
