@@ -133,25 +133,22 @@ hopr:
         #- !Promiscuous
         #
         # # Maximum number of opened channels the strategy should maintain.
-        # max_channels: 10
+        # max_channels: 30
         #
         # # A quality threshold between 0 and 1 used to determine whether the strategy should open channel with the peer.
-        # network_quality_open_threshold: 0.5
+        # network_quality_open_threshold: 0.9
         #
         # # A quality threshold between 0 and 1 used to determine whether the strategy should close channel with the peer.
-        # network_quality_close_threshold: 0.5
+        # network_quality_close_threshold: 0.2
         #
         # Number of heartbeats sent to the peer before it is considered for selection.
-        # minimum_peer_pings: 100
+        # minimum_peer_pings: 50
         #
         # # A stake of tokens that should be allocated to a channel opened by the strategy.
-        # new_channel_stake: "1000000 HOPR"
+        # new_channel_stake: "10000000000000000000 HOPR"
         #
         # # Minimum token balance of the node. When reached, the strategy will not open any new channels.
-        # minimum_node_balance: "10000000 HOPR"
-        #
-        # # Minimum number of network quality samples before the strategy can start making decisions.
-        # min_network_size_samples: 20
+        # minimum_safe_balance: "1000000000000000000000 HOPR"
         #
         # # If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
         # # if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the
@@ -159,7 +156,7 @@ hopr:
         #
         # # Specifies a minimum version of the peer the strategy should open a channel to.
         # # Accepts semver syntax.
-        # minimum_peer_version: ">=2.1.0"
+        # minimum_peer_version: ">=2.2.1"
         #
         ############################################
         #
