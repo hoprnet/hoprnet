@@ -19,7 +19,7 @@ Relevant smart contracts are listed below, per environment **(to be updated)**:
 
 ## Register a node by the runner
 
-To be updated
+Self registration is currently disabled.
 
 <!-- ### Eligibility
 
