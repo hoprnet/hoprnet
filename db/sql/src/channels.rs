@@ -19,6 +19,7 @@ use crate::{HoprDbGeneralModelOperations, OptTx};
 pub struct ChannelEditor {
     orig: ChannelEntry,
     model: channel::ActiveModel,
+    delete: bool,
 }
 
 impl ChannelEditor {
@@ -51,6 +52,12 @@ impl ChannelEditor {
         self.model.epoch = Set(epoch.into().to_be_bytes().to_vec());
         self
     }
+
+    /// If set, the channel will be deleted, no other edits will be done.
+    pub fn delete(mut self) -> Self {
+        self.delete = true;
+        self
+    }
 }
 
 /// Defines DB API for accessing information about HOPR payment channels.
@@ -67,6 +74,7 @@ pub trait HoprDbChannelOperations {
     async fn begin_channel_update<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>>;
 
     /// Commits changes of the channel to the database.
+    /// Returns the updated channel, or on deletion, the deleted channel entry.
     async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry>;
 
     /// Retrieves the channel by source and destination.
@@ -145,6 +153,7 @@ impl HoprDbChannelOperations for HoprDb {
                             Some(ChannelEditor {
                                 orig: model.clone().try_into()?,
                                 model: model.into_active_model(),
+                                delete: false,
                             })
                         } else {
                             None
@@ -162,8 +171,13 @@ impl HoprDbChannelOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let model = editor.model.update(tx.as_ref()).await?;
-                    Ok::<_, DbSqlError>(model.try_into()?)
+                    if !editor.delete {
+                        let model = editor.model.update(tx.as_ref()).await?;
+                        Ok::<_, DbSqlError>(model.try_into()?)
+                    } else {
+                        editor.model.delete(tx.as_ref()).await?;
+                        Ok::<_, DbSqlError>(editor.orig)
+                    }
                 })
             })
             .await?;
