@@ -100,8 +100,13 @@ impl Display for ChannelDecision {
 }
 
 #[inline]
-fn ten_hopr() -> Balance {
+fn default_new_channel_stake() -> Balance {
     Balance::new_from_str("10000000000000000000", BalanceType::HOPR)
+}
+
+#[inline]
+fn default_min_safe_balance() -> Balance {
+    Balance::new_from_str("1000000000000000000000", BalanceType::HOPR)
 }
 
 #[inline]
@@ -154,21 +159,22 @@ pub struct PromiscuousStrategyConfig {
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
     ///
-    /// Defaults to 10 HOPR
+    /// Default is 10 wxHOPR
     #[serde_as(as = "DisplayFromStr")]
-    #[serde(default = "ten_hopr")]
-    #[default(ten_hopr())]
+    #[serde(default = "default_new_channel_stake")]
+    #[default(default_new_channel_stake())]
     pub new_channel_stake: Balance,
 
-    /// Minimum token balance of the node. When reached, the strategy will not open any new channels.
+    /// Minimum token balance of the node's Safe.
+    /// When reached, the strategy will not open any new channels.
     ///
-    /// Defaults to 10 HOPR
+    /// Default is 1000 wxHOPR
     #[serde_as(as = "DisplayFromStr")]
-    #[serde(default = "ten_hopr")]
-    #[default(ten_hopr())]
-    pub minimum_node_balance: Balance,
+    #[serde(default = "default_min_safe_balance")]
+    #[default(default_min_safe_balance())]
+    pub minimum_safe_balance: Balance,
 
-    /// Maximum number of opened channels the strategy should maintain.
+    /// The maximum number of opened channels the strategy should maintain.
     ///
     /// Defaults to square-root of the sampled network size, the minimum is 10.
     pub max_channels: Option<usize>,
@@ -185,9 +191,9 @@ pub struct PromiscuousStrategyConfig {
 
     /// Specifies a minimum version (in semver syntax) of the peer the strategy should open a channel to.
     ///
-    /// Default is ">=2.1.0"
+    /// Default is ">=2.2.1"
     #[serde_as(as = "DisplayFromStr")]
-    #[default(">=2.1.0".parse().expect("should be valid default version"))]
+    #[default(">=2.2.1".parse().expect("should be valid default version"))]
     pub minimum_peer_version: semver::VersionReq,
 }
 
@@ -295,13 +301,11 @@ where
                 .db
                 .get_network_peers(PeerSelector::default(), false)
                 .await?
-                .filter(|status| {
+                .inspect(|status| {
                     if status.quality > 0.0 {
                         num_online_peers += 1;
-                        futures::future::ready(true)
                     } else {
                         trace!(peer = %status.id.1, "peer is not online");
-                        futures::future::ready(false)
                     }
                 })
                 .filter_map(|status| async move {
@@ -376,7 +380,7 @@ where
 
             if let Some(channel) = channel_with_peer {
                 if *quality < self.cfg.network_quality_close_threshold {
-                    // Need to close the channel, because quality has dropped
+                    // Need to close the channel because quality has dropped
                     debug!(destination = %channel.destination, quality = %quality, threshold = self.cfg.network_quality_close_threshold,
                         "strategy proposes to close existing channel"
                     );
@@ -471,7 +475,7 @@ where
                 .map_err(hopr_db_sql::api::errors::DbError::from)?;
 
             // Check if we do not surpass the minimum node's balance while opening new channels
-            let max_to_open = ((current_safe_balance - self.cfg.minimum_node_balance).amount()
+            let max_to_open = ((current_safe_balance - self.cfg.minimum_safe_balance).amount()
                 / self.cfg.new_channel_stake.amount())
             .as_usize();
             debug!(%current_safe_balance, max_to_open, num_candidates = new_channel_candidates.len(), "maximum number of channel openings with current balance");
@@ -523,7 +527,7 @@ where
             .get_safe_hopr_balance(None)
             .await
             .map_err(hopr_db_sql::api::errors::DbError::from)?;
-        if safe_balance <= self.cfg.minimum_node_balance {
+        if safe_balance <= self.cfg.minimum_safe_balance {
             error!(
                 "strategy cannot work with safe token balance already being less or equal than minimum node balance"
             );
@@ -801,7 +805,8 @@ mod tests {
             network_quality_open_threshold: 0.5,
             network_quality_close_threshold: 0.3,
             new_channel_stake: BalanceType::HOPR.balance(10),
-            minimum_node_balance: BalanceType::HOPR.balance(50),
+            minimum_safe_balance: BalanceType::HOPR.balance(50),
+            minimum_peer_version: ">=2.2.0".parse()?,
             ..Default::default()
         };
 
