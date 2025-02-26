@@ -75,13 +75,10 @@ pub struct Config {
 impl Config {
     /// Creates a new configuration object with default values.
     pub fn new(keypair: &libp2p_identity::Keypair) -> Self {
-        let client_tls_config = Arc::new(
-            QuicClientConfig::try_from(libp2p_tls::make_client_config(keypair, None).unwrap())
-                .unwrap(),
-        );
-        let server_tls_config = Arc::new(
-            QuicServerConfig::try_from(libp2p_tls::make_server_config(keypair).unwrap()).unwrap(),
-        );
+        let client_tls_config =
+            Arc::new(QuicClientConfig::try_from(libp2p_tls::make_client_config(keypair, None).unwrap()).unwrap());
+        let server_tls_config =
+            Arc::new(QuicServerConfig::try_from(libp2p_tls::make_server_config(keypair).unwrap()).unwrap());
         Self {
             client_tls_config,
             server_tls_config,
@@ -149,6 +146,15 @@ impl From<Config> for QuinnConfig {
         transport.stream_receive_window(max_stream_data.into());
         transport.receive_window(max_connection_data.into());
         transport.mtu_discovery_config(mtu_discovery_config);
+
+        // NOTE: Custom HOPR modification
+        transport.send_fairness(false);
+
+        // NOTE: Custom HOPR modification
+        let mut cubic = quinn::congestion::CubicConfig::default();
+        cubic.initial_window(1200 * 10 * 15); // 15x the default
+        transport.congestion_controller_factory(Arc::new(cubic));
+
         let transport = Arc::new(transport);
 
         let mut server_config = quinn::ServerConfig::with_crypto(server_tls_config);
