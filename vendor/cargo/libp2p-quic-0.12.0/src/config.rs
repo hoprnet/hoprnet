@@ -160,9 +160,10 @@ impl From<Config> for QuinnConfig {
         //     .max_ack_delay(None);
         // transport.ack_frequency_config(Some(ack_freq_cfg));
 
-        let mut cubic = quinn::congestion::CubicConfig::default();
-        cubic.initial_window(1200 * 10 * 15); // 15x the default
-        transport.congestion_controller_factory(Arc::new(cubic));
+        // let mut cubic = quinn::congestion::CubicConfig::default();
+        // cubic.initial_window(1200 * 10 * 15); // 15x the default
+        let mut bbr = quinn::congestion::BbrConfig::default();
+        transport.congestion_controller_factory(Arc::new(bbr));
         // ========== START ==========
 
         let transport = Arc::new(transport);
