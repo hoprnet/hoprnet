@@ -149,16 +149,16 @@ impl From<Config> for QuinnConfig {
 
         // NOTE: Custom HOPR modification
         // ========== START ==========
-        let packet_threshold = 20;
+        let packet_threshold = 3;
         transport.send_fairness(false);
         transport.send_window((8 * max_stream_data).into());
         transport.packet_threshold(packet_threshold);
         let mut ack_freq_cfg = quinn::AckFrequencyConfig::default();
-        // ack_freq_cfg
-        //     .reordering_threshold((packet_threshold - 1).into())
-        //     .ack_eliciting_threshold(quinn::VarInt::from_u64(10u64).expect("must be convertible"))
-        //     .max_ack_delay(None);
-        // transport.ack_frequency_config(Some(ack_freq_cfg));
+        ack_freq_cfg
+            .reordering_threshold((packet_threshold - 1).into())
+            .ack_eliciting_threshold(quinn::VarInt::from_u64(9u64).expect("must be convertible"))
+            .max_ack_delay(None);
+        transport.ack_frequency_config(Some(ack_freq_cfg));
 
         // let mut cubic = quinn::congestion::CubicConfig::default();
         // cubic.initial_window(1200 * 10 * 15); // 15x the default
