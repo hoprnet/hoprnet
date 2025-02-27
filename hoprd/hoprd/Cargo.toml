@@ -15,7 +15,7 @@ default = [
   "prometheus",
   "telemetry",
   "explicit-path",
-  # "transport-quic",
+  "transport-quic",
 ] # uses tokio by default because of axum
 prometheus = [
   "dep:hopr-metrics",
