@@ -82,3 +82,4 @@ scrape_configs:
 - `hopr_udp_ingress_packet_len`: UDP packet lengths on ingress per counterparty, keys: `counterparty`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
 - `hopr_udp_egress_packet_len`: UDP packet lengths on egress per counterparty, keys: `counterparty`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
 - `hopr_session_inner_sizes`: Sizes of data chunks fed from inner session to HOPR protocol, keys: `session_id`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0
+- `hopr_frame_time_to_finish`: Measures time in seconds it takes a frame to be reassembled or skipped

@@ -59,6 +59,16 @@ use hopr_primitive_types::prelude::AsUnixTimestamp;
 use crate::errors::NetworkTypeError;
 use crate::session::errors::SessionError;
 
+#[cfg(all(not(test), feature = "prometheus"))]
+lazy_static::lazy_static! {
+    static ref METRIC_TIME_TO_FRAME_FINISH: hopr_metrics::SimpleHistogram =
+        hopr_metrics::SimpleHistogram::new(
+            "hopr_frame_time_to_finish",
+            "Measures time in seconds it takes a frame to be reassembled or skipped",
+            vec![0.05,0.1,0.25,0.5,1.0,1.5,2.0,2.5,3.0,4.0,5.0,7.0,10.0,12.0,15.0,20.0],
+        ).unwrap();
+}
+
 /// ID of a [Frame].
 pub type FrameId = u32;
 /// Type representing the sequence numbers in a [Frame].
@@ -225,6 +235,7 @@ impl TryFrom<&[u8]> for Segment {
 #[derive(Debug)]
 struct FrameBuilder {
     frame_id: FrameId,
+    _initiated: std::time::Instant,
     segments: Vec<OnceLock<Box<[u8]>>>,
     remaining: AtomicU8,
     last_ts: AtomicU64,
@@ -242,6 +253,7 @@ impl FrameBuilder {
     fn empty(frame_id: FrameId, seq_len: SeqNum) -> Self {
         Self {
             frame_id,
+            _initiated: std::time::Instant::now(),
             segments: vec![OnceLock::new(); seq_len as usize],
             remaining: AtomicU8::new(seq_len),
             last_ts: AtomicU64::new(0),
@@ -443,6 +455,9 @@ impl FrameReassembler {
     /// Emits the frame if it is the next in sequence and complete.
     /// If it is not next in the sequence or incomplete, it is discarded forever.
     fn emit_if_complete_discard_otherwise(&self, builder: FrameBuilder) -> crate::session::errors::Result<()> {
+        #[cfg(all(not(test), feature = "prometheus"))]
+        METRIC_TIME_TO_FRAME_FINISH.observe(builder._initiated.elapsed().as_secs_f64());
+
         if self.next_emitted_frame.fetch_add(1, Ordering::SeqCst) == builder.frame_id && builder.is_complete() {
             self.reassembled
                 .unbounded_send(builder.reassemble())
@@ -454,6 +469,7 @@ impl FrameReassembler {
         }
         self.last_emission
             .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+
         Ok(())
     }
 
@@ -484,9 +500,13 @@ impl FrameReassembler {
                         .compare_exchange(frame_id, frame_id + 1, Ordering::SeqCst, Ordering::Relaxed)
                         .is_ok()
                 {
+                    let builder = e.remove();
+                    #[cfg(all(not(test), feature = "prometheus"))]
+                    METRIC_TIME_TO_FRAME_FINISH.observe(builder._initiated.elapsed().as_secs_f64());
+
                     // Emit this complete frame
                     self.reassembled
-                        .unbounded_send(e.remove().reassemble())
+                        .unbounded_send(builder.reassemble())
                         .map_err(|_| SessionError::ReassemblerClosed)?;
                     self.last_emission
                         .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
@@ -502,6 +522,9 @@ impl FrameReassembler {
                         .compare_exchange(frame_id, frame_id + 1, Ordering::SeqCst, Ordering::Relaxed)
                         .is_ok()
                 {
+                    #[cfg(all(not(test), feature = "prometheus"))]
+                    METRIC_TIME_TO_FRAME_FINISH.observe(builder._initiated.elapsed().as_secs_f64());
+
                     // Emit this frame if already complete
                     self.reassembled
                         .unbounded_send(builder.reassemble())
