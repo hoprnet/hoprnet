@@ -1,7 +1,11 @@
 {
   "enabled": true,
   "prCreation": "not-pending",
-  "extends": ["schedule:earlyMondays", "config:base", ":disableDependencyDashboard"],
+  "extends": [
+    "schedule:earlyMondays",
+    "config:base",
+    ":disableDependencyDashboard"
+  ],
   "docker": {
     "enabled": true,
     "pinDigests": true
