@@ -77,10 +77,10 @@ async fn build_p2p_network(
             move || tcp_upgrade,
         )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_quic_config(|mut cfg| {
-            cfg.max_concurrent_stream_limit = 5120; // from 256
-            cfg
-        })
+        // .with_quic_config(|mut cfg| {
+        //     cfg.max_concurrent_stream_limit = 5120; // from 256
+        //     cfg
+        // })
         .with_dns();
 
     // Both features could be enabled during testing, therefore we only use tokio when its
@@ -94,10 +94,10 @@ async fn build_p2p_network(
             || tcp_upgrade,
         )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_quic_config(|mut cfg| {
-            cfg.max_concurrent_stream_limit = 5120; // from 256
-            cfg
-        })
+        // .with_quic_config(|mut cfg| {
+        //     cfg.max_concurrent_stream_limit = 5120; // from 256
+        //     cfg
+        // })
         .with_dns();
 
     Ok(swarm
