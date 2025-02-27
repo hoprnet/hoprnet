@@ -25,6 +25,10 @@ use hopr_primitive_types::prelude::*;
 use std::collections::HashMap;
 use tracing::{debug, error, info, trace, warn};
 
+use crate::errors::Result;
+use crate::errors::StrategyError::CriteriaNotSatisfied;
+use crate::strategy::SingularStrategy;
+use crate::Strategy;
 use async_trait::async_trait;
 use futures::StreamExt;
 use hopr_chain_actions::channels::ChannelActions;
@@ -37,11 +41,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
-
-use crate::errors::Result;
-use crate::errors::StrategyError::CriteriaNotSatisfied;
-use crate::strategy::SingularStrategy;
-use crate::Strategy;
+use std::time::Duration;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{SimpleCounter, SimpleGauge};
@@ -129,6 +129,11 @@ fn just_true() -> bool {
     true
 }
 
+#[inline]
+fn default_initial_delay() -> Duration {
+    Duration::from_secs(5 * 60)
+}
+
 const MIN_AUTO_DETECTED_MAX_AUTO_CHANNELS: usize = 10;
 
 /// Configuration of [PromiscuousStrategy].
@@ -156,6 +161,13 @@ pub struct PromiscuousStrategyConfig {
     #[serde(default = "default_minimum_pings")]
     #[default(default_minimum_pings())]
     pub minimum_peer_pings: u32,
+
+    /// Initial delay from startup before the strategy starts taking decisions.
+    ///
+    /// Default is 5 minutes.
+    #[serde(default = "default_initial_delay")]
+    #[default(default_initial_delay())]
+    pub initial_delay: Duration,
 
     /// A stake of tokens that should be allocated to a channel opened by the strategy.
     ///
@@ -270,11 +282,12 @@ where
     db: Db,
     hopr_chain_actions: A,
     cfg: PromiscuousStrategyConfig,
+    started_at: std::time::Instant,
 }
 
 #[derive(Debug, Default)]
 struct NetworkStats {
-    pub peers_with_quality: HashMap<Address, f64>,
+    pub peers_with_quality: HashMap<Address, (f64, u64)>,
     pub num_online_peers: usize,
 }
 
@@ -295,6 +308,7 @@ where
             db,
             hopr_chain_actions,
             cfg,
+            started_at: std::time::Instant::now(),
         }
     }
 
@@ -313,12 +327,6 @@ where
                     }
                 })
                 .filter_map(|status| async move {
-                    // Assume only peers with enough heartbeat pings
-                    if status.heartbeats_sent < self.cfg.minimum_peer_pings as u64 {
-                        trace!(peer = %status.id.1, pings_sent = status.heartbeats_sent, "peer has too few sent pings");
-                        return None;
-                    }
-
                     // Check if peer reports any version
                     if let Some(version) = status.peer_version.clone().and_then(|v| {
                         semver::Version::from_str(&v)
@@ -334,7 +342,7 @@ where
                                 .await
                                 .and_then(|addr| addr.ok_or(DbSqlError::MissingAccount.into()))
                             {
-                                Some((addr, status.get_average_quality()))
+                                Some((addr, (status.get_average_quality(), status.heartbeats_sent)))
                             } else {
                                 error!(address = %status.id.1, "could not find on-chain address");
                                 None
@@ -375,22 +383,36 @@ where
         let network_stats = self.get_network_stats().await?;
         debug!(?network_stats, "retrieved network stats");
 
+        // Close all channels to nodes that are not in the network peers
+        // The initial_delay should take care of prior heartbeats to take place.
+        our_outgoing_open_channels
+            .iter()
+            .filter(|channel| !network_stats.peers_with_quality.contains_key(&channel.destination))
+            .for_each(|channel| {
+                debug!(destination = %channel.destination, "destination of opened channel is not between the network peers");
+                tick_decision.add_to_close(*channel);
+            });
+
         // Go through all the peer ids and their qualities
         // to find out which channels should be closed and
         // which peer ids should become candidates for a new channel
-        for (address, quality) in network_stats.peers_with_quality.iter() {
+        for (address, (quality, num_pings)) in network_stats.peers_with_quality.iter() {
             // Get the channel we have opened with it
             let channel_with_peer = our_outgoing_open_channels.iter().find(|c| c.destination.eq(address));
 
             if let Some(channel) = channel_with_peer {
-                if *quality < self.cfg.network_quality_close_threshold {
+                if *quality < self.cfg.network_quality_close_threshold
+                    && *num_pings >= self.cfg.minimum_peer_pings as u64
+                {
                     // Need to close the channel because quality has dropped
                     debug!(destination = %channel.destination, quality = %quality, threshold = self.cfg.network_quality_close_threshold,
                         "strategy proposes to close existing channel"
                     );
                     tick_decision.add_to_close(*channel);
                 }
-            } else if *quality >= self.cfg.network_quality_open_threshold {
+            } else if *quality >= self.cfg.network_quality_open_threshold
+                && *num_pings >= self.cfg.minimum_peer_pings as u64
+            {
                 // Try to open a channel with this peer, because it is high-quality,
                 // and we don't yet have a channel with it
                 debug!(destination = %address, quality = %quality, threshold = self.cfg.network_quality_open_threshold,
@@ -438,14 +460,14 @@ where
             // Sort by quality, lowest-quality first
             sorted_channels.sort_unstable_by(|p1, p2| {
                 let q1 = match network_stats.peers_with_quality.get(&p1.destination) {
-                    Some(q) => *q,
+                    Some((q, _)) => *q,
                     None => {
                         error!(channel = ?p1, "could not determine peer quality");
                         0_f64
                     }
                 };
                 let q2 = match network_stats.peers_with_quality.get(&p2.destination) {
-                    Some(q) => *q,
+                    Some((q, _)) => *q,
                     None => {
                         error!(peer = %p2, "could not determine peer quality");
                         0_f64
@@ -535,6 +557,11 @@ where
             error!(
                 "strategy cannot work with safe token balance already being less or equal than minimum node balance"
             );
+            return Err(CriteriaNotSatisfied);
+        }
+
+        if self.started_at.elapsed() < self.cfg.initial_delay {
+            debug!("strategy is not yet ready to execute, waiting for initial delay");
             return Err(CriteriaNotSatisfied);
         }
 
@@ -811,6 +838,7 @@ mod tests {
             new_channel_stake: BalanceType::HOPR.balance(10),
             minimum_safe_balance: BalanceType::HOPR.balance(50),
             minimum_peer_version: ">=2.2.0".parse()?,
+            initial_delay: Duration::ZERO,
             ..Default::default()
         };
 
@@ -839,6 +867,8 @@ mod tests {
             .return_once(move |_, _| Ok(ok(mock_action_confirmation_opening(PEERS[4].0, new_stake)).boxed()));
 
         let strat = PromiscuousStrategy::new(strat_cfg.clone(), db, actions);
+
+        async_std::task::sleep(Duration::from_millis(100)).await;
 
         strat.on_tick().await?;
 
