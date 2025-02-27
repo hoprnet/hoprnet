@@ -455,8 +455,8 @@ impl FrameReassembler {
     /// Emits the frame if it is the next in sequence and complete.
     /// If it is not next in the sequence or incomplete, it is discarded forever.
     fn emit_if_complete_discard_otherwise(&self, builder: FrameBuilder) -> crate::session::errors::Result<()> {
-        #[cfg(all(not(test), feature = "prometheus"))]
-        METRIC_TIME_TO_FRAME_FINISH.observe(builder._initiated.elapsed().as_secs_f64());
+        let time_spent = builder._initiated.elapsed();
+        let frame_id = builder.frame_id;
 
         if self.next_emitted_frame.fetch_add(1, Ordering::SeqCst) == builder.frame_id && builder.is_complete() {
             self.reassembled
@@ -469,6 +469,10 @@ impl FrameReassembler {
         }
         self.last_emission
             .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+
+        //#[cfg(all(not(test), feature = "prometheus"))]
+        //METRIC_TIME_TO_FRAME_FINISH.observe(builder._initiated.elapsed().as_secs_f64());
+        tracing::info!(frame_id, ?time_spent, "frame finished");
 
         Ok(())
     }
@@ -501,8 +505,7 @@ impl FrameReassembler {
                         .is_ok()
                 {
                     let builder = e.remove();
-                    #[cfg(all(not(test), feature = "prometheus"))]
-                    METRIC_TIME_TO_FRAME_FINISH.observe(builder._initiated.elapsed().as_secs_f64());
+                    let time_spent = builder._initiated.elapsed();
 
                     // Emit this complete frame
                     self.reassembled
@@ -510,6 +513,11 @@ impl FrameReassembler {
                         .map_err(|_| SessionError::ReassemblerClosed)?;
                     self.last_emission
                         .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+
+                    //#[cfg(all(not(test), feature = "prometheus"))]
+                    //METRIC_TIME_TO_FRAME_FINISH.observe(builder._initiated.elapsed().as_secs_f64());
+                    tracing::info!(frame_id, ?time_spent, "frame finished");
+
                     cascade = true; // Try to emit next frames in sequence
                 }
             }
@@ -522,8 +530,7 @@ impl FrameReassembler {
                         .compare_exchange(frame_id, frame_id + 1, Ordering::SeqCst, Ordering::Relaxed)
                         .is_ok()
                 {
-                    #[cfg(all(not(test), feature = "prometheus"))]
-                    METRIC_TIME_TO_FRAME_FINISH.observe(builder._initiated.elapsed().as_secs_f64());
+                    let time_spent = builder._initiated.elapsed();
 
                     // Emit this frame if already complete
                     self.reassembled
@@ -531,6 +538,12 @@ impl FrameReassembler {
                         .map_err(|_| SessionError::ReassemblerClosed)?;
                     self.last_emission
                         .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+
+                    //#[cfg(all(not(test), feature = "prometheus"))]
+                    //METRIC_TIME_TO_FRAME_FINISH.observe(builder._initiated.elapsed().as_secs_f64());
+
+                    tracing::info!(frame_id, ?time_spent, "frame finished");
+
                     cascade = true; // Try to emit the next frames in sequence
                 } else {
                     // If not complete nor the next one to be emitted, just start building it
