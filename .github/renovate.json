@@ -1,10 +1,20 @@
 {
   "enabled": true,
   "prCreation": "not-pending",
-  "extends": ["config:base", ":disableDependencyDashboard"],
+  "extends": [
+    "schedule:earlyMondays",
+    "config:base",
+    ":disableDependencyDashboard"
+  ],
   "docker": {
     "enabled": true,
     "pinDigests": true
+  },
+  "ci": {
+    "enabled": true
+  },
+  "rust": {
+    "enabled": true
   },
   "vulnerabilityAlerts": {
     "enabled": true

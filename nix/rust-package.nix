@@ -76,27 +76,22 @@ let
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
-    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
-    buildInputs = [ openssl ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
+    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl pkgs.cacert libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
+    buildInputs = [ openssl pkgs.cacert ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
-    CARGO_HOME = ".cargo";
-    RUST_MIN_STACK = "16777216"; # 16MB required to run the tests and compilation
-    cargoExtraArgs = "--offline -p ${pname} ${cargoExtraArgs}";
+    cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
     # this env var is used by utoipa-swagger-ui to prevent internet access
-    CARGO_FEATURE_VENDORED = "true";
-    cargoVendorDir = "vendor/cargo";
+    # CARGO_FEATURE_VENDORED = "true";
+    strictDeps = true;
     # disable running tests automatically for now
     doCheck = false;
-    # prevent nix from changing config.sub files under vendor/cargo
-    dontUpdateAutotoolsGnuConfigScripts = true;
     # set to the revision because during build the Git info is not available
     VERGEN_GIT_SHA = rev;
   };
 
   sharedArgs =
     if runTests then sharedArgsBase // {
-      # exclude hopr-socks-server because it requires access to the internet
-      cargoTestExtraArgs = "--workspace -F runtime-async-std -F runtime-tokio --exclude hopr-socks-server";
+      cargoTestExtraArgs = "--workspace -F runtime-async-std -F runtime-tokio";
       doCheck = true;
     }
     else if runClippy then sharedArgsBase // { cargoClippyExtraArgs = "-- -Dwarnings"; }
@@ -104,7 +99,7 @@ let
 
   docsArgs = {
     cargoArtifacts = null;
-    cargoExtraArgs = "--offline"; # overwrite the default to build all docs
+    cargoExtraArgs = ""; # overwrite the default to build all docs
     cargoDocExtraArgs = "--workspace --no-deps";
     RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
     CARGO_TARGET_DIR = "target/";
@@ -122,11 +117,6 @@ let
   defaultArgs = {
     cargoArtifacts = craneLib.buildDepsOnly (sharedArgs // {
       src = depsSrc;
-      extraDummyScript = ''
-        mkdir -p $out/vendor/cargo
-        cp -r --no-preserve=mode,ownership ${depsSrc}/vendor/cargo $out/vendor/
-        echo "# placeholder" > $out/vendor/cargo/config.toml
-      '';
     });
   };
 
@@ -144,7 +134,6 @@ builder (args // {
   preConfigure = ''
     # respect the amount of available cores for building
     export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
-    echo "# placeholder" > vendor/cargo/config.toml
     sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
       ethereum/contracts/foundry.in.toml > \
       ethereum/contracts/foundry.toml
