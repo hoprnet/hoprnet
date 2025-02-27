@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["account","channels","logs","tickets"]};
