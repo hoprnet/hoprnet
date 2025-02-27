@@ -31,10 +31,10 @@ pub mod swarm;
 /// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
 mod behavior;
 
-use std::fmt::Debug;
-
 use core_network::network::NetworkTriggeredEvent;
 use core_network::ping::PingQueryReplier;
+use std::fmt::Debug;
+use std::time::Duration;
 
 use futures::Stream;
 /// Re-export of the entire libp2p functionality
@@ -56,7 +56,7 @@ use crate::constants::{
     HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0,
 };
 
-pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// `Ping` protocol base type for the ping operation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,7 +132,15 @@ impl HoprNetworkBehavior {
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
                 libp2p::request_response::Config::default()
-                    .with_request_timeout(MSG_ACK_TIMEOUT)
+                    .with_request_timeout(
+                        std::env::var("HOPR_INTERNAL_LIBP2P_MSG_ACK_TIMEOUT_MS")
+                            .and_then(|v| {
+                                v.parse::<u64>()
+                                    .map(Duration::from_millis)
+                                    .map_err(|_e| std::env::VarError::NotPresent)
+                            })
+                            .unwrap_or(MSG_ACK_TIMEOUT),
+                    )
                     .with_max_concurrent_streams(
                         std::env::var("HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS")
                             .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
@@ -145,7 +153,15 @@ impl HoprNetworkBehavior {
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
                 libp2p::request_response::Config::default()
-                    .with_request_timeout(MSG_ACK_TIMEOUT)
+                    .with_request_timeout(
+                        std::env::var("HOPR_INTERNAL_LIBP2P_MSG_ACK_TIMEOUT_MS")
+                            .and_then(|v| {
+                                v.parse::<u64>()
+                                    .map(Duration::from_millis)
+                                    .map_err(|_e| std::env::VarError::NotPresent)
+                            })
+                            .unwrap_or(MSG_ACK_TIMEOUT),
+                    )
                     .with_max_concurrent_streams(
                         std::env::var("HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS")
                             .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
