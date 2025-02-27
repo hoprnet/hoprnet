@@ -94,13 +94,13 @@ hex-literal = "0.4.1"
 hickory-resolver = "0.24.1"
 http-types = "2.12.0"
 lazy_static = "1.4.0"
-libp2p = { version = "0.55.0" }
-libp2p-identity = { version = "0.2.10", features = [
+libp2p = { version = "0.54.1" }
+libp2p-identity = { version = "0.2.9", features = [
   "peerid",
   "ed25519",
   "rand",
 ] }
-libp2p-mplex = "0.43.0"
+libp2p-mplex = "0.42.0"
 mockall = "0.13.0"
 mockito = "1.4.0"
 moka = { version = "0.12.7", features = ["future"] }
