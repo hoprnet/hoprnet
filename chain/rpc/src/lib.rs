@@ -236,12 +236,16 @@ impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
 
 /// Abstraction for an HTTP client that performs HTTP POST with serializable request data.
 #[async_trait]
-pub trait HttpPostRequestor: Send + Sync {
+pub trait HttpRequestor: Send + Sync {
     /// Performs HTTP POST of JSON data to the given URL
     /// and gets the JSON response.
     async fn http_post<T>(&self, url: &str, data: T) -> std::result::Result<Box<[u8]>, HttpRequestError>
     where
         T: Serialize + Send + Sync;
+
+    /// Performs HTTP GET query to the given URL
+    /// and gets the JSON response.
+    async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError>;
 }
 
 /// Common configuration for all native `HttpPostRequestor`s
