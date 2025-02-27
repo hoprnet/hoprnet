@@ -10,9 +10,6 @@
     "enabled": true,
     "pinDigests": true
   },
-  "ci": {
-    "enabled": true
-  },
   "rust": {
     "enabled": true
   },
