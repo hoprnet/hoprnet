@@ -49,13 +49,14 @@ async fn build_p2p_network(
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>> {
     let tcp_upgrade = libp2p::core::upgrade::SelectUpgrade::new(
         {
-            let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
-                .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                .unwrap_or(5120);
+            // let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
+            //     .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
+            //     .unwrap_or(5120);
 
-            let mut cfg = libp2p::yamux::Config::default();
-            cfg.set_max_num_streams(num_streams);
-            cfg
+            // let yamux self-configure
+            // cfg.set_max_num_streams(num_streams);
+            // cfg
+            libp2p::yamux::Config::default()
         },
         libp2p_mplex::MplexConfig::new()
             .set_max_num_streams(1024)
@@ -76,7 +77,10 @@ async fn build_p2p_network(
             move || tcp_upgrade,
         )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_quic()
+        .with_quic_config(|mut cfg| {
+            cfg.max_concurrent_stream_limit = 5120; // from 256
+            cfg
+        })
         .with_dns();
 
     // Both features could be enabled during testing, therefore we only use tokio when its
@@ -90,7 +94,10 @@ async fn build_p2p_network(
             || tcp_upgrade,
         )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_quic()
+        .with_quic_config(|mut cfg| {
+            cfg.max_concurrent_stream_limit = 5120; // from 256
+            cfg
+        })
         .with_dns();
 
     Ok(swarm

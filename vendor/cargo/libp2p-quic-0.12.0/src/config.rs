@@ -75,13 +75,10 @@ pub struct Config {
 impl Config {
     /// Creates a new configuration object with default values.
     pub fn new(keypair: &libp2p_identity::Keypair) -> Self {
-        let client_tls_config = Arc::new(
-            QuicClientConfig::try_from(libp2p_tls::make_client_config(keypair, None).unwrap())
-                .unwrap(),
-        );
-        let server_tls_config = Arc::new(
-            QuicServerConfig::try_from(libp2p_tls::make_server_config(keypair).unwrap()).unwrap(),
-        );
+        let client_tls_config =
+            Arc::new(QuicClientConfig::try_from(libp2p_tls::make_client_config(keypair, None).unwrap()).unwrap());
+        let server_tls_config =
+            Arc::new(QuicServerConfig::try_from(libp2p_tls::make_server_config(keypair).unwrap()).unwrap());
         Self {
             client_tls_config,
             server_tls_config,
@@ -149,6 +146,26 @@ impl From<Config> for QuinnConfig {
         transport.stream_receive_window(max_stream_data.into());
         transport.receive_window(max_connection_data.into());
         transport.mtu_discovery_config(mtu_discovery_config);
+
+        // NOTE: Custom HOPR modification
+        // ========== START ==========
+        // let packet_threshold = 3;
+        // transport.send_fairness(false);
+        // transport.send_window((8 * max_stream_data).into());
+        // transport.packet_threshold(packet_threshold);
+        let mut ack_freq_cfg = quinn::AckFrequencyConfig::default();
+        ack_freq_cfg
+            .reordering_threshold(quinn::VarInt::from_u64(1u64).expect("must be convertible"))
+            .ack_eliciting_threshold(quinn::VarInt::from_u64(0u64).expect("must be convertible"))
+            .max_ack_delay(None);
+        transport.ack_frequency_config(Some(ack_freq_cfg));
+
+        let mut cc = quinn::congestion::CubicConfig::default();
+        cc.initial_window(1200 * 10 * 15); // 15x the default
+                                           // let mut cc = quinn::congestion::BbrConfig::default();
+        transport.congestion_controller_factory(Arc::new(cc));
+        // ========== START ==========
+
         let transport = Arc::new(transport);
 
         let mut server_config = quinn::ServerConfig::with_crypto(server_tls_config);
