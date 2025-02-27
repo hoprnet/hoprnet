@@ -153,12 +153,12 @@ impl From<Config> for QuinnConfig {
         // transport.send_fairness(false);
         // transport.send_window((8 * max_stream_data).into());
         // transport.packet_threshold(packet_threshold);
-        // let mut ack_freq_cfg = quinn::AckFrequencyConfig::default();
-        // ack_freq_cfg
-        //     .reordering_threshold((packet_threshold - 1).into())
-        //     .ack_eliciting_threshold(quinn::VarInt::from_u64(9u64).expect("must be convertible"))
-        //     .max_ack_delay(None);
-        // transport.ack_frequency_config(Some(ack_freq_cfg));
+        let mut ack_freq_cfg = quinn::AckFrequencyConfig::default();
+        ack_freq_cfg
+            .reordering_threshold(quinn::VarInt::from_u64(1u64).expect("must be convertible"))
+            .ack_eliciting_threshold(quinn::VarInt::from_u64(0u64).expect("must be convertible"))
+            .max_ack_delay(None);
+        transport.ack_frequency_config(Some(ack_freq_cfg));
 
         let mut cc = quinn::congestion::CubicConfig::default();
         cc.initial_window(1200 * 10 * 15); // 15x the default
