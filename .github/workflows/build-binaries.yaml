@@ -100,11 +100,15 @@ jobs:
           echo "runner_needs_nix_setup=${runner_needs_nix_setup}" | tee -a $GITHUB_OUTPUT
           echo "runner=${{ inputs.runner || github.event.inputs.runner }}"
 
-
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.vars.outputs.branch }}
+
+      # - name: Replace the crates.io registry with a private proxy registry
+      #   env:
+      #     PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
+      #   run: "cat >> .cargo/config.toml<< EOF        \n[source.hopr-cargo-registry-cache]\nregistry = \"sparse+${PRIVATE_CARGO_REGISTRY_PROXY_URL}\"\n    #magic___^_^___line\n[source.crates-io]\nreplace-with = \"hopr-cargo-registry-cache\"\nEOF\n    #magic___^_^___line\n"
 
       - name: Install Nix
         if: steps.vars.outputs.runner_needs_nix_setup == 'true'

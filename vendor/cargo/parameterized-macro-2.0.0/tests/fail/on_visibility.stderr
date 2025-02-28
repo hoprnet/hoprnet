@@ -1,5 +1,0 @@
-error[E0433]: failed to resolve: could not find `my_test` in `a`
-  --> $DIR/on_visibility.rs:20:12
-   |
-20 |         a::my_test::case_0(); // this isn't ok
-   |            ^^^^^^^ could not find `my_test` in `a`

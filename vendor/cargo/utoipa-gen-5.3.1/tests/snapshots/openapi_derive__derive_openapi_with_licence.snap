@@ -1,9 +1,0 @@
----
-source: utoipa-gen/tests/openapi_derive.rs
-expression: info
-snapshot_kind: text
----
-{
-  "identifier": "MIT",
-  "name": "licence_name"
-}
