@@ -190,7 +190,7 @@ mod tests {
 
     #[async_std::test]
     async fn segmenter_should_not_segment_small_data_unless_flushed() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500,1024);
+        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
         writer.write_all(b"test").await?;
 
         pin_mut!(segments);
@@ -213,7 +213,7 @@ mod tests {
 
     #[async_std::test]
     async fn segmenter_should_segment_complete_frame() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500,1024);
+        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
 
         let mut offset = 0;
         let data = hopr_crypto_random::random_bytes::<1500>();
@@ -246,7 +246,7 @@ mod tests {
         const MTU: usize = 462;
         const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
 
-        let (mut writer, segments) = Segmenter::<MTU>::new(1500,1024);
+        let (mut writer, segments) = Segmenter::<MTU>::new(1500, 1024);
 
         let mut offset = 0;
         let data = hopr_crypto_random::random_bytes::<1500>();
@@ -284,7 +284,7 @@ mod tests {
 
     #[async_std::test]
     async fn segmenter_should_segment_multiple_complete_frames() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500,1024);
+        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
 
         let data = hopr_crypto_random::random_bytes::<4500>();
 
@@ -310,7 +310,7 @@ mod tests {
 
     #[async_std::test]
     async fn segmenter_should_segment_multiple_complete_frames_and_incomplete_frame_on_close() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500,1024);
+        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
 
         let data = hopr_crypto_random::random_bytes::<4504>();
 
@@ -349,7 +349,7 @@ mod tests {
 
     #[async_std::test]
     async fn segmenter_should_segment_multiple_complete_frames_and_incomplete_frame_on_flush() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500,1024);
+        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
 
         let data = hopr_crypto_random::random_bytes::<4504>();
 
