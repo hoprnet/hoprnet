@@ -7,22 +7,23 @@ use ethers::{
     utils::parse_units,
 };
 use primitive_types::U256;
-use reqwest::Client;
 use serde::Deserialize;
 use url::Url;
 
-const URL: &str = "https://ggnosis.blockscan.com/gasapi.ashx?apikey=key&method=gasoracle";
+use crate::HttpRequestor;
+
 pub const EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS: u64 = 3_000_000_000;
 pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS: u64 = 100_000_000;
 
 /// Use the underlying gas tracker API of GnosisScan to populate the gas price.
 /// It returns gas price in gwei.
 /// It implements the `GasOracle` trait.
+/// If no Oracle URL is given, it returns no values.
 #[derive(Clone, Debug)]
 #[must_use]
-pub struct GnosisScan {
-    client: Client,
-    url: Url,
+pub struct GnosisScan<C> {
+    client: C,
+    url: Option<Url>,
     gas_category: GasCategory,
 }
 
@@ -63,14 +64,8 @@ impl ResponseResult {
     }
 }
 
-impl Default for GnosisScan {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[async_trait]
-impl GasOracle for GnosisScan {
+impl<C: HttpRequestor + std::fmt::Debug> GasOracle for GnosisScan<C> {
     async fn fetch(&self) -> Result<U256, GasOracleError> {
         let res: Response = self.query().await?;
         let gas_price_in_gwei = res.gas_from_category(self.gas_category);
@@ -89,15 +84,9 @@ impl GasOracle for GnosisScan {
     }
 }
 
-impl GnosisScan {
-    /// Creates a new GnosisScan gas price oracle.
-    pub fn new() -> Self {
-        Self::with_client(Client::new())
-    }
-
+impl<C: HttpRequestor> GnosisScan<C> {
     /// Same as [`Self::new`] but with a custom [`Client`].
-    pub fn with_client(client: Client) -> Self {
-        let url = Url::parse(URL).unwrap();
+    pub fn with_client(client: C, url: Option<Url>) -> Self {
         Self {
             client,
             url,
@@ -113,17 +102,18 @@ impl GnosisScan {
 
     /// Perform a request to the gas price API and deserialize the response.
     pub async fn query(&self) -> Result<Response, GasOracleError> {
-        let response = self
-            .client
-            .get(self.url.as_ref())
-            .send()
+        self.client
+            .http_get(self.url.as_ref().ok_or(GasOracleError::NoValues)?.as_str())
             .await
-            .map_err(|_| GasOracleError::InvalidResponse)?
-            .error_for_status()
-            .map_err(|_| GasOracleError::InvalidResponse)?
-            .json()
-            .await
-            .map_err(|_| GasOracleError::InvalidResponse)?;
-        Ok(response)
+            .map_err(|error| {
+                tracing::error!(%error, "failed to query gas price API");
+                GasOracleError::InvalidResponse
+            })
+            .and_then(|response| {
+                serde_json::from_slice(response.as_ref()).map_err(|error| {
+                    tracing::error!(%error, "failed to deserialize gas price API response");
+                    GasOracleError::InvalidResponse
+                })
+            })
     }
 }

@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::debug;
+use url::Url;
 use validator::Validate;
 
 use hopr_bindings::hopr_node_management_module::HoprNodeManagementModule;
@@ -28,7 +29,7 @@ use hopr_primitive_types::prelude::*;
 use crate::errors::RpcError::ContractError;
 use crate::errors::{Result, RpcError};
 use crate::middleware::GnosisScan;
-use crate::{HoprRpcOperations, NodeSafeModuleStatus, PendingTransaction};
+use crate::{HoprRpcOperations, HttpRequestor, NodeSafeModuleStatus, PendingTransaction};
 
 // define basic safe abi
 abigen!(
@@ -38,8 +39,11 @@ abigen!(
     ]"#,
 );
 
+/// Default gas oracle URL for Gnosis chain.
+pub const DEFAULT_GAS_ORACLE_URL: &str = "https://ggnosis.blockscan.com/gasapi.ashx?apikey=key&method=gasoracle";
+
 /// Configuration of the RPC related parameters.
-#[derive(Clone, Debug, Copy, PartialEq, Eq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
+#[derive(Clone, Debug, PartialEq, Eq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct RpcOperationsConfig {
     /// Blockchain id
     ///
@@ -86,27 +90,33 @@ pub struct RpcOperationsConfig {
     #[validate(range(min = 1, max = 100))]
     #[default = 8]
     pub finality: u32,
+    /// URL to the gas price oracle.
+    ///
+    /// Defaults to [`DEFAULT_GAS_ORACLE_URL`].
+    #[default(Some(DEFAULT_GAS_ORACLE_URL.parse().unwrap()))]
+    pub gas_oracle_url: Option<Url>,
 }
 
-pub(crate) type HoprMiddleware<P> =
-    NonceManagerMiddleware<GasOracleMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>, GnosisScan>>;
+pub(crate) type HoprMiddleware<P, R> =
+    NonceManagerMiddleware<GasOracleMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>, GnosisScan<R>>>;
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug)]
-pub struct RpcOperations<P: JsonRpcClient + 'static> {
-    pub(crate) provider: Arc<HoprMiddleware<P>>,
+pub struct RpcOperations<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> {
+    pub(crate) provider: Arc<HoprMiddleware<P, R>>,
     pub(crate) cfg: RpcOperationsConfig,
-    contract_instances: Arc<ContractInstances<HoprMiddleware<P>>>,
-    node_module: HoprNodeManagementModule<HoprMiddleware<P>>,
-    node_safe: SafeSingleton<HoprMiddleware<P>>,
+    contract_instances: Arc<ContractInstances<HoprMiddleware<P, R>>>,
+    node_module: HoprNodeManagementModule<HoprMiddleware<P, R>>,
+    node_safe: SafeSingleton<HoprMiddleware<P, R>>,
 }
 
 // Needs manual impl not to impose Clone requirements on P
-impl<P: JsonRpcClient> Clone for RpcOperations<P> {
+// R does not need to be Clone as well, since it's always in an Arc
+impl<P: JsonRpcClient, R: HttpRequestor> Clone for RpcOperations<P, R> {
     fn clone(&self) -> Self {
         Self {
             provider: self.provider.clone(),
-            cfg: self.cfg,
+            cfg: self.cfg.clone(),
             contract_instances: self.contract_instances.clone(),
             node_module: HoprNodeManagementModule::new(self.cfg.module_address, self.provider.clone()),
             node_safe: SafeSingleton::new(self.cfg.safe_address, self.provider.clone()),
@@ -114,10 +124,10 @@ impl<P: JsonRpcClient> Clone for RpcOperations<P> {
     }
 }
 
-impl<P: JsonRpcClient + 'static> RpcOperations<P> {
-    pub fn new(json_rpc: P, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
+impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R> {
+    pub fn new(json_rpc: P, requestor: R, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
         let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);
-        let gas_oracle = GnosisScan::new();
+        let gas_oracle = GnosisScan::with_client(requestor, cfg.gas_oracle_url.clone());
 
         let provider = Arc::new(
             Provider::new(json_rpc)
@@ -135,9 +145,9 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
                 provider.clone(),
                 cfg!(test),
             )),
-            cfg,
             node_module: HoprNodeManagementModule::new(cfg.module_address, provider.clone()),
             node_safe: SafeSingleton::new(cfg.safe_address, provider.clone()),
+            cfg,
             provider,
         })
     }
@@ -164,7 +174,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
 }
 
 #[async_trait]
-impl<P: JsonRpcClient + 'static> HoprRpcOperations for RpcOperations<P> {
+impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprRpcOperations for RpcOperations<P, R> {
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
         Ok(self.get_block(block_number).await?.map(|b| b.timestamp.as_u64()))
     }
@@ -517,6 +527,7 @@ mod tests {
             tx_polling_interval: Duration::from_millis(10),
             expected_block_time,
             finality: 2,
+            //gas_oracle_url: None,
             ..RpcOperationsConfig::default()
         };
 
@@ -529,7 +540,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
 
         // call eth_gas_estimate
         let (_, estimated_max_priority_fee) = rpc.provider.estimate_eip1559_fees(None).await?;
@@ -560,6 +571,7 @@ mod tests {
             tx_polling_interval: Duration::from_millis(10),
             expected_block_time,
             finality: 2,
+            gas_oracle_url: None,
             ..RpcOperationsConfig::default()
         };
 
@@ -572,7 +584,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -603,6 +615,7 @@ mod tests {
             tx_polling_interval: Duration::from_millis(10),
             expected_block_time,
             finality: 2,
+            gas_oracle_url: None,
             ..RpcOperationsConfig::default()
         };
 
@@ -615,7 +628,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -659,6 +672,7 @@ mod tests {
             tx_polling_interval: Duration::from_millis(10),
             expected_block_time,
             finality: 2,
+            gas_oracle_url: None,
             ..RpcOperationsConfig::default()
         };
 
@@ -671,7 +685,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -709,6 +723,7 @@ mod tests {
             expected_block_time,
             finality: 2,
             contract_addrs: ContractAddresses::from(&contract_instances),
+            gas_oracle_url: None,
             ..RpcOperationsConfig::default()
         };
 
@@ -724,7 +739,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
 
         let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await?;
         assert_eq!(amount, balance.amount().as_u64(), "invalid balance");
@@ -767,6 +782,7 @@ mod tests {
             contract_addrs: ContractAddresses::from(&contract_instances),
             module_address: module,
             safe_address: safe,
+            gas_oracle_url: None,
             ..RpcOperationsConfig::default()
         };
 
@@ -779,7 +795,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client.clone(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client.clone(), SurfRequestor::default(), &chain_key_0, cfg)?;
 
         let result_before_including_node = rpc.check_node_safe_module_status((&chain_key_0).into()).await?;
         // before including node to the safe and module, only the first chck is false, the others are true
@@ -860,6 +876,7 @@ mod tests {
             contract_addrs: ContractAddresses::from(&contract_instances),
             module_address: module,
             safe_address: safe,
+            gas_oracle_url: None,
             ..RpcOperationsConfig::default()
         };
 
@@ -872,7 +889,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client.clone(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client.clone(), SurfRequestor::default(), &chain_key_0, cfg.clone())?;
 
         // check the eligibility status (before registering in the NetworkRegistry contract)
         let result_before_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).await?;
@@ -887,7 +904,7 @@ mod tests {
             NetworkRegistryProxy::Dummy(e) => {
                 let _ = e.owner_add_account(cfg.safe_address.into()).send().await?.await?;
             }
-            NetworkRegistryProxy::Safe(e) => {}
+            NetworkRegistryProxy::Safe(_) => {}
         };
 
         let _ = rpc

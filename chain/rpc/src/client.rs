@@ -474,7 +474,7 @@ pub mod surf_client {
     use tracing::info;
 
     use crate::errors::HttpRequestError;
-    use crate::{HttpRequestor, HttpPostRequestorConfig};
+    use crate::{HttpPostRequestorConfig, HttpRequestor};
 
     /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.
     /// `surf` works also for Browsers in WASM environments.
@@ -501,12 +501,19 @@ pub mod surf_client {
             Self { client, cfg }
         }
 
-        async fn http_query<T>(&self, method: http_types::Method, url: &str, data: Option<T>) -> Result<Box<[u8]>, HttpRequestError>
+        async fn http_query<T>(
+            &self,
+            method: http_types::Method,
+            url: &str,
+            data: Option<T>,
+        ) -> Result<Box<[u8]>, HttpRequestError>
         where
-            T: Serialize + Send + Sync
+            T: Serialize + Send + Sync,
         {
             let request = match method {
-                http_types::Method::Post => self.client.post(url)
+                http_types::Method::Post => self
+                    .client
+                    .post(url)
                     .body_json(&data.ok_or(HttpRequestError::UnknownError("missing data".to_string()))?)
                     .map_err(|e| HttpRequestError::UnknownError(e.to_string()))?,
                 http_types::Method::Get => self.client.get(url),
@@ -523,9 +530,9 @@ pub mod surf_client {
                     Err(e) => Err(HttpRequestError::TransportError(e.to_string())),
                 }
             }
-                .timeout(self.cfg.http_request_timeout)
-                .await
-                .map_err(|_| HttpRequestError::Timeout)?
+            .timeout(self.cfg.http_request_timeout)
+            .await
+            .map_err(|_| HttpRequestError::Timeout)?
         }
     }
 
@@ -545,7 +552,6 @@ pub mod surf_client {
     }
 }
 
-
 #[cfg(any(test, feature = "runtime-tokio"))]
 pub mod reqwest_client {
     use async_trait::async_trait;
@@ -556,7 +562,7 @@ pub mod reqwest_client {
     use tracing::info;
 
     use crate::errors::HttpRequestError;
-    use crate::{HttpRequestor, HttpPostRequestorConfig};
+    use crate::{HttpPostRequestorConfig, HttpRequestor};
 
     /// HTTP client that uses a Tokio runtime-based HTTP client library, such as `reqwest`.
     #[derive(Clone, Debug, Default)]
@@ -592,16 +598,24 @@ pub mod reqwest_client {
             }
         }
 
-        async fn http_query<T>(&self, method: http_types::Method, url: &str, data: Option<T>) -> Result<Box<[u8]>, HttpRequestError>
-        where T: Serialize + Send + Sync {
+        async fn http_query<T>(
+            &self,
+            method: http_types::Method,
+            url: &str,
+            data: Option<T>,
+        ) -> Result<Box<[u8]>, HttpRequestError>
+        where
+            T: Serialize + Send + Sync,
+        {
             let url = reqwest::Url::parse(url)
                 .map_err(|e| HttpRequestError::UnknownError(format!("url parse error: {e}")))?;
 
             let builder = match method {
-                http_types::Method::Get => self.client.get(url.clone()).header("content-type", "application/json"),
-                http_types::Method::Post => self.client.post(url.clone()).header("content-type", "application/json")
-                    .body(serde_json::to_string(&data.ok_or(HttpRequestError::UnknownError("missing data".to_string()))?)
-                              .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?),
+                http_types::Method::Get => self.client.get(url.clone()),
+                http_types::Method::Post => self.client.post(url.clone()).body(
+                    serde_json::to_string(&data.ok_or(HttpRequestError::UnknownError("missing data".to_string()))?)
+                        .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?,
+                ),
                 _ => return Err(HttpRequestError::UnknownError("unsupported method".to_string())),
             };
 
@@ -612,6 +626,7 @@ pub mod reqwest_client {
                 .unwrap_or(true)
             {
                 let resp = builder
+                    .header("content-type", "application/json")
                     .send()
                     .await
                     .map_err(|e| {
@@ -643,7 +658,7 @@ pub mod reqwest_client {
         where
             T: Serialize + Send + Sync,
         {
-           self.http_query(http_types::Method::Post, url, Some(data)).await
+            self.http_query(http_types::Method::Post, url, Some(data)).await
         }
 
         async fn http_get(&self, url: &str) -> Result<Box<[u8]>, HttpRequestError> {
@@ -1285,6 +1300,7 @@ mod tests {
 
     // Requires manual implementation, because mockall does not work well with generic methods
     // in non-generic traits.
+    #[derive(Debug)]
     struct NullHttpPostRequestor;
 
     #[async_trait]
@@ -1296,7 +1312,7 @@ mod tests {
             Err(HttpRequestError::UnknownError("use of NullHttpPostRequestor".into()))
         }
 
-        async fn http_get(&self, url: &str) -> Result<Box<[u8]>, HttpRequestError> {
+        async fn http_get(&self, _: &str) -> Result<Box<[u8]>, HttpRequestError> {
             Err(HttpRequestError::UnknownError("use of NullHttpPostRequestor".into()))
         }
     }

@@ -7,6 +7,9 @@
 //!
 //! Both of these traits implemented and realized via the [RpcOperations](rpc::RpcOperations) type,
 //! so this represents the main entry point to all RPC related operations.
+
+extern crate core;
+
 use async_trait::async_trait;
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 use futures::{FutureExt, Stream};
@@ -236,7 +239,9 @@ impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
 
 /// Abstraction for an HTTP client that performs HTTP POST with serializable request data.
 #[async_trait]
-pub trait HttpRequestor: Send + Sync {
+pub trait HttpRequestor: std::fmt::Debug + Send + Sync {
+
+
     /// Performs HTTP POST of JSON data to the given URL
     /// and gets the JSON response.
     async fn http_post<T>(&self, url: &str, data: T) -> std::result::Result<Box<[u8]>, HttpRequestError>
