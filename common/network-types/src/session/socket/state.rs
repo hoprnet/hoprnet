@@ -20,7 +20,7 @@ pub struct SocketComponents<const C: usize> {
 }
 
 /// Abstraction of the [SessionSocket] state.
-pub trait SocketState<const C: usize> {
+pub trait SocketState<const C: usize>: Clone + Send {
     /// Gets ID of this Session.
     fn session_id(&self) -> &str;
 
@@ -67,33 +67,39 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
         &self.0
     }
 
+    #[tracing::instrument(skip(self), fields(session_id = self.0))]
     fn run(&mut self, _: SocketComponents<C>) -> Result<(), SessionError> {
-        tracing::debug!(session_id = self.session_id(), "stateless socket started");
+        tracing::debug!("stateless socket started");
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), fields(session_id = self.0))]
     fn stop(&mut self) -> Result<(), SessionError> {
-        tracing::debug!(session_id = self.session_id(), "stateless socket stopped");
+        tracing::debug!("stateless socket stopped");
         Ok(())
     }
 
-    fn incoming_segment(&mut self, id: &SegmentId, _segment_count: SeqNum) -> Result<(), SessionError> {
-        tracing::trace!(session_id = self.session_id(), %id, "incoming segment");
+    #[tracing::instrument(skip(self), fields(session_id = self.0, frame_id = seg_id.0))]
+    fn incoming_segment(&mut self, seg_id: &SegmentId, _: SeqNum) -> Result<(), SessionError> {
+        tracing::trace!("incoming segment");
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), fields(session_id = self.0))]
     fn incoming_retransmission_request(&mut self, _request: SegmentRequest<C>) -> Result<(), SessionError> {
-        tracing::debug!(session_id = self.session_id(), "incoming retransmission request");
+        tracing::debug!("incoming retransmission request");
         Ok(())
     }
 
-    fn incoming_acknowledged_frames(&mut self, _ack: FrameAcknowledgements<C>) -> Result<(), SessionError> {
-        tracing::debug!(session_id = self.session_id(), "incoming frame acknowledgements");
+    #[tracing::instrument(skip(self), fields(session_id = self.0))]
+    fn incoming_acknowledged_frames(&mut self, _: FrameAcknowledgements<C>) -> Result<(), SessionError> {
+        tracing::debug!("incoming frame acknowledgements");
         Ok(())
     }
 
-    fn frame_received(&mut self, id: FrameId) -> Result<(), SessionError> {
-        tracing::trace!(session_id = self.session_id(), %id, "frame completed");
+    #[tracing::instrument(skip(self), fields(session_id = self.0))]
+    fn frame_received(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
+        tracing::trace!("frame completed");
         Ok(())
     }
 
@@ -131,7 +137,6 @@ pub struct AcknowledgementStateConfig {
 
 #[derive(Clone)]
 struct AcknowledgementStateContext<const C: usize> {
-    id: String,
     rb_tx: RingBufferProducer<Segment>,
     rb_rx: RingBufferView<Segment>,
     incoming_frame_retries_tx: SkipDelaySender<RetriedFrameId>,
@@ -178,7 +183,6 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let (ack_tx, ack_rx) = futures::channel::mpsc::channel(200_000);
 
         let context = self.context.insert(AcknowledgementStateContext {
-            id: self.id.clone(),
             rb_tx,
             rb_rx,
             incoming_frame_retries_tx,
