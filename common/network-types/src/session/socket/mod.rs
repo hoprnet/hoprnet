@@ -8,6 +8,7 @@ use state::SocketState;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use tracing::Instrument;
 
 use crate::prelude::errors::SessionError;
 use crate::prelude::frame_reconstructor_with_inspector;
@@ -37,10 +38,11 @@ impl<const C: usize> SessionSocket<C> {
     pub fn new<T, S>(transport: T, mut state: S, cfg: SessionSocketConfig) -> Result<Self, SessionError>
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
-        S: for<'a> SocketState<'a, C> + Clone + Send + 'static
+        S: SocketState<C> + Clone + Send + 'static,
     {
         // Downstream Segments get reconstructed into Frames
-        let (downstream_segment_in, downstream_frames_out, inspector) =  frame_reconstructor_with_inspector(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
+        let (downstream_segment_in, downstream_frames_out, inspector) =
+            frame_reconstructor_with_inspector(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
 
         // Upstream frames get segmented and are yielded by the data_rx stream
         let (upstream_frames_in, segmented_data_rx) = Segmenter::<C>::new(cfg.frame_size, RECONSTRUCTOR_CAPACITY);
@@ -49,23 +51,19 @@ impl<const C: usize> SessionSocket<C> {
         let (packets_out, packets_in) = Framed::new(transport, SessionCodec::<C>).split();
 
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
-        state.run(SocketComponents {
-            inspector,
-            ctl_tx,
-        })?;
+        state.run(SocketComponents { inspector, ctl_tx })?;
 
         // Messages incoming from Upstream and from the State go downstream as Packets
         // Segmented data coming from Upstream go out right away.
-        let mut st_1 = state.clone();
-        let st_2 = state.clone();
+        let mut st_clone = state.clone();
         hopr_async_runtime::prelude::spawn(
             (
                 ctl_rx,
                 segmented_data_rx.map(move |s| {
                     // The segment_sent event is raised only for segments coming from Upstream,
                     // not for the segments from the Control stream (= segment resends).
-                    if let Err(error) = st_1.segment_sent(&s) {
-                        tracing::debug!(session_id = st_1.session_id(), %error, "outgoing segment state update failed");
+                    if let Err(error) = st_clone.segment_sent(&s) {
+                        tracing::debug!(%error, "outgoing segment state update failed");
                     }
                     SessionMessage::<C>::Segment(s)
                 }),
@@ -74,11 +72,12 @@ impl<const C: usize> SessionSocket<C> {
                 .map(Ok)
                 .forward(packets_out)
                 .map(move |result| match result {
-                    Ok(_) => tracing::debug!(session_id = st_2.session_id(), "outgoing packet processing done"),
+                    Ok(_) => tracing::debug!("outgoing packet processing done"),
                     Err(error) => {
-                        tracing::error!(session_id = st_2.session_id(), %error, "error while processing outgoing packets")
+                        tracing::error!(%error, "error while processing outgoing packets")
                     }
-                }),
+                })
+                .instrument(tracing::debug_span!("packets_out", session_id = state.session_id())),
         );
 
         // Packets incoming from Downstream:
@@ -94,17 +93,19 @@ impl<const C: usize> SessionSocket<C> {
                         SessionMessage::Request(r) => st_1.incoming_retransmission_request(r.clone()),
                         SessionMessage::Acknowledge(a) => st_1.incoming_acknowledged_frames(a.clone()),
                     } {
-                        tracing::debug!(session_id = st_1.session_id(), %error, "incoming message state update failed");
+                        tracing::debug!(%error, "incoming message state update failed");
                     }
                     future::ok(packet.try_as_segment())
                 })
                 .forward(downstream_segment_in)
-                .map(move |result| match st_2.stop().and(result) { // Also close the state
-                    Ok(_) => tracing::debug!(session_id = st_2.session_id(), "incoming packet processing done"),
+                .map(move |result| match st_2.stop().and(result) {
+                    // Also close the state
+                    Ok(_) => tracing::debug!("incoming packet processing done"),
                     Err(error) => {
-                        tracing::error!(session_id = st_2.session_id(), %error, "error while processing incoming packets")
+                        tracing::error!(%error, "error while processing incoming packets")
                     }
-                }),
+                })
+                .instrument(tracing::debug_span!("packets_in", session_id = state.session_id())),
         );
 
         Ok(Self {
