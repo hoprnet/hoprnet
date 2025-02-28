@@ -124,7 +124,7 @@ rand = "0.8.5"
 rand_distr = "0.4.3"
 rayon = "1.10.0"
 regex = "1.11.1"
-reqwest = { version = "0.12.12" }
+reqwest = { version = "0.12.12", features = ["json"] }
 ringbuffer = "0.15.0"
 rpassword = "7.3"
 rust-stream-ext-concurrent = "1.0.0"
@@ -186,6 +186,7 @@ tracing-subscriber = { version = "0.3.19", features = [
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.17.0"
 uuid = { version = "1.12.1" }
+url = { version = "2.5.2", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.6", features = ["build"] }
 void = "1.0.2"
