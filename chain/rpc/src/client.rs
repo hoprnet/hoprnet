@@ -15,6 +15,7 @@
 use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, JsonRpcError};
 use futures::StreamExt;
+use http_types::Method;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
@@ -500,7 +501,10 @@ pub mod surf_client {
 
             Self { client, cfg }
         }
+    }
 
+    #[async_trait]
+    impl HttpRequestor for SurfRequestor {
         async fn http_query<T>(
             &self,
             method: http_types::Method,
@@ -533,21 +537,6 @@ pub mod surf_client {
             .timeout(self.cfg.http_request_timeout)
             .await
             .map_err(|_| HttpRequestError::Timeout)?
-        }
-    }
-
-    #[async_trait]
-    impl HttpRequestor for SurfRequestor {
-        async fn http_post<T: Serialize + Send + Sync>(
-            &self,
-            url: &str,
-            data: T,
-        ) -> Result<Box<[u8]>, HttpRequestError> {
-            self.http_query(http_types::Method::Post, url, Some(data)).await
-        }
-
-        async fn http_get(&self, url: &str) -> Result<Box<[u8]>, HttpRequestError> {
-            self.http_query::<String>(http_types::Method::Get, url, None).await
         }
     }
 }
@@ -597,7 +586,10 @@ pub mod reqwest_client {
                     }),
             }
         }
+    }
 
+    #[async_trait]
+    impl HttpRequestor for ReqwestRequestor {
         async fn http_query<T>(
             &self,
             method: http_types::Method,
@@ -649,20 +641,6 @@ pub mod reqwest_client {
             } else {
                 Err(HttpRequestError::HttpError(StatusCode::TooManyRequests))
             }
-        }
-    }
-
-    #[async_trait]
-    impl HttpRequestor for ReqwestRequestor {
-        async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
-        where
-            T: Serialize + Send + Sync,
-        {
-            self.http_query(http_types::Method::Post, url, Some(data)).await
-        }
-
-        async fn http_get(&self, url: &str) -> Result<Box<[u8]>, HttpRequestError> {
-            self.http_query::<String>(http_types::Method::Get, url, None).await
         }
     }
 }
@@ -857,6 +835,13 @@ impl<T> Drop for SnapshotRequestor<T> {
 
 #[async_trait::async_trait]
 impl<R: HttpRequestor> HttpRequestor for SnapshotRequestor<R> {
+    async fn http_query<T>(&self, _: Method, _: &str, _: Option<T>) -> Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync,
+    {
+        todo!()
+    }
+
     async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
     where
         T: Serialize + Send + Sync,
@@ -871,6 +856,13 @@ impl<R: HttpRequestor> HttpRequestor for SnapshotRequestor<R> {
 
 #[async_trait]
 impl<R: HttpRequestor> HttpRequestor for &SnapshotRequestor<R> {
+    async fn http_query<T>(&self, _: Method, _: &str, _: Option<T>) -> Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync,
+    {
+        todo!()
+    }
+
     async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
     where
         T: Serialize + Send + Sync,
@@ -918,6 +910,7 @@ mod tests {
     use hopr_chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
+    use http_types::Method;
     use serde::Serialize;
     use serde_json::json;
     use std::fmt::Debug;
@@ -1305,14 +1298,10 @@ mod tests {
 
     #[async_trait]
     impl HttpRequestor for NullHttpPostRequestor {
-        async fn http_post<T>(&self, _: &str, _: T) -> Result<Box<[u8]>, HttpRequestError>
+        async fn http_query<T>(&self, _: Method, _: &str, _: Option<T>) -> Result<Box<[u8]>, HttpRequestError>
         where
             T: Serialize + Send + Sync,
         {
-            Err(HttpRequestError::UnknownError("use of NullHttpPostRequestor".into()))
-        }
-
-        async fn http_get(&self, _: &str) -> Result<Box<[u8]>, HttpRequestError> {
             Err(HttpRequestError::UnknownError("use of NullHttpPostRequestor".into()))
         }
     }
