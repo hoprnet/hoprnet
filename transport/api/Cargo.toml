@@ -10,7 +10,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [features]
-default = ["mixer-stream"]
+default = ["mixer-channel"]
 transport-quic = []
 runtime-async-std = [
   "core-network/runtime-async-std",
