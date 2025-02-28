@@ -182,8 +182,8 @@ mod tests {
 
     #[async_std::test]
     async fn stateless_socket_bidirectional_should_work() -> anyhow::Result<()> {
-        let mut alice_socket = SessionSocket::<MTU>::new(DuplexIO(alice_reader, bob_writer), Stateless::new("alice"));
-        let mut bob_socket = SessionSocket::<MTU>::new(DuplexIO(bob_reader, alice_writer), Stateless::new("bob"));
+        let mut alice_socket = SessionSocket::<MTU, _>::new(DuplexIO(alice_reader, bob_writer), Stateless::new("alice"));
+        let mut bob_socket = SessionSocket::<MTU, _>::new(DuplexIO(bob_reader, alice_writer), Stateless::new("bob"));
 
         Ok(())
     }
