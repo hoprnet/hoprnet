@@ -119,19 +119,20 @@ impl<const C: usize, S: SocketState<C> + 'static> SessionSocket<C, S> {
                         future::ready(match maybe_frame {
                             Ok(frame) => {
                                 if let Err(error) = state.frame_received(frame.frame_id) {
-                                    tracing::debug!(session_id = state.session_id(), %error, "frame received state update failed");
+                                    tracing::error!(%error, "frame received state update failed");
                                 }
                                 Some(Ok(frame))
                             }
                             Err(SessionError::FrameDiscarded(frame_id))
                             | Err(SessionError::IncompleteFrame(frame_id)) => {
                                 if let Err(error) = state.frame_discarded(frame_id) {
-                                    tracing::debug!(session_id = state.session_id(), %error, "frame discarded state update failed");
+                                    tracing::error!(%error, "frame discarded state update failed");
                                 }
                                 None // Downstream skips discarded frames
                             }
                             Err(err) => Some(Err(std::io::Error::other(err))),
                         })
+                        .instrument(tracing::debug_span!("frame_writer", session_id = state.session_id()))
                     })
                     .into_async_read(),
             ),
