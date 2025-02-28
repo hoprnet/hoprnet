@@ -2,7 +2,7 @@ use std::net::{Ipv4Addr, ToSocketAddrs};
 
 pub use multiaddr::{Multiaddr, Protocol};
 
-use crate::errors::Result;
+use crate::errors::{Result, TransportIdentityError};
 
 /// Remove the `p2p/<PeerId>` component from a multiaddress
 pub fn strip_p2p_protocol(ma: &Multiaddr) -> Multiaddr {
@@ -47,7 +47,7 @@ pub fn is_supported(ma: &Multiaddr) -> bool {
 }
 
 /// Replaces the IPv4 and IPv6 from the network layer with a unspecified interface in any multiaddress.
-pub(crate) fn replace_transport_with_unspecified(ma: &Multiaddr) -> Result<Multiaddr> {
+pub fn replace_transport_with_unspecified(ma: &Multiaddr) -> Result<Multiaddr> {
     let mut out = Multiaddr::empty();
 
     for proto in ma.iter() {
@@ -62,7 +62,7 @@ pub(crate) fn replace_transport_with_unspecified(ma: &Multiaddr) -> Result<Multi
 }
 
 /// Resolves the DNS parts of a multiaddress and replaces it with the resolved IP address.
-pub(crate) fn resolve_dns_if_any(ma: &Multiaddr) -> Result<Multiaddr> {
+pub fn resolve_dns_if_any(ma: &Multiaddr) -> Result<Multiaddr> {
     let mut out = Multiaddr::empty();
 
     for proto in ma.iter() {
@@ -70,11 +70,11 @@ pub(crate) fn resolve_dns_if_any(ma: &Multiaddr) -> Result<Multiaddr> {
             Protocol::Dns4(domain) => {
                 let ip = format!("{domain}:443") // dummy port, irrevelant at this point
                     .to_socket_addrs()
-                    .map_err(|e| crate::errors::P2PError::Logic(e.to_string()))?
+                    .map_err(|e| TransportIdentityError::Multiaddress(e.to_string()))?
                     .filter(|sa| sa.is_ipv4())
                     .collect::<Vec<_>>()
                     .first()
-                    .ok_or(crate::errors::P2PError::Logic(format!(
+                    .ok_or(TransportIdentityError::Multiaddress(format!(
                         "Failed to resolve {domain} to an IPv4 address. Does the DNS entry has an A record?"
                     )))?
                     .ip();
@@ -84,11 +84,11 @@ pub(crate) fn resolve_dns_if_any(ma: &Multiaddr) -> Result<Multiaddr> {
             Protocol::Dns6(domain) => {
                 let ip = format!("{domain}:443") // dummy port, irrevelant at this point
                     .to_socket_addrs()
-                    .map_err(|e| crate::errors::P2PError::Logic(e.to_string()))?
+                    .map_err(|e| TransportIdentityError::Multiaddress(e.to_string()))?
                     .filter(|sa| sa.is_ipv6())
                     .collect::<Vec<_>>()
                     .first()
-                    .ok_or(crate::errors::P2PError::Logic(format!(
+                    .ok_or(TransportIdentityError::Multiaddress(format!(
                         "Failed to resolve {domain} to an IPv6 address. Does the DNS entry has an AAAA record?"
                     )))?
                     .ip();
