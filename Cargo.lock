@@ -2941,6 +2941,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f90f7dce0722e95104fcb095585910c0977252f286e354b5e3bd38902cd99988"
 
 [[package]]
+name = "futures-time"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6404853a6824881fe5f7d662d147dc4e84ecd2259ba0378f272a71dab600758a"
+dependencies = [
+ "async-channel 1.9.0",
+ "async-io 1.13.0",
+ "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "futures-timer"
 version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4477,7 +4489,9 @@ dependencies = [
  "async-std",
  "async-std-resolver 0.24.2",
  "async-stream",
+ "asynchronous-codec",
  "bitvec",
+ "bytes 1.8.0",
  "criterion",
  "crossbeam-queue",
  "crossbeam-skiplist",
@@ -4485,6 +4499,8 @@ dependencies = [
  "dashmap 6.1.0",
  "flume 0.11.1",
  "futures",
+ "futures-concurrency",
+ "futures-time",
  "governor 0.8.0",
  "hex",
  "hex-literal",
@@ -4498,9 +4514,12 @@ dependencies = [
  "lazy_static",
  "libp2p-identity",
  "parameterized",
+ "parking_lot",
+ "pin-project",
  "rand 0.8.5",
  "rand_distr",
  "rayon",
+ "ringbuffer",
  "serde",
  "serde_bytes",
  "smart-default",

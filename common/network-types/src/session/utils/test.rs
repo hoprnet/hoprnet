@@ -1,80 +1,123 @@
+use futures::channel::mpsc::UnboundedSender;
+use futures::future::Either;
+use futures::stream::BoxStream;
+use futures::{pin_mut, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt};
+use hex_literal::hex;
+use rand::distributions::{Bernoulli, Distribution};
+use rand::prelude::StdRng;
+use rand::{Rng, SeedableRng};
+use rand_distr::Normal;
+use std::collections::VecDeque;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use futures::channel::mpsc::UnboundedSender;
-use futures::stream::BoxStream;
-use futures::{AsyncRead, AsyncWrite, StreamExt};
-use rand::distributions::Bernoulli;
-use rand::prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng};
+// Using static RNG seed to make tests reproducible between different runs
+const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct RetryToken {
-    pub num_retry: usize,
-    pub started_at: Instant,
-    backoff_base: f64,
-    created_at: Instant,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum RetryResult {
-    Wait(Duration),
-    RetryNow(RetryToken),
-    Expired,
-}
-
-impl RetryToken {
-    pub fn new(now: Instant, backoff_base: f64) -> Self {
-        Self {
-            num_retry: 0,
-            started_at: now,
-            created_at: Instant::now(),
-            backoff_base,
-        }
+pub async fn frames_send_and_recv<S>(
+    num_frames: usize,
+    frame_size: usize,
+    alice: S,
+    bob: S,
+    timeout: Duration,
+    alice_to_bob_only: bool,
+    randomized_frame_sizes: bool,
+) where
+    S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+{
+    #[derive(PartialEq, Eq)]
+    enum Direction {
+        Send,
+        Recv,
+        Both,
     }
 
-    pub fn replenish(self, now: Instant, backoff_base: f64) -> Self {
-        Self {
-            num_retry: 0,
-            started_at: now,
-            created_at: self.created_at,
-            backoff_base,
-        }
-    }
+    let frame_sizes = if randomized_frame_sizes {
+        let norm_dist = rand_distr::Normal::new(frame_size as f64 * 0.75, frame_size as f64 / 4.0).unwrap();
+        StdRng::from_seed(RNG_SEED)
+            .sample_iter(norm_dist)
+            .map(|s| (s as usize).max(10).min(2 * frame_size))
+            .take(num_frames)
+            .collect::<Vec<_>>()
+    } else {
+        std::iter::repeat(frame_size).take(num_frames).collect::<Vec<_>>()
+    };
 
-    fn retry_in(&self, base: Duration, max_duration: Duration, jitter_dev: f64) -> Option<Duration> {
-        let jitter_coeff = if jitter_dev > 0.0 {
-            // Should not use jitter with sigma > 0.25
-            rand_distr::Normal::new(1.0, jitter_dev.min(0.25))
-                .unwrap()
-                .sample(&mut thread_rng())
-                .abs()
+    let socket_worker = |mut socket: S, d: Direction| {
+        let frame_sizes = frame_sizes.clone();
+        let frame_sizes_total = frame_sizes.iter().sum();
+        async move {
+            let mut received = Vec::with_capacity(frame_sizes_total);
+            let mut sent = Vec::with_capacity(frame_sizes_total);
+
+            if d == Direction::Send || d == Direction::Both {
+                for frame_size in &frame_sizes {
+                    let mut write = vec![0u8; *frame_size];
+                    hopr_crypto_random::random_fill(&mut write);
+                    socket.write(&write).await?;
+                    sent.extend(write);
+                }
+            }
+
+            if d == Direction::Recv || d == Direction::Both {
+                // Either read everything or timeout trying
+                while received.len() < frame_sizes_total {
+                    let mut buffer = [0u8; 2048];
+                    let read = socket.read(&mut buffer).await?;
+                    received.extend(buffer.into_iter().take(read));
+                }
+            }
+
+            // TODO: fix this so it works properly
+            // We cannot close immediately as some ack/resends might be ongoing
+            //socket.close().await.unwrap();
+
+            Ok::<_, std::io::Error>((sent, received))
+        }
+    };
+
+    let alice_worker = async_std::task::spawn(socket_worker(
+        alice,
+        if alice_to_bob_only {
+            Direction::Send
         } else {
-            1.0
-        };
+            Direction::Both
+        },
+    ));
+    let bob_worker = async_std::task::spawn(socket_worker(
+        bob,
+        if alice_to_bob_only {
+            Direction::Recv
+        } else {
+            Direction::Both
+        },
+    ));
 
-        // jitter * base * backoff_base ^ num_retry
-        let duration = base.mul_f64(jitter_coeff * self.backoff_base.powi(self.num_retry as i32));
-        (duration < max_duration).then_some(duration)
-    }
+    let send_recv = futures::future::join(alice_worker, bob_worker);
+    let timeout = async_std::task::sleep(timeout);
 
-    pub fn check(&self, now: Instant, base: Duration, max: Duration, jitter_dev: f64) -> RetryResult {
-        match self.retry_in(base, max, jitter_dev) {
-            None => RetryResult::Expired,
-            Some(retry_in) if self.started_at + retry_in >= now => RetryResult::Wait(self.started_at + retry_in - now),
-            _ => RetryResult::RetryNow(Self {
-                num_retry: self.num_retry + 1,
-                started_at: self.started_at,
-                backoff_base: self.backoff_base,
-                created_at: self.created_at,
-            }),
+    pin_mut!(send_recv);
+    pin_mut!(timeout);
+
+    match futures::future::select(send_recv, timeout).await {
+        Either::Left(((Ok((alice_sent, alice_recv)), Ok((bob_sent, bob_recv))), _)) => {
+            assert_eq!(
+                hex::encode(alice_sent),
+                hex::encode(bob_recv),
+                "alice sent must be equal to bob received"
+            );
+            assert_eq!(
+                hex::encode(bob_sent),
+                hex::encode(alice_recv),
+                "bob sent must be equal to alice received",
+            );
         }
-    }
-
-    pub fn time_since_creation(&self) -> Duration {
-        self.created_at.elapsed()
+        Either::Left(((Err(e), _), _)) => panic!("alice send recv error: {e}"),
+        Either::Left(((_, Err(e)), _)) => panic!("bob send recv error: {e}"),
+        Either::Right(_) => panic!("timeout"),
     }
 }
 
@@ -130,8 +173,10 @@ impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
         }
 
         if let Some(stats) = &self.stats {
-            stats.bytes_sent.fetch_add(buf.len(), Ordering::Relaxed);
-            stats.packets_sent.fetch_add(1, Ordering::Relaxed);
+            stats
+                .bytes_sent
+                .fetch_add(buf.len(), std::sync::atomic::Ordering::Relaxed);
+            stats.packets_sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
         tracing::trace!("FaultyNetwork::poll_write {} bytes", buf.len());
@@ -156,8 +201,12 @@ impl<const C: usize> AsyncRead for FaultyNetwork<'_, C> {
                 buf[..len].copy_from_slice(&item.as_ref()[..len]);
 
                 if let Some(stats) = &self.stats {
-                    stats.bytes_received.fetch_add(len, Ordering::Relaxed);
-                    stats.packets_received.fetch_add(1, Ordering::Relaxed);
+                    stats
+                        .bytes_received
+                        .fetch_add(len, std::sync::atomic::Ordering::Relaxed);
+                    stats
+                        .packets_received
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
 
                 tracing::trace!("FaultyNetwork::poll_read: {len} bytes ready");
@@ -198,9 +247,33 @@ impl<const C: usize> FaultyNetwork<'_, C> {
     }
 }
 
+/// Sample an index between `0` and `len - 1` using the given distribution and RNG.
+pub fn sample_index<T: Distribution<f64>, R: Rng>(dist: &mut T, rng: &mut R, len: usize) -> usize {
+    let f: f64 = dist.sample(rng);
+    (f.max(0.0).round() as usize).min(len - 1)
+}
+
+/// Shuffles the given `vec` by taking the next element with index `|N(0,factor^2)`|, where
+/// `N` denotes normal distribution.
+/// When used on frame segments vector, it will shuffle the segments in a controlled manner;
+/// such that an entire frame can unlikely swap position with another, if `factor` ~ frame length in segments.
+pub fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
+    if factor == 0.0 || vec.is_empty() {
+        return vec.into(); // no mixing
+    }
+
+    let mut dist = Normal::new(0.0, factor).unwrap();
+    let mut ret = Vec::new();
+    while !vec.is_empty() {
+        ret.push(vec.remove(sample_index(&mut dist, rng, vec.len())).unwrap());
+    }
+    ret
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::session::utils::test::{FaultyNetwork, FaultyNetworkConfig};
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use std::future::Future;
 
