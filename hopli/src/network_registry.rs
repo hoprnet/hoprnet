@@ -54,9 +54,9 @@ use crate::{
     },
     utils::{Cmd, HelperErrors},
 };
-use bindings::hopr_network_registry::HoprNetworkRegistry;
 use clap::Parser;
 use ethers::types::H160;
+use hopr_bindings::hopr_network_registry::HoprNetworkRegistry;
 use std::str::FromStr;
 use tracing::info;
 

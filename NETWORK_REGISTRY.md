@@ -2,7 +2,8 @@
 
 To test HOPR protocol and develop dApps on top of HOPR at a resonable scale, nodes are only allowed to join the network (sending messages) if they are registered on a "Network Registry" smart contract.
 
-This restriction on the access guarded by the "Network Registry" is only enabled in the staging or production environment by default. If you are running a cluster of HOPR nodes locally in the anvil network, the "Network Registry" is not enabled.
+This restriction on the access guarded by the "Network Registry" is only enabled in the staging or production environment by default.  
+If you are running a cluster of HOPR nodes locally in the anvil network, the "Network Registry" is not enabled.
 
 There are two ways of registering a node:
 
@@ -11,17 +12,14 @@ There are two ways of registering a node:
 
 Relevant smart contracts are listed below, per environment **(to be updated)**:
 
-| Contract                 | Staging                                                                                                                      | Production                                                                                                                           |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| xHOPR                    | [0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F](https://goerli.etherscan.io/token/0xe8aD2ac347dA7549Aaca8F5B1c5Bf979d85bC78F)   | [0xD057604A14982FE8D88c5fC25Aac3267eA142a08](https://blockscout.com/xdai/mainnet/address/0xD057604A14982FE8D88c5fC25Aac3267eA142a08) |
-| HOPR Boost               | [0xd7ECa0E90cD85b08875E7d10d4D25B274C6CC549](https://goerli.etherscan.io/token/0xd7eca0e90cd85b08875e7d10d4d25b274c6cc549)   | [0x43d13D7B83607F14335cF2cB75E87dA369D056c7](https://blockscout.com/xdai/mainnet/address/0x43d13D7B83607F14335cF2cB75E87dA369D056c7) |
-| HOPR Stake (Season 3)    | [0x0d4Ec37e692BcD36FE7dDcB37a14358d7F44d72C](https://goerli.etherscan.io/address/0x0d4Ec37e692BcD36FE7dDcB37a14358d7F44d72C) | [0xae933331ef0bE122f9499512d3ed4Fa3896DCf20](https://blockscout.com/xdai/mainnet/address/0xae933331ef0bE122f9499512d3ed4Fa3896DCf20) |
-| HoprNetworkRegistry      | [0x3e5AA27125C90686444b2d093BFe9b843E82D2F5](https://goerli.etherscan.io/address/0x3e5AA27125C90686444b2d093BFe9b843E82D2F5) |                                                                                                                                      |
-| HoprNetworkRegistryProxy | [0x3ee6e1eaE59C44EC30bc5e8FEeE587f95C9F2626](https://goerli.etherscan.io/address/0x3ee6e1eaE59C44EC30bc5e8FEeE587f95C9F2626) |                                                                                                                                      |
+| Contract                 | Production                                                                                                             |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| HoprNetworkRegistry      | [0x582b4b586168621dAf83bEb2AeADb5fb20F8d50d](https://gnosisscan.io/address/0x582b4b586168621dAf83bEb2AeADb5fb20F8d50d) |
+| HoprNetworkRegistryProxy | [0x2bc6b78B0aA892e97714F0e3b1c74487f92C5884](https://gnosisscan.io/address/0x2bc6b78B0aA892e97714F0e3b1c74487f92C5884) |
 
 ## Register a node by the runner
 
-To be updated
+Self registration is currently disabled.
 
 <!-- ### Eligibility
 

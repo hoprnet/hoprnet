@@ -19,11 +19,11 @@
 //! The functions return immediately but provide futures that can be awaited in case the callers wish to await the on-chain
 //! confirmation of each ticket redemption.
 //!
-//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent).
+//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent).
 //! by the Indexer.
 use async_trait::async_trait;
-use chain_types::actions::Action;
 use futures::StreamExt;
+use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::api::info::DomainSeparator;
 use hopr_db_sql::api::tickets::{HoprDbTicketOperations, TicketSelector};
@@ -250,10 +250,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chain_types::chain_events::ChainEventType::TicketRedeemed;
-    use chain_types::chain_events::SignificantChainEvent;
     use futures::FutureExt;
     use hex_literal::hex;
+    use hopr_chain_types::chain_events::ChainEventType::TicketRedeemed;
+    use hopr_chain_types::chain_events::SignificantChainEvent;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::api::info::DomainSeparator;

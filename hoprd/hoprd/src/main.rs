@@ -18,7 +18,7 @@ use tracing::{error, info, trace, warn};
 use tracing_subscriber::prelude::*;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
-use hopr_lib::{ApplicationData, AsUnixTimestamp, HoprLibProcesses, ToHex};
+use hopr_lib::{AsUnixTimestamp, HoprLibProcesses, ToHex};
 use hopr_platform::file::native::join;
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
@@ -27,20 +27,6 @@ use hoprd_db_api::aliases::{HoprdDbAliasesOperations, ME_AS_ALIAS};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 use hoprd::exit::HoprServerIpForwardingReactor;
-
-const WEBSOCKET_EVENT_BROADCAST_CAPACITY: usize = 10000;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleHistogram;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_MESSAGE_LATENCY: SimpleHistogram = SimpleHistogram::new(
-        "hopr_message_latency_sec",
-        "Histogram of measured received message latencies in seconds",
-        vec![0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0]
-    ).unwrap();
-}
 
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {
@@ -93,26 +79,23 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     {
         match std::env::var("HOPRD_USE_OPENTELEMETRY") {
             Ok(v) if v == "true" => {
-                let tracer = opentelemetry_otlp::new_pipeline()
-                    .tracing()
-                    .with_exporter(
-                        opentelemetry_otlp::new_exporter()
-                            .tonic()
-                            .with_protocol(opentelemetry_otlp::Protocol::Grpc)
-                            .with_timeout(std::time::Duration::from_secs(5)),
-                    )
-                    .with_trace_config(
-                        opentelemetry_sdk::trace::Config::default()
-                            .with_sampler(Sampler::AlwaysOn)
-                            .with_id_generator(RandomIdGenerator::default())
-                            .with_max_events_per_span(64)
-                            .with_max_attributes_per_span(16)
-                            .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
-                                "service.name",
-                                std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
-                            )])),
-                    )
-                    .install_batch(opentelemetry_sdk::runtime::Tokio)?
+                let exporter = opentelemetry_otlp::SpanExporter::builder()
+                    .with_tonic()
+                    .with_protocol(opentelemetry_otlp::Protocol::Grpc)
+                    .with_timeout(std::time::Duration::from_secs(5))
+                    .build()?;
+
+                let tracer = opentelemetry_sdk::trace::TracerProvider::builder()
+                    .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+                    .with_sampler(Sampler::AlwaysOn)
+                    .with_id_generator(RandomIdGenerator::default())
+                    .with_max_events_per_span(64)
+                    .with_max_attributes_per_span(16)
+                    .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
+                        "service.name",
+                        std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
+                    )]))
+                    .build()
                     .tracer(env!("CARGO_PKG_NAME"));
 
                 telemetry = Some(tracing_opentelemetry::layer().with_tracer(tracer))
@@ -165,6 +148,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         warn!("!! FOR TESTING ONLY !! THIS BUILD IS USING AN INSECURE FIXED RNG !!")
     }
 
+    if std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true") {
+        warn!("!! FOR TESTING ONLY !! Node is running with some safety checks disabled!");
+    }
+
     let args = <CliArgs as clap::Parser>::parse();
     let cfg = hoprd::config::HoprdConfig::from_cli_args(args, false)?;
 
@@ -208,14 +195,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         blockchain_address = hopr_lib::Keypair::public(&hopr_keys.chain_key).to_address().to_hex(),
         "Node public identifiers"
     );
-
-    // TODO: the following check can be removed once [PR](https://github.com/hoprnet/hoprnet/pull/5665) is merged
-    if hopr_lib::Keypair::public(&hopr_keys.packet_key)
-        .to_string()
-        .starts_with("0xff")
-    {
-        warn!("This node uses an invalid packet key type and will not be able to become an effective relay node, please create a new identity!");
-    }
 
     // Create the node instance
     info!("Creating the HOPRd node instance from hopr-lib");
@@ -262,11 +241,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let (mut ws_events_tx, ws_events_rx) =
-        async_broadcast::broadcast::<ApplicationData>(WEBSOCKET_EVENT_BROADCAST_CAPACITY);
-    let ws_events_rx = ws_events_rx.deactivate(); // No need to copy the data unless the websocket is opened, but leaves the channel open
-    ws_events_tx.set_overflow(true); // Set overflow in case of full the oldest record is discarded
-
     let inbox_clone = inbox.clone();
 
     let node_clone = node.clone();
@@ -274,10 +248,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processes: Vec<HoprdProcesses> = Vec::new();
 
     if cfg.api.enable {
-        // TODO: remove RLP in 3.0
-        let msg_encoder =
-            |data: &[u8]| hopr_lib::rlp::encode(data, hopr_platform::time::native::current_time().as_unix_timestamp());
-
         let node_cfg_str = cfg.as_redacted_string()?;
         let api_cfg = cfg.api.clone();
 
@@ -305,8 +275,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 hoprd_db,
                 inbox,
                 session_listener_sockets,
-                websocket_rx: ws_events_rx,
-                msg_encoder: Some(msg_encoder),
                 default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
             })
             .await
@@ -319,7 +287,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (hopr_socket, hopr_processes) = node
         .run(HoprServerIpForwardingReactor::new(
             hopr_keys.packet_key.clone(),
-            Default::default(),
+            cfg.session_ip_forwarding,
         ))
         .await?;
 
@@ -327,48 +295,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut ingress = hopr_socket.reader();
     processes.push(HoprdProcesses::Inbox(spawn(async move {
         while let Some(data) = ingress.next().await {
-            let recv_at = SystemTime::now();
+            let tag = data.application_tag;
 
-            // TODO: remove RLP in 3.0
-            match hopr_lib::rlp::decode(&data.plain_text) {
-                Ok((msg, sent)) => {
-                    let latency = recv_at.as_unix_timestamp().saturating_sub(sent);
+            trace!(
+                ?tag,
+                receiged_at = DateTime::<Utc>::from(SystemTime::now()).to_rfc3339(),
+                "received message"
+            );
 
-                    trace!(
-                        tag = ?data.application_tag,
-                        latency_in_ms = latency.as_millis(),
-                        receiged_at = DateTime::<Utc>::from(recv_at).to_rfc3339(),
-                        "received message"
-                    );
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_MESSAGE_LATENCY.observe(latency.as_secs_f64());
-
-                    if cfg.api.enable && ws_events_tx.receiver_count() > 0 {
-                        if let Err(e) = ws_events_tx.try_broadcast(ApplicationData {
-                            application_tag: data.application_tag,
-                            plain_text: msg.clone(),
-                        }) {
-                            error!(error = %e, "Failed to notify websockets about a new message");
-                        }
-                    }
-
-                    if !inbox_clone
-                        .write()
-                        .await
-                        .push(ApplicationData {
-                            application_tag: data.application_tag,
-                            plain_text: msg,
-                        })
-                        .await
-                    {
-                        warn!(
-                            tag = data.application_tag,
-                            "Received a message with an ignored Inbox tag",
-                        )
-                    }
-                }
-                Err(e) => error!(error = %e, "RLP decoding failed"),
+            if !inbox_clone.write().await.push(data).await {
+                warn!(?tag, "Received a message with an ignored Inbox tag",)
             }
         }
     })));

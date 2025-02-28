@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use ethers::types::TxHash;
 
-use chain_types::chain_events::SignificantChainEvent;
 use hopr_chain_rpc::BlockWithLogs;
+use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::Result;

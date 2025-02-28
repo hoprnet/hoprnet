@@ -36,7 +36,6 @@ libp2p-identity = { workspace = true }
 mockall = { workspace = true }
 parameterized = { workspace = true }
 
-core-path = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-sphinx = { workspace = true, features = [
   "ed25519",
@@ -44,6 +43,7 @@ hopr-crypto-sphinx = { workspace = true, features = [
   "x25519",
 ] }
 hopr-db-api = { workspace = true }
+hopr-path = { workspace = true }
 
 
 [[bench]]

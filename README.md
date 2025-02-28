@@ -82,7 +82,7 @@ All releases and associated changelogs are located in the [official releases](ht
 The following instructions show how any `$RELEASE` may be installed, to select the release, override the `$RELEASE` variable, e.g.:
 
 - `export RELEASE=latest` to track the latest changes on the repository's `master` branch
-- `export RELEASE=saint-louis` to track the latest changes on the repository's `release/saint-louis` branch (2.1.X)
+- `export RELEASE=singapore` to track the latest changes on the repository's `release/singapore` branch (2.2.X)
 - `export RELEASE=<version>` to get a specific `<version>`
 
 Container image has the format
@@ -94,7 +94,7 @@ where:
 Pull the container image with `docker`:
 
 ```shell
-$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:saint-louis
+$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
@@ -153,7 +153,7 @@ Options:
       --maxBlockRange <MAX_BLOCK_RANGE>
           Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
       --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>
-          Maximum number of RPC requestes that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
+          Maximum number of RPC requests that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
       --init...
@@ -177,23 +177,9 @@ Options:
       --safeAddress <HOPRD_SAFE_ADDR>
           Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
       --moduleAddress <HOPRD_MODULE_ADDR>
-          Address of the node mangement module [env: HOPRD_MODULE_ADDRESS=]
+          Address of the node management module [env: HOPRD_MODULE_ADDRESS=]
       --protocolConfig <HOPRD_PROTOCOL_CONFIG_PATH>
           Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
-      --dryRun
-          DEPRECATED [env: HOPRD_DRY_RUN=]
-      --healthCheck
-          DEPRECATED
-      --healthCheckHost <HEALTH_CHECK_HOST>
-          DEPRECATED
-      --healthCheckPort <HEALTH_CHECK_PORT>
-          DEPRECATED
-      --defaultStrategy <DEFAULT_STRATEGY>
-          DEPRECATED [env: HOPRD_DEFAULT_STRATEGY=] [possible values: promiscuous, aggregating, auto_redeeming, auto_funding, closure_finalizer, multi, passive]
-      --maxAutoChannels <MAX_AUTO_CHANNELS>
-          DEPRECATED [env: HOPRD_MAX_AUTO_CHANNELS=]
-      --disableTicketAutoRedeem...
-          DEPRECATED [env: HOPRD_DISABLE_AUTO_REDEEEM_TICKETS=]
   -h, --help
           Print help
   -V, --version
@@ -214,8 +200,12 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
 - `HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS` - cutoff duration from now to not retain the peers with older records in the peers database (e.g. after a restart)
 - `HOPR_INTERNAL_REST_API_MAX_CONCURRENT_WEBSOCKET_COUNT` - the maximum number of concurrent websocket opened through the REST API
+- `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
+- `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
+- `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
+- `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
-- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified).
+- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
 
 ### Example execution
 
@@ -281,7 +271,7 @@ Either setup `nix` and `flake` to use the nix environment, or [install Rust tool
 
 ### Nix environment setup
 
-Install `nix`` from the official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html).
+Install `nix` from the official website at [https://nix.dev/install-nix.html](https://nix.dev/install-nix.html).
 
 Create a nix configuration file at `~/.config/nix/nix.conf` with the following content:
 

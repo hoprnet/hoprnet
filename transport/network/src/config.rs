@@ -14,6 +14,8 @@ pub const DEFAULT_NETWORK_QUALITY_AVERAGE_WINDOW_SIZE: u32 = 25;
 pub const DEFAULT_NETWORK_BACKOFF_EXPONENT: f64 = 1.5;
 pub const DEFAULT_NETWORK_BACKOFF_MIN: f64 = 2.0;
 
+pub const DEFAULT_AUTO_PATH_QUALITY_THRESHOLD: f64 = 0.95;
+
 /// Configuration for the [`crate::network::Network`] object
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, SmartDefault, PartialEq)]
@@ -39,6 +41,10 @@ pub struct NetworkConfig {
     #[default(quality_offline_threshold())]
     pub quality_offline_threshold: f64,
 
+    #[serde(default = "quality_auto_path_threshold")]
+    #[default(quality_auto_path_threshold())]
+    pub quality_auto_path_threshold: f64,
+
     #[serde(default = "quality_step")]
     #[default(quality_step())]
     pub quality_step: f64,
@@ -48,8 +54,8 @@ pub struct NetworkConfig {
     pub quality_avg_window_size: u32,
 
     #[serde_as(as = "DurationSeconds<u64>")]
-    #[serde(default = "duration_4_min")]
-    #[default(duration_4_min())]
+    #[serde(default = "duration_2_min")]
+    #[default(duration_2_min())]
     pub ignore_timeframe: Duration,
 
     #[serde(default = "backoff_exponent")]
@@ -81,6 +87,13 @@ impl Validate for NetworkConfig {
             errors.add(
                 "quality_bad_threshold",
                 validator::ValidationError::new("quality_bad_threshold must be between 0 and 1"),
+            );
+        }
+
+        if !(0.0..=1.0).contains(&self.quality_auto_path_threshold) {
+            errors.add(
+                "quality_auto_path_threshold",
+                validator::ValidationError::new("quality_auto_path_threshold must be between 0 and 1"),
             );
         }
 
@@ -151,6 +164,11 @@ fn quality_offline_threshold() -> f64 {
 }
 
 #[inline]
+fn quality_auto_path_threshold() -> f64 {
+    DEFAULT_AUTO_PATH_QUALITY_THRESHOLD
+}
+
+#[inline]
 fn quality_step() -> f64 {
     DEFAULT_NETWORK_QUALITY_STEP
 }
@@ -161,8 +179,8 @@ fn quality_average_window_size() -> u32 {
 }
 
 #[inline]
-fn duration_4_min() -> Duration {
-    Duration::from_secs(4 * 60)
+fn duration_2_min() -> Duration {
+    Duration::from_secs(2 * 60)
 }
 
 #[inline]

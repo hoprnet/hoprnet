@@ -12,7 +12,7 @@ use hoprd_db_api::errors::DbError;
 
 use crate::{
     types::{HoprIdentifier, PeerOrAddress},
-    ApiErrorStatus, InternalState, BASE_PATH,
+    ApiError, ApiErrorStatus, InternalState, BASE_PATH,
 };
 
 #[serde_as]
@@ -36,12 +36,9 @@ pub(crate) struct PeerIdResponse {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AliasDestinationBodyRequest {
     pub alias: String,
-    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    destination: Option<PeerOrAddress>,
-    #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = String)]
-    peer_id: Option<hopr_lib::PeerId>,
+    pub destination: PeerOrAddress,
 }
 
 /// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding PeerId as a hashmap.
@@ -105,15 +102,7 @@ pub(super) async fn set_alias(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let destination = if let Some(destination) = args.destination {
-        destination
-    } else if let Some(peer_id) = args.peer_id {
-        PeerOrAddress::PeerId(peer_id)
-    } else {
-        return (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput).into_response();
-    };
-
-    match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
+    match HoprIdentifier::new_with(args.destination, hopr.peer_resolver()).await {
         Ok(destination) => match state
             .hoprd_db
             .set_alias(destination.peer_id.to_string(), args.alias)

@@ -23,8 +23,8 @@ use crate::{
     key_pair::PrivateKeyArgs,
     utils::{Cmd, HelperErrors},
 };
-use bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
 use clap::Parser;
+use hopr_bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
 use hopr_internal_types::prelude::{f64_to_win_prob, win_prob_to_f64};
 use tracing::{debug, info};
 

@@ -6,8 +6,6 @@ set -Eeuo pipefail
 usage() {
   echo ""
   echo "Usage: $0 <release_name>"
-  echo ""
-  echo "$0 saint-louis"
   echo
 }
 

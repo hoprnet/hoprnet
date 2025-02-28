@@ -1,6 +1,7 @@
-use chain_actions::errors::ChainActionsError;
-use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
+
+use hopr_chain_actions::errors::ChainActionsError;
+use hopr_primitive_types::errors::GeneralError;
 
 /// Enumerates all errors in this crate.
 #[derive(Debug, Error)]

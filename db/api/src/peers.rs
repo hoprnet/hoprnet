@@ -155,7 +155,7 @@ impl PeerStatus {
     /// and maximum peer ignore period.
     #[inline]
     pub fn is_ignored(&self, now: SystemTime, max_ignore: Duration) -> bool {
-        self.ignored.map_or(false, |t| now.saturating_sub(t) <= max_ignore)
+        self.ignored.is_some_and(|t| now.saturating_sub(t) <= max_ignore)
     }
 }
 

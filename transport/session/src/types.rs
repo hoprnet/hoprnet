@@ -170,7 +170,7 @@ impl Session {
         // If we request any capability, we need to use Session protocol
         if !capabilities.is_empty() {
             // This is a very coarse assumption, that it takes max 2 seconds for each hop one way.
-            let rto_base = 2 * Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
+            let rto_base = Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
 
             let expiration_coefficient = if capabilities.contains(&Capability::Retransmission)
                 || capabilities.contains(&Capability::RetransmissionAckOnly)

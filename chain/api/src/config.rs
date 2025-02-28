@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use validator::Validate;
 
-use chain_types::ContractAddresses;
+use hopr_chain_types::ContractAddresses;
 use hopr_primitive_types::primitives::Address;
 
 use crate::errors::HoprChainError;

@@ -453,7 +453,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
 
         db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
             .await?;
@@ -497,7 +497,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
 
         db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
             .await?;
@@ -548,13 +548,13 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
 
         db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
             .await?;
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
+        let packet_2 = *OffchainKeypair::random().public();
 
         db.insert_account(None, AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced))
             .await?;
@@ -586,7 +586,7 @@ mod tests {
         db.insert_account(
             None,
             AccountEntry::new(
-                OffchainKeypair::random().public().clone(),
+                *OffchainKeypair::random().public(),
                 chain_1,
                 AccountType::Announced {
                     multiaddr: "/ip4/1.2.3.4/tcp/1234".parse()?,
@@ -625,7 +625,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
 
         db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
             .await?;
@@ -642,7 +642,7 @@ mod tests {
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let mut entry = AccountEntry::new(
-            OffchainKeypair::random().public().clone(),
+            *OffchainKeypair::random().public(),
             chain_1,
             AccountType::Announced {
                 multiaddr: "/ip4/1.2.3.4/tcp/1234".parse()?,
@@ -683,10 +683,10 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
+        let packet_2 = *OffchainKeypair::random().public();
 
         let db_clone = db.clone();
         db.begin_transaction()
@@ -733,10 +733,10 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         let chain_1 = ChainKeypair::random().public().to_address();
-        let packet_1 = OffchainKeypair::random().public().clone();
+        let packet_1 = *OffchainKeypair::random().public();
 
         let chain_2 = ChainKeypair::random().public().to_address();
-        let packet_2 = OffchainKeypair::random().public().clone();
+        let packet_2 = *OffchainKeypair::random().public();
 
         let db_clone = db.clone();
         db.begin_transaction()

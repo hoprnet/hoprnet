@@ -273,7 +273,7 @@ mod tests {
         let offchain_kp = OffchainKeypair::from_secret(&PRIVATE_KEY)?;
         let mut ack = Acknowledgement::new(HalfKey::default(), &offchain_kp);
 
-        assert!(ack.validate(&offchain_kp.public()));
+        assert!(ack.validate(offchain_kp.public()));
 
         let buf = Vec::new();
         let serialized = cbor4ii::serde::to_vec(buf, &ack)?;

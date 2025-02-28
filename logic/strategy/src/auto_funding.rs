@@ -4,14 +4,15 @@
 //!
 //! For details on default parameters see [AutoFundingStrategyConfig].
 use async_trait::async_trait;
-use chain_actions::channels::ChannelActions;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use tracing::info;
 use validator::Validate;
+
+use hopr_chain_actions::channels::ChannelActions;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::strategy::SingularStrategy;
@@ -48,13 +49,16 @@ pub struct AutoFundingStrategyConfig {
 /// The `AutoFundingStrategy` automatically funds channel that
 /// dropped it's staked balance below the configured threshold.
 pub struct AutoFundingStrategy<A: ChannelActions> {
-    chain_actions: A,
+    hopr_chain_actions: A,
     cfg: AutoFundingStrategyConfig,
 }
 
 impl<A: ChannelActions> AutoFundingStrategy<A> {
-    pub fn new(cfg: AutoFundingStrategyConfig, chain_actions: A) -> Self {
-        Self { cfg, chain_actions }
+    pub fn new(cfg: AutoFundingStrategyConfig, hopr_chain_actions: A) -> Self {
+        Self {
+            cfg,
+            hopr_chain_actions,
+        }
     }
 }
 
@@ -93,7 +97,7 @@ impl<A: ChannelActions + Send + Sync> SingularStrategy for AutoFundingStrategy<A
                 METRIC_COUNT_AUTO_FUNDINGS.increment();
 
                 let rx = self
-                    .chain_actions
+                    .hopr_chain_actions
                     .fund_channel(channel.get_id(), self.cfg.funding_amount)
                     .await?;
                 std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
@@ -111,12 +115,12 @@ mod tests {
     use crate::auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig};
     use crate::strategy::SingularStrategy;
     use async_trait::async_trait;
-    use chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use chain_actions::channels::ChannelActions;
-    use chain_types::actions::Action;
-    use chain_types::chain_events::ChainEventType;
     use futures::{future::ok, FutureExt};
     use hex_literal::hex;
+    use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
+    use hopr_chain_actions::channels::ChannelActions;
+    use hopr_chain_types::actions::Action;
+    use hopr_chain_types::chain_events::ChainEventType;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_internal_types::prelude::*;
@@ -134,14 +138,14 @@ mod tests {
         ChannelAct { }
         #[async_trait]
         impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: Balance) -> chain_actions::errors::Result<PendingAction>;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> chain_actions::errors::Result<PendingAction>;
+            async fn open_channel(&self, destination: Address, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
             async fn close_channel(
                 &self,
                 counterparty: Address,
                 direction: ChannelDirection,
                 redeem_before_close: bool,
-            ) -> chain_actions::errors::Result<PendingAction>;
+            ) -> hopr_chain_actions::errors::Result<PendingAction>;
         }
     }
 

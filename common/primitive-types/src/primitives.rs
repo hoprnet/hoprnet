@@ -62,7 +62,7 @@ impl Address {
         ret.push_str("0x");
 
         for (i, c) in address_hex.chars().enumerate() {
-            let nibble = hash[i / 2] >> (((i + 1) % 2) * 4) & 0xf;
+            let nibble = (hash[i / 2] >> (((i + 1) % 2) * 4)) & 0xf;
             if nibble < 8 {
                 ret.push(c);
             } else {

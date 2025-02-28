@@ -1,14 +1,8 @@
-[source.crates-io]
-replace-with = "vendored-sources"
-
-[source.vendored-sources]
-directory = "vendor/cargo"
-
-[install]
-root = ".cargo"
-
 # [build]
 # rustflags = ["-Wunused-crate-dependencies"]
 # Nightly only
 #rustflags = [ "-Zlocation-detail=none" ]
 #rustdocflags = ["--enable-index-page", "-Z", "unstable-options"]
+
+[install]
+root = ".cargo"

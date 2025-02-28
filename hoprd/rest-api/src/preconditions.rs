@@ -14,10 +14,9 @@ use urlencoding::decode;
 use crate::{ApiErrorStatus, Auth, InternalState, BASE_PATH};
 
 fn is_a_websocket_uri(uri: &OriginalUri) -> bool {
-    const MESSAGES_PATH: &str = const_format::formatcp!("{BASE_PATH}/messages/websocket");
     const SESSION_PATH: &str = const_format::formatcp!("{BASE_PATH}/session/websocket");
 
-    uri.path().starts_with(MESSAGES_PATH) || uri.path().starts_with(SESSION_PATH)
+    uri.path().starts_with(SESSION_PATH)
 }
 
 pub(crate) async fn cap_websockets(

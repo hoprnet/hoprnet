@@ -85,7 +85,7 @@ class Cluster:
                 logging.error(f"Node {node} did not return addresses")
 
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
-        logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to connect to all peers")
+        logging.info(f"Waiting up to {2 * GLOBAL_TIMEOUT}s for nodes to connect to all peers")
 
         tasks = []
         for node in self.nodes.values():

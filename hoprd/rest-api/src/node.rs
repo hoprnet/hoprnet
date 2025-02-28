@@ -18,10 +18,13 @@ use crate::{
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "version": "2.1.0"
+        "version": "2.1.0",
+        "apiVersion": "3.10.0"
     }))]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct NodeVersionResponse {
     version: String,
+    api_version: String,
 }
 
 /// Get the release version of the running node.
@@ -40,8 +43,8 @@ pub(crate) struct NodeVersionResponse {
     )]
 pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let version = state.hopr.version();
-
-    (StatusCode::OK, Json(NodeVersionResponse { version })).into_response()
+    let api_version = env!("CARGO_PKG_VERSION").to_owned();
+    (StatusCode::OK, Json(NodeVersionResponse { version, api_version })).into_response()
 }
 
 /// Get the configuration of the running node.
@@ -392,10 +395,6 @@ pub(crate) struct NodeInfoResponse {
     /// Channel closure period in seconds
     channel_closure_period: u64,
     indexer_block: u32,
-    #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
-    indexer_checksum: Hash,
-    index_block_prev_checksum: u32,
     indexer_last_log_block: u32,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
@@ -446,12 +445,6 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 connectivity_status: hopr.network_health().await,
                 channel_closure_period: channel_closure_notice_period.as_secs(),
                 indexer_block: indexer_state_info.latest_block_number,
-                // FIXME: this is only done for backwards-compatibility, ideally we don't return
-                // this value
-                indexer_checksum: Hash::default(),
-                // FIXME: this is only done for backwards-compatibility, ideally we don't return
-                // this value
-                index_block_prev_checksum: 0,
                 indexer_last_log_block: indexer_state_info.latest_log_block_number,
                 indexer_last_log_checksum: indexer_state_info.latest_log_checksum,
             };

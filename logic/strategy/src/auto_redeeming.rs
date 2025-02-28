@@ -4,17 +4,18 @@
 //!
 //! For details on default parameters, see [AutoRedeemingStrategyConfig].
 use async_trait::async_trait;
-use chain_actions::redeem::TicketRedeemActions;
-use hopr_db_sql::api::tickets::HoprDbTicketOperations;
-use hopr_db_sql::prelude::TicketSelector;
-use hopr_internal_types::prelude::*;
-use hopr_internal_types::tickets::{AcknowledgedTicket, AcknowledgedTicketStatus};
-use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
 use tracing::{debug, error, info};
 use validator::Validate;
+
+use hopr_chain_actions::redeem::TicketRedeemActions;
+use hopr_db_sql::api::tickets::HoprDbTicketOperations;
+use hopr_db_sql::prelude::TicketSelector;
+use hopr_internal_types::prelude::*;
+use hopr_internal_types::tickets::{AcknowledgedTicket, AcknowledgedTicketStatus};
+use hopr_primitive_types::prelude::*;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::strategy::SingularStrategy;
@@ -72,7 +73,7 @@ pub struct AutoRedeemingStrategyConfig {
 /// for redemption once encountered.
 /// The strategy does not await the result of the redemption.
 pub struct AutoRedeemingStrategy<A: TicketRedeemActions, Db: HoprDbTicketOperations> {
-    chain_actions: A,
+    hopr_chain_actions: A,
     db: Db,
     cfg: AutoRedeemingStrategyConfig,
 }
@@ -90,8 +91,12 @@ impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> Display for AutoRedeemi
 }
 
 impl<A: TicketRedeemActions, Db: HoprDbTicketOperations> AutoRedeemingStrategy<A, Db> {
-    pub fn new(cfg: AutoRedeemingStrategyConfig, db: Db, chain_actions: A) -> Self {
-        Self { cfg, db, chain_actions }
+    pub fn new(cfg: AutoRedeemingStrategyConfig, db: Db, hopr_chain_actions: A) -> Self {
+        Self {
+            cfg,
+            db,
+            hopr_chain_actions,
+        }
     }
 }
 
@@ -110,7 +115,7 @@ where
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_COUNT_AUTO_REDEEMS.increment();
 
-            let rx = self.chain_actions.redeem_ticket(ack.clone()).await?;
+            let rx = self.hopr_chain_actions.redeem_ticket(ack.clone()).await?;
             std::mem::drop(rx); // The Receiver is not intentionally awaited here and the oneshot Sender can fail safely
             Ok(())
         } else {
@@ -146,7 +151,7 @@ where
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_COUNT_AUTO_REDEEMS.increment();
 
-                    self.chain_actions.redeem_ticket(ack.clone())
+                    self.hopr_chain_actions.redeem_ticket(ack.clone())
                 }))
                 .await
                 .into_iter()
@@ -179,12 +184,12 @@ where
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use chain_actions::redeem::TicketRedeemActions;
-    use chain_types::actions::Action;
-    use chain_types::chain_events::ChainEventType;
     use futures::{future::ok, FutureExt};
     use hex_literal::hex;
+    use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
+    use hopr_chain_actions::redeem::TicketRedeemActions;
+    use hopr_chain_types::actions::Action;
+    use hopr_chain_types::chain_events::ChainEventType;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::api::tickets::TicketSelector;
@@ -230,19 +235,19 @@ mod tests {
         TicketRedeemAct { }
         #[async_trait]
         impl TicketRedeemActions for TicketRedeemAct {
-            async fn redeem_all_tickets(&self, only_aggregated: bool) -> chain_actions::errors::Result<Vec<PendingAction>>;
+            async fn redeem_all_tickets(&self, only_aggregated: bool) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_tickets_with_counterparty(
                 &self,
                 counterparty: &Address,
                 only_aggregated: bool,
-            ) -> chain_actions::errors::Result<Vec<PendingAction>>;
+            ) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
             async fn redeem_tickets_in_channel(
                 &self,
                 channel: &ChannelEntry,
                 only_aggregated: bool,
-            ) -> chain_actions::errors::Result<Vec<PendingAction >>;
-            async fn redeem_tickets(&self, selector: TicketSelector) -> chain_actions::errors::Result<Vec<PendingAction>>;
-            async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> chain_actions::errors::Result<PendingAction>;
+            ) -> hopr_chain_actions::errors::Result<Vec<PendingAction >>;
+            async fn redeem_tickets(&self, selector: TicketSelector) -> hopr_chain_actions::errors::Result<Vec<PendingAction>>;
+            async fn redeem_ticket(&self, ack: AcknowledgedTicket) -> hopr_chain_actions::errors::Result<PendingAction>;
         }
     }
 

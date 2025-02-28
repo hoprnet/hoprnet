@@ -2,6 +2,7 @@
 hopr:
   # run heartbeats more frequently
   heartbeat:
+    max_parallel_probes: 10
     interval: 10
     threshold: 10
     variance: 1
@@ -13,3 +14,10 @@ hopr:
     allow_recursive: false
     execution_interval: 1
     strategies: []
+  protocol:
+    outgoing_ticket_winning_prob: 1.0
+    heartbeat:
+      timeout: 5
+session_ip_forwarding:
+  use_target_allow_list: false
+

@@ -27,8 +27,8 @@ use tracing::{debug, error, info, warn};
 
 use async_lock::RwLock;
 use async_trait::async_trait;
-use chain_actions::channels::ChannelActions;
 use futures::StreamExt;
+use hopr_chain_actions::channels::ChannelActions;
 use hopr_db_sql::api::peers::PeerSelector;
 use hopr_db_sql::errors::DbSqlError;
 use hopr_db_sql::HoprDbAllOperations;
@@ -162,7 +162,7 @@ where
     A: ChannelActions,
 {
     db: Db,
-    chain_actions: A,
+    hopr_chain_actions: A,
     cfg: PromiscuousStrategyConfig,
     sma: RwLock<SingleSumSMA<u32>>,
 }
@@ -172,10 +172,10 @@ where
     Db: HoprDbAllOperations + Clone,
     A: ChannelActions,
 {
-    pub fn new(cfg: PromiscuousStrategyConfig, db: Db, chain_actions: A) -> Self {
+    pub fn new(cfg: PromiscuousStrategyConfig, db: Db, hopr_chain_actions: A) -> Self {
         Self {
             db,
-            chain_actions,
+            hopr_chain_actions,
             sma: RwLock::new(SingleSumSMA::new(cfg.min_network_size_samples as usize)),
             cfg,
         }
@@ -416,7 +416,7 @@ where
 
         for channel_to_close in tick_decision.get_to_close() {
             match self
-                .chain_actions
+                .hopr_chain_actions
                 .close_channel(
                     channel_to_close.destination,
                     ChannelDirection::Outgoing,
@@ -436,7 +436,7 @@ where
 
         for channel_to_open in tick_decision.get_to_open() {
             match self
-                .chain_actions
+                .hopr_chain_actions
                 .open_channel(channel_to_open.0, channel_to_open.1)
                 .await
             {
@@ -466,12 +466,11 @@ where
 mod tests {
     use super::*;
     use anyhow::Context;
-    use chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use chain_types::actions::Action;
-    use chain_types::chain_events::ChainEventType;
-    use core_network::{network::PeerOrigin, PeerId};
     use futures::{future::ok, FutureExt};
     use hex_literal::hex;
+    use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
+    use hopr_chain_types::actions::Action;
+    use hopr_chain_types::chain_events::ChainEventType;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::accounts::HoprDbAccountOperations;
@@ -480,6 +479,7 @@ mod tests {
     use hopr_db_sql::db::HoprDb;
     use hopr_db_sql::info::HoprDbInfoOperations;
     use hopr_db_sql::HoprDbGeneralModelOperations;
+    use hopr_transport_network::{network::PeerOrigin, PeerId};
     use lazy_static::lazy_static;
     use mockall::mock;
 
@@ -543,14 +543,14 @@ mod tests {
         ChannelAct { }
         #[async_trait]
         impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: Balance) -> chain_actions::errors::Result<PendingAction>;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> chain_actions::errors::Result<PendingAction>;
+            async fn open_channel(&self, destination: Address, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
             async fn close_channel(
                 &self,
                 counterparty: Address,
                 direction: ChannelDirection,
                 redeem_before_close: bool,
-            ) -> chain_actions::errors::Result<PendingAction>;
+            ) -> hopr_chain_actions::errors::Result<PendingAction>;
         }
     }
 

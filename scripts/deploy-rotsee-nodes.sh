@@ -28,7 +28,7 @@ mapfile -t ssh_hosts <<<"$(<${1})"
 action="${2:-deploy}"
 docker_image="${3:-europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:latest}"
 
-CONTAINER_NAME=hoprd-node-rotsee-saint-louis
+CONTAINER_NAME=hoprd-node-rotsee-singapore
 SSH_USER=root
 NETWORK=rotsee
 
@@ -68,7 +68,6 @@ run_node() {
       --data /app/hoprd-db \
       --password '${IDENTITY_PASSWORD}' \
       --apiHost "0.0.0.0" --apiToken "${API_TOKEN}" \
-      --healthCheck --healthCheckHost "0.0.0.0" \
       --heartbeatInterval 20000 --heartbeatThreshold 60000 \
       \${safe_args}
 EOF

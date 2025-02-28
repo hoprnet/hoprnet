@@ -575,7 +575,7 @@ mod tests {
         let log_db_updated = db.get_log(log.block_number, log.tx_index, log.log_index).await.unwrap();
 
         assert_eq!(log_db_updated.processed, Some(true));
-        assert_eq!(log_db_updated.processed_at.is_some(), true);
+        assert!(log_db_updated.processed_at.is_some());
     }
 
     #[async_std::test]
@@ -619,7 +619,7 @@ mod tests {
         while next_block <= start_block + blocks {
             let ordered_logs = db.get_logs(Some(next_block), Some(block_fetch_interval)).await.unwrap();
 
-            assert!(ordered_logs.len() > 0);
+            assert!(!ordered_logs.is_empty());
 
             ordered_logs.iter().reduce(|prev_log, curr_log| {
                 assert!(prev_log.block_number >= next_block);
@@ -637,7 +637,7 @@ mod tests {
                 }
                 curr_log
             });
-            next_block = next_block + block_fetch_interval;
+            next_block += block_fetch_interval;
         }
     }
 
@@ -866,8 +866,8 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
         let addr_1 = Address::new(b"my address 123456789");
         let addr_2 = Address::new(b"my 2nd address 12345");
-        let topic_1 = Hash::create(&[b"my topic 1"]).into();
-        let topic_2 = Hash::create(&[b"my topic 2"]).into();
+        let topic_1 = Hash::create(&[b"my topic 1"]);
+        let topic_2 = Hash::create(&[b"my topic 2"]);
 
         db.ensure_logs_origin(vec![(addr_1, topic_1)]).await?;
 

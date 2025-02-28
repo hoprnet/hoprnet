@@ -1,5 +1,6 @@
 pub mod topics {
-    use bindings::{
+    use ethers::{contract::EthEvent, types::TxHash};
+    use hopr_bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
         hopr_channels::{
             ChannelBalanceDecreasedFilter, ChannelBalanceIncreasedFilter, ChannelClosedFilter, ChannelOpenedFilter,
@@ -15,7 +16,6 @@ pub mod topics {
         hopr_token::{ApprovalFilter, TransferFilter},
         hopr_winning_probability_oracle::WinProbUpdatedFilter,
     };
-    use ethers::{contract::EthEvent, types::TxHash};
 
     pub fn channel() -> Vec<TxHash> {
         vec![
@@ -58,7 +58,7 @@ pub mod topics {
         vec![
             RegisteredNodeSafeFilter::signature(),
             DergisteredNodeSafeFilter::signature(),
-            bindings::hopr_node_safe_registry::DomainSeparatorUpdatedFilter::signature(),
+            hopr_bindings::hopr_node_safe_registry::DomainSeparatorUpdatedFilter::signature(),
         ]
     }
 

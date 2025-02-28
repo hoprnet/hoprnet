@@ -263,7 +263,7 @@ mod tests {
         let path = std::path::Path::new(&random_tmp_file);
 
         {
-            let db = HoprDb::new(&path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
 
             db.add_network_peer(
                 &peer_id,
@@ -275,7 +275,7 @@ mod tests {
             .await?;
         }
         {
-            let db = HoprDb::new(&path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
 
             let not_found_peer = db.get_network_peer(&peer_id).await?;
 
@@ -295,14 +295,14 @@ mod tests {
         let random_tmp_file = format!("/tmp/{random_filename}.sqlite");
 
         let ofk = OffchainKeypair::random();
-        let peer_id: PeerId = ofk.public().clone().into();
+        let peer_id: PeerId = (*ofk.public()).into();
         let ma_1: Multiaddr = format!("/ip4/127.0.0.1/tcp/10000/p2p/{peer_id}").parse()?;
         let ma_2: Multiaddr = format!("/ip4/127.0.0.1/tcp/10002/p2p/{peer_id}").parse()?;
 
         let path = std::path::Path::new(&random_tmp_file);
 
         {
-            let db = HoprDb::new(&path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
 
             db.add_network_peer(
                 &peer_id,
@@ -316,7 +316,7 @@ mod tests {
             let ten_seconds_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(10);
 
             db.update_network_peer(hopr_db_api::peers::PeerStatus {
-                id: (ofk.public().clone(), peer_id),
+                id: (*ofk.public(), peer_id),
                 origin: PeerOrigin::Initialization,
                 is_public: true,
                 last_seen: ten_seconds_ago,
@@ -333,7 +333,7 @@ mod tests {
             .await?;
         }
         {
-            let db = HoprDb::new(&path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
+            let db = HoprDb::new(path, ChainKeypair::random(), crate::db::HoprDbConfig::default()).await?;
 
             let found_peer = db.get_network_peer(&peer_id).await?.map(|p| p.id.1);
 

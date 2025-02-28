@@ -396,7 +396,7 @@ mod tests {
 
         let ce = ChannelEntry::new(
             Address::default(),
-            expected_destination.clone(),
+            expected_destination,
             BalanceType::HOPR.zero(),
             0_u32.into(),
             ChannelStatus::Open,

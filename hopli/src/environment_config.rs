@@ -26,7 +26,7 @@ use std::{
     sync::Arc,
 };
 
-use chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
+use hopr_chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
 use hopr_chain_rpc::{
     client::{surf_client::SurfRequestor as DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy},
     errors::RpcError,

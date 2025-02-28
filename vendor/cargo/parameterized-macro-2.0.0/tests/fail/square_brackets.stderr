@@ -1,5 +1,0 @@
-error: expected curly braces
- --> tests/fail/square_brackets.rs:3:21
-  |
-3 | #[parameterized(v = [1, 2, 3])]
-  |                     ^

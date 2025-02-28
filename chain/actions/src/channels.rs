@@ -11,10 +11,10 @@
 //! into the [ActionQueue](crate::action_queue::ActionQueue).
 //! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
 //! confirmation of the corresponding operation.
-//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](chain_types::chain_events::SignificantChainEvent)
+//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent)
 //! by the Indexer.
 use async_trait::async_trait;
-use chain_types::actions::Action;
+use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
@@ -223,10 +223,10 @@ mod tests {
     use crate::channels::ChannelActions;
     use crate::errors::ChainActionsError;
     use crate::ChainActions;
-    use chain_types::actions::Action;
-    use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use futures::FutureExt;
     use hex_literal::hex;
+    use hopr_chain_types::actions::Action;
+    use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::channels::HoprDbChannelOperations;

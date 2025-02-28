@@ -1,25 +1,23 @@
-use futures::{pin_mut, select, StreamExt};
+use futures::{pin_mut, select, SinkExt, Stream, StreamExt};
 use futures_concurrency::stream::Merge;
-use libp2p::{request_response::OutboundRequestId, PeerId};
-use std::{num::NonZeroU8, sync::Arc};
+use libp2p::{request_response::OutboundRequestId, request_response::ResponseChannel, swarm::SwarmEvent};
+
+use std::num::NonZeroU8;
 use tracing::{debug, error, info, trace, warn};
 
-use core_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_internal_types::prelude::*;
+use hopr_transport_identity::{
+    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
+    Multiaddr, PeerId,
+};
+use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_transport_protocol::{
     config::ProtocolConfig,
-    ticket_aggregation::processor::{
-        TicketAggregationActions, TicketAggregationFinalizer, TicketAggregationInteraction, TicketAggregationProcessed,
-    },
+    ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationFinalizer, TicketAggregationProcessed},
+    PeerDiscovery,
 };
 
-use crate::{
-    constants,
-    errors::Result,
-    libp2p::{request_response::ResponseChannel, swarm::SwarmEvent},
-    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any, Multiaddr},
-    HoprNetworkBehavior, HoprNetworkBehaviorEvent, PeerDiscovery, Ping, Pong,
-};
+use crate::{constants, errors::Result, HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -35,36 +33,29 @@ lazy_static::lazy_static! {
 /// Build objects comprising the p2p network.
 ///
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
-async fn build_p2p_network(
+async fn build_p2p_network<T, U>(
     me: libp2p::identity::Keypair,
     network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
-    indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerDiscovery>,
+    indexer_update_input: U,
     heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
-    ticket_aggregation_interactions: TicketAggregationInteraction<
-        TicketAggregationResponseType,
-        TicketAggregationRequestType,
-    >,
+    ticket_aggregation_interactions: T,
     protocol_cfg: ProtocolConfig,
-) -> Result<libp2p::Swarm<HoprNetworkBehavior>> {
-    let tcp_upgrade = libp2p::core::upgrade::SelectUpgrade::new(
-        {
-            let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
-                .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                .unwrap_or(1024);
-
-            let mut cfg = libp2p::yamux::Config::default();
-            cfg.set_max_num_streams(num_streams);
-            cfg
-        },
-        libp2p_mplex::MplexConfig::new()
-            .set_max_num_streams(1024)
-            .set_max_buffer_size(32)
-            .set_split_send_size(8 * 1024)
-            .set_max_buffer_behaviour(libp2p_mplex::MaxBufferBehaviour::Block)
-            .clone(),
-    );
-
+) -> Result<libp2p::Swarm<HoprNetworkBehavior>>
+where
+    T: Stream<Item = crate::behavior::ticket_aggregation::Event> + Send + 'static,
+    U: Stream<Item = PeerDiscovery> + Send + 'static,
+{
     let me_peerid: PeerId = me.public().into();
+
+    let tcp_upgrade = {
+        let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
+            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
+            .unwrap_or(1024);
+
+        let mut cfg = libp2p::yamux::Config::default();
+        cfg.set_max_num_streams(num_streams);
+        cfg
+    };
 
     #[cfg(feature = "runtime-async-std")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
@@ -72,7 +63,7 @@ async fn build_p2p_network(
         .with_tcp(
             libp2p::tcp::Config::default().nodelay(true),
             libp2p::noise::Config::new,
-            move || tcp_upgrade,
+            || tcp_upgrade,
         )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
@@ -117,7 +108,7 @@ async fn build_p2p_network(
             )
             .with_max_negotiating_inbound_streams(
                 std::env::var("HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT")
-                    .map(|v| v.trim().parse::<usize>().unwrap_or(128))
+                    .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
                     .unwrap_or(constants::HOPR_SWARM_CONCURRENTLY_NEGOTIATING_INBOUND_PEER_COUNT),
             )
             .with_idle_connection_timeout(
@@ -130,23 +121,28 @@ async fn build_p2p_network(
         .build())
 }
 
+pub type TicketAggregationWriter =
+    TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>;
+pub type TicketAggregationEvent = crate::behavior::ticket_aggregation::Event;
+
 pub struct HoprSwarm {
     pub(crate) swarm: libp2p::Swarm<HoprNetworkBehavior>,
 }
 
 impl HoprSwarm {
-    pub async fn new(
+    pub async fn new<U, T>(
         identity: libp2p::identity::Keypair,
         network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
-        indexer_update_input: futures::channel::mpsc::UnboundedReceiver<PeerDiscovery>,
+        indexer_update_input: U,
         heartbeat_requests: futures::channel::mpsc::UnboundedReceiver<(PeerId, PingQueryReplier)>,
-        ticket_aggregation_interactions: TicketAggregationInteraction<
-            TicketAggregationResponseType,
-            TicketAggregationRequestType,
-        >,
+        ticket_aggregation_interactions: T,
         my_multiaddresses: Vec<Multiaddr>,
         protocol_cfg: ProtocolConfig,
-    ) -> Self {
+    ) -> Self
+    where
+        T: Stream<Item = TicketAggregationEvent> + Send + 'static,
+        U: Stream<Item = PeerDiscovery> + Send + 'static,
+    {
         let mut swarm = build_p2p_network(
             identity,
             network_update_input,
@@ -205,17 +201,20 @@ impl HoprSwarm {
     }
 
     // TODO: rename to with_outputs
-    pub fn with_processors(
+    pub fn with_processors<MS, MR, AS, AR>(
         self,
-        ack_to_send: futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
-        ack_received: futures::channel::mpsc::UnboundedSender<(PeerId, Acknowledgement)>,
-        msg_to_send: futures::channel::mpsc::UnboundedReceiver<(PeerId, Box<[u8]>)>,
-        msg_received: futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
-        ticket_aggregation_writer: TicketAggregationActions<
-            TicketAggregationResponseType,
-            TicketAggregationRequestType,
-        >,
-    ) -> HoprSwarmWithProcessors {
+        ack_to_send: AS,
+        ack_received: AR,
+        msg_to_send: MS,
+        msg_received: MR,
+        ticket_aggregation_writer: TicketAggregationWriter,
+    ) -> HoprSwarmWithProcessors<MS, MR, AS, AR>
+    where
+        AR: futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static + std::marker::Unpin,
+        AS: futures::Stream<Item = (PeerId, Acknowledgement)> + Send + Sync + 'static,
+        MR: futures::Sink<(PeerId, Box<[u8]>)> + Send + Sync + 'static + std::marker::Unpin,
+        MS: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
+    {
         HoprSwarmWithProcessors {
             swarm: self,
             ack_to_send,
@@ -258,39 +257,57 @@ use hopr_internal_types::legacy;
 pub type TicketAggregationRequestType = OutboundRequestId;
 pub type TicketAggregationResponseType = ResponseChannel<std::result::Result<legacy::Ticket, String>>;
 
-pub struct HoprSwarmWithProcessors {
+pub struct HoprSwarmWithProcessors<MS, MR, AS, AR>
+where
+    AR: futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static + std::marker::Unpin,
+    AS: futures::Stream<Item = (PeerId, Acknowledgement)> + Send + Sync + 'static,
+    MR: futures::Sink<(PeerId, Box<[u8]>)> + Send + Sync + 'static + std::marker::Unpin,
+    MS: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
+{
     swarm: HoprSwarm,
-    ack_to_send: futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
-    ack_received: futures::channel::mpsc::UnboundedSender<(PeerId, Acknowledgement)>,
-    msg_to_send: futures::channel::mpsc::UnboundedReceiver<(PeerId, Box<[u8]>)>,
-    msg_received: futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
+    ack_to_send: AS,
+    ack_received: AR,
+    msg_to_send: MS,
+    msg_received: MR,
     ticket_aggregation_writer: TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>,
 }
 
-impl std::fmt::Debug for HoprSwarmWithProcessors {
+impl<MS, MR, AS, AR> std::fmt::Debug for HoprSwarmWithProcessors<MS, MR, AS, AR>
+where
+    AR: futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static + std::marker::Unpin,
+    AS: futures::Stream<Item = (PeerId, Acknowledgement)> + Send + Sync + 'static,
+    MR: futures::Sink<(PeerId, Box<[u8]>)> + Send + Sync + 'static + std::marker::Unpin,
+    MS: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SwarmEventLoop").finish()
     }
 }
 
-impl HoprSwarmWithProcessors {
+impl<MS, MR, AS, AR> HoprSwarmWithProcessors<MS, MR, AS, AR>
+where
+    AR: futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static + std::marker::Unpin,
+    AS: futures::Stream<Item = (PeerId, Acknowledgement)> + Send + Sync + 'static,
+    MR: futures::Sink<(PeerId, Box<[u8]>)> + Send + Sync + 'static + std::marker::Unpin,
+    MS: futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
+{
     /// Main p2p loop that instantiates a new libp2p::Swarm instance and sets up listening and reacting pipelines
     /// running in a neverending loop future.
     ///
     /// The function represents the entirety of the business logic of the hopr daemon related to core operations.
     ///
     /// This future can only be resolved by an unrecoverable error or a panic.
-    pub async fn run(self, version: String) {
+    pub async fn run(mut self, version: String) {
         let mut swarm: libp2p::Swarm<HoprNetworkBehavior> = self.swarm.into();
 
         // NOTE: an improvement would be a forgetting cache for the active requests
-        let active_pings: moka::future::Cache<libp2p::request_response::OutboundRequestId, Arc<PingQueryReplier>> =
+        let active_pings: moka::future::Cache<libp2p::request_response::OutboundRequestId, PingQueryReplier> =
             moka::future::CacheBuilder::new(1000)
                 .time_to_live(std::time::Duration::from_secs(40))
                 .build();
         let active_aggregation_requests: moka::future::Cache<
             libp2p::request_response::OutboundRequestId,
-            Arc<TicketAggregationFinalizer>,
+            TicketAggregationFinalizer,
         > = moka::future::CacheBuilder::new(1000)
             .time_to_live(std::time::Duration::from_secs(40))
             .build();
@@ -326,14 +343,15 @@ impl HoprSwarmWithProcessors {
                             libp2p::request_response::Event::<Box<[u8]>, ()>::Message {
                                 peer,
                                 message,
+                                ..
                             } => match message {
                                 libp2p::request_response::Message::<Box<[u8]>, ()>::Request {
                                     request_id, request, channel
                                 } => {
                                     trace!(%peer, %request_id, "Received a message");
 
-                                    if let Err(e) = self.msg_received.unbounded_send((peer, request)) {
-                                        error!(%peer, %request_id, transport="libp2p", protocol="/hopr/msg/0.1.0", error = %e, "Failed to process a message");
+                                    if let Err(_e) = self.msg_received.send((peer, request)).await {
+                                        error!(%peer, %request_id, transport="libp2p", protocol="/hopr/msg/0.1.0", error = "Failed to enqueue a received message", "Failed to process incoming message");
                                     };
 
                                     if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
@@ -351,7 +369,7 @@ impl HoprSwarmWithProcessors {
                             } => {
                                 error!(%peer, %error,  "Failed to send a message");
                             },
-                            libp2p::request_response::Event::<Box<[u8]>, ()>::InboundFailure {peer, request_id, error} => {
+                            libp2p::request_response::Event::<Box<[u8]>, ()>::InboundFailure {peer, request_id, error, ..} => {
                                 warn!(%peer, %request_id, error = %error, "Failed to receive a message");
                             }
                             libp2p::request_response::Event::<Box<[u8]>, ()>::ResponseSent {..} => {
@@ -364,16 +382,17 @@ impl HoprSwarmWithProcessors {
                         match event {
                             libp2p::request_response::Event::<Acknowledgement,()>::Message {
                                 peer,
-                                message
+                                message,
+                                ..
                             } => match message {
                                 libp2p::request_response::Message::<Acknowledgement,()>::Request {
                                     request_id, request, channel
                                 } => {
                                     trace!(%peer, %request_id, "Received an acknowledgment");
 
-                                    self.ack_received.unbounded_send((peer, request)).unwrap_or_else(|e| {
-                                        error!(%peer, %request_id, transport="libp2p", protocol="/hopr/ack/0.1.0", error = %e, "Failed to process an acknowledgement");
-                                    });
+                                    if let Err(_e) = self.ack_received.send((peer, request)).await {
+                                        error!(%peer, %request_id, transport="libp2p", protocol="/hopr/ack/0.1.0", error = "Failed to enqueue a received ack", "Failed to process incoming ack");
+                                    }
 
                                     if swarm.behaviour_mut().ack.send_response(channel, ()).is_err() {
                                         error!(%peer, %request_id, transport="libp2p", protocol="/hopr/ack/0.1.0", "Failed to confirm receiving an acknowledgement, likely a timeout");
@@ -386,11 +405,11 @@ impl HoprSwarmWithProcessors {
                                 }
                             },
                             libp2p::request_response::Event::<Acknowledgement,()>::OutboundFailure {
-                                peer, error, request_id
+                                peer, error, request_id, ..
                             } => {
                                 error!(%peer, %request_id, %error, "Failed to send an acknowledgement");
                             },
-                            libp2p::request_response::Event::<Acknowledgement,()>::InboundFailure {peer, request_id, error} => {
+                            libp2p::request_response::Event::<Acknowledgement,()>::InboundFailure {peer, request_id, error, ..} => {
                                 warn!(%peer, %request_id, %error, "Failed to receive an acknowledgement");
                             }
                             libp2p::request_response::Event::<Acknowledgement,()>::ResponseSent {..} => {
@@ -403,7 +422,8 @@ impl HoprSwarmWithProcessors {
                         match event {
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::Message {
                                 peer,
-                                message
+                                message,
+                                ..
                             } => {
                                 match message {
                                     libp2p::request_response::Message::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::Request {
@@ -426,12 +446,12 @@ impl HoprSwarmWithProcessors {
                                 }
                             },
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::OutboundFailure {
-                                peer, request_id, error,
+                                peer, request_id, error, ..
                             } => {
                                 error!(%peer, %request_id, %error, "Failed to send an aggregation request");
                             },
                             libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::InboundFailure {
-                                peer, request_id, error
+                                peer, request_id, error, ..
                             } => {
                                 warn!(%peer, %request_id, %error, "Failed to receive an aggregated ticket");
                             },
@@ -445,7 +465,8 @@ impl HoprSwarmWithProcessors {
                         match event {
                             libp2p::request_response::Event::<Ping,Pong>::Message {
                                 peer,
-                                message
+                                message,
+                                ..
                             } => {
                                 match message {
                                     libp2p::request_response::Message::<Ping,Pong>::Request {
@@ -466,11 +487,7 @@ impl HoprSwarmWithProcessors {
                                         if let Some(replier) = active_pings.remove(&request_id).await {
                                             active_pings.run_pending_tasks().await;     // needed to remove the invalidated, but still present instance of Arc inside
                                             trace!(%peer, %request_id, "Processing manual ping response");
-                                            if let Some(replier) = Arc::<PingQueryReplier>::into_inner(replier) {
-                                                replier.notify(response.0, response.1)
-                                            } else {
-                                                warn!(%peer, %request_id, "Failed to notify with replier, multiple instances exist")
-                                            }
+                                            replier.notify(response.0, response.1)
                                         } else {
                                             debug!(%peer, %request_id, "Failed to find heartbeat replier");
                                         }
@@ -478,7 +495,7 @@ impl HoprSwarmWithProcessors {
                                 }
                             },
                             libp2p::request_response::Event::<Ping,Pong>::OutboundFailure {
-                                peer, request_id, error,
+                                peer, request_id, error, ..
                             } => {
                                 active_pings.invalidate(&request_id).await;
                                 if matches!(error, libp2p::request_response::OutboundFailure::DialFailure) {
@@ -488,7 +505,7 @@ impl HoprSwarmWithProcessors {
                                 }
                             },
                             libp2p::request_response::Event::<Ping,Pong>::InboundFailure {
-                                peer, request_id, error
+                                peer, request_id, error, ..
                             } => {
                                 warn!(%peer, %request_id, "Failed to receive a Pong request: {error}");
                             },
@@ -516,13 +533,13 @@ impl HoprSwarmWithProcessors {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregationBehavior(event)) => {
                         let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior", behavior="ticket aggregation");
 
-                        trace!(event = tracing::field::debug(&event), "Received a discovery event");
+                        trace!(event = tracing::field::debug(&event), "Received a ticket aggregation event");
                         match event {
                             TicketAggregationProcessed::Send(peer, acked_tickets, finalizer) => {
                                 let ack_tkt_count = acked_tickets.len();
                                 let request_id = swarm.behaviour_mut().ticket_aggregation.send_request(&peer, acked_tickets);
                                 debug!(%peer, %request_id, "Sending request to aggregate {ack_tkt_count} tickets");
-                                active_aggregation_requests.insert(request_id, Arc::new(finalizer)).await;
+                                active_aggregation_requests.insert(request_id, finalizer).await;
                             },
                             TicketAggregationProcessed::Reply(peer, ticket, response) => {
                                 debug!(%peer, "Enqueuing a response'");
@@ -533,12 +550,8 @@ impl HoprSwarmWithProcessors {
                             TicketAggregationProcessed::Receive(peer, _, request) => {
                                 match active_aggregation_requests.remove(&request).await {
                                     Some(finalizer) => {
-                                        active_aggregation_requests.run_pending_tasks().await;     // needed to remove the invalidated, but still present instance of Arc inside
-                                        if let Some(finalizer) = Arc::<TicketAggregationFinalizer>::into_inner(finalizer) {
-                                            finalizer.finalize();
-                                        } else {
-                                            warn!(%peer, request_id = %request, "Failed to finalize ticket aggregation, multiple instances of request exist")
-                                        }
+                                        active_aggregation_requests.run_pending_tasks().await;
+                                        finalizer.finalize();
                                     },
                                     None => {
                                         warn!(%peer, request_id = %request, "Response already handled")
@@ -554,7 +567,7 @@ impl HoprSwarmWithProcessors {
                         match event {
                             crate::behavior::heartbeat::Event::ToProbe((peer, replier)) => {
                                 let req_id = swarm.behaviour_mut().heartbeat.send_request(&peer, Ping(replier.challenge()));
-                                active_pings.insert(req_id, Arc::new(replier)).await;
+                                active_pings.insert(req_id, replier).await;
                             },
                         }
                     }

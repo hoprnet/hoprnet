@@ -7,11 +7,10 @@ use libp2p::{
     swarm::{dummy::ConnectionHandler, CloseConnection, NetworkBehaviour, ToSwarm},
     Multiaddr, PeerId,
 };
-
-use core_network::network::NetworkTriggeredEvent;
 use tracing::debug;
 
-use crate::PeerDiscovery;
+use hopr_transport_network::network::NetworkTriggeredEvent;
+use hopr_transport_protocol::PeerDiscovery;
 
 #[derive(Debug)]
 pub enum DiscoveryInput {
