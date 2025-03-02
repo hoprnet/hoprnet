@@ -70,7 +70,6 @@ impl FrameBuilder {
         Ok(())
     }
 
-    #[cfg(feature = "frame-inspector")]
     pub fn as_missing(&self) -> BitVec {
         self.segments.iter().map(Option::is_none).collect()
     }

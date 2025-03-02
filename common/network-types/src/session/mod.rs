@@ -32,11 +32,12 @@ pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId}
 
 pub use segmenter::Segmenter;
 
+use crate::session::reassembly::{FrameDashMap, FrameHashMap, FrameMap};
 #[cfg(any(test, feature = "testing"))]
 pub use utils::test as testing;
 
-fn build_reconstructor(
-    reassembler: reassembly::Reassembler,
+fn build_reconstructor<M: FrameMap + Send + 'static>(
+    reassembler: reassembly::Reassembler<M>,
     sequencer: sequencer::Sequencer<Frame>,
 ) -> (
     impl futures::Sink<Segment, Error = errors::SessionError>,
@@ -76,7 +77,7 @@ pub fn frame_reconstructor(
     impl futures::Stream<Item = Result<Frame, errors::SessionError>>,
 ) {
     build_reconstructor(
-        reassembly::Reassembler::new(frame_timeout, capacity),
+        reassembly::Reassembler::<FrameHashMap>::new(frame_timeout, capacity),
         sequencer::Sequencer::new(sequencer::SequencerConfig {
             timeout: frame_timeout,
             capacity,
@@ -85,7 +86,6 @@ pub fn frame_reconstructor(
     )
 }
 
-#[cfg(feature = "frame-inspector")]
 pub fn frame_reconstructor_with_inspector(
     frame_timeout: std::time::Duration,
     capacity: usize,
@@ -94,11 +94,11 @@ pub fn frame_reconstructor_with_inspector(
     impl futures::Stream<Item = Result<Frame, errors::SessionError>>,
     reassembly::FrameInspector,
 ) {
-    let reassembler = reassembly::Reassembler::new(frame_timeout, capacity);
+    let reassembler = reassembly::Reassembler::<FrameDashMap>::new(frame_timeout, capacity);
     let inspector = reassembler.inspect();
 
     let (sink, stream) = build_reconstructor(
-        reassembly::Reassembler::new(frame_timeout, capacity),
+        reassembler,
         sequencer::Sequencer::new(sequencer::SequencerConfig {
             timeout: frame_timeout,
             capacity,

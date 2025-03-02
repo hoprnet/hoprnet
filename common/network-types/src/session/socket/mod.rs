@@ -13,7 +13,6 @@ use tracing::Instrument;
 use crate::prelude::errors::SessionError;
 use crate::prelude::frame_reconstructor_with_inspector;
 use crate::prelude::protocol::{SessionCodec, SessionMessage};
-use crate::session::reassembly::FrameInspector;
 use crate::session::segmenter::Segmenter;
 use crate::session::socket::state::SocketComponents;
 
@@ -183,7 +182,8 @@ mod tests {
 
     #[async_std::test]
     async fn stateless_socket_bidirectional_should_work() -> anyhow::Result<()> {
-        let mut alice_socket = SessionSocket::<MTU, _>::new(DuplexIO(alice_reader, bob_writer), Stateless::new("alice"));
+        let mut alice_socket =
+            SessionSocket::<MTU, _>::new(DuplexIO(alice_reader, bob_writer), Stateless::new("alice"));
         let mut bob_socket = SessionSocket::<MTU, _>::new(DuplexIO(bob_reader, alice_writer), Stateless::new("bob"));
 
         Ok(())

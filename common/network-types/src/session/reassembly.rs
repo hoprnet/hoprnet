@@ -7,25 +7,41 @@ use crate::prelude::errors::SessionError;
 use crate::prelude::{Frame, FrameId, Segment};
 use crate::session::frames::FrameBuilder;
 
-#[cfg(feature = "frame-inspector")]
 #[derive(Clone, Debug)]
-pub struct FrameInspector(std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>>);
+pub struct FrameInspector(FrameDashMap);
 
-#[cfg(feature = "frame-inspector")]
 impl FrameInspector {
     pub fn missing_segments(&self, frame_id: &FrameId) -> Option<bitvec::prelude::BitVec> {
-        self.0.get(frame_id).map(|f| f.as_missing())
+        self.0 .0.get(frame_id).map(|f| f.as_missing())
     }
 }
 
-pub(crate) enum FrameMapEntry<O,V> {
+pub(crate) trait FrameMapOccupiedEntry {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder;
+
+    fn frame_id(&self) -> &FrameId;
+
+    fn finalize(self) -> FrameBuilder;
+}
+
+pub(crate) trait FrameMapVacantEntry {
+    fn insert_builder(self, value: FrameBuilder);
+}
+
+pub(crate) enum FrameMapEntry<O: FrameMapOccupiedEntry, V: FrameMapVacantEntry> {
     Occupied(O),
     Vacant(V),
 }
 
 pub(crate) trait FrameMap {
-    type ExistingEntry<'a> where Self: 'a;
-    type VacantEntry<'a> where Self: 'a;
+    type ExistingEntry<'a>: FrameMapOccupiedEntry
+    where
+        Self: 'a;
+    type VacantEntry<'a>: FrameMapVacantEntry
+    where
+        Self: 'a;
+
+    fn with_capacity(capacity: usize) -> Self;
 
     fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>>;
 
@@ -34,16 +50,41 @@ pub(crate) trait FrameMap {
     fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool);
 }
 
+impl<'a> FrameMapOccupiedEntry for dashmap::OccupiedEntry<'a, FrameId, FrameBuilder> {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder {
+        self.get_mut()
+    }
+
+    fn frame_id(&self) -> &FrameId {
+        self.key()
+    }
+
+    fn finalize(self) -> FrameBuilder {
+        self.remove()
+    }
+}
+
+impl<'a> FrameMapVacantEntry for dashmap::VacantEntry<'a, FrameId, FrameBuilder> {
+    fn insert_builder(self, value: FrameBuilder) {
+        self.insert(value);
+    }
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct FrameDashMap(std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>>);
 
 impl FrameMap for FrameDashMap {
     type ExistingEntry<'a> = dashmap::OccupiedEntry<'a, FrameId, FrameBuilder>;
     type VacantEntry<'a> = dashmap::VacantEntry<'a, FrameId, FrameBuilder>;
 
+    fn with_capacity(capacity: usize) -> Self {
+        Self(std::sync::Arc::new(dashmap::DashMap::with_capacity(capacity)))
+    }
+
     fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>> {
         match self.0.entry(frame_id) {
             dashmap::Entry::Occupied(e) => FrameMapEntry::Occupied(e),
-            dashmap::Entry::Vacant(v) => FrameMapEntry::Vacant(v)
+            dashmap::Entry::Vacant(v) => FrameMapEntry::Vacant(v),
         }
     }
 
@@ -56,12 +97,35 @@ impl FrameMap for FrameDashMap {
     }
 }
 
+impl<'a> FrameMapOccupiedEntry for std::collections::hash_map::OccupiedEntry<'a, FrameId, FrameBuilder> {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder {
+        self.get_mut()
+    }
+
+    fn frame_id(&self) -> &FrameId {
+        self.key()
+    }
+
+    fn finalize(self) -> FrameBuilder {
+        self.remove()
+    }
+}
+
+impl<'a> FrameMapVacantEntry for std::collections::hash_map::VacantEntry<'a, FrameId, FrameBuilder> {
+    fn insert_builder(self, value: FrameBuilder) {
+        self.insert(value);
+    }
+}
+
 pub(crate) struct FrameHashMap(std::collections::HashMap<FrameId, FrameBuilder>);
 
 impl FrameMap for FrameHashMap {
     type ExistingEntry<'a> = std::collections::hash_map::OccupiedEntry<'a, FrameId, FrameBuilder>;
     type VacantEntry<'a> = std::collections::hash_map::VacantEntry<'a, FrameId, FrameBuilder>;
 
+    fn with_capacity(capacity: usize) -> Self {
+        Self(std::collections::HashMap::with_capacity(capacity))
+    }
 
     fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>> {
         match self.0.entry(frame_id) {
@@ -82,11 +146,8 @@ impl FrameMap for FrameHashMap {
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
-pub struct Reassembler {
-    #[cfg(feature = "frame-inspector")]
-    incomplete_frames: std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>>,
-    #[cfg(not(feature = "frame-inspector"))]
-    incomplete_frames: std::collections::HashMap<FrameId, FrameBuilder>,
+pub struct Reassembler<M> {
+    incomplete_frames: M,
     complete_frames: VecDeque<Result<Frame, SessionError>>,
     tx_waker: Option<Waker>,
     rx_waker: Option<Waker>,
@@ -96,16 +157,13 @@ pub struct Reassembler {
     last_expiration: Instant,
 }
 
-impl Reassembler {
+impl<M: FrameMap> Reassembler<M> {
     /// Indicates how many incomplete frames there could be per one complete/discarded frame.
     const INCOMPLETE_FRAME_RATIO: usize = 2;
 
     pub fn new(max_age: Duration, capacity: usize) -> Self {
         Self {
-            #[cfg(feature = "frame-inspector")]
-            incomplete_frames: dashmap::DashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1).into(),
-            #[cfg(not(feature = "frame-inspector"))]
-            incomplete_frames: std::collections::HashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1),
+            incomplete_frames: M::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1),
             complete_frames: VecDeque::with_capacity(capacity),
             tx_waker: None,
             rx_waker: None,
@@ -114,11 +172,6 @@ impl Reassembler {
             max_age,
             capacity,
         }
-    }
-
-    #[cfg(feature = "frame-inspector")]
-    pub fn inspect(&self) -> FrameInspector {
-        FrameInspector(self.incomplete_frames.clone())
     }
 
     fn expire_frames(&mut self) -> usize {
@@ -146,7 +199,13 @@ impl Reassembler {
     }
 }
 
-impl futures::Sink<Segment> for Reassembler {
+impl Reassembler<FrameDashMap> {
+    pub fn inspect(&self) -> FrameInspector {
+        FrameInspector(self.incomplete_frames.clone())
+    }
+}
+
+impl<M: FrameMap> futures::Sink<Segment> for Reassembler<M> {
     type Error = SessionError;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -188,31 +247,25 @@ impl futures::Sink<Segment> for Reassembler {
             return Err(SessionError::ReassemblerClosed);
         }
 
-        #[cfg(feature = "frame-inspector")]
-        use dashmap::mapref::entry::Entry;
-
-        #[cfg(not(feature = "frame-inspector"))]
-        use std::collections::hash_map::Entry;
-
         let maybe_frame = match self.incomplete_frames.entry(item.frame_id) {
-            Entry::Occupied(mut e) => {
-                let builder = e.get_mut();
+            FrameMapEntry::Occupied(mut e) => {
+                let builder = e.get_builder_mut();
                 match builder.add_segment(item) {
                     Ok(_) => {
                         if builder.is_complete() {
-                            tracing::trace!(frame_id = e.key(), "Reassembler::start_send frame is complete");
-                            Some(e.remove().try_into())
+                            tracing::trace!(frame_id = e.frame_id(), "Reassembler::start_send frame is complete");
+                            Some(e.finalize().try_into())
                         } else {
                             None
                         }
                     }
                     Err(error) => {
-                        tracing::error!(frame_id = e.key(), %error, "encountered invalid segment");
+                        tracing::error!(frame_id = e.frame_id(), %error, "encountered invalid segment");
                         None
                     }
                 }
             }
-            Entry::Vacant(e) => {
+            FrameMapEntry::Vacant(e) => {
                 let builder = FrameBuilder::from(item);
                 if builder.is_complete() {
                     tracing::trace!(
@@ -221,7 +274,7 @@ impl futures::Sink<Segment> for Reassembler {
                     );
                     Some(builder.try_into())
                 } else {
-                    e.insert(builder);
+                    e.insert_builder(builder);
                     None
                 }
             }
@@ -269,7 +322,7 @@ impl futures::Sink<Segment> for Reassembler {
     }
 }
 
-impl futures::Stream for Reassembler {
+impl<M: FrameMap> futures::Stream for Reassembler<M> {
     type Item = Result<Frame, SessionError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
