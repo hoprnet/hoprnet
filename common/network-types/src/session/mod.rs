@@ -29,10 +29,9 @@ pub mod state;
 mod utils;
 
 pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId};
-
+use frames::{FrameDashMap, FrameHashMap, FrameMap};
 pub use segmenter::Segmenter;
 
-use crate::session::reassembly::{FrameDashMap, FrameHashMap, FrameMap};
 #[cfg(any(test, feature = "testing"))]
 pub use utils::test as testing;
 
@@ -92,7 +91,7 @@ pub fn frame_reconstructor_with_inspector(
 ) -> (
     impl futures::Sink<Segment, Error = errors::SessionError>,
     impl futures::Stream<Item = Result<Frame, errors::SessionError>>,
-    reassembly::FrameInspector,
+    frames::FrameInspector,
 ) {
     let reassembler = reassembly::Reassembler::<FrameDashMap>::new(frame_timeout, capacity);
     let inspector = reassembler.inspect();

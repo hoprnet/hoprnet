@@ -85,6 +85,142 @@ impl FrameBuilder {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct FrameInspector(pub(crate) FrameDashMap);
+
+impl FrameInspector {
+    pub fn missing_segments(&self, frame_id: &FrameId) -> Option<bitvec::prelude::BitVec> {
+        self.0 .0.get(frame_id).map(|f| f.as_missing())
+    }
+}
+
+pub(crate) trait FrameMapOccupiedEntry {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder;
+
+    fn frame_id(&self) -> &FrameId;
+
+    fn finalize(self) -> FrameBuilder;
+}
+
+pub(crate) trait FrameMapVacantEntry {
+    fn insert_builder(self, value: FrameBuilder);
+}
+
+pub(crate) enum FrameMapEntry<O: FrameMapOccupiedEntry, V: FrameMapVacantEntry> {
+    Occupied(O),
+    Vacant(V),
+}
+
+pub(crate) trait FrameMap {
+    type ExistingEntry<'a>: FrameMapOccupiedEntry
+    where
+        Self: 'a;
+    type VacantEntry<'a>: FrameMapVacantEntry
+    where
+        Self: 'a;
+
+    fn with_capacity(capacity: usize) -> Self;
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>>;
+
+    fn len(&self) -> usize;
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool);
+}
+
+impl<'a> FrameMapOccupiedEntry for dashmap::OccupiedEntry<'a, FrameId, FrameBuilder> {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder {
+        self.get_mut()
+    }
+
+    fn frame_id(&self) -> &FrameId {
+        self.key()
+    }
+
+    fn finalize(self) -> FrameBuilder {
+        self.remove()
+    }
+}
+
+impl<'a> FrameMapVacantEntry for dashmap::VacantEntry<'a, FrameId, FrameBuilder> {
+    fn insert_builder(self, value: FrameBuilder) {
+        self.insert(value);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct FrameDashMap(std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>>);
+
+impl FrameMap for FrameDashMap {
+    type ExistingEntry<'a> = dashmap::OccupiedEntry<'a, FrameId, FrameBuilder>;
+    type VacantEntry<'a> = dashmap::VacantEntry<'a, FrameId, FrameBuilder>;
+
+    fn with_capacity(capacity: usize) -> Self {
+        Self(std::sync::Arc::new(dashmap::DashMap::with_capacity(capacity)))
+    }
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>> {
+        match self.0.entry(frame_id) {
+            dashmap::Entry::Occupied(e) => FrameMapEntry::Occupied(e),
+            dashmap::Entry::Vacant(v) => FrameMapEntry::Vacant(v),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {
+        self.0.retain(f)
+    }
+}
+
+impl<'a> FrameMapOccupiedEntry for std::collections::hash_map::OccupiedEntry<'a, FrameId, FrameBuilder> {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder {
+        self.get_mut()
+    }
+
+    fn frame_id(&self) -> &FrameId {
+        self.key()
+    }
+
+    fn finalize(self) -> FrameBuilder {
+        self.remove()
+    }
+}
+
+impl<'a> FrameMapVacantEntry for std::collections::hash_map::VacantEntry<'a, FrameId, FrameBuilder> {
+    fn insert_builder(self, value: FrameBuilder) {
+        self.insert(value);
+    }
+}
+
+pub(crate) struct FrameHashMap(std::collections::HashMap<FrameId, FrameBuilder>);
+
+impl FrameMap for FrameHashMap {
+    type ExistingEntry<'a> = std::collections::hash_map::OccupiedEntry<'a, FrameId, FrameBuilder>;
+    type VacantEntry<'a> = std::collections::hash_map::VacantEntry<'a, FrameId, FrameBuilder>;
+
+    fn with_capacity(capacity: usize) -> Self {
+        Self(std::collections::HashMap::with_capacity(capacity))
+    }
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>> {
+        match self.0.entry(frame_id) {
+            std::collections::hash_map::Entry::Occupied(e) => FrameMapEntry::Occupied(e),
+            std::collections::hash_map::Entry::Vacant(v) => FrameMapEntry::Vacant(v),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {
+        self.0.retain(f)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

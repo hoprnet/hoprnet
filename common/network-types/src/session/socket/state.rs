@@ -2,7 +2,7 @@ use crate::prelude::errors::SessionError;
 use crate::prelude::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
 use crate::prelude::{FrameId, Segment, SegmentId};
 use crate::session::frame::SeqNum;
-use crate::session::reassembly::FrameInspector;
+use crate::session::frames::FrameInspector;
 use crate::session::utils::skip_queue::{skip_delay_channel, Skip, SkipDelaySender};
 use crate::session::utils::{
     next_deadline_with_backoff, searchable_ringbuffer, RetriedFrameId, RingBufferProducer, RingBufferView,
