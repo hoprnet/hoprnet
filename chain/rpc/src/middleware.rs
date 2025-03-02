@@ -35,14 +35,11 @@ pub struct Response {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "PascalCase")]
 pub struct ResponseResult {
-    #[serde(rename = "LastBlock")]
     pub last_block: String,
-    #[serde(rename = "SafeGasPrice")]
     pub safe_gas_price: String,
-    #[serde(rename = "ProposeGasPrice")]
     pub propose_gas_price: String,
-    #[serde(rename = "FastGasPrice")]
     pub fast_gas_price: String,
 }
 
