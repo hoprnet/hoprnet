@@ -18,6 +18,67 @@ impl FrameInspector {
     }
 }
 
+pub(crate) enum FrameMapEntry<O,V> {
+    Occupied(O),
+    Vacant(V),
+}
+
+pub(crate) trait FrameMap {
+    type ExistingEntry<'a> where Self: 'a;
+    type VacantEntry<'a> where Self: 'a;
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>>;
+
+    fn len(&self) -> usize;
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool);
+}
+
+pub(crate) struct FrameDashMap(std::sync::Arc<dashmap::DashMap<FrameId, FrameBuilder>>);
+
+impl FrameMap for FrameDashMap {
+    type ExistingEntry<'a> = dashmap::OccupiedEntry<'a, FrameId, FrameBuilder>;
+    type VacantEntry<'a> = dashmap::VacantEntry<'a, FrameId, FrameBuilder>;
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>> {
+        match self.0.entry(frame_id) {
+            dashmap::Entry::Occupied(e) => FrameMapEntry::Occupied(e),
+            dashmap::Entry::Vacant(v) => FrameMapEntry::Vacant(v)
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {
+        self.0.retain(f)
+    }
+}
+
+pub(crate) struct FrameHashMap(std::collections::HashMap<FrameId, FrameBuilder>);
+
+impl FrameMap for FrameHashMap {
+    type ExistingEntry<'a> = std::collections::hash_map::OccupiedEntry<'a, FrameId, FrameBuilder>;
+    type VacantEntry<'a> = std::collections::hash_map::VacantEntry<'a, FrameId, FrameBuilder>;
+
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>> {
+        match self.0.entry(frame_id) {
+            std::collections::hash_map::Entry::Occupied(e) => FrameMapEntry::Occupied(e),
+            std::collections::hash_map::Entry::Vacant(v) => FrameMapEntry::Vacant(v),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {
+        self.0.retain(f)
+    }
+}
+
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
