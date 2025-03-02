@@ -1,0 +1,267 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `chain/types/src/lib.rs`."><title>lib.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-916cea96.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hopr_chain_types" data-themes="" data-resource-suffix="" data-rustdoc-version="1.87.0-nightly (287487624 2025-02-28)" data-channel="nightly" data-search-js="search-f7327375.js" data-settings-js="settings-d72f25bb.js" ><script src="../../static.files/storage-d8ac8691.js"></script><script defer src="../../static.files/src-script-b8d3f215.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-a7bf3405.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">hopr_chain_types/</div>lib.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! This crate contains various on-chain related modules and types.
+<a href=#2 id=2 data-nosnippet>2</a>
+<a href=#3 id=3 data-nosnippet>3</a></span><span class="kw">use </span>ethers::prelude::<span class="kw-2">*</span>;
+<a href=#4 id=4 data-nosnippet>4</a><span class="kw">use </span>hex_literal::hex;
+<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span>serde::{Deserialize, Serialize};
+<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span>std::sync::Arc;
+<a href=#7 id=7 data-nosnippet>7</a>
+<a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span>hopr_bindings::hopr_announcements::HoprAnnouncements;
+<a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span>hopr_bindings::hopr_channels::HoprChannels;
+<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span>hopr_bindings::hopr_dummy_proxy_for_network_registry::HoprDummyProxyForNetworkRegistry;
+<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span>hopr_bindings::hopr_network_registry::HoprNetworkRegistry;
+<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span>hopr_bindings::hopr_node_management_module::HoprNodeManagementModule;
+<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span>hopr_bindings::hopr_node_safe_registry::HoprNodeSafeRegistry;
+<a href=#14 id=14 data-nosnippet>14</a><span class="kw">use </span>hopr_bindings::hopr_node_stake_factory::HoprNodeStakeFactory;
+<a href=#15 id=15 data-nosnippet>15</a><span class="kw">use </span>hopr_bindings::hopr_safe_proxy_for_network_registry::HoprSafeProxyForNetworkRegistry;
+<a href=#16 id=16 data-nosnippet>16</a><span class="kw">use </span>hopr_bindings::hopr_ticket_price_oracle::HoprTicketPriceOracle;
+<a href=#17 id=17 data-nosnippet>17</a><span class="kw">use </span>hopr_bindings::hopr_token::HoprToken;
+<a href=#18 id=18 data-nosnippet>18</a><span class="kw">use </span>hopr_bindings::hopr_winning_probability_oracle::HoprWinningProbabilityOracle;
+<a href=#19 id=19 data-nosnippet>19</a>
+<a href=#20 id=20 data-nosnippet>20</a><span class="kw">use </span>ethers::abi::Token;
+<a href=#21 id=21 data-nosnippet>21</a><span class="kw">use </span>hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+<a href=#22 id=22 data-nosnippet>22</a><span class="kw">use </span>hopr_primitive_types::primitives::Address;
+<a href=#23 id=23 data-nosnippet>23</a><span class="kw">use </span>std::str::FromStr;
+<a href=#24 id=24 data-nosnippet>24</a>
+<a href=#25 id=25 data-nosnippet>25</a><span class="kw">pub mod </span>actions;
+<a href=#26 id=26 data-nosnippet>26</a><span class="kw">pub mod </span>chain_events;
+<a href=#27 id=27 data-nosnippet>27</a>
+<a href=#28 id=28 data-nosnippet>28</a><span class="comment">// Various (mostly testing related) utility functions
+<a href=#29 id=29 data-nosnippet>29</a></span><span class="kw">pub mod </span>utils;
+<a href=#30 id=30 data-nosnippet>30</a>
+<a href=#31 id=31 data-nosnippet>31</a><span class="kw">pub use </span>ethers::core::types::transaction::eip2718::TypedTransaction;
+<a href=#32 id=32 data-nosnippet>32</a>
+<a href=#33 id=33 data-nosnippet>33</a><span class="macro">lazy_static::lazy_static!</span> {
+<a href=#34 id=34 data-nosnippet>34</a>    <span class="kw">pub static </span><span class="kw-2">ref </span>ERC_1820_REGISTRY_DEPLOY_CODE: [u8; <span class="number">2619</span>] = <span class="macro">hex!</span>(<span class="string">"f90a388085174876e800830c35008080b909e5608060405234801561001057600080fd5b506109c5806100206000396000f3fe608060405234801561001057600080fd5b50600436106100a5576000357c010000000000000000000000000000000000000000000000000000000090048063a41e7d5111610078578063a41e7d51146101d4578063aabbb8ca1461020a578063b705676514610236578063f712f3e814610280576100a5565b806329965a1d146100aa5780633d584063146100e25780635df8122f1461012457806365ba36c114610152575b600080fd5b6100e0600480360360608110156100c057600080fd5b50600160a060020a038135811691602081013591604090910135166102b6565b005b610108600480360360208110156100f857600080fd5b5035600160a060020a0316610570565b60408051600160a060020a039092168252519081900360200190f35b6100e06004803603604081101561013a57600080fd5b50600160a060020a03813581169160200135166105bc565b6101c26004803603602081101561016857600080fd5b81019060208101813564010000000081111561018357600080fd5b82018360208201111561019557600080fd5b803590602001918460018302840111640100000000831117156101b757600080fd5b5090925090506106b3565b60408051918252519081900360200190f35b6100e0600480360360408110156101ea57600080fd5b508035600160a060020a03169060200135600160e060020a0319166106ee565b6101086004803603604081101561022057600080fd5b50600160a060020a038135169060200135610778565b61026c6004803603604081101561024c57600080fd5b508035600160a060020a03169060200135600160e060020a0319166107ef565b604080519115158252519081900360200190f35b61026c6004803603604081101561029657600080fd5b508035600160a060020a03169060200135600160e060020a0319166108aa565b6000600160a060020a038416156102cd57836102cf565b335b9050336102db82610570565b600160a060020a031614610339576040805160e560020a62461bcd02815260206004820152600f60248201527f4e6f7420746865206d616e616765720000000000000000000000000000000000604482015290519081900360640190fd5b6103428361092a565b15610397576040805160e560020a62461bcd02815260206004820152601a60248201527f4d757374206e6f7420626520616e204552433136352068617368000000000000604482015290519081900360640190fd5b600160a060020a038216158015906103b85750600160a060020a0382163314155b156104ff5760405160200180807f455243313832305f4143434550545f4d4147494300000000000000000000000081525060140190506040516020818303038152906040528051906020012082600160a060020a031663249cb3fa85846040518363ffffffff167c01000000000000000000000000000000000000000000000000000000000281526004018083815260200182600160a060020a0316600160a060020a031681526020019250505060206040518083038186803b15801561047e57600080fd5b505afa158015610492573d6000803e3d6000fd5b505050506040513d60208110156104a857600080fd5b5051146104ff576040805160e560020a62461bcd02815260206004820181905260248201527f446f6573206e6f7420696d706c656d656e742074686520696e74657266616365604482015290519081900360640190fd5b600160a060020a03818116600081815260208181526040808320888452909152808220805473ffffffffffffffffffffffffffffffffffffffff19169487169485179055518692917f93baa6efbd2244243bfee6ce4cfdd1d04fc4c0e9a786abd3a41313bd352db15391a450505050565b600160a060020a03818116600090815260016020526040812054909116151561059a5750806105b7565b50600160a060020a03808216600090815260016020526040902054165b919050565b336105c683610570565b600160a060020a031614610624576040805160e560020a62461bcd02815260206004820152600f60248201527f4e6f7420746865206d616e616765720000000000000000000000000000000000604482015290519081900360640190fd5b81600160a060020a031681600160a060020a0316146106435780610646565b60005b600160a060020a03838116600081815260016020526040808220805473ffffffffffffffffffffffffffffffffffffffff19169585169590951790945592519184169290917f605c2dbf762e5f7d60a546d42e7205dcb1b011ebc62a61736a57c9089d3a43509190a35050565b600082826040516020018083838082843780830192505050925050506040516020818303038152906040528051906020012090505b92915050565b6106f882826107ef565b610703576000610705565b815b600160a060020a03928316600081815260208181526040808320600160e060020a031996909616808452958252808320805473ffffffffffffffffffffffffffffffffffffffff19169590971694909417909555908152600284528181209281529190925220805460ff19166001179055565b600080600160a060020a038416156107905783610792565b335b905061079d8361092a565b156107c357826107ad82826108aa565b6107b85760006107ba565b815b925050506106e8565b600160a060020a0390811660009081526020818152604080832086845290915290205416905092915050565b6000808061081d857f01ffc9a70000000000000000000000000000000000000000000000000000000061094c565b909250905081158061082d575080155b1561083d576000925050506106e8565b61084f85600160e060020a031961094c565b909250905081158061086057508015155b15610870576000925050506106e8565b61087a858561094c565b909250905060018214801561088f5750806001145b1561089f576001925050506106e8565b506000949350505050565b600160a060020a0382166000908152600260209081526040808320600160e060020a03198516845290915281205460ff1615156108f2576108eb83836107ef565b90506106e8565b50600160a060020a03808316600081815260208181526040808320600160e060020a0319871684529091529020549091161492915050565b7bffffffffffffffffffffffffffffffffffffffffffffffffffffffff161590565b6040517f01ffc9a7000000000000000000000000000000000000000000000000000000008082526004820183905260009182919060208160248189617530fa90519096909550935050505056fea165627a7a72305820377f4a2d4301ede9949f163f319021a6e9c687c292a5e2b2c4734c126b524e6c00291ba01820182018201820182018201820182018201820182018201820182018201820a01820182018201820182018201820182018201820182018201820182018201820"</span>);
+<a href=#35 id=35 data-nosnippet>35</a>}
+<a href=#36 id=36 data-nosnippet>36</a>
+<a href=#37 id=37 data-nosnippet>37</a><span class="doccomment">/// Short-hand for creating new EIP1559 transaction object.
+<a href=#38 id=38 data-nosnippet>38</a></span><span class="kw">pub fn </span>create_eip1559_transaction() -&gt; TypedTransaction {
+<a href=#39 id=39 data-nosnippet>39</a>    TypedTransaction::Eip1559(Eip1559TransactionRequest::new())
+<a href=#40 id=40 data-nosnippet>40</a>}
+<a href=#41 id=41 data-nosnippet>41</a>
+<a href=#42 id=42 data-nosnippet>42</a><span class="doccomment">/// Holds addresses of all smart contracts.
+<a href=#43 id=43 data-nosnippet>43</a></span><span class="attr">#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+<a href=#44 id=44 data-nosnippet>44</a></span><span class="kw">pub struct </span>ContractAddresses {
+<a href=#45 id=45 data-nosnippet>45</a>    <span class="doccomment">/// Token contract
+<a href=#46 id=46 data-nosnippet>46</a>    </span><span class="kw">pub </span>token: Address,
+<a href=#47 id=47 data-nosnippet>47</a>    <span class="doccomment">/// Channels contract
+<a href=#48 id=48 data-nosnippet>48</a>    </span><span class="kw">pub </span>channels: Address,
+<a href=#49 id=49 data-nosnippet>49</a>    <span class="doccomment">/// Announcements contract
+<a href=#50 id=50 data-nosnippet>50</a>    </span><span class="kw">pub </span>announcements: Address,
+<a href=#51 id=51 data-nosnippet>51</a>    <span class="doccomment">/// Network registry contract
+<a href=#52 id=52 data-nosnippet>52</a>    </span><span class="kw">pub </span>network_registry: Address,
+<a href=#53 id=53 data-nosnippet>53</a>    <span class="doccomment">/// Network registry proxy contract
+<a href=#54 id=54 data-nosnippet>54</a>    </span><span class="kw">pub </span>network_registry_proxy: Address,
+<a href=#55 id=55 data-nosnippet>55</a>    <span class="doccomment">/// Safe registry contract
+<a href=#56 id=56 data-nosnippet>56</a>    </span><span class="kw">pub </span>safe_registry: Address,
+<a href=#57 id=57 data-nosnippet>57</a>    <span class="doccomment">/// Price oracle contract
+<a href=#58 id=58 data-nosnippet>58</a>    </span><span class="kw">pub </span>price_oracle: Address,
+<a href=#59 id=59 data-nosnippet>59</a>    <span class="doccomment">/// Minimum ticket winning probability contract
+<a href=#60 id=60 data-nosnippet>60</a>    </span><span class="kw">pub </span>win_prob_oracle: Address,
+<a href=#61 id=61 data-nosnippet>61</a>    <span class="doccomment">/// Stake factory contract
+<a href=#62 id=62 data-nosnippet>62</a>    </span><span class="kw">pub </span>stake_factory: Address,
+<a href=#63 id=63 data-nosnippet>63</a>    <span class="doccomment">/// Node management module contract (can be zero if safe is not used)
+<a href=#64 id=64 data-nosnippet>64</a>    </span><span class="kw">pub </span>module_implementation: Address,
+<a href=#65 id=65 data-nosnippet>65</a>}
+<a href=#66 id=66 data-nosnippet>66</a>
+<a href=#67 id=67 data-nosnippet>67</a><span class="attr">#[derive(Debug, Clone)]
+<a href=#68 id=68 data-nosnippet>68</a></span><span class="kw">pub enum </span>NetworkRegistryProxy&lt;M: Middleware&gt; {
+<a href=#69 id=69 data-nosnippet>69</a>    Dummy(HoprDummyProxyForNetworkRegistry&lt;M&gt;),
+<a href=#70 id=70 data-nosnippet>70</a>    Safe(HoprSafeProxyForNetworkRegistry&lt;M&gt;),
+<a href=#71 id=71 data-nosnippet>71</a>}
+<a href=#72 id=72 data-nosnippet>72</a>
+<a href=#73 id=73 data-nosnippet>73</a><span class="kw">impl</span>&lt;M: Middleware&gt; NetworkRegistryProxy&lt;M&gt; {
+<a href=#74 id=74 data-nosnippet>74</a>    <span class="kw">pub fn </span>address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Address {
+<a href=#75 id=75 data-nosnippet>75</a>        <span class="kw">match </span><span class="self">self </span>{
+<a href=#76 id=76 data-nosnippet>76</a>            NetworkRegistryProxy::Dummy(c) =&gt; c.address().into(),
+<a href=#77 id=77 data-nosnippet>77</a>            NetworkRegistryProxy::Safe(c) =&gt; c.address().into(),
+<a href=#78 id=78 data-nosnippet>78</a>        }
+<a href=#79 id=79 data-nosnippet>79</a>    }
+<a href=#80 id=80 data-nosnippet>80</a>}
+<a href=#81 id=81 data-nosnippet>81</a>
+<a href=#82 id=82 data-nosnippet>82</a><span class="doccomment">/// Holds instances to contracts.
+<a href=#83 id=83 data-nosnippet>83</a></span><span class="attr">#[derive(Debug)]
+<a href=#84 id=84 data-nosnippet>84</a></span><span class="kw">pub struct </span>ContractInstances&lt;M: Middleware&gt; {
+<a href=#85 id=85 data-nosnippet>85</a>    <span class="kw">pub </span>token: HoprToken&lt;M&gt;,
+<a href=#86 id=86 data-nosnippet>86</a>    <span class="kw">pub </span>channels: HoprChannels&lt;M&gt;,
+<a href=#87 id=87 data-nosnippet>87</a>    <span class="kw">pub </span>announcements: HoprAnnouncements&lt;M&gt;,
+<a href=#88 id=88 data-nosnippet>88</a>    <span class="kw">pub </span>network_registry: HoprNetworkRegistry&lt;M&gt;,
+<a href=#89 id=89 data-nosnippet>89</a>    <span class="kw">pub </span>network_registry_proxy: NetworkRegistryProxy&lt;M&gt;,
+<a href=#90 id=90 data-nosnippet>90</a>    <span class="kw">pub </span>safe_registry: HoprNodeSafeRegistry&lt;M&gt;,
+<a href=#91 id=91 data-nosnippet>91</a>    <span class="kw">pub </span>price_oracle: HoprTicketPriceOracle&lt;M&gt;,
+<a href=#92 id=92 data-nosnippet>92</a>    <span class="kw">pub </span>win_prob_oracle: HoprWinningProbabilityOracle&lt;M&gt;,
+<a href=#93 id=93 data-nosnippet>93</a>    <span class="kw">pub </span>stake_factory: HoprNodeStakeFactory&lt;M&gt;,
+<a href=#94 id=94 data-nosnippet>94</a>    <span class="kw">pub </span>module_implementation: HoprNodeManagementModule&lt;M&gt;,
+<a href=#95 id=95 data-nosnippet>95</a>}
+<a href=#96 id=96 data-nosnippet>96</a>
+<a href=#97 id=97 data-nosnippet>97</a><span class="kw">impl</span>&lt;M: Middleware&gt; Clone <span class="kw">for </span>ContractInstances&lt;M&gt; {
+<a href=#98 id=98 data-nosnippet>98</a>    <span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
+<a href=#99 id=99 data-nosnippet>99</a>        <span class="comment">// Requires manual clone implementation, because `M` is usually never `Clone`
+<a href=#100 id=100 data-nosnippet>100</a>        </span><span class="kw">let </span>client = <span class="self">self</span>.token.client();
+<a href=#101 id=101 data-nosnippet>101</a>        <span class="self">Self </span>{
+<a href=#102 id=102 data-nosnippet>102</a>            token: HoprToken::new(<span class="self">self</span>.token.address(), client.clone()),
+<a href=#103 id=103 data-nosnippet>103</a>            channels: HoprChannels::new(<span class="self">self</span>.channels.address(), client.clone()),
+<a href=#104 id=104 data-nosnippet>104</a>            announcements: HoprAnnouncements::new(<span class="self">self</span>.announcements.address(), client.clone()),
+<a href=#105 id=105 data-nosnippet>105</a>            network_registry: HoprNetworkRegistry::new(<span class="self">self</span>.network_registry.address(), client.clone()),
+<a href=#106 id=106 data-nosnippet>106</a>            network_registry_proxy: <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.network_registry_proxy {
+<a href=#107 id=107 data-nosnippet>107</a>                NetworkRegistryProxy::Dummy(nr) =&gt; {
+<a href=#108 id=108 data-nosnippet>108</a>                    NetworkRegistryProxy::Dummy(HoprDummyProxyForNetworkRegistry::new(nr.address(), client.clone()))
+<a href=#109 id=109 data-nosnippet>109</a>                }
+<a href=#110 id=110 data-nosnippet>110</a>                NetworkRegistryProxy::Safe(nr) =&gt; {
+<a href=#111 id=111 data-nosnippet>111</a>                    NetworkRegistryProxy::Safe(HoprSafeProxyForNetworkRegistry::new(nr.address(), client.clone()))
+<a href=#112 id=112 data-nosnippet>112</a>                }
+<a href=#113 id=113 data-nosnippet>113</a>            },
+<a href=#114 id=114 data-nosnippet>114</a>            safe_registry: HoprNodeSafeRegistry::new(<span class="self">self</span>.safe_registry.address(), client.clone()),
+<a href=#115 id=115 data-nosnippet>115</a>            price_oracle: HoprTicketPriceOracle::new(<span class="self">self</span>.price_oracle.address(), client.clone()),
+<a href=#116 id=116 data-nosnippet>116</a>            win_prob_oracle: HoprWinningProbabilityOracle::new(<span class="self">self</span>.win_prob_oracle.address(), client.clone()),
+<a href=#117 id=117 data-nosnippet>117</a>            stake_factory: HoprNodeStakeFactory::new(<span class="self">self</span>.stake_factory.address(), client.clone()),
+<a href=#118 id=118 data-nosnippet>118</a>            module_implementation: HoprNodeManagementModule::new(<span class="self">self</span>.module_implementation.address(), client.clone()),
+<a href=#119 id=119 data-nosnippet>119</a>        }
+<a href=#120 id=120 data-nosnippet>120</a>    }
+<a href=#121 id=121 data-nosnippet>121</a>}
+<a href=#122 id=122 data-nosnippet>122</a>
+<a href=#123 id=123 data-nosnippet>123</a><span class="kw">impl</span>&lt;M: Middleware&gt; ContractInstances&lt;M&gt; {
+<a href=#124 id=124 data-nosnippet>124</a>    <span class="kw">pub fn </span>new(contract_addresses: <span class="kw-2">&amp;</span>ContractAddresses, provider: Arc&lt;M&gt;, use_dummy_nr: bool) -&gt; <span class="self">Self </span>{
+<a href=#125 id=125 data-nosnippet>125</a>        <span class="self">Self </span>{
+<a href=#126 id=126 data-nosnippet>126</a>            token: HoprToken::new(contract_addresses.token, provider.clone()),
+<a href=#127 id=127 data-nosnippet>127</a>            channels: HoprChannels::new(contract_addresses.channels, provider.clone()),
+<a href=#128 id=128 data-nosnippet>128</a>            announcements: HoprAnnouncements::new(contract_addresses.announcements, provider.clone()),
+<a href=#129 id=129 data-nosnippet>129</a>            network_registry: HoprNetworkRegistry::new(contract_addresses.network_registry, provider.clone()),
+<a href=#130 id=130 data-nosnippet>130</a>            network_registry_proxy: <span class="kw">if </span>use_dummy_nr {
+<a href=#131 id=131 data-nosnippet>131</a>                NetworkRegistryProxy::Dummy(HoprDummyProxyForNetworkRegistry::new(
+<a href=#132 id=132 data-nosnippet>132</a>                    contract_addresses.network_registry_proxy,
+<a href=#133 id=133 data-nosnippet>133</a>                    provider.clone(),
+<a href=#134 id=134 data-nosnippet>134</a>                ))
+<a href=#135 id=135 data-nosnippet>135</a>            } <span class="kw">else </span>{
+<a href=#136 id=136 data-nosnippet>136</a>                NetworkRegistryProxy::Safe(HoprSafeProxyForNetworkRegistry::new(
+<a href=#137 id=137 data-nosnippet>137</a>                    contract_addresses.network_registry_proxy,
+<a href=#138 id=138 data-nosnippet>138</a>                    provider.clone(),
+<a href=#139 id=139 data-nosnippet>139</a>                ))
+<a href=#140 id=140 data-nosnippet>140</a>            },
+<a href=#141 id=141 data-nosnippet>141</a>            safe_registry: HoprNodeSafeRegistry::new(contract_addresses.safe_registry, provider.clone()),
+<a href=#142 id=142 data-nosnippet>142</a>            price_oracle: HoprTicketPriceOracle::new(contract_addresses.price_oracle, provider.clone()),
+<a href=#143 id=143 data-nosnippet>143</a>            win_prob_oracle: HoprWinningProbabilityOracle::new(contract_addresses.win_prob_oracle, provider.clone()),
+<a href=#144 id=144 data-nosnippet>144</a>            stake_factory: HoprNodeStakeFactory::new(contract_addresses.stake_factory, provider.clone()),
+<a href=#145 id=145 data-nosnippet>145</a>            module_implementation: HoprNodeManagementModule::new(
+<a href=#146 id=146 data-nosnippet>146</a>                contract_addresses.module_implementation,
+<a href=#147 id=147 data-nosnippet>147</a>                provider.clone(),
+<a href=#148 id=148 data-nosnippet>148</a>            ),
+<a href=#149 id=149 data-nosnippet>149</a>        }
+<a href=#150 id=150 data-nosnippet>150</a>    }
+<a href=#151 id=151 data-nosnippet>151</a>
+<a href=#152 id=152 data-nosnippet>152</a>    <span class="doccomment">/// Deploys testing environment (with dummy network registry proxy) via the given provider.
+<a href=#153 id=153 data-nosnippet>153</a>    </span><span class="kw">pub async fn </span>deploy_for_testing(provider: Arc&lt;M&gt;, deployer: <span class="kw-2">&amp;</span>ChainKeypair) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, ContractError&lt;M&gt;&gt; {
+<a href=#154 id=154 data-nosnippet>154</a>        {
+<a href=#155 id=155 data-nosnippet>155</a>            <span class="comment">// Fund 1820 deployer and deploy ERC1820Registry
+<a href=#156 id=156 data-nosnippet>156</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>tx = Eip1559TransactionRequest::new();
+<a href=#157 id=157 data-nosnippet>157</a>            tx = tx.to(H160::from_str(<span class="kw">crate</span>::utils::ERC_1820_DEPLOYER).expect(<span class="string">"deployer address should be valid"</span>));
+<a href=#158 id=158 data-nosnippet>158</a>            tx = tx.value(<span class="kw">crate</span>::utils::ETH_VALUE_FOR_ERC1820_DEPLOYER);
+<a href=#159 id=159 data-nosnippet>159</a>
+<a href=#160 id=160 data-nosnippet>160</a>            provider
+<a href=#161 id=161 data-nosnippet>161</a>                .send_transaction(tx, <span class="prelude-val">None</span>)
+<a href=#162 id=162 data-nosnippet>162</a>                .<span class="kw">await
+<a href=#163 id=163 data-nosnippet>163</a>                </span>.map_err(|e| ContractError::MiddlewareError { e })<span class="question-mark">?
+<a href=#164 id=164 data-nosnippet>164</a>                </span>.<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#165 id=165 data-nosnippet>165</a>
+<a href=#166 id=166 data-nosnippet>166</a>            provider
+<a href=#167 id=167 data-nosnippet>167</a>                .send_raw_transaction(Bytes::from_static(<span class="kw-2">&amp;*</span>ERC_1820_REGISTRY_DEPLOY_CODE))
+<a href=#168 id=168 data-nosnippet>168</a>                .<span class="kw">await
+<a href=#169 id=169 data-nosnippet>169</a>                </span>.map_err(|e| ContractError::MiddlewareError { e })<span class="question-mark">?
+<a href=#170 id=170 data-nosnippet>170</a>                </span>.<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#171 id=171 data-nosnippet>171</a>        }
+<a href=#172 id=172 data-nosnippet>172</a>
+<a href=#173 id=173 data-nosnippet>173</a>        <span class="comment">// Get deployer address
+<a href=#174 id=174 data-nosnippet>174</a>        </span><span class="kw">let </span>self_address: types::Address = deployer.public().to_address().into();
+<a href=#175 id=175 data-nosnippet>175</a>
+<a href=#176 id=176 data-nosnippet>176</a>        <span class="kw">let </span>stake_factory = HoprNodeStakeFactory::deploy(provider.clone(), ())<span class="question-mark">?</span>.send().<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#177 id=177 data-nosnippet>177</a>        <span class="kw">let </span>module_implementation = HoprNodeManagementModule::deploy(provider.clone(), ())<span class="question-mark">?</span>.send().<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#178 id=178 data-nosnippet>178</a>        <span class="kw">let </span>safe_registry = HoprNodeSafeRegistry::deploy(provider.clone(), ())<span class="question-mark">?</span>.send().<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#179 id=179 data-nosnippet>179</a>        <span class="kw">let </span>price_oracle = HoprTicketPriceOracle::deploy(
+<a href=#180 id=180 data-nosnippet>180</a>            provider.clone(),
+<a href=#181 id=181 data-nosnippet>181</a>            (self_address, ethers::types::U256::from(<span class="number">100000000000000000_u128</span>)),
+<a href=#182 id=182 data-nosnippet>182</a>        )<span class="question-mark">?
+<a href=#183 id=183 data-nosnippet>183</a>        </span>.send()
+<a href=#184 id=184 data-nosnippet>184</a>        .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#185 id=185 data-nosnippet>185</a>        <span class="kw">let </span>win_prob_oracle = HoprWinningProbabilityOracle::deploy(
+<a href=#186 id=186 data-nosnippet>186</a>            provider.clone(),
+<a href=#187 id=187 data-nosnippet>187</a>            (self_address, ethers::types::U256::from(<span class="number">72057594037927935_u128</span>)), <span class="comment">// 0xFFFFFFFFFFFFFF
+<a href=#188 id=188 data-nosnippet>188</a>        </span>)<span class="question-mark">?
+<a href=#189 id=189 data-nosnippet>189</a>        </span>.send()
+<a href=#190 id=190 data-nosnippet>190</a>        .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#191 id=191 data-nosnippet>191</a>        <span class="kw">let </span>token = HoprToken::deploy(provider.clone(), ())<span class="question-mark">?</span>.send().<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#192 id=192 data-nosnippet>192</a>        <span class="kw">let </span>network_registry_proxy = HoprDummyProxyForNetworkRegistry::deploy(provider.clone(), self_address)<span class="question-mark">?
+<a href=#193 id=193 data-nosnippet>193</a>            </span>.send()
+<a href=#194 id=194 data-nosnippet>194</a>            .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#195 id=195 data-nosnippet>195</a>        <span class="kw">let </span>channels = HoprChannels::deploy(
+<a href=#196 id=196 data-nosnippet>196</a>            provider.clone(),
+<a href=#197 id=197 data-nosnippet>197</a>            Token::Tuple(<span class="macro">vec!</span>[
+<a href=#198 id=198 data-nosnippet>198</a>                Token::Address(token.address()),
+<a href=#199 id=199 data-nosnippet>199</a>                Token::Uint(<span class="number">1_u32</span>.into()),
+<a href=#200 id=200 data-nosnippet>200</a>                Token::Address(safe_registry.address()),
+<a href=#201 id=201 data-nosnippet>201</a>            ]),
+<a href=#202 id=202 data-nosnippet>202</a>        )<span class="question-mark">?
+<a href=#203 id=203 data-nosnippet>203</a>        </span>.send()
+<a href=#204 id=204 data-nosnippet>204</a>        .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#205 id=205 data-nosnippet>205</a>        <span class="kw">let </span>announcements = HoprAnnouncements::deploy(provider.clone(), Token::Address(safe_registry.address()))<span class="question-mark">?
+<a href=#206 id=206 data-nosnippet>206</a>            </span>.send()
+<a href=#207 id=207 data-nosnippet>207</a>            .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#208 id=208 data-nosnippet>208</a>        <span class="kw">let </span>network_registry = HoprNetworkRegistry::deploy(
+<a href=#209 id=209 data-nosnippet>209</a>            provider.clone(),
+<a href=#210 id=210 data-nosnippet>210</a>            (
+<a href=#211 id=211 data-nosnippet>211</a>                ethers::types::Address::from(network_registry_proxy.address()),
+<a href=#212 id=212 data-nosnippet>212</a>                self_address,
+<a href=#213 id=213 data-nosnippet>213</a>                self_address,
+<a href=#214 id=214 data-nosnippet>214</a>            ),
+<a href=#215 id=215 data-nosnippet>215</a>        )<span class="question-mark">?
+<a href=#216 id=216 data-nosnippet>216</a>        </span>.send()
+<a href=#217 id=217 data-nosnippet>217</a>        .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#218 id=218 data-nosnippet>218</a>
+<a href=#219 id=219 data-nosnippet>219</a>        <span class="comment">// Disable network registry in local environment
+<a href=#220 id=220 data-nosnippet>220</a>        </span>network_registry.disable_registry().send().<span class="kw">await</span><span class="question-mark">?</span>.<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#221 id=221 data-nosnippet>221</a>
+<a href=#222 id=222 data-nosnippet>222</a>        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+<a href=#223 id=223 data-nosnippet>223</a>            token,
+<a href=#224 id=224 data-nosnippet>224</a>            channels,
+<a href=#225 id=225 data-nosnippet>225</a>            announcements,
+<a href=#226 id=226 data-nosnippet>226</a>            network_registry,
+<a href=#227 id=227 data-nosnippet>227</a>            network_registry_proxy: NetworkRegistryProxy::Dummy(network_registry_proxy),
+<a href=#228 id=228 data-nosnippet>228</a>            safe_registry,
+<a href=#229 id=229 data-nosnippet>229</a>            price_oracle,
+<a href=#230 id=230 data-nosnippet>230</a>            win_prob_oracle,
+<a href=#231 id=231 data-nosnippet>231</a>            stake_factory,
+<a href=#232 id=232 data-nosnippet>232</a>            module_implementation,
+<a href=#233 id=233 data-nosnippet>233</a>        })
+<a href=#234 id=234 data-nosnippet>234</a>    }
+<a href=#235 id=235 data-nosnippet>235</a>}
+<a href=#236 id=236 data-nosnippet>236</a>
+<a href=#237 id=237 data-nosnippet>237</a><span class="kw">impl</span>&lt;M: Middleware&gt; From&lt;<span class="kw-2">&amp;</span>ContractInstances&lt;M&gt;&gt; <span class="kw">for </span>ContractAddresses {
+<a href=#238 id=238 data-nosnippet>238</a>    <span class="kw">fn </span>from(value: <span class="kw-2">&amp;</span>ContractInstances&lt;M&gt;) -&gt; <span class="self">Self </span>{
+<a href=#239 id=239 data-nosnippet>239</a>        <span class="self">Self </span>{
+<a href=#240 id=240 data-nosnippet>240</a>            token: value.token.address().into(),
+<a href=#241 id=241 data-nosnippet>241</a>            channels: value.channels.address().into(),
+<a href=#242 id=242 data-nosnippet>242</a>            announcements: value.announcements.address().into(),
+<a href=#243 id=243 data-nosnippet>243</a>            network_registry: value.network_registry.address().into(),
+<a href=#244 id=244 data-nosnippet>244</a>            network_registry_proxy: value.network_registry_proxy.address(),
+<a href=#245 id=245 data-nosnippet>245</a>            safe_registry: value.safe_registry.address().into(),
+<a href=#246 id=246 data-nosnippet>246</a>            price_oracle: value.price_oracle.address().into(),
+<a href=#247 id=247 data-nosnippet>247</a>            win_prob_oracle: value.win_prob_oracle.address().into(),
+<a href=#248 id=248 data-nosnippet>248</a>            stake_factory: value.stake_factory.address().into(),
+<a href=#249 id=249 data-nosnippet>249</a>            module_implementation: value.module_implementation.address().into(),
+<a href=#250 id=250 data-nosnippet>250</a>        }
+<a href=#251 id=251 data-nosnippet>251</a>    }
+<a href=#252 id=252 data-nosnippet>252</a>}
+<a href=#253 id=253 data-nosnippet>253</a>
+<a href=#254 id=254 data-nosnippet>254</a><span class="doccomment">/// Creates local Anvil instance.
+<a href=#255 id=255 data-nosnippet>255</a>///
+<a href=#256 id=256 data-nosnippet>256</a>/// Used for testing. When block time is given, new blocks are mined periodically.
+<a href=#257 id=257 data-nosnippet>257</a>/// Otherwise, a new block is mined per transaction.
+<a href=#258 id=258 data-nosnippet>258</a></span><span class="kw">pub fn </span>create_anvil(block_time: <span class="prelude-ty">Option</span>&lt;std::time::Duration&gt;) -&gt; ethers::utils::AnvilInstance {
+<a href=#259 id=259 data-nosnippet>259</a>    <span class="comment">// The anvil binary must be in the PATH.
+<a href=#260 id=260 data-nosnippet>260</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>anvil = ethers::utils::Anvil::new();
+<a href=#261 id=261 data-nosnippet>261</a>
+<a href=#262 id=262 data-nosnippet>262</a>    <span class="kw">if let </span><span class="prelude-val">Some</span>(bt) = block_time {
+<a href=#263 id=263 data-nosnippet>263</a>        anvil = anvil.block_time(bt.as_secs());
+<a href=#264 id=264 data-nosnippet>264</a>    }
+<a href=#265 id=265 data-nosnippet>265</a>
+<a href=#266 id=266 data-nosnippet>266</a>    anvil.spawn()
+<a href=#267 id=267 data-nosnippet>267</a>}</code></pre></div></section></main></body></html>

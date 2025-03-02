@@ -1,0 +1,1 @@
+searchState.loadedDescShard("hopr_parallelize", 0, "Parallelization utilities for different types of workloads.\nModule for real thread pool based parallelization of CPU …\nSpawn an awaitable non-blocking execution of the given …\nSpawn an awaitable non-blocking execution of the given …")

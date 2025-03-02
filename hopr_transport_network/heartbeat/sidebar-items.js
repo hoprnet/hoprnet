@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["Heartbeat","HeartbeatConfig","HeartbeatExternalInteractions"],"trait":["HeartbeatExternalApi"],"type":["AsyncSleepFn"]};
