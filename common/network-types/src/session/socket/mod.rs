@@ -160,7 +160,7 @@ impl<const C: usize, S: SocketState<C> + 'static> futures::io::AsyncWrite for Se
         inner.poll_flush(cx)
     }
 
-    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let this = self.project();
         let _ = this.state.stop();
 
