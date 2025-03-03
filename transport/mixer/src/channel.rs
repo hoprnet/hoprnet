@@ -207,14 +207,17 @@ impl<T> Stream for Receiver<T> {
             };
 
             if channel.buffer.peek().map(|x| x.0.release_at < now).unwrap_or(false) {
-                let data = channel
+                let item = channel
                     .buffer
                     .pop()
-                    .expect("The value should be present within the same locked access")
-                    .0
-                    .item;
+                    .expect("The value should be present within the same locked access");
 
-                trace!(from = "direct", "yield item");
+                trace!(
+                    difference_expected_vs_now_in_ms = (now - item.0.release_at).as_millis(),
+                    "released data from the buffer",
+                );
+
+                let data = item.0.item;
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_QUEUE_SIZE.decrement(1.0f64);
@@ -232,12 +235,9 @@ impl<T> Stream for Receiver<T> {
             if let Some(next) = channel.buffer.peek() {
                 let remaining = next.0.release_at.duration_since(now);
 
-                trace!("reseting the timer");
                 channel.timer.reset(remaining);
 
                 futures::ready!(channel.timer.poll_unpin(cx));
-
-                trace!(from = "timer", "yield item");
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_QUEUE_SIZE.decrement(1.0f64);
@@ -252,7 +252,6 @@ impl<T> Stream for Receiver<T> {
                 ));
             }
 
-            trace!(from = "direct", "pending");
             Poll::Pending
         } else {
             self.channel.receiver_active.store(false, Ordering::Relaxed);
