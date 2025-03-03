@@ -300,7 +300,15 @@ where
                 .then_concurrent(move |(peer, data)| {
                     let msg_processor = msg_processor_read.clone();
 
-                    async move { msg_processor.recv(&peer, data).await.map_err(|e| (peer, e)) }
+                    async move { 
+                        let now = std::time::Instant::now();
+                        let r = msg_processor.recv(&peer, data).await.map_err(|e| (peer, e));
+                        let elapsed = now.elapsed();
+                        if elapsed.as_millis() > 150 {
+                            tracing::warn!("msg_processor.recv took {}ms", elapsed.as_millis());
+                        }
+                        r
+                    }
                 })
                 .filter_map(move |v| {
                     let mut internal_ack_send = internal_ack_send.clone();
@@ -316,9 +324,16 @@ where
                                         METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
                                         METRIC_PACKET_COUNT.increment(&["received"]);
                                     }
+
+                                    let now = std::time::Instant::now();
                                     internal_ack_send.send((ack.peer, ack.ack)).await.unwrap_or_else(|e| {
                                         error!(error = %e, "Failed to forward an acknowledgement to the transport layer");
                                     });
+                                    let elapsed = now.elapsed();
+                                    if elapsed.as_millis() > 150 {
+                                        tracing::warn!("internal_ack.send took {}ms", elapsed.as_millis());
+                                    }
+
                                     Some(data)
                                 }
                                 msg::processor::RecvOperation::Forward { msg, ack } => {
