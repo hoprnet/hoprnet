@@ -4617,6 +4617,7 @@ dependencies = [
  "core-network",
  "futures",
  "futures-concurrency",
+ "hopr-async-runtime",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
