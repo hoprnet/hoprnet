@@ -351,13 +351,19 @@ impl HoprSwarmWithProcessors {
                                 } => {
                                     trace!(%peer, %request_id, %connection_id, "Received a message");
 
-                                    if let Err(e) = self.msg_received.unbounded_send((peer, request)) {
-                                        error!(%peer, %request_id, %connection_id, transport="libp2p", protocol="/hopr/msg/0.1.0", error = %e, "Failed to process a message");
+                                    let now = std::time::Instant::now();
+                                    if let Err(_e) =  self.msg_received.unbounded_send((peer, request)) {
+                                        error!(%peer, %request_id, transport="libp2p", protocol="/hopr/msg/0.1.0", error = "Failed to enqueue a received message", "Failed to process incoming message");
                                     };
 
                                     if swarm.behaviour_mut().msg.send_response(channel, ()).is_err() {
                                         error!(%peer, %request_id, %connection_id, transport="libp2p", protocol="/hopr/msg/0.1.0", "Failed to confirm receiving a message, likely a timeout");
                                     };
+
+                                    let elapsed = now.elapsed();
+                                    if elapsed.as_millis() > 150 {
+                                        warn!(%peer, %request_id, %connection_id, elapsed = %elapsed.as_millis(), "Processing a message took too long");
+                                    }
                                 },
                                 libp2p::request_response::Message::<Box<[u8]>, ()>::Response {
                                     request_id, ..

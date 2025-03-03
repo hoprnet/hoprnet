@@ -15,8 +15,8 @@ prometheus = [
   "dep:hopr-metrics",
   "hopr-transport-protocol/prometheus",
 ]
-runtime-async-std = ["libp2p/async-std"]
-runtime-tokio = ["libp2p/tokio"]
+runtime-async-std = ["libp2p/async-std", "hopr-async-runtime/runtime-async-std"]
+runtime-tokio = ["libp2p/tokio", "hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 futures = { workspace = true }
@@ -40,6 +40,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 void = { workspace = true } # needed for Behavior implementations from libp2p
 
+hopr-async-runtime = { workspace = true }
 core-network = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
