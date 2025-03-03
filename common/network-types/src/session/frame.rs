@@ -582,6 +582,7 @@ impl FrameReassembler {
                 count += 1;
             } else {
                 // Break on the first incomplete and non-expired frame
+                tracing::trace!(incomplete = self.sequences.len(), "incomplete frames in reassembler");
                 break;
             }
         }

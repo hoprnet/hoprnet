@@ -4420,6 +4420,7 @@ dependencies = [
  "dashmap 6.1.0",
  "flume 0.11.1",
  "futures",
+ "futures-concurrency",
  "governor 0.7.0",
  "hex",
  "hex-literal",
