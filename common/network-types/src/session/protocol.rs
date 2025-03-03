@@ -242,11 +242,9 @@ impl<const C: usize> FrameAcknowledgements<C> {
         let mut out = Vec::with_capacity(2);
         let mut frame_ack = Self::default();
         for frame_id in items {
-            if frame_ack.push(frame_id) {
-                if frame_ack.is_full() {
-                    out.push(frame_ack);
-                    frame_ack = Self::default();
-                }
+            if frame_ack.push(frame_id) && frame_ack.is_full() {
+                out.push(frame_ack);
+                frame_ack = Self::default();
             }
         }
         out

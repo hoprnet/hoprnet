@@ -54,7 +54,7 @@ impl<const C: usize> Segmenter<C> {
             seg.seq_idx = i as SeqNum;
             seg.seq_len = seq_len as SeqNum;
 
-            let _ = ready!(self.tx.as_mut().poll_ready(cx))?;
+            ready!(self.tx.as_mut().poll_ready(cx))?;
 
             tracing::trace!(
                 frame_id = seg.frame_id,
@@ -64,7 +64,7 @@ impl<const C: usize> Segmenter<C> {
             self.tx.as_mut().start_send(seg)?;
         }
 
-        let _ = ready!(self.tx.as_mut().poll_flush(cx))?;
+        ready!(self.tx.as_mut().poll_flush(cx))?;
         tracing::trace!(
             frame_id = self.next_frame_id,
             "Segmenter::poll_flush_segments frame flushed out"
@@ -108,7 +108,7 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
 
-        if buf.len() == 0 {
+        if buf.is_empty() {
             tracing::trace!("Segmenter::poll_write ready empty buffer");
             return Poll::Ready(Ok(0));
         }
@@ -174,7 +174,7 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
             self.complete_segment();
         }
 
-        let _ = ready!(self.as_mut().poll_flush_segments(cx).map_err(std::io::Error::other))?;
+        ready!(self.as_mut().poll_flush_segments(cx).map_err(std::io::Error::other))?;
         self.tx.as_mut().poll_close(cx).map_err(std::io::Error::other)
     }
 }

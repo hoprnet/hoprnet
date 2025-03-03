@@ -15,7 +15,7 @@ use std::time::Duration;
 use tracing::Instrument;
 
 pub struct SocketComponents<const C: usize> {
-    pub inspector: FrameInspector,
+    pub inspector: Option<FrameInspector>,
     pub ctl_tx: UnboundedSender<SessionMessage<C>>,
 }
 
@@ -103,13 +103,15 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
         Ok(())
     }
 
-    fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError> {
-        tracing::warn!(session_id = self.session_id(), %id, "frame discarded");
+    #[tracing::instrument(skip(self), fields(session_id = self.0))]
+    fn frame_discarded(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
+        tracing::warn!("frame discarded");
         Ok(())
     }
 
+    #[tracing::instrument(skip(self, segment), fields(session_id = self.0, frame_id = segment.frame_id, seq_idx = segment.seq_idx))]
     fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError> {
-        tracing::trace!(session_id = self.session_id(), id = %segment.id(), "segment sent");
+        tracing::trace!("segment sent");
         Ok(())
     }
 }
@@ -189,7 +191,9 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             outgoing_frame_retries_tx,
             ack_tx,
             ctl_tx: socket_components.ctl_tx,
-            inspector: socket_components.inspector,
+            inspector: socket_components
+                .inspector
+                .ok_or(SessionError::InvalidState("inspector is not available".into()))?,
         });
 
         if self.cfg.enable_partial_acknowledgements {

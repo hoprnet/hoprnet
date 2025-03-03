@@ -9,6 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
+default = ["hashbrown"]
 serde = ["dep:serde", "dep:serde_bytes", "libp2p-identity/serde"]
 runtime-async-std = [
   "dep:async-std-resolver",
@@ -20,6 +21,7 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hickory-resolver/tokio-runtime",
 ]
+hashbrown = ["dep:hashbrown"]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 testing = []
 
@@ -40,6 +42,7 @@ futures-time = { workspace = true }
 governor = { workspace = true }
 hex = { workspace = true }
 hickory-resolver = { workspace = true }
+hashbrown = { version = "0.15.2", optional = true }
 lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
 pin-project = "1.1.3"

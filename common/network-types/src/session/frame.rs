@@ -212,6 +212,7 @@ impl Segment {
     }
 
     /// Length of the segment data plus header.
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         Self::HEADER_SIZE + self.data.len()
     }

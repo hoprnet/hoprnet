@@ -1,6 +1,5 @@
 mod state;
 
-use asynchronous_codec::Framed;
 use futures::StreamExt;
 use futures::{future, pin_mut, FutureExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
@@ -11,10 +10,11 @@ use std::time::Duration;
 use tracing::Instrument;
 
 use crate::prelude::errors::SessionError;
-use crate::prelude::frame_reconstructor_with_inspector;
 use crate::prelude::protocol::{SessionCodec, SessionMessage};
+use crate::prelude::{frame_reconstructor, frame_reconstructor_with_inspector, Frame, Segment};
+use crate::session::frames::FrameInspector;
 use crate::session::segmenter::Segmenter;
-use crate::session::socket::state::SocketComponents;
+use crate::session::socket::state::{SocketComponents, Stateless};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, smart_default::SmartDefault)]
 pub struct SessionSocketConfig {
@@ -35,8 +35,32 @@ pub struct SessionSocket<const C: usize, S> {
 
 const RECONSTRUCTOR_CAPACITY: usize = 1024;
 
+impl<const C: usize> SessionSocket<C, Stateless<C>> {
+    /// Creates a new stateless socket suitable for fast UDP-like communication.
+    pub fn new_stateless<T, I>(id: I, transport: T, cfg: SessionSocketConfig) -> Result<Self, SessionError>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        I: std::fmt::Display,
+    {
+        // Downstream Segments get reconstructed into Frames
+        let (downstream_segment_in, downstream_frames_out) =
+            frame_reconstructor(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
+
+        Self::create(
+            transport,
+            Stateless::new(id),
+            downstream_segment_in,
+            downstream_frames_out,
+            None,
+            cfg,
+        )
+    }
+}
+
 impl<const C: usize, S: SocketState<C> + 'static> SessionSocket<C, S> {
-    pub fn new<T>(transport: T, mut state: S, cfg: SessionSocketConfig) -> Result<Self, SessionError>
+    /// Creates a stateful socket with frame inspection capabilities - suitable for communication
+    /// requiring TCP-like delivery guarantees.
+    pub fn new<T>(transport: T, state: S, cfg: SessionSocketConfig) -> Result<Self, SessionError>
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
@@ -44,11 +68,34 @@ impl<const C: usize, S: SocketState<C> + 'static> SessionSocket<C, S> {
         let (downstream_segment_in, downstream_frames_out, inspector) =
             frame_reconstructor_with_inspector(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
 
+        Self::create(
+            transport,
+            state,
+            downstream_segment_in,
+            downstream_frames_out,
+            Some(inspector),
+            cfg,
+        )
+    }
+
+    fn create<T, SIn, FOut>(
+        transport: T,
+        mut state: S,
+        downstream_segment_in: SIn,
+        downstream_frames_out: FOut,
+        inspector: Option<FrameInspector>,
+        cfg: SessionSocketConfig,
+    ) -> Result<Self, SessionError>
+    where
+        T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
+        SIn: futures::Sink<Segment, Error = SessionError> + Send + 'static,
+        FOut: futures::Stream<Item = Result<Frame, SessionError>> + Send + 'static,
+    {
         // Upstream frames get segmented and are yielded by the data_rx stream
         let (upstream_frames_in, segmented_data_rx) = Segmenter::<C>::new(cfg.frame_size, RECONSTRUCTOR_CAPACITY);
 
         // Downstream transport
-        let (packets_out, packets_in) = Framed::new(transport, SessionCodec::<C>).split();
+        let (packets_out, packets_in) = asynchronous_codec::Framed::new(transport, SessionCodec::<C>).split();
 
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
         state.run(SocketComponents { inspector, ctl_tx })?;

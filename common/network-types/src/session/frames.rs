@@ -128,7 +128,7 @@ pub(crate) trait FrameMap {
     fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool);
 }
 
-impl<'a> FrameMapOccupiedEntry for dashmap::OccupiedEntry<'a, FrameId, FrameBuilder> {
+impl FrameMapOccupiedEntry for dashmap::OccupiedEntry<'_, FrameId, FrameBuilder> {
     fn get_builder_mut(&mut self) -> &mut FrameBuilder {
         self.get_mut()
     }
@@ -142,7 +142,7 @@ impl<'a> FrameMapOccupiedEntry for dashmap::OccupiedEntry<'a, FrameId, FrameBuil
     }
 }
 
-impl<'a> FrameMapVacantEntry for dashmap::VacantEntry<'a, FrameId, FrameBuilder> {
+impl FrameMapVacantEntry for dashmap::VacantEntry<'_, FrameId, FrameBuilder> {
     fn insert_builder(self, value: FrameBuilder) {
         self.insert(value);
     }
@@ -175,7 +175,11 @@ impl FrameMap for FrameDashMap {
     }
 }
 
-impl<'a> FrameMapOccupiedEntry for std::collections::hash_map::OccupiedEntry<'a, FrameId, FrameBuilder> {
+#[cfg(not(feature = "hashbrown"))]
+pub(crate) struct FrameHashMap(std::collections::HashMap<FrameId, FrameBuilder>);
+
+#[cfg(not(feature = "hashbrown"))]
+impl FrameMapOccupiedEntry for std::collections::hash_map::OccupiedEntry<'_, FrameId, FrameBuilder> {
     fn get_builder_mut(&mut self) -> &mut FrameBuilder {
         self.get_mut()
     }
@@ -189,14 +193,14 @@ impl<'a> FrameMapOccupiedEntry for std::collections::hash_map::OccupiedEntry<'a,
     }
 }
 
-impl<'a> FrameMapVacantEntry for std::collections::hash_map::VacantEntry<'a, FrameId, FrameBuilder> {
+#[cfg(not(feature = "hashbrown"))]
+impl FrameMapVacantEntry for std::collections::hash_map::VacantEntry<'_, FrameId, FrameBuilder> {
     fn insert_builder(self, value: FrameBuilder) {
         self.insert(value);
     }
 }
 
-pub(crate) struct FrameHashMap(std::collections::HashMap<FrameId, FrameBuilder>);
-
+#[cfg(not(feature = "hashbrown"))]
 impl FrameMap for FrameHashMap {
     type ExistingEntry<'a> = std::collections::hash_map::OccupiedEntry<'a, FrameId, FrameBuilder>;
     type VacantEntry<'a> = std::collections::hash_map::VacantEntry<'a, FrameId, FrameBuilder>;
@@ -209,6 +213,56 @@ impl FrameMap for FrameHashMap {
         match self.0.entry(frame_id) {
             std::collections::hash_map::Entry::Occupied(e) => FrameMapEntry::Occupied(e),
             std::collections::hash_map::Entry::Vacant(v) => FrameMapEntry::Vacant(v),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn retain(&mut self, f: impl FnMut(&FrameId, &mut FrameBuilder) -> bool) {
+        self.0.retain(f)
+    }
+}
+
+#[cfg(feature = "hashbrown")]
+pub(crate) struct FrameHashMap(hashbrown::HashMap<FrameId, FrameBuilder>);
+
+#[cfg(feature = "hashbrown")]
+impl FrameMapOccupiedEntry for hashbrown::hash_map::OccupiedEntry<'_, FrameId, FrameBuilder> {
+    fn get_builder_mut(&mut self) -> &mut FrameBuilder {
+        self.get_mut()
+    }
+
+    fn frame_id(&self) -> &FrameId {
+        self.key()
+    }
+
+    fn finalize(self) -> FrameBuilder {
+        self.remove()
+    }
+}
+
+#[cfg(feature = "hashbrown")]
+impl FrameMapVacantEntry for hashbrown::hash_map::VacantEntry<'_, FrameId, FrameBuilder> {
+    fn insert_builder(self, value: FrameBuilder) {
+        self.insert(value);
+    }
+}
+
+#[cfg(feature = "hashbrown")]
+impl FrameMap for FrameHashMap {
+    type ExistingEntry<'a> = hashbrown::hash_map::OccupiedEntry<'a, FrameId, FrameBuilder>;
+    type VacantEntry<'a> = hashbrown::hash_map::VacantEntry<'a, FrameId, FrameBuilder>;
+
+    fn with_capacity(capacity: usize) -> Self {
+        Self(hashbrown::HashMap::with_capacity(capacity))
+    }
+
+    fn entry(&mut self, frame_id: FrameId) -> FrameMapEntry<Self::ExistingEntry<'_>, Self::VacantEntry<'_>> {
+        match self.0.entry(frame_id) {
+            hashbrown::hash_map::Entry::Occupied(e) => FrameMapEntry::Occupied(e),
+            hashbrown::hash_map::Entry::Vacant(v) => FrameMapEntry::Vacant(v),
         }
     }
 
