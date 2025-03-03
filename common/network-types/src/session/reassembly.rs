@@ -231,13 +231,17 @@ mod tests {
     use super::*;
 
     use async_std::prelude::FutureExt;
-    use bitvec::prelude::*;
     use futures::{pin_mut, SinkExt, StreamExt, TryStreamExt};
     use hex_literal::hex;
     use rand::prelude::SliceRandom;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
+
+    use crate::session::frames::FrameHashMap;
+
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
+
+    type BasicReassembler = Reassembler<FrameHashMap>;
 
     #[test_log::test(async_std::test)]
     pub async fn reassembler_should_reassemble_frames() -> anyhow::Result<()> {
@@ -248,7 +252,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = Reassembler::new(Duration::from_secs(5), 1024).split();
+        let (r_sink, r_stream) = BasicReassembler::new(Duration::from_secs(5), 1024).split();
 
         let mut segments = expected
             .iter()
@@ -284,7 +288,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = Reassembler::new(Duration::from_millis(45), 1024).split();
+        let (r_sink, r_stream) = BasicReassembler::new(Duration::from_millis(45), 1024).split();
 
         let mut segments = expected
             .iter()
@@ -348,7 +352,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = Reassembler::new(Duration::from_millis(100), 1024).split();
+        let (r_sink, r_stream) = BasicReassembler::new(Duration::from_millis(100), 1024).split();
 
         let mut segments = expected
             .iter()
@@ -397,7 +401,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = Reassembler::new(Duration::from_secs(5), 3).split();
+        let (r_sink, r_stream) = BasicReassembler::new(Duration::from_secs(5), 3).split();
 
         pin_mut!(r_sink);
         pin_mut!(r_stream);
@@ -466,7 +470,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let reassembler = Reassembler::new(
+        let reassembler = BasicReassembler::new(
             Duration::from_secs(5),
             2, // = max 4 incomplete frames before fail
         );

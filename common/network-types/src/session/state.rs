@@ -1052,19 +1052,15 @@ impl<const C: usize> AsyncRead for SessionSocket<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::DuplexIO;
+
     use futures::future::Either;
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use futures::pin_mut;
-    use hex_literal::hex;
     use parameterized::parameterized;
-    use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng};
-    use std::iter::Extend;
     use test_log::test;
 
-    use crate::session::utils::test;
     use crate::session::utils::test::{frames_send_and_recv, FaultyNetwork, FaultyNetworkConfig, NetworkStats};
+    use crate::utils::DuplexIO;
 
     const MTU: usize = 466; // MTU used by HOPR
 

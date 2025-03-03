@@ -220,18 +220,56 @@ impl<const C: usize, S: SocketState<C> + 'static> futures::io::AsyncWrite for Se
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::socket::state::Stateless;
-    use crate::utils::DuplexIO;
+    use futures::AsyncReadExt;
 
+    use crate::utils::DuplexIO;
     use crate::session::testing::*;
 
     const MTU: usize = 466;
 
+    type Duplex<'a> = DuplexIO<futures::io::ReadHalf<FaultyNetwork<'a, MTU>>, futures::io::WriteHalf<FaultyNetwork<'a, MTU>>>;
+
+    fn setup_alice_bob<'a>(
+        network_cfg: FaultyNetworkConfig,
+        alice_stats: Option<NetworkStats>,
+        bob_stats: Option<NetworkStats>,
+    ) -> (Duplex<'a>, Duplex<'a>) {
+        let (alice_stats, bob_stats) = alice_stats
+            .zip(bob_stats)
+            .map(|(alice, bob)| {
+                (
+                    NetworkStats {
+                        packets_sent: bob.packets_sent,
+                        bytes_sent: bob.bytes_sent,
+                        packets_received: alice.packets_received,
+                        bytes_received: alice.bytes_received,
+                    },
+                    NetworkStats {
+                        packets_sent: alice.packets_sent,
+                        bytes_sent: alice.bytes_sent,
+                        packets_received: bob.packets_received,
+                        bytes_received: bob.bytes_received,
+                    },
+                )
+            })
+            .unzip();
+
+        let (alice_reader, alice_writer) = FaultyNetwork::new(network_cfg, alice_stats).split();
+        let (bob_reader, bob_writer) = FaultyNetwork::new(network_cfg, bob_stats).split();
+
+        (DuplexIO(alice_reader, bob_writer), DuplexIO(bob_reader, alice_writer))
+    }
+
     #[async_std::test]
     async fn stateless_socket_bidirectional_should_work() -> anyhow::Result<()> {
+        let (alice, bob) = setup_alice_bob(FaultyNetworkConfig::default(), None, None);
+
         let mut alice_socket =
-            SessionSocket::<MTU, _>::new(DuplexIO(alice_reader, bob_writer), Stateless::new("alice"));
-        let mut bob_socket = SessionSocket::<MTU, _>::new(DuplexIO(bob_reader, alice_writer), Stateless::new("bob"));
+            SessionSocket::<MTU,_>::new_stateless("alice", alice, Default::default())?;
+
+        let mut bob_socket =
+            SessionSocket::<MTU,_>::new_stateless("bob", bob, Default::default())?;
+
 
         Ok(())
     }

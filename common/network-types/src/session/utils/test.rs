@@ -136,6 +136,44 @@ pub struct NetworkStats {
     pub bytes_received: Arc<AtomicUsize>,
 }
 
+impl NetworkStats {
+    pub fn assert_packets_sent(&self, expected: usize) {
+        let actual = self.packets_sent.load(std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            actual,
+            expected,
+            "packets sent must be equal to {expected}, but was {actual}",
+        );
+    }
+
+    pub fn assert_packets_received(&self, expected: usize) {
+        let actual = self.packets_received.load(std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            actual,
+            expected,
+            "packets received must be equal to {expected}, but was {actual}",
+        )
+    }
+
+    pub fn assert_bytes_sent(&self, expected: usize) {
+        let actual = self.bytes_sent.load(std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            actual,
+            expected,
+            "bytes sent must be equal to {expected}, but was {actual}",
+        );
+    }
+
+    pub fn assert_bytes_received(&self, expected: usize) {
+        let actual = self.bytes_received.load(std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            actual,
+            expected,
+            "bytes received must be equal to {expected}, but was {actual}",
+        );
+    }
+}
+
 impl Default for FaultyNetworkConfig {
     fn default() -> Self {
         Self {

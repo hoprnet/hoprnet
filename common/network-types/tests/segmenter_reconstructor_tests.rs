@@ -5,7 +5,7 @@ use std::time::Duration;
 
 #[test_log::test(async_std::test)]
 async fn test_segmenter_reconstructor() -> anyhow::Result<()> {
-    let (mut data_in, segments_out) = Segmenter::<462, 1024>::new(1500);
+    let (mut data_in, segments_out) = Segmenter::<462>::new(1500, 1024);
     let (segments_in, data_out) = frame_reconstructor(Duration::from_secs(10), 1024);
 
     let jh = async_std::task::spawn(segments_out.map(Ok).forward(segments_in));
