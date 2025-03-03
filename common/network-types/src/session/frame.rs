@@ -486,9 +486,12 @@ impl FrameReassembler {
             return Err(SessionError::ReassemblerClosed);
         }
 
+        let start = std::time::Instant::now();
+
         // Check if this frame has not been emitted yet.
         let frame_id = segment.frame_id;
         if frame_id < self.next_emitted_frame.load(Ordering::SeqCst) {
+            tracing::trace!("trying to push segment of a frame that has been emitted");
             return Err(SessionError::OldSegment(frame_id));
         }
 
@@ -564,6 +567,11 @@ impl FrameReassembler {
             }
         }
 
+        let push_time = start.elapsed();
+        if push_time > Duration::from_millis(50) {
+            tracing::trace!(?push_time, "segment push done");
+        }
+
         Ok(())
     }
 
@@ -599,6 +607,8 @@ impl FrameReassembler {
             return Ok(0);
         }
 
+        let start = std::time::Instant::now();
+
         let cutoff = current_time().sub(self.max_age).as_unix_timestamp().as_millis() as u64;
         let mut count = 0;
         loop {
@@ -621,6 +631,11 @@ impl FrameReassembler {
                 tracing::trace!(incomplete = self.sequences.len(), "incomplete frames in reassembler");
                 break;
             }
+        }
+
+        let eviction_time = start.elapsed();
+        if eviction_time > Duration::from_millis(50) {
+            tracing::trace!(?eviction_time, count, "eviction done");
         }
 
         Ok(count)
