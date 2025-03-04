@@ -17,7 +17,7 @@ use crate::db::HoprDb;
 use crate::errors::DbSqlError;
 use crate::info::HoprDbInfoOperations;
 use crate::prelude::HoprDbTicketOperations;
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::OptTx;
 
 use hopr_parallelize::cpu::spawn_fifo_blocking;
 
@@ -38,11 +38,7 @@ impl HoprDbProtocolOperations for HoprDb {
         let myself = self.clone();
         let me_ckp = me.clone();
 
-        let result = self
-            .begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
+        let result =  {
                     match myself
                         .caches
                         .unacked_tickets
@@ -58,13 +54,13 @@ impl HoprDbProtocolOperations for HoprDb {
                         PendingAcknowledgement::WaitingAsSender => {
                             trace!("received acknowledgement as sender: first relayer has processed the packet");
 
-                            Ok(ResolvedAcknowledgement::Sending(ack.ack_challenge()))
+                            Ok::<_, DbSqlError>(ResolvedAcknowledgement::Sending(ack.ack_challenge()))
                         }
 
                         PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
                             if myself
                                 .get_channel_by_parties(
-                                    Some(tx),
+                                    None,
                                     unacknowledged.ticket.verified_issuer(),
                                     &myself.me_onchain,
                                     true,
@@ -74,14 +70,14 @@ impl HoprDbProtocolOperations for HoprDb {
                                     c.channel_epoch.as_u32() != unacknowledged.verified_ticket().channel_epoch
                                 })
                             {
-                                return Err(DbSqlError::LogicalError(format!(
+                                return Err(DbError::LogicalError(format!(
                                     "no channel found for  address '{}'",
                                     unacknowledged.ticket.verified_issuer()
                                 )));
                             }
 
                             let domain_separator = myself
-                                .get_indexer_data(Some(tx))
+                                .get_indexer_data(None)
                                 .await?
                                 .channels_dst
                                 .ok_or_else(|| DbSqlError::LogicalError("domain separator missing".into()))?;
@@ -106,9 +102,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             .await
                         }
                     }
-                })
-            })
-            .await?;
+                }?;
 
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
@@ -177,13 +171,9 @@ impl HoprDbProtocolOperations for HoprDb {
             ))
         })?;
 
-        let components =
-            self.begin_transaction()
-                .await?
-                .perform(|tx| {
-                    Box::pin(async move {
+        let components = {
                         let domain_separator =
-                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                            myself.get_indexer_data(None).await?.channels_dst.ok_or_else(|| {
                                 DbSqlError::LogicalError("failed to fetch the domain separator".into())
                             })?;
 
@@ -193,7 +183,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         } else {
                             myself
                                 .create_multihop_ticket(
-                                    Some(tx),
+                                    None,
                                     me.public().to_address(),
                                     next_peer,
                                     path.len() as u8,
@@ -212,9 +202,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 })
                         })
                         .await
-                    })
-                })
-                .await?;
+                    }?;
 
         match components {
             ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {
