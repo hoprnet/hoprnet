@@ -169,8 +169,8 @@ impl Session {
 
         // If we request any capability, we need to use Session protocol
         if !capabilities.is_empty() {
-            // This is a very coarse assumption, that it takes max 2 seconds for each hop one way.
-            let rto_base = Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
+            // This is a very coarse assumption, that it takes max 750 seconds for each hop one way.
+            let rto_base = Duration::from_millis(750u64) * (routing_options.count_hops() + 1) as u32;
 
             let expiration_coefficient = if capabilities.contains(&Capability::Retransmission)
                 || capabilities.contains(&Capability::RetransmissionAckOnly)
@@ -493,11 +493,15 @@ impl futures::AsyncRead for InnerSession {
                 Poll::Ready(Ok(copy_len))
             }
             Poll::Ready(None) => {
+                tracing::trace!(session_id = %self.id, "inner session is done");
                 self.rx.close();
                 Poll::Ready(Ok(0)) // due to convention, Ok(0) indicates EOF
             }
             //Poll::Ready(None) => Poll::Ready(Err(Error::from(ErrorKind::NotConnected))),
-            Poll::Pending => Poll::Pending,
+            Poll::Pending => {
+                tracing::trace!(session_id = %self.id, "session is pending");
+                Poll::Pending
+            }
         }
     }
 }
