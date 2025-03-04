@@ -61,25 +61,25 @@ pub mod msg;
 pub mod ticket_aggregation;
 
 pub mod timer;
+use hopr_transport_identity::Multiaddr;
 pub use timer::execute_on_tick;
 
-pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
-
-use core_path::path::TransportPath;
 use futures::{SinkExt, StreamExt};
-use libp2p::PeerId;
-use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
-use tracing::{error, trace};
+use tracing::error;
 
-use hopr_async_runtime::prelude::{sleep, spawn};
-use hopr_crypto_types::prelude::*;
+use core_path::path::TransportPath;
+use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
+use hopr_transport_identity::PeerId;
+
+pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
+use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleCounter, SimpleGauge};
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -111,33 +111,39 @@ lazy_static::lazy_static! {
     ).unwrap();
     static ref METRIC_REJECTED_TICKETS_COUNT: SimpleCounter =
         SimpleCounter::new("hopr_rejected_tickets_count", "Number of rejected tickets").unwrap();
-    // mixer
-    static ref METRIC_QUEUE_SIZE: SimpleGauge =
-        SimpleGauge::new("hopr_mixer_queue_size", "Current mixer queue size").unwrap();
-    static ref METRIC_MIXER_AVERAGE_DELAY: SimpleGauge = SimpleGauge::new(
-        "hopr_mixer_average_packet_delay",
-        "Average mixer packet delay averaged over a packet window"
-    )
-    .unwrap();
 }
 
-const ENV_MIXER_PACKET_MAX_DELAY_MILLIS: &str = "HOPR_INTERNAL_MIXER_PACKET_MAX_DELAY_MILLIS";
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
 pub enum ProtocolProcesses {
+    #[strum(to_string = "HOPR [ack] - ingress")]
     AckIn,
+    #[strum(to_string = "HOPR [ack] - egress")]
     AckOut,
+    #[strum(to_string = "HOPR [msg] - ingress")]
     MsgIn,
+    #[strum(to_string = "HOPR [msg] - egress")]
     MsgOut,
+    #[strum(to_string = "HOPR [msg] - mixer")]
+    Mixer,
+    #[strum(to_string = "bloom filter persistence (periodic)")]
     BloomPersist,
 }
+/// Processed indexer generated events.
+#[derive(Debug, Clone)]
+pub enum PeerDiscovery {
+    Allow(PeerId),
+    Ban(PeerId),
+    Announce(PeerId, Vec<Multiaddr>),
+}
 
+/// Run all processes responsible for handling the msg and acknowledgment protocols.
+///
+/// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
+/// overlayed on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
-    cfg: msg::processor::PacketInteractionConfig,
+    packet_cfg: msg::processor::PacketInteractionConfig,
     db: Db,
-    me: &OffchainKeypair,
-    me_onchain: &ChainKeypair,
     bloom_filter_persistent_path: Option<String>,
     wire_ack: (
         impl futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static,
@@ -155,6 +161,9 @@ pub async fn run_msg_ack_protocol<Db>(
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
+    let me = packet_cfg.packet_keypair.clone();
+    let me_onchain = &packet_cfg.chain_keypair.clone();
+
     let mut processes = HashMap::new();
 
     #[cfg(all(feature = "prometheus", not(test)))]
@@ -167,8 +176,6 @@ where
         lazy_static::initialize(&METRIC_PACKET_COUNT_PER_PEER);
         lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);
         lazy_static::initialize(&METRIC_REJECTED_TICKETS_COUNT);
-        lazy_static::initialize(&METRIC_QUEUE_SIZE);
-        lazy_static::initialize(&METRIC_MIXER_AVERAGE_DELAY);
     }
 
     let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
@@ -193,7 +200,7 @@ where
 
     let ack_processor_read = ack::processor::AcknowledgementProcessor::new(db.clone(), me_onchain);
     let ack_processor_write = ack_processor_read.clone();
-    let msg_processor_read = msg::processor::PacketProcessor::new(db.clone(), tbf, cfg);
+    let msg_processor_read = msg::processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
 
     processes.insert(
@@ -251,14 +258,6 @@ where
 
     let msg_to_send_tx = wire_msg.0.clone();
 
-    let mixer_cfg = msg::mixer::MixerConfig::new(
-        0,
-        std::env::var(ENV_MIXER_PACKET_MAX_DELAY_MILLIS)
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or_else(|| msg::mixer::MixerConfig::default().delay_range().1),
-    );
-
     processes.insert(
         ProtocolProcesses::MsgOut,
         spawn(async move {
@@ -266,9 +265,6 @@ where
                 .1
                 .then_concurrent(|(data, path, finalizer)| {
                     let msg_processor = msg_processor_write.clone();
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_QUEUE_SIZE.increment(1.0f64);
 
                     async move {
                         match PacketWrapping::send(&msg_processor, data, path).await {
@@ -282,9 +278,6 @@ where
                                 Some(v)
                             }
                             Err(e) => {
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                METRIC_QUEUE_SIZE.decrement(1.0f64);
-
                                 finalizer.finalize(Err(e));
                                 None
                             }
@@ -292,28 +285,8 @@ where
                     }
                 })
                 .filter_map(|v| async move { v })
-                // delay purposefully isolated into a separate concurrent task
-                .then_concurrent(|v| async move {
-                    let random_delay = mixer_cfg.random_delay();
-                    trace!(delay_in_ms = random_delay.as_millis(), "Created random mixer delay",);
-
-                    sleep(random_delay).await;
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    {
-                        METRIC_QUEUE_SIZE.decrement(1.0f64);
-
-                        let weight = 1.0f64 / mixer_cfg.metric_delay_window as f64;
-                        METRIC_MIXER_AVERAGE_DELAY.set(
-                            (weight * random_delay.as_millis() as f64)
-                                + ((1.0f64 - weight) * METRIC_MIXER_AVERAGE_DELAY.get()),
-                        );
-                    }
-
-                    v
-                })
                 .map(Ok)
-                .forward(wire_msg.0)
+                .forward(msg_to_send_tx)
                 .await;
         }),
     );
@@ -327,11 +300,19 @@ where
                 .then_concurrent(move |(peer, data)| {
                     let msg_processor = msg_processor_read.clone();
 
-                    async move { msg_processor.recv(&peer, data).await.map_err(|e| (peer, e)) }
+                    async move { 
+                        let now = std::time::Instant::now();
+                        let r = msg_processor.recv(&peer, data).await.map_err(|e| (peer, e));
+                        let elapsed = now.elapsed();
+                        if elapsed.as_millis() > 150 {
+                            tracing::warn!("msg_processor.recv took {}ms", elapsed.as_millis());
+                        }
+                        r
+                    }
                 })
                 .filter_map(move |v| {
                     let mut internal_ack_send = internal_ack_send.clone();
-                    let mut msg_to_send_tx = msg_to_send_tx.clone();
+                    let mut msg_to_send_tx = wire_msg.0.clone();
                     let me = me.clone();
 
                     async move {
@@ -343,9 +324,16 @@ where
                                         METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
                                         METRIC_PACKET_COUNT.increment(&["received"]);
                                     }
+
+                                    let now = std::time::Instant::now();
                                     internal_ack_send.send((ack.peer, ack.ack)).await.unwrap_or_else(|e| {
                                         error!(error = %e, "Failed to forward an acknowledgement to the transport layer");
                                     });
+                                    let elapsed = now.elapsed();
+                                    if elapsed.as_millis() > 150 {
+                                        tracing::warn!("internal_ack.send took {}ms", elapsed.as_millis());
+                                    }
+
                                     Some(data)
                                 }
                                 msg::processor::RecvOperation::Forward { msg, ack } => {
