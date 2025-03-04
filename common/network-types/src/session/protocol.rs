@@ -413,6 +413,8 @@ impl<const C: usize> asynchronous_codec::Encoder for SessionCodec<C> {
         dst.put_u8(disc);
         dst.put_u16(msg_len);
         dst.extend_from_slice(&msg);
+
+        tracing::trace!(disc, msg_len, "encoded message");
         Ok(())
     }
 }
@@ -422,7 +424,8 @@ impl<const C: usize> asynchronous_codec::Decoder for SessionCodec<C> {
     type Error = SessionError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if src.len() < C {
+        tracing::trace!(msg_len = src.len(), "decoding message");
+        if src.len() < SessionMessage::<C>::minimum_message_size() {
             return Ok(None);
         }
 

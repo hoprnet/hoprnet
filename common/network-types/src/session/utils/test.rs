@@ -13,6 +13,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use tracing::instrument;
 
 // Using static RNG seed to make tests reproducible between different runs
 const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
@@ -140,8 +141,7 @@ impl NetworkStats {
     pub fn assert_packets_sent(&self, expected: usize) {
         let actual = self.packets_sent.load(std::sync::atomic::Ordering::Relaxed);
         assert_eq!(
-            actual,
-            expected,
+            actual, expected,
             "packets sent must be equal to {expected}, but was {actual}",
         );
     }
@@ -149,8 +149,7 @@ impl NetworkStats {
     pub fn assert_packets_received(&self, expected: usize) {
         let actual = self.packets_received.load(std::sync::atomic::Ordering::Relaxed);
         assert_eq!(
-            actual,
-            expected,
+            actual, expected,
             "packets received must be equal to {expected}, but was {actual}",
         )
     }
@@ -158,8 +157,7 @@ impl NetworkStats {
     pub fn assert_bytes_sent(&self, expected: usize) {
         let actual = self.bytes_sent.load(std::sync::atomic::Ordering::Relaxed);
         assert_eq!(
-            actual,
-            expected,
+            actual, expected,
             "bytes sent must be equal to {expected}, but was {actual}",
         );
     }
@@ -167,8 +165,7 @@ impl NetworkStats {
     pub fn assert_bytes_received(&self, expected: usize) {
         let actual = self.bytes_received.load(std::sync::atomic::Ordering::Relaxed);
         assert_eq!(
-            actual,
-            expected,
+            actual, expected,
             "bytes received must be equal to {expected}, but was {actual}",
         );
     }
@@ -195,11 +192,15 @@ pub struct FaultyNetwork<'a, const C: usize> {
 }
 
 impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
-    fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+    #[instrument(name = "FaultyNetwork::poll_write", level = "trace", skip(self, buf), fields(len = buf.len()))]
+    fn poll_write(self: Pin<&mut Self>, _: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         if buf.len() > C {
             return Poll::Ready(Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                format!("data length passed to downstream must be less or equal to {C}"),
+                format!(
+                    "data length passed to downstream must be less or equal to {C}, actual: {}",
+                    buf.len()
+                ),
             )));
         }
 
@@ -217,21 +218,26 @@ impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
             stats.packets_sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
 
-        tracing::trace!("FaultyNetwork::poll_write {} bytes", buf.len());
+        tracing::trace!("write done");
         Poll::Ready(Ok(buf.len()))
     }
 
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+    #[instrument(name = "FaultyNetwork::poll_flush", level = "trace", skip(self))]
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        tracing::trace!("polling flush");
         Poll::Ready(Ok(()))
     }
 
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+    #[instrument(name = "FaultyNetwork::poll_close", level = "trace", skip(self))]
+    fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        tracing::trace!("polling close");
         self.ingress.close_channel();
         Poll::Ready(Ok(()))
     }
 }
 
 impl<const C: usize> AsyncRead for FaultyNetwork<'_, C> {
+    #[instrument(name = "FaultyNetwork::poll_read", level = "trace", skip(self, cx, buf))]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         match self.egress.poll_next_unpin(cx) {
             Poll::Ready(Some(item)) => {
@@ -247,7 +253,7 @@ impl<const C: usize> AsyncRead for FaultyNetwork<'_, C> {
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
 
-                tracing::trace!("FaultyNetwork::poll_read: {len} bytes ready");
+                tracing::trace!(len, "bytes ready");
                 Poll::Ready(Ok(len))
             }
             Poll::Ready(None) => Poll::Ready(Ok(0)),

@@ -79,8 +79,8 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self), fields(session_id = self.0, frame_id = seg_id.0))]
-    fn incoming_segment(&mut self, seg_id: &SegmentId, _: SeqNum) -> Result<(), SessionError> {
+    #[tracing::instrument(skip(self, seg_id), fields(frame_id = seg_id.0, seq_idx = seg_id.1))]
+    fn incoming_segment(&mut self, seg_id: &SegmentId, seq_len: SeqNum) -> Result<(), SessionError> {
         tracing::trace!("incoming segment");
         Ok(())
     }

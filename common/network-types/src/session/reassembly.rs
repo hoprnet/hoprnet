@@ -1,13 +1,13 @@
-use std::collections::VecDeque;
-use std::pin::Pin;
-use std::task::{Context, Poll, Waker};
-use std::time::{Duration, Instant};
-
 use crate::prelude::errors::SessionError;
 use crate::prelude::{Frame, Segment};
 use crate::session::frames::{
     FrameBuilder, FrameDashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry, FrameMapVacantEntry,
 };
+use std::collections::VecDeque;
+use std::pin::Pin;
+use std::task::{Context, Poll, Waker};
+use std::time::{Duration, Instant};
+use tracing::instrument;
 
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
@@ -74,8 +74,9 @@ impl Reassembler<FrameDashMap> {
 impl<M: FrameMap> futures::Sink<Segment> for Reassembler<M> {
     type Error = SessionError;
 
+    #[instrument(name = "Reassembler::poll_ready", level = "trace", skip(self, cx), fields(capacity = self.capacity, remaining = self.complete_frames.len()))]
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        tracing::trace!("Reassembler::poll_ready");
+        tracing::trace!("checking ready");
         if self.is_closed {
             return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
@@ -96,19 +97,17 @@ impl<M: FrameMap> futures::Sink<Segment> for Reassembler<M> {
                 waker.wake();
             }
 
-            tracing::trace!("Reassembler::poll_ready pending");
+            tracing::trace!("pending");
             Poll::Pending
         } else {
-            tracing::trace!(
-                remaining = self.capacity - self.complete_frames.len(),
-                "Reassembler::poll_ready ready",
-            );
+            tracing::trace!(remaining = self.capacity - self.complete_frames.len(), "ready",);
             Poll::Ready(Ok(()))
         }
     }
 
+    #[instrument(name = "Reassembler::start_send", level = "trace", skip(self, item), fields(frame_id = item.frame_id, seq_idx = item.seq_idx))]
     fn start_send(mut self: Pin<&mut Self>, item: Segment) -> Result<(), Self::Error> {
-        tracing::trace!("Reassembler::start_send");
+        tracing::trace!("starting send");
         if self.is_closed {
             return Err(SessionError::ReassemblerClosed);
         }
@@ -119,14 +118,14 @@ impl<M: FrameMap> futures::Sink<Segment> for Reassembler<M> {
                 match builder.add_segment(item) {
                     Ok(_) => {
                         if builder.is_complete() {
-                            tracing::trace!(frame_id = e.frame_id(), "Reassembler::start_send frame is complete");
+                            tracing::trace!("frame is complete");
                             Some(e.finalize().try_into())
                         } else {
                             None
                         }
                     }
                     Err(error) => {
-                        tracing::error!(frame_id = e.frame_id(), %error, "encountered invalid segment");
+                        tracing::error!(%error, "encountered invalid segment");
                         None
                     }
                 }
@@ -134,10 +133,7 @@ impl<M: FrameMap> futures::Sink<Segment> for Reassembler<M> {
             FrameMapEntry::Vacant(e) => {
                 let builder = FrameBuilder::from(item);
                 if builder.is_complete() {
-                    tracing::trace!(
-                        frame_id = builder.frame_id(),
-                        "Reassembler::start_send single segment frame is complete",
-                    );
+                    tracing::trace!("segment frame is complete");
                     Some(builder.try_into())
                 } else {
                     e.insert_builder(builder);
@@ -148,7 +144,7 @@ impl<M: FrameMap> futures::Sink<Segment> for Reassembler<M> {
 
         if let Some(frame) = maybe_frame {
             self.complete_frames.push_back(frame);
-            tracing::trace!("Reassembler::start_send pushed new");
+            tracing::trace!("pushed new");
             if let Some(waker) = self.tx_waker.take() {
                 waker.wake();
             }
@@ -157,8 +153,9 @@ impl<M: FrameMap> futures::Sink<Segment> for Reassembler<M> {
         Ok(())
     }
 
+    #[instrument(name = "Reassembler::poll_flush", level = "trace", skip(self))]
     fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        tracing::trace!("Reassembler::poll_flush");
+        tracing::trace!("polling flush");
         if self.is_closed {
             return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
@@ -170,8 +167,9 @@ impl<M: FrameMap> futures::Sink<Segment> for Reassembler<M> {
         Poll::Ready(Ok(()))
     }
 
+    #[instrument(name = "Reassembler::poll_close", level = "trace", skip(self))]
     fn poll_close(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        tracing::trace!("Reassembler::poll_close");
+        tracing::trace!("polling close");
         if self.is_closed {
             return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
@@ -191,12 +189,13 @@ impl<M: FrameMap> futures::Sink<Segment> for Reassembler<M> {
 impl<M: FrameMap> futures::Stream for Reassembler<M> {
     type Item = Result<Frame, SessionError>;
 
+    #[instrument(name = "Reassembler::poll_next", level = "trace", skip(self, cx))]
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        tracing::trace!("Reassembler::poll_next");
+        tracing::trace!("polling next");
         self.expire_frames();
 
         if self.is_closed && self.complete_frames.is_empty() {
-            tracing::trace!("Reassembler::poll_next done");
+            tracing::trace!("done - closed");
             return Poll::Ready(None);
         }
 
@@ -206,8 +205,8 @@ impl<M: FrameMap> futures::Stream for Reassembler<M> {
             }
             Poll::Ready(Some(
                 complete
-                    .inspect(|f| tracing::trace!(frame_id = f.frame_id, "Reassembler::poll_next ready"))
-                    .inspect_err(|e| tracing::trace!(error = %e, "Reassembler::poll_next ready error")),
+                    .inspect(|f| tracing::trace!(frame_id = f.frame_id, "ready"))
+                    .inspect_err(|e| tracing::trace!(error = %e, "ready error")),
             ))
         } else if !self.is_closed {
             // The next sink operation will wake us up, but only if we give it a chance
@@ -217,10 +216,10 @@ impl<M: FrameMap> futures::Stream for Reassembler<M> {
                 waker.wake();
             }
 
-            tracing::trace!("Reassembler::poll_next pending");
+            tracing::trace!("pending");
             Poll::Pending
         } else {
-            tracing::trace!("Reassembler::poll_next done");
+            tracing::trace!("done");
             Poll::Ready(None)
         }
     }

@@ -1,12 +1,12 @@
-use futures::{ready, Sink, SinkExt};
-use std::pin::Pin;
-use std::task::{Context, Poll};
-
 use crate::prelude::protocol::SessionMessage;
 use crate::session::errors::SessionError;
 use crate::session::frame::FrameId;
 use crate::session::frame::SeqNum;
 use crate::session::Segment;
+use futures::{ready, Sink, SinkExt};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tracing::instrument;
 
 /// `C` is MTU size, `F` is frame size.
 pub struct Segmenter<const C: usize> {
@@ -17,6 +17,7 @@ pub struct Segmenter<const C: usize> {
     frame_size: usize,
     closed: bool,
     tx: Pin<Box<dyn Sink<Segment, Error = SessionError> + Send>>,
+    flush_each_segment: bool,
 }
 
 impl<const C: usize> Segmenter<C> {
@@ -40,14 +41,16 @@ impl<const C: usize> Segmenter<C> {
                 closed: false,
                 tx: Box::pin(tx.sink_map_err(|e| SessionError::ProcessingError(e.to_string()))),
                 frame_size,
+                flush_each_segment: false, // TODO:
             },
             rx,
         )
     }
 
+    #[instrument(name = "Segmenter::poll_flush_segments", level = "trace", skip(self, cx), fields(frame_id = self.next_frame_id, seq_len = self.ready_segments.len()))]
     fn poll_flush_segments(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SessionError>> {
         let seq_len = self.ready_segments.len();
-        tracing::trace!(frame_id = self.next_frame_id, seq_len, "Segmenter::poll_flush_segments");
+        tracing::trace!("flushing segments");
 
         let all_segments = self.ready_segments.drain(..).collect::<Vec<_>>();
         for (i, mut seg) in all_segments.into_iter().enumerate() {
@@ -56,19 +59,19 @@ impl<const C: usize> Segmenter<C> {
 
             ready!(self.tx.as_mut().poll_ready(cx))?;
 
-            tracing::trace!(
-                frame_id = seg.frame_id,
-                seq_idx = seg.seq_idx,
-                "Segmenter::poll_flush_segments segment out"
-            );
+            tracing::trace!(frame_id = seg.frame_id, seq_idx = seg.seq_idx, "segment out");
             self.tx.as_mut().start_send(seg)?;
+
+            if self.flush_each_segment {
+                ready!(self.tx.as_mut().poll_flush(cx))?;
+                tracing::trace!(frame_id = self.next_frame_id, seg_idx = i, "segment flushed out");
+            }
         }
 
-        ready!(self.tx.as_mut().poll_flush(cx))?;
-        tracing::trace!(
-            frame_id = self.next_frame_id,
-            "Segmenter::poll_flush_segments frame flushed out"
-        );
+        if !self.flush_each_segment {
+            ready!(self.tx.as_mut().poll_flush(cx))?;
+            tracing::trace!(frame_id = self.next_frame_id, "frame flushed out");
+        }
 
         self.next_frame_id += 1;
         self.current_frame_len = 0;
@@ -76,6 +79,7 @@ impl<const C: usize> Segmenter<C> {
         Poll::Ready(Ok(()))
     }
 
+    #[instrument(name = "Segmenter::complete_segment", level = "trace", skip(self), fields(frame_id = self.next_frame_id, seq_len = self.ready_segments.len()))]
     fn complete_segment(&mut self) {
         let new_segment = Segment {
             frame_id: self.next_frame_id,
@@ -90,10 +94,10 @@ impl<const C: usize> Segmenter<C> {
 
         tracing::trace!(
             frame_id = self.next_frame_id,
-            seq_idx = self.seg_buffer.len(),
+            seq_idx = self.ready_segments.len(),
             bytes_added = seg_len,
             remaining_in_frame = self.frame_size - self.current_frame_len,
-            "Segmenter::complete_segment"
+            "completed segment"
         );
 
         self.ready_segments.push(new_segment);
@@ -101,15 +105,16 @@ impl<const C: usize> Segmenter<C> {
 }
 
 impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
+    #[instrument(name = "Segmenter::poll_write", level = "trace", skip(self, cx, buf), fields(len = buf.len()))]
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        tracing::trace!("Segmenter::poll_write");
+        tracing::trace!("polling write");
         if self.closed {
-            tracing::trace!("Segmenter::poll_write error closed");
+            tracing::trace!("error closed");
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
 
         if buf.is_empty() {
-            tracing::trace!("Segmenter::poll_write ready empty buffer");
+            tracing::trace!("ready empty buffer");
             return Poll::Ready(Ok(0));
         }
 
@@ -118,12 +123,12 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
         tracing::trace!(
             len = len_to_write,
             remaining = Self::PAYLOAD_CAPACITY - self.seg_buffer.len(),
-            "Segmenter::poll_write add segment data"
+            "add segment data"
         );
 
         if self.seg_buffer.len() == Self::PAYLOAD_CAPACITY {
             if self.current_frame_len + len_to_write > self.frame_size {
-                tracing::trace!("Segmenter::poll_write frame full");
+                tracing::trace!("frame full");
                 ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
             }
 
@@ -134,14 +139,16 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
             }
         }
 
-        tracing::trace!(len = len_to_write, "Segmenter::poll_write ready");
+        tracing::trace!(len = len_to_write, "ready");
         Poll::Ready(Ok(len_to_write))
     }
 
+    #[instrument(name = "Segmenter::poll_flush", level = "trace", skip(self, cx))]
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        tracing::trace!("Segmenter::poll_flush");
+        tracing::trace!("flush");
+
         if self.closed {
-            tracing::trace!("Segmenter::poll_flush error closed");
+            tracing::trace!("error closed");
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
 
@@ -149,17 +156,19 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
             tracing::trace!(
                 frame_id = self.next_frame_id,
                 len = self.seg_buffer.len(),
-                "Segmenter::poll_flush partial frame"
+                "partial frame"
             );
             self.complete_segment();
         }
         self.as_mut().poll_flush_segments(cx).map_err(std::io::Error::other)
     }
 
+    #[instrument(name = "Segmenter::poll_close", level = "trace", skip(self, cx))]
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        tracing::trace!("Segmenter::poll_close");
+        tracing::trace!("close");
+
         if self.closed {
-            tracing::trace!("Segmenter::poll_close error closed");
+            tracing::trace!("error closed");
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
 
@@ -169,7 +178,7 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
             tracing::trace!(
                 frame_id = self.next_frame_id,
                 len = self.seg_buffer.len(),
-                "Segmenter::poll_close partial frame"
+                "partial frame"
             );
             self.complete_segment();
         }

@@ -1,10 +1,10 @@
+use crate::prelude::errors::SessionError;
+use crate::prelude::FrameId;
 use std::collections::BinaryHeap;
 use std::pin::{pin, Pin};
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
-
-use crate::prelude::errors::SessionError;
-use crate::prelude::FrameId;
+use tracing::instrument;
 
 #[derive(Copy, Clone, Debug)]
 pub struct SequencerConfig {
@@ -56,13 +56,14 @@ where
 {
     type Error = SessionError;
 
+    #[instrument(name = "Sequencer::poll_ready", level = "trace", skip(self, cx))]
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        tracing::trace!("Sequencer::poll_ready");
+        tracing::trace!("polling ready");
         if self.is_closed {
             return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
 
-        tracing::trace!(len = self.buffer.len(), "Sequencer::poll_ready buffer");
+        tracing::trace!(len = self.buffer.len(), "buffer");
 
         if self.buffer.len() >= self.cfg.capacity {
             self.rx_waker = Some(cx.waker().clone());
@@ -72,26 +73,24 @@ where
                 waker.wake();
             }
 
-            tracing::trace!("Sequencer::poll_ready pending");
+            tracing::trace!("pending");
             Poll::Pending
         } else {
-            tracing::trace!(
-                len = self.cfg.capacity - self.buffer.len(),
-                "Sequencer::poll_ready ready"
-            );
+            tracing::trace!(len = self.cfg.capacity - self.buffer.len(), "ready");
             Poll::Ready(Ok(()))
         }
     }
 
+    #[instrument(name = "Sequencer::start_send", level = "trace", skip(self, item))]
     fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        tracing::trace!("Sequencer::start_send");
+        tracing::trace!("starting send");
         if self.is_closed {
             return Err(SessionError::ReassemblerClosed);
         }
 
         if item.ge(&self.next_id) {
             self.buffer.push(std::cmp::Reverse(item));
-            tracing::trace!("Sequencer::start_send pushed new");
+            tracing::trace!("pushed new");
             if self.buffer.len() >= self.cfg.flush_at {
                 if let Some(waker) = self.tx_waker.take() {
                     waker.wake();
@@ -104,8 +103,9 @@ where
         Ok(())
     }
 
+    #[instrument(name = "Sequencer::poll_flush", level = "trace", skip(self))]
     fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        tracing::trace!("Sequencer::poll_flush");
+        tracing::trace!("polling flush");
         if self.is_closed {
             return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
@@ -117,8 +117,9 @@ where
         Poll::Ready(Ok(()))
     }
 
+    #[instrument(name = "Sequencer::poll_close", level = "trace", skip(self))]
     fn poll_close(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        tracing::trace!("Sequencer::poll_close");
+        tracing::trace!("polling close");
         if self.is_closed {
             return Poll::Ready(Err(SessionError::ReassemblerClosed));
         }
@@ -141,10 +142,11 @@ where
 {
     type Item = Result<T, SessionError>;
 
+    #[instrument(name = "Sequencer::poll_next", level = "trace", skip(self, cx))]
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        tracing::trace!("Sequencer::poll_next");
+        tracing::trace!("polling next");
         if self.is_closed && self.buffer.is_empty() {
-            tracing::trace!("Sequencer::poll_next done");
+            tracing::trace!("done");
             return Poll::Ready(None);
         }
 
@@ -161,14 +163,10 @@ where
                     if let Some(waker) = self.rx_waker.take() {
                         waker.wake();
                     }
-                    tracing::trace!(
-                        frame_id = current_to_emit,
-                        len = self.buffer.len(),
-                        "Sequencer::poll_next ready"
-                    );
+                    tracing::trace!(frame_id = current_to_emit, len = self.buffer.len(), "ready");
                     Poll::Ready(popped)
                 } else {
-                    tracing::trace!(frame_id = current_to_emit, "Sequencer::poll_next discard");
+                    tracing::trace!(frame_id = current_to_emit, "discard");
                     Poll::Ready(Some(Err(SessionError::FrameDiscarded(current_to_emit))))
                 };
             }
@@ -178,7 +176,7 @@ where
                 // we emit the missing ones as discarded frames until we
                 // catch up with the rest of the buffered frames to flush out.
                 self.next_id += 1;
-                tracing::trace!(frame_id = current_to_emit, "Sequencer::poll_next discard");
+                tracing::trace!(frame_id = current_to_emit, "discard");
                 return Poll::Ready(Some(Err(SessionError::FrameDiscarded(current_to_emit))));
             }
         }
@@ -191,7 +189,7 @@ where
             waker.wake();
         }
 
-        tracing::trace!("Sequencer::poll_next pending");
+        tracing::trace!("pending");
         Poll::Pending
     }
 }

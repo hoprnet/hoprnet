@@ -54,7 +54,7 @@ fn build_reconstructor<M: FrameMap + Send + 'static>(
                 // discarded in the sequencer as missing,
                 // so we're safe to filter them out here and only log them.
                 maybe_frame
-                    .inspect_err(|e| tracing::error!("failed to reassemble frame: {e}"))
+                    .inspect_err(|error| tracing::error!(%error, "failed to reassemble frame"))
                     .ok()
                     .map(Ok)
             })
@@ -62,7 +62,7 @@ fn build_reconstructor<M: FrameMap + Send + 'static>(
             .await
         {
             Ok(_) => tracing::debug!("frame reconstructor finished"),
-            Err(e) => tracing::error!("frame reconstructor finished with error: {e}"),
+            Err(error) => tracing::error!(%error, "frame reconstructor finished with error"),
         }
     });
     (sink, stream)

@@ -22,6 +22,8 @@ pub struct SessionSocketConfig {
     pub frame_size: usize,
     #[default(Duration::from_secs(4))]
     pub frame_timeout: Duration,
+    #[default(false)]
+    pub allow_multiple_segments: bool,
 }
 
 #[pin_project::pin_project]
@@ -94,8 +96,15 @@ impl<const C: usize, S: SocketState<C> + 'static> SessionSocket<C, S> {
         // Upstream frames get segmented and are yielded by the data_rx stream
         let (upstream_frames_in, segmented_data_rx) = Segmenter::<C>::new(cfg.frame_size, RECONSTRUCTOR_CAPACITY);
 
+        let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
+
+        // Check if we allow sending multiple segments to downstream in a single write
+        if !cfg.allow_multiple_segments {
+            framed.set_send_high_water_mark(C);
+        }
+
         // Downstream transport
-        let (packets_out, packets_in) = asynchronous_codec::Framed::new(transport, SessionCodec::<C>).split();
+        let (packets_out, packets_in) = framed.split();
 
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
         state.run(SocketComponents { inspector, ctl_tx })?;
@@ -124,7 +133,10 @@ impl<const C: usize, S: SocketState<C> + 'static> SessionSocket<C, S> {
                         tracing::error!(%error, "error while processing outgoing packets")
                     }
                 })
-                .instrument(tracing::debug_span!("packets_out", session_id = state.session_id())),
+                .instrument(tracing::debug_span!(
+                    "SessionSocket::packets_out",
+                    session_id = state.session_id()
+                )),
         );
 
         // Packets incoming from Downstream:
@@ -152,7 +164,10 @@ impl<const C: usize, S: SocketState<C> + 'static> SessionSocket<C, S> {
                         tracing::error!(%error, "error while processing incoming packets")
                     }
                 })
-                .instrument(tracing::debug_span!("packets_in", session_id = state.session_id())),
+                .instrument(tracing::debug_span!(
+                    "SessionSocket::packets_in",
+                    session_id = state.session_id()
+                )),
         );
 
         Ok(Self {
@@ -178,7 +193,10 @@ impl<const C: usize, S: SocketState<C> + 'static> SessionSocket<C, S> {
                             }
                             Err(err) => Some(Err(std::io::Error::other(err))),
                         })
-                        .instrument(tracing::debug_span!("frame_writer", session_id = state.session_id()))
+                        .instrument(tracing::debug_span!(
+                            "SessionSocket::frame_writer",
+                            session_id = state.session_id()
+                        ))
                     })
                     .into_async_read(),
             ),
@@ -220,14 +238,15 @@ impl<const C: usize, S: SocketState<C> + 'static> futures::io::AsyncWrite for Se
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::AsyncReadExt;
+    use futures::{AsyncReadExt, AsyncWriteExt};
 
-    use crate::utils::DuplexIO;
     use crate::session::testing::*;
+    use crate::utils::DuplexIO;
 
     const MTU: usize = 466;
 
-    type Duplex<'a> = DuplexIO<futures::io::ReadHalf<FaultyNetwork<'a, MTU>>, futures::io::WriteHalf<FaultyNetwork<'a, MTU>>>;
+    type Duplex<'a> =
+        DuplexIO<futures::io::ReadHalf<FaultyNetwork<'a, MTU>>, futures::io::WriteHalf<FaultyNetwork<'a, MTU>>>;
 
     fn setup_alice_bob<'a>(
         network_cfg: FaultyNetworkConfig,
@@ -260,17 +279,31 @@ mod tests {
         (DuplexIO(alice_reader, bob_writer), DuplexIO(bob_reader, alice_writer))
     }
 
-    #[async_std::test]
-    async fn stateless_socket_bidirectional_should_work() -> anyhow::Result<()> {
+    #[test_log::test(async_std::test)]
+    async fn stateless_socket_unidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob(FaultyNetworkConfig::default(), None, None);
 
-        let mut alice_socket =
-            SessionSocket::<MTU,_>::new_stateless("alice", alice, Default::default())?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
 
-        let mut bob_socket =
-            SessionSocket::<MTU,_>::new_stateless("bob", bob, Default::default())?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, Default::default())?;
 
+        let data = hopr_crypto_random::random_bytes::<4096>();
 
+        alice_socket.write_all(&data).await?;
+        alice_socket.flush().await?;
+
+        let mut bob_data = vec![0; data.len()];
+        bob_socket.read_exact(&mut bob_data).await?;
+        assert_eq!(data, *bob_data);
+
+        /*
+        bob_socket.write_all(&data).await?;
+        bob_socket.flush().await?;
+
+        let mut alice_data = vec![0; data.len()];
+        alice_socket.read_exact(&mut alice_data).await?;
+        assert_eq!(data, *alice_data);
+        */
         Ok(())
     }
 }
