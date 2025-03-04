@@ -9,7 +9,7 @@ repository = "https://github.com/hoprnet/hoprnet"
 license = "GPL-3.0-only"
 
 [features]
-default = []
+default = ["hashbrown"]
 serde = ["dep:serde", "dep:serde_bytes", "libp2p-identity/serde"]
 runtime-async-std = [
   "dep:async-std-resolver",
@@ -21,6 +21,7 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hickory-resolver/tokio-runtime",
 ]
+hashbrown = ["dep:hashbrown"]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 testing = []
 
@@ -28,19 +29,27 @@ testing = []
 aquamarine = { workspace = true }
 arrayvec = { workspace = true }
 async-std-resolver = { workspace = true, optional = true }
+asynchronous-codec = "0.7.0"
 bitvec = { workspace = true }
+bytes = "1"
 crossbeam-queue = { workspace = true }
 crossbeam-skiplist = { workspace = true }
 dashmap = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
+futures-concurrency = { workspace = true }
+futures-time = { workspace = true }
 governor = { workspace = true }
 hex = { workspace = true }
 hickory-resolver = { workspace = true }
+hashbrown = { version = "0.15.2", optional = true }
 lazy_static = { workspace = true, optional = true }
 libp2p-identity = { workspace = true }
+pin-project = "1.1.3"
+parking_lot = "0.12.3"
 rand = { workspace = true }
 rand_distr = { workspace = true }
+ringbuffer = "0.15.0"
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
@@ -77,6 +86,9 @@ tokio-util = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 
+[[bench]]
+name = "reconstructor_bench"
+harness = false
 
 [[bench]]
 name = "session"

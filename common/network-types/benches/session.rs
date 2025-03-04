@@ -8,7 +8,7 @@ use std::collections::HashSet;
 #[cfg(not(feature = "testing"))]
 compile_error!("Must specify the 'testing' feature");
 
-use hopr_network_types::prelude::{FaultyNetwork, FaultyNetworkConfig};
+use hopr_network_types::session::testing::{FaultyNetwork, FaultyNetworkConfig};
 
 /// This MTU is based on the current MTU size in HOPR 2.2
 const MTU: usize = 466;
