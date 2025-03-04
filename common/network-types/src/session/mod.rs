@@ -31,11 +31,13 @@ mod utils;
 pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId};
 use frames::{FrameDashMap, FrameHashMap, FrameMap};
 pub use segmenter::Segmenter;
+use tracing::Instrument;
 
 #[cfg(any(test, feature = "testing"))]
 pub use utils::test as testing;
 
 fn build_reconstructor<M: FrameMap + Send + 'static>(
+    id: &str,
     reassembler: reassembly::Reassembler<M>,
     sequencer: sequencer::Sequencer<Frame>,
 ) -> (
@@ -47,28 +49,33 @@ fn build_reconstructor<M: FrameMap + Send + 'static>(
     let (sink, rs_stream) = reassembler.split();
     let (seq_sink, stream) = sequencer.split();
 
-    hopr_async_runtime::prelude::spawn(async {
-        match rs_stream
-            .filter_map(|maybe_frame| async {
-                // Frames that fail to reassemble will eventually be
-                // discarded in the sequencer as missing,
-                // so we're safe to filter them out here and only log them.
-                maybe_frame
-                    .inspect_err(|error| tracing::error!(%error, "failed to reassemble frame"))
-                    .ok()
-                    .map(Ok)
-            })
-            .forward(seq_sink)
-            .await
-        {
-            Ok(_) => tracing::debug!("frame reconstructor finished"),
-            Err(error) => tracing::error!(%error, "frame reconstructor finished with error"),
+    let id = id.to_string();
+    hopr_async_runtime::prelude::spawn(
+        async {
+            match rs_stream
+                .filter_map(|maybe_frame| async {
+                    // Frames that fail to reassemble will eventually be
+                    // discarded in the sequencer as missing,
+                    // so we're safe to filter them out here and only log them.
+                    maybe_frame
+                        .inspect_err(|error| tracing::error!(%error, "failed to reassemble frame"))
+                        .ok()
+                        .map(Ok)
+                })
+                .forward(seq_sink)
+                .await
+            {
+                Ok(_) => tracing::debug!("frame reconstructor finished"),
+                Err(error) => tracing::error!(%error, "frame reconstructor finished with error"),
+            }
         }
-    });
+        .instrument(tracing::debug_span!("FrameReconstructor", session_id = %id)),
+    );
     (sink, stream)
 }
 
 pub fn frame_reconstructor(
+    id: &str,
     frame_timeout: std::time::Duration,
     capacity: usize,
 ) -> (
@@ -76,6 +83,7 @@ pub fn frame_reconstructor(
     impl futures::Stream<Item = Result<Frame, errors::SessionError>>,
 ) {
     build_reconstructor(
+        id,
         reassembly::Reassembler::<FrameHashMap>::new(frame_timeout, capacity),
         sequencer::Sequencer::new(sequencer::SequencerConfig {
             timeout: frame_timeout,
@@ -86,6 +94,7 @@ pub fn frame_reconstructor(
 }
 
 pub fn frame_reconstructor_with_inspector(
+    id: &str,
     frame_timeout: std::time::Duration,
     capacity: usize,
 ) -> (
@@ -97,6 +106,7 @@ pub fn frame_reconstructor_with_inspector(
     let inspector = reassembler.inspect();
 
     let (sink, stream) = build_reconstructor(
+        id,
         reassembler,
         sequencer::Sequencer::new(sequencer::SequencerConfig {
             timeout: frame_timeout,
@@ -130,7 +140,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, seq_stream) = frame_reconstructor(Duration::from_secs(5), 1024);
+        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_secs(5), 1024);
 
         let mut segments = expected
             .iter()
@@ -163,7 +173,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, seq_stream) = frame_reconstructor(Duration::from_millis(50), 1024);
+        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_millis(50), 1024);
 
         let mut segments = expected
             .iter()

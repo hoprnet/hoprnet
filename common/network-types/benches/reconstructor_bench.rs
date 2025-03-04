@@ -10,7 +10,7 @@ use hopr_network_types::session::utils::test::linear_half_normal_shuffle;
 use hopr_network_types::session::FrameId;
 
 async fn send_one_way(segments: &Vec<Segment>) {
-    let (r_sink, seq_stream) = frame_reconstructor(Duration::from_secs(5), 8192);
+    let (r_sink, seq_stream) = frame_reconstructor("bench", Duration::from_secs(5), 8192);
 
     let all = hopr_async_runtime::prelude::spawn(seq_stream.try_collect::<Vec<_>>());
     let segments = segments.clone();

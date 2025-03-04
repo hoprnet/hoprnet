@@ -7,7 +7,7 @@ use state::SocketState;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tracing::Instrument;
+use tracing::{instrument, Instrument};
 
 use crate::prelude::errors::SessionError;
 use crate::prelude::protocol::{SessionCodec, SessionMessage};
@@ -42,15 +42,17 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
     pub fn new_stateless<T, I>(id: I, transport: T, cfg: SessionSocketConfig) -> Result<Self, SessionError>
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
-        I: std::fmt::Display,
+        I: std::fmt::Display + Clone,
     {
+        let state = Stateless::new(id);
+
         // Downstream Segments get reconstructed into Frames
         let (downstream_segment_in, downstream_frames_out) =
-            frame_reconstructor(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
+            frame_reconstructor(state.session_id(), cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
 
         Self::create(
             transport,
-            Stateless::new(id),
+            state,
             downstream_segment_in,
             downstream_frames_out,
             None,
@@ -68,7 +70,7 @@ impl<const C: usize, S: SocketState<C> + 'static> SessionSocket<C, S> {
     {
         // Downstream Segments get reconstructed into Frames
         let (downstream_segment_in, downstream_frames_out, inspector) =
-            frame_reconstructor_with_inspector(cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
+            frame_reconstructor_with_inspector(state.session_id(), cfg.frame_timeout, RECONSTRUCTOR_CAPACITY);
 
         Self::create(
             transport,
@@ -205,6 +207,7 @@ impl<const C: usize, S: SocketState<C> + 'static> SessionSocket<C, S> {
 }
 
 impl<const C: usize, S: SocketState<C> + 'static> futures::io::AsyncRead for SessionSocket<C, S> {
+    #[instrument(name = "SessionSocket::poll_read", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id(), len = buf.len()))]
     fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
         let inner = &mut self.downstream_frames_out;
         pin_mut!(inner);
@@ -213,18 +216,21 @@ impl<const C: usize, S: SocketState<C> + 'static> futures::io::AsyncRead for Ses
 }
 
 impl<const C: usize, S: SocketState<C> + 'static> futures::io::AsyncWrite for SessionSocket<C, S> {
+    #[instrument(name = "SessionSocket::poll_write", level = "trace", skip(self, cx, buf), fields(session_id = self.state.session_id(), len = buf.len()))]
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         let inner = &mut self.upstream_frames_in;
         pin_mut!(inner);
         inner.poll_write(cx, buf)
     }
 
+    #[instrument(name = "SessionSocket::poll_flush", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let inner = &mut self.upstream_frames_in;
         pin_mut!(inner);
         inner.poll_flush(cx)
     }
 
+    #[instrument(name = "SessionSocket::poll_close", level = "trace", skip(self, cx), fields(session_id = self.state.session_id()))]
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         let this = self.project();
         let _ = this.state.stop();
@@ -284,7 +290,6 @@ mod tests {
         let (alice, bob) = setup_alice_bob(FaultyNetworkConfig::default(), None, None);
 
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
-
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, Default::default())?;
 
         let data = hopr_crypto_random::random_bytes::<4096>();
@@ -296,14 +301,35 @@ mod tests {
         bob_socket.read_exact(&mut bob_data).await?;
         assert_eq!(data, *bob_data);
 
-        /*
+        alice_socket.close().await?;
+        bob_socket.close().await?;
+
+        Ok(())
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn stateless_socket_bidirectional_should_work() -> anyhow::Result<()> {
+        let (alice, bob) = setup_alice_bob(FaultyNetworkConfig::default(), None, None);
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, Default::default())?;
+
+        let data = hopr_crypto_random::random_bytes::<4096>();
+
+        alice_socket.write_all(&data).await?;
+        alice_socket.flush().await?;
+
         bob_socket.write_all(&data).await?;
         bob_socket.flush().await?;
+
+        let mut bob_data = vec![0; data.len()];
+        bob_socket.read_exact(&mut bob_data).await?;
+        assert_eq!(data, *bob_data);
 
         let mut alice_data = vec![0; data.len()];
         alice_socket.read_exact(&mut alice_data).await?;
         assert_eq!(data, *alice_data);
-        */
+
         Ok(())
     }
 }
