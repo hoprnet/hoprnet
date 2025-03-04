@@ -58,15 +58,11 @@ jobs:
         env:
           USER: runner
 
-      - name: Get PR labels
-        id: pr-labels
-        uses: joerick/pr-labels-action@v1.0.9
-
       - name: Determine build options
         id: options
         run: |
           nix_debug_option="-debug"
-          if [[ "${{ inputs.production }}" = "true" || -n "${GITHUB_PR_LABEL_DOCKER_PRODUCTION_BUILD}" ]]; then
+          if [[ "${{ inputs.production }}" = "true" || -n "${{ contains(github.event.pull_request.labels.*.name, 'docker-production-build') }}" ]]; then
             nix_debug_option=""
           fi
           declare docker_tag docker_tag_pr docker_release_latest_tag
@@ -127,7 +123,7 @@ jobs:
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}
 
       - name: Trigger deploy workflow if needed
-        if: (env.GITHUB_PR_LABEL_DEPLOY_NODES || inputs.production ) && contains(inputs.package,'hoprd') && vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true'
+        if: (contains(github.event.pull_request.labels.*.name, 'deploy-nodes') || inputs.production ) && contains(inputs.package,'hoprd') && vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true'
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
