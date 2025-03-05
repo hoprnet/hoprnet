@@ -1,7 +1,7 @@
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::Either;
 use futures::stream::BoxStream;
-use futures::{pin_mut, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt};
+use futures::{pin_mut, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, FutureExt, StreamExt};
 use hex_literal::hex;
 use rand::distributions::{Bernoulli, Distribution};
 use rand::prelude::StdRng;
@@ -13,6 +13,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use hashbrown::HashSet;
+use test_log::tracing_subscriber::filter::FilterExt;
 use tracing::instrument;
 
 // Using static RNG seed to make tests reproducible between different runs
@@ -122,11 +124,13 @@ pub async fn frames_send_and_recv<S>(
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FaultyNetworkConfig {
     pub fault_prob: f64,
     pub mixing_factor: usize,
+    pub avg_delay: Duration,
     pub rng_seed: [u8; 32],
+    pub ids_to_drop: HashSet<usize>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -176,10 +180,12 @@ impl Default for FaultyNetworkConfig {
         Self {
             fault_prob: 0.0,
             mixing_factor: 0,
+            avg_delay: Duration::ZERO,
             rng_seed: [
                 0xd8, 0xa4, 0x71, 0xf1, 0xc2, 0x04, 0x90, 0xa3, 0x44, 0x2b, 0x96, 0xfd, 0xde, 0x9d, 0x18, 0x07, 0x42,
                 0x80, 0x96, 0xe1, 0x60, 0x1b, 0x0c, 0xef, 0x0e, 0xea, 0x7e, 0x6d, 0x44, 0xa2, 0x4c, 0x01,
             ],
+            ids_to_drop: Default::default(),
         }
     }
 }
@@ -189,6 +195,8 @@ pub struct FaultyNetwork<'a, const C: usize> {
     ingress: UnboundedSender<Box<[u8]>>,
     egress: BoxStream<'a, Box<[u8]>>,
     stats: Option<NetworkStats>,
+    packet_counter: AtomicUsize,
+    ids_to_drop: HashSet<usize>,
 }
 
 impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
@@ -204,18 +212,21 @@ impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
             )));
         }
 
-        if let Err(e) = self.ingress.unbounded_send(buf.into()) {
-            return Poll::Ready(Err(std::io::Error::new(
-                std::io::ErrorKind::BrokenPipe,
-                format!("failed to send data: {e}"),
-            )));
-        }
+        let packet_id = self.packet_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if !self.ids_to_drop.contains(&packet_id) {
+            if let Err(e) = self.ingress.unbounded_send(buf.into()) {
+                return Poll::Ready(Err(std::io::Error::new(
+                    std::io::ErrorKind::BrokenPipe,
+                    format!("failed to send data: {e}"),
+                )));
+            }
 
-        if let Some(stats) = &self.stats {
-            stats
-                .bytes_sent
-                .fetch_add(buf.len(), std::sync::atomic::Ordering::Relaxed);
-            stats.packets_sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if let Some(stats) = &self.stats {
+                stats
+                    .bytes_sent
+                    .fetch_add(buf.len(), std::sync::atomic::Ordering::Relaxed);
+                stats.packets_sent.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            }
         }
 
         tracing::trace!("write done");
@@ -269,25 +280,33 @@ impl<const C: usize> FaultyNetwork<'_, C> {
 
         let mut rng = StdRng::from_seed(cfg.rng_seed);
         let bernoulli = Bernoulli::new(1.0 - cfg.fault_prob).unwrap();
-        let egress = egress.filter(move |_| futures::future::ready(bernoulli.sample(&mut rng)));
+        let egress = egress
+            .filter(move |_| futures::future::ready(bernoulli.sample(&mut rng)))
+            .map(move |e| {
+                let mut avg_delay = cfg.avg_delay;
+                if cfg.mixing_factor > 0 {
+                    avg_delay = avg_delay.max(Duration::from_micros(10));
+                }
+
+                let mut rng = StdRng::from_seed(cfg.rng_seed);
+                let wait = rng.gen_range(Duration::ZERO..2*avg_delay);
+                async move {
+                    if wait > Duration::ZERO {
+                        hopr_async_runtime::prelude::sleep(wait).await;
+                    }
+                    e
+                }
+            });
 
         let egress = if cfg.mixing_factor > 0 {
-            let mut rng = StdRng::from_seed(cfg.rng_seed);
             egress
-                .map(move |e| {
-                    let wait = rng.gen_range(0..20);
-                    async move {
-                        hopr_async_runtime::prelude::sleep(Duration::from_micros(wait)).await;
-                        e
-                    }
-                })
                 .buffer_unordered(cfg.mixing_factor)
                 .boxed()
         } else {
             egress.boxed()
         };
 
-        Self { ingress, egress, stats }
+        Self { ingress, egress, stats, packet_counter: AtomicUsize::new(0), ids_to_drop: cfg.ids_to_drop }
     }
 }
 
