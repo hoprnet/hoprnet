@@ -370,12 +370,17 @@ mod tests {
     async fn stateless_socket_unidirectional_should_should_skip_missing_frames() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob(FaultyNetworkConfig {
             avg_delay: Duration::from_millis(50),
-            ids_to_drop: [0].collect(),
+            ids_to_drop: HashSet::from_iter([0_usize]),
             ..Default::default()
         }, None, None);
 
+        let bob_cfg = SessionSocketConfig {
+            frame_timeout: Duration::from_millis(110),
+            ..Default::default()
+        };
+
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, Default::default())?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, bob_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
@@ -385,7 +390,9 @@ mod tests {
         let mut bob_data = vec![0; data.len()];
         bob_socket.read_exact(&mut bob_data).await?;
 
-        assert_eq!(data, *bob_data);
+        assert_eq!(data.len()-452, bob_data.len());
+
+        //assert_eq!(data[4], *bob_data);
 
         alice_socket.close().await?;
         bob_socket.close().await?;

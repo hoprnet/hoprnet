@@ -282,7 +282,7 @@ impl<const C: usize> FaultyNetwork<'_, C> {
         let bernoulli = Bernoulli::new(1.0 - cfg.fault_prob).unwrap();
         let egress = egress
             .filter(move |_| futures::future::ready(bernoulli.sample(&mut rng)))
-            .map(move |e| {
+            .then(move |e| {
                 let mut avg_delay = cfg.avg_delay;
                 if cfg.mixing_factor > 0 {
                     avg_delay = avg_delay.max(Duration::from_micros(10));
