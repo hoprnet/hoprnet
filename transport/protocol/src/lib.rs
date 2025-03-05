@@ -327,7 +327,7 @@ where
                 .then_concurrent(move |(peer, data)| {
                     let msg_processor = msg_processor_read.clone();
 
-                    async move { 
+                    async move {
                         let now = std::time::Instant::now();
                         let r = msg_processor.recv(&peer, data).await.map_err(|e| (peer, e));
                         let elapsed = now.elapsed();
