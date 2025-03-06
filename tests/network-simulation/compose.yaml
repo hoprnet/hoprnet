@@ -1,0 +1,30 @@
+hoprd-service: &hoprd-service
+  image: $HOPRD_IMAGE
+  network_mode: "none"
+  tty: true
+  depends_on:
+    - ns3
+
+services:
+  hoprd-1:
+    <<: *hoprd-service
+    container_name: hopr-network-simulation-hoprd-1
+  hoprd-2:
+    <<: *hoprd-service
+    container_name: hopr-network-simulation-hoprd-2
+  hoprd-3:
+    <<: *hoprd-service
+    container_name: hopr-network-simulation-hoprd-3
+  ns3:
+    container_name: hopr-network-simulation-ns3
+    network_mode: "host"
+    build:
+      dockerfile: ./ns3/Dockerfile
+      context: .
+    volumes:
+      - ./ns-setup.cc:/ns-setup.cc
+    tty: true
+    cap_add:
+      - NET_ADMIN
+    devices:
+        - /dev/net/tun:/dev/net/tun
