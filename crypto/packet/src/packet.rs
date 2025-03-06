@@ -146,7 +146,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
     /// each of the challenges has the same size of `additional_relayer_data_len`.
     ///
     /// Optionally, there could be some additional data (`additional_data_last_hop`) for the packet destination.
-    /// This is reserved for the future use by SURBs.
+    /// This is being used to transfer [`Pseudonym`](hopr_crypto_sphinx::surb::Pseudonym) for SURBs.
     pub fn new(
         shared_keys: SharedKeys<S::E, S::G>,
         msg: &[u8],

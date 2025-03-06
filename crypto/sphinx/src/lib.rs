@@ -30,3 +30,4 @@ pub mod prp;
 pub mod routing;
 /// Derivation of shared keys for SPHINX header
 pub mod shared_keys;
+pub mod surb;

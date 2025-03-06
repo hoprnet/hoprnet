@@ -123,8 +123,8 @@ impl RoutingInfo {
             if idx == 0 {
                 extended_header[0] = RELAYER_END_PREFIX;
 
-                if let Some(data) = additional_data_last_hop {
-                    extended_header[1..data.len()].copy_from_slice(data);
+                if let Some(last_hop_data) = additional_data_last_hop {
+                    extended_header[1..last_hop_data.len()].copy_from_slice(last_hop_data);
                 }
 
                 let padding_len = (max_hops - secrets.len()) * routing_info_len;

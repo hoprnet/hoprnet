@@ -156,48 +156,6 @@ impl ChainPacketComponents {
     }
 }
 
-#[allow(dead_code)] // used in tests
-pub fn forward(
-    packet: ChainPacketComponents,
-    chain_keypair: &ChainKeypair,
-    next_ticket: TicketBuilder,
-    domain_separator: &Hash,
-) -> ChainPacketComponents {
-    match packet {
-        ChainPacketComponents::Forwarded {
-            next_challenge,
-            packet,
-            ack_challenge,
-            packet_tag,
-            ack_key,
-            previous_hop,
-            own_key,
-            next_hop,
-            path_pos,
-            ..
-        } => {
-            let ticket = next_ticket
-                .challenge(next_challenge.to_ethereum_challenge())
-                .build_signed(chain_keypair, domain_separator)
-                .expect("ticket should create")
-                .leak();
-            ChainPacketComponents::Forwarded {
-                packet,
-                ticket,
-                ack_challenge,
-                packet_tag,
-                ack_key,
-                previous_hop,
-                own_key,
-                next_hop,
-                next_challenge,
-                path_pos,
-            }
-        }
-        _ => packet,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::ChainPacketComponents;
@@ -225,6 +183,47 @@ mod tests {
             hex!("9dec751c00f49e50fceff7114823f726a0425a68a8dc6af0e4287badfea8f4a4"),
             hex!("9a82976f7182c05126313bead5617c623b93d11f9f9691c87b1a26f869d569ed")
         ].map(|privkey| OffchainKeypair::from_secret(&privkey).expect("lazy static keypair should be valid"));
+    }
+
+    fn forward(
+        packet: ChainPacketComponents,
+        chain_keypair: &ChainKeypair,
+        next_ticket: TicketBuilder,
+        domain_separator: &Hash,
+    ) -> ChainPacketComponents {
+        match packet {
+            ChainPacketComponents::Forwarded {
+                next_challenge,
+                packet,
+                ack_challenge,
+                packet_tag,
+                ack_key,
+                previous_hop,
+                own_key,
+                next_hop,
+                path_pos,
+                ..
+            } => {
+                let ticket = next_ticket
+                    .challenge(next_challenge.to_ethereum_challenge())
+                    .build_signed(chain_keypair, domain_separator)
+                    .expect("ticket should create")
+                    .leak();
+                ChainPacketComponents::Forwarded {
+                    packet,
+                    ticket,
+                    ack_challenge,
+                    packet_tag,
+                    ack_key,
+                    previous_hop,
+                    own_key,
+                    next_hop,
+                    next_challenge,
+                    path_pos,
+                }
+            }
+            _ => packet,
+        }
     }
 
     impl ChainPacketComponents {
@@ -388,7 +387,7 @@ mod tests {
                         keypairs_offchain.len() - i - 1,
                         &keypairs_onchain[i],
                     )?;
-                    packet = super::super::forward(packet.clone(), &keypairs_onchain[i], ticket, &Hash::default());
+                    packet = forward(packet.clone(), &keypairs_onchain[i], ticket, &Hash::default());
                 }
                 ChainPacketComponents::Outgoing { .. } => panic!("invalid packet state"),
             }
