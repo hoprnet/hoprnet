@@ -17,9 +17,9 @@ use typenum::Unsigned;
 
 use crate::{
     errors::{PacketError::PacketDecodingError, Result},
-    packet::ForwardedMetaPacket::{Final, Relayed},
     por::POR_SECRET_LENGTH,
 };
+use crate::errors::PacketError;
 
 /// Tag used to separate padding from data
 const PADDING_TAG: &[u8] = b"HOPR";
@@ -147,36 +147,36 @@ impl<S: SphinxSuite> MetaPacket<S> {
     ///
     /// Optionally, there could be some additional data (`additional_data_last_hop`) for the packet destination.
     /// This is being used to transfer [`Pseudonym`](hopr_crypto_sphinx::surb::Pseudonym) for SURBs.
-    pub fn new(
+    pub fn new<const RELAYER_DATA_LEN: usize>(
         shared_keys: SharedKeys<S::E, S::G>,
         msg: &[u8],
         path: &[<S::P as Keypair>::Public],
         max_hops: usize,
-        additional_relayer_data_len: usize,
-        additional_data_relayer: &[&[u8]],
+        additional_data_relayer: &[[u8; RELAYER_DATA_LEN]],
         additional_data_last_hop: Option<&[u8]>,
-    ) -> Self {
-        assert!(msg.len() <= PAYLOAD_SIZE, "message too long to fit into a packet");
+    ) -> Result<Self> {
+        if msg.len() > PAYLOAD_SIZE {
+            return Err(PacketError::PacketConstructionError("message too long to fit into a packet".into()));
+        }
 
         let mut payload = add_padding(msg);
 
-        let routing_info = RoutingInfo::new::<S>(
+        let routing_info = RoutingInfo::new::<S, _, RELAYER_DATA_LEN>(
             max_hops,
             path,
             &shared_keys.secrets,
-            additional_relayer_data_len,
             additional_data_relayer,
             additional_data_last_hop,
-        );
+        )?;
 
-        // Encrypt packet payload using the derived shared secrets
+        // Encrypt the packet payload using the derived shared secrets
         for secret in shared_keys.secrets.iter().rev() {
             let prp = PRP::from_parameters(PRPParameters::new(secret));
             prp.forward_inplace(&mut payload)
                 .unwrap_or_else(|e| panic!("onion encryption error {e}"))
         }
 
-        Self::new_from_parts(shared_keys.alpha, routing_info, &payload)
+        Ok(Self::new_from_parts(shared_keys.alpha, routing_info, &payload))
     }
 
     fn new_from_parts(
@@ -212,10 +212,10 @@ impl<S: SphinxSuite> MetaPacket<S> {
         &self.packet[..len]
     }
 
-    /// Returns the routing info subslice from the packet data.
-    fn routing_info(&self) -> &[u8] {
+    /// Returns the routing information from the packet data as a mutable slice.
+    fn routing_info_mut(&mut self) -> &mut [u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
-        &self.packet[base..base + Self::HEADER_LEN]
+        &mut self.packet[base..base + Self::HEADER_LEN]
     }
 
     /// Returns the packet checksum (MAC) subslice from the packet data.
@@ -233,7 +233,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
     /// Attempts to remove the layer of encryption of this packet by using the given `node_keypair`.
     /// This will transform this packet into the [ForwardedMetaPacket].
     pub fn into_forwarded(
-        self,
+        mut self,
         node_keypair: &S::P,
         max_hops: usize,
         additional_data_relayer_len: usize,
@@ -245,11 +245,11 @@ impl<S: SphinxSuite> MetaPacket<S> {
             &(node_keypair.public().into()),
         )?;
 
-        let mut routing_info_cpy: Vec<u8> = self.routing_info().into();
+        let mac_cpy = self.mac().to_vec();
         let fwd_header = forward_header::<S>(
             &secret,
-            &mut routing_info_cpy,
-            self.mac(),
+            self.routing_info_mut(),
+            &mac_cpy,
             max_hops,
             additional_data_relayer_len,
             additional_data_last_hop_len,
@@ -265,32 +265,34 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 path_pos,
                 next_node,
                 additional_info,
-            } => Relayed {
-                packet: Self::new_from_parts(
-                    alpha,
-                    RoutingInfo {
-                        routing_information: header,
-                        mac,
-                    },
-                    &decrypted,
-                ),
-                packet_tag: derive_packet_tag(&secret),
-                derived_secret: secret,
-                next_node: <S::P as Keypair>::Public::try_from(&next_node)
-                    .map_err(|_| PacketDecodingError("couldn't parse next node id".into()))?,
-                path_pos,
-                additional_info,
+            } =>
+                ForwardedMetaPacket::Relayed {
+                    packet: Self::new_from_parts(
+                        alpha,
+                        RoutingInfo {
+                            routing_information: header,
+                            mac,
+                        },
+                        &decrypted,
+                    ),
+                    packet_tag: derive_packet_tag(&secret),
+                    derived_secret: secret,
+                    next_node: <S::P as Keypair>::Public::try_from(&next_node)
+                        .map_err(|_| PacketDecodingError("couldn't parse next node id".into()))?,
+                    path_pos,
+                    additional_info,
             },
-            ForwardedHeader::FinalNode { additional_data } => Final {
-                packet_tag: derive_packet_tag(&secret),
-                derived_secret: secret,
-                plain_text: remove_padding(&decrypted)
-                    .ok_or(PacketDecodingError(format!(
-                        "couldn't remove padding: {}",
-                        hex::encode(decrypted.as_ref())
-                    )))?
-                    .into(),
-                additional_data,
+            ForwardedHeader::FinalNode { additional_data } =>
+                ForwardedMetaPacket::Final {
+                    packet_tag: derive_packet_tag(&secret),
+                    derived_secret: secret,
+                    plain_text: remove_padding(&decrypted)
+                        .ok_or(PacketDecodingError(format!(
+                            "couldn't remove padding: {}",
+                            hex::encode(decrypted.as_ref())
+                        )))?
+                        .into(),
+                    additional_data,
             },
         })
     }
@@ -367,10 +369,9 @@ mod tests {
             msg,
             &pubkeys,
             INTERMEDIATE_HOPS + 1,
-            POR_SECRET_LENGTH,
-            &por_strings.iter().map(|v| v.as_ref()).collect::<Vec<_>>(),
+            &por_strings,
             None,
-        );
+        )?;
 
         assert!(mp.as_ref().len() < 1492, "metapacket too long {}", mp.as_ref().len());
 

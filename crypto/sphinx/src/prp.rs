@@ -108,7 +108,7 @@ impl PRP {
             Ok(())
         } else {
             Err(InvalidParameterSize {
-                name: "plaintext".into(),
+                name: "plaintext",
                 expected: PRP_MIN_LENGTH,
             })
         }
@@ -132,7 +132,7 @@ impl PRP {
             Ok(())
         } else {
             Err(InvalidParameterSize {
-                name: "ciphertext".into(),
+                name: "ciphertext",
                 expected: PRP_MIN_LENGTH,
             })
         }

@@ -4208,7 +4208,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4242,7 +4242,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-sphinx"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "aes 0.8.4",
  "anyhow",

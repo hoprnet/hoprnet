@@ -56,7 +56,7 @@ impl Display for ChainPacketComponents {
 }
 
 impl ChainPacketComponents {
-    /// Size of the packet including header, padded payload, ticket and ack challenge.
+    /// Size of the packet including header, padded payload, ticket, and ack challenge.
     pub const SIZE: usize = MetaPacket::<CurrentSphinxSuite>::PACKET_LEN + Ticket::SIZE;
 
     /// Constructs a new outgoing packet with the given path.
@@ -89,10 +89,9 @@ impl ChainPacketComponents {
                 msg,
                 public_keys_path,
                 INTERMEDIATE_HOPS + 1,
-                POR_SECRET_LENGTH,
-                &por_strings.iter().map(|s| s.as_ref()).collect::<Vec<_>>(),
+                &por_strings,
                 None,
-            ),
+            )?,
             ticket,
             next_hop: public_keys_path[0],
             ack_challenge: por_values.ack_challenge,

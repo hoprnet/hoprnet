@@ -115,7 +115,7 @@ pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> hopr_crypto_t
         Ok(HalfKey::try_from(scalar.to_bytes().as_ref())?)
     } else {
         Err(InvalidParameterSize {
-            name: "secret".into(),
+            name: "secret",
             expected: SecretKey::LENGTH,
         })
     }
