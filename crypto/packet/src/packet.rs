@@ -180,7 +180,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
         let mut payload = add_padding(msg);
 
-        let routing_info = RoutingInfo::new::<H>(
+        let routing_info = RoutingInfo::<H>::new(
             &path
                 .iter()
                 .map(|key| key_mapper.map_key_to_id(key))
@@ -202,7 +202,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
     fn new_from_parts(
         alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
-        routing_info: RoutingInfo,
+        routing_info: RoutingInfo<H>,
         payload: &[u8],
     ) -> Self {
         assert!(
@@ -273,18 +273,14 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
         Ok(match fwd_header {
             ForwardedHeader::RelayNode {
-                header,
-                mac,
+                next_header,
                 path_pos,
                 next_node,
                 additional_info,
             } => ForwardedMetaPacket::Relayed {
                 packet: Self::new_from_parts(
                     alpha,
-                    RoutingInfo {
-                        routing_information: header,
-                        mac,
-                    },
+                    next_header,
                     &decrypted,
                 ),
                 packet_tag: derive_packet_tag(&secret),

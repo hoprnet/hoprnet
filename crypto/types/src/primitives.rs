@@ -10,9 +10,13 @@ use zeroize::ZeroizeOnDrop;
 
 use crate::utils::SecretValue;
 
-/// Represents a secret key of fixed length.
+/// Represents a 256-bit secret key of fixed length.
 /// The value is auto-zeroized on drop.
 pub type SecretKey = SecretValue<typenum::U32>;
+
+/// Represents a 128-bit secret key of fixed length.
+/// The value is auto-zeroized on drop.
+pub type SecretKey16 = SecretValue<typenum::U16>;
 
 /// Generalization of digest-like operation (MAC, Digest,...)
 /// Defines the `update` and `finalize` operations to produce digest value of arbitrary data.

@@ -24,7 +24,7 @@ use std::marker::PhantomData;
 
 /// Implements the overlay packet intermediary object.
 pub mod chain;
-/// Enumerates all errors in this crate.
+/// Lists all errors in this crate.
 pub mod errors;
 /// Implements SPHINX packet format.
 pub mod packet;
@@ -47,35 +47,12 @@ impl<S: SphinxSuite> SphinxHeaderSpec for HoprFullSphinxHeader<S> {
     type LastHopData = [u8; 0];
 }
 
-pub struct SmallKeyIdent([u8; Self::SIZE]);
-
-impl TryFrom<&[u8]> for SmallKeyIdent {
-    type Error = GeneralError;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        Ok(Self(
-            value
-                .try_into()
-                .map_err(|_| GeneralError::ParseError("SmallKeyIdent".into()))?,
-        ))
-    }
-}
-
-impl AsRef<[u8]> for SmallKeyIdent {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl BytesRepresentable for SmallKeyIdent {
-    const SIZE: usize = 8;
-}
 
 pub struct HoprReducedSphinxHeader<S: SphinxSuite = CurrentSphinxSuite>(PhantomData<S>);
 impl<S: SphinxSuite> SphinxHeaderSpec for HoprReducedSphinxHeader<S> {
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
-    const KEY_ID_SIZE: std::num::NonZeroUsize = std::num::NonZeroUsize::new(SmallKeyIdent::SIZE).unwrap();
-    type KeyId = SmallKeyIdent;
+    const KEY_ID_SIZE: std::num::NonZeroUsize = std::num::NonZeroUsize::new(KeyIdent::SIZE).unwrap();
+    type KeyId = KeyIdent;
     const RELAYER_DATA_SIZE: usize = por::POR_SECRET_LENGTH;
     type RelayerData = [u8; por::POR_SECRET_LENGTH];
     const LAST_HOP_DATA_SIZE: usize = 16;

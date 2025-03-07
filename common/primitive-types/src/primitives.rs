@@ -504,6 +504,33 @@ impl PartialOrd<Self> for SerializableLog {
     }
 }
 
+/// Identifier of public keys.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, Hash)]
+pub struct KeyIdent([u8; Self::SIZE]);
+
+impl TryFrom<&[u8]> for KeyIdent {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(
+            value
+                .try_into()
+                .map_err(|_| ParseError("KeyIdent".into()))?,
+        ))
+    }
+}
+
+impl AsRef<[u8]> for KeyIdent {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl BytesRepresentable for KeyIdent {
+    const SIZE: usize = 8;
+}
+
+
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {

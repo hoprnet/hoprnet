@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use hopr_crypto_random::random_fill;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -11,21 +12,8 @@ const RELAYER_END_PREFIX: u8 = 0xff;
 
 const PATH_POSITION_LEN: usize = 1;
 
-/// Carries routing information for the mixnet packet.
-pub struct RoutingInfo {
-    pub routing_information: Box<[u8]>,
-    pub mac: [u8; SimpleMac::SIZE],
-}
 
-impl Default for RoutingInfo {
-    fn default() -> Self {
-        Self {
-            routing_information: Box::default(),
-            mac: [0u8; SimpleMac::SIZE],
-        }
-    }
-}
-
+/// Contains the necessary size and type specifications for the Sphinx packet header.
 pub trait SphinxHeaderSpec {
     /// Maximum number of hops.
     const MAX_HOPS: NonZeroUsize;
@@ -94,7 +82,26 @@ pub trait SphinxHeaderSpec {
     }
 }
 
-impl RoutingInfo {
+/// Carries routing information for the mixnet packet.
+pub struct RoutingInfo<H: SphinxHeaderSpec> {
+    pub routing_information: Box<[u8]>, // Cannot use [u8; H::HEADER_LEN] due to Rust limitation
+    pub mac: [u8; SimpleMac::SIZE],
+    _h: PhantomData<H>,
+}
+
+impl<H: SphinxHeaderSpec> Default for RoutingInfo<H> {
+    fn default() -> Self {
+        Self {
+            routing_information: Default::default(),
+            mac: [0u8; SimpleMac::SIZE],
+            _h: PhantomData,
+        }
+    }
+}
+
+impl<H: SphinxHeaderSpec> RoutingInfo<H> {
+    pub const SIZE: usize = H::HEADER_LEN + SimpleMac::SIZE;
+
     /// Creates the routing information of the mixnet packet.
     ///
     /// # Arguments
@@ -102,7 +109,7 @@ impl RoutingInfo {
     /// * `secrets` shared secrets with the nodes along the path
     /// * `additional_data_relayer` additional data for each relayer
     /// * `additional_data_last_hop` additional data for the final recipient
-    pub fn new<H: SphinxHeaderSpec>(
+    pub fn new(
         path: &[H::KeyId],
         secrets: &[SharedSecret],
         additional_data_relayer: &[H::RelayerData],
@@ -222,9 +229,7 @@ pub enum ForwardedHeader<H: SphinxHeaderSpec> {
     /// The packet is supposed to be relayed
     RelayNode {
         /// Transformed header
-        header: Box<[u8]>, // cannot be defined as [u8; H::HEADER_LEN], due to Rust limitation
-        /// Authentication tag
-        mac: [u8; SimpleMac::SIZE],
+        next_header: RoutingInfo<H>,
         /// Position of the relay in the path
         path_pos: u8,
         /// Public key of the next node
@@ -310,8 +315,11 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         header[H::HEADER_LEN - H::ROUTING_INFO_LEN..].copy_from_slice(&key_stream);
 
         Ok(ForwardedHeader::RelayNode {
-            header: (&header[..H::HEADER_LEN]).into(),
-            mac,
+            next_header: RoutingInfo::<H> {
+                routing_information: (&header[..H::HEADER_LEN]).into(),
+                mac,
+                _h: PhantomData
+            },
             path_pos,
             next_node,
             additional_info,
@@ -403,7 +411,7 @@ mod tests {
         let shares = S::new_shared_keys(&pub_keys)?;
 
         let rinfo =
-            RoutingInfo::new::<TestSpec<<S::P as Keypair>::Public, 3, 0, 0>>(&pub_keys, &shares.secrets, &[], [])?;
+            RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 0, 0>>::new(&pub_keys, &shares.secrets, &[], [])?;
 
         let mut header: Vec<u8> = rinfo.routing_information.into();
 
@@ -415,12 +423,12 @@ mod tests {
 
             match fwd {
                 ForwardedHeader::RelayNode {
-                    mac,
+                    next_header,
                     next_node,
                     path_pos,
                     ..
                 } => {
-                    last_mac.copy_from_slice(&mac);
+                    last_mac.copy_from_slice(&next_header.mac);
                     assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
                     assert_eq!(
                         path_pos,
@@ -453,7 +461,7 @@ mod tests {
         let relayer_data = (0..keypairs.len()).map(|i| [(i + 1) as u8; 32]).collect::<Vec<_>>();
         let last_hop_data = [0xff_u8; 32];
 
-        let rinfo = RoutingInfo::new::<TestSpec<<S::P as Keypair>::Public, 3, 32, 32>>(
+        let rinfo = RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 32, 32>>::new(
             &pub_keys,
             &shares.secrets,
             &relayer_data,
@@ -470,13 +478,13 @@ mod tests {
 
             match fwd {
                 ForwardedHeader::RelayNode {
-                    mac,
+                    next_header,
                     next_node,
                     path_pos,
                     additional_info,
                     ..
                 } => {
-                    last_mac.copy_from_slice(&mac);
+                    last_mac.copy_from_slice(&next_header.mac);
                     assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
                     assert_eq!(
                         path_pos,
