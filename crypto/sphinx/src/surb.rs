@@ -3,7 +3,7 @@ use crate::shared_keys::SharedSecret;
 
 /// Pseudonym used to identify the creator of a [`SURB`].
 /// This allows indexing [`SURB`] and [`LocalSURBEntry`] at both parties.
-pub trait Pseudonym : AsRef<[u8]> { }
+pub trait Pseudonym: AsRef<[u8]> {}
 
 /// Single Use Reply Block
 pub struct SURB<K: AsRef<[u8]>> {
@@ -21,5 +21,5 @@ pub struct LocalSURBEntry {
     /// Encryption key the other party should use to encrypt the data for us.
     pub sender_key: [u8; 16],
     /// Shared keys for nodes along the return path.
-    pub shared_keys: Vec<SharedSecret>
+    pub shared_keys: Vec<SharedSecret>,
 }
