@@ -1,7 +1,10 @@
+use crate::errors::PacketError;
+use crate::errors::{PacketError::PacketDecodingError, Result};
+use hopr_crypto_sphinx::routing::SphinxHeaderSpec;
 use hopr_crypto_sphinx::{
     derivation::derive_packet_tag,
     prp::{PRPParameters, PRP},
-    routing::{forward_header, header_length, ForwardedHeader, RoutingInfo},
+    routing::{forward_header, ForwardedHeader, RoutingInfo},
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
 };
 use hopr_crypto_types::{
@@ -15,27 +18,8 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use typenum::Unsigned;
 
-use crate::{
-    errors::{PacketError::PacketDecodingError, Result},
-    por::POR_SECRET_LENGTH,
-};
-use crate::errors::PacketError;
-
 /// Tag used to separate padding from data
 const PADDING_TAG: &[u8] = b"HOPR";
-
-/// Determines the total length (header + payload) of the packet given the header information.
-pub const fn packet_length<S: SphinxSuite>(
-    max_hops: usize,
-    additional_data_relayer_len: usize,
-    additional_data_last_hop_len: usize,
-) -> usize {
-    <S::P as Keypair>::Public::SIZE
-        + header_length::<S>(max_hops, additional_data_relayer_len, additional_data_last_hop_len)
-        + SimpleMac::SIZE
-        + PAYLOAD_SIZE
-        + PADDING_TAG.len()
-}
 
 // TODO: Make padding length prefixed in 3.0
 
@@ -64,6 +48,36 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
     Some(&msg.split_at(pos).1[PADDING_TAG.len()..])
 }
 
+pub trait KeyIdMapper<S: SphinxSuite, H: SphinxHeaderSpec> {
+    fn map_key_to_id(&self, key_id: &<S::P as Keypair>::Public) -> Result<H::KeyId>;
+    fn map_id_to_public(&self, key_id: &H::KeyId) -> Result<<S::P as Keypair>::Public>;
+}
+
+pub struct SimpleKeyMapper<S, H> {
+    _s: PhantomData<S>,
+    _h: PhantomData<H>,
+}
+
+impl<S, H> Default for SimpleKeyMapper<S, H> {
+    fn default() -> Self {
+        Self {
+            _s: PhantomData,
+            _h: PhantomData,
+        }
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> KeyIdMapper<S, H> for SimpleKeyMapper<S, H> {
+    fn map_key_to_id(&self, key_id: &<S::P as Keypair>::Public) -> Result<H::KeyId> {
+        H::KeyId::try_from(key_id.as_ref()).map_err(|_| PacketError::PacketConstructionError("invalid key id".into()))
+    }
+
+    fn map_id_to_public(&self, key_id: &H::KeyId) -> Result<<S::P as Keypair>::Public> {
+        <S::P as Keypair>::Public::try_from(key_id.as_ref())
+            .map_err(|_| PacketError::PacketConstructionError("invalid key".into()))
+    }
+}
+
 /// An encrypted packet.
 ///
 /// A sender can create a new packet via [MetaPacket::new] and send it.
@@ -73,23 +87,25 @@ fn remove_padding(msg: &[u8]) -> Option<&[u8]> {
 /// about the next recipient of this packet.
 ///
 /// The packet format is directly dependent on the used [SphinxSuite].
-pub struct MetaPacket<S: SphinxSuite> {
+pub struct MetaPacket<S, H> {
     packet: Box<[u8]>,
     _s: PhantomData<S>,
+    _h: PhantomData<H>,
 }
 
-impl<S: SphinxSuite> Debug for MetaPacket<S> {
+impl<S, H> Debug for MetaPacket<S, H> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{}]", hex::encode(&self.packet))
     }
 }
 
-// Needs manual Clone implementation to not impose Clone restriction on `S`
-impl<S: SphinxSuite> Clone for MetaPacket<S> {
+// Needs manual Clone implementation to not impose Clone restriction on `S` and `H`
+impl<S, H> Clone for MetaPacket<S, H> {
     fn clone(&self) -> Self {
         Self {
             packet: self.packet.clone(),
             _s: PhantomData,
+            _h: PhantomData,
         }
     }
 }
@@ -101,18 +117,18 @@ impl<S: SphinxSuite> Clone for MetaPacket<S> {
 /// and is thus [Final], or it is meant to be sent (relayed)
 /// to the next hop - thus it is [Relayed].
 #[allow(dead_code)]
-pub enum ForwardedMetaPacket<S: SphinxSuite> {
+pub enum ForwardedMetaPacket<S: SphinxSuite, H: SphinxHeaderSpec> {
     /// The content is another [MetaPacket] meant to be sent to the next hop.
     Relayed {
         /// Packet for the next hop.
-        packet: MetaPacket<S>,
+        packet: MetaPacket<S, H>,
         /// Public key of the next hop.
         next_node: <S::P as Keypair>::Public,
         /// Position in the channel path of this packet.
         path_pos: u8,
         /// Contains the PoR challenge that will be solved when we receive
         /// the acknowledgement after we forward the inner packet to the next hop.
-        additional_info: Box<[u8]>,
+        additional_info: H::RelayerData,
         /// Shared secret that was used to encrypt the removed layer.
         derived_secret: SharedSecret,
         /// Packet checksum.
@@ -123,7 +139,7 @@ pub enum ForwardedMetaPacket<S: SphinxSuite> {
         /// Decrypted payload
         plain_text: Box<[u8]>,
         /// Reserved for SURBs. Currently not used
-        additional_data: Box<[u8]>,
+        additional_data: H::LastHopData,
         /// Shared secret that was used to encrypt the removed layer.
         derived_secret: SharedSecret,
         /// Packet checksum.
@@ -131,12 +147,13 @@ pub enum ForwardedMetaPacket<S: SphinxSuite> {
     },
 }
 
-impl<S: SphinxSuite> MetaPacket<S> {
+impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
     /// The fixed length of the Sphinx packet header.
-    pub const HEADER_LEN: usize = header_length::<S>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+    pub const HEADER_LEN: usize = H::HEADER_LEN;
 
     /// The fixed length of the padded packet.
-    pub const PACKET_LEN: usize = packet_length::<S>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
+    pub const PACKET_LEN: usize =
+        <S::P as Keypair>::Public::SIZE + H::HEADER_LEN + SimpleMac::SIZE + PAYLOAD_SIZE + PADDING_TAG.len();
 
     /// Creates a new outgoing packet with the given payload `msg`, `path` and `shared_keys` computed along the path.
     ///
@@ -147,23 +164,27 @@ impl<S: SphinxSuite> MetaPacket<S> {
     ///
     /// Optionally, there could be some additional data (`additional_data_last_hop`) for the packet destination.
     /// This is being used to transfer [`Pseudonym`](hopr_crypto_sphinx::surb::Pseudonym) for SURBs.
-    pub fn new<const RELAYER_DATA_LEN: usize>(
+    pub fn new<M: KeyIdMapper<S, H>>(
         shared_keys: SharedKeys<S::E, S::G>,
         msg: &[u8],
         path: &[<S::P as Keypair>::Public],
-        max_hops: usize,
-        additional_data_relayer: &[[u8; RELAYER_DATA_LEN]],
-        additional_data_last_hop: Option<&[u8]>,
+        key_mapper: &M,
+        additional_data_relayer: &[H::RelayerData],
+        additional_data_last_hop: H::LastHopData,
     ) -> Result<Self> {
         if msg.len() > PAYLOAD_SIZE {
-            return Err(PacketError::PacketConstructionError("message too long to fit into a packet".into()));
+            return Err(PacketError::PacketConstructionError(
+                "message too long to fit into a packet".into(),
+            ));
         }
 
         let mut payload = add_padding(msg);
 
-        let routing_info = RoutingInfo::new::<S, _, RELAYER_DATA_LEN>(
-            max_hops,
-            path,
+        let routing_info = RoutingInfo::new::<H>(
+            &path
+                .iter()
+                .map(|key| key_mapper.map_key_to_id(key))
+                .collect::<Result<Vec<_>>>()?,
             &shared_keys.secrets,
             additional_data_relayer,
             additional_data_last_hop,
@@ -203,6 +224,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
         Self {
             packet: packet.into_boxed_slice(),
             _s: PhantomData,
+            _h: PhantomData,
         }
     }
 
@@ -232,13 +254,11 @@ impl<S: SphinxSuite> MetaPacket<S> {
 
     /// Attempts to remove the layer of encryption of this packet by using the given `node_keypair`.
     /// This will transform this packet into the [ForwardedMetaPacket].
-    pub fn into_forwarded(
+    pub fn into_forwarded<K: KeyIdMapper<S, H>>(
         mut self,
         node_keypair: &S::P,
-        max_hops: usize,
-        additional_data_relayer_len: usize,
-        additional_data_last_hop_len: usize,
-    ) -> Result<ForwardedMetaPacket<S>> {
+        key_mapper: &K,
+    ) -> Result<ForwardedMetaPacket<S, H>> {
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
             Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(self.alpha()),
             &(node_keypair.into()),
@@ -246,14 +266,7 @@ impl<S: SphinxSuite> MetaPacket<S> {
         )?;
 
         let mac_cpy = self.mac().to_vec();
-        let fwd_header = forward_header::<S>(
-            &secret,
-            self.routing_info_mut(),
-            &mac_cpy,
-            max_hops,
-            additional_data_relayer_len,
-            additional_data_last_hop_len,
-        )?;
+        let fwd_header = forward_header::<H>(&secret, self.routing_info_mut(), &mac_cpy)?;
 
         let prp = PRP::from_parameters(PRPParameters::new(&secret));
         let decrypted = prp.inverse(self.payload())?;
@@ -265,46 +278,43 @@ impl<S: SphinxSuite> MetaPacket<S> {
                 path_pos,
                 next_node,
                 additional_info,
-            } =>
-                ForwardedMetaPacket::Relayed {
-                    packet: Self::new_from_parts(
-                        alpha,
-                        RoutingInfo {
-                            routing_information: header,
-                            mac,
-                        },
-                        &decrypted,
-                    ),
-                    packet_tag: derive_packet_tag(&secret),
-                    derived_secret: secret,
-                    next_node: <S::P as Keypair>::Public::try_from(&next_node)
-                        .map_err(|_| PacketDecodingError("couldn't parse next node id".into()))?,
-                    path_pos,
-                    additional_info,
+            } => ForwardedMetaPacket::Relayed {
+                packet: Self::new_from_parts(
+                    alpha,
+                    RoutingInfo {
+                        routing_information: header,
+                        mac,
+                    },
+                    &decrypted,
+                ),
+                packet_tag: derive_packet_tag(&secret),
+                derived_secret: secret,
+                next_node: key_mapper.map_id_to_public(&next_node)?,
+                path_pos,
+                additional_info,
             },
-            ForwardedHeader::FinalNode { additional_data } =>
-                ForwardedMetaPacket::Final {
-                    packet_tag: derive_packet_tag(&secret),
-                    derived_secret: secret,
-                    plain_text: remove_padding(&decrypted)
-                        .ok_or(PacketDecodingError(format!(
-                            "couldn't remove padding: {}",
-                            hex::encode(decrypted.as_ref())
-                        )))?
-                        .into(),
-                    additional_data,
+            ForwardedHeader::FinalNode { additional_data } => ForwardedMetaPacket::Final {
+                packet_tag: derive_packet_tag(&secret),
+                derived_secret: secret,
+                plain_text: remove_padding(&decrypted)
+                    .ok_or(PacketDecodingError(format!(
+                        "couldn't remove padding: {}",
+                        hex::encode(decrypted.as_ref())
+                    )))?
+                    .into(),
+                additional_data,
             },
         })
     }
 }
 
-impl<S: SphinxSuite> AsRef<[u8]> for MetaPacket<S> {
+impl<S: SphinxSuite, H: SphinxHeaderSpec> AsRef<[u8]> for MetaPacket<S, H> {
     fn as_ref(&self) -> &[u8] {
         self.packet.as_ref()
     }
 }
 
-impl<S: SphinxSuite> TryFrom<&[u8]> for MetaPacket<S> {
+impl<S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&[u8]> for MetaPacket<S, H> {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
@@ -312,6 +322,7 @@ impl<S: SphinxSuite> TryFrom<&[u8]> for MetaPacket<S> {
             Ok(Self {
                 packet: value.into(),
                 _s: PhantomData,
+                _h: PhantomData,
             })
         } else {
             Err(GeneralError::ParseError("MetaPacket".into()))
@@ -319,7 +330,7 @@ impl<S: SphinxSuite> TryFrom<&[u8]> for MetaPacket<S> {
     }
 }
 
-impl<S: SphinxSuite> BytesRepresentable for MetaPacket<S> {
+impl<S: SphinxSuite, H: SphinxHeaderSpec> BytesRepresentable for MetaPacket<S, H> {
     const SIZE: usize = <S::G as GroupElement<S::E>>::AlphaLen::USIZE
         + Self::HEADER_LEN
         + SimpleMac::SIZE
@@ -329,15 +340,27 @@ impl<S: SphinxSuite> BytesRepresentable for MetaPacket<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::packet::{add_padding, remove_padding, ForwardedMetaPacket, MetaPacket, PADDING_TAG};
-    use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
-    use hopr_crypto_sphinx::{
-        ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite},
-        shared_keys::SphinxSuite,
-    };
+    use super::*;
+
+    use hopr_crypto_sphinx::ec_groups::{Ed25519Suite, Secp256k1Suite, X25519Suite};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
-    use hopr_internal_types::protocol::INTERMEDIATE_HOPS;
     use parameterized::parameterized;
+    use std::num::NonZeroUsize;
+
+    use crate::por::{ProofOfRelayString, POR_SECRET_LENGTH};
+
+    struct TestHeader<S: SphinxSuite>(PhantomData<S>);
+
+    impl<S: SphinxSuite> SphinxHeaderSpec for TestHeader<S> {
+        const MAX_HOPS: NonZeroUsize = NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
+        const KEY_ID_SIZE: NonZeroUsize = NonZeroUsize::new(<S::P as Keypair>::Public::SIZE).unwrap();
+        type KeyId = <S::P as Keypair>::Public;
+
+        const RELAYER_DATA_SIZE: usize = POR_SECRET_LENGTH;
+        type RelayerData = [u8; POR_SECRET_LENGTH];
+        const LAST_HOP_DATA_SIZE: usize = 0;
+        type LastHopData = [u8; 0];
+    }
 
     #[test]
     fn test_padding() {
@@ -364,13 +387,13 @@ mod tests {
 
         let msg = b"some random test message";
 
-        let mut mp = MetaPacket::<S>::new(
+        let mut mp = MetaPacket::<S, TestHeader<S>>::new(
             shared_keys,
             msg,
             &pubkeys,
-            INTERMEDIATE_HOPS + 1,
+            &SimpleKeyMapper::default(),
             &por_strings,
-            None,
+            [],
         )?;
 
         assert!(mp.as_ref().len() < 1492, "metapacket too long {}", mp.as_ref().len());
@@ -378,7 +401,7 @@ mod tests {
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp
                 .clone()
-                .into_forwarded(pair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)
+                .into_forwarded(pair, &SimpleKeyMapper::default())
                 .unwrap_or_else(|_| panic!("failed to unwrap at {i}"));
 
             match fwd {

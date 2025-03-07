@@ -5,26 +5,11 @@ use std::num::NonZeroUsize;
 
 use crate::derivation::derive_mac_key;
 use crate::prg::{PRGParameters, PRG};
-use crate::shared_keys::{SharedSecret, SphinxSuite};
+use crate::shared_keys::SharedSecret;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
 const PATH_POSITION_LEN: usize = 1;
-
-/// Length of the header routing information per hop
-/*const fn routing_information_length<S: SphinxSuite>(additional_data_relayer_len: usize) -> usize {
-    <S::P as Keypair>::Public::SIZE + PATH_POSITION_LEN + SimpleMac::SIZE + additional_data_relayer_len
-}
-
-/// Returns the size of the packet header given the information about the number of hops and additional relayer info.
-pub const fn header_length<S: SphinxSuite>(
-    max_hops: usize,
-    additional_data_relayer_len: usize,
-    additional_data_last_hop_len: usize,
-) -> usize {
-    let last_hop = additional_data_last_hop_len + 1; // 1 = end prefix length
-    last_hop + (max_hops - 1) * routing_information_length::<S>(additional_data_relayer_len)
-}*/
 
 /// Carries routing information for the mixnet packet.
 pub struct RoutingInfo {
@@ -345,6 +330,7 @@ mod tests {
     use super::*;
     use std::marker::PhantomData;
 
+    use crate::shared_keys::SphinxSuite;
     use hopr_crypto_types::keypairs::OffchainKeypair;
     use parameterized::parameterized;
     use std::num::NonZero;

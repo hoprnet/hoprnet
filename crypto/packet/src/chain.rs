@@ -5,11 +5,12 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
+use crate::packet::SimpleKeyMapper;
 use crate::{
     errors::{PacketError::PacketDecodingError, Result},
     packet::{ForwardedMetaPacket, MetaPacket},
-    por::{pre_verify, ProofOfRelayString, ProofOfRelayValues, POR_SECRET_LENGTH},
-    CurrentSphinxSuite,
+    por::{pre_verify, ProofOfRelayString, ProofOfRelayValues},
+    CurrentSphinxSuite, HoprFullSphinxHeader,
 };
 
 /// Indicates the packet type.
@@ -25,7 +26,7 @@ pub enum ChainPacketComponents {
     },
     /// Packet must be forwarded
     Forwarded {
-        packet: MetaPacket<CurrentSphinxSuite>,
+        packet: MetaPacket<CurrentSphinxSuite, HoprFullSphinxHeader>,
         ticket: Ticket,
         ack_challenge: HalfKeyChallenge,
         packet_tag: PacketTag,
@@ -38,7 +39,7 @@ pub enum ChainPacketComponents {
     },
     /// Packet that is being sent out by us
     Outgoing {
-        packet: MetaPacket<CurrentSphinxSuite>,
+        packet: MetaPacket<CurrentSphinxSuite, HoprFullSphinxHeader>,
         ticket: Ticket,
         next_hop: OffchainPublicKey,
         ack_challenge: HalfKeyChallenge,
@@ -57,7 +58,7 @@ impl Display for ChainPacketComponents {
 
 impl ChainPacketComponents {
     /// Size of the packet including header, padded payload, ticket, and ack challenge.
-    pub const SIZE: usize = MetaPacket::<CurrentSphinxSuite>::PACKET_LEN + Ticket::SIZE;
+    pub const SIZE: usize = MetaPacket::<CurrentSphinxSuite, HoprFullSphinxHeader>::PACKET_LEN + Ticket::SIZE;
 
     /// Constructs a new outgoing packet with the given path.
     /// # Arguments
@@ -83,14 +84,17 @@ impl ChainPacketComponents {
             .build_signed(chain_keypair, domain_separator)?
             .leak();
 
+        // TODO: replace this
+        let mapper = SimpleKeyMapper::default();
+
         Ok(Self::Outgoing {
-            packet: MetaPacket::<CurrentSphinxSuite>::new(
+            packet: MetaPacket::<CurrentSphinxSuite, HoprFullSphinxHeader>::new(
                 shared_keys,
                 msg,
                 public_keys_path,
-                INTERMEDIATE_HOPS + 1,
+                &mapper,
                 &por_strings,
-                None,
+                [],
             )?,
             ticket,
             next_hop: public_keys_path[0],
@@ -102,11 +106,15 @@ impl ChainPacketComponents {
     /// packet can be further delivered (relayed to the next hop or read).
     pub fn from_incoming(data: &[u8], node_keypair: &OffchainKeypair, previous_hop: OffchainPublicKey) -> Result<Self> {
         if data.len() == Self::SIZE {
-            let (pre_packet, pre_ticket) = data.split_at(MetaPacket::<CurrentSphinxSuite>::PACKET_LEN);
+            let (pre_packet, pre_ticket) =
+                data.split_at(MetaPacket::<CurrentSphinxSuite, HoprFullSphinxHeader>::PACKET_LEN);
 
-            let mp: MetaPacket<CurrentSphinxSuite> = MetaPacket::try_from(pre_packet)?;
+            // TODO: replace this
+            let mapper = SimpleKeyMapper::default();
 
-            match mp.into_forwarded(node_keypair, INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0)? {
+            let mp: MetaPacket<CurrentSphinxSuite, HoprFullSphinxHeader> = MetaPacket::try_from(pre_packet)?;
+
+            match mp.into_forwarded(node_keypair, &mapper)? {
                 ForwardedMetaPacket::Relayed {
                     packet,
                     derived_secret,
