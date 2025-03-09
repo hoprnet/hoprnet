@@ -338,7 +338,7 @@ impl ChainPacketComponents {
                         }
                     };
 
-                    // This ticket is not parsed nor verified on the final hop
+                    // The pre_ticket is not parsed nor verified on the final hop
                     Ok(Self::Final {
                         packet_tag,
                         ack_key,

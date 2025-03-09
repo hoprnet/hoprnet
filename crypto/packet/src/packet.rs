@@ -257,9 +257,9 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
     }
 
     /// Returns the payload subslice from the packet data.
-    fn payload(&self) -> &[u8] {
+    fn payload_mut(&mut self) -> &mut [u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE;
-        &self.packet[base..base + PADDED_PAYLOAD_SIZE]
+        &mut self.packet[base..base + PADDED_PAYLOAD_SIZE]
     }
 
     /// Attempts to remove the layer of encryption of this packet by using the given `node_keypair`.
@@ -280,11 +280,14 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
             &(node_keypair.public().into()),
         )?;
 
+        // Forward the packet header
         let mac_cpy = self.mac().to_vec();
         let fwd_header = forward_header::<H>(&secret, self.routing_info_mut(), &mac_cpy)?;
 
+        // Perform initial decryption over the payload
+        let decrypted = self.payload_mut();
         let prp = PRP::from_parameters(PRPParameters::new(&secret));
-        let mut decrypted = prp.inverse(self.payload())?;
+        prp.inverse_inplace(decrypted)?;
 
         Ok(match fwd_header {
             ForwardedHeader::RelayNode {
@@ -293,7 +296,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
                 next_node,
                 additional_info,
             } => ForwardedMetaPacket::Relayed {
-                packet: Self::new_from_parts(alpha, next_header, &decrypted)?,
+                packet: Self::new_from_parts(alpha, next_header, decrypted)?,
                 packet_tag: derive_packet_tag(&secret),
                 derived_secret: secret,
                 next_node: key_mapper.map_id_to_public(&next_node).ok_or_else(|| {
@@ -318,21 +321,19 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
                     // to reverse the decryption done by individual hops
                     for secret in local_surb.shared_keys.iter().rev() {
                         let prp = PRP::from_parameters(PRPParameters::new(secret));
-                        prp.forward_inplace(&mut decrypted)?;
+                        prp.forward_inplace(decrypted)?;
                     }
 
                     // Inverse the initial encryption using the sender key
                     let prp = PRP::from_parameters(PRPParameters::new(&local_surb.sender_key));
-                    prp.inverse_inplace(&mut decrypted)?;
+                    prp.inverse_inplace(decrypted)?;
                 }
 
                 ForwardedMetaPacket::Final {
                     packet_tag: derive_packet_tag(&secret),
                     derived_secret: secret,
-                    plain_text: remove_padding(&decrypted)
-                        .ok_or_else(|| {
-                            PacketDecodingError(format!("couldn't remove padding: {}", hex::encode(decrypted.as_ref())))
-                        })?
+                    plain_text: remove_padding(decrypted)
+                        .ok_or_else(|| PacketDecodingError("couldn't remove padding".into()))?
                         .into(),
                     additional_data,
                 }
