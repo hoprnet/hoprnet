@@ -7,6 +7,7 @@ use std::num::NonZeroUsize;
 use crate::derivation::derive_mac_key;
 use crate::prg::{PRGParameters, PRG};
 use crate::shared_keys::SharedSecret;
+use crate::surb::{Pseudonym, SphinxRecipientMessage};
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
@@ -20,11 +21,14 @@ pub trait SphinxHeaderSpec {
     /// Public key identifier type.
     type KeyId: BytesRepresentable + Clone;
 
+    /// Pseudonym used to represent node for SURBs.
+    type Pseudonym: Pseudonym;
+
     /// Type representing additional data for relayers.
     type RelayerData: BytesRepresentable;
 
     /// Type representing additional data for the recipient (last hop).
-    type LastHopData: BytesRepresentable;
+    type LastHopData: BytesRepresentable + TryInto<SphinxRecipientMessage<Self::Pseudonym>, Error = GeneralError>;
 
     /// Type representing additional data delivered with each SURB to its receiver.
     type SurbReceiverData: BytesRepresentable;
@@ -402,8 +406,10 @@ mod tests {
     {
         const MAX_HOPS: NonZeroUsize = NonZero::new(HOPS).unwrap();
         type KeyId = K;
+        type Pseudonym = WrappedBytes<16>;
         type RelayerData = WrappedBytes<RELAYER_DATA>;
         type LastHopData = WrappedBytes<LAST_HOP_DATA>;
+        type SurbReceiverData = WrappedBytes<53>;
     }
 
     #[test]

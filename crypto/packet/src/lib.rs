@@ -45,6 +45,7 @@ pub struct HoprSphinxHeaderSpec<S: SphinxSuite = CurrentSphinxSuite>(PhantomData
 impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
     type KeyId = KeyIdent<4>;
+    type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
     type LastHopData = return_path::EncodedRecipientMessage<HoprPseudonym>;
     type SurbReceiverData = por::ProofOfRelayValues;

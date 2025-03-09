@@ -1,4 +1,4 @@
-use hopr_crypto_sphinx::surb::{create_surb, LocalSURBEntry};
+use hopr_crypto_sphinx::surb::{create_surb, LocalSURBEntry, SURB};
 use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -8,13 +8,13 @@ use std::fmt::{Display, Formatter};
 use crate::errors::PacketError;
 use crate::errors::PacketError::PacketConstructionError;
 use crate::packet::{KeyIdMapper, MetaPacketRouting};
-use crate::return_path::SphinxRecipientMessage;
 use crate::{
     errors::{PacketError::PacketDecodingError, Result},
     packet::{ForwardedMetaPacket, MetaPacket},
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues},
     CurrentSphinxSuite, HoprPseudonym, HoprSphinxHeaderSpec, HoprSurb,
 };
+use hopr_crypto_sphinx::surb::SphinxRecipientMessage;
 
 /// Indicates the packet type.
 #[allow(clippy::large_enum_variant)] // TODO: see if some parts can be boxed
@@ -25,7 +25,8 @@ pub enum ChainPacketComponents {
         packet_tag: PacketTag,
         ack_key: HalfKey,
         previous_hop: OffchainPublicKey,
-        plain_text: Box<[u8]>,
+        plain_text: Option<Box<[u8]>>,
+        surbs: Vec<(HoprPseudonym, SURB<CurrentSphinxSuite, HoprSphinxHeaderSpec>)>,
     },
     /// The packet must be forwarded
     Forwarded {
@@ -260,19 +261,24 @@ impl ChainPacketComponents {
 
     /// Deserializes the packet and performs the forward-transformation, so the
     /// packet can be further delivered (relayed to the next hop or read).
-    pub fn from_incoming<M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>>(
+    pub fn from_incoming<M, F>(
         data: &[u8],
         node_keypair: &OffchainKeypair,
         previous_hop: OffchainPublicKey,
         mapper: &M,
-    ) -> Result<Self> {
+        local_surbs: F,
+    ) -> Result<Self>
+    where
+        M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>,
+        F: Fn(&HoprPseudonym) -> Option<LocalSURBEntry>,
+    {
         if data.len() == Self::SIZE {
             let (pre_packet, pre_ticket) =
                 data.split_at(MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN);
 
             let mp: MetaPacket<CurrentSphinxSuite, HoprSphinxHeaderSpec> = MetaPacket::try_from(pre_packet)?;
 
-            match mp.into_forwarded(node_keypair, mapper)? {
+            match mp.into_forwarded(node_keypair, mapper, local_surbs)? {
                 ForwardedMetaPacket::Relayed {
                     packet,
                     derived_secret,
@@ -303,15 +309,42 @@ impl ChainPacketComponents {
                     packet_tag,
                     plain_text,
                     derived_secret,
-                    additional_data: _,
+                    additional_data,
                 } => {
                     let ack_key = derive_ack_key_share(&derived_secret);
+                    let (surbs, plain_text) = match additional_data {
+                        SphinxRecipientMessage::DataOnly | SphinxRecipientMessage::ReplyOnly(_) => {
+                            (Vec::new(), Some(plain_text))
+                        }
+                        d @ SphinxRecipientMessage::DataWithSurb(p) | d @ SphinxRecipientMessage::SurbsOnly(_, p) => {
+                            let chunks = plain_text.chunks_exact(HoprSurb::SIZE);
+                            let num_surbs = d.num_surbs();
+                            let data = matches!(d, SphinxRecipientMessage::DataWithSurb(_))
+                                .then(|| Box::from(chunks.remainder()));
+
+                            let surbs = chunks
+                                .map(|c| {
+                                    HoprSurb::try_from(c)
+                                        .map(|s| (p, s))
+                                        .map_err(|_| PacketDecodingError("packet has invalid surb".into()))
+                                })
+                                .collect::<Result<Vec<_>>>()?;
+
+                            if num_surbs != surbs.len() as u8 {
+                                return Err(PacketDecodingError("packet has invalid number of surbs".into()));
+                            }
+
+                            (surbs, data)
+                        }
+                    };
+
                     // This ticket is not parsed nor verified on the final hop
                     Ok(Self::Final {
                         packet_tag,
                         ack_key,
                         previous_hop,
                         plain_text,
+                        surbs,
                     })
                 }
             }
@@ -397,7 +430,7 @@ mod tests {
         pub fn to_bytes(&self) -> Box<[u8]> {
             let dummy_ticket = hex!("67f0ca18102feec505e5bfedcc25963e9c64a6f8a250adcad7d2830dd607585700000000000000000000000000000000000000000000000000000000000000003891bf6fd4a78e868fc7ad477c09b16fc70dd01ea67e18264d17e3d04f6d8576de2e6472b0072e510df6e9fa1dfcc2727cc7633edfeb9ec13860d9ead29bee71d68de3736c2f7a9f42de76ccd57a5f5847bc7349");
             let (packet, ticket) = match self {
-                Self::Final { plain_text, .. } => (plain_text.clone(), dummy_ticket.as_ref().into()),
+                Self::Final { plain_text, .. } => (plain_text.clone().unwrap(), dummy_ticket.as_ref().into()),
                 Self::Forwarded { packet, ticket, .. } => (
                     Vec::from(packet.as_ref()).into_boxed_slice(),
                     ticket.clone().into_boxed(),
@@ -554,13 +587,13 @@ mod tests {
                 .public()
                 .clone();
 
-            packet = ChainPacketComponents::from_incoming(&packet.to_bytes(), path_element, sender, &mapper)
+            packet = ChainPacketComponents::from_incoming(&packet.to_bytes(), path_element, sender, &mapper, |_| None)
                 .unwrap_or_else(|e| panic!("failed to deserialize packet at hop {i}: {e}"));
 
             match &packet {
                 ChainPacketComponents::Final { plain_text, .. } => {
                     assert_eq!(keypairs_offchain.len() - 1, i);
-                    assert_eq!(&test_message, &plain_text.as_ref());
+                    assert_eq!(&test_message, &plain_text.clone().unwrap().as_ref());
                 }
                 ChainPacketComponents::Forwarded { .. } => {
                     let ticket = mock_ticket(

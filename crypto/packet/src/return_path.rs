@@ -1,4 +1,4 @@
-use hopr_crypto_sphinx::surb::Pseudonym;
+use hopr_crypto_sphinx::surb::{Pseudonym, SphinxRecipientMessage};
 use hopr_primitive_types::errors::GeneralError;
 use hopr_primitive_types::prelude::{BytesRepresentable, ToHex};
 use std::fmt::Display;
@@ -37,19 +37,6 @@ impl<'a> TryFrom<&'a [u8]> for SimplePseudonym {
 
 impl Pseudonym for SimplePseudonym {}
 
-/// Represents an additional message delivered to the recipient of a Sphinx packet.
-///
-/// This message serves as an indication of what is included in the packet payload.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SphinxRecipientMessage<P: Pseudonym> {
-    /// The packet payload contains only data.
-    DataOnly,
-    /// The packet payload contains a SURB followed by data.
-    DataWithSurb(P),
-    /// The packet contains only multiple SURBs with no more data.
-    SurbsOnly(u8, P),
-}
-
 /// Encodes the [`SphinxRecipientMessage`] into a wire-format.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncodedRecipientMessage<P: Pseudonym>(Box<[u8]>, PhantomData<P>); // cannot use generics in consts
@@ -59,12 +46,16 @@ impl<P: Pseudonym> From<SphinxRecipientMessage<P>> for EncodedRecipientMessage<P
         let mut ret = Self::default();
         match value {
             SphinxRecipientMessage::DataOnly => {}
+            SphinxRecipientMessage::ReplyOnly(p) => {
+                ret.0[0] = 1 << 4;
+                ret.0[1..].copy_from_slice(p.as_ref());
+            }
             SphinxRecipientMessage::DataWithSurb(p) => {
-                ret.0[0] = 1;
+                ret.0[0] = 2 << 4;
                 ret.0[1..].copy_from_slice(p.as_ref());
             }
             SphinxRecipientMessage::SurbsOnly(n, p) => {
-                ret.0[0] = n;
+                ret.0[0] = (3 << 4) | (n & 0x0f);
                 ret.0[1..].copy_from_slice(p.as_ref());
             }
         }
@@ -72,12 +63,41 @@ impl<P: Pseudonym> From<SphinxRecipientMessage<P>> for EncodedRecipientMessage<P
     }
 }
 
+impl<P: Pseudonym> TryFrom<EncodedRecipientMessage<P>> for SphinxRecipientMessage<P> {
+    type Error = GeneralError;
+
+    fn try_from(value: EncodedRecipientMessage<P>) -> Result<Self, Self::Error> {
+        let message_id = (value.0[0] & 0xf0) >> 4;
+        let num_surbs = value.0[0] & 0x0f;
+        match message_id {
+            0 => Ok(SphinxRecipientMessage::DataOnly),
+            1 => Ok(SphinxRecipientMessage::ReplyOnly(P::try_from(&value.0[1..])?)),
+            2 => {
+                let pseudonym_data = &value.0[1..];
+                let pseudonym = P::try_from(pseudonym_data)?;
+                Ok(SphinxRecipientMessage::DataWithSurb(pseudonym))
+            }
+            3 => {
+                let pseudonym_data = &value.0[1..];
+                let pseudonym = P::try_from(pseudonym_data)?;
+                Ok(SphinxRecipientMessage::SurbsOnly(num_surbs, pseudonym))
+            }
+            _ => Err(GeneralError::ParseError("HoprPseudonym".into())),
+        }
+    }
+}
+
 impl<P: Pseudonym> PartialEq<SphinxRecipientMessage<P>> for EncodedRecipientMessage<P> {
     fn eq(&self, other: &SphinxRecipientMessage<P>) -> bool {
+        let message_id = (self.0[0] & 0xf0) >> 4;
         match other {
-            SphinxRecipientMessage::DataOnly => self.0[0] == 0,
-            SphinxRecipientMessage::DataWithSurb(p) => self.0[0] == 1 && self.0[1..].eq(p.as_ref()),
-            SphinxRecipientMessage::SurbsOnly(n, p) => self.0[1] == *n && self.0[1..].eq(p.as_ref()),
+            SphinxRecipientMessage::DataOnly => message_id == 0,
+            SphinxRecipientMessage::ReplyOnly(p) => message_id == 1 && self.0[1..].eq(p.as_ref()),
+            SphinxRecipientMessage::DataWithSurb(p) => message_id == 2 && self.0[1..].eq(p.as_ref()),
+            SphinxRecipientMessage::SurbsOnly(n, p) => {
+                let num_surbs = self.0[0] & 0x0f;
+                message_id == 3 && num_surbs == *n && self.0[1..].eq(p.as_ref())
+            }
         }
     }
 }

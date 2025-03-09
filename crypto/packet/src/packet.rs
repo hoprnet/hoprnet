@@ -1,5 +1,5 @@
 use hopr_crypto_sphinx::routing::SphinxHeaderSpec;
-use hopr_crypto_sphinx::surb::SURB;
+use hopr_crypto_sphinx::surb::{LocalSURBEntry, SphinxRecipientMessage, SURB};
 use hopr_crypto_sphinx::{
     derivation::derive_packet_tag,
     prp::{PRPParameters, PRP},
@@ -132,8 +132,8 @@ pub enum ForwardedMetaPacket<S: SphinxSuite, H: SphinxHeaderSpec> {
     Final {
         /// Decrypted payload
         plain_text: Box<[u8]>,
-        /// Reserved for SURBs. Currently not used
-        additional_data: H::LastHopData,
+        /// Contains additional information about the packet payload.
+        additional_data: SphinxRecipientMessage<H::Pseudonym>,
         /// Shared secret that was used to encrypt the removed layer.
         derived_secret: SharedSecret,
         /// Packet checksum.
@@ -264,11 +264,16 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
     /// Attempts to remove the layer of encryption of this packet by using the given `node_keypair`.
     /// This will transform this packet into the [ForwardedMetaPacket].
-    pub fn into_forwarded<K: KeyIdMapper<S, H>>(
+    pub fn into_forwarded<K, F>(
         mut self,
         node_keypair: &S::P,
         key_mapper: &K,
-    ) -> Result<ForwardedMetaPacket<S, H>> {
+        entry_fn: F,
+    ) -> Result<ForwardedMetaPacket<S, H>>
+    where
+        K: KeyIdMapper<S, H>,
+        F: Fn(&H::Pseudonym) -> Option<LocalSURBEntry>,
+    {
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
             Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(self.alpha()),
             &(node_keypair.into()),
@@ -279,7 +284,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
         let fwd_header = forward_header::<H>(&secret, self.routing_info_mut(), &mac_cpy)?;
 
         let prp = PRP::from_parameters(PRPParameters::new(&secret));
-        let decrypted = prp.inverse(self.payload())?;
+        let mut decrypted = prp.inverse(self.payload())?;
 
         Ok(match fwd_header {
             ForwardedHeader::RelayNode {
@@ -297,16 +302,41 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
                 path_pos,
                 additional_info,
             },
-            ForwardedHeader::FinalNode { additional_data } => ForwardedMetaPacket::Final {
-                packet_tag: derive_packet_tag(&secret),
-                derived_secret: secret,
-                plain_text: remove_padding(&decrypted)
-                    .ok_or_else(|| {
-                        PacketDecodingError(format!("couldn't remove padding: {}", hex::encode(decrypted.as_ref())))
-                    })?
-                    .into(),
-                additional_data,
-            },
+            ForwardedHeader::FinalNode { additional_data } => {
+                // If the received packet contains a reply message for a pseudonym,
+                // we must perform additional steps to decrypt it
+                let additional_data: SphinxRecipientMessage<H::Pseudonym> = additional_data.try_into()?;
+                if let SphinxRecipientMessage::<H::Pseudonym>::ReplyOnly(pseudonym) = &additional_data {
+                    let local_surb = entry_fn(pseudonym).ok_or_else(|| {
+                        PacketDecodingError(format!(
+                            "couldn't find local SURB entry for pseudonym: {}",
+                            pseudonym.to_hex()
+                        ))
+                    })?;
+
+                    // Encrypt the packet payload using the derived shared secrets,
+                    // to reverse the decryption done by individual hops
+                    for secret in local_surb.shared_keys.iter().rev() {
+                        let prp = PRP::from_parameters(PRPParameters::new(secret));
+                        prp.forward_inplace(&mut decrypted)?;
+                    }
+
+                    // Inverse the initial encryption using the sender key
+                    let prp = PRP::from_parameters(PRPParameters::new(&local_surb.sender_key));
+                    prp.inverse_inplace(&mut decrypted)?;
+                }
+
+                ForwardedMetaPacket::Final {
+                    packet_tag: derive_packet_tag(&secret),
+                    derived_secret: secret,
+                    plain_text: remove_padding(&decrypted)
+                        .ok_or_else(|| {
+                            PacketDecodingError(format!("couldn't remove padding: {}", hex::encode(decrypted.as_ref())))
+                        })?
+                        .into(),
+                    additional_data,
+                }
+            }
         })
     }
 }
@@ -350,8 +380,8 @@ pub(crate) mod tests {
     use std::num::NonZeroUsize;
 
     use crate::por::{ProofOfRelayString, ProofOfRelayValues};
-    use crate::return_path::SphinxRecipientMessage;
     use crate::{return_path, HoprPseudonym};
+    use hopr_crypto_sphinx::surb::SphinxRecipientMessage;
 
     impl<S, H> KeyIdMapper<S, H> for BiHashMap<H::KeyId, <S::P as Keypair>::Public>
     where
@@ -374,6 +404,7 @@ pub(crate) mod tests {
     impl<S: SphinxSuite> SphinxHeaderSpec for TestHeader<S> {
         const MAX_HOPS: NonZeroUsize = NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
         type KeyId = KeyIdent<4>;
+        type Pseudonym = HoprPseudonym;
         type RelayerData = ProofOfRelayString;
         type LastHopData = return_path::EncodedRecipientMessage<HoprPseudonym>;
         type SurbReceiverData = ProofOfRelayValues;
@@ -429,7 +460,7 @@ pub(crate) mod tests {
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp
                 .clone()
-                .into_forwarded(pair, &mapper)
+                .into_forwarded(pair, &mapper, |_| None)
                 .unwrap_or_else(|_| panic!("failed to unwrap at {i}"));
 
             match fwd {

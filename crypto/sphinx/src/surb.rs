@@ -162,3 +162,29 @@ where
 
     Ok((surb, local_surb))
 }
+
+/// Represents an additional message delivered to the recipient of a Sphinx packet.
+///
+/// This message serves as an indication of what is included in the packet payload.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SphinxRecipientMessage<P: Pseudonym> {
+    /// The packet payload contains only data from a forward message.
+    DataOnly,
+    /// The packet payload contains only data from a reply message.
+    ReplyOnly(P),
+    /// The packet payload contains a SURB followed by data.
+    DataWithSurb(P),
+    /// The packet contains only multiple SURBs with no more data.
+    SurbsOnly(u8, P),
+}
+
+impl<P: Pseudonym> SphinxRecipientMessage<P> {
+    pub fn num_surbs(&self) -> u8 {
+        match self {
+            Self::DataOnly => 0,
+            Self::ReplyOnly(_) => 0,
+            Self::DataWithSurb(_) => 1,
+            Self::SurbsOnly(n, _) => *n,
+        }
+    }
+}
