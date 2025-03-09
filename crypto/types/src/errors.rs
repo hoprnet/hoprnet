@@ -4,7 +4,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum CryptoError {
-    #[error("cryptographic parameter '{name}' must be {expected} bytes")]
+    #[error("cryptographic parameter '{name}' must be {expected} bytes long")]
     InvalidParameterSize { name: &'static str, expected: usize },
 
     #[error("input to the function has invalid value or size")]

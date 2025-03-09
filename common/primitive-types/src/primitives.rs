@@ -505,31 +505,62 @@ impl PartialOrd<Self> for SerializableLog {
 }
 
 /// Identifier of public keys.
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, Hash)]
-pub struct KeyIdent([u8; Self::SIZE]);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct KeyIdent<const N: usize = 4>([u8; N]);
 
-impl TryFrom<&[u8]> for KeyIdent {
-    type Error = GeneralError;
-
-    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(
-            value
-                .try_into()
-                .map_err(|_| ParseError("KeyIdent".into()))?,
-        ))
+impl<const N: usize> Display for KeyIdent<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
     }
 }
 
-impl AsRef<[u8]> for KeyIdent {
+impl From<u32> for KeyIdent<4> {
+    fn from(value: u32) -> Self {
+        Self(value.to_be_bytes())
+    }
+}
+
+impl From<KeyIdent<4>> for u32 {
+    fn from(value: KeyIdent<4>) -> Self {
+        u32::from_be_bytes(value.0)
+    }
+}
+
+impl From<u64> for KeyIdent<8> {
+    fn from(value: u64) -> Self {
+        Self(value.to_be_bytes())
+    }
+}
+
+impl From<KeyIdent<8>> for u64 {
+    fn from(value: KeyIdent<8>) -> Self {
+        u64::from_be_bytes(value.0)
+    }
+}
+
+impl<const N: usize> TryFrom<&[u8]> for KeyIdent<N> {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| ParseError("KeyIdent".into()))?))
+    }
+}
+
+impl<const N: usize> AsRef<[u8]> for KeyIdent<N> {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl BytesRepresentable for KeyIdent {
-    const SIZE: usize = 8;
+impl<const N: usize> Default for KeyIdent<N> {
+    fn default() -> Self {
+        Self([0u8; N])
+    }
 }
 
+impl<const N: usize> BytesRepresentable for KeyIdent<N> {
+    const SIZE: usize = N;
+}
 
 /// Unit tests of pure Rust code
 #[cfg(test)]

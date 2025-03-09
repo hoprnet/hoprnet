@@ -1,7 +1,7 @@
-use std::marker::PhantomData;
 use hopr_crypto_random::random_fill;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 
 use crate::derivation::derive_mac_key;
@@ -12,29 +12,34 @@ const RELAYER_END_PREFIX: u8 = 0xff;
 
 const PATH_POSITION_LEN: usize = 1;
 
-
 /// Contains the necessary size and type specifications for the Sphinx packet header.
 pub trait SphinxHeaderSpec {
     /// Maximum number of hops.
     const MAX_HOPS: NonZeroUsize;
 
-    /// Size of the public key identifier
-    const KEY_ID_SIZE: NonZeroUsize;
-
     /// Public key identifier type.
-    type KeyId: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError>;
-
-    /// Size of the additional data for relayers.
-    const RELAYER_DATA_SIZE: usize;
+    type KeyId: BytesRepresentable + Clone;
 
     /// Type representing additional data for relayers.
-    type RelayerData: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = std::array::TryFromSliceError>;
-
-    /// Size of the additional data for the recipient (last hop).
-    const LAST_HOP_DATA_SIZE: usize;
+    type RelayerData: BytesRepresentable;
 
     /// Type representing additional data for the recipient (last hop).
-    type LastHopData: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = std::array::TryFromSliceError>;
+    type LastHopData: BytesRepresentable;
+
+    /// Type representing additional data delivered with each SURB to its receiver.
+    type SurbReceiverData: BytesRepresentable;
+
+    /// Size of the additional data for relayers.
+    const RELAYER_DATA_SIZE: usize = Self::RelayerData::SIZE;
+
+    /// Size of the additional data for the recipient (last hop).
+    const LAST_HOP_DATA_SIZE: usize = Self::LastHopData::SIZE;
+
+    /// Size of the additional data included in SURBs.
+    const SURB_RECEIVER_DATA_SIZE: usize = Self::SurbReceiverData::SIZE;
+
+    /// Size of the public key identifier
+    const KEY_ID_SIZE: NonZeroUsize = NonZeroUsize::new(Self::KeyId::SIZE).unwrap();
 
     /// Length of the header routing information per hop.
     ///
@@ -86,7 +91,17 @@ pub trait SphinxHeaderSpec {
 pub struct RoutingInfo<H: SphinxHeaderSpec> {
     pub routing_information: Box<[u8]>, // Cannot use [u8; H::HEADER_LEN] due to Rust limitation
     pub mac: [u8; SimpleMac::SIZE],
-    _h: PhantomData<H>,
+    pub(crate) _h: PhantomData<H>,
+}
+
+impl<H: SphinxHeaderSpec> Clone for RoutingInfo<H> {
+    fn clone(&self) -> Self {
+        Self {
+            routing_information: self.routing_information.clone(),
+            mac: self.mac,
+            _h: PhantomData,
+        }
+    }
 }
 
 impl<H: SphinxHeaderSpec> Default for RoutingInfo<H> {
@@ -318,7 +333,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
             next_header: RoutingInfo::<H> {
                 routing_information: (&header[..H::HEADER_LEN]).into(),
                 mac,
-                _h: PhantomData
+                _h: PhantomData,
             },
             path_pos,
             next_node,
@@ -343,6 +358,42 @@ mod tests {
     use parameterized::parameterized;
     use std::num::NonZero;
 
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    struct WrappedBytes<const N: usize>([u8; N]);
+
+    impl<const N: usize> Default for WrappedBytes<N> {
+        fn default() -> Self {
+            Self([0u8; N])
+        }
+    }
+
+    impl<const N: usize> WrappedBytes<N> {
+        pub const fn len(&self) -> usize {
+            N
+        }
+    }
+
+    impl<'a, const N: usize> TryFrom<&'a [u8]> for WrappedBytes<N> {
+        type Error = GeneralError;
+
+        fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+            value
+                .try_into()
+                .map(Self)
+                .map_err(|_| GeneralError::ParseError("WrappedBytes".into()))
+        }
+    }
+
+    impl<const N: usize> AsRef<[u8]> for WrappedBytes<N> {
+        fn as_ref(&self) -> &[u8] {
+            &self.0
+        }
+    }
+
+    impl<const N: usize> BytesRepresentable for WrappedBytes<N> {
+        const SIZE: usize = N;
+    }
+
     struct TestSpec<K, const HOPS: usize, const RELAYER_DATA: usize, const LAST_HOP_DATA: usize>(PhantomData<K>);
     impl<K, const HOPS: usize, const RELAYER_DATA: usize, const LAST_HOP_DATA: usize> SphinxHeaderSpec
         for TestSpec<K, HOPS, RELAYER_DATA, LAST_HOP_DATA>
@@ -350,12 +401,9 @@ mod tests {
         K: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> + BytesRepresentable,
     {
         const MAX_HOPS: NonZeroUsize = NonZero::new(HOPS).unwrap();
-        const KEY_ID_SIZE: NonZeroUsize = NonZero::new(K::SIZE).unwrap();
         type KeyId = K;
-        const RELAYER_DATA_SIZE: usize = RELAYER_DATA;
-        type RelayerData = [u8; RELAYER_DATA];
-        const LAST_HOP_DATA_SIZE: usize = LAST_HOP_DATA;
-        type LastHopData = [u8; LAST_HOP_DATA];
+        type RelayerData = WrappedBytes<RELAYER_DATA>;
+        type LastHopData = WrappedBytes<LAST_HOP_DATA>;
     }
 
     #[test]
@@ -410,8 +458,12 @@ mod tests {
         let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
         let shares = S::new_shared_keys(&pub_keys)?;
 
-        let rinfo =
-            RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 0, 0>>::new(&pub_keys, &shares.secrets, &[], [])?;
+        let rinfo = RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 0, 0>>::new(
+            &pub_keys,
+            &shares.secrets,
+            &[],
+            Default::default(),
+        )?;
 
         let mut header: Vec<u8> = rinfo.routing_information.into();
 
@@ -458,8 +510,10 @@ mod tests {
         let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
         let shares = S::new_shared_keys(&pub_keys)?;
 
-        let relayer_data = (0..keypairs.len()).map(|i| [(i + 1) as u8; 32]).collect::<Vec<_>>();
-        let last_hop_data = [0xff_u8; 32];
+        let relayer_data = (0..keypairs.len())
+            .map(|i| WrappedBytes([(i + 1) as u8; 32]))
+            .collect::<Vec<WrappedBytes<32>>>();
+        let last_hop_data = WrappedBytes::<32>([0xff_u8; 32]);
 
         let rinfo = RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 32, 32>>::new(
             &pub_keys,

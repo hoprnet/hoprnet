@@ -1,32 +1,35 @@
-use std::fmt::{Display, Formatter};
-
+use hopr_crypto_sphinx::surb::{create_surb, LocalSURBEntry};
 use hopr_crypto_sphinx::{derivation::derive_ack_key_share, shared_keys::SphinxSuite};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use std::fmt::{Display, Formatter};
 
-use crate::packet::SimpleKeyMapper;
+use crate::errors::PacketError;
+use crate::errors::PacketError::PacketConstructionError;
+use crate::packet::{KeyIdMapper, MetaPacketRouting};
+use crate::return_path::SphinxRecipientMessage;
 use crate::{
     errors::{PacketError::PacketDecodingError, Result},
     packet::{ForwardedMetaPacket, MetaPacket},
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues},
-    CurrentSphinxSuite, HoprFullSphinxHeader,
+    CurrentSphinxSuite, HoprPseudonym, HoprSphinxHeaderSpec, HoprSurb,
 };
 
 /// Indicates the packet type.
 #[allow(clippy::large_enum_variant)] // TODO: see if some parts can be boxed
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum ChainPacketComponents {
-    /// Packet is intended for us
+    /// The packet is intended for us
     Final {
         packet_tag: PacketTag,
         ack_key: HalfKey,
         previous_hop: OffchainPublicKey,
         plain_text: Box<[u8]>,
     },
-    /// Packet must be forwarded
+    /// The packet must be forwarded
     Forwarded {
-        packet: MetaPacket<CurrentSphinxSuite, HoprFullSphinxHeader>,
+        packet: MetaPacket<CurrentSphinxSuite, HoprSphinxHeaderSpec>,
         ticket: Ticket,
         ack_challenge: HalfKeyChallenge,
         packet_tag: PacketTag,
@@ -34,12 +37,12 @@ pub enum ChainPacketComponents {
         previous_hop: OffchainPublicKey,
         own_key: HalfKey,
         next_hop: OffchainPublicKey,
-        next_challenge: Challenge,
+        next_challenge: EthereumChallenge,
         path_pos: u8,
     },
-    /// Packet that is being sent out by us
+    /// The packet that is being sent out by us
     Outgoing {
-        packet: MetaPacket<CurrentSphinxSuite, HoprFullSphinxHeader>,
+        packet: MetaPacket<CurrentSphinxSuite, HoprSphinxHeaderSpec>,
         ticket: Ticket,
         next_hop: OffchainPublicKey,
         ack_challenge: HalfKeyChallenge,
@@ -56,65 +59,220 @@ impl Display for ChainPacketComponents {
     }
 }
 
+/// Determines options on how HOPR packet can be routed to its destination.
+#[derive(Clone)]
+pub enum PacketRouting<'a> {
+    /// The packet is routed directly via the given path.
+    ForwardPath(&'a [OffchainPublicKey]),
+    /// The packet is routed via an existing SURB.
+    Surb(HoprSurb),
+}
+
 impl ChainPacketComponents {
-    /// Size of the packet including header, padded payload, ticket, and ack challenge.
-    pub const SIZE: usize = MetaPacket::<CurrentSphinxSuite, HoprFullSphinxHeader>::PACKET_LEN + Ticket::SIZE;
+    /// The size of the packet including header, padded payload, ticket, and ack challenge.
+    pub const SIZE: usize = MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN + Ticket::SIZE;
+
+    fn into_raw_msg<M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>>(
+        msg: &[u8],
+        msg_type: SphinxRecipientMessage<HoprPseudonym>,
+        routing: PacketRouting,
+        chain_keypair: &ChainKeypair,
+        ticket: TicketBuilder,
+        mapper: &M,
+        domain_separator: &Hash,
+    ) -> Result<Self> {
+        match routing {
+            PacketRouting::ForwardPath(forward_path) => {
+                let shared_keys = CurrentSphinxSuite::new_shared_keys(forward_path)?;
+                let por_values = ProofOfRelayValues::new(&shared_keys.secrets[0], shared_keys.secrets.get(1))?;
+                let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
+
+                // Update the ticket with the challenge
+                let ticket = ticket
+                    .challenge(por_values.ticket_challenge())
+                    .build_signed(chain_keypair, domain_separator)?
+                    .leak();
+
+                Ok(Self::Outgoing {
+                    packet: MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::new(
+                        msg,
+                        MetaPacketRouting::ForwardPath {
+                            shared_keys,
+                            forward_path,
+                            additional_data_relayer: &por_strings,
+                            additional_data_last_hop: msg_type.into(),
+                        },
+                        mapper,
+                    )?,
+                    ticket,
+                    next_hop: forward_path[0],
+                    ack_challenge: por_values.acknowledgement_challenge(),
+                })
+            }
+            PacketRouting::Surb(surb) => {
+                // Update the ticket with the challenge
+                let ticket = ticket
+                    .challenge(surb.additional_data_receiver.ticket_challenge())
+                    .build_signed(chain_keypair, domain_separator)?
+                    .leak();
+
+                Ok(Self::Outgoing {
+                    ticket,
+                    next_hop: mapper.map_id_to_public(&surb.first_relayer).ok_or_else(|| {
+                        PacketConstructionError(format!(
+                            "failed to map key id {} to public key",
+                            surb.first_relayer.to_hex()
+                        ))
+                    })?,
+                    ack_challenge: surb.additional_data_receiver.acknowledgement_challenge(),
+                    packet: MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::new(
+                        msg,
+                        MetaPacketRouting::Surb(surb),
+                        mapper,
+                    )?,
+                })
+            }
+        }
+    }
 
     /// Constructs a new outgoing packet with the given path.
     /// # Arguments
     /// * `msg` packet payload
-    /// * `public_keys_path` public keys of a complete path for the packet to take
-    /// * `private_key` private key of the local node
-    /// * `ticket` ticket for the first hop on the path
-    /// * `domain_separator`
-    pub fn into_outgoing(
+    /// * `routing` routing to the destination
+    /// * `chain_keypair` private key of the local node
+    /// * `ticket` ticket builder for the first hop on the path
+    /// * `domain_separator` channels contract domain separator
+    pub fn into_outgoing<M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>>(
         msg: &[u8],
-        public_keys_path: &[OffchainPublicKey],
+        routing: PacketRouting,
+        surb: Option<(HoprPseudonym, &[OffchainPublicKey])>,
         chain_keypair: &ChainKeypair,
         ticket: TicketBuilder,
+        mapper: &M,
         domain_separator: &Hash,
-    ) -> Result<Self> {
-        let shared_keys = CurrentSphinxSuite::new_shared_keys(public_keys_path)?;
-        let por_values = ProofOfRelayValues::new(&shared_keys.secrets[0], shared_keys.secrets.get(1));
-        let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets);
+    ) -> Result<(Self, Option<LocalSURBEntry>)> {
+        if let Some((pseudonym, return_path)) = surb {
+            if msg.len() + HoprSurb::SIZE > PAYLOAD_SIZE {
+                return Err(PacketError::PacketConstructionError(
+                    "message too long to fit with a surb into the packet".into(),
+                ));
+            }
 
-        // Update the ticket with the challenge
-        let ticket = ticket
-            .challenge(por_values.ticket_challenge.to_ethereum_challenge())
-            .build_signed(chain_keypair, domain_separator)?
-            .leak();
+            let shared_keys = CurrentSphinxSuite::new_shared_keys(return_path)?;
+            let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
+            let por_values = ProofOfRelayValues::new(&shared_keys.secrets[0], shared_keys.secrets.get(1))?;
 
-        // TODO: replace this
-        let mapper = SimpleKeyMapper::default();
-
-        Ok(Self::Outgoing {
-            packet: MetaPacket::<CurrentSphinxSuite, HoprFullSphinxHeader>::new(
+            let (surb, local) = create_surb::<CurrentSphinxSuite, HoprSphinxHeaderSpec>(
                 shared_keys,
-                msg,
-                public_keys_path,
-                &mapper,
+                &return_path
+                    .iter()
+                    .map(|k| {
+                        mapper
+                            .map_key_to_id(k)
+                            .ok_or_else(|| PacketConstructionError(format!("failed to map key {} to id", k.to_hex())))
+                    })
+                    .collect::<Result<Vec<_>>>()?,
                 &por_strings,
-                [],
-            )?,
+                SphinxRecipientMessage::DataOnly.into(),
+                por_values,
+            )?;
+            let mut composed_msg = Vec::with_capacity(msg.len() + HoprSurb::SIZE);
+            composed_msg.extend(surb.into_boxed());
+            composed_msg.extend_from_slice(msg);
+
+            Self::into_raw_msg(
+                &composed_msg,
+                SphinxRecipientMessage::DataWithSurb(pseudonym),
+                routing,
+                chain_keypair,
+                ticket,
+                mapper,
+                domain_separator,
+            )
+            .map(|p| (p, Some(local)))
+        } else {
+            Self::into_raw_msg(
+                msg,
+                SphinxRecipientMessage::DataOnly,
+                routing,
+                chain_keypair,
+                ticket,
+                mapper,
+                domain_separator,
+            )
+            .map(|p| (p, None))
+        }
+    }
+
+    pub fn into_outgoing_surbs<M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>>(
+        pseudonym: HoprPseudonym,
+        return_paths: &[&[OffchainPublicKey]],
+        routing: PacketRouting,
+        chain_keypair: &ChainKeypair,
+        ticket: TicketBuilder,
+        mapper: &M,
+        domain_separator: &Hash,
+    ) -> Result<(Self, Vec<LocalSURBEntry>)> {
+        if return_paths.is_empty() || return_paths.len() * HoprSurb::SIZE > PAYLOAD_SIZE {
+            return Err(PacketError::PacketConstructionError(
+                "too many SURBs to fit in the packet".into(),
+            ));
+        }
+
+        let mut composed_msg = Vec::with_capacity(return_paths.len() * HoprSurb::SIZE);
+        let mut local_surbs = Vec::with_capacity(return_paths.len());
+
+        for return_path in return_paths {
+            let shared_keys = CurrentSphinxSuite::new_shared_keys(return_path)?;
+            let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
+            let por_values = ProofOfRelayValues::new(&shared_keys.secrets[0], shared_keys.secrets.get(1))?;
+
+            let (surb, local) = create_surb::<CurrentSphinxSuite, HoprSphinxHeaderSpec>(
+                shared_keys,
+                &return_path
+                    .iter()
+                    .map(|k| {
+                        mapper
+                            .map_key_to_id(k)
+                            .ok_or_else(|| PacketConstructionError(format!("failed to map key {} to id", k.to_hex())))
+                    })
+                    .collect::<Result<Vec<_>>>()?,
+                &por_strings,
+                SphinxRecipientMessage::DataOnly.into(),
+                por_values,
+            )?;
+
+            composed_msg.extend(surb.into_boxed());
+            local_surbs.push(local);
+        }
+
+        Self::into_raw_msg(
+            &composed_msg,
+            SphinxRecipientMessage::SurbsOnly(return_paths.len() as u8, pseudonym),
+            routing,
+            chain_keypair,
             ticket,
-            next_hop: public_keys_path[0],
-            ack_challenge: por_values.ack_challenge,
-        })
+            mapper,
+            domain_separator,
+        )
+        .map(|p| (p, local_surbs))
     }
 
     /// Deserializes the packet and performs the forward-transformation, so the
     /// packet can be further delivered (relayed to the next hop or read).
-    pub fn from_incoming(data: &[u8], node_keypair: &OffchainKeypair, previous_hop: OffchainPublicKey) -> Result<Self> {
+    pub fn from_incoming<M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>>(
+        data: &[u8],
+        node_keypair: &OffchainKeypair,
+        previous_hop: OffchainPublicKey,
+        mapper: &M,
+    ) -> Result<Self> {
         if data.len() == Self::SIZE {
             let (pre_packet, pre_ticket) =
-                data.split_at(MetaPacket::<CurrentSphinxSuite, HoprFullSphinxHeader>::PACKET_LEN);
+                data.split_at(MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN);
 
-            // TODO: replace this
-            let mapper = SimpleKeyMapper::default();
+            let mp: MetaPacket<CurrentSphinxSuite, HoprSphinxHeaderSpec> = MetaPacket::try_from(pre_packet)?;
 
-            let mp: MetaPacket<CurrentSphinxSuite, HoprFullSphinxHeader> = MetaPacket::try_from(pre_packet)?;
-
-            match mp.into_forwarded(node_keypair, &mapper)? {
+            match mp.into_forwarded(node_keypair, mapper)? {
                 ForwardedMetaPacket::Relayed {
                     packet,
                     derived_secret,
@@ -127,7 +285,7 @@ impl ChainPacketComponents {
                     let ack_key = derive_ack_key_share(&derived_secret);
 
                     let ticket = Ticket::try_from(pre_ticket)?;
-                    let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
+                    let verification_output = pre_verify(&derived_secret, additional_info.as_ref(), &ticket.challenge)?;
                     Ok(Self::Forwarded {
                         packet,
                         ticket,
@@ -165,8 +323,10 @@ impl ChainPacketComponents {
 
 #[cfg(test)]
 mod tests {
-    use super::ChainPacketComponents;
+    use super::{ChainPacketComponents, PacketRouting};
+
     use async_trait::async_trait;
+    use bimap::BiHashMap;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
@@ -212,7 +372,7 @@ mod tests {
                 ..
             } => {
                 let ticket = next_ticket
-                    .challenge(next_challenge.to_ethereum_challenge())
+                    .challenge(next_challenge)
                     .build_signed(chain_keypair, domain_separator)
                     .expect("ticket should create")
                     .leak();
@@ -336,6 +496,11 @@ mod tests {
     fn test_packet_create_and_transform(amount: usize) -> anyhow::Result<()> {
         let mut keypairs_offchain = Vec::from_iter(PEERS_OFFCHAIN[0..amount].iter());
         let mut keypairs_onchain = Vec::from_iter(PEERS_ONCHAIN[0..amount].iter());
+        let mapper = keypairs_offchain
+            .iter()
+            .enumerate()
+            .map(|(i, k)| (KeyIdent::from(i as u32), k.public().clone()))
+            .collect::<BiHashMap<_, _>>();
 
         let own_channel_kp = keypairs_onchain
             .drain(..1)
@@ -365,8 +530,17 @@ mod tests {
             .map(|v| OffchainPublicKey::try_from(v))
             .collect::<hopr_primitive_types::errors::Result<Vec<_>>>()?;
 
-        let mut packet =
-            ChainPacketComponents::into_outgoing(test_message, &path, &own_channel_kp, ticket, &Hash::default())?;
+        let (mut packet, surb) = ChainPacketComponents::into_outgoing(
+            test_message,
+            PacketRouting::ForwardPath(&path),
+            None,
+            &own_channel_kp,
+            ticket,
+            &mapper,
+            &Hash::default(),
+        )?;
+
+        assert!(surb.is_none());
 
         match &packet {
             ChainPacketComponents::Outgoing { .. } => {}
@@ -380,7 +554,7 @@ mod tests {
                 .public()
                 .clone();
 
-            packet = ChainPacketComponents::from_incoming(&packet.to_bytes(), path_element, sender)
+            packet = ChainPacketComponents::from_incoming(&packet.to_bytes(), path_element, sender, &mapper)
                 .unwrap_or_else(|e| panic!("failed to deserialize packet at hop {i}: {e}"));
 
             match &packet {

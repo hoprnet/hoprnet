@@ -23,6 +23,7 @@ use k256::{
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use std::fmt::Debug;
+use std::hash::Hasher;
 use std::sync::OnceLock;
 use std::{
     fmt::{Display, Formatter},
@@ -185,6 +186,12 @@ impl CurvePoint {
             .to_affine();
 
         affine.into()
+    }
+}
+
+impl std::hash::Hash for CurvePoint {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.compressed.hash(state);
     }
 }
 
@@ -750,7 +757,7 @@ pub type PacketTag = [u8; PACKET_TAG_LENGTH];
 ///
 /// assert_eq!(from_uncompressed, from_transaction_signature);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PublicKey(CurvePoint);
 
 impl PublicKey {
@@ -941,7 +948,7 @@ impl From<&PublicKey> for k256::ProjectivePoint {
 }
 
 /// Represents a compressed serializable extension of the `PublicKey` using the secp256k1 curve.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct CompressedPublicKey(pub PublicKey);
 
 impl TryFrom<&[u8]> for CompressedPublicKey {

@@ -12,12 +12,11 @@
 //! The currently used implementation is selected using the `CurrentSphinxSuite` type in the `packet` module.
 //!
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
-//! In particular, as soon as there's way to represent `Ed448` PeerIDs, it would be easy to create e.g. `X448Suite`.
+//! In particular, as soon as there's a way to represent `Ed448` PeerIDs, it would be easy to create e.g. `X448Suite`.
 //!
 
 use hopr_crypto_sphinx::routing::SphinxHeaderSpec;
 use hopr_crypto_sphinx::shared_keys::SphinxSuite;
-use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::marker::PhantomData;
@@ -30,34 +29,29 @@ pub mod errors;
 pub mod packet;
 /// Implements the Proof of Relay.
 pub mod por;
+pub mod return_path;
 /// Implements ticket validation logic.
 pub mod validation;
+
+/// Pseudonyms used for the return path.
+pub type HoprPseudonym = return_path::SimplePseudonym;
 
 /// Currently used public key cipher suite for Sphinx.
 pub type CurrentSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
 
-pub struct HoprFullSphinxHeader<S: SphinxSuite = CurrentSphinxSuite>(PhantomData<S>);
-impl<S: SphinxSuite> SphinxHeaderSpec for HoprFullSphinxHeader<S> {
+/// Current Sphinx header specification for the HOPR protocol.
+pub struct HoprSphinxHeaderSpec<S: SphinxSuite = CurrentSphinxSuite>(PhantomData<S>);
+
+impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
-    const KEY_ID_SIZE: std::num::NonZeroUsize = std::num::NonZeroUsize::new(<S::P as Keypair>::Public::SIZE).unwrap();
-    type KeyId = <S::P as Keypair>::Public;
-    const RELAYER_DATA_SIZE: usize = por::POR_SECRET_LENGTH;
-    type RelayerData = [u8; por::POR_SECRET_LENGTH];
-    const LAST_HOP_DATA_SIZE: usize = 0;
-    type LastHopData = [u8; 0];
+    type KeyId = KeyIdent<4>;
+    type RelayerData = por::ProofOfRelayString;
+    type LastHopData = return_path::EncodedRecipientMessage<HoprPseudonym>;
+    type SurbReceiverData = por::ProofOfRelayValues;
 }
 
-
-pub struct HoprReducedSphinxHeader<S: SphinxSuite = CurrentSphinxSuite>(PhantomData<S>);
-impl<S: SphinxSuite> SphinxHeaderSpec for HoprReducedSphinxHeader<S> {
-    const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
-    const KEY_ID_SIZE: std::num::NonZeroUsize = std::num::NonZeroUsize::new(KeyIdent::SIZE).unwrap();
-    type KeyId = KeyIdent;
-    const RELAYER_DATA_SIZE: usize = por::POR_SECRET_LENGTH;
-    type RelayerData = [u8; por::POR_SECRET_LENGTH];
-    const LAST_HOP_DATA_SIZE: usize = 16;
-    type LastHopData = [u8; 16];
-}
+/// Single Use Reply Block representation for HOPR protocol.
+pub type HoprSurb = hopr_crypto_sphinx::surb::SURB<CurrentSphinxSuite, HoprSphinxHeaderSpec>;
 
 #[cfg(test)]
 mod tests {
@@ -67,9 +61,9 @@ mod tests {
 
     #[test]
     fn header_and_packet_lengths() {
-        let header_len = HoprFullSphinxHeader::<CurrentSphinxSuite>::HEADER_LEN;
+        let header_len = HoprSphinxHeaderSpec::<CurrentSphinxSuite>::HEADER_LEN;
         assert_eq!(
-            MetaPacket::<CurrentSphinxSuite, HoprFullSphinxHeader>::HEADER_LEN,
+            MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::HEADER_LEN,
             header_len
         ); // 394 bytes
 
@@ -78,7 +72,7 @@ mod tests {
 
         let hopr_packet_len = ChainPacketComponents::SIZE;
         assert_eq!(
-            MetaPacket::<CurrentSphinxSuite, HoprFullSphinxHeader>::PACKET_LEN + Ticket::SIZE,
+            MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN + Ticket::SIZE,
             hopr_packet_len
         ); // 1116 bytes
 
