@@ -2,7 +2,7 @@ use hopr_crypto_sphinx::routing::SphinxHeaderSpec;
 use hopr_crypto_sphinx::surb::{LocalSURBEntry, SphinxRecipientMessage, SURB};
 use hopr_crypto_sphinx::{
     derivation::derive_packet_tag,
-    prp::{PRPParameters, PRP},
+    prp::{LionessPRP, LionessPRPParameters},
     routing::{forward_header, ForwardedHeader, RoutingInfo},
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
 };
@@ -10,12 +10,12 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
+use crate::errors::PacketError;
+use crate::errors::{PacketError::PacketDecodingError, Result};
+use hopr_crypto_sphinx::prp::PRP;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use typenum::Unsigned;
-
-use crate::errors::PacketError;
-use crate::errors::{PacketError::PacketDecodingError, Result};
 
 /// Tag used to separate padding from data
 const PADDING_TAG: u8 = 0xaa;
@@ -190,7 +190,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
                 // Encrypt the packet payload using the derived shared secrets
                 for secret in shared_keys.secrets.iter().rev() {
-                    let prp = PRP::from_parameters(PRPParameters::new(secret));
+                    let prp = LionessPRP::from_parameters(LionessPRPParameters::new(secret));
                     prp.forward_inplace(&mut payload)
                         .unwrap_or_else(|e| panic!("onion encryption error {e}"));
                 }
@@ -199,7 +199,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
             }
             MetaPacketRouting::Surb(surb) => {
                 // Encrypt the packet using the sender's key from the SURB
-                let prp = PRP::from_parameters(PRPParameters::new(&surb.sender_key));
+                let prp = LionessPRP::from_parameters(LionessPRPParameters::new(&surb.sender_key));
                 prp.forward_inplace(&mut payload)
                     .unwrap_or_else(|e| panic!("onion encryption error {e}"));
 
@@ -286,7 +286,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
-        let prp = PRP::from_parameters(PRPParameters::new(&secret));
+        let prp = LionessPRP::from_parameters(LionessPRPParameters::new(&secret));
         prp.inverse_inplace(decrypted)?;
 
         Ok(match fwd_header {
@@ -320,12 +320,12 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
                     // Encrypt the packet payload using the derived shared secrets,
                     // to reverse the decryption done by individual hops
                     for secret in local_surb.shared_keys.iter().rev() {
-                        let prp = PRP::from_parameters(PRPParameters::new(secret));
+                        let prp = LionessPRP::from_parameters(LionessPRPParameters::new(secret));
                         prp.forward_inplace(decrypted)?;
                     }
 
                     // Inverse the initial encryption using the sender key
-                    let prp = PRP::from_parameters(PRPParameters::new(&local_surb.sender_key));
+                    let prp = LionessPRP::from_parameters(LionessPRPParameters::new(&local_surb.sender_key));
                     prp.inverse_inplace(decrypted)?;
                 }
 
