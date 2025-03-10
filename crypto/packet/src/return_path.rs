@@ -2,7 +2,6 @@ use hopr_crypto_sphinx::surb::SphinxRecipientMessage;
 use hopr_crypto_types::types::Pseudonym;
 use hopr_primitive_types::errors::GeneralError;
 use hopr_primitive_types::prelude::BytesRepresentable;
-use std::fmt::Display;
 use std::marker::PhantomData;
 
 /// Encodes the [`SphinxRecipientMessage`] into a wire-format.

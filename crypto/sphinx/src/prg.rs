@@ -1,5 +1,6 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
 use chacha20::ChaCha20;
+use chacha20::cipher::StreamCipherSeek;
 use hopr_crypto_types::primitives::SecretKey;
 use zeroize::ZeroizeOnDrop;
 
@@ -28,6 +29,7 @@ impl PRG for Chacha20PRG {
         assert!(from < to, "{from} must be less then to {to}");
 
         let mut out = vec![0u8; to - from];
+        self.0.seek(from as u64);
         self.0.apply_keystream(&mut out);
         out.into_boxed_slice()
     }

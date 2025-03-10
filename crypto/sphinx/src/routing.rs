@@ -76,7 +76,6 @@ pub trait SphinxHeaderSpec {
         let padding_len = (Self::MAX_HOPS.get() - secrets.len()) * Self::ROUTING_INFO_LEN;
 
         let mut ret = vec![0u8; Self::HEADER_LEN - padding_len - Self::LAST_HOP_DATA_SIZE - 1];
-
         let mut length = Self::ROUTING_INFO_LEN;
         let mut start = Self::HEADER_LEN;
 
