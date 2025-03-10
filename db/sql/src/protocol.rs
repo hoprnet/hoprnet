@@ -404,7 +404,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
                             let ticket = spawn_fifo_blocking(move || {
                                 ticket_builder
-                                    .challenge(next_challenge.to_ethereum_challenge())
+                                    .challenge(next_challenge)
                                     .build_signed(&me, &domain_separator)
                             })
                             .await?;

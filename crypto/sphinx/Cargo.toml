@@ -25,7 +25,6 @@ k256 = { version = "0.13.0", features = [
 ] }
 sha3 = { workspace = true }
 typenum = { workspace = true }
-universal-hash = "0.5.1"
 
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }

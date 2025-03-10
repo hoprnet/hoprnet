@@ -7,7 +7,6 @@ use typenum::Unsigned;
 use crate::utils::SecretValue;
 
 pub use chacha20::ChaCha20;
-pub use poly1305::universal_hash::UniversalHash;
 pub use poly1305::Poly1305;
 
 /// Represents a 256-bit secret key of fixed length.

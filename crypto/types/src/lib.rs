@@ -25,6 +25,7 @@ pub mod crypto_traits {
     pub use cipher::{
         BlockSizeUser, Iv, IvSizeUser, Key, KeyInit, KeyIvInit, KeySizeUser, StreamCipher, StreamCipherSeek,
     };
+    pub use poly1305::universal_hash::UniversalHash;
 }
 
 #[doc(hidden)]

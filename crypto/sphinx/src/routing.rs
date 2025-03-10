@@ -1,15 +1,15 @@
-use crate::derivation::{derive_mac_key, generate_key_iv};
-use crate::shared_keys::SharedSecret;
-use crate::surb::SphinxRecipientMessage;
 use hopr_crypto_random::random_fill;
-use hopr_crypto_types::crypto_traits::{KeyInit, StreamCipher, StreamCipherSeek};
+use hopr_crypto_types::crypto_traits::{KeyInit, StreamCipher, StreamCipherSeek, UniversalHash};
 use hopr_crypto_types::prelude::*;
 use hopr_crypto_types::types::Pseudonym;
 use hopr_primitive_types::prelude::*;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use typenum::Unsigned;
-use universal_hash::UniversalHash;
+
+use crate::derivation::{derive_mac_key, generate_key_iv};
+use crate::shared_keys::SharedSecret;
+use crate::surb::SphinxRecipientMessage;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
@@ -41,7 +41,7 @@ pub trait SphinxHeaderSpec {
     type PRG: crypto_traits::StreamCipher + crypto_traits::StreamCipherSeek + crypto_traits::KeyIvInit;
 
     /// One-time authenticator used for Sphinx header tag.
-    type UH: UniversalHash + crypto_traits::KeyInit;
+    type UH: crypto_traits::UniversalHash + crypto_traits::KeyInit;
 
     /// Size of the additional data for relayers.
     const RELAYER_DATA_SIZE: usize = Self::RelayerData::SIZE;
@@ -243,10 +243,10 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 prg.apply_keystream(&mut extended_header[0..H::HEADER_LEN]);
             }
 
-            let mut m = H::UH::new_from_slice(derive_mac_key(&secrets[inverted_idx]).as_ref())
+            let mut uh = H::UH::new_from_slice(derive_mac_key(&secrets[inverted_idx]).as_ref())
                 .map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
-            m.update_padded(&extended_header[0..H::HEADER_LEN]);
-            ret.mac.copy_from_slice(&m.finalize());
+            uh.update_padded(&extended_header[0..H::HEADER_LEN]);
+            ret.mac.copy_from_slice(&uh.finalize());
         }
 
         ret.routing_information = (&extended_header[0..H::HEADER_LEN]).into();
@@ -306,6 +306,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         });
     }
 
+    // Compute and verify the authentication tag
     let mut uh = H::UH::new_from_slice(derive_mac_key(secret).as_ref())
         .map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
     uh.update_padded(header);

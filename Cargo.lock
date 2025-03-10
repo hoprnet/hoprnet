@@ -4266,7 +4266,6 @@ dependencies = [
  "sha3",
  "subtle",
  "typenum",
- "universal-hash 0.5.1",
 ]
 
 [[package]]
