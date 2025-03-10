@@ -2,7 +2,6 @@ use hopr_crypto_sphinx::routing::SphinxHeaderSpec;
 use hopr_crypto_sphinx::surb::{LocalSURBEntry, SphinxRecipientMessage, SURB};
 use hopr_crypto_sphinx::{
     derivation::derive_packet_tag,
-    prp::{LionessPRP, LionessPRPParameters},
     routing::{forward_header, ForwardedHeader, RoutingInfo},
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
 };
@@ -157,7 +156,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
     /// each of the challenges has the same size of `additional_relayer_data_len`.
     ///
     /// Optionally, there could be some additional data (`additional_data_last_hop`) for the packet destination.
-    /// This is being used to transfer [`Pseudonym`](hopr_crypto_sphinx::surb::Pseudonym) for when the
+    /// This is being used to transfer [`Pseudonym`](hopr_crypto_types::types::Pseudonym) for when the
     /// packet contains SURBs.
     pub fn new<M: KeyIdMapper<S, H>>(msg: &[u8], routing: MetaPacketRouting<S, H>, key_mapper: &M) -> Result<Self> {
         if msg.len() > PAYLOAD_SIZE {
@@ -189,19 +188,17 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
                 )?;
 
                 // Encrypt the packet payload using the derived shared secrets
-                for secret in shared_keys.secrets.iter().rev() {
-                    let prp = LionessPRP::from_parameters(LionessPRPParameters::new(secret));
-                    prp.forward_inplace(&mut payload)
-                        .unwrap_or_else(|e| panic!("onion encryption error {e}"));
+                for secret in shared_keys.secrets.into_iter().rev() {
+                    let mut prp = S::PRP::from(secret);
+                    prp.forward_inplace(&mut payload)?;
                 }
 
                 Self::new_from_parts(shared_keys.alpha, routing_info, &payload)
             }
             MetaPacketRouting::Surb(surb) => {
                 // Encrypt the packet using the sender's key from the SURB
-                let prp = LionessPRP::from_parameters(LionessPRPParameters::new(&surb.sender_key));
-                prp.forward_inplace(&mut payload)
-                    .unwrap_or_else(|e| panic!("onion encryption error {e}"));
+                let mut prp = S::PRP::from(surb.sender_key);
+                prp.forward_inplace(&mut payload)?;
 
                 Self::new_from_parts(surb.alpha, surb.header, &payload)
             }
@@ -286,7 +283,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
-        let prp = LionessPRP::from_parameters(LionessPRPParameters::new(&secret));
+        let mut prp = S::PRP::from(secret.clone());
         prp.inverse_inplace(decrypted)?;
 
         Ok(match fwd_header {
@@ -319,13 +316,13 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
                     // Encrypt the packet payload using the derived shared secrets,
                     // to reverse the decryption done by individual hops
-                    for secret in local_surb.shared_keys.iter().rev() {
-                        let prp = LionessPRP::from_parameters(LionessPRPParameters::new(secret));
+                    for secret in local_surb.shared_keys.into_iter().rev() {
+                        let mut prp = S::PRP::from(secret);
                         prp.forward_inplace(decrypted)?;
                     }
 
                     // Inverse the initial encryption using the sender key
-                    let prp = LionessPRP::from_parameters(LionessPRPParameters::new(&local_surb.sender_key));
+                    let mut prp = S::PRP::from(local_surb.sender_key);
                     prp.inverse_inplace(decrypted)?;
                 }
 
@@ -409,6 +406,7 @@ pub(crate) mod tests {
         type RelayerData = ProofOfRelayString;
         type LastHopData = return_path::EncodedRecipientMessage<HoprPseudonym>;
         type SurbReceiverData = ProofOfRelayValues;
+        type PRG = hopr_crypto_sphinx::prg::Chacha20PRG;
     }
 
     #[test]

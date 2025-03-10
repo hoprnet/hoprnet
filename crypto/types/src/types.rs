@@ -27,7 +27,9 @@ use std::hash::Hasher;
 use std::sync::OnceLock;
 use std::{
     fmt::{Display, Formatter},
+    hash,
     ops::Add,
+    result,
     str::FromStr,
 };
 use tracing::warn;
@@ -1238,6 +1240,53 @@ impl PartialEq for Signature {
 }
 
 impl Eq for Signature {}
+
+/// Pseudonym used to identify the creator of a `SURB`.
+/// This allows indexing `SURB` and `LocalSURBEntry` at both parties.
+///
+/// To maintain anonymity, this must be something else than the sender's
+/// public key or public key identifier.
+pub trait Pseudonym: BytesRepresentable + hash::Hash + Eq + Display {
+    /// Generates a random pseudonym.
+    fn random() -> Self {
+        let mut data = vec![0u8; Self::SIZE];
+        hopr_crypto_random::random_fill(&mut data);
+        Self::try_from(&data).unwrap()
+    }
+}
+
+/// Represents a simple UUID-like pseudonym consisting of 16 bytes.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct SimplePseudonym(pub [u8; Self::SIZE]);
+
+impl Display for SimplePseudonym {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl BytesRepresentable for SimplePseudonym {
+    const SIZE: usize = 16;
+}
+
+impl AsRef<[u8]> for SimplePseudonym {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for SimplePseudonym {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> result::Result<Self, Self::Error> {
+        value
+            .try_into()
+            .map(Self)
+            .map_err(|_| ParseError("HoprPseudonym".into()))
+    }
+}
+
+impl Pseudonym for SimplePseudonym {}
 
 #[cfg(test)]
 mod tests {

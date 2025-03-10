@@ -1,26 +1,10 @@
-use hopr_crypto_types::prelude::{DigestLike, SecretKey, SimpleMac};
-use hopr_primitive_types::prelude::{BytesRepresentable, GeneralError};
-use std::fmt::Display;
-use std::hash::Hash;
-use std::marker::PhantomData;
-use typenum::Unsigned;
-
 use crate::routing::{RoutingInfo, SphinxHeaderSpec};
 use crate::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
-
-/// Pseudonym used to identify the creator of a [`SURB`].
-/// This allows indexing [`SURB`] and [`LocalSURBEntry`] at both parties.
-///
-/// To maintain anonymity, this must be something else than the sender's
-/// public key or public key identifier.
-pub trait Pseudonym: BytesRepresentable + Hash + Eq + Display {
-    /// Generates a random pseudonym.
-    fn random() -> Self {
-        let mut data = vec![0u8; Self::SIZE];
-        hopr_crypto_random::random_fill(&mut data);
-        Self::try_from(&data).unwrap()
-    }
-}
+use hopr_crypto_types::prelude::{DigestLike, SecretKey, SimpleMac};
+use hopr_crypto_types::types::Pseudonym;
+use hopr_primitive_types::prelude::GeneralError;
+use std::marker::PhantomData;
+use typenum::Unsigned;
 
 /// Single Use Reply Block
 pub struct SURB<S: SphinxSuite, H: SphinxHeaderSpec> {

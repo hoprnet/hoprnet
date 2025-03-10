@@ -1,41 +1,9 @@
-use hopr_crypto_sphinx::surb::{Pseudonym, SphinxRecipientMessage};
+use hopr_crypto_sphinx::surb::SphinxRecipientMessage;
+use hopr_crypto_types::types::Pseudonym;
 use hopr_primitive_types::errors::GeneralError;
-use hopr_primitive_types::prelude::{BytesRepresentable, ToHex};
+use hopr_primitive_types::prelude::BytesRepresentable;
 use std::fmt::Display;
 use std::marker::PhantomData;
-
-/// Represents a simple UUID-like pseudonym consisting of 16 bytes.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct SimplePseudonym(pub [u8; Self::SIZE]);
-
-impl Display for SimplePseudonym {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_hex())
-    }
-}
-
-impl BytesRepresentable for SimplePseudonym {
-    const SIZE: usize = 16;
-}
-
-impl AsRef<[u8]> for SimplePseudonym {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl<'a> TryFrom<&'a [u8]> for SimplePseudonym {
-    type Error = GeneralError;
-
-    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        value
-            .try_into()
-            .map(Self)
-            .map_err(|_| GeneralError::ParseError("HoprPseudonym".into()))
-    }
-}
-
-impl Pseudonym for SimplePseudonym {}
 
 /// Encodes the [`SphinxRecipientMessage`] into a wire-format.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -8,6 +8,8 @@ use hopr_crypto_types::utils::SecretValue;
 use std::marker::PhantomData;
 use std::ops::Mul;
 
+use crate::prp::PRP;
+
 /// Represents a shared secret with a remote peer.
 pub type SharedSecret = SecretValue<typenum::U32>;
 
@@ -161,6 +163,9 @@ pub trait SphinxSuite {
 
     /// EC group element
     type G: GroupElement<Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
+
+    /// Pseudo-Random Permutation used to encrypt and decrypt packet payload
+    type PRP: PRP;
 
     /// Convenience function to generate shared keys from the path of public keys.
     fn new_shared_keys(public_keys: &[<Self::P as Keypair>::Public]) -> Result<SharedKeys<Self::E, Self::G>> {

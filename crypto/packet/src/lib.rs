@@ -17,6 +17,7 @@
 
 use hopr_crypto_sphinx::routing::SphinxHeaderSpec;
 use hopr_crypto_sphinx::shared_keys::SphinxSuite;
+use hopr_crypto_types::types;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::marker::PhantomData;
@@ -34,7 +35,7 @@ pub mod return_path;
 pub mod validation;
 
 /// Pseudonyms used for the return path.
-pub type HoprPseudonym = return_path::SimplePseudonym;
+pub type HoprPseudonym = types::SimplePseudonym;
 
 /// Currently used public key cipher suite for Sphinx.
 pub type CurrentSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
@@ -49,6 +50,7 @@ impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
     type RelayerData = por::ProofOfRelayString;
     type LastHopData = return_path::EncodedRecipientMessage<HoprPseudonym>;
     type SurbReceiverData = por::ProofOfRelayValues;
+    type PRG = hopr_crypto_sphinx::prg::Chacha20PRG;
 }
 
 /// Single Use Reply Block representation for HOPR protocol.

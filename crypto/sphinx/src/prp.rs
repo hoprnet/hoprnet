@@ -1,4 +1,6 @@
 use blake2::Blake2bMac;
+use chacha20::cipher::{KeyIvInit, StreamCipher};
+use chacha20::ChaCha20;
 use digest::{FixedOutput, Mac};
 use hopr_crypto_types::errors::CryptoError::InvalidParameterSize;
 use hopr_crypto_types::primitives::{SecretKey, SimpleStreamCipher};
@@ -8,29 +10,55 @@ use zeroize::ZeroizeOnDrop;
 use crate::derivation::generate_key_iv;
 
 /// Abstraction for Pseudo-Random Permutation.
-pub trait PRP {
+pub trait PRP: From<SecretKey> {
     /// Applies forward permutation on the given plaintext and returns a new buffer
     /// containing the result.
-    fn forward(&self, plaintext: &[u8]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
-        let mut out = Vec::from(plaintext);
+    fn forward(&mut self, plaintext: &[u8]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
+        let mut out = plaintext.to_vec();
         self.forward_inplace(&mut out)?;
         Ok(out.into_boxed_slice())
     }
 
     /// Applies forward permutation on the given plaintext and modifies the given buffer in-place.
-    fn forward_inplace(&self, plaintext: &mut [u8]) -> hopr_crypto_types::errors::Result<()>;
+    fn forward_inplace(&mut self, plaintext: &mut [u8]) -> hopr_crypto_types::errors::Result<()>;
 
     /// Applies inverse permutation on the given plaintext and returns a new buffer
     /// containing the result.
-    fn inverse(&self, ciphertext: &[u8]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
-        let mut out = Vec::from(ciphertext);
+    fn inverse(&mut self, ciphertext: &[u8]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
+        let mut out = ciphertext.to_vec();
         self.inverse_inplace(&mut out)?;
         Ok(out.into_boxed_slice())
     }
 
     /// Applies inverse permutation on the given ciphertext and modifies the given buffer in-place.
-    fn inverse_inplace(&self, ciphertext: &mut [u8]) -> hopr_crypto_types::errors::Result<()>;
+    fn inverse_inplace(&mut self, ciphertext: &mut [u8]) -> hopr_crypto_types::errors::Result<()>;
 }
+
+pub struct Chacha20PRP(ChaCha20);
+
+impl From<SecretKey> for Chacha20PRP {
+    fn from(value: SecretKey) -> Self {
+        let mut key = chacha20::Key::default();
+        let mut iv = chacha20::Nonce::default();
+        generate_key_iv(&value, HASH_KEY_PRP.as_bytes(), &mut key, &mut iv, false);
+
+        Self(ChaCha20::new(&key, &iv))
+    }
+}
+
+impl PRP for Chacha20PRP {
+    fn forward_inplace(&mut self, plaintext: &mut [u8]) -> hopr_crypto_types::errors::Result<()> {
+        self.0.apply_keystream(plaintext);
+        Ok(())
+    }
+
+    fn inverse_inplace(&mut self, ciphertext: &mut [u8]) -> hopr_crypto_types::errors::Result<()> {
+        self.0.apply_keystream(ciphertext);
+        Ok(())
+    }
+}
+
+// TODO: remove the legacy stuff below
 
 // Module-specific constants
 const LIONESS_INTERMEDIATE_KEY_LENGTH: usize = 32;
@@ -63,9 +91,9 @@ impl Default for LionessPRPParameters {
 impl LionessPRPParameters {
     /// Creates new parameters for the PRP by expanding the given
     /// keying material into the secret key and IV for the underlying cryptographic transformation.
-    pub fn new(secret: &SecretKey) -> Self {
+    pub fn new(secret: SecretKey) -> Self {
         let mut ret = LionessPRPParameters::default();
-        generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), &mut ret.key, &mut ret.iv, false);
+        generate_key_iv(&secret, HASH_KEY_PRP.as_bytes(), &mut ret.key, &mut ret.iv, false);
         ret
     }
 }
@@ -76,6 +104,12 @@ impl LionessPRPParameters {
 pub struct LionessPRP {
     keys: [[u8; LIONESS_INTERMEDIATE_KEY_LENGTH]; 4],
     ivs: [[u8; LIONESS_INTERMEDIATE_IV_LENGTH]; 4],
+}
+
+impl From<SecretKey> for LionessPRP {
+    fn from(value: SecretKey) -> Self {
+        Self::from_parameters(LionessPRPParameters::new(value))
+    }
 }
 
 impl LionessPRP {
@@ -145,7 +179,7 @@ impl LionessPRP {
 
 impl PRP for LionessPRP {
     /// Applies forward permutation on the given plaintext and modifies the given buffer in-place.
-    fn forward_inplace(&self, plaintext: &mut [u8]) -> hopr_crypto_types::errors::Result<()> {
+    fn forward_inplace(&mut self, plaintext: &mut [u8]) -> hopr_crypto_types::errors::Result<()> {
         if plaintext.len() >= LIONESS_PRP_MIN_LENGTH {
             Self::xor_keystream(plaintext, &self.keys[0], &self.ivs[0]);
             Self::xor_hash(plaintext, &self.keys[1], &self.ivs[1]);
@@ -160,7 +194,7 @@ impl PRP for LionessPRP {
         }
     }
     /// Applies inverse permutation on the given ciphertext and modifies the given buffer in-place.
-    fn inverse_inplace(&self, ciphertext: &mut [u8]) -> hopr_crypto_types::errors::Result<()> {
+    fn inverse_inplace(&mut self, ciphertext: &mut [u8]) -> hopr_crypto_types::errors::Result<()> {
         if ciphertext.len() >= LIONESS_PRP_MIN_LENGTH {
             Self::xor_hash(ciphertext, &self.keys[3], &self.ivs[3]);
             Self::xor_keystream(ciphertext, &self.keys[2], &self.ivs[2]);
@@ -184,7 +218,7 @@ mod tests {
 
     #[test]
     fn test_prp_fixed() {
-        let prp = LionessPRP::new([0u8; 4 * 32], [0u8; 4 * 16]);
+        let mut prp = LionessPRP::new([0u8; 4 * 32], [0u8; 4 * 16]);
 
         let data = [1u8; 278];
 
@@ -196,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_prp_random() {
-        let prp = LionessPRP::new(random_bytes(), random_bytes());
+        let mut prp = LionessPRP::new(random_bytes(), random_bytes());
         let data: [u8; 278] = random_bytes();
 
         let ct = prp.forward(&data).unwrap();
@@ -208,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_prp_random_inplace() {
-        let prp = LionessPRP::new(random_bytes(), random_bytes());
+        let mut prp = LionessPRP::new(random_bytes(), random_bytes());
         let mut data: [u8; 278] = random_bytes();
         let data_old = data;
 
@@ -224,7 +258,7 @@ mod tests {
         let expected_key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25");
         let expected_iv = hex!("a59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38");
 
-        let params = LionessPRPParameters::new(&SecretKey::default());
+        let params = LionessPRPParameters::new(SecretKey::default());
 
         assert_eq!(expected_key, params.key);
         assert_eq!(expected_iv, params.iv)
@@ -232,14 +266,14 @@ mod tests {
 
     #[test]
     fn test_prp_ciphertext_from_params() {
-        let params = LionessPRPParameters::new(&SecretKey::default());
+        let params = LionessPRPParameters::new(SecretKey::default());
 
         let expected_key = hex!("a9c6632c9f76e5e4dd03203196932350a47562f816cebb810c64287ff68586f35cb715a26e268fc3ce68680e16767581de4e2cb3944c563d1f1a0cc077f3e788a12f31ae07111d77a876a66de5bdd6176bdaa2e07d1cb2e36e428afafdebb2109f70ce8422c8821233053bdd5871523ffb108f1e0f86809999a99d407590df25");
         let expected_iv = hex!("a59991716be504b26471dea53d688c4bab8e910328e54ebb6ebf07b49e6d12eacfc56e0935ba2300559b43ede25aa09eee7e8a2deea5f0bdaee2e859834edd38");
         assert_eq!(expected_key, params.key);
         assert_eq!(expected_iv, params.iv);
 
-        let prp = LionessPRP::from_parameters(params);
+        let mut prp = LionessPRP::from_parameters(params);
 
         let pt = [0u8; 100];
         let ct = prp.forward(&pt).unwrap();

@@ -1,13 +1,13 @@
+use crate::derivation::derive_mac_key;
+use crate::prg::PRG;
+use crate::shared_keys::SharedSecret;
+use crate::surb::SphinxRecipientMessage;
 use hopr_crypto_random::random_fill;
 use hopr_crypto_types::prelude::*;
+use hopr_crypto_types::types::Pseudonym;
 use hopr_primitive_types::prelude::*;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
-
-use crate::derivation::derive_mac_key;
-use crate::prg::{PRGParameters, PRG};
-use crate::shared_keys::SharedSecret;
-use crate::surb::{Pseudonym, SphinxRecipientMessage};
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
@@ -32,6 +32,9 @@ pub trait SphinxHeaderSpec {
 
     /// Type representing additional data delivered with each SURB to its receiver.
     type SurbReceiverData: BytesRepresentable;
+
+    /// Pseudo-Random Generator function used to encrypt and decrypt the Sphinx header.
+    type PRG: PRG;
 
     /// Size of the additional data for relayers.
     const RELAYER_DATA_SIZE: usize = Self::RelayerData::SIZE;
@@ -78,8 +81,7 @@ pub trait SphinxHeaderSpec {
         let mut start = Self::HEADER_LEN;
 
         for secret in secrets.iter().take(secrets.len() - 1) {
-            let prg = PRG::from_parameters(PRGParameters::new(secret));
-
+            let mut prg = Self::PRG::from(secret);
             let digest = prg.digest(start, Self::HEADER_LEN + Self::ROUTING_INFO_LEN);
             xor_inplace(&mut ret[0..length], digest.as_ref());
 
@@ -149,7 +151,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
 
         for idx in 0..secrets.len() {
             let inverted_idx = secrets.len() - idx - 1;
-            let prg = PRG::from_parameters(PRGParameters::new(&secrets[inverted_idx]));
+            let mut prg = H::PRG::from(&secrets[inverted_idx]);
 
             if idx == 0 {
                 // End prefix
@@ -301,7 +303,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
     }
 
     // Decrypt the header using the keystream
-    let prg = PRG::from_parameters(PRGParameters::new(secret));
+    let mut prg = H::PRG::from(secret);
     let key_stream = prg.digest(0, H::HEADER_LEN);
     xor_inplace(header, &key_stream);
 
@@ -357,6 +359,7 @@ mod tests {
     use super::*;
     use std::marker::PhantomData;
 
+    use crate::prg::Chacha20PRG;
     use crate::shared_keys::SphinxSuite;
     use hopr_crypto_types::keypairs::OffchainKeypair;
     use parameterized::parameterized;
@@ -398,18 +401,27 @@ mod tests {
         const SIZE: usize = N;
     }
 
+    impl<const N: usize> TryFrom<WrappedBytes<N>> for SphinxRecipientMessage<SimplePseudonym> {
+        type Error = GeneralError;
+
+        fn try_from(value: WrappedBytes<N>) -> Result<Self, Self::Error> {
+            unimplemented!("not needed for the tests")
+        }
+    }
+
     struct TestSpec<K, const HOPS: usize, const RELAYER_DATA: usize, const LAST_HOP_DATA: usize>(PhantomData<K>);
     impl<K, const HOPS: usize, const RELAYER_DATA: usize, const LAST_HOP_DATA: usize> SphinxHeaderSpec
         for TestSpec<K, HOPS, RELAYER_DATA, LAST_HOP_DATA>
     where
-        K: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> + BytesRepresentable,
+        K: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> + BytesRepresentable + Clone,
     {
         const MAX_HOPS: NonZeroUsize = NonZero::new(HOPS).unwrap();
         type KeyId = K;
-        type Pseudonym = WrappedBytes<16>;
+        type Pseudonym = SimplePseudonym;
         type RelayerData = WrappedBytes<RELAYER_DATA>;
         type LastHopData = WrappedBytes<LAST_HOP_DATA>;
         type SurbReceiverData = WrappedBytes<53>;
+        type PRG = Chacha20PRG;
     }
 
     #[test]
@@ -431,7 +443,9 @@ mod tests {
 
         for i in 0..max_hops - 1 {
             let idx = secrets.len() - i - 2;
-            let mask = PRG::from_parameters(PRGParameters::new(&secrets[idx])).digest(0, extended_header_len);
+
+            let mut prg = Chacha20PRG::from(&secrets[idx]);
+            let mask = prg.digest(0, extended_header_len);
 
             xor_inplace(&mut extended_header, &mask);
 
