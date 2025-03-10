@@ -682,8 +682,8 @@ impl OffchainPublicKey {
     /// Tries to create the public key from a Ed25519 private key.
     /// The length must be exactly `ed25519_dalek::SECRET_KEY_LENGTH`.
     pub fn from_privkey(private_key: &[u8]) -> Result<Self> {
-        let mut pk: [u8; ed25519_dalek::SECRET_KEY_LENGTH] = private_key.try_into().map_err(|_| InvalidInputValue)?;
-        let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk).map_err(|_| InvalidInputValue)?;
+        let mut pk: [u8; ed25519_dalek::SECRET_KEY_LENGTH] = private_key.try_into().map_err(|_| InvalidInputValue("private_key"))?;
+        let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk).map_err(|_| InvalidInputValue("private_key"))?;
         let kp: libp2p_identity::ed25519::Keypair = sk.into();
         Ok(Self(
             CompressedEdwardsY::from_slice(&kp.public().to_bytes())

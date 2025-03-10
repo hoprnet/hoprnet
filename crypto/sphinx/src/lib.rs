@@ -22,10 +22,6 @@
 pub mod derivation;
 /// Implementations of `SphinxSuite` trait for different elliptic curve groups
 pub mod ec_groups;
-/// Implementation of a pseudo-random generator functions used in SPHINX packet header construction
-pub mod prg;
-/// Implementation of the pseudo-random permutations used in SPHINX packet payload
-pub mod prp;
 /// Implementation of the SPHINX header format
 pub mod routing;
 /// Derivation of shared keys for SPHINX header

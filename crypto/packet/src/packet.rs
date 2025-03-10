@@ -9,12 +9,14 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use crate::errors::PacketError;
-use crate::errors::{PacketError::PacketDecodingError, Result};
-use hopr_crypto_sphinx::prp::PRP;
+use cipher::StreamCipher;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use typenum::Unsigned;
+
+use crate::errors::PacketError;
+use crate::errors::{PacketError::PacketDecodingError, Result};
+
 
 /// Tag used to separate padding from data
 const PADDING_TAG: u8 = 0xaa;
@@ -189,16 +191,16 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
                 // Encrypt the packet payload using the derived shared secrets
                 for secret in shared_keys.secrets.into_iter().rev() {
-                    let mut prp = S::PRP::from(secret);
-                    prp.forward_inplace(&mut payload)?;
+                    let mut prp = S::new_prp(&secret)?;
+                    prp.apply_keystream(&mut payload);
                 }
 
                 Self::new_from_parts(shared_keys.alpha, routing_info, &payload)
             }
             MetaPacketRouting::Surb(surb) => {
                 // Encrypt the packet using the sender's key from the SURB
-                let mut prp = S::PRP::from(surb.sender_key);
-                prp.forward_inplace(&mut payload)?;
+                let mut prp = S::new_prp(&surb.sender_key)?;
+                prp.apply_keystream(&mut payload);
 
                 Self::new_from_parts(surb.alpha, surb.header, &payload)
             }
@@ -283,8 +285,8 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
-        let mut prp = S::PRP::from(secret.clone());
-        prp.inverse_inplace(decrypted)?;
+        let mut prp = S::new_prp(&secret)?;
+        prp.apply_keystream(decrypted);
 
         Ok(match fwd_header {
             ForwardedHeader::RelayNode {
@@ -317,13 +319,13 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
                     // Encrypt the packet payload using the derived shared secrets,
                     // to reverse the decryption done by individual hops
                     for secret in local_surb.shared_keys.into_iter().rev() {
-                        let mut prp = S::PRP::from(secret);
-                        prp.forward_inplace(decrypted)?;
+                        let mut prp = S::new_prp(&secret)?;
+                        prp.apply_keystream(decrypted);
                     }
 
                     // Inverse the initial encryption using the sender key
-                    let mut prp = S::PRP::from(local_surb.sender_key);
-                    prp.inverse_inplace(decrypted)?;
+                    let mut prp = S::new_prp(&local_surb.sender_key)?;
+                    prp.apply_keystream(decrypted);
                 }
 
                 ForwardedMetaPacket::Final {
@@ -406,7 +408,7 @@ pub(crate) mod tests {
         type RelayerData = ProofOfRelayString;
         type LastHopData = return_path::EncodedRecipientMessage<HoprPseudonym>;
         type SurbReceiverData = ProofOfRelayValues;
-        type PRG = hopr_crypto_sphinx::prg::Chacha20PRG;
+        type PRG = hopr_crypto_types::primitives::ChaCha20;
     }
 
     #[test]

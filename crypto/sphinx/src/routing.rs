@@ -1,17 +1,20 @@
-use crate::derivation::derive_mac_key;
-use crate::prg::PRG;
-use crate::shared_keys::SharedSecret;
-use crate::surb::SphinxRecipientMessage;
 use hopr_crypto_random::random_fill;
 use hopr_crypto_types::prelude::*;
 use hopr_crypto_types::types::Pseudonym;
 use hopr_primitive_types::prelude::*;
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
+use cipher::{StreamCipher, StreamCipherSeek};
+
+use crate::derivation::{derive_mac_key, generate_key_iv};
+use crate::shared_keys::SharedSecret;
+use crate::surb::SphinxRecipientMessage;
 
 const RELAYER_END_PREFIX: u8 = 0xff;
 
 const PATH_POSITION_LEN: usize = 1;
+
+const HASH_KEY_PRG: &str = "HASH_KEY_PRG";
 
 /// Contains the necessary size and type specifications for the Sphinx packet header.
 pub trait SphinxHeaderSpec {
@@ -34,7 +37,7 @@ pub trait SphinxHeaderSpec {
     type SurbReceiverData: BytesRepresentable;
 
     /// Pseudo-Random Generator function used to encrypt and decrypt the Sphinx header.
-    type PRG: PRG;
+    type PRG: cipher::StreamCipher + cipher::StreamCipherSeek + cipher::KeyIvInit;
 
     /// Size of the additional data for relayers.
     const RELAYER_DATA_SIZE: usize = Self::RelayerData::SIZE;
@@ -70,7 +73,7 @@ pub trait SphinxHeaderSpec {
         }
 
         if secrets.len() > Self::MAX_HOPS.into() {
-            return Err(CryptoError::InvalidInputValue);
+            return Err(CryptoError::InvalidInputValue("secrets.len"));
         }
 
         let padding_len = (Self::MAX_HOPS.get() - secrets.len()) * Self::ROUTING_INFO_LEN;
@@ -80,14 +83,20 @@ pub trait SphinxHeaderSpec {
         let mut start = Self::HEADER_LEN;
 
         for secret in secrets.iter().take(secrets.len() - 1) {
-            let mut prg = Self::PRG::from(secret);
-            prg.apply(start, &mut ret[0..length]);
+            let mut prg = Self::new_prg(secret)?;
+            prg.seek(start);
+            prg.apply_keystream(&mut ret[0..length]);
 
             length += Self::ROUTING_INFO_LEN;
             start -= Self::ROUTING_INFO_LEN;
         }
 
         Ok(ret.into_boxed_slice())
+    }
+
+    /// Instantiates a new Pseudo-Random Generator.
+    fn new_prg(secret: &SecretKey) -> hopr_crypto_types::errors::Result<Self::PRG> {
+        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), true)
     }
 }
 
@@ -141,7 +150,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
             });
         }
         if secrets.len() > H::MAX_HOPS.get() || H::MAX_HOPS.get() > RELAYER_END_PREFIX as usize {
-            return Err(CryptoError::InvalidInputValue);
+            return Err(CryptoError::InvalidInputValue("secrets.len"));
         }
 
         let mut extended_header = vec![0u8; H::EXT_HEADER_LEN];
@@ -149,7 +158,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
 
         for idx in 0..secrets.len() {
             let inverted_idx = secrets.len() - idx - 1;
-            let mut prg = H::PRG::from(&secrets[inverted_idx]);
+            let mut prg = H::new_prg(&secrets[inverted_idx])?;
 
             if idx == 0 {
                 // End prefix
@@ -175,7 +184,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 }
 
                 // Encrypt last hop data and padding
-                prg.apply(0, &mut extended_header[0..1 + H::LAST_HOP_DATA_SIZE + padding_len]);
+                prg.apply_keystream(&mut extended_header[0..1 + H::LAST_HOP_DATA_SIZE + padding_len]);
 
                 if secrets.len() > 1 {
                     let filler = H::generate_filler(secrets)?;
@@ -224,7 +233,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 }
 
                 // Encrypt the entire extended header
-                prg.apply(0, &mut extended_header[0..H::HEADER_LEN]);
+                prg.apply_keystream(&mut extended_header[0..H::HEADER_LEN]);
             }
 
             let mut m = SimpleMac::new(&derive_mac_key(&secrets[inverted_idx]));
@@ -296,8 +305,8 @@ pub fn forward_header<H: SphinxHeaderSpec>(
     }
 
     // Decrypt the header using the keystream
-    let mut prg = H::PRG::from(secret);
-    prg.apply(0, &mut header[0..H::HEADER_LEN]);
+    let mut prg = H::new_prg(secret)?;
+    prg.apply_keystream(&mut header[0..H::HEADER_LEN]);
 
     if header[0] != RELAYER_END_PREFIX {
         // Path position
@@ -306,7 +315,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         // Try to deserialize the public key to validate it
         let next_node = (&header[PATH_POSITION_LEN..PATH_POSITION_LEN + H::KEY_ID_SIZE.get()])
             .try_into()
-            .map_err(|_| CryptoError::InvalidInputValue)?;
+            .map_err(|_| CryptoError::InvalidInputValue("next_node"))?;
 
         // Authentication tag
         let mac: [u8; SimpleMac::SIZE] = (&header
@@ -318,14 +327,15 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         let additional_info = (&header[PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + SimpleMac::SIZE
             ..PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + SimpleMac::SIZE + H::RELAYER_DATA_SIZE])
             .try_into()
-            .map_err(|_| CryptoError::InvalidInputValue)?;
+            .map_err(|_| CryptoError::InvalidInputValue("additional_relayer_data"))?;
 
         // Shift the entire header left, to discard the data we just read
         header.copy_within(H::ROUTING_INFO_LEN.., 0);
 
         // Erase the read data from the header to apply the raw key-stream
         header[H::HEADER_LEN - H::ROUTING_INFO_LEN..].fill(0);
-        prg.apply(H::HEADER_LEN, &mut header[H::HEADER_LEN - H::ROUTING_INFO_LEN..H::HEADER_LEN]);
+        prg.seek(H::HEADER_LEN);
+        prg.apply_keystream(&mut header[H::HEADER_LEN - H::ROUTING_INFO_LEN..H::HEADER_LEN]);
 
         Ok(ForwardedHeader::RelayNode {
             next_header: RoutingInfo::<H> {
@@ -341,7 +351,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         Ok(ForwardedHeader::FinalNode {
             additional_data: (&header[1..1 + H::LAST_HOP_DATA_SIZE])
                 .try_into()
-                .map_err(|_| CryptoError::InvalidInputValue)?,
+                .map_err(|_| CryptoError::InvalidInputValue("last_data_last_hop"))?,
         })
     }
 }
@@ -349,13 +359,12 @@ pub fn forward_header<H: SphinxHeaderSpec>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::marker::PhantomData;
-
-    use crate::prg::Chacha20PRG;
-    use crate::shared_keys::SphinxSuite;
     use hopr_crypto_types::keypairs::OffchainKeypair;
     use parameterized::parameterized;
+    use std::marker::PhantomData;
     use std::num::NonZero;
+    use chacha20::ChaCha20;
+    use crate::shared_keys::SphinxSuite;
 
     #[derive(Debug, Clone, Copy, PartialEq)]
     struct WrappedBytes<const N: usize>([u8; N]);
@@ -413,7 +422,7 @@ mod tests {
         type RelayerData = WrappedBytes<RELAYER_DATA>;
         type LastHopData = WrappedBytes<LAST_HOP_DATA>;
         type SurbReceiverData = WrappedBytes<53>;
-        type PRG = Chacha20PRG;
+        type PRG = ChaCha20;
     }
 
     #[test]
@@ -436,8 +445,8 @@ mod tests {
         for i in 0..max_hops - 1 {
             let idx = secrets.len() - i - 2;
 
-            let mut prg = Chacha20PRG::from(&secrets[idx]);
-            prg.apply(0, &mut extended_header);
+            let mut prg = generate_key_iv::<ChaCha20>(&secrets[idx], HASH_KEY_PRG.as_bytes(), true)?;
+            prg.apply_keystream(&mut extended_header);
 
             let mut erased = extended_header.clone();
             erased[header_len..].iter_mut().for_each(|x| *x = 0);

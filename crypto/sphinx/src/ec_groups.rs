@@ -4,7 +4,6 @@ use hopr_crypto_types::errors::Result;
 #[cfg(feature = "secp256k1")]
 use elliptic_curve::{ops::MulByGenerator, Group};
 
-use crate::prp::Chacha20PRP;
 use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 
 #[cfg(any(feature = "x25519", feature = "ed25519"))]
@@ -78,7 +77,7 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edward
     fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
         curve25519_dalek::edwards::CompressedEdwardsY(alpha.into())
             .decompress()
-            .ok_or(hopr_crypto_types::errors::CryptoError::InvalidInputValue)
+            .ok_or(hopr_crypto_types::errors::CryptoError::InvalidInputValue("alpha"))
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
@@ -108,7 +107,7 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
         let v: &[u8] = alpha.as_ref();
         hopr_crypto_types::types::CurvePoint::try_from(v)
             .map(|c| c.into_projective_point())
-            .map_err(|_| hopr_crypto_types::errors::CryptoError::InvalidInputValue)
+            .map_err(|_| hopr_crypto_types::errors::CryptoError::InvalidInputValue("alpha"))
     }
 
     fn generate(scalar: &k256::Scalar) -> Self {
@@ -129,7 +128,7 @@ impl SphinxSuite for Secp256k1Suite {
     type P = hopr_crypto_types::keypairs::ChainKeypair;
     type E = k256::Scalar;
     type G = k256::ProjectivePoint;
-    type PRP = Chacha20PRP;
+    type PRP = hopr_crypto_types::primitives::ChaCha20;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainKeypair`
@@ -141,7 +140,7 @@ impl SphinxSuite for Ed25519Suite {
     type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
-    type PRP = Chacha20PRP;
+    type PRP = hopr_crypto_types::primitives::ChaCha20;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainKeypair`
@@ -153,7 +152,7 @@ impl SphinxSuite for X25519Suite {
     type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;
-    type PRP = Chacha20PRP;
+    type PRP = hopr_crypto_types::primitives::ChaCha20;
 }
 
 #[cfg(test)]

@@ -14,6 +14,7 @@ crate-type = ["rlib"]
 [dependencies]
 aes = { workspace = true }
 blake2 = "0.10"
+cipher = "0.4.4"
 chacha20 = { version = "0.9.1", features = ["zeroize"] }
 chacha20poly1305 = "0.10.1"
 ctr = { workspace = true }
@@ -30,6 +31,7 @@ k256 = { version = "0.13.0", features = [
 ] }
 sha3 = { workspace = true }
 typenum = { workspace = true }
+universal-hash = "0.5.1"
 zeroize = { workspace = true, features = ["zeroize_derive"] }
 
 hopr-crypto-types = { workspace = true }

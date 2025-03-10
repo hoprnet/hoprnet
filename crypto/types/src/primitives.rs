@@ -1,7 +1,6 @@
 use blake2::{Blake2s256, Blake2sMac256};
 use chacha20::cipher::KeyIvInit;
 use chacha20::cipher::{IvSizeUser, KeySizeUser, StreamCipher, StreamCipherSeek};
-use chacha20::ChaCha20;
 use digest::{FixedOutputReset, KeyInit, Output, OutputSizeUser, Update};
 use generic_array::GenericArray;
 use sha3::Keccak256;
@@ -9,6 +8,8 @@ use typenum::Unsigned;
 use zeroize::ZeroizeOnDrop;
 
 use crate::utils::SecretValue;
+
+pub use chacha20::ChaCha20;
 
 /// Represents a 256-bit secret key of fixed length.
 /// The value is auto-zeroized on drop.

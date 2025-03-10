@@ -7,8 +7,8 @@ pub enum CryptoError {
     #[error("cryptographic parameter '{name}' must be {expected} bytes long")]
     InvalidParameterSize { name: &'static str, expected: usize },
 
-    #[error("input to the function has invalid value or size")]
-    InvalidInputValue,
+    #[error("input to the function '{0}' has invalid value or size")]
+    InvalidInputValue(&'static str),
 
     #[error("secret scalar results in an invalid EC point")]
     InvalidSecretScalar,

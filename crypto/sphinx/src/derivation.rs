@@ -1,4 +1,5 @@
 use blake2::Blake2s256;
+use cipher::KeyIvInit;
 use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
@@ -7,6 +8,7 @@ use hopr_crypto_types::errors::CryptoError::{CalculationError, InvalidParameterS
 use hopr_crypto_types::primitives::{DigestLike, SecretKey, SimpleDigest, SimpleMac};
 use hopr_crypto_types::types::{HalfKey, PacketTag};
 use k256::Secp256k1;
+use hopr_crypto_types::prelude::CryptoError;
 
 // Module-specific constants
 const HASH_KEY_COMMITMENT_SEED: &str = "HASH_KEY_COMMITMENT_SEED";
@@ -82,12 +84,16 @@ pub fn derive_mac_key(secret: &SecretKey) -> SecretKey {
 
 /// Internal convenience function to generate key and IV from the given secret.
 /// WARNING: The `iv_first` distinguishes if the IV should be sampled before or after the key is sampled.
-pub(crate) fn generate_key_iv(secret: &SecretKey, info: &[u8], key: &mut [u8], iv: &mut [u8], iv_first: bool) {
-    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref()).expect("secret key length must be correct");
+pub(crate) fn generate_key_iv<T: KeyIvInit>(secret: &SecretKey, info: &[u8], iv_first: bool) -> hopr_crypto_types::errors::Result<T> {
+    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref())
+        .map_err(|_| CryptoError::InvalidInputValue("secret"))?;
+
+    let mut key = cipher::Key::<T>::default();
+    let mut iv = cipher::Iv::<T>::default();
 
     let mut out = vec![0u8; key.len() + iv.len()];
     hkdf.expand(info, &mut out)
-        .expect("key and iv are too big for this kdf");
+        .map_err(|_| CryptoError::InvalidInputValue("output length"))?;
 
     if iv_first {
         let (v_iv, v_key) = out.split_at(iv.len());
@@ -98,6 +104,8 @@ pub(crate) fn generate_key_iv(secret: &SecretKey, info: &[u8], key: &mut [u8], i
         key.copy_from_slice(v_key);
         iv.copy_from_slice(v_iv);
     }
+
+    Ok(T::new(&key, &iv))
 }
 
 /// Sample a random secp256k1 field element that can represent a valid secp256k1 point.

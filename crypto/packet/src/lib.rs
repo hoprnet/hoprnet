@@ -50,7 +50,7 @@ impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
     type RelayerData = por::ProofOfRelayString;
     type LastHopData = return_path::EncodedRecipientMessage<HoprPseudonym>;
     type SurbReceiverData = por::ProofOfRelayValues;
-    type PRG = hopr_crypto_sphinx::prg::Chacha20PRG;
+    type PRG = hopr_crypto_types::primitives::ChaCha20;
 }
 
 /// Single Use Reply Block representation for HOPR protocol.

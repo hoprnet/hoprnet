@@ -7,8 +7,9 @@ use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::utils::SecretValue;
 use std::marker::PhantomData;
 use std::ops::Mul;
+use hopr_crypto_types::prelude::SecretKey;
 
-use crate::prp::PRP;
+use crate::derivation::generate_key_iv;
 
 /// Represents a shared secret with a remote peer.
 pub type SharedSecret = SecretValue<typenum::U32>;
@@ -153,6 +154,8 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     }
 }
 
+const HASH_KEY_PRP: &str = "HASH_KEY_PRP";
+
 /// Represents an instantiation of the Spinx protocol using the given EC group and corresponding public key object.
 pub trait SphinxSuite {
     /// Keypair corresponding to the EC group
@@ -165,11 +168,16 @@ pub trait SphinxSuite {
     type G: GroupElement<Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
 
     /// Pseudo-Random Permutation used to encrypt and decrypt packet payload
-    type PRP: PRP;
+    type PRP: cipher::StreamCipher + cipher::KeyIvInit;
 
     /// Convenience function to generate shared keys from the path of public keys.
     fn new_shared_keys(public_keys: &[<Self::P as Keypair>::Public]) -> Result<SharedKeys<Self::E, Self::G>> {
         SharedKeys::generate(public_keys.iter().map(|pk| pk.into()).collect())
+    }
+
+    /// Instantiates a new Pseudo-Random Permutation
+    fn new_prp(secret: &SecretKey) -> Result<Self::PRP> {
+        generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), false)
     }
 }
 
