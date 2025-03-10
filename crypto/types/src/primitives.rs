@@ -54,7 +54,7 @@ where
 
 /// Simple digest computation wrapper.
 /// Use `new`, `update` and `finalize` triplet to produce hash of arbitrary data.
-/// Currently this instance is using Blake2s256.
+/// Currently, this instance is using Blake2s256.
 #[derive(Default, Clone)]
 pub struct SimpleDigest(Blake2s256);
 

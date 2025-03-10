@@ -81,8 +81,7 @@ pub trait SphinxHeaderSpec {
 
         for secret in secrets.iter().take(secrets.len() - 1) {
             let mut prg = Self::PRG::from(secret);
-            let digest = prg.digest(start, Self::HEADER_LEN + Self::ROUTING_INFO_LEN);
-            xor_inplace(&mut ret[0..length], digest.as_ref());
+            prg.apply(start, &mut ret[0..length]);
 
             length += Self::ROUTING_INFO_LEN;
             start -= Self::ROUTING_INFO_LEN;
@@ -176,11 +175,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 }
 
                 // Encrypt last hop data and padding
-                let key_stream = prg.digest(0, 1 + H::LAST_HOP_DATA_SIZE + padding_len);
-                xor_inplace(
-                    &mut extended_header[0..1 + H::LAST_HOP_DATA_SIZE + padding_len],
-                    &key_stream,
-                );
+                prg.apply(0, &mut extended_header[0..1 + H::LAST_HOP_DATA_SIZE + padding_len]);
 
                 if secrets.len() > 1 {
                     let filler = H::generate_filler(secrets)?;
@@ -229,8 +224,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 }
 
                 // Encrypt the entire extended header
-                let key_stream = prg.digest(0, H::HEADER_LEN);
-                xor_inplace(&mut extended_header, &key_stream);
+                prg.apply(0, &mut extended_header[0..H::HEADER_LEN]);
             }
 
             let mut m = SimpleMac::new(&derive_mac_key(&secrets[inverted_idx]));
@@ -303,8 +297,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
 
     // Decrypt the header using the keystream
     let mut prg = H::PRG::from(secret);
-    let key_stream = prg.digest(0, H::HEADER_LEN);
-    xor_inplace(header, &key_stream);
+    prg.apply(0, &mut header[0..H::HEADER_LEN]);
 
     if header[0] != RELAYER_END_PREFIX {
         // Path position
@@ -330,9 +323,9 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         // Shift the entire header left, to discard the data we just read
         header.copy_within(H::ROUTING_INFO_LEN.., 0);
 
-        // Erase the read data from the header
-        let key_stream = prg.digest(H::HEADER_LEN, H::HEADER_LEN + H::ROUTING_INFO_LEN);
-        header[H::HEADER_LEN - H::ROUTING_INFO_LEN..].copy_from_slice(&key_stream);
+        // Erase the read data from the header to apply the raw key-stream
+        header[H::HEADER_LEN - H::ROUTING_INFO_LEN..].fill(0);
+        prg.apply(H::HEADER_LEN, &mut header[H::HEADER_LEN - H::ROUTING_INFO_LEN..H::HEADER_LEN]);
 
         Ok(ForwardedHeader::RelayNode {
             next_header: RoutingInfo::<H> {
@@ -403,8 +396,8 @@ mod tests {
     impl<const N: usize> TryFrom<WrappedBytes<N>> for SphinxRecipientMessage<SimplePseudonym> {
         type Error = GeneralError;
 
-        fn try_from(value: WrappedBytes<N>) -> Result<Self, Self::Error> {
-            unimplemented!("not needed for the tests")
+        fn try_from(_: WrappedBytes<N>) -> Result<Self, Self::Error> {
+            unimplemented!("not needed in tests")
         }
     }
 
@@ -444,9 +437,7 @@ mod tests {
             let idx = secrets.len() - i - 2;
 
             let mut prg = Chacha20PRG::from(&secrets[idx]);
-            let mask = prg.digest(0, extended_header_len);
-
-            xor_inplace(&mut extended_header, &mask);
+            prg.apply(0, &mut extended_header);
 
             let mut erased = extended_header.clone();
             erased[header_len..].iter_mut().for_each(|x| *x = 0);
