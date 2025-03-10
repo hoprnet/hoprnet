@@ -30,7 +30,6 @@ anyhow = { workspace = true }
 async-std = { workspace = true }
 async-trait = { workspace = true }
 bimap = "0.6.3"
-cipher = "0.4.4"
 criterion = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }

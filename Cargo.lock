@@ -4220,7 +4220,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "bimap",
- "cipher 0.4.4",
  "criterion",
  "hex",
  "hex-literal",
@@ -4252,15 +4251,9 @@ dependencies = [
 name = "hopr-crypto-sphinx"
 version = "0.7.0"
 dependencies = [
- "aes 0.8.4",
  "anyhow",
  "blake2",
- "chacha20",
- "chacha20poly1305",
- "cipher 0.4.4",
- "ctr 0.9.2",
  "curve25519-dalek",
- "digest 0.10.7",
  "elliptic-curve",
  "generic-array",
  "hex-literal",
@@ -4274,16 +4267,16 @@ dependencies = [
  "subtle",
  "typenum",
  "universal-hash 0.5.1",
- "zeroize",
 ]
 
 [[package]]
 name = "hopr-crypto-types"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "blake2",
  "chacha20",
+ "cipher 0.4.4",
  "crypto_box",
  "curve25519-dalek",
  "digest 0.10.7",
@@ -4296,6 +4289,7 @@ dependencies = [
  "k256",
  "lazy_static",
  "libp2p-identity",
+ "poly1305",
  "primitive-types",
  "serde",
  "sha2 0.10.8",
@@ -7290,6 +7284,7 @@ dependencies = [
  "cpufeatures",
  "opaque-debug",
  "universal-hash 0.5.1",
+ "zeroize",
 ]
 
 [[package]]

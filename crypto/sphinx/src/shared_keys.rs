@@ -4,10 +4,10 @@ use hkdf::SimpleHkdf;
 use hopr_crypto_types::errors::CryptoError::CalculationError;
 use hopr_crypto_types::errors::Result;
 use hopr_crypto_types::keypairs::Keypair;
+use hopr_crypto_types::prelude::SecretKey;
 use hopr_crypto_types::utils::SecretValue;
 use std::marker::PhantomData;
 use std::ops::Mul;
-use hopr_crypto_types::prelude::SecretKey;
 
 use crate::derivation::generate_key_iv;
 
@@ -168,7 +168,7 @@ pub trait SphinxSuite {
     type G: GroupElement<Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
 
     /// Pseudo-Random Permutation used to encrypt and decrypt packet payload
-    type PRP: cipher::StreamCipher + cipher::KeyIvInit;
+    type PRP: hopr_crypto_types::crypto_traits::StreamCipher + hopr_crypto_types::crypto_traits::KeyIvInit;
 
     /// Convenience function to generate shared keys from the path of public keys.
     fn new_shared_keys(public_keys: &[<Self::P as Keypair>::Public]) -> Result<SharedKeys<Self::E, Self::G>> {

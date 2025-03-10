@@ -1,22 +1,13 @@
-use crate::errors::CryptoError;
-use crate::errors::CryptoError::InvalidInputValue;
 use generic_array::{ArrayLength, GenericArray};
 use hopr_crypto_random::random_array;
 use k256::elliptic_curve::{Group, PrimeField};
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
-/// Convenience method to XOR one slice onto other.
-pub fn xor_inplace(a: &mut [u8], b: &[u8]) {
-    let bound = a.len().min(b.len());
+use crate::errors::CryptoError;
+use crate::errors::CryptoError::InvalidInputValue;
 
-    // TODO: use portable_simd here
-    for i in 0..bound {
-        a[i] ^= b[i];
-    }
-}
-
-/// Generates a random elliptic curve point on secp256k1 curve (but not a point in infinity).
+/// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
 pub(crate) fn random_group_element() -> ([u8; 32], crate::types::CurvePoint) {
     let mut scalar = k256::NonZeroScalar::from_uint(1u32.into()).unwrap();

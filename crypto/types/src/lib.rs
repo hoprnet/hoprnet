@@ -20,8 +20,16 @@ pub mod utils;
 /// Contains implementation of Verifiable Random Function used in tickets
 pub mod vrf;
 
+/// Re-exports from the generic cryptographic traits.
+pub mod crypto_traits {
+    pub use cipher::{
+        BlockSizeUser, Iv, IvSizeUser, Key, KeyInit, KeyIvInit, KeySizeUser, StreamCipher, StreamCipherSeek,
+    };
+}
+
 #[doc(hidden)]
 pub mod prelude {
+    pub use super::crypto_traits;
     pub use super::errors::CryptoError;
     pub use super::keypairs::*;
     pub use super::primitives::*;

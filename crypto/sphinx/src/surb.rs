@@ -1,10 +1,11 @@
-use crate::routing::{RoutingInfo, SphinxHeaderSpec};
-use crate::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
-use hopr_crypto_types::prelude::{DigestLike, SecretKey, SimpleMac};
+use hopr_crypto_types::prelude::SecretKey;
 use hopr_crypto_types::types::Pseudonym;
 use hopr_primitive_types::prelude::GeneralError;
 use std::marker::PhantomData;
 use typenum::Unsigned;
+
+use crate::routing::{RoutingInfo, SphinxHeaderSpec};
+use crate::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
 
 /// Single Use Reply Block
 pub struct SURB<S: SphinxSuite, H: SphinxHeaderSpec> {
@@ -24,7 +25,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> SURB<S, H> {
     pub const SIZE: usize = H::KEY_ID_SIZE.get()
         + <S::G as GroupElement<S::E>>::AlphaLen::USIZE
         + RoutingInfo::<H>::SIZE
-        + SimpleMac::SIZE
+        + H::TAG_SIZE
         + SecretKey::LENGTH
         + H::SURB_RECEIVER_DATA_SIZE;
 
@@ -79,17 +80,16 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
                         [H::KEY_ID_SIZE.get() + alpha..H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN]
                         .into(),
                     mac: value[H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN
-                        ..H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + SimpleMac::SIZE]
-                        .try_into()
-                        .map_err(|_| GeneralError::ParseError("SURB".into()))?,
+                        ..H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE]
+                        .into(),
                     _h: PhantomData,
                 },
-                sender_key: value[H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + SimpleMac::SIZE
-                    ..H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + SimpleMac::SIZE + SecretKey::LENGTH]
+                sender_key: value[H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE
+                    ..H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE + SecretKey::LENGTH]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB".into()))?,
                 additional_data_receiver: value
-                    [H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + SimpleMac::SIZE + SecretKey::LENGTH..]
+                    [H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE + SecretKey::LENGTH..]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB".into()))?,
             })

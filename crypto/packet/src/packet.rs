@@ -9,14 +9,13 @@ use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use cipher::StreamCipher;
+use hopr_crypto_types::crypto_traits::StreamCipher;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use typenum::Unsigned;
 
 use crate::errors::PacketError;
 use crate::errors::{PacketError::PacketDecodingError, Result};
-
 
 /// Tag used to separate padding from data
 const PADDING_TAG: u8 = 0xaa;
@@ -147,8 +146,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
     pub const HEADER_LEN: usize = H::HEADER_LEN;
 
     /// The fixed length of the padded packet.
-    pub const PACKET_LEN: usize =
-        <S::P as Keypair>::Public::SIZE + H::HEADER_LEN + SimpleMac::SIZE + PADDED_PAYLOAD_SIZE;
+    pub const PACKET_LEN: usize = <S::P as Keypair>::Public::SIZE + H::HEADER_LEN + H::TAG_SIZE + PADDED_PAYLOAD_SIZE;
 
     /// Creates a new outgoing packet with the given payload `msg`, `routing` and `shared_keys` computed along the path.
     ///
@@ -252,12 +250,12 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
     /// Returns the packet checksum (MAC) subslice from the packet data.
     fn mac(&self) -> &[u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN;
-        &self.packet[base..base + SimpleMac::SIZE]
+        &self.packet[base..base + H::TAG_SIZE]
     }
 
     /// Returns the payload subslice from the packet data.
     fn payload_mut(&mut self) -> &mut [u8] {
-        let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE;
+        let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + H::TAG_SIZE;
         &mut self.packet[base..base + PADDED_PAYLOAD_SIZE]
     }
 
@@ -365,7 +363,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&[u8]> for MetaPacket<S, H> {
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec> BytesRepresentable for MetaPacket<S, H> {
     const SIZE: usize =
-        <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + SimpleMac::SIZE + PADDED_PAYLOAD_SIZE;
+        <S::G as GroupElement<S::E>>::AlphaLen::USIZE + Self::HEADER_LEN + H::TAG_SIZE + PADDED_PAYLOAD_SIZE;
 }
 
 #[cfg(test)]
@@ -409,6 +407,7 @@ pub(crate) mod tests {
         type LastHopData = return_path::EncodedRecipientMessage<HoprPseudonym>;
         type SurbReceiverData = ProofOfRelayValues;
         type PRG = hopr_crypto_types::primitives::ChaCha20;
+        type UH = hopr_crypto_types::primitives::Poly1305;
     }
 
     #[test]

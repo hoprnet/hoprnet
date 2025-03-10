@@ -1,17 +1,13 @@
 use blake2::Blake2s256;
-use cipher::KeyIvInit;
 use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
 use hopr_crypto_random::random_fill;
-use hopr_crypto_types::errors::CryptoError::{CalculationError, InvalidParameterSize};
-use hopr_crypto_types::primitives::{DigestLike, SecretKey, SimpleDigest, SimpleMac};
-use hopr_crypto_types::types::{HalfKey, PacketTag};
+use hopr_crypto_types::prelude::CryptoError::{CalculationError, InvalidParameterSize};
+use hopr_crypto_types::prelude::*;
 use k256::Secp256k1;
-use hopr_crypto_types::prelude::CryptoError;
 
 // Module-specific constants
-const HASH_KEY_COMMITMENT_SEED: &str = "HASH_KEY_COMMITMENT_SEED";
 const HASH_KEY_HMAC: &str = "HASH_KEY_HMAC";
 const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
 const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";
@@ -19,15 +15,6 @@ const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
 
 /// Size of the nonce in the Ping sub protocol
 pub const PING_PONG_NONCE_SIZE: usize = 16;
-
-/// Calculates a message authentication code with fixed key tag (HASH_KEY_HMAC)
-/// The given `secret` is first transformed using HKDF before the MAC calculation is performed.
-/// Based on `SimpleMac`
-pub fn create_tagged_mac(secret: &SecretKey, data: &[u8]) -> [u8; SimpleMac::SIZE] {
-    let mut mac = SimpleMac::new(&derive_mac_key(secret));
-    mac.update(data);
-    mac.finalize().into()
-}
 
 /// Helper function to expand an already cryptographically strong key material using the HKDF expand function
 /// The size of the secret must be at least the size of the output of the underlying hash function, which in this
@@ -59,19 +46,6 @@ pub fn derive_ping_pong(challenge: Option<&[u8]>) -> Box<[u8]> {
     ret.into()
 }
 
-/// Derives the commitment seed given the compressed private key representation
-/// and the serialized channel information.
-pub fn derive_commitment_seed(private_key: &[u8], channel_info: &[u8]) -> [u8; SimpleMac::SIZE] {
-    let sk: SecretKey = hkdf_expand_from_prk(
-        &private_key.try_into().expect("commitment private key size invalid"),
-        HASH_KEY_COMMITMENT_SEED.as_bytes(),
-    )
-    .into();
-    let mut mac = SimpleMac::new(&sk);
-    mac.update(channel_info);
-    mac.finalize().into()
-}
-
 /// Derives the packet tag used during packet construction by expanding the given secret.
 pub fn derive_packet_tag(secret: &SecretKey) -> PacketTag {
     hkdf_expand_from_prk::<typenum::U16>(secret, HASH_KEY_PACKET_TAG.as_bytes()).into()
@@ -84,12 +58,16 @@ pub fn derive_mac_key(secret: &SecretKey) -> SecretKey {
 
 /// Internal convenience function to generate key and IV from the given secret.
 /// WARNING: The `iv_first` distinguishes if the IV should be sampled before or after the key is sampled.
-pub(crate) fn generate_key_iv<T: KeyIvInit>(secret: &SecretKey, info: &[u8], iv_first: bool) -> hopr_crypto_types::errors::Result<T> {
-    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref())
-        .map_err(|_| CryptoError::InvalidInputValue("secret"))?;
+pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit>(
+    secret: &SecretKey,
+    info: &[u8],
+    iv_first: bool,
+) -> hopr_crypto_types::errors::Result<T> {
+    let hkdf =
+        SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref()).map_err(|_| CryptoError::InvalidInputValue("secret"))?;
 
-    let mut key = cipher::Key::<T>::default();
-    let mut iv = cipher::Iv::<T>::default();
+    let mut key = crypto_traits::Key::<T>::default();
+    let mut iv = crypto_traits::Iv::<T>::default();
 
     let mut out = vec![0u8; key.len() + iv.len()];
     hkdf.expand(info, &mut out)
@@ -150,17 +128,6 @@ mod tests {
     use hopr_crypto_types::types::PublicKey;
     use hopr_crypto_types::vrf::derive_vrf_parameters;
     use k256::Scalar;
-
-    #[test]
-    fn test_derive_commitment_seed() {
-        let priv_key = [0u8; SecretKey::LENGTH];
-        let chinfo = [0u8; SecretKey::LENGTH];
-
-        let res = derive_commitment_seed(&priv_key, &chinfo);
-
-        let r = hex!("0abe559a1577e99e16f112bb8a88f7793ff1fb22af46b810995fb754ea319386");
-        assert_eq!(r, res.as_ref());
-    }
 
     #[test]
     fn test_derive_packet_tag() {
@@ -224,16 +191,5 @@ mod tests {
         assert_eq!(h_check, params.h);
 
         Ok(())
-    }
-
-    #[test]
-    fn test_mac() {
-        let key = GenericArray::from([1u8; SecretKey::LENGTH]);
-        let data = [2u8; 64];
-        let mac = create_tagged_mac(&key.into(), &data);
-
-        let expected = hex!("77264e8ea3052b621dbb8b1904403a64b1064c884cf7629c266edd7e237f2799");
-        assert_eq!(SimpleMac::SIZE, mac.len());
-        assert_eq!(expected, mac);
     }
 }

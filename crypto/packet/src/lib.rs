@@ -51,6 +51,7 @@ impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
     type LastHopData = return_path::EncodedRecipientMessage<HoprPseudonym>;
     type SurbReceiverData = por::ProofOfRelayValues;
     type PRG = hopr_crypto_types::primitives::ChaCha20;
+    type UH = hopr_crypto_types::primitives::Poly1305;
 }
 
 /// Single Use Reply Block representation for HOPR protocol.
