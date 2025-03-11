@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use hopr_crypto_packet::chain::ChainPacketComponents;
+use hopr_crypto_packet::chain::{ChainPacketComponents, PacketRouting};
 use hopr_crypto_packet::validation::validate_unacknowledged_ticket;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
@@ -177,7 +177,7 @@ impl HoprDbProtocolOperations for HoprDb {
             ))
         })?;
 
-        let components =
+        let (components, surb) =
             self.begin_transaction()
                 .await?
                 .perform(|tx| {
@@ -204,12 +204,17 @@ impl HoprDbProtocolOperations for HoprDb {
                         };
 
                         spawn_fifo_blocking(move || {
-                            ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator)
-                                .map_err(|e| {
-                                    DbSqlError::LogicalError(format!(
-                                        "failed to construct chain components for a packet: {e}"
-                                    ))
-                                })
+                            ChainPacketComponents::into_outgoing(
+                                &data,
+                                PacketRouting::ForwardPath(&path),
+                                 None,
+                                 &me, next_ticket, &mapper, &domain_separator
+                            )
+                            .map_err(|e| {
+                                DbSqlError::LogicalError(format!(
+                                    "failed to construct chain components for a packet: {e}"
+                                ))
+                            })
                         })
                         .await
                     })
@@ -264,7 +269,7 @@ impl HoprDbProtocolOperations for HoprDb {
         let offchain_keypair = pkt_keypair.clone();
 
         let packet = spawn_fifo_blocking(move || {
-            ChainPacketComponents::from_incoming(&data, &offchain_keypair, sender)
+            ChainPacketComponents::from_incoming(&data, &offchain_keypair, sender, &mapper, local_surbs)
                 .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
         })
         .await?;
