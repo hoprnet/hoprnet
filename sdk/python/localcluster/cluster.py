@@ -187,7 +187,7 @@ class Cluster:
         for node in self.nodes.values():
             links_blocks.append(await node.links())
 
-        logging.debug("\n".join(links_blocks))
+        logging.info("\n".join(links_blocks))
 
     @property
     def size(self):
