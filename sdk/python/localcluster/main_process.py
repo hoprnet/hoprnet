@@ -24,7 +24,8 @@ random.seed(SEED)
 
 
 async def bringup(
-    config: str, test_mode: bool = False, fully_connected: bool = False
+    config: str, test_mode: bool = False, fully_connected: bool = False,
+    docker_compose: bool = False
 ) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 
@@ -35,19 +36,25 @@ async def bringup(
     with open(config, "r") as f:
         config = yaml.safe_load(f)
 
-    cluster = Cluster(config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"))
+    cluster = Cluster(config, ANVIL_CONFIG_FILE,
+                      ANVIL_FOLDER.joinpath("protocol-config.json"),
+                      docker_compose)
     anvil = Anvil(ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"))
-
     snapshot = Snapshot(PORT_BASE, MAIN_DIR, cluster)
 
-    # STOP OLD LOCAL ANVIL SERVER
-    anvil.kill()
+    if not docker_compose:
+        # STOP OLD LOCAL ANVIL SERVER
+        anvil.kill()
 
-    if not snapshot.usable:
-        logging.info("Snapshot not usable")
+    # always run full setup when using docker compose
+    if docker_compose or not snapshot.usable:
+        if not docker_compose and not snapshot.usable:
+            logging.info("Snapshot not usable")
 
-        # START NEW LOCAL ANVIL SERVER
-        anvil.run()
+        # START NEW LOCAL ANVIL SERVER (only when not using docker compose)
+        if not docker_compose:
+            anvil.run()
+
         anvil.mirror_contracts(
             CONTRACTS_ADDRESSES,
             ANVIL_FOLDER.joinpath("protocol-config.json"),
@@ -62,31 +69,35 @@ async def bringup(
         # wait before contract deployments are finalized
         await asyncio.sleep(2.5)
 
-        # BRING UP NODES (with funding)
-        await cluster.shared_bringup(skip_funding=False)
+        # only bring down cluster and snapshot if not using docker compose
+        if not docker_compose:
+            # BRING UP NODES (with funding)
+            await cluster.shared_bringup(skip_funding=False)
 
-        anvil.kill()
-        cluster.clean_up()
+            anvil.kill()
+            cluster.clean_up()
 
-        # delay to ensure anvil is stopped and state file closed
-        await asyncio.sleep(1)
+            # delay to ensure anvil is stopped and state file closed
+            await asyncio.sleep(1)
 
-        snapshot.create(ANVIL_FOLDER.joinpath("anvil.state.json"))
+            snapshot.create(ANVIL_FOLDER.joinpath("anvil.state.json"))
 
-    snapshot.reuse()
+    if not docker_compose:
+        snapshot.reuse()
 
-    anvil.run(AnvilState.LOAD)
+        anvil.run(AnvilState.LOAD)
 
-    # SETUP NODES USING STORED IDENTITIES
-    cluster.copy_identities()
-    cluster.load_addresses()
+        # SETUP NODES USING STORED IDENTITIES
+        cluster.copy_identities()
+        cluster.load_addresses()
 
-    # wait before contract deployments are finalized
-    await asyncio.sleep(2.5)
+        # wait before contract deployments are finalized
+        await asyncio.sleep(2.5)
 
-    # BRING UP NODES (without funding)
+    # BRING UP NODES (without funding when using snapshot, with funding otherwise)
+    skip_funding = not docker_compose
     try:
-        await cluster.shared_bringup(skip_funding=True)
+        await cluster.shared_bringup(skip_funding)
     except asyncio.TimeoutError as e:
         logging.error(f"Timeout error: {e}")
         return cluster, anvil
@@ -94,6 +105,10 @@ async def bringup(
     if not test_mode:
         await cluster.alias_peers()
 
+        if fully_connected:
+            await cluster.connect_peers()
+
+    if docker_compose:
         if fully_connected:
             await cluster.connect_peers()
 
