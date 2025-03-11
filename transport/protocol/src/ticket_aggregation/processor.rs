@@ -476,7 +476,7 @@ mod tests {
             .amount(price_per_packet.div_f64(ticket_win_prob)?)
             .index(index)
             .index_offset(1)
-            .win_prob(ticket_win_prob)
+            .win_prob(ticket_win_prob.try_into()?)
             .channel_epoch(1)
             .challenge(response.to_challenge().into())
             .build_signed(signer, &domain_separator)?

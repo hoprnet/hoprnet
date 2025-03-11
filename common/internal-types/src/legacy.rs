@@ -229,7 +229,7 @@ mod tests {
             .balance(BalanceType::HOPR.balance(100))
             .index_offset(1)
             .index(1)
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .challenge(EthereumChallenge::new(&hex!(
                 "045a4d76d0bfc0d84f6ff946b5934b7ea6a2958f"
             )))
@@ -259,7 +259,7 @@ mod tests {
             .amount(1000000_u64)
             .index(10)
             .index_offset(2)
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(2)
             .challenge(EthereumChallenge::new(ETHEREUM_CHALLENGE.as_ref()))
             .build_signed(&ALICE, &domain_separator)?;
@@ -307,7 +307,7 @@ mod tests {
             .amount(1000000_u64)
             .index(10)
             .index_offset(2)
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(2)
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
             .build_signed(&ALICE, &domain_separator)?;
