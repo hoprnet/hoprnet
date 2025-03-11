@@ -1,11 +1,10 @@
-use futures::pin_mut;
 use futures::{future::Either, SinkExt};
+use futures::{pin_mut, Sink};
 use hopr_crypto_packet::errors::PacketError;
 use hopr_db_api::protocol::TransportPacketWithChainData;
-use libp2p_identity::PeerId;
+use hopr_transport_identity::PeerId;
 use tracing::error;
 
-use core_path::path::{Path, TransportPath};
 use hopr_async_runtime::prelude::sleep;
 use hopr_crypto_packet::errors::{
     PacketError::{TagReplay, TransportError},
@@ -14,11 +13,11 @@ use hopr_crypto_packet::errors::{
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
+use hopr_path::path::{Path, TransportPath};
 use hopr_primitive_types::prelude::*;
 
 use super::packet::OutgoingPacket;
 use crate::bloom;
-use crate::msg::mixer::MixerConfig;
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -83,7 +82,8 @@ where
                 data.to_bytes(),
                 self.cfg.chain_keypair.clone(),
                 path?,
-                self.cfg.outgoing_ticket_win_prob,
+                self.determine_actual_outgoing_win_prob().await,
+                self.determine_actual_outgoing_ticket_price().await?,
             )
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
@@ -115,7 +115,8 @@ where
                 self.cfg.chain_keypair.clone(),
                 &self.cfg.packet_keypair,
                 previous_hop,
-                self.cfg.outgoing_ticket_win_prob,
+                self.determine_actual_outgoing_win_prob().await,
+                self.determine_actual_outgoing_ticket_price().await?,
             )
             .await
             .map_err(|e| match e {
@@ -195,6 +196,37 @@ where
             .with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
             .await
     }
+
+    // NOTE: as opposed to the winning probability, the ticket price does not have
+    // a reasonable default and therefore the operation fails
+    async fn determine_actual_outgoing_ticket_price(&self) -> Result<Balance> {
+        // This operation hits the cache unless the new value is fetched for the first time
+        let network_ticket_price =
+            self.db.get_network_ticket_price().await.map_err(|e| {
+                PacketError::LogicError(format!("failed to determine current network ticket price: {e}"))
+            })?;
+
+        Ok(self.cfg.outgoing_ticket_price.unwrap_or(network_ticket_price))
+    }
+
+    async fn determine_actual_outgoing_win_prob(&self) -> f64 {
+        // This operation hits the cache unless the new value is fetched for the first time
+        let network_win_prob = self
+            .db
+            .get_network_winning_probability()
+            .await
+            .inspect_err(|error| error!(%error, "failed to determine current network winning probability"))
+            .ok();
+
+        // If no explicit winning probability is configured, use the network value
+        // or 1 if the network value was not determined.
+        // This code does not take the max from those, as it is the upper layer's responsibility
+        // to ensure the configured value is not smaller than the network value.
+        self.cfg
+            .outgoing_ticket_win_prob
+            .or(network_win_prob)
+            .unwrap_or(DEFAULT_OUTGOING_TICKET_WIN_PROB)
+    }
 }
 
 /// Packet send finalizer notifying the awaiting future once the send has been acknowledged.
@@ -251,13 +283,19 @@ impl PacketSendAwaiter {
 
 pub type SendMsgInput = (ApplicationData, TransportPath, PacketSendFinalizer);
 
-#[derive(Debug)]
-pub struct MsgSender {
-    tx: futures::channel::mpsc::UnboundedSender<SendMsgInput>,
+#[derive(Debug, Clone)]
+pub struct MsgSender<T>
+where
+    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,
+{
+    tx: T,
 }
 
-impl MsgSender {
-    pub fn new(tx: futures::channel::mpsc::UnboundedSender<SendMsgInput>) -> Self {
+impl<T> MsgSender<T>
+where
+    T: Sink<SendMsgInput> + Send + Sync + Clone + 'static + std::marker::Unpin,
+{
+    pub fn new(tx: T) -> Self {
         Self { tx }
     }
 
@@ -270,7 +308,7 @@ impl MsgSender {
             .clone()
             .send((data, path, tx.into()))
             .await
-            .map_err(|_| TransportError("Failed to send a message".to_owned()))
+            .map_err(|_| TransportError("Failed to send a message".into()))
             .map(move |_| {
                 let awaiter: PacketSendAwaiter = rx.into();
                 awaiter
@@ -281,21 +319,24 @@ impl MsgSender {
 /// Configuration parameters for the packet interaction.
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {
-    pub check_unrealized_balance: bool,
     pub packet_keypair: OffchainKeypair,
     pub chain_keypair: ChainKeypair,
-    pub mixer: MixerConfig,
-    pub outgoing_ticket_win_prob: f64,
+    pub outgoing_ticket_win_prob: Option<f64>,
+    pub outgoing_ticket_price: Option<Balance>,
 }
 
 impl PacketInteractionConfig {
-    pub fn new(packet_keypair: &OffchainKeypair, chain_keypair: &ChainKeypair, outgoing_ticket_win_prob: f64) -> Self {
+    pub fn new(
+        packet_keypair: &OffchainKeypair,
+        chain_keypair: &ChainKeypair,
+        outgoing_ticket_win_prob: Option<f64>,
+        outgoing_ticket_price: Option<Balance>,
+    ) -> Self {
         Self {
             packet_keypair: packet_keypair.clone(),
             chain_keypair: chain_keypair.clone(),
-            check_unrealized_balance: true,
-            mixer: MixerConfig::default(),
             outgoing_ticket_win_prob,
+            outgoing_ticket_price,
         }
     }
 }

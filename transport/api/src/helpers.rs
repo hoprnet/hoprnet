@@ -1,23 +1,25 @@
 use async_lock::RwLock;
-use libp2p::{Multiaddr, PeerId};
+use futures::channel::mpsc::Sender;
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
-use chain_types::chain_events::NetworkRegistryStatus;
-use core_path::{
+use hopr_chain_types::chain_events::NetworkRegistryStatus;
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_db_sql::HoprDbAllOperations;
+use hopr_internal_types::protocol::ApplicationData;
+use hopr_network_types::prelude::RoutingOptions;
+use hopr_path::{
     path::TransportPath,
     selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
     selectors::PathSelector,
 };
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_sql::HoprDbAllOperations;
-use hopr_internal_types::protocol::ApplicationData;
 use hopr_primitive_types::primitives::Address;
-use hopr_transport_protocol::msg::processor::MsgSender;
-use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg};
-
-use hopr_network_types::prelude::RoutingOptions;
-use hopr_transport_session::errors::SessionManagerError;
+use hopr_transport_identity::PeerId;
+use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
+use hopr_transport_session::{
+    errors::{SessionManagerError, TransportSessionError},
+    traits::SendMsg,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -45,12 +47,6 @@ impl From<NetworkRegistryStatus> for PeerEligibility {
     }
 }
 
-/// Indexer events triggered externally from the [`crate::HoprTransport`] object.
-pub enum IndexerTransportEvent {
-    EligibilityUpdate(PeerId, PeerEligibility),
-    Announce(PeerId, Vec<Multiaddr>),
-}
-
 /// Ticket statistics data exposed by the ticket mechanism.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
@@ -64,7 +60,7 @@ pub struct TicketStatistics {
 #[derive(Clone)]
 pub(crate) struct PathPlanner<T> {
     db: T,
-    channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+    channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     selector: DfsPathSelector<RandomizedEdgeWeighting>,
 }
 
@@ -75,7 +71,7 @@ where
     pub(crate) fn new(
         db: T,
         path_selector_cfg: DfsPathSelectorConfig,
-        channel_graph: Arc<RwLock<core_path::channel_graph::ChannelGraph>>,
+        channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     ) -> Self {
         Self {
             db,
@@ -84,7 +80,7 @@ where
         }
     }
 
-    pub(crate) fn channel_graph(&self) -> Arc<RwLock<core_path::channel_graph::ChannelGraph>> {
+    pub(crate) fn channel_graph(&self) -> Arc<RwLock<hopr_path::channel_graph::ChannelGraph>> {
         self.channel_graph.clone()
     }
 
@@ -141,7 +137,7 @@ where
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            use core_path::path::Path;
+            use hopr_path::path::Path;
             hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.hops().len() - 1) as f64);
         }
 
@@ -151,7 +147,7 @@ where
 
 #[derive(Clone)]
 pub(crate) struct MessageSender<T> {
-    pub process_packet_send: Arc<OnceLock<MsgSender>>,
+    pub process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     pub resolver: PathPlanner<T>,
 }
 
@@ -159,7 +155,7 @@ impl<T> MessageSender<T>
 where
     T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
 {
-    pub fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T>) -> Self {
+    pub fn new(process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>, resolver: PathPlanner<T>) -> Self {
         Self {
             process_packet_send,
             resolver,

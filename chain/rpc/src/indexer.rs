@@ -17,7 +17,7 @@ use tracing::{debug, error, trace, warn};
 
 use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
-use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
+use crate::{BlockWithLogs, HoprIndexerRpcOperations, HttpRequestor, Log, LogFilter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -57,7 +57,7 @@ fn split_range<'a>(
     .boxed()
 }
 
-impl<P: JsonRpcClient + 'static> RpcOperations<P> {
+impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R> {
     /// Retrieves logs in the given range (`from_block` and `to_block` are inclusive).
     fn stream_logs(&self, filter: LogFilter, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
         let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
@@ -102,7 +102,7 @@ impl<P: JsonRpcClient + 'static> RpcOperations<P> {
 }
 
 #[async_trait]
-impl<P: JsonRpcClient + 'static> HoprIndexerRpcOperations for RpcOperations<P> {
+impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprIndexerRpcOperations for RpcOperations<P, R> {
     async fn block_number(&self) -> Result<u64> {
         self.get_block_number().await
     }
@@ -232,10 +232,10 @@ mod tests {
     use std::time::Duration;
     use tracing::debug;
 
-    use bindings::hopr_channels::*;
-    use bindings::hopr_token::{ApprovalFilter, TransferFilter};
-    use chain_types::{ContractAddresses, ContractInstances};
     use hopr_async_runtime::prelude::{sleep, spawn};
+    use hopr_bindings::hopr_channels::*;
+    use hopr_bindings::hopr_token::{ApprovalFilter, TransferFilter};
+    use hopr_chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 
     use crate::client::surf_client::SurfRequestor;
@@ -301,7 +301,7 @@ mod tests {
     #[async_std::test]
     async fn test_should_get_block_number() -> anyhow::Result<()> {
         let expected_block_time = Duration::from_secs(1);
-        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
         let client = JsonRpcProviderClient::new(
@@ -313,13 +313,14 @@ mod tests {
         let cfg = RpcOperationsConfig {
             finality: 2,
             expected_block_time,
+            gas_oracle_url: None,
             ..RpcOperationsConfig::default()
         };
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
 
         let b1 = rpc.block_number().await?;
 
@@ -338,7 +339,7 @@ mod tests {
 
         let expected_block_time = Duration::from_secs(1);
 
-        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
 
@@ -349,7 +350,7 @@ mod tests {
         };
 
         let tokens_minted_at =
-            chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+            hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
         debug!("tokens were minted at block {tokens_minted_at}");
 
         let contract_addrs = ContractAddresses::from(&contract_instances);
@@ -358,6 +359,7 @@ mod tests {
             tx_polling_interval: Duration::from_millis(10),
             contract_addrs,
             expected_block_time,
+            gas_oracle_url: None,
             ..RpcOperationsConfig::default()
         };
 
@@ -370,7 +372,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.token, contract_addrs.channels],
@@ -398,7 +400,7 @@ mod tests {
         });
 
         // Spawn channel funding
-        chain_types::utils::fund_channel(
+        hopr_chain_types::utils::fund_channel(
             chain_key_1.public().to_address(),
             contract_instances.token,
             contract_instances.channels,
@@ -474,7 +476,7 @@ mod tests {
 
         let expected_block_time = Duration::from_secs(1);
 
-        let anvil = chain_types::utils::create_anvil(Some(expected_block_time));
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_1 = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
 
@@ -485,7 +487,7 @@ mod tests {
         };
 
         let tokens_minted_at =
-            chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+            hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
         debug!("tokens were minted at block {tokens_minted_at}");
 
         let contract_addrs = ContractAddresses::from(&contract_instances);
@@ -495,6 +497,7 @@ mod tests {
             contract_addrs,
             expected_block_time,
             finality: 2,
+            gas_oracle_url: None,
             ..RpcOperationsConfig::default()
         };
 
@@ -507,7 +510,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.channels],
@@ -533,7 +536,7 @@ mod tests {
         });
 
         // Spawn channel funding
-        chain_types::utils::fund_channel(
+        hopr_chain_types::utils::fund_channel(
             chain_key_1.public().to_address(),
             contract_instances.token,
             contract_instances.channels,

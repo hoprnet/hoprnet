@@ -11,7 +11,7 @@
 //! All necessary pre-requisites are checked by the implementation before the respective [Action] is submitted
 //! to the [ActionQueue](crate::action_queue::ActionQueue).
 use async_trait::async_trait;
-use chain_types::actions::Action;
+use hopr_chain_types::actions::Action;
 use hopr_crypto_types::keypairs::OffchainKeypair;
 use hopr_crypto_types::prelude::Keypair;
 use hopr_db_sql::accounts::HoprDbAccountOperations;
@@ -93,10 +93,10 @@ mod tests {
     use crate::errors::ChainActionsError;
     use crate::node::NodeActions;
     use crate::ChainActions;
-    use chain_types::actions::Action;
-    use chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use futures::FutureExt;
     use hex_literal::hex;
+    use hopr_chain_types::actions::Action;
+    use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::accounts::HoprDbAccountOperations;

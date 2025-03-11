@@ -1,10 +1,9 @@
-use clap::builder::{PossibleValuesParser, ValueParser};
+use clap::builder::ValueParser;
 use clap::{ArgAction, Parser};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use strum::VariantNames;
 
-use hopr_lib::{looks_like_domain, HostConfig, Strategy};
+use hopr_lib::{looks_like_domain, HostConfig};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -187,7 +186,7 @@ pub struct CliArgs {
 
     #[arg(
         long = "maxRequestsPerSec",
-        help = "Maximum number of RPC requestes that can be performed per second.",
+        help = "Maximum number of RPC requests that can be performed per second.",
         env = "HOPRD_MAX_RPC_REQUESTS_PER_SEC",
         value_name = "MAX_RPC_REQUESTS_PER_SEC",
         value_parser = clap::value_parser ! (u32)
@@ -319,7 +318,7 @@ pub struct CliArgs {
     #[arg(
         long = "moduleAddress",
         value_name = "HOPRD_MODULE_ADDR",
-        help = "Address of the node mangement module",
+        help = "Address of the node management module",
         env = "HOPRD_MODULE_ADDRESS"
     )]
     pub module_address: Option<String>,
@@ -331,81 +330,4 @@ pub struct CliArgs {
         env = "HOPRD_PROTOCOL_CONFIG_PATH"
     )]
     pub protocol_config_path: Option<String>,
-
-    // ==================================
-    /// deprecated
-    #[deprecated]
-    #[arg(
-        long = "testUseWeakCrypto",
-        env = "HOPRD_TEST_USE_WEAK_CRYPTO",
-        action = ArgAction::SetTrue,
-        help = "DEPRECATED",
-        hide = true,
-        default_value_t = false
-    )]
-    pub test_use_weak_crypto: bool,
-
-    /// deprecated
-    #[deprecated]
-    #[arg(
-        long = "dryRun",
-        help = "DEPRECATED",
-        env = "HOPRD_DRY_RUN",
-        default_value_t = false,
-        action = ArgAction::SetTrue
-    )]
-    pub dry_run: bool,
-
-    /// deprecated
-    #[deprecated]
-    #[arg(
-        long = "healthCheck",
-        help = "DEPRECATED",
-        action = ArgAction::SetTrue,
-        default_value_t = false
-    )]
-    pub health_check: bool,
-
-    /// deprecated
-    #[deprecated]
-    #[arg(long = "healthCheckHost", help = "DEPRECATED")]
-    pub health_check_host: Option<String>,
-
-    /// deprecated
-    #[deprecated]
-    #[arg(
-        long = "healthCheckPort",
-        value_parser = clap::value_parser ! (u16),
-        help = "DEPRECATED",
-    )]
-    pub health_check_port: Option<u16>,
-
-    //#[deprecated] not marked as deprecated to allow showing a warning
-    #[arg(
-    long = "defaultStrategy",
-    help = "DEPRECATED",
-    env = "HOPRD_DEFAULT_STRATEGY",
-    value_name = "DEFAULT_STRATEGY",
-    value_parser = PossibleValuesParser::new(Strategy::VARIANTS)
-    )]
-    pub default_strategy: Option<String>,
-
-    //#[deprecated] not marked as deprecated to allow showing a warning
-    #[arg(
-    long = "maxAutoChannels",
-    help = "DEPRECATED",
-    env = "HOPRD_MAX_AUTO_CHANNELS",
-    value_name = "MAX_AUTO_CHANNELS",
-    value_parser = clap::value_parser ! (u32)
-    )]
-    pub max_auto_channels: Option<u32>, // Make this a string if we want to supply functions instead in the future.
-
-    //#[deprecated] not marked as deprecated to allow showing a warning
-    #[arg(
-    long = "disableTicketAutoRedeem",
-    env = "HOPRD_DISABLE_AUTO_REDEEEM_TICKETS",
-    help = "DEPRECATED",
-    action = ArgAction::Count
-    )]
-    pub auto_redeem_tickets: u8,
 }

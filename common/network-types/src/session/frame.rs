@@ -666,7 +666,7 @@ pub(crate) mod tests {
             .collect::<Vec<_>>();
         static ref SEGMENTS: Vec<Segment> = {
             let vec = FRAMES.par_iter().flat_map(|f| f.segment(MTU).unwrap()).collect::<VecDeque<_>>();
-            let mut rng = rand::rngs::StdRng::from_seed(RAND_SEED.clone());
+            let mut rng = rand::rngs::StdRng::from_seed(*RAND_SEED);
             linear_half_normal_shuffle(&mut rng, vec, MIXING_FACTOR)
         };
     }
@@ -776,7 +776,7 @@ pub(crate) mod tests {
             frame_id: 1,
             seq_idx: 0,
             seq_len: 1,
-            data: hex!("cafe").clone().into(),
+            data: hex!("cafe").into(),
         };
 
         fragmented.push_segment(segment)?;
@@ -828,7 +828,7 @@ pub(crate) mod tests {
 
     #[async_std::test]
     async fn pushing_segment_of_an_evicted_frame_into_reassembler_should_fail() -> anyhow::Result<()> {
-        let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_millis(5).into());
+        let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_millis(5));
 
         let mut segments = FRAMES[0].segment(MTU)?;
         let segment_1 = segments.pop().unwrap(); // Remove the first segment
@@ -1053,7 +1053,7 @@ pub(crate) mod tests {
     ) -> (Vec<Segment>, Vec<&'static Frame>, HashSet<SegmentId>) {
         assert!((0.0..=1.0).contains(&corrupted_ratio));
 
-        let mut rng = rand::rngs::StdRng::from_seed(RAND_SEED.clone());
+        let mut rng = rand::rngs::StdRng::from_seed(*RAND_SEED);
 
         let (excluded_frame_ids, excluded_segments): (HashSet<FrameId>, HashSet<SegmentId>) = (1..num_frames + 1)
             .choose_multiple(&mut rng, ((num_frames as f32) * corrupted_ratio) as usize)
@@ -1088,7 +1088,7 @@ pub(crate) mod tests {
         // Corrupt 30% of the frames, by removing a random segment from them
         let (segments, expected_frames, excluded) = corrupt_frames(FRAME_COUNT / 4, 0.3);
 
-        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(25).into());
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(25));
 
         segments.into_iter().try_for_each(|s| fragmented.push_segment(s))?;
 
@@ -1098,7 +1098,7 @@ pub(crate) mod tests {
             .flat_map_iter(|e| e.into_missing_segments())
             .collect::<HashSet<_>>();
 
-        assert!(computed_missing.par_iter().all(|s| excluded.contains(&s)));
+        assert!(computed_missing.par_iter().all(|s| excluded.contains(s)));
         /*assert!(
             excluded.par_iter().all(|s| computed_missing.contains(&s)),
             "seed {}",
@@ -1148,7 +1148,7 @@ pub(crate) mod tests {
         let (segments, expected_frames, _) = corrupt_frames(1000, 1.0);
         assert!(expected_frames.is_empty());
 
-        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(100).into());
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(100));
 
         segments.into_par_iter().try_for_each(|s| fragmented.push_segment(s))?;
         drop(fragmented);
@@ -1204,7 +1204,7 @@ pub(crate) mod tests {
 
     #[async_std::test]
     async fn frame_reassembler_yields_and_evicts_frames_on_unreliable_network() -> anyhow::Result<()> {
-        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(25).into());
+        let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(25));
         let fragmented = Arc::new(fragmented);
 
         let done = Arc::new(AtomicBool::new(false));

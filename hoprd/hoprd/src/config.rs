@@ -3,16 +3,16 @@ use std::net::{IpAddr, SocketAddr};
 use std::str::FromStr;
 use std::time::Duration;
 
+use proc_macro_regex::regex;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use tracing::debug;
+use validator::{Validate, ValidationError};
+
 use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
 use hopr_platform::file::native::read_to_string;
 use hoprd_api::config::{Api, Auth};
 use hoprd_inbox::config::MessageInboxConfiguration;
-
-use proc_macro_regex::regex;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use tracing::{debug, warn};
-use validator::{Validate, ValidationError};
 
 use crate::errors::HoprdError;
 
@@ -222,33 +222,6 @@ impl HoprdConfig {
             cfg.identity.private_key = Some(x)
         };
 
-        // TODO: strategy configuration from the CLI should be removed in 3.0!
-
-        // strategy
-        if cli_args.default_strategy.is_some() {
-            warn!(
-                "DEPRECATION: 'defaultStrategy' (HOPRD_DEFAULT_STRATEGY) option is now deprecated \
-            and has no effect. It will be removed in future releases, please use configuration file \
-            to configure strategies"
-            );
-        }
-
-        if cli_args.auto_redeem_tickets == 1 {
-            warn!(
-                "DEPRECATION: 'disableTicketAutoRedeem' (HOPRD_DISABLE_AUTO_REDEEM_TICKETS) \
-            option is now deprecated and has no effect. It will be removed in future releases, \
-            please use configuration file to configure strategies"
-            );
-        }
-
-        if cli_args.max_auto_channels.is_some() {
-            warn!(
-                "DEPRECATION: 'maxAutoChannels' (HOPRD_MAX_AUTO_CHANNELS) option is now deprecated \
-            and has no effect. It will be removed in future releases, please use configuration file \
-            to configure strategies"
-            );
-        }
-
         // chain
         if cli_args.announce > 0 {
             cfg.hopr.chain.announce = true;
@@ -378,20 +351,33 @@ fn default_max_tcp_target_retries() -> u32 {
     10
 }
 
+fn just_true() -> bool {
+    true
+}
+
 /// Configuration of the Exit node (see [`HoprServerIpForwardingReactor`]) and the Entry node.
 #[serde_as]
 #[derive(
     Clone, Debug, Eq, PartialEq, smart_default::SmartDefault, serde::Deserialize, serde::Serialize, validator::Validate,
 )]
 pub struct SessionIpForwardingConfig {
-    /// If specified, enforces only the given target addresses (after DNS resolution).
-    /// If `None` is specified, allows all targets.
+    /// Controls whether allowlisting should be done via `target_allow_list`.
+    /// If set to `false`, the node will act as an Exit node for any target.
     ///
-    /// Defaults to `None`.
+    /// Defaults to `true`.
+    #[serde(default = "just_true")]
+    #[default(true)]
+    pub use_target_allow_list: bool,
+
+    /// Enforces only the given target addresses (after DNS resolution).
+    ///
+    /// This is used only if `use_target_allow_list` is set to `true`.
+    /// If left empty (and `use_target_allow_list` is `true`), the node will not act as an Exit node.
+    ///
+    /// Defaults to empty.
     #[serde(default)]
-    #[default(None)]
-    #[serde_as(as = "Option<HashSet<serde_with::DisplayFromStr>>")]
-    pub target_allow_list: Option<HashSet<SocketAddr>>,
+    #[serde_as(as = "HashSet<serde_with::DisplayFromStr>")]
+    pub target_allow_list: HashSet<SocketAddr>,
 
     /// Delay between retries in seconds to reach a TCP target.
     ///

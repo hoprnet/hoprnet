@@ -1,4 +1,3 @@
-use libp2p::Multiaddr;
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -9,10 +8,19 @@ use std::str::FromStr;
 use std::time::Duration;
 use validator::{Validate, ValidationError};
 
-pub use core_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
+use hopr_transport_identity::Multiaddr;
+pub use hopr_transport_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
 pub use hopr_transport_protocol::config::ProtocolConfig;
 
 use crate::errors::HoprTransportError;
+
+pub struct HoprTransportConfig {
+    pub transport: TransportConfig,
+    pub network: hopr_transport_network::config::NetworkConfig,
+    pub protocol: hopr_transport_protocol::config::ProtocolConfig,
+    pub heartbeat: hopr_transport_network::heartbeat::HeartbeatConfig,
+    pub session: SessionGlobalConfig,
+}
 
 regex!(is_dns_address_regex "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$");
 
@@ -24,7 +32,7 @@ pub fn looks_like_domain(s: &str) -> bool {
 
 /// Check whether the string is an actual reachable domain.
 pub fn is_reachable_domain(host: &str) -> bool {
-    host.to_socket_addrs().map_or(false, |i| i.into_iter().next().is_some())
+    host.to_socket_addrs().is_ok_and(|i| i.into_iter().next().is_some())
 }
 
 /// Enumeration of possible host types.

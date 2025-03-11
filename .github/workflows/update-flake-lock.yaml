@@ -1,5 +1,5 @@
 ---
-name: update-flake-lock
+name: Update flake.lock
 
 on:
   workflow_dispatch: # allows manual triggering
@@ -13,10 +13,49 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Update flake.lock
-        uses: DeterminateSystems/update-flake-lock@main
+      # # NOTE: not working on self-hosted runners
+      # - name: Update flake.lock
+      #   uses: DeterminateSystems/update-flake-lock@main
+      #   with:
+      #     pr-title: "chore(nix): update flake.lock"
+      #     pr-labels: |
+      #       dependencies
+      #       automated
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
         with:
-          pr-title: "chore(nix): update flake.lock"
-          pr-labels: |
-            dependencies
-            automated
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v15
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Update the flake.lock
+        run: nix flake update
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GH_RUNNER_TOKEN }}
+          commit-message: "Update flake.lock"
+          base: master
+          title: "Bump the flake.lock"
+          body: "Update the inputs pinned in the flake.lock and used by the flake.nix."
+          branch: bot/update/flake-lock
+          delete-branch: true
+          draft: false
+          assignees: ${{ github.actor }}
+          team-reviewers: "@hoprnet/hopr-development"
+
+      - name: Enable Auto Merge
+        run: |
+          git fetch
+          git checkout bot/update/flake-lock
+          gh pr ready
+          gh pr merge --auto --delete-branch --squash
+        env:
+          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}

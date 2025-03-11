@@ -9,19 +9,19 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
-use chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
-use chain_actions::action_state::IndexerActionTracker;
-use chain_actions::payload::SafePayloadGenerator;
-use chain_actions::ChainActions;
-use chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-pub use chain_types::chain_events::SignificantChainEvent;
-use chain_types::ContractAddresses;
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use hopr_chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
+use hopr_chain_actions::action_state::IndexerActionTracker;
+use hopr_chain_actions::payload::SafePayloadGenerator;
+use hopr_chain_actions::ChainActions;
+use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
 use hopr_chain_rpc::client::SimpleJsonRpcRetryPolicy;
 use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use hopr_chain_rpc::HoprRpcOperations;
+pub use hopr_chain_types::chain_events::SignificantChainEvent;
+use hopr_chain_types::ContractAddresses;
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::account::AccountEntry;
@@ -35,18 +35,17 @@ use crate::errors::{HoprChainError, Result};
 ///
 /// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
 #[cfg(feature = "runtime-async-std")]
-pub type DefaultHttpPostRequestor = hopr_chain_rpc::client::surf_client::SurfRequestor;
+pub type DefaultHttpRequestor = hopr_chain_rpc::client::surf_client::SurfRequestor;
 
-// Both features could be enabled during testing, therefore we only use tokio when its
+// Both features could be enabled during testing; therefore, we only use tokio when its
 // exclusively enabled.
 #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-pub type DefaultHttpPostRequestor = hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
+pub type DefaultHttpRequestor = hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
 
 /// The default JSON RPC provider client
 ///
 /// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
-pub type JsonRpcClient =
-    hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>;
+pub type JsonRpcClient = hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpRequestor, SimpleJsonRpcRetryPolicy>;
 
 /// Checks whether the node can be registered with the Safe in the NodeSafeRegistry
 pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
@@ -124,7 +123,8 @@ type ActionQueueType<T> = ActionQueue<
         hopr_chain_rpc::TypedTransaction,
         RpcEthereumClient<
             RpcOperations<
-                hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>,
+                hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpRequestor, SimpleJsonRpcRetryPolicy>,
+                DefaultHttpRequestor,
             >,
         >,
         SafePayloadGenerator,
@@ -145,10 +145,10 @@ pub struct HoprChain<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::De
     indexer_cfg: IndexerConfig,
     indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
     db: T,
-    chain_actions: ChainActions<T>,
+    hopr_chain_actions: ChainActions<T>,
     action_queue: ActionQueueType<T>,
     action_state: Arc<IndexerActionTracker>,
-    rpc_operations: RpcOperations<JsonRpcClient>,
+    rpc_operations: RpcOperations<JsonRpcClient, DefaultHttpRequestor>,
 }
 
 impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> HoprChain<T> {
@@ -187,6 +187,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             tx_polling_interval: Duration::from_millis(chain_config.tx_polling_interval),
             finality: chain_config.confirmations,
             max_block_range_fetch_size: chain_config.max_block_range,
+            ..Default::default()
         };
 
         // TODO: extract this from the global config type
@@ -197,15 +198,18 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
         // --- Configs done ---
 
+        let requestor = DefaultHttpRequestor::new(rpc_http_config);
+
         // Build JSON RPC client
         let rpc_client = JsonRpcClient::new(
             &chain_config.chain.default_provider,
-            DefaultHttpPostRequestor::new(rpc_http_config),
+            requestor.clone(),
             rpc_http_retry_policy,
         );
 
         // Build RPC operations
-        let rpc_operations = RpcOperations::new(rpc_client, &me_onchain, rpc_cfg).expect("failed to initialize RPC");
+        let rpc_operations =
+            RpcOperations::new(rpc_client, requestor, &me_onchain, rpc_cfg).expect("failed to initialize RPC");
 
         // Build the Ethereum Transaction Executor that uses RpcOperations as backend
         let ethereum_tx_executor = EthereumTransactionExecutor::new(
@@ -225,7 +229,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         let action_sender = action_queue.new_sender();
 
         // Instantiate Chain Actions
-        let chain_actions = ChainActions::new(&me_onchain, db.clone(), action_sender);
+        let hopr_chain_actions = ChainActions::new(&me_onchain, db.clone(), action_sender);
 
         Self {
             me_onchain,
@@ -234,7 +238,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             indexer_cfg,
             indexer_events_tx,
             db,
-            chain_actions,
+            hopr_chain_actions,
             action_queue,
             action_state,
             rpc_operations,
@@ -319,14 +323,14 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 
     pub fn actions_ref(&self) -> &ChainActions<T> {
-        &self.chain_actions
+        &self.hopr_chain_actions
     }
 
     pub fn actions_mut_ref(&mut self) -> &mut ChainActions<T> {
-        &mut self.chain_actions
+        &mut self.hopr_chain_actions
     }
 
-    pub fn rpc(&self) -> &RpcOperations<JsonRpcClient> {
+    pub fn rpc(&self) -> &RpcOperations<JsonRpcClient, DefaultHttpRequestor> {
         &self.rpc_operations
     }
 
@@ -344,5 +348,13 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
     pub async fn get_eligibility_status(&self) -> errors::Result<bool> {
         Ok(self.rpc_operations.get_eligibility_status(self.me_onchain()).await?)
+    }
+
+    pub async fn get_minimum_winning_probability(&self) -> errors::Result<f64> {
+        Ok(self.rpc_operations.get_minimum_network_winning_probability().await?)
+    }
+
+    pub async fn get_minimum_ticket_price(&self) -> errors::Result<Balance> {
+        Ok(self.rpc_operations.get_minimum_network_ticket_price().await?)
     }
 }

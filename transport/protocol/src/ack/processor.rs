@@ -1,10 +1,10 @@
-use libp2p_identity::PeerId;
 use tracing::trace;
 
 use hopr_crypto_types::prelude::*;
 pub use hopr_db_api::protocol::AckResult;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
+use hopr_transport_identity::PeerId;
 
 use crate::errors::{ProtocolError, Result};
 

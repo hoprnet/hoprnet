@@ -1,7 +1,5 @@
 [workspace]
 
-exclude = ["vendor/cargo/scale-info-2.10.0"]
-
 resolver = "2"
 
 members = [
@@ -25,7 +23,6 @@ members = [
   "db/sql",
   "ethereum/bindings",
   "hopli",
-  "hopr-socks/hopr-socks-server",
   "hopr/hopr-lib",
   "hoprd/db/api",
   "hoprd/db/migration",
@@ -39,6 +36,8 @@ members = [
   "misc/metrics",
   "misc/platform",
   "transport/api",
+  "transport/identity",
+  "transport/mixer",
   "transport/network",
   "transport/p2p",
   "transport/protocol",
@@ -47,39 +46,43 @@ members = [
 
 [workspace.dependencies]
 aes = "0.8"
-anyhow = "1.0.93"
+anyhow = "1.0.95"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
-async-broadcast = "0.7.1"
 async-channel = "2.3.1"
 async-lock = "3.4.0"
 async-signal = "0.2.8"
 async-std = { version = "1.13.0", features = ["attributes", "unstable"] }
-async-std-resolver = { version = "0.24.1" }
+async-std-resolver = { version = "0.24.2" }
 async-stream = "0.3.6"
-async-trait = "0.1.83"
+async-trait = "0.1.85"
 atomic_enum = "0.3.0"
-axum = { version = "0.7.7", features = ["ws", "http2"] }
+axum = { version = "0.8.2", features = ["ws", "http2"] }
+axum-extra = { version = "0.11.0", features = ["query"] }
+backon = { version = "1.3.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
 bincode = "1.3.3"
 bitvec = "1.0.1"
 bloomfilter = { version = "2.0.0", features = ["serde"] }
-chrono = { version = "0.4.38", default-features = false }
-clap = { version = "4.5.20", features = ["derive", "env", "string"] }
-const_format = "0.2.33"
+bytesize = { version = "1.3.0", features = ["serde"] }
+cbor4ii = { version = "1.0.0" }
+chrono = { version = "0.4.39", default-features = false }
+clap = { version = "4.5.27", features = ["derive", "env", "string"] }
+const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.5.1", features = [
   "async_tokio",
   "async-std",
   "html_reports",
 ] }
-crossbeam-queue = "0.3.11"
+crossbeam-queue = "0.3.12"
 crossbeam-skiplist = "0.1.3"
+ctor = "0.2.9"
 ctr = "0.9"
 dashmap = "6.1.0"
 divan = "0.1.15"
-env_logger = "0.11.3"
+env_logger = "0.11.6"
 ethers = { version = "2.0.10", default-features = false }
 flume = "0.11.1"
 float-cmp = "0.10.0"
@@ -88,31 +91,30 @@ futures-concurrency = "7.6.2"
 futures-timer = "3.0.3"
 generic-array = { version = "0.14.7", features = ["zeroize"] }
 getrandom = "0.2.15"
-governor = { version = "0.7" }
+governor = { version = "0.8" }
 hex = "0.4.3"
 hex-literal = "0.4.1"
-hickory-resolver = "0.24.1"
+hickory-resolver = "0.24.2"
 http-types = "2.12.0"
 lazy_static = "1.4.0"
-libp2p = { version = "0.54.1" }
-libp2p-identity = { version = "0.2.9", features = [
+libp2p = { version = "0.55.0" }
+libp2p-identity = { version = "0.2.10", features = [
   "peerid",
   "ed25519",
   "rand",
 ] }
-libp2p-mplex = "0.42.0"
-mockall = "0.13.0"
-mockito = "1.4.0"
-moka = { version = "0.12.7", features = ["future"] }
+mockall = "0.13.1"
+mockito = "1.6.1"
+moka = { version = "0.12.10", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num_enum = "0.7.2"
-opentelemetry = { version = "0.24.0" }
-opentelemetry-otlp = { version = "0.17.0", default-features = false }
-opentelemetry_sdk = { version = "0.24.0" }
-tracing-opentelemetry = { version = "0.25.0" }
+opentelemetry = { version = "0.27.1" }
+opentelemetry-otlp = { version = "0.27.0", default-features = false }
+opentelemetry_sdk = { version = "0.27.1" }
+tracing-opentelemetry = { version = "0.28.0" }
 parameterized = "2.0.0"
-petgraph = { version = "0.6.5", features = ["serde-1"] }
+petgraph = { version = "0.7.1", features = ["serde-1"] }
 primitive-types = { version = "0.12.2", features = [
   "serde",
 ] } # cannot be updated until the ethers-rs is replaced with alloy-rs
@@ -122,40 +124,40 @@ rand = "0.8.5"
 rand_distr = "0.4.3"
 rayon = "1.10.0"
 regex = "1.11.1"
-reqwest = { version = "0.12.9" }
+reqwest = { version = "0.12.12", features = ["json"] }
 ringbuffer = "0.15.0"
 rpassword = "7.3"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
-sea-orm = { version = "1.1.1", features = [
+sea-orm = { version = "1.1.4", features = [
   "sqlx-sqlite",
   "with-chrono",
   "debug-print",
 ] }
-sea-orm-cli = { version = "1.1.1", features = ["codegen"] }
-sea-orm-migration = { version = "1.1.1", features = [
+sea-orm-cli = { version = "1.1.4", features = ["codegen"] }
+sea-orm-migration = { version = "1.1.4", features = [
   "sqlx-sqlite",
   "with-chrono",
 ] }
-sea-query = { version = "0.32.0", default-features = false }
+sea-query = { version = "0.32.1", default-features = false }
 sea-query-binder = { version = "0.7.0", default-features = false, features = [
   "with-chrono",
   "sqlx-sqlite",
   "runtime-async-std-rustls",
 ] }
-semver = "1.0.23"
-serde = { version = "1.0.214", features = ["derive"] }
+semver = "1.0.25"
+serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11.14"
-serde_json = "1.0.132"
+serde_json = "1.0.137"
 serde_repr = "0.1.19"
-serde_with = { version = "3.11.0", features = ["base64"] }
+serde_with = { version = "3.12.0", features = ["base64"] }
 serde_yaml = { version = "0.9.33" }
-serial_test = "3.1.1"
+serial_test = "3.2.0"
 sha3 = "0.10"
 signal-hook = "0.3.17"
 smart-default = "0.7.1"
-socket2 = "0.5.7"
-sqlx = { version = "0.8.2", default-features = false, features = [
+socket2 = "0.5.8"
+sqlx = { version = "0.8.3", default-features = false, features = [
   "sqlite",
   "macros",
   "migrate",
@@ -163,19 +165,19 @@ sqlx = { version = "0.8.2", default-features = false, features = [
 strum = { version = "0.26.3", features = ["derive"] }
 surf = { version = "2.3.2" }
 surf-governor = { version = "0.2.0" }
-tempfile = "3.13.0"
-test-log = { version = "0.2.16", features = ["trace"] }
-thiserror = "1.0.68"
-tokio = { version = "1.41.0", features = [
+tempfile = "3.15.0"
+test-log = { version = "0.2.17", features = ["trace"] }
+thiserror = "2.0.11"
+tokio = { version = "1.43.0", features = [
   "rt-multi-thread",
   "macros",
   "tracing",
 ] }
-tokio-util = { version = "0.7.12", features = ["compat"] }
+tokio-util = { version = "0.7.13", features = ["compat"] }
 tokio-retry = "0.3.0"
-tracing = { version = "0.1.40" }
+tracing = { version = "0.1.41" }
 tracing-futures = { version = "0.2.5" }
-tracing-subscriber = { version = "0.3.18", features = [
+tracing-subscriber = { version = "0.3.19", features = [
   "env-filter",
   "fmt",
   "registry",
@@ -183,23 +185,21 @@ tracing-subscriber = { version = "0.3.18", features = [
 ] }
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.17.0"
-uuid = { version = "1.11.0" }
-validator = { version = "0.19.0", features = ["derive"] }
-vergen-gix = { version = "1.0.2", features = ["build"] }
+uuid = { version = "1.12.1" }
+url = { version = "2.5.2", features = ["serde"] }
+validator = { version = "0.20.0", features = ["derive"] }
+vergen-gix = { version = "1.0.6", features = ["build"] }
 void = "1.0.2"
 zeroize = { version = "1.8.1" }
 
-bindings = { path = "ethereum/bindings", default-features = false }
-chain-actions = { path = "chain/actions", default-features = false }
-chain-api = { path = "chain/api", default-features = false }
-chain-indexer = { path = "chain/indexer", default-features = false }
-chain-types = { path = "chain/types", default-features = false }
-core-network = { path = "transport/network", default-features = false }
-core-path = { path = "logic/path", default-features = false }
-hopr-transport-protocol = { path = "transport/protocol", default-features = false }
-hopr-transport = { path = "transport/api", default-features = false }
+
 hopr-async-runtime = { path = "common/async-runtime" }
+hopr-bindings = { path = "ethereum/bindings", default-features = false }
+hopr-chain-actions = { path = "chain/actions", default-features = false }
+hopr-chain-api = { path = "chain/api", default-features = false }
+hopr-chain-indexer = { path = "chain/indexer", default-features = false }
 hopr-chain-rpc = { path = "chain/rpc", default-features = false }
+hopr-chain-types = { path = "chain/types", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }
 hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = [
@@ -214,11 +214,17 @@ hopr-internal-types = { path = "common/internal-types", default-features = false
 hopr-lib = { path = "hopr/hopr-lib", default-features = false }
 hopr-metrics = { path = "misc/metrics", default-features = false }
 hopr-network-types = { path = "common/network-types", default-features = false }
+hopr-path = { path = "logic/path" }
 hopr-parallelize = { path = "common/parallelize" }
 hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 hopr-strategy = { path = "logic/strategy", default-features = false }
-hopr-transport-p2p = { path = "transport/p2p", default-features = false }
+hopr-transport = { path = "transport/api" }
+hopr-transport-identity = { path = "transport/identity" }
+hopr-transport-network = { path = "transport/network" }
+hopr-transport-mixer = { path = "transport/mixer" }
+hopr-transport-protocol = { path = "transport/protocol" }
+hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }

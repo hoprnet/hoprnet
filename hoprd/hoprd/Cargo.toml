@@ -15,7 +15,7 @@ default = [
   "prometheus",
   "telemetry",
   "explicit-path",
-  # "transport-quic", # TODO: re-enable this once properly tested
+  "transport-quic",
 ] # uses tokio by default because of axum
 prometheus = [
   "dep:hopr-metrics",
@@ -34,7 +34,6 @@ runtime-async-std = [
 runtime-tokio = [
   "dep:tokio",
   "dep:tokio-retry",
-  "tokio-util/compat",
   "hopr-lib/runtime-tokio",
   "hopr-network-types/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
@@ -57,7 +56,6 @@ prof = [
 
 [dependencies]
 anyhow = { workspace = true }
-async-broadcast = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }
 async-std = { workspace = true, features = [
@@ -66,7 +64,6 @@ async-std = { workspace = true, features = [
 ], optional = true }
 chrono = { workspace = true }
 clap = { workspace = true }
-const_format = { workspace = true }
 futures = { workspace = true }
 home = "0.5.9"
 lazy_static = { workspace = true, optional = true }
@@ -81,7 +78,6 @@ strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-retry = { workspace = true, optional = true }
-tokio-util = { workspace = true, optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "json"] }
 validator = { workspace = true }

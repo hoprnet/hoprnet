@@ -155,7 +155,7 @@ where
                 self.db.update_network_peer(peer_status).await?;
             }
         } else {
-            debug!("Adding '{peer}' from {origin} with multiaddresses {addrs:?}");
+            debug!(%peer, %origin, multiaddresses = ?addrs, "Adding peer to the store");
 
             self.db
                 .add_network_peer(
@@ -321,7 +321,7 @@ where
                 if let Some(ignore_start) = v.ignored {
                     let should_be_ignored = ignore_start
                         .checked_add(self.cfg.ignore_timeframe)
-                        .map_or(false, |v| v > threshold);
+                        .is_some_and(|v| v > threshold);
 
                     if should_be_ignored {
                         return None;

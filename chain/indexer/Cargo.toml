@@ -1,5 +1,5 @@
 [package]
-name = "chain-indexer"
+name = "hopr-chain-indexer"
 version = "0.6.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -35,12 +35,11 @@ futures = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = { workspace = true }
 smart-default = { workspace = true }
-sea-orm = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-bindings = { workspace = true }
-chain-types = { workspace = true }
+hopr-bindings = { workspace = true }
+hopr-chain-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-chain-rpc = { workspace = true }
 hopr-crypto-types = { workspace = true }

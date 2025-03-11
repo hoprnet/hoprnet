@@ -27,13 +27,14 @@ jobs:
     if: github.event.pull_request.draft == false
     env:
       needs_nix_setup: false
+      CI: "true"
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@v29
+        uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -46,7 +47,8 @@ jobs:
           USER: runner
 
       - name: Run unit tests
-        run: nix build -L .#hopr-test
+        run: |
+          nix build .#hopr-test
 
   tests-unit-nightly:
     runs-on: self-hosted-hoprnet-bigger
@@ -54,6 +56,7 @@ jobs:
     if: github.event.pull_request.draft == false
     env:
       needs_nix_setup: false
+      CI: "true"
     steps:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -68,7 +71,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@v29
+        uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -80,8 +83,9 @@ jobs:
         env:
           USER: runner
 
-      - name: Run unit tests
-        run: nix build -L .#hopr-test-nightly
+      - name: Run unit tests nightly
+        run: |
+          nix build .#hopr-test-nightly
 
   tests-smart-contracts:
     runs-on: self-hosted-hoprnet-bigger
@@ -103,7 +107,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@v27
+        uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -141,7 +145,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@v29
+        uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -157,12 +161,12 @@ jobs:
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
-          mkdir -p /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/smoke_test_snapshot/snapshot /tmp/hopr-smoke-test/test_websocket_api/snapshot --recursive
+          mkdir -p /tmp/hopr-localcluster/
+          gcloud storage rsync gs://hoprnet-test-artifacts/snapshot /tmp/hopr-localcluster/snapshot --recursive
         continue-on-error: true
 
       - name: Check snapshot
-        run: ls -lR /tmp/hopr-smoke-test/test_websocket_api/snapshot || echo "no snapshot found"
+        run: ls -lR /tmp/hopr-localcluster/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests websocket
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
@@ -171,8 +175,8 @@ jobs:
         uses: "google-github-actions/upload-cloud-storage@v2"
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
-          path: /tmp/hopr-smoke-test/test_websocket_api/snapshot
-          destination: hoprnet-test-artifacts/smoke_test_snapshot
+          path: /tmp/hopr-localcluster/snapshot
+          destination: hoprnet-test-artifacts/
           gzip: false
 
       - name: Compress test logs
@@ -230,7 +234,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@v29
+        uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -246,12 +250,12 @@ jobs:
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
-          mkdir -p /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
-          gcloud storage rsync gs://hoprnet-test-artifacts/smoke_test_snapshot/snapshot /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot --recursive
+          mkdir -p /tmp/hopr-localcluster/snapshot
+          gcloud storage rsync gs://hoprnet-test-artifacts/snapshot /tmp/hopr-localcluster/snapshot --recursive
         continue-on-error: true
 
       - name: Check snapshot
-        run: ls -lR /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot || echo "no snapshot found"
+        run: ls -lR /tmp/hopr-localcluster/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests ${{ matrix.suite }}
         run: nix develop .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
@@ -260,8 +264,8 @@ jobs:
         uses: "google-github-actions/upload-cloud-storage@v2"
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
-          path: /tmp/hopr-smoke-test/test_${{ matrix.suite }}/snapshot
-          destination: hoprnet-test-artifacts/smoke_test_snapshot
+          path: /tmp/hopr-localcluster/snapshot
+          destination: hoprnet-test-artifacts/
           gzip: false
 
       - name: Compress test logs

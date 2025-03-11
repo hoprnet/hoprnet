@@ -1,11 +1,6 @@
 use async_trait::async_trait;
-use chain_actions::channels::ChannelActions;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use hopr_db_sql::accounts::HoprDbAccountOperations;
-use hopr_db_sql::channels::HoprDbChannelOperations;
-use hopr_internal_types::prelude::*;
-use hopr_platform::time::native::current_time;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::{Display, Formatter};
@@ -13,6 +8,12 @@ use std::ops::Sub;
 use std::time::Duration;
 use tracing::{debug, error, info};
 use validator::Validate;
+
+use hopr_chain_actions::channels::ChannelActions;
+use hopr_db_sql::accounts::HoprDbAccountOperations;
+use hopr_db_sql::channels::HoprDbChannelOperations;
+use hopr_internal_types::prelude::*;
+use hopr_platform::time::native::current_time;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleCounter;
@@ -29,6 +30,10 @@ lazy_static::lazy_static! {
     .unwrap();
 }
 
+#[inline]
+fn default_max_closure_overdue() -> Duration {
+    Duration::from_secs(300)
+}
 /// Contains configuration of the [ClosureFinalizerStrategy].
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
@@ -36,9 +41,10 @@ pub struct ClosureFinalizerStrategyConfig {
     /// Do not attempt to finalize closure of channels that have
     /// been overdue for closure for more than this period.
     ///
-    /// Default is 3600 seconds.
+    /// Default is 300 seconds.
     #[serde_as(as = "DurationSeconds<u64>")]
-    #[default(Duration::from_secs(3600))]
+    #[serde(default = "default_max_closure_overdue")]
+    #[default(default_max_closure_overdue())]
     pub max_closure_overdue: Duration,
 }
 
@@ -51,7 +57,7 @@ where
 {
     db: Db,
     cfg: ClosureFinalizerStrategyConfig,
-    chain_actions: A,
+    hopr_chain_actions: A,
 }
 
 impl<Db, A> ClosureFinalizerStrategy<Db, A>
@@ -60,8 +66,12 @@ where
     A: ChannelActions,
 {
     /// Constructs the strategy.
-    pub fn new(cfg: ClosureFinalizerStrategyConfig, db: Db, chain_actions: A) -> Self {
-        Self { db, chain_actions, cfg }
+    pub fn new(cfg: ClosureFinalizerStrategyConfig, db: Db, hopr_chain_actions: A) -> Self {
+        Self {
+            db,
+            hopr_chain_actions,
+            cfg,
+        }
     }
 }
 
@@ -100,7 +110,7 @@ where
                 let channel_cpy = *channel;
                 info!(channel = %channel_cpy, "channel closure finalizer: finalizing closure");
                 match self
-                    .chain_actions
+                    .hopr_chain_actions
                     .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
                     .await
                 {
@@ -126,12 +136,12 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use chain_types::actions::Action;
-    use chain_types::chain_events::ChainEventType;
     use futures::future::ok;
     use futures::FutureExt;
     use hex_literal::hex;
+    use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
+    use hopr_chain_types::actions::Action;
+    use hopr_chain_types::chain_events::ChainEventType;
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::db::HoprDb;
@@ -158,14 +168,14 @@ mod tests {
         ChannelAct { }
         #[async_trait]
         impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: Balance) -> chain_actions::errors::Result<PendingAction>;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> chain_actions::errors::Result<PendingAction>;
+            async fn open_channel(&self, destination: Address, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
             async fn close_channel(
                 &self,
                 counterparty: Address,
                 direction: ChannelDirection,
                 redeem_before_close: bool,
-            ) -> chain_actions::errors::Result<PendingAction>;
+            ) -> hopr_chain_actions::errors::Result<PendingAction>;
         }
     }
 

@@ -51,10 +51,11 @@ use utoipa::{Modify, OpenApi};
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;
 
+use hopr_lib::{errors::HoprLibError, Address, Hopr};
+use hopr_network_types::prelude::IpProtocol;
+
 use crate::config::Auth;
 use crate::session::StoredSessionEntry;
-use hopr_lib::{errors::HoprLibError, Address, ApplicationData, Hopr};
-use hopr_network_types::prelude::IpProtocol;
 
 pub(crate) const BASE_PATH: &str = "/api/v3";
 
@@ -77,9 +78,7 @@ pub(crate) struct InternalState {
     pub hopr: Arc<Hopr>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
-    pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
     pub websocket_active_count: Arc<AtomicU16>,
-    pub msg_encoder: Option<MessageEncoder>,
     pub open_listeners: ListenerJoinHandles,
     pub default_listen_host: std::net::SocketAddr,
 }
@@ -198,8 +197,6 @@ pub struct RestApiParameters {
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub session_listener_sockets: ListenerJoinHandles,
-    pub websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
-    pub msg_encoder: Option<MessageEncoder>,
     pub default_session_listen_host: std::net::SocketAddr,
 }
 
@@ -213,8 +210,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         hoprd_db,
         inbox,
         session_listener_sockets,
-        websocket_rx,
-        msg_encoder,
         default_session_listen_host,
     } = params;
 
@@ -225,8 +220,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         inbox,
         hoprd_db,
         session_listener_sockets,
-        websocket_rx,
-        msg_encoder,
         default_session_listen_host,
     )
     .await;
@@ -241,8 +234,6 @@ async fn build_api(
     inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     open_listeners: ListenerJoinHandles,
-    websocket_rx: async_broadcast::InactiveReceiver<ApplicationData>,
-    msg_encoder: Option<MessageEncoder>,
     default_listen_host: std::net::SocketAddr,
 ) -> Router {
     let state = AppState { hopr };
@@ -250,24 +241,20 @@ async fn build_api(
         auth: Arc::new(cfg.auth.clone()),
         hoprd_cfg,
         hopr: state.hopr.clone(),
-        msg_encoder,
         inbox,
         hoprd_db,
-        websocket_rx,
-        websocket_active_count: Arc::new(AtomicU16::new(0)),
         open_listeners,
         default_listen_host,
+        websocket_active_count: Arc::new(AtomicU16::new(0)),
     };
 
     Router::new()
-        .nest(
-            "/",
+        .merge(
             Router::new()
                 .merge(SwaggerUi::new("/swagger-ui").url("/api-docs2/openapi.json", ApiDoc::openapi()))
                 .merge(Scalar::with_url("/scalar", ApiDoc::openapi())),
         )
-        .nest(
-            "/",
+        .merge(
             Router::new()
                 .route("/startedz", get(checks::startedz))
                 .route("/readyz", get(checks::readyz))
@@ -281,24 +268,24 @@ async fn build_api(
                 .route("/aliases", get(alias::aliases))
                 .route("/aliases", post(alias::set_alias))
                 .route("/aliases", delete(alias::clear_aliases))
-                .route("/aliases/:alias", get(alias::get_alias))
-                .route("/aliases/:alias", delete(alias::delete_alias))
+                .route("/aliases/{alias}", get(alias::get_alias))
+                .route("/aliases/{alias}", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
                 .route("/account/withdraw", post(account::withdraw))
-                .route("/peers/:destination", get(peers::show_peer_info))
+                .route("/peers/{destination}", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
-                .route("/channels/:channelId", get(channels::show_channel))
-                .route("/channels/:channelId/tickets", get(tickets::show_channel_tickets))
-                .route("/channels/:channelId", delete(channels::close_channel))
-                .route("/channels/:channelId/fund", post(channels::fund_channel))
+                .route("/channels/{channelId}", get(channels::show_channel))
+                .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets))
+                .route("/channels/{channelId}", delete(channels::close_channel))
+                .route("/channels/{channelId}/fund", post(channels::fund_channel))
                 .route(
-                    "/channels/:channelId/tickets/redeem",
+                    "/channels/{channelId}/tickets/redeem",
                     post(tickets::redeem_tickets_in_channel),
                 )
                 .route(
-                    "/channels/:channelId/tickets/aggregate",
+                    "/channels/{channelId}/tickets/aggregate",
                     post(tickets::aggregate_tickets_in_channel),
                 )
                 .route("/tickets", get(tickets::show_all_tickets))
@@ -312,7 +299,6 @@ async fn build_api(
                 .route("/messages/peek", post(messages::peek))
                 .route("/messages/peek-all", post(messages::peek_all))
                 .route("/messages/size", get(messages::size))
-                .route("/messages/websocket", get(messages::websocket))
                 .route("/network/price", get(network::price))
                 .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
@@ -322,11 +308,11 @@ async fn build_api(
                 .route("/node/entryNodes", get(node::entry_nodes))
                 .route("/node/metrics", get(node::metrics))
                 .route("/node/graph", get(node::channel_graph))
-                .route("/peers/:destination/ping", post(peers::ping_peer))
+                .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/websocket", get(session::websocket))
-                .route("/session/:protocol", post(session::create_client))
-                .route("/session/:protocol", get(session::list_clients))
-                .route("/session/:protocol/:ip/:port", delete(session::close_client))
+                .route("/session/{protocol}", post(session::create_client))
+                .route("/session/{protocol}", get(session::list_clients))
+                .route("/session/{protocol}/{ip}/{port}", delete(session::close_client))
                 .with_state(inner_state.clone().into())
                 .layer(middleware::from_fn_with_state(
                     inner_state.clone(),
@@ -398,6 +384,7 @@ enum ApiErrorStatus {
     DatabaseError,
     UnsupportedFeature,
     Timeout,
+    PingError(String),
     Unauthorized,
     TooManyOpenWebsocketConnections,
     InvalidQuality,

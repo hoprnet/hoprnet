@@ -90,9 +90,6 @@ hopr:
         # The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
         # This condition is independent of `aggregation_threshold`.
         unrealized_balance_ratio: 0.9
-        # Maximum time to wait for the ticket aggregation to complete.
-        # This does not affect the runtime of the strategy `on_acknowledged_ticket` event processing.
-        aggregation_timeout: 60
         # If set, the strategy will automatically aggregate tickets in channel that has transitioned
         # to the `PendingToClose` state. This happens regardless if `aggregation_threshold`
         # or `unrealized_balance_ratio` thresholds are met on that channel.
@@ -108,6 +105,10 @@ hopr:
         #
         # If set, the strategy will redeem only aggregated tickets.
         redeem_only_aggregated: true
+        # If set, all tickets will be redeemed on channel closure.
+        redeem_all_on_close: true
+        # Sets the minimum value of a ticket to be able to redeem it.
+        minimum_redeem_ticket_value: "90000000000000000 HOPR"
         #
         ############################################
         #
@@ -171,13 +172,13 @@ hopr:
         #
         # Does not attempt to finalize closure of channels that have been overdue for closure for more than
         # this number of seconds.
-        # max_closure_overdue: 3600
+        max_closure_overdue: 300
 
   # Configuration of the heartbeat mechanism for probing
   # other nodes in the HOPR network.
   heartbeat:
     # The maximum number of concurrent heartbeat probes
-    max_parallel_probes: 14
+    max_parallel_probes: 25
     # Interval in which the heartbeat is triggered in seconds
     interval: 60
     # The time interval for which to consider peer heartbeat renewal in seconds
@@ -201,7 +202,7 @@ hopr:
     # Size of the quality moving average window.
     quality_avg_window_size: 25
     # Indicates how long (in seconds) a node is considered "ignored"
-    ignore_timeframe: 240
+    ignore_timeframe: 120
     # Backoff exponent when probing nodes
     backoff_exponent: 1.5
     # Minimum backoff (in seconds) when probing nodes
@@ -224,7 +225,7 @@ hopr:
     # Heartbeat sub-protocol configuration
     heartbeat:
       # Timeout in seconds
-      timeout: 15
+      timeout: 6
     # Message sub-protocol configuration
     ticket_aggregation:
       # Timeout in seconds
@@ -304,14 +305,19 @@ inbox:
   excluded_tags: [0]
 # Session Entry/Exit IP forwarding configuration for this node
 # This applies whenever the node is an Exit node of a Session.
-# session_ip_forwarding:
-#
-# List of IP address and port tuples (written as e.g.: "127.0.0.1:8080") which are allowed
-# to be targets of incoming Sessions.
-# If the value is not set, all targets are allowed (default).
-# For targets specifying a DNS name, the DNS resolution is performed first before the list is matched.
-# Production configuration should always use this allowlist, e.g.: target_allow_list: ["127.0.0.1:8080"]
-# target_allow_list:
+session_ip_forwarding:
+  #
+  # Indicates whether the allowlist in `target_allow_list` should be used.
+  # If set to `false`, all Session targets will be allowed.
+  use_target_allow_list: true
+  #
+  # List of IP address and port tuples (written as e.g.: "127.0.0.1:8080") which are allowed
+  # to be targets of incoming Sessions.
+  # This has effect only if `use_target_allow_list` is `true`.
+  # If left empty (default), the node will deny any Session target and will effectively not act as an Exit node.
+  # For targets specifying a DNS name, the DNS resolution is performed first before the list is matched.
+  # Production configuration should always use this allowlist, e.g.: target_allow_list: ["127.0.0.1:8080"]
+  target_allow_list: []
 #
 # If the target is on TCP protocol, the Exit node can try to reach it this number of times.
 # max_tcp_target_retries: 10
