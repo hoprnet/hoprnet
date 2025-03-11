@@ -255,7 +255,7 @@ class Node:
         output_strings.append(
             f"\t\tRest API:\thttp://{self.host_addr}:{self.api_port}/scalar | http://{self.host_addr}:{self.api_port}/swagger-ui/index.html"
         )
-        output_strings.append(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}", end="\n\n")
+        output_strings.append(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}\n\n")
 
         return "\n".join(output_strings)
 
