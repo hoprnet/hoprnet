@@ -52,10 +52,10 @@ on:
       topology:
         type: choice
         options:
+          - receiver
           - many2many
           - sender
           - relayer
-          - receiver
         required: true
         description: 'Nodes channel topology'
       workload:
