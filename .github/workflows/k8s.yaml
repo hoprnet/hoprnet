@@ -11,7 +11,7 @@ on:
       - unlabeled
 
 env:
-  GITOPS_BRANCH: master
+  GITOPS_BRANCH: main
 jobs:
   deploy:
     name: deploy
