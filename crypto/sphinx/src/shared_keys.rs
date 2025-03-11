@@ -1,4 +1,3 @@
-use blake2::Blake2s256;
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
 use hopr_crypto_types::prelude::*;
@@ -128,8 +127,8 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         })
     }
 
-    /// Calculates the forward transformation for the given the local private key.
-    /// The `public_group_element` is a precomputed group element associated to the private key for efficiency.
+    /// Calculates the forward transformation given the local private key.
+    /// The `public_group_element` is a precomputed group element associated with the private key for efficiency.
     pub fn forward_transform(
         alpha: &Alpha<G::AlphaLen>,
         private_scalar: &E,

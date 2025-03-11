@@ -1,8 +1,8 @@
-use blake2::Blake2s256;
 use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
 use hopr_crypto_random::random_fill;
+use hopr_crypto_types::crypto_traits::{Digest, Output};
 use hopr_crypto_types::prelude::CryptoError::{CalculationError, InvalidParameterSize};
 use hopr_crypto_types::prelude::*;
 use k256::Secp256k1;
@@ -16,8 +16,8 @@ const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
 /// Size of the nonce in the Ping sub protocol
 pub const PING_PONG_NONCE_SIZE: usize = 16;
 
-/// Helper function to expand an already cryptographically strong key material using the HKDF expand function
-/// The size of the secret must be at least the size of the output of the underlying hash function, which in this
+/// Helper function to expand an already cryptographically strong key material using the HKDF expand function.
+/// The size of the secret must be at least the size of the underlying hash function, which in this
 /// case is Blake2s256, meaning the `secret` size must be at least 32 bytes.
 fn hkdf_expand_from_prk<L: ArrayLength<u8>>(secret: &SecretKey, tag: &[u8]) -> GenericArray<u8, L> {
     // Create HKDF instance
@@ -32,18 +32,16 @@ fn hkdf_expand_from_prk<L: ArrayLength<u8>>(secret: &SecretKey, tag: &[u8]) -> G
 
 /// Derives a ping challenge (if no challenge is given) or a pong response to a ping challenge.
 pub fn derive_ping_pong(challenge: Option<&[u8]>) -> Box<[u8]> {
-    let mut ret = [0u8; PING_PONG_NONCE_SIZE];
+    let mut ret = Output::<Blake2s256>::default();
     match challenge {
         None => random_fill(&mut ret),
         Some(chal) => {
-            let mut digest = SimpleDigest::default();
+            let mut digest = Blake2s256::default();
             digest.update(chal);
-            // Finalize requires enough space for the hash value, so this needs an extra copy
-            let hash = digest.finalize();
-            ret.copy_from_slice(&hash[0..PING_PONG_NONCE_SIZE]);
+            digest.finalize_into(&mut ret);
         }
     }
-    ret.into()
+    ret[..PING_PONG_NONCE_SIZE].into()
 }
 
 /// Derives the packet tag used during packet construction by expanding the given secret.
@@ -93,7 +91,7 @@ pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit>(
 /// The `tag` parameter will be used as an additional Domain Separation Tag.
 pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> hopr_crypto_types::errors::Result<HalfKey> {
     if secret.len() >= SecretKey::LENGTH {
-        let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Sha3_256>>(
+        let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<Sha3_256>>(
             &[secret],
             &[b"secp256k1_XMD:SHA3-256_SSWU_RO_", tag.as_bytes()],
         )
@@ -163,10 +161,8 @@ mod tests {
 
         let params = derive_vrf_parameters(&message, &keypair, dst)?;
 
-        let cap_b = Secp256k1::hash_from_bytes::<ExpandMsgXmd<sha3::Keccak256>>(
-            &[&pub_key.to_address().as_ref(), &message],
-            &[dst],
-        )?;
+        let cap_b =
+            Secp256k1::hash_from_bytes::<ExpandMsgXmd<Keccak256>>(&[&pub_key.to_address().as_ref(), &message], &[dst])?;
 
         assert_eq!(
             params.get_s_b_witness(&keypair.public().to_address(), &message, dst)?,
@@ -178,7 +174,7 @@ mod tests {
 
         let r_v: ProjectivePoint<Secp256k1> = cap_b * params.s - params.V.clone().into_projective_point() * params.h;
 
-        let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<sha3::Keccak256>>(
+        let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<Keccak256>>(
             &[
                 &pub_key.to_address().as_ref(),
                 &params.V.as_uncompressed().as_bytes()[1..],

@@ -1,7 +1,9 @@
+use cipher::crypto_common::{Output, OutputSizeUser};
 use curve25519_dalek::{
     edwards::{CompressedEdwardsY, EdwardsPoint},
     montgomery::MontgomeryPoint,
 };
+use digest::Digest;
 use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
 use hopr_primitive_types::errors::GeneralError::ParseError;
 use hopr_primitive_types::prelude::*;
@@ -41,10 +43,11 @@ use crate::{
         Result,
     },
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    primitives::{DigestLike, EthDigest},
 };
 
 pub use libp2p_identity::PeerId;
+use sha3::Keccak256;
+use typenum::Unsigned;
 
 /// Extend support for arbitrary array sizes in serde
 ///
@@ -536,11 +539,11 @@ impl Hash {
     /// Takes all the byte slices and computes hash of their concatenated value.
     /// Uses the Keccak256 digest.
     pub fn create(inputs: &[&[u8]]) -> Self {
-        let mut hash = EthDigest::default();
+        let mut output = Output::<Keccak256>::default();
+        let mut hash = Keccak256::default();
         inputs.iter().for_each(|v| hash.update(v));
-        let mut ret = Self([0u8; Self::SIZE]);
-        hash.finalize_into(&mut ret.0);
-        ret
+        hash.finalize_into(&mut output);
+        Self(output.into())
     }
 }
 
@@ -560,7 +563,7 @@ impl TryFrom<&[u8]> for Hash {
 
 impl BytesRepresentable for Hash {
     /// Size of the digest, which is [`EthDigest::SIZE`].
-    const SIZE: usize = EthDigest::SIZE;
+    const SIZE: usize = <Keccak256 as OutputSizeUser>::OutputSize::USIZE;
 }
 
 impl From<[u8; Self::SIZE]> for Hash {
@@ -1061,12 +1064,8 @@ impl From<[u8; Self::SIZE]> for Response {
 }
 
 /// Represents an EdDSA signature using Ed25519 Edwards curve.
-// TODO: change this to OffchainSignature([u8; Self::SIZE]) in 3.0
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OffchainSignature {
-    #[serde(with = "arrays")]
-    signature: [u8; Self::SIZE],
-}
+pub struct OffchainSignature(#[serde(with = "arrays")] [u8; Self::SIZE]);
 
 impl OffchainSignature {
     /// Sign the given message using the [OffchainKeypair].
@@ -1085,7 +1084,7 @@ impl OffchainSignature {
 
     /// Verify this signature of the given message and [OffchainPublicKey].
     pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
-        let sgn = ed25519_dalek::Signature::from_slice(&self.signature).expect("corrupted OffchainSignature");
+        let sgn = ed25519_dalek::Signature::from_slice(&self.0).expect("corrupted OffchainSignature");
         let pk = ed25519_dalek::VerifyingKey::from_bytes(public_key.0.as_bytes()).unwrap();
         pk.verify_strict(msg, &sgn).is_ok()
     }
@@ -1093,7 +1092,7 @@ impl OffchainSignature {
 
 impl AsRef<[u8]> for OffchainSignature {
     fn as_ref(&self) -> &[u8] {
-        &self.signature
+        &self.0
     }
 }
 
@@ -1114,10 +1113,8 @@ impl BytesRepresentable for OffchainSignature {
 
 impl From<ed25519_dalek::Signature> for OffchainSignature {
     fn from(value: ed25519_dalek::Signature) -> Self {
-        let mut ret = Self {
-            signature: [0u8; Self::SIZE],
-        };
-        ret.signature.copy_from_slice(value.to_bytes().as_ref());
+        let mut ret = Self([0u8; Self::SIZE]);
+        ret.0.copy_from_slice(value.to_bytes().as_ref());
         ret
     }
 }

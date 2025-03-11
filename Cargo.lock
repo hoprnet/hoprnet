@@ -4252,7 +4252,6 @@ name = "hopr-crypto-sphinx"
 version = "0.7.0"
 dependencies = [
  "anyhow",
- "blake2",
  "curve25519-dalek",
  "elliptic-curve",
  "generic-array",
@@ -4263,7 +4262,6 @@ dependencies = [
  "hopr-primitive-types",
  "k256",
  "parameterized",
- "sha3",
  "subtle",
  "typenum",
 ]
@@ -4272,11 +4270,13 @@ dependencies = [
 name = "hopr-crypto-types"
 version = "0.2.0"
 dependencies = [
+ "aes 0.8.4",
  "anyhow",
  "blake2",
  "chacha20",
  "cipher 0.4.4",
  "crypto_box",
+ "ctr 0.9.2",
  "curve25519-dalek",
  "digest 0.10.7",
  "ed25519-dalek",
@@ -4978,9 +4978,7 @@ dependencies = [
 name = "hoprd-keypair"
 version = "0.4.0"
 dependencies = [
- "aes 0.8.4",
  "anyhow",
- "ctr 0.9.2",
  "hex",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -4989,7 +4987,6 @@ dependencies = [
  "scrypt 0.11.0",
  "serde",
  "serde_json",
- "sha3",
  "tempfile",
  "thiserror 2.0.11",
  "tracing",
