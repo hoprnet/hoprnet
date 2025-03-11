@@ -19,7 +19,7 @@ pub trait HoprDbProtocolOperations {
         -> crate::errors::Result<AckResult>;
 
     /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
-    async fn get_network_winning_probability(&self) -> crate::errors::Result<f64>;
+    async fn get_network_winning_probability(&self) -> crate::errors::Result<WinningProbability>;
 
     /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
     async fn get_network_ticket_price(&self) -> crate::errors::Result<Balance>;
@@ -30,7 +30,7 @@ pub trait HoprDbProtocolOperations {
         data: Box<[u8]>,
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData, DbError>;
 
@@ -42,7 +42,7 @@ pub trait HoprDbProtocolOperations {
         me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> crate::errors::Result<TransportPacketWithChainData>;
 }

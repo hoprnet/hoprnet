@@ -52,7 +52,7 @@ pub struct TicketSelector {
     pub index: TicketIndexSelector,
     /// If given, the tickets are further restricted to the ones with a winning probability
     /// in this range.
-    pub win_prob: (Bound<EncodedWinProb>, Bound<EncodedWinProb>),
+    pub win_prob: (Bound<WinningProbability>, Bound<WinningProbability>),
     /// If given, the tickets are further restricted to the ones with an amount
     /// in this range.
     pub amount: (Bound<Balance>, Bound<Balance>),
@@ -182,7 +182,7 @@ impl TicketSelector {
     }
 
     /// Returns this instance with a winning probability range bounds set.
-    pub fn with_winning_probability<T: RangeBounds<EncodedWinProb>>(mut self, range: T) -> Self {
+    pub fn with_winning_probability<T: RangeBounds<WinningProbability>>(mut self, range: T) -> Self {
         self.win_prob = (range.start_bound().cloned(), range.end_bound().cloned());
         self
     }

@@ -520,7 +520,11 @@ where
         let packet_cfg = PacketInteractionConfig::new(
             &self.me,
             me_onchain,
-            self.cfg.protocol.outgoing_ticket_winning_prob,
+            self.cfg
+                .protocol
+                .outgoing_ticket_winning_prob
+                .map(WinningProbability::try_from)
+                .transpose()?,
             self.cfg.protocol.outgoing_ticket_price,
         );
 

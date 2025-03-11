@@ -660,7 +660,7 @@ impl Hopr {
         let network_min_win_prob = self.hopr_chain_api.get_minimum_winning_probability().await?;
         let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
         if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
-            && configured_win_prob.is_some_and(|c| c < network_min_win_prob)
+            && configured_win_prob.is_some_and(|c| c < network_min_win_prob.as_f64())
         {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
                 "configured outgoing ticket winning probability is lower than the network minimum winning probability: {configured_win_prob:?} < {network_min_win_prob}"
@@ -1206,7 +1206,7 @@ impl Hopr {
     }
 
     /// Get minimum incoming ticket winning probability
-    pub async fn get_minimum_incoming_ticket_win_probability(&self) -> errors::Result<f64> {
+    pub async fn get_minimum_incoming_ticket_win_probability(&self) -> errors::Result<WinningProbability> {
         Ok(self
             .db
             .get_indexer_data(None)

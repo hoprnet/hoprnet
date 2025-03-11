@@ -146,7 +146,7 @@ impl HoprDbProtocolOperations for HoprDb {
         Ok(result.into())
     }
 
-    async fn get_network_winning_probability(&self) -> Result<f64> {
+    async fn get_network_winning_probability(&self) -> Result<WinningProbability> {
         Ok(self
             .get_indexer_data(None)
             .await
@@ -166,7 +166,7 @@ impl HoprDbProtocolOperations for HoprDb {
         data: Box<[u8]>,
         me: ChainKeypair,
         path: Vec<OffchainPublicKey>,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData> {
         let myself = self.clone();
@@ -258,7 +258,7 @@ impl HoprDbProtocolOperations for HoprDb {
         me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData> {
         let offchain_keypair = pkt_keypair.clone();
@@ -346,7 +346,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 .mul(U256::from(path_pos));
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_INCOMING_WIN_PROB.observe(ticket.win_prob());
+                            METRIC_INCOMING_WIN_PROB.observe(ticket.win_prob().as_f64());
 
                             // Here also the signature on the ticket gets validated,
                             // so afterward we are sure the source of the `channel`
@@ -469,7 +469,7 @@ impl HoprDb {
         me_onchain: Address,
         destination: Address,
         current_path_pos: u8,
-        winning_prob: f64,
+        winning_prob: WinningProbability,
         ticket_price: Balance,
     ) -> crate::errors::Result<TicketBuilder> {
         let channel = self
@@ -484,7 +484,7 @@ impl HoprDb {
             ticket_price
                 .amount()
                 .mul(U256::from(current_path_pos - 1))
-                .div_f64(winning_prob)
+                .div_f64(winning_prob.into())
                 .map_err(|e| {
                     DbSqlError::LogicalError(format!(
                         "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
