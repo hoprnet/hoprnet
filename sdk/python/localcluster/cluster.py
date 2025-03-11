@@ -183,7 +183,7 @@ class Cluster:
         await asyncio.gather(*tasks)
 
     async def links(self):
-        links_blocks = []
+        links_blocks = ["\n\n"]
         for node in self.nodes.values():
             links_blocks.append(await node.links())
 

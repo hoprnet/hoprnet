@@ -416,9 +416,7 @@
               };
             };
           };
-
-          # bash scripts/run-local-anvil.sh -l /tmp/hopr-localcluster/anvil/anvil.log -c /tmp/hopr-localcluster/anvil/anvil.cfg -p 3000 -ds /tmp/hopr-localcluster/anvil/anvil.state.json
-
+          
           dockerImageUploadScript = image: pkgs.writeShellScriptBin "docker-image-upload" ''
             set -eu
             OCI_ARCHIVE="$(nix build --no-link --print-out-paths ${image})"
