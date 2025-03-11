@@ -17,5 +17,5 @@
     "enabled": true
   },
   "semanticCommits": "enabled",
-  "rangeStrategy": "auto"
+  "rangeStrategy": "bump"
 }
