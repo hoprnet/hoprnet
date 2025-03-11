@@ -1015,7 +1015,7 @@ impl HoprDbTicketOperations for HoprDb {
             })?;
 
         // Aggregated tickets always have 100% winning probability
-        if aggregated_ticket.win_prob() != WinningProbability::ALWAYS_WINNING {
+        if aggregated_ticket.win_prob() != WinningProbability::ALWAYS {
             return Err(DbSqlError::LogicalError("Aggregated tickets must have 100% win probability".into()).into());
         }
 
@@ -1224,7 +1224,7 @@ impl HoprDbTicketOperations for HoprDb {
             .index_offset(
                 (last_acked_ticket.verified_ticket().index - first_acked_ticket.verified_ticket().index + 1) as u32,
             )
-            .win_prob(WinningProbability::ALWAYS_WINNING) // Aggregated tickets have always 100% winning probability
+            .win_prob(WinningProbability::ALWAYS) // Aggregated tickets have always 100% winning probability
             .channel_epoch(channel_epoch)
             .challenge(first_acked_ticket.verified_ticket().challenge)
             .build_signed(me, &domain_separator)
