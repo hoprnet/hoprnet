@@ -340,10 +340,7 @@
               ./scripts/run-local-anvil.sh
               ./scripts/run-local-cluster.sh
               ./scripts/utils.sh
-              ./sdk/python
-              ./sdk/identities
-              ./target/debug/hopli
-              ./target/debug/hoprd
+              (fs.fileFilter (file: true) ./sdk)
               ./tests/requirements.txt
               ./Makefile
               (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
@@ -363,6 +360,8 @@
               findutils
               foundry-bin
               gnumake
+	            hoprd
+              hopli
               jq
               lsof
               plutoSrc
@@ -417,7 +416,8 @@
                 "/scripts/run-local-cluster.sh"
               ];
               ExposedPorts = {
-                "8545/tcp" = { };
+                "8545/tcp" = {};
+                "3011-3061" = {};
               };
             };
           };
