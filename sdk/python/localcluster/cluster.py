@@ -3,6 +3,7 @@ import os
 import shutil
 from pathlib import Path
 from subprocess import run
+from pyroute2 import NDB
 
 from . import utils
 from .constants import (
@@ -21,10 +22,12 @@ GLOBAL_TIMEOUT = 60
 
 
 class Cluster:
-    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path):
+    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path,
+                 docker_compose: bool = False):
         self.anvil_config = anvil_config
         self.protocol_config = protocol_config
         self.nodes: dict[str, Node] = {}
+        self.docker_compose = docker_compose
         index = 1
 
         for network_name, params in config["networks"].items():
@@ -34,7 +37,24 @@ class Cluster:
 
     def clean_up(self):
         logging.info(f"Tearing down the {self.size} nodes cluster")
-        [node.clean_up() for node in self.nodes.values()]
+
+        if self.docker_compose:
+            # delete all the bridges and tap interfaces before bringing down
+            # docker compose cluster
+            with NDB() as ndb:
+                for node in self.nodes.values():
+                    logging.info(f"Disable and delete bridge and tap interfaces for node {node.id}")
+                    with ndb.interfaces[node.bridge_interface] as br:
+                        br.set(state='down')
+                    with ndb.interfaces[node.tap_interface] as tap:
+                        tap.set(state='down')
+                    ndb.interfaces[node.bridge_interface].remove()
+                    ndb.interfaces[node.tap_interface].remove()
+
+            subprocess.run(["docker-compose", "-f", "../../../tests/network-simulation/compose.yaml", "down"], cwd=PWD)
+        else:
+            # just kill the individual nodes
+            [node.clean_up() for node in self.nodes.values()]
 
     def create_safes(self):
         logging.info("Creating safe and modules for all the ids, store them in args files")
@@ -45,7 +65,18 @@ class Cluster:
         logging.info("Setting up nodes with protocol config files")
         for node in self.nodes.values():
             logging.debug(f"Setting up {node}")
-            node.setup(PASSWORD, self.protocol_config, PWD)
+
+            # use res as env file for the node in docker compose setup
+            if not self.docker_compose:
+                node.setup(PASSWORD, self.protocol_config, PWD)
+            else:
+                env = node.generate_env(PASSWORD, self.protocol_config, PWD)
+                with open(node.dir.joinpath(".env"), "w") as f:
+                    for k, v in env.items():
+                        f.write(f"{k}={v}\n")
+
+        if self.docker_compose:
+            self.docker_compose_bringup()
 
         # WAIT FOR NODES TO BE UP
         logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to start up")
@@ -186,6 +217,10 @@ class Cluster:
         print("")
         for node in self.nodes.values():
             await node.links()
+
+    def docker_compose_bringup(self):
+        logging.info("Bringing up the docker compose cluster")
+        subprocess.run(["docker-compose", "-f", "../../../tests/network-simulation/compose.yaml", "up", "-d"], cwd=PWD)
 
     @property
     def size(self):

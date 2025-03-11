@@ -141,12 +141,30 @@ class Node:
         logging.error(f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
         return False
 
-    def setup(self, password: str, config_file: Path, dir: Path):
+    def generate_env(self, password: str, config_file: Path, dir: Path):
         trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
         log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
 
-        api_token_param = f"--api-token={self.api_token}" if self.api_token else "--disableApiAuthentication"
+        api_token_env = { "HOPRD_API_TOKEN": self.api_token } if self.api_token else { "HOPRD_DISABLE_API_AUTHENTICATION": "true" }
+        cfg_path_env = { "HOPRD_CONFIGURATION_FILE_PATH": self.cfg_file_path } if self.cfg_file is not None else {}
+
         custom_env = {
+            "HOPRD_ANNOUNCE": "true",
+            "HOPRD_API": "true",
+            "HOPRD_API_PORT": f"{self.api_port}",
+            "HOPRD_DATA": self.dir,
+            "HOPRD_HOST": f"{self.host_addr}:{self.p2p_port}",
+            "HOPRD_IDENTITY": self.dir.joinpath("hoprd.id"),
+            "HOPRD_INIT": "true",
+            "HOPRD_NETWORK": self.network,
+            "HOPRD_PASSWORD": password,
+            "HOPRD_PROTOCOL_CONFIG_PATH": config_file,
+            "HOPRD_PROVIDER": f"http://127.0.0.1:{self.anvil_port}",
+            "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
+            "HOPR_TEST_DISABLE_CHECKS": "true",
+            "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
+            "RUST_BACKTRACE": "full",
+            "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}",
             "RUST_LOG": ",".join(
                 [
                     log_level,
@@ -162,40 +180,26 @@ class Node:
                     "hickory_resolver=warn",
                 ]
             ),
-            "RUST_BACKTRACE": "full",
-            "HOPR_TEST_DISABLE_CHECKS": "true",
-            "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
-            "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
-            "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}",
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
+        env = custom_env | loaded_env | api_token_env | cfg_path_env
+        return env
+
+    def setup(self, password: str, config_file: Path, dir: Path):
+        env = self.generate_env(password, config_file, dir)
 
         cmd = [
             "hoprd",
-            "--announce",
-            "--api",
-            "--init",
             "--testAnnounceLocalAddresses",
             "--testPreferLocalAddresses",
-            f"--apiPort={self.api_port}",
-            f"--data={self.dir}",
-            f"--host={self.host_addr}:{self.p2p_port}",
-            f"--identity={self.dir.joinpath('hoprd.id')}",
-            f"--network={self.network}",
-            f"--password={password}",
-            f"--protocolConfig={config_file}",
-            f"--provider=http://127.0.0.1:{self.anvil_port}",
-            api_token_param,
         ]
-        if self.cfg_file_path is not None:
-            cmd += [f"--configurationFilePath={self.cfg_file_path}"]
 
         with open(self.dir.joinpath("hoprd.log"), "w") as log_file:
             self.proc = Popen(
                 cmd,
                 stdout=log_file,
                 stderr=STDOUT,
-                env=os.environ | custom_env | loaded_env,
+                env=os.environ | env,
                 cwd=dir,
             )
 
