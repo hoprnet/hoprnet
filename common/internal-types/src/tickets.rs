@@ -31,9 +31,9 @@ pub struct WinningProbability(EncodedWinProb);
 
 impl WinningProbability {
     /// 100% winning probability
-    pub const ALWAYS_WINNING: Self = Self([0xff; ENCODED_WIN_PROB_LENGTH]);
+    pub const ALWAYS: Self = Self([0xff; ENCODED_WIN_PROB_LENGTH]);
     /// 0% winning probability.
-    pub const NEVER_WINNING: Self = Self([0u8; ENCODED_WIN_PROB_LENGTH]);
+    pub const NEVER: Self = Self([0u8; ENCODED_WIN_PROB_LENGTH]);
 
     const LOWEST_NON_ZERO: f64 = 0.00000001;
 
@@ -51,11 +51,11 @@ impl WinningProbability {
 
     /// Convert probability to a float.
     pub fn as_f64(&self) -> f64 {
-        if self.eq(&Self::NEVER_WINNING) {
+        if self.eq(&Self::NEVER) {
             return 0.0;
         }
 
-        if self.eq(&Self::ALWAYS_WINNING) {
+        if self.eq(&Self::ALWAYS) {
             return 1.0;
         }
 
@@ -77,11 +77,11 @@ impl WinningProbability {
         }
 
         if f64_approx_eq(0.0, win_prob, Self::LOWEST_NON_ZERO) {
-            return Ok(Self::NEVER_WINNING);
+            return Ok(Self::NEVER);
         }
 
         if f64_approx_eq(1.0, win_prob, Self::LOWEST_NON_ZERO) {
-            return Ok(Self::ALWAYS_WINNING);
+            return Ok(Self::ALWAYS);
         }
 
         let tmp: u64 = (win_prob + 1.0).to_bits();
@@ -101,7 +101,7 @@ impl WinningProbability {
 
 impl Default for WinningProbability {
     fn default() -> Self {
-        Self::ALWAYS_WINNING
+        Self::ALWAYS
     }
 }
 
@@ -237,7 +237,7 @@ impl TicketBuilder {
             index: 0,
             amount: Some(U256::zero()),
             index_offset: 1,
-            win_prob: WinningProbability::NEVER_WINNING,
+            win_prob: WinningProbability::NEVER,
             channel_epoch: 0,
             ..Default::default()
         }
@@ -1058,9 +1058,9 @@ pub mod tests {
 
     #[test]
     pub fn test_win_prob_to_f64() -> anyhow::Result<()> {
-        assert_eq!(0.0f64, WinningProbability::NEVER_WINNING.as_f64());
+        assert_eq!(0.0f64, WinningProbability::NEVER.as_f64());
 
-        assert_eq!(1.0f64, WinningProbability::ALWAYS_WINNING.as_f64());
+        assert_eq!(1.0f64, WinningProbability::ALWAYS.as_f64());
 
         let mut test_bit_string = [0xffu8; 7];
         test_bit_string[0] = 0x7f;

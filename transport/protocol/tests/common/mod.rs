@@ -208,7 +208,7 @@ pub async fn peer_setup_for(
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: opk.clone(),
             chain_keypair: ock.clone(),
-            outgoing_ticket_win_prob: Some(WinningProbability::ALWAYS_WINNING),
+            outgoing_ticket_win_prob: Some(WinningProbability::ALWAYS),
             outgoing_ticket_price: Some(BalanceType::HOPR.balance(100)),
         };
 

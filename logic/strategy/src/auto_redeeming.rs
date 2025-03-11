@@ -224,7 +224,7 @@ mod tests {
             .amount(PRICE_PER_PACKET.div_f64(1.0f64)? * worth_packets)
             .index(index)
             .index_offset(idx_offset)
-            .win_prob(WinningProbability::ALWAYS_WINNING)
+            .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(4)
             .challenge(Challenge::from(cp_sum).into())
             .build_signed(&BOB, &Hash::default())?
