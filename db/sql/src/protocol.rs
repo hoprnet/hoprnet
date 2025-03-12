@@ -177,49 +177,51 @@ impl HoprDbProtocolOperations for HoprDb {
             ))
         })?;
 
-        let (components, surb) =
-            self.begin_transaction()
-                .await?
-                .perform(|tx| {
-                    Box::pin(async move {
-                        let domain_separator =
-                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                                DbSqlError::LogicalError("failed to fetch the domain separator".into())
-                            })?;
+        let (components, surb) = self
+            .begin_transaction()
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let domain_separator = myself
+                        .get_indexer_data(Some(tx))
+                        .await?
+                        .channels_dst
+                        .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the domain separator".into()))?;
 
-                        // Decide whether to create a 0-hop or multihop ticket
-                        let next_ticket = if path.len() == 1 {
-                            TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_peer)
-                        } else {
-                            myself
-                                .create_multihop_ticket(
-                                    Some(tx),
-                                    me.public().to_address(),
-                                    next_peer,
-                                    path.len() as u8,
-                                    outgoing_ticket_win_prob,
-                                    outgoing_ticket_price,
-                                )
-                                .await?
-                        };
-
-                        spawn_fifo_blocking(move || {
-                            ChainPacketComponents::into_outgoing(
-                                &data,
-                                PacketRouting::ForwardPath(&path),
-                                 None,
-                                 &me, next_ticket, &mapper, &domain_separator
+                    // Decide whether to create a 0-hop or multihop ticket
+                    let next_ticket = if path.len() == 1 {
+                        TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_peer)
+                    } else {
+                        myself
+                            .create_multihop_ticket(
+                                Some(tx),
+                                me.public().to_address(),
+                                next_peer,
+                                path.len() as u8,
+                                outgoing_ticket_win_prob,
+                                outgoing_ticket_price,
                             )
-                            .map_err(|e| {
-                                DbSqlError::LogicalError(format!(
-                                    "failed to construct chain components for a packet: {e}"
-                                ))
-                            })
+                            .await?
+                    };
+
+                    spawn_fifo_blocking(move || {
+                        ChainPacketComponents::into_outgoing(
+                            &data,
+                            PacketRouting::ForwardPath(&path),
+                            None,
+                            &me,
+                            next_ticket,
+                            &mapper,
+                            &domain_separator,
+                        )
+                        .map_err(|e| {
+                            DbSqlError::LogicalError(format!("failed to construct chain components for a packet: {e}"))
                         })
-                        .await
                     })
+                    .await
                 })
-                .await?;
+            })
+            .await?;
 
         match components {
             ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {

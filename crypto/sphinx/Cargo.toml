@@ -23,6 +23,7 @@ k256 = { version = "0.13.0", features = [
   "serde",
 ] }
 typenum = { workspace = true }
+zeroize = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }

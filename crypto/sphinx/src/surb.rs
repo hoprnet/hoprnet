@@ -1,8 +1,7 @@
-use hopr_crypto_types::prelude::SecretKey;
-use hopr_crypto_types::types::Pseudonym;
-use hopr_primitive_types::prelude::GeneralError;
-use std::marker::PhantomData;
+use hopr_crypto_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 use typenum::Unsigned;
+use zeroize::ZeroizeOnDrop;
 
 use crate::routing::{RoutingInfo, SphinxHeaderSpec};
 use crate::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
@@ -16,7 +15,7 @@ pub struct SURB<S: SphinxSuite, H: SphinxHeaderSpec> {
     /// Sphinx routing header.
     pub header: RoutingInfo<H>,
     /// Encryption key to use to encrypt the data for the SURB's creator.
-    pub sender_key: SecretKey,
+    pub sender_key: SecretKey16,
     /// Additional data for the SURB receiver.
     pub additional_data_receiver: H::SurbReceiverData,
 }
@@ -25,20 +24,27 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> SURB<S, H> {
     pub const SIZE: usize = H::KEY_ID_SIZE.get()
         + <S::G as GroupElement<S::E>>::AlphaLen::USIZE
         + RoutingInfo::<H>::SIZE
-        + H::TAG_SIZE
-        + SecretKey::LENGTH
+        + SecretKey16::LENGTH
         + H::SURB_RECEIVER_DATA_SIZE;
 
     pub fn into_boxed(self) -> Box<[u8]> {
-        let mut ret = vec![0u8; Self::SIZE];
-        ret.extend_from_slice(self.first_relayer.as_ref());
-        ret.extend_from_slice(self.alpha.as_ref());
-        ret.extend_from_slice(self.header.routing_information.as_ref());
-        ret.extend_from_slice(self.header.mac.as_ref());
-        ret.extend_from_slice(self.sender_key.as_ref());
-        ret.extend_from_slice(self.additional_data_receiver.as_ref());
+        let alpha_len = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
 
-        debug_assert_eq!(ret.len(), Self::SIZE);
+        let mut ret = vec![0u8; Self::SIZE];
+        ret[..H::KEY_ID_SIZE.get()].copy_from_slice(self.first_relayer.as_ref());
+        ret[H::KEY_ID_SIZE.get()..H::KEY_ID_SIZE.get() + alpha_len].copy_from_slice(self.alpha.as_ref());
+        ret[H::KEY_ID_SIZE.get() + alpha_len..H::KEY_ID_SIZE.get() + alpha_len + RoutingInfo::<H>::SIZE]
+            .copy_from_slice(self.header.as_ref());
+        ret[H::KEY_ID_SIZE.get() + alpha_len + RoutingInfo::<H>::SIZE
+            ..H::KEY_ID_SIZE.get() + alpha_len + RoutingInfo::<H>::SIZE + SecretKey16::LENGTH]
+            .copy_from_slice(self.sender_key.as_ref());
+        ret[H::KEY_ID_SIZE.get() + alpha_len + RoutingInfo::<H>::SIZE + SecretKey16::LENGTH
+            ..H::KEY_ID_SIZE.get()
+                + alpha_len
+                + RoutingInfo::<H>::SIZE
+                + SecretKey16::LENGTH
+                + H::SURB_RECEIVER_DATA_SIZE]
+            .copy_from_slice(self.additional_data_receiver.as_ref());
 
         ret.into_boxed_slice()
     }
@@ -70,41 +76,35 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
             Ok(Self {
                 first_relayer: value[0..H::KEY_ID_SIZE.get()]
                     .try_into()
-                    .map_err(|_| GeneralError::ParseError("SURB".into()))?,
+                    .map_err(|_| GeneralError::ParseError("SURB.first_relayer".into()))?,
                 alpha: Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(
                     &value[H::KEY_ID_SIZE.get()..H::KEY_ID_SIZE.get() + alpha],
                 )
                 .clone(),
-                header: RoutingInfo::<H> {
-                    routing_information: value
-                        [H::KEY_ID_SIZE.get() + alpha..H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN]
-                        .into(),
-                    mac: value[H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN
-                        ..H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE]
-                        .into(),
-                    _h: PhantomData,
-                },
+                header: value[H::KEY_ID_SIZE.get() + alpha..H::KEY_ID_SIZE.get() + alpha + RoutingInfo::<H>::SIZE]
+                    .try_into()
+                    .map_err(|_| GeneralError::ParseError("SURB.header".into()))?,
                 sender_key: value[H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE
-                    ..H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE + SecretKey::LENGTH]
+                    ..H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE + SecretKey16::LENGTH]
                     .try_into()
-                    .map_err(|_| GeneralError::ParseError("SURB".into()))?,
+                    .map_err(|_| GeneralError::ParseError("SURB.sender_key".into()))?,
                 additional_data_receiver: value
-                    [H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE + SecretKey::LENGTH..]
+                    [H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE + SecretKey16::LENGTH..]
                     .try_into()
-                    .map_err(|_| GeneralError::ParseError("SURB".into()))?,
+                    .map_err(|_| GeneralError::ParseError("SURB.additional_data_receiver".into()))?,
             })
         } else {
-            Err(GeneralError::ParseError("SURB".into()))
+            Err(GeneralError::ParseError("SURB::SIZE".into()))
         }
     }
 }
 
 /// Entry stored locally by the [`SURB`] creator to allow decryption
 /// of received responses.
-#[derive(Clone)]
+#[derive(Clone, ZeroizeOnDrop)]
 pub struct LocalSURBEntry {
     /// Encryption key the other party should use to encrypt the data for us.
-    pub sender_key: SecretKey,
+    pub sender_key: SecretKey16,
     /// Shared keys for nodes along the return path.
     pub shared_keys: Vec<SharedSecret>,
 }
@@ -129,7 +129,7 @@ where
         additional_data_last_hop,
     )?;
 
-    let sender_key = SecretKey::random();
+    let sender_key = SecretKey16::random();
 
     let surb = SURB {
         sender_key: sender_key.clone(),
@@ -163,6 +163,7 @@ pub enum SphinxRecipientMessage<P: Pseudonym> {
 }
 
 impl<P: Pseudonym> SphinxRecipientMessage<P> {
+    /// Number of SURBs the message carries.
     pub fn num_surbs(&self) -> u8 {
         match self {
             Self::DataOnly => 0,
@@ -170,5 +171,44 @@ impl<P: Pseudonym> SphinxRecipientMessage<P> {
             Self::DataWithSurb(_) => 1,
             Self::SurbsOnly(n, _) => *n,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ec_groups::X25519Suite;
+    use crate::tests::*;
+
+    #[allow(type_alias_bounds)]
+    pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66, 17>;
+
+    fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, LocalSURBEntry)>
+    where
+        <<S as SphinxSuite>::P as Keypair>::Public: Copy,
+    {
+        let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
+        let shares = S::new_shared_keys(&pub_keys)?;
+
+        Ok(create_surb::<S, HeaderSpec<S>>(
+            shares,
+            &pub_keys,
+            &[Default::default(); 4],
+            Default::default(),
+            Default::default(),
+        )?)
+    }
+
+    #[test]
+    fn surb_x25519_serialize_deserialize() -> anyhow::Result<()> {
+        let (surb_1, _) = generate_surbs::<X25519Suite>((0..3).map(|_| OffchainKeypair::random()).collect())?;
+
+        let surb_1_enc = surb_1.into_boxed();
+
+        let surb_2 = SURB::<X25519Suite, HeaderSpec<X25519Suite>>::try_from(surb_1_enc.as_ref())?;
+
+        assert_eq!(surb_1_enc, surb_2.into_boxed());
+
+        Ok(())
     }
 }

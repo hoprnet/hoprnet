@@ -56,13 +56,17 @@ pub fn derive_mac_key(secret: &SecretKey) -> SecretKey {
 
 /// Internal convenience function to generate key and IV from the given secret.
 /// WARNING: The `iv_first` distinguishes if the IV should be sampled before or after the key is sampled.
-pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit>(
-    secret: &SecretKey,
+pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
+    secret: &S,
     info: &[u8],
     iv_first: bool,
 ) -> hopr_crypto_types::errors::Result<T> {
-    let hkdf =
-        SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref()).map_err(|_| CryptoError::InvalidInputValue("secret"))?;
+    let key_mat = secret.as_ref();
+    if key_mat.len() < 16 {
+        return Err(CryptoError::InvalidInputValue("secret must have at least 128-bits"));
+    }
+
+    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(key_mat).map_err(|_| CryptoError::InvalidInputValue("secret"))?;
 
     let mut key = crypto_traits::Key::<T>::default();
     let mut iv = crypto_traits::Iv::<T>::default();

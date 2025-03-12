@@ -4264,6 +4264,7 @@ dependencies = [
  "parameterized",
  "subtle",
  "typenum",
+ "zeroize",
 ]
 
 [[package]]

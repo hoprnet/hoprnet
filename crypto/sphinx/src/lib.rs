@@ -28,3 +28,78 @@ pub mod routing;
 pub mod shared_keys;
 /// Contains Return Path and SURB-related types
 pub mod surb;
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use std::marker::PhantomData;
+    use std::num::{NonZero, NonZeroUsize};
+
+    use hopr_crypto_types::prelude::*;
+    use hopr_primitive_types::errors::GeneralError;
+    use hopr_primitive_types::prelude::*;
+
+    use crate::routing::SphinxHeaderSpec;
+    use crate::surb::SphinxRecipientMessage;
+
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub(crate) struct WrappedBytes<const N: usize>(pub [u8; N]);
+
+    impl<const N: usize> Default for WrappedBytes<N> {
+        fn default() -> Self {
+            Self([0u8; N])
+        }
+    }
+
+    impl<const N: usize> WrappedBytes<N> {
+        pub const fn len(&self) -> usize {
+            N
+        }
+    }
+
+    impl<'a, const N: usize> TryFrom<&'a [u8]> for WrappedBytes<N> {
+        type Error = GeneralError;
+
+        fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+            value
+                .try_into()
+                .map(Self)
+                .map_err(|_| GeneralError::ParseError("WrappedBytes".into()))
+        }
+    }
+
+    impl<const N: usize> AsRef<[u8]> for WrappedBytes<N> {
+        fn as_ref(&self) -> &[u8] {
+            &self.0
+        }
+    }
+
+    impl<const N: usize> BytesRepresentable for WrappedBytes<N> {
+        const SIZE: usize = N;
+    }
+
+    impl<const N: usize> TryFrom<WrappedBytes<N>> for SphinxRecipientMessage<SimplePseudonym> {
+        type Error = GeneralError;
+
+        fn try_from(_: WrappedBytes<N>) -> Result<Self, Self::Error> {
+            unimplemented!("not needed in tests")
+        }
+    }
+
+    pub(crate) struct TestSpec<K, const HOPS: usize, const RELAYER_DATA: usize, const LAST_HOP_DATA: usize>(
+        PhantomData<K>,
+    );
+    impl<K, const HOPS: usize, const RELAYER_DATA: usize, const LAST_HOP_DATA: usize> SphinxHeaderSpec
+        for TestSpec<K, HOPS, RELAYER_DATA, LAST_HOP_DATA>
+    where
+        K: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> + BytesRepresentable + Clone,
+    {
+        const MAX_HOPS: NonZeroUsize = NonZero::new(HOPS).unwrap();
+        type KeyId = K;
+        type Pseudonym = SimplePseudonym;
+        type RelayerData = WrappedBytes<RELAYER_DATA>;
+        type LastHopData = WrappedBytes<LAST_HOP_DATA>;
+        type SurbReceiverData = WrappedBytes<53>;
+        type PRG = ChaCha20;
+        type UH = Poly1305;
+    }
+}

@@ -197,7 +197,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
             }
             MetaPacketRouting::Surb(surb) => {
                 // Encrypt the packet using the sender's key from the SURB
-                let mut prp = S::new_prp(&surb.sender_key)?;
+                let mut prp = S::new_reply_prp(&surb.sender_key)?;
                 prp.apply_keystream(&mut payload);
 
                 Self::new_from_parts(surb.alpha, surb.header, &payload)
@@ -210,12 +210,6 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
         routing_info: RoutingInfo<H>,
         payload: &[u8],
     ) -> Result<Self> {
-        if routing_info.routing_information.is_empty() {
-            return Err(PacketError::PacketConstructionError(
-                "routing info must not be empty".into(),
-            ));
-        }
-
         if payload.len() != PADDED_PAYLOAD_SIZE {
             return Err(PacketError::PacketConstructionError(format!(
                 "packet payload must be exactly {PADDED_PAYLOAD_SIZE} bytes long"
@@ -224,8 +218,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
 
         let mut packet = Vec::with_capacity(Self::SIZE);
         packet.extend_from_slice(&alpha);
-        packet.extend_from_slice(&routing_info.routing_information);
-        packet.extend_from_slice(&routing_info.mac);
+        packet.extend_from_slice(routing_info.as_ref());
         packet.extend_from_slice(payload);
 
         Ok(Self {
@@ -321,8 +314,8 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
                         prp.apply_keystream(decrypted);
                     }
 
-                    // Inverse the initial encryption using the sender key
-                    let mut prp = S::new_prp(&local_surb.sender_key)?;
+                    // Invert the initial encryption using the sender key
+                    let mut prp = S::new_reply_prp(&local_surb.sender_key)?;
                     prp.apply_keystream(decrypted);
                 }
 

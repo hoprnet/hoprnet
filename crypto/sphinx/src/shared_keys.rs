@@ -151,6 +151,8 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
 const HASH_KEY_PRP: &str = "HASH_KEY_PRP";
 
+const HASH_KEY_REPLY_PRP: &str = "HASH_KEY_REPLY_PRP";
+
 /// Represents an instantiation of the Spinx protocol using the given EC group and corresponding public key object.
 pub trait SphinxSuite {
     /// Keypair corresponding to the EC group
@@ -172,9 +174,14 @@ pub trait SphinxSuite {
         SharedKeys::generate(public_keys.iter().map(|pk| pk.into()).collect())
     }
 
-    /// Instantiates a new Pseudo-Random Permutation
+    /// Instantiates a new Pseudo-Random Permutation for general packet data.
     fn new_prp(secret: &SecretKey) -> hopr_crypto_types::errors::Result<Self::PRP> {
         generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), false)
+    }
+
+    /// Instantiates a new Pseudo-Random Permutation for reply data.
+    fn new_reply_prp(secret: &SecretKey16) -> hopr_crypto_types::errors::Result<Self::PRP> {
+        generate_key_iv(secret, HASH_KEY_REPLY_PRP.as_bytes(), false)
     }
 }
 

@@ -108,35 +108,43 @@ pub trait SphinxHeaderSpec {
 }
 
 /// Carries routing information for the mixnet packet.
-pub struct RoutingInfo<H: SphinxHeaderSpec> {
-    pub routing_information: Box<[u8]>, // Cannot use [u8; H::HEADER_LEN] due to Rust limitation
-    pub mac: Box<[u8]>,                 // Cannot use [u8; H::TAG_SIZE] due to Rust limitation
-    pub(crate) _h: PhantomData<H>,
-}
+pub struct RoutingInfo<H: SphinxHeaderSpec>(Box<[u8]>, PhantomData<H>);
 
 impl<H: SphinxHeaderSpec> Clone for RoutingInfo<H> {
     fn clone(&self) -> Self {
-        Self {
-            routing_information: self.routing_information.clone(),
-            mac: self.mac.clone(),
-            _h: PhantomData,
-        }
+        Self(self.0.clone(), PhantomData)
     }
 }
 
 impl<H: SphinxHeaderSpec> Default for RoutingInfo<H> {
     fn default() -> Self {
-        Self {
-            routing_information: vec![0u8; H::HEADER_LEN].into_boxed_slice(),
-            mac: vec![0u8; H::TAG_SIZE].into_boxed_slice(),
-            _h: PhantomData,
+        Self(vec![0u8; Self::SIZE].into_boxed_slice(), PhantomData)
+    }
+}
+
+impl<H: SphinxHeaderSpec> AsRef<[u8]> for RoutingInfo<H> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for RoutingInfo<H> {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        if value.len() == Self::SIZE {
+            Ok(Self(value.into(), PhantomData))
+        } else {
+            Err(GeneralError::ParseError("RoutingInfo".into()))
         }
     }
 }
 
-impl<H: SphinxHeaderSpec> RoutingInfo<H> {
-    pub const SIZE: usize = H::HEADER_LEN + H::TAG_SIZE;
+impl<H: SphinxHeaderSpec> BytesRepresentable for RoutingInfo<H> {
+    const SIZE: usize = H::HEADER_LEN + H::TAG_SIZE;
+}
 
+impl<H: SphinxHeaderSpec> RoutingInfo<H> {
     /// Creates the routing information of the mixnet packet.
     ///
     /// # Arguments
@@ -221,7 +229,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 // Include the last computed authentication tag
                 extended_header
                     [PATH_POSITION_LEN + H::KEY_ID_SIZE.get()..PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + H::TAG_SIZE]
-                    .copy_from_slice(&ret.mac);
+                    .copy_from_slice(ret.mac());
 
                 // The additional relayer data is optional
                 if H::RELAYER_DATA_SIZE > 0 {
@@ -246,11 +254,27 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
             let mut uh = H::UH::new_from_slice(derive_mac_key(&secrets[inverted_idx]).as_ref())
                 .map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
             uh.update_padded(&extended_header[0..H::HEADER_LEN]);
-            ret.mac.copy_from_slice(&uh.finalize());
+            ret.mac_mut().copy_from_slice(&uh.finalize());
         }
 
-        ret.routing_information = (&extended_header[0..H::HEADER_LEN]).into();
+        ret.routing_mut().copy_from_slice(&extended_header[0..H::HEADER_LEN]);
         Ok(ret)
+    }
+
+    pub fn routing(&self) -> &[u8] {
+        &self.0[0..H::HEADER_LEN]
+    }
+
+    pub fn mac(&self) -> &[u8] {
+        &self.0[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE]
+    }
+
+    pub(crate) fn routing_mut(&mut self) -> &mut [u8] {
+        &mut self.0[0..H::HEADER_LEN]
+    }
+
+    pub(crate) fn mac_mut(&mut self) -> &mut [u8] {
+        &mut self.0[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE]
     }
 }
 
@@ -325,10 +349,12 @@ pub fn forward_header<H: SphinxHeaderSpec>(
             .try_into()
             .map_err(|_| CryptoError::InvalidInputValue("next_node"))?;
 
+        let mut next_header = RoutingInfo::<H>::default();
+
         // Authentication tag
-        let mac: Box<[u8]> = (&header
-            [PATH_POSITION_LEN + H::KEY_ID_SIZE.get()..PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + H::TAG_SIZE])
-            .into();
+        next_header.mac_mut().copy_from_slice(
+            &header[PATH_POSITION_LEN + H::KEY_ID_SIZE.get()..PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + H::TAG_SIZE],
+        );
 
         // Optional additional relayer data
         let additional_info = (&header[PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + H::TAG_SIZE
@@ -336,7 +362,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
             .try_into()
             .map_err(|_| CryptoError::InvalidInputValue("additional_relayer_data"))?;
 
-        // Shift the entire header left, to discard the data we just read
+        // Shift the entire header to the left, to discard the data we just read
         header.copy_within(H::ROUTING_INFO_LEN.., 0);
 
         // Erase the read data from the header to apply the raw key-stream
@@ -344,12 +370,10 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         prg.seek(H::HEADER_LEN);
         prg.apply_keystream(&mut header[H::HEADER_LEN - H::ROUTING_INFO_LEN..H::HEADER_LEN]);
 
+        next_header.routing_mut().copy_from_slice(&header[0..H::HEADER_LEN]);
+
         Ok(ForwardedHeader::RelayNode {
-            next_header: RoutingInfo::<H> {
-                routing_information: (&header[..H::HEADER_LEN]).into(),
-                mac,
-                _h: PhantomData,
-            },
+            next_header,
             path_pos,
             next_node,
             additional_info,
@@ -364,76 +388,15 @@ pub fn forward_header<H: SphinxHeaderSpec>(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     use hopr_crypto_types::crypto_traits::BlockSizeUser;
     use hopr_crypto_types::keypairs::OffchainKeypair;
     use parameterized::parameterized;
-    use std::marker::PhantomData;
-    use std::num::NonZero;
 
     use crate::shared_keys::SphinxSuite;
-
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    struct WrappedBytes<const N: usize>([u8; N]);
-
-    impl<const N: usize> Default for WrappedBytes<N> {
-        fn default() -> Self {
-            Self([0u8; N])
-        }
-    }
-
-    impl<const N: usize> WrappedBytes<N> {
-        pub const fn len(&self) -> usize {
-            N
-        }
-    }
-
-    impl<'a, const N: usize> TryFrom<&'a [u8]> for WrappedBytes<N> {
-        type Error = GeneralError;
-
-        fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-            value
-                .try_into()
-                .map(Self)
-                .map_err(|_| GeneralError::ParseError("WrappedBytes".into()))
-        }
-    }
-
-    impl<const N: usize> AsRef<[u8]> for WrappedBytes<N> {
-        fn as_ref(&self) -> &[u8] {
-            &self.0
-        }
-    }
-
-    impl<const N: usize> BytesRepresentable for WrappedBytes<N> {
-        const SIZE: usize = N;
-    }
-
-    impl<const N: usize> TryFrom<WrappedBytes<N>> for SphinxRecipientMessage<SimplePseudonym> {
-        type Error = GeneralError;
-
-        fn try_from(_: WrappedBytes<N>) -> Result<Self, Self::Error> {
-            unimplemented!("not needed in tests")
-        }
-    }
-
-    struct TestSpec<K, const HOPS: usize, const RELAYER_DATA: usize, const LAST_HOP_DATA: usize>(PhantomData<K>);
-    impl<K, const HOPS: usize, const RELAYER_DATA: usize, const LAST_HOP_DATA: usize> SphinxHeaderSpec
-        for TestSpec<K, HOPS, RELAYER_DATA, LAST_HOP_DATA>
-    where
-        K: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> + BytesRepresentable + Clone,
-    {
-        const MAX_HOPS: NonZeroUsize = NonZero::new(HOPS).unwrap();
-        type KeyId = K;
-        type Pseudonym = SimplePseudonym;
-        type RelayerData = WrappedBytes<RELAYER_DATA>;
-        type LastHopData = WrappedBytes<LAST_HOP_DATA>;
-        type SurbReceiverData = WrappedBytes<53>;
-        type PRG = ChaCha20;
-        type UH = Poly1305;
-    }
+    use crate::tests::*;
 
     #[test]
     fn test_filler_generate_verify() -> anyhow::Result<()> {
@@ -455,7 +418,7 @@ mod tests {
         for i in 0..max_hops - 1 {
             let idx = secrets.len() - i - 2;
 
-            let mut prg = generate_key_iv::<ChaCha20>(&secrets[idx], HASH_KEY_PRG.as_bytes(), true)?;
+            let mut prg = generate_key_iv::<ChaCha20, _>(&secrets[idx], HASH_KEY_PRG.as_bytes(), true)?;
             prg.apply_keystream(&mut extended_header);
 
             let mut erased = extended_header.clone();
@@ -494,10 +457,10 @@ mod tests {
             Default::default(),
         )?;
 
-        let mut header: Vec<u8> = rinfo.routing_information.into();
+        let mut header = rinfo.routing().to_vec();
 
         let mut last_mac = [0u8; <Poly1305 as BlockSizeUser>::BlockSize::USIZE];
-        last_mac.copy_from_slice(&rinfo.mac);
+        last_mac.copy_from_slice(&rinfo.mac());
 
         for (i, secret) in shares.secrets.iter().enumerate() {
             let fwd = forward_header::<TestSpec<<S::P as Keypair>::Public, 3, 0, 0>>(secret, &mut header, &last_mac)?;
@@ -509,7 +472,7 @@ mod tests {
                     path_pos,
                     ..
                 } => {
-                    last_mac.copy_from_slice(&next_header.mac);
+                    last_mac.copy_from_slice(&next_header.mac());
                     assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
                     assert_eq!(
                         path_pos,
@@ -551,10 +514,10 @@ mod tests {
             last_hop_data,
         )?;
 
-        let mut header: Vec<u8> = rinfo.routing_information.into();
+        let mut header = rinfo.routing().to_vec();
 
         let mut last_mac = [0u8; <Poly1305 as BlockSizeUser>::BlockSize::USIZE];
-        last_mac.copy_from_slice(&rinfo.mac);
+        last_mac.copy_from_slice(&rinfo.mac());
 
         for (i, secret) in shares.secrets.iter().enumerate() {
             let fwd = forward_header::<TestSpec<<S::P as Keypair>::Public, 3, 32, 32>>(secret, &mut header, &last_mac)?;
@@ -567,7 +530,7 @@ mod tests {
                     additional_info,
                     ..
                 } => {
-                    last_mac.copy_from_slice(&next_header.mac);
+                    last_mac.copy_from_slice(&next_header.mac());
                     assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
                     assert_eq!(
                         path_pos,
