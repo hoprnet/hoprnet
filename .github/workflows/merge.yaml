@@ -235,6 +235,21 @@ jobs:
       base_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
 
+  build_pluto:
+    strategy:
+      matrix:
+        package:
+          - pluto-docker
+    name: Build ${{ matrix.package }}
+    # only run build and tag if the PR is merged, not if its closed
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/build-docker.yaml
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+      package: ${{ matrix.package }}
+      production: true
+    secrets: inherit
+
   docs:
     name: Docs
     needs:
