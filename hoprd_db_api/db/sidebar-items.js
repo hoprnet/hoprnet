@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SQL_DB_METADATA_FILE_NAME"],"struct":["HoprdDb"]};
