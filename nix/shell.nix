@@ -40,7 +40,7 @@ craneLib.devShell {
 
     # docs utilities
     graphviz
-    
+
     # github integration
     gh
 

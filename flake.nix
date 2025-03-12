@@ -355,7 +355,7 @@
               findutils
               foundry-bin
               gnumake
-	            hoprd
+              hoprd
               hopli
               jq
               lsof
@@ -411,12 +411,12 @@
                 "/scripts/run-local-cluster.sh"
               ];
               ExposedPorts = {
-                "8545/tcp" = {};
-                "3011-3061" = {};
+                "8545/tcp" = { };
+                "3011-3061" = { };
               };
             };
           };
-          
+
           dockerImageUploadScript = image: pkgs.writeShellScriptBin "docker-image-upload" ''
             set -eu
             OCI_ARCHIVE="$(nix build --no-link --print-out-paths ${image})"

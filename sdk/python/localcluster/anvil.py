@@ -23,8 +23,7 @@ class Anvil:
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
 
     def run(self, state=AnvilState.DUMP):
-        logging.info("Starting and waiting for local anvil server to be up" +
-                     f"({state.name.lower()} state enabled)")
+        logging.info("Starting and waiting for local anvil server to be up" + f"({state.name.lower()} state enabled)")
 
         command = f"""
             bash scripts/run-local-anvil.sh
@@ -43,10 +42,8 @@ class Anvil:
         )
 
     def mirror_contracts(self, src_file: Path, dest_file: Path, src_network: str, dest_network: str):
-        logging.info(
-            "Mirror contract data because of anvil-deploy node only writing to localhost")
-        shutil.copy(PWD.joinpath(
-            "scripts", "protocol-config-anvil.json"), dest_file)
+        logging.info("Mirror contract data because of anvil-deploy node only writing to localhost")
+        shutil.copy(PWD.joinpath("scripts", "protocol-config-anvil.json"), dest_file)
 
         with open(src_file, "r") as file:
             src_data = json.load(file)
