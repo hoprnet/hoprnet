@@ -65,12 +65,6 @@ mod tests {
 
     #[test]
     fn header_and_packet_lengths() {
-        let header_len = HoprSphinxHeaderSpec::<CurrentSphinxSuite>::HEADER_LEN;
-        assert_eq!(
-            MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::HEADER_LEN,
-            header_len
-        ); // 394 bytes
-
         //let packet_len = packet_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
         //assert_eq!(MetaPacket::<CurrentSphinxSuite, HoprSphinxHeader>::PACKET_LEN, packet_len); // 968 bytes
 

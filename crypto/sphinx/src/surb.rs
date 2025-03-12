@@ -1,7 +1,6 @@
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use typenum::Unsigned;
-use zeroize::ZeroizeOnDrop;
 
 use crate::routing::{RoutingInfo, SphinxHeaderSpec};
 use crate::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
@@ -101,7 +100,7 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
 
 /// Entry stored locally by the [`SURB`] creator to allow decryption
 /// of received responses.
-#[derive(Clone, ZeroizeOnDrop)]
+#[derive(Clone)]
 pub struct LocalSURBEntry {
     /// Encryption key the other party should use to encrypt the data for us.
     pub sender_key: SecretKey16,

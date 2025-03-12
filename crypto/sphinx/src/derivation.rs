@@ -12,6 +12,7 @@ const HASH_KEY_HMAC: &str = "HASH_KEY_HMAC";
 const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
 const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";
 const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
+const HASH_KEY_RAW_KEY: &str = "HASH_KEY_RAW_KEY";
 
 /// Size of the nonce in the Ping sub protocol
 pub const PING_PONG_NONCE_SIZE: usize = 16;
@@ -55,7 +56,16 @@ pub fn derive_mac_key(secret: &SecretKey) -> SecretKey {
 }
 
 /// Internal convenience function to generate key and IV from the given secret.
-/// WARNING: The `iv_first` distinguishes if the IV should be sampled before or after the key is sampled.
+///
+/// The `secret` must be at least 16 bytes long.
+/// The function internally uses Blake2s256 based HKDF (see RFC 5869).
+///
+/// For `secret` shorter than 32 bytes, the HKDF uses `Extract` first and then `Expand`
+/// to derive the key and IV.
+/// For `secret` that is 32 bytes or longer, only `Expand` is used to derive key and IV.
+///
+/// **WARNING**:
+/// The `iv_first` distinguishes if the IV should be sampled before or after the key is sampled.
 pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
     secret: &S,
     info: &[u8],
@@ -66,7 +76,11 @@ pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
         return Err(CryptoError::InvalidInputValue("secret must have at least 128-bits"));
     }
 
-    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(key_mat).map_err(|_| CryptoError::InvalidInputValue("secret"))?;
+    let hkdf = if key_mat.len() < Blake2s256::output_size() {
+        SimpleHkdf::<Blake2s256>::new(Some(HASH_KEY_RAW_KEY.as_bytes()), key_mat)
+    } else {
+        SimpleHkdf::<Blake2s256>::from_prk(key_mat).map_err(|_| CryptoError::InvalidInputValue("secret"))?
+    };
 
     let mut key = crypto_traits::Key::<T>::default();
     let mut iv = crypto_traits::Iv::<T>::default();
