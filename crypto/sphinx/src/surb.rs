@@ -101,14 +101,14 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
 /// Entry stored locally by the [`SURB`] creator to allow decryption
 /// of received responses.
 #[derive(Clone)]
-pub struct LocalSURBEntry {
+pub struct ReplyOpener {
     /// Encryption key the other party should use to encrypt the data for us.
     pub sender_key: SecretKey16,
     /// Shared keys for nodes along the return path.
     pub shared_keys: Vec<SharedSecret>,
 }
 
-/// Creates a pair of [`SURB`] and [`LocalSURBEntry`].
+/// Creates a pair of [`SURB`] and [`ReplyOpener`].
 ///
 /// The former is sent to the other party, the latter is kept locally.
 pub fn create_surb<S: SphinxSuite, H: SphinxHeaderSpec>(
@@ -117,7 +117,7 @@ pub fn create_surb<S: SphinxSuite, H: SphinxHeaderSpec>(
     additional_data_relayer: &[H::RelayerData],
     additional_data_last_hop: H::LastHopData,
     additional_data_receiver: H::SurbReceiverData,
-) -> hopr_crypto_types::errors::Result<(SURB<S, H>, LocalSURBEntry)>
+) -> hopr_crypto_types::errors::Result<(SURB<S, H>, ReplyOpener)>
 where
     H::KeyId: Copy,
 {
@@ -138,7 +138,7 @@ where
         alpha: shared_keys.alpha,
     };
 
-    let local_surb = LocalSURBEntry {
+    let local_surb = ReplyOpener {
         sender_key: sender_key.clone(),
         shared_keys: shared_keys.secrets,
     };
@@ -182,7 +182,7 @@ mod tests {
     #[allow(type_alias_bounds)]
     pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66, 17>;
 
-    fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, LocalSURBEntry)>
+    fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener)>
     where
         <<S as SphinxSuite>::P as Keypair>::Public: Copy,
     {

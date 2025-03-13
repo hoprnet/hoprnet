@@ -12,6 +12,8 @@ use crate::errors::{PacketError, Result};
 pub const POR_SECRET_LENGTH: usize = 2 * PublicKey::SIZE_COMPRESSED;
 
 /// Type that contains the challenge for the first ticket sent to the first relayer.
+///
+/// This is the first entry of the entire PoR challenge chain generated for the packet.
 #[derive(Clone)]
 pub struct ProofOfRelayValues([u8; Self::SIZE]);
 
@@ -19,6 +21,7 @@ impl ProofOfRelayValues {
     fn create(
         secret_b: &SharedSecret,
         secret_c: Option<&SharedSecret>,
+        chain_length: u8,
     ) -> hopr_crypto_types::errors::Result<(Self, HalfKey)> {
         let s0 = derive_own_key_share(secret_b);
         let s1 = derive_ack_key_share(secret_c.unwrap_or(&SharedSecret::random()));
@@ -29,15 +32,26 @@ impl ProofOfRelayValues {
             .to_ethereum_challenge();
 
         let mut ret = [0u8; Self::SIZE];
-        ret[0..HalfKeyChallenge::SIZE].copy_from_slice(ack_challenge.as_ref());
-        ret[HalfKeyChallenge::SIZE..].copy_from_slice(ticket_challenge.as_ref());
+        ret[0] = chain_length;
+        ret[1..1 + HalfKeyChallenge::SIZE].copy_from_slice(ack_challenge.as_ref());
+        ret[1 + HalfKeyChallenge::SIZE..].copy_from_slice(ticket_challenge.as_ref());
         Ok((Self(ret), s0))
     }
 
     /// Takes the secrets which the first and the second relayer are able to derive from the packet header
     /// and computes the challenge for the first ticket.
-    pub fn new(secret_b: &SharedSecret, secret_c: Option<&SharedSecret>) -> hopr_crypto_types::errors::Result<Self> {
-        Self::create(secret_b, secret_c).map(|(v, _)| v)
+    pub fn new(
+        secret_b: &SharedSecret,
+        secret_c: Option<&SharedSecret>,
+        chain_length: u8,
+    ) -> hopr_crypto_types::errors::Result<Self> {
+        Self::create(secret_b, secret_c, chain_length).map(|(v, _)| v)
+    }
+
+    /// Length of this PoR challenge chain (number of hops + 1).
+    // TODO: needed to know how to price the ticket on the return path, will be fixed in #3765
+    pub fn chain_length(&self) -> u8 {
+        self.0[0]
     }
 
     /// Returns the challenge that must be solved once the acknowledgement
@@ -45,13 +59,13 @@ impl ProofOfRelayValues {
     ///
     /// This is the [`ProofOfRelayValues::ticket_challenge`] minus hint.
     pub fn acknowledgement_challenge(&self) -> HalfKeyChallenge {
-        HalfKeyChallenge::new(&self.0[0..HalfKeyChallenge::SIZE])
+        HalfKeyChallenge::new(&self.0[1..1 + HalfKeyChallenge::SIZE])
     }
 
     /// Returns the complete challenge that is present on the ticket corresponding to the
     /// packet.
     pub fn ticket_challenge(&self) -> EthereumChallenge {
-        EthereumChallenge::new(&self.0[HalfKeyChallenge::SIZE..])
+        EthereumChallenge::new(&self.0[1 + HalfKeyChallenge::SIZE..])
     }
 }
 
@@ -73,7 +87,7 @@ impl<'a> TryFrom<&'a [u8]> for ProofOfRelayValues {
 }
 
 impl BytesRepresentable for ProofOfRelayValues {
-    const SIZE: usize = HalfKeyChallenge::SIZE + EthereumChallenge::SIZE;
+    const SIZE: usize = 1 + HalfKeyChallenge::SIZE + EthereumChallenge::SIZE;
 }
 
 /// Contains the Proof of Relay challenge for the next downstream node as well as the hint that is used to
@@ -223,7 +237,7 @@ mod tests {
         let secrets = (0..AMOUNT).map(|_| SharedSecret::random()).collect::<Vec<_>>();
 
         // Generated challenge
-        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]))?;
+        let first_challenge = ProofOfRelayValues::new(&secrets[0], Some(&secrets[1]), secrets.len() as u8)?;
 
         // For the first relayer
         let first_por_string = ProofOfRelayString::new(&secrets[1], Some(&secrets[2]))?;
@@ -282,7 +296,8 @@ mod tests {
         const AMOUNT: usize = 2;
         let secrets = (0..AMOUNT).map(|_| SharedSecret::random()).collect::<Vec<_>>();
 
-        let (first_challenge, own_key) = ProofOfRelayValues::create(&secrets[0], Some(&secrets[1]))?;
+        let (first_challenge, own_key) =
+            ProofOfRelayValues::create(&secrets[0], Some(&secrets[1]), secrets.len() as u8)?;
         let ack = derive_ack_key_share(&secrets[1]);
 
         assert!(

@@ -1,5 +1,5 @@
 use hopr_crypto_sphinx::routing::SphinxHeaderSpec;
-use hopr_crypto_sphinx::surb::{LocalSURBEntry, SphinxRecipientMessage, SURB};
+use hopr_crypto_sphinx::surb::{ReplyOpener, SphinxRecipientMessage, SURB};
 use hopr_crypto_sphinx::{
     derivation::derive_packet_tag,
     routing::{forward_header, ForwardedHeader, RoutingInfo},
@@ -259,11 +259,11 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
         mut self,
         node_keypair: &S::P,
         key_mapper: &K,
-        entry_fn: F,
+        mut reply_openers: F,
     ) -> Result<ForwardedMetaPacket<S, H>>
     where
         K: KeyIdMapper<S, H>,
-        F: Fn(&H::Pseudonym) -> Option<LocalSURBEntry>,
+        F: FnMut(&H::Pseudonym) -> Option<ReplyOpener>,
     {
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
             Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(self.alpha()),
@@ -301,7 +301,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> MetaPacket<S, H> {
                 // we must perform additional steps to decrypt it
                 let additional_data: SphinxRecipientMessage<H::Pseudonym> = additional_data.try_into()?;
                 if let SphinxRecipientMessage::<H::Pseudonym>::ReplyOnly(pseudonym) = &additional_data {
-                    let local_surb = entry_fn(pseudonym).ok_or_else(|| {
+                    let local_surb = reply_openers(pseudonym).ok_or_else(|| {
                         PacketDecodingError(format!("couldn't find local SURB entry for pseudonym: {pseudonym}"))
                     })?;
 
@@ -405,7 +405,7 @@ pub(crate) mod tests {
         let data = b"test";
         let padded = add_padding(data);
 
-        let mut expected = vec![0u8; 495];
+        let mut expected = vec![0u8; PAYLOAD_SIZE - data.len()];
         expected.push(PADDING_TAG);
         expected.extend_from_slice(data);
         assert_eq!(&expected, padded.as_ref());
@@ -447,6 +447,7 @@ pub(crate) mod tests {
 
         assert!(mp.as_ref().len() < 1492, "metapacket too long {}", mp.as_ref().len());
 
+        let mut received_plaintext = Box::default();
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp
                 .clone()
@@ -464,11 +465,13 @@ pub(crate) mod tests {
                     ..
                 } => {
                     assert_eq!(keypairs.len() - 1, i);
-                    assert_eq!(msg, plain_text.as_ref());
                     assert_eq!(additional_data, SphinxRecipientMessage::DataOnly);
+                    received_plaintext = plain_text;
                 }
             }
         }
+
+        assert_eq!(msg, received_plaintext.as_ref());
 
         Ok(())
     }
@@ -487,7 +490,11 @@ pub(crate) mod tests {
 
         let shared_keys = S::new_shared_keys(&pubkeys)?;
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
-        let por_values = ProofOfRelayValues::new(&shared_keys.secrets[0], shared_keys.secrets.get(1))?;
+        let por_values = ProofOfRelayValues::new(
+            &shared_keys.secrets[0],
+            shared_keys.secrets.get(1),
+            shared_keys.secrets.len() as u8,
+        )?;
 
         let pseudonym = SimplePseudonym::random();
         let ids = <BiHashMap<_, _> as KeyIdMapper<S, TestHeader<S>>>::map_keys_to_ids(&mapper, &pubkeys)
@@ -495,7 +502,7 @@ pub(crate) mod tests {
             .map(|v| v.ok_or_else(|| anyhow!("failed to map keys to ids")))
             .collect::<anyhow::Result<Vec<KeyIdent>>>()?;
 
-        let (surb, local_surb) = create_surb::<S, TestHeader<S>>(
+        let (surb, opener) = create_surb::<S, TestHeader<S>>(
             shared_keys,
             &ids,
             &por_strings,
@@ -509,9 +516,10 @@ pub(crate) mod tests {
 
         let surb_retriever = |p: &HoprPseudonym| {
             assert_eq!(pseudonym, *p);
-            Some(local_surb.clone())
+            Some(opener.clone())
         };
 
+        let mut received_plaintext = Box::default();
         for (i, pair) in keypairs.iter().enumerate() {
             let fwd = mp
                 .clone()
@@ -529,41 +537,43 @@ pub(crate) mod tests {
                     ..
                 } => {
                     assert_eq!(keypairs.len() - 1, i);
-                    assert_eq!(msg, plain_text.as_ref());
                     assert_eq!(additional_data, SphinxRecipientMessage::ReplyOnly(pseudonym));
+                    received_plaintext = plain_text;
                 }
             }
         }
 
+        assert_eq!(msg, received_plaintext.as_ref());
+
         Ok(())
     }
 
-    #[parameterized(amount = { 4, 3, 2 })]
+    #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_x25519_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_test_meta_packet::<X25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
     }
 
-    #[parameterized(amount = { 4, 3, 2 })]
+    #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_x25519_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_meta_packet_reply_test::<X25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
     }
 
-    #[parameterized(amount = { 4, 3, 2 })]
+    #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_test_meta_packet::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
     }
 
-    #[parameterized(amount = { 4, 3, 2 })]
+    #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_meta_packet_reply_test::<Ed25519Suite>((0..amount).map(|_| OffchainKeypair::random()).collect())
     }
 
-    #[parameterized(amount = { 4, 3, 2 })]
+    #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_secp256k1_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_test_meta_packet::<Secp256k1Suite>((0..amount).map(|_| ChainKeypair::random()).collect())
     }
 
-    #[parameterized(amount = { 4, 3, 2 })]
+    #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_secp256k1_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_meta_packet_reply_test::<Secp256k1Suite>((0..amount).map(|_| ChainKeypair::random()).collect())
     }
