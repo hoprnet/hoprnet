@@ -1,5 +1,4 @@
 import logging
-import os
 from pathlib import Path
 
 logging.basicConfig(format="%(asctime)s %(message)s")
