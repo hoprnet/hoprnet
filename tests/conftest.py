@@ -1,5 +1,6 @@
 import asyncio
 import itertools
+from pathlib import Path
 import logging
 import os
 import random
@@ -78,7 +79,7 @@ def random_distinct_pairs_from(values: list, count: int):
 @pytest.fixture(scope="session")
 async def swarm7(request):
     # path is related to where the test is run. Most likely the root of the repo
-    params_path = os.path.join(os.path.dirname(__file__), "../sdk/python/localcluster.params.yml")
+    params_path = Path(__file__).parent.joinpath("../sdk/python/localcluster.params.yml")
     cluster, anvil = await localcluster.bringup(params_path, test_mode=True, fully_connected=False)
 
     yield cluster.nodes
