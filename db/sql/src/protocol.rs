@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use hopr_crypto_packet::chain::{ChainPacketComponents, PacketRouting};
+use hopr_crypto_packet::chain::{HoprPacket, PacketRouting};
 use hopr_crypto_packet::validation::validate_unacknowledged_ticket;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
@@ -205,7 +205,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     };
 
                     spawn_fifo_blocking(move || {
-                        ChainPacketComponents::into_outgoing(
+                        HoprPacket::into_outgoing(
                             &data,
                             PacketRouting::ForwardPath(&path),
                             None,
@@ -224,10 +224,10 @@ impl HoprDbProtocolOperations for HoprDb {
             .await?;
 
         match components {
-            ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {
+            HoprPacket::Final { .. } | HoprPacket::Forwarded { .. } => {
                 Err(DbSqlError::LogicalError("Must contain an outgoing packet type".into()).into())
             }
-            ChainPacketComponents::Outgoing {
+            HoprPacket::Outgoing {
                 packet,
                 ticket,
                 next_hop,
@@ -239,7 +239,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     .await;
 
                 let payload = spawn_fifo_blocking(move || {
-                    let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
+                    let mut payload = Vec::with_capacity(HoprPacket::SIZE);
                     payload.extend_from_slice(packet.as_ref());
 
                     let ticket_bytes: [u8; Ticket::SIZE] = ticket.into();
@@ -271,13 +271,13 @@ impl HoprDbProtocolOperations for HoprDb {
         let offchain_keypair = pkt_keypair.clone();
 
         let packet = spawn_fifo_blocking(move || {
-            ChainPacketComponents::from_incoming(&data, &offchain_keypair, sender, &mapper, local_surbs)
+            HoprPacket::from_incoming(&data, &offchain_keypair, sender, &mapper, local_surbs)
                 .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
         })
         .await?;
 
         match packet {
-            ChainPacketComponents::Final {
+            HoprPacket::Final {
                 packet_tag,
                 ack_key,
                 previous_hop,
@@ -294,7 +294,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     ack,
                 })
             }
-            ChainPacketComponents::Forwarded {
+            HoprPacket::Forwarded {
                 packet,
                 ticket,
                 ack_challenge,
@@ -444,7 +444,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 let (ack, payload) = spawn_fifo_blocking(move || {
                     let ack = Acknowledgement::new(ack_key, &offchain_keypair);
 
-                    let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
+                    let mut payload = Vec::with_capacity(HoprPacket::SIZE);
                     payload.extend_from_slice(packet.as_ref());
 
                     let ticket_bytes = verified_ticket.leak().into_encoded();
@@ -462,7 +462,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     ack,
                 })
             }
-            ChainPacketComponents::Outgoing { .. } => {
+            HoprPacket::Outgoing { .. } => {
                 Err(DbSqlError::LogicalError("Cannot receive an outgoing packet".into()).into())
             }
         }

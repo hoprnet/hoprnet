@@ -38,10 +38,10 @@ pub mod validation;
 pub type HoprPseudonym = types::SimplePseudonym;
 
 /// Currently used public key cipher suite for Sphinx.
-pub type CurrentSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
+pub type HoprSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
 
 /// Current Sphinx header specification for the HOPR protocol.
-pub struct HoprSphinxHeaderSpec<S: SphinxSuite = CurrentSphinxSuite>(PhantomData<S>);
+pub struct HoprSphinxHeaderSpec<S: SphinxSuite = HoprSphinxSuite>(PhantomData<S>);
 
 impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
@@ -55,12 +55,12 @@ impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
 }
 
 /// Single Use Reply Block representation for HOPR protocol.
-pub type HoprSurb = hopr_crypto_sphinx::surb::SURB<CurrentSphinxSuite, HoprSphinxHeaderSpec>;
+pub type HoprSurb = hopr_crypto_sphinx::surb::SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chain::ChainPacketComponents;
+    use crate::chain::HoprPacket;
     use crate::packet::MetaPacket;
 
     #[test]
@@ -68,9 +68,9 @@ mod tests {
         //let packet_len = packet_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
         //assert_eq!(MetaPacket::<CurrentSphinxSuite, HoprSphinxHeader>::PACKET_LEN, packet_len); // 968 bytes
 
-        let hopr_packet_len = ChainPacketComponents::SIZE;
+        let hopr_packet_len = HoprPacket::SIZE;
         assert_eq!(
-            MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN + Ticket::SIZE,
+            MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN + Ticket::SIZE,
             hopr_packet_len
         ); // 1116 bytes
 

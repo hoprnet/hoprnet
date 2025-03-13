@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hopr_crypto_packet::chain::ChainPacketComponents;
+use hopr_crypto_packet::chain::HoprPacket;
 use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::{TicketBuilder, PAYLOAD_SIZE};
@@ -32,7 +32,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                 // The number of hops for ticket creation does not matter for benchmark purposes
                 let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
 
-                ChainPacketComponents::into_outgoing(&msg, &path[0..=hop], &chain_key, tb, &dst)
+                HoprPacket::into_outgoing(&msg, &path[0..=hop], &chain_key, tb, &dst)
             });
         });
     }
@@ -60,9 +60,9 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
 
     // Sender
-    let packet = match ChainPacketComponents::into_outgoing(&msg, &path, &chain_key, tb, &dst).unwrap() {
-        ChainPacketComponents::Outgoing { packet, ticket, .. } => {
-            let mut ret = Vec::with_capacity(ChainPacketComponents::SIZE);
+    let packet = match HoprPacket::into_outgoing(&msg, &path, &chain_key, tb, &dst).unwrap() {
+        HoprPacket::Outgoing { packet, ticket, .. } => {
+            let mut ret = Vec::with_capacity(HoprPacket::SIZE);
             ret.extend_from_slice(packet.as_ref());
             ret.extend_from_slice(&ticket.clone().into_encoded());
             ret.into_boxed_slice()
@@ -76,7 +76,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     group.throughput(Throughput::Elements(1));
     group.bench_function("any hop", |b| {
         b.iter(|| {
-            ChainPacketComponents::from_incoming(&packet, &relayer, sender.public().clone()).unwrap();
+            HoprPacket::from_incoming(&packet, &relayer, sender.public().clone()).unwrap();
         })
     });
 }
@@ -102,9 +102,9 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
 
     // Sender
-    let packet = match ChainPacketComponents::into_outgoing(&msg, &path, &chain_key, tb, &dst).unwrap() {
-        ChainPacketComponents::Outgoing { packet, ticket, .. } => {
-            let mut ret = Vec::with_capacity(ChainPacketComponents::SIZE);
+    let packet = match HoprPacket::into_outgoing(&msg, &path, &chain_key, tb, &dst).unwrap() {
+        HoprPacket::Outgoing { packet, ticket, .. } => {
+            let mut ret = Vec::with_capacity(HoprPacket::SIZE);
             ret.extend_from_slice(packet.as_ref());
             ret.extend_from_slice(&ticket.clone().into_encoded());
             ret.into_boxed_slice()
@@ -113,9 +113,9 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     };
 
     // Relayer
-    let packet = match ChainPacketComponents::from_incoming(&packet, &relayer, sender.public().clone()).unwrap() {
-        ChainPacketComponents::Forwarded { packet, ticket, .. } => {
-            let mut ret = Vec::with_capacity(ChainPacketComponents::SIZE);
+    let packet = match HoprPacket::from_incoming(&packet, &relayer, sender.public().clone()).unwrap() {
+        HoprPacket::Forwarded { packet, ticket, .. } => {
+            let mut ret = Vec::with_capacity(HoprPacket::SIZE);
             ret.extend_from_slice(packet.as_ref());
             ret.extend_from_slice(&ticket.clone().into_encoded());
             ret.into_boxed_slice()
@@ -129,7 +129,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     group.throughput(Throughput::Elements(1));
     group.bench_function("any hop", |b| {
         b.iter(|| {
-            ChainPacketComponents::from_incoming(&packet, &recipient, relayer.public().clone()).unwrap();
+            HoprPacket::from_incoming(&packet, &recipient, relayer.public().clone()).unwrap();
         })
     });
 }

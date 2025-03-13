@@ -5,32 +5,31 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
 
-use crate::errors::PacketError;
 use crate::errors::PacketError::PacketConstructionError;
 use crate::packet::{KeyIdMapper, MetaPacketRouting};
 use crate::{
     errors::{PacketError::PacketDecodingError, Result},
     packet::{ForwardedMetaPacket, MetaPacket},
     por::{pre_verify, ProofOfRelayString, ProofOfRelayValues},
-    CurrentSphinxSuite, HoprPseudonym, HoprSphinxHeaderSpec, HoprSurb,
+    HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
 };
 use hopr_crypto_sphinx::surb::SphinxRecipientMessage;
 
 /// Indicates the packet type.
 #[allow(clippy::large_enum_variant)] // TODO: see if some parts can be boxed
 #[derive(Clone)]
-pub enum ChainPacketComponents {
+pub enum HoprPacket {
     /// The packet is intended for us
     Final {
         packet_tag: PacketTag,
         ack_key: HalfKey,
         previous_hop: OffchainPublicKey,
         plain_text: Option<Box<[u8]>>,
-        surbs: Vec<(HoprPseudonym, SURB<CurrentSphinxSuite, HoprSphinxHeaderSpec>)>,
+        surbs: Vec<(HoprPseudonym, SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>)>,
     },
     /// The packet must be forwarded
     Forwarded {
-        packet: MetaPacket<CurrentSphinxSuite, HoprSphinxHeaderSpec>,
+        packet: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         ticket: Ticket,
         ack_challenge: HalfKeyChallenge,
         packet_tag: PacketTag,
@@ -43,14 +42,14 @@ pub enum ChainPacketComponents {
     },
     /// The packet that is being sent out by us
     Outgoing {
-        packet: MetaPacket<CurrentSphinxSuite, HoprSphinxHeaderSpec>,
+        packet: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         ticket: Ticket,
         next_hop: OffchainPublicKey,
         ack_challenge: HalfKeyChallenge,
     },
 }
 
-impl Display for ChainPacketComponents {
+impl Display for HoprPacket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
             Self::Final { .. } => write!(f, "Final"),
@@ -69,11 +68,11 @@ pub enum PacketRouting<'a> {
     Surb(HoprSurb),
 }
 
-impl ChainPacketComponents {
+impl HoprPacket {
     /// The size of the packet including header, padded payload, ticket, and ack challenge.
-    pub const SIZE: usize = MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN + Ticket::SIZE;
+    pub const SIZE: usize = MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN + Ticket::SIZE;
 
-    fn into_raw_msg<M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>>(
+    fn into_raw_msg<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
         msg: &[u8],
         msg_type: SphinxRecipientMessage<HoprPseudonym>,
         routing: PacketRouting,
@@ -90,7 +89,7 @@ impl ChainPacketComponents {
                     ));
                 }
 
-                let shared_keys = CurrentSphinxSuite::new_shared_keys(forward_path)?;
+                let shared_keys = HoprSphinxSuite::new_shared_keys(forward_path)?;
                 let por_values = ProofOfRelayValues::new(
                     &shared_keys.secrets[0],
                     shared_keys.secrets.get(1),
@@ -105,7 +104,7 @@ impl ChainPacketComponents {
                     .leak();
 
                 Ok(Self::Outgoing {
-                    packet: MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::new(
+                    packet: MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::new(
                         msg,
                         MetaPacketRouting::ForwardPath {
                             shared_keys,
@@ -136,7 +135,7 @@ impl ChainPacketComponents {
                         ))
                     })?,
                     ack_challenge: surb.additional_data_receiver.acknowledgement_challenge(),
-                    packet: MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::new(
+                    packet: MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::new(
                         msg,
                         MetaPacketRouting::Surb(surb),
                         mapper,
@@ -146,18 +145,16 @@ impl ChainPacketComponents {
         }
     }
 
-    fn create_surb_for_path<M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>>(
+    fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
         return_path: &[OffchainPublicKey],
         pseudonym: HoprPseudonym,
         mapper: &M,
     ) -> Result<(HoprSurb, ReplyOpener)> {
         if return_path.is_empty() {
-            return Err(PacketError::PacketConstructionError(
-                "return path cannot be empty".into(),
-            ));
+            return Err(PacketConstructionError("return path cannot be empty".into()));
         }
 
-        let shared_keys = CurrentSphinxSuite::new_shared_keys(return_path)?;
+        let shared_keys = HoprSphinxSuite::new_shared_keys(return_path)?;
         let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
         let por_values = ProofOfRelayValues::new(
             &shared_keys.secrets[0],
@@ -165,7 +162,7 @@ impl ChainPacketComponents {
             shared_keys.secrets.len() as u8,
         )?;
 
-        Ok(create_surb::<CurrentSphinxSuite, HoprSphinxHeaderSpec>(
+        Ok(create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
             shared_keys,
             &return_path
                 .iter()
@@ -181,45 +178,68 @@ impl ChainPacketComponents {
         )?)
     }
 
+    /// Calculates how many SURBs can be fitted into a packet that
+    /// also carries a message of the given length.
+    pub const fn max_surbs_with_message(msg_len: usize) -> usize {
+        (PAYLOAD_SIZE - msg_len) / HoprSurb::SIZE
+    }
+
     /// Constructs a new outgoing packet with the given path.
+    ///
     /// # Arguments
     /// * `msg` packet payload
     /// * `routing` routing to the destination
+    /// * `surb` optional SURBs with same pseudonym
     /// * `chain_keypair` private key of the local node
     /// * `ticket` ticket builder for the first hop on the path
     /// * `domain_separator` channels contract domain separator
-    pub fn into_outgoing<M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>>(
+    ///
+    /// **NOTE**
+    /// For the given pseudonym, the [`ReplyOpener`] order matters.
+    pub fn into_outgoing<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
         msg: &[u8],
         routing: PacketRouting,
-        surb: Option<(HoprPseudonym, &[OffchainPublicKey])>,
+        surb: Option<(HoprPseudonym, &[&[OffchainPublicKey]])>,
         chain_keypair: &ChainKeypair,
         ticket: TicketBuilder,
         mapper: &M,
         domain_separator: &Hash,
-    ) -> Result<(Self, Option<ReplyOpener>)> {
-        if let Some((pseudonym, return_path)) = surb {
-            if msg.len() + HoprSurb::SIZE > PAYLOAD_SIZE {
-                return Err(PacketError::PacketConstructionError(
-                    "message too long to fit with a surb into the packet".into(),
-                ));
+    ) -> Result<(Self, Vec<ReplyOpener>)> {
+        if let Some((pseudonym, return_paths)) = surb {
+            if msg.len() + return_paths.len() * HoprSurb::SIZE > PAYLOAD_SIZE {
+                return Err(PacketConstructionError(format!(
+                    "message too long to fit with {} surbs into the packet",
+                    return_paths.len()
+                )));
             }
 
-            let (surb, opener) = Self::create_surb_for_path(return_path, pseudonym, mapper)?;
+            let mut composed_msg = Vec::with_capacity(msg.len() + return_paths.len() * HoprSurb::SIZE);
+            let mut openers = Vec::with_capacity(return_paths.len());
+            for return_path in return_paths {
+                let (surb, opener) = Self::create_surb_for_path(return_path, pseudonym, mapper)?;
 
-            let mut composed_msg = Vec::with_capacity(msg.len() + HoprSurb::SIZE);
-            composed_msg.extend(surb.into_boxed());
-            composed_msg.extend_from_slice(msg);
+                composed_msg.extend(surb.into_boxed());
+                openers.push(opener);
+            }
+
+            // TODO: this should be refactored into a better enum
+            let msg_type = if msg.is_empty() {
+                SphinxRecipientMessage::SurbsOnly(return_paths.len() as u8, pseudonym)
+            } else {
+                composed_msg.extend_from_slice(msg);
+                SphinxRecipientMessage::DataWithSurb(pseudonym)
+            };
 
             Self::into_raw_msg(
                 &composed_msg,
-                SphinxRecipientMessage::DataWithSurb(pseudonym),
+                msg_type,
                 routing,
                 chain_keypair,
                 ticket,
                 mapper,
                 domain_separator,
             )
-            .map(|p| (p, Some(opener)))
+            .map(|p| (p, openers))
         } else {
             Self::into_raw_msg(
                 msg,
@@ -230,46 +250,8 @@ impl ChainPacketComponents {
                 mapper,
                 domain_separator,
             )
-            .map(|p| (p, None))
+            .map(|p| (p, Vec::with_capacity(0)))
         }
-    }
-
-    pub fn into_outgoing_surbs<M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>>(
-        pseudonym: HoprPseudonym,
-        return_paths: &[&[OffchainPublicKey]],
-        routing: PacketRouting,
-        chain_keypair: &ChainKeypair,
-        ticket: TicketBuilder,
-        mapper: &M,
-        domain_separator: &Hash,
-    ) -> Result<(Self, Vec<ReplyOpener>)> {
-        if return_paths.is_empty() || return_paths.len() * HoprSurb::SIZE > PAYLOAD_SIZE {
-            return Err(PacketError::PacketConstructionError(format!(
-                "too many SURBs ({} bytes total) to fit in a single packet",
-                return_paths.len() * HoprSurb::SIZE
-            )));
-        }
-
-        let mut composed_msg = Vec::with_capacity(return_paths.len() * HoprSurb::SIZE);
-        let mut openers = Vec::with_capacity(return_paths.len());
-
-        for return_path in return_paths {
-            let (surb, opener) = Self::create_surb_for_path(return_path, pseudonym, mapper)?;
-
-            composed_msg.extend(surb.into_boxed());
-            openers.push(opener);
-        }
-
-        Self::into_raw_msg(
-            &composed_msg,
-            SphinxRecipientMessage::SurbsOnly(return_paths.len() as u8, pseudonym),
-            routing,
-            chain_keypair,
-            ticket,
-            mapper,
-            domain_separator,
-        )
-        .map(|p| (p, openers))
     }
 
     /// Deserializes the packet and performs the forward-transformation, so the
@@ -282,14 +264,14 @@ impl ChainPacketComponents {
         reply_openers: F,
     ) -> Result<Self>
     where
-        M: KeyIdMapper<CurrentSphinxSuite, HoprSphinxHeaderSpec>,
+        M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
         F: FnMut(&HoprPseudonym) -> Option<ReplyOpener>,
     {
         if data.len() == Self::SIZE {
             let (pre_packet, pre_ticket) =
-                data.split_at(MetaPacket::<CurrentSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN);
+                data.split_at(MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN);
 
-            let mp: MetaPacket<CurrentSphinxSuite, HoprSphinxHeaderSpec> = MetaPacket::try_from(pre_packet)?;
+            let mp: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec> = MetaPacket::try_from(pre_packet)?;
 
             match mp.into_forwarded(node_keypair, mapper, reply_openers)? {
                 ForwardedMetaPacket::Relayed {
@@ -369,7 +351,7 @@ impl ChainPacketComponents {
 
 #[cfg(test)]
 mod tests {
-    use super::{ChainPacketComponents, PacketRouting};
+    use super::{HoprPacket, PacketRouting};
 
     use anyhow::{anyhow, bail, Context};
     use bimap::BiHashMap;
@@ -399,13 +381,13 @@ mod tests {
     }
 
     fn forward(
-        packet: ChainPacketComponents,
+        packet: HoprPacket,
         chain_keypair: &ChainKeypair,
         next_ticket: TicketBuilder,
         domain_separator: &Hash,
-    ) -> ChainPacketComponents {
+    ) -> HoprPacket {
         match packet {
-            ChainPacketComponents::Forwarded {
+            HoprPacket::Forwarded {
                 next_challenge,
                 packet,
                 ack_challenge,
@@ -422,7 +404,7 @@ mod tests {
                     .build_signed(chain_keypair, domain_separator)
                     .expect("ticket should create")
                     .leak();
-                ChainPacketComponents::Forwarded {
+                HoprPacket::Forwarded {
                     packet,
                     ticket,
                     ack_challenge,
@@ -439,7 +421,7 @@ mod tests {
         }
     }
 
-    impl ChainPacketComponents {
+    impl HoprPacket {
         pub fn to_bytes(&self) -> Box<[u8]> {
             let dummy_ticket = hex!("67f0ca18102feec505e5bfedcc25963e9c64a6f8a250adcad7d2830dd607585700000000000000000000000000000000000000000000000000000000000000003891bf6fd4a78e868fc7ad477c09b16fc70dd01ea67e18264d17e3d04f6d8576de2e6472b0072e510df6e9fa1dfcc2727cc7633edfeb9ec13860d9ead29bee71d68de3736c2f7a9f42de76ccd57a5f5847bc7349");
             let (packet, ticket) = match self {
@@ -486,12 +468,14 @@ mod tests {
 
     fn create_packet(
         forward_hops: usize,
-        return_hops: Option<(HoprPseudonym, usize)>,
+        return_hops: Option<(HoprPseudonym, Vec<usize>)>,
         msg: &[u8],
-    ) -> anyhow::Result<(ChainPacketComponents, Option<ReplyOpener>)> {
+    ) -> anyhow::Result<(HoprPacket, Vec<ReplyOpener>)> {
         assert!((0..=3).contains(&forward_hops), "forward hops must be between 1 and 3");
         assert!(
-            return_hops.is_none_or(|(_, return_hops)| (0..=3).contains(&return_hops)),
+            return_hops
+                .as_ref()
+                .is_none_or(|(_, ret_hops)| ret_hops.iter().all(|h| (0..=3).contains(h))),
             "return hops must be between 1 and 3"
         );
 
@@ -501,24 +485,28 @@ mod tests {
             .map(|kp| *kp.1.public())
             .collect::<Vec<_>>();
 
-        if let Some((pseudonym, return_hops)) = return_hops {
-            let return_path = PEERS[0..=return_hops]
-                .iter()
-                .rev()
-                .map(|kp| *kp.1.public())
+        if let Some((pseudonym, ret_hops)) = return_hops {
+            let return_paths = ret_hops
+                .into_iter()
+                .map(|h| PEERS[0..=h].iter().rev().map(|kp| *kp.1.public()).collect::<Vec<_>>())
                 .collect::<Vec<_>>();
 
-            Ok(ChainPacketComponents::into_outgoing(
+            let return_paths_refs = return_paths
+                .iter()
+                .map(|return_path| return_path.as_slice())
+                .collect::<Vec<_>>();
+
+            Ok(HoprPacket::into_outgoing(
                 msg,
                 PacketRouting::ForwardPath(&path),
-                Some((pseudonym, &return_path)),
+                Some((pseudonym, &return_paths_refs)),
                 &PEERS[0].0,
                 ticket,
                 &*MAPPER,
                 &Hash::default(),
             )?)
         } else {
-            Ok(ChainPacketComponents::into_outgoing(
+            Ok(HoprPacket::into_outgoing(
                 msg,
                 PacketRouting::ForwardPath(&path),
                 None,
@@ -530,55 +518,7 @@ mod tests {
         }
     }
 
-    fn create_surbs_only_packet(
-        forward_hops: usize,
-        pseudonym: HoprPseudonym,
-        return_hops: Vec<usize>,
-    ) -> anyhow::Result<(ChainPacketComponents, Vec<ReplyOpener>)> {
-        assert!((0..=3).contains(&forward_hops), "forward hops must be between 1 and 3");
-        assert!(
-            return_hops.iter().all(|return_hops| (0..=3).contains(return_hops)),
-            "return hops must be between 1 and 3"
-        );
-
-        let ticket = mock_ticket(&PEERS[1].0.public().0, forward_hops + 1, &PEERS[0].0)?;
-        let path = PEERS[1..=forward_hops + 1]
-            .iter()
-            .map(|kp| *kp.1.public())
-            .collect::<Vec<_>>();
-
-        let return_paths = return_hops
-            .into_iter()
-            .map(|return_hops| {
-                PEERS[0..=return_hops]
-                    .iter()
-                    .rev()
-                    .map(|kp| *kp.1.public())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-
-        let return_paths_refs = return_paths
-            .iter()
-            .map(|return_path| return_path.as_slice())
-            .collect::<Vec<_>>();
-
-        Ok(ChainPacketComponents::into_outgoing_surbs(
-            pseudonym,
-            &return_paths_refs,
-            PacketRouting::ForwardPath(&path),
-            &PEERS[0].0,
-            ticket,
-            &*MAPPER,
-            &Hash::default(),
-        )?)
-    }
-
-    fn create_packet_from_surb(
-        sender_node: usize,
-        surb: HoprSurb,
-        msg: &[u8],
-    ) -> anyhow::Result<ChainPacketComponents> {
+    fn create_packet_from_surb(sender_node: usize, surb: HoprSurb, msg: &[u8]) -> anyhow::Result<HoprPacket> {
         assert!((1..=4).contains(&sender_node), "sender_node must be between 1 and 4");
 
         let ticket = mock_ticket(
@@ -587,7 +527,7 @@ mod tests {
             &PEERS[sender_node].0,
         )?;
 
-        Ok(ChainPacketComponents::into_outgoing(
+        Ok(HoprPacket::into_outgoing(
             msg,
             PacketRouting::Surb(surb),
             None,
@@ -603,9 +543,9 @@ mod tests {
         path_len: usize,
         node_pos: usize,
         is_reply: bool,
-        packet: ChainPacketComponents,
+        packet: HoprPacket,
         openers: F,
-    ) -> anyhow::Result<ChainPacketComponents>
+    ) -> anyhow::Result<HoprPacket>
     where
         F: FnMut(&HoprPseudonym) -> Option<ReplyOpener>,
     {
@@ -618,13 +558,12 @@ mod tests {
             (_, true) => PEERS[node_pos + 1].1.public().clone(),
         };
 
-        let packet =
-            ChainPacketComponents::from_incoming(&packet.to_bytes(), &PEERS[node_pos].1, prev_hop, &*MAPPER, openers)
-                .context(format!("deserialization failure at hop {node_pos}"))?;
+        let packet = HoprPacket::from_incoming(&packet.to_bytes(), &PEERS[node_pos].1, prev_hop, &*MAPPER, openers)
+            .context(format!("deserialization failure at hop {node_pos}"))?;
 
         match &packet {
-            ChainPacketComponents::Final { .. } => Ok(packet),
-            ChainPacketComponents::Forwarded { .. } => {
+            HoprPacket::Final { .. } => Ok(packet),
+            HoprPacket::Forwarded { .. } => {
                 let next_hop = match (node_pos, is_reply) {
                     (3, false) => PEERS[4].0.public().0.clone(),
                     (_, false) => PEERS[node_pos + 1].0.public().0.clone(),
@@ -640,7 +579,7 @@ mod tests {
                     &Hash::default(),
                 ))
             }
-            ChainPacketComponents::Outgoing { .. } => bail!("invalid packet state"),
+            HoprPacket::Outgoing { .. } => bail!("invalid packet state"),
         }
     }
 
@@ -649,9 +588,9 @@ mod tests {
         let msg = b"some testing forward message";
         let (mut packet, opener) = create_packet(hops, None, msg)?;
 
-        assert!(opener.is_none());
+        assert!(opener.is_empty());
         match &packet {
-            ChainPacketComponents::Outgoing { .. } => {}
+            HoprPacket::Outgoing { .. } => {}
             _ => bail!("invalid packet initial state"),
         }
 
@@ -661,11 +600,11 @@ mod tests {
                 .context(format!("packet decoding failed at hop {hop}"))?;
 
             match &packet {
-                ChainPacketComponents::Final { plain_text, .. } => {
+                HoprPacket::Final { plain_text, .. } => {
                     assert_eq!(hop - 1, hops, "final packet must be at the last hop");
                     actual_plain_text = plain_text.as_ref().map(|pt| pt.clone());
                 }
-                ChainPacketComponents::Forwarded {
+                HoprPacket::Forwarded {
                     previous_hop,
                     next_hop,
                     path_pos,
@@ -675,7 +614,7 @@ mod tests {
                     assert_eq!(PEERS[hop + 1].1.public(), next_hop, "invalid next hop");
                     assert_eq!(hops + 1 - hop, *path_pos as usize, "invalid path position");
                 }
-                ChainPacketComponents::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
+                HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
             }
         }
 
@@ -688,11 +627,11 @@ mod tests {
     fn test_packet_forward_message_with_surb(forward_hops: usize, return_hops: usize) -> anyhow::Result<()> {
         let msg = b"some testing forward message";
         let pseudonym = SimplePseudonym::random();
-        let (mut packet, opener) = create_packet(forward_hops, Some((pseudonym, return_hops)), msg)?;
+        let (mut packet, openers) = create_packet(forward_hops, Some((pseudonym, vec![return_hops])), msg)?;
 
-        assert!(opener.is_some());
+        assert_eq!(1, openers.len(), "invalid number of openers");
         match &packet {
-            ChainPacketComponents::Outgoing { .. } => {}
+            HoprPacket::Outgoing { .. } => {}
             _ => bail!("invalid packet initial state"),
         }
 
@@ -703,12 +642,12 @@ mod tests {
                 .context(format!("packet decoding failed at hop {hop}"))?;
 
             match &packet {
-                ChainPacketComponents::Final { plain_text, surbs, .. } => {
+                HoprPacket::Final { plain_text, surbs, .. } => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
                     received_plain_text = plain_text.clone().ok_or(anyhow!("no plaintext found"))?;
                     received_surbs.extend(surbs.clone());
                 }
-                ChainPacketComponents::Forwarded {
+                HoprPacket::Forwarded {
                     previous_hop,
                     next_hop,
                     path_pos,
@@ -718,7 +657,7 @@ mod tests {
                     assert_eq!(PEERS[hop + 1].1.public(), next_hop, "invalid next hop");
                     assert_eq!(forward_hops + 1 - hop, *path_pos as usize, "invalid path position");
                 }
-                ChainPacketComponents::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
+                HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
             }
         }
 
@@ -743,11 +682,11 @@ mod tests {
 
         // Forward packet
         let fwd_msg = b"some testing forward message";
-        let (mut fwd_packet, opener) = create_packet(forward_hops, Some((pseudonym, return_hops)), fwd_msg)?;
+        let (mut fwd_packet, mut openers) = create_packet(forward_hops, Some((pseudonym, vec![return_hops])), fwd_msg)?;
 
-        assert!(opener.is_some());
+        assert_eq!(1, openers.len(), "invalid number of openers");
         match &fwd_packet {
-            ChainPacketComponents::Outgoing { .. } => {}
+            HoprPacket::Outgoing { .. } => {}
             _ => bail!("invalid packet initial state"),
         }
 
@@ -758,12 +697,12 @@ mod tests {
                 .context(format!("packet decoding failed at hop {hop}"))?;
 
             match &fwd_packet {
-                ChainPacketComponents::Final { plain_text, surbs, .. } => {
+                HoprPacket::Final { plain_text, surbs, .. } => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
                     received_fwd_plain_text = plain_text.clone().ok_or(anyhow!("no plaintext found"))?;
                     received_surbs.extend(surbs.clone());
                 }
-                ChainPacketComponents::Forwarded {
+                HoprPacket::Forwarded {
                     previous_hop,
                     next_hop,
                     path_pos,
@@ -773,7 +712,7 @@ mod tests {
                     assert_eq!(PEERS[hop + 1].1.public(), next_hop, "invalid next hop");
                     assert_eq!(forward_hops + 1 - hop, *path_pos as usize, "invalid path position");
                 }
-                ChainPacketComponents::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
+                HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
             }
         }
 
@@ -790,28 +729,28 @@ mod tests {
         let re_msg = b"some testing reply message";
         let mut re_packet = create_packet_from_surb(forward_hops + 1, received_surbs[0].1.clone(), re_msg)?;
 
-        let openers = |p: &HoprPseudonym| {
+        let mut openers_fn = |p: &HoprPseudonym| {
             assert_eq!(p, &pseudonym);
-            opener.clone()
+            openers.pop()
         };
 
         match &re_packet {
-            ChainPacketComponents::Outgoing { .. } => {}
+            HoprPacket::Outgoing { .. } => {}
             _ => bail!("invalid packet initial state"),
         }
 
         let mut received_re_plain_text = Box::default();
         for hop in (0..=return_hops).rev() {
-            re_packet = process_packet_at_node(return_hops + 1, hop, true, re_packet, openers)
+            re_packet = process_packet_at_node(return_hops + 1, hop, true, re_packet, &mut openers_fn)
                 .context(format!("packet decoding failed at hop {hop}"))?;
 
             match &re_packet {
-                ChainPacketComponents::Final { plain_text, surbs, .. } => {
+                HoprPacket::Final { plain_text, surbs, .. } => {
                     assert_eq!(hop, 0, "final packet must be at the last hop");
                     assert!(surbs.is_empty(), "must not receive surbs on reply");
                     received_re_plain_text = plain_text.clone().ok_or(anyhow!("no plaintext found"))?;
                 }
-                ChainPacketComponents::Forwarded {
+                HoprPacket::Forwarded {
                     previous_hop,
                     next_hop,
                     path_pos,
@@ -821,7 +760,7 @@ mod tests {
                     assert_eq!(PEERS[hop - 1].1.public(), next_hop, "invalid next hop");
                     assert_eq!(hop, *path_pos as usize, "invalid path position");
                 }
-                ChainPacketComponents::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
+                HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
             }
         }
 
@@ -838,12 +777,11 @@ mod tests {
         let pseudonym = SimplePseudonym::random();
 
         // Forward packet
-        let (mut fwd_packet, mut openers) =
-            create_surbs_only_packet(forward_hops, pseudonym, vec![return_hops, return_hops])?;
+        let (mut fwd_packet, mut openers) = create_packet(forward_hops, Some((pseudonym, vec![return_hops; 2])), &[])?;
 
         assert_eq!(2, openers.len(), "invalid number of openers");
         match &fwd_packet {
-            ChainPacketComponents::Outgoing { .. } => {}
+            HoprPacket::Outgoing { .. } => {}
             _ => bail!("invalid packet initial state"),
         }
 
@@ -853,13 +791,13 @@ mod tests {
                 .context(format!("packet decoding failed at hop {hop}"))?;
 
             match &fwd_packet {
-                ChainPacketComponents::Final { plain_text, surbs, .. } => {
+                HoprPacket::Final { plain_text, surbs, .. } => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
                     assert!(plain_text.is_none(), "must not receive plaintext on surbs only packet");
                     assert_eq!(2, surbs.len(), "invalid number of received surbs per packet");
                     received_surbs.extend(surbs.clone());
                 }
-                ChainPacketComponents::Forwarded {
+                HoprPacket::Forwarded {
                     previous_hop,
                     next_hop,
                     path_pos,
@@ -869,7 +807,7 @@ mod tests {
                     assert_eq!(PEERS[hop + 1].1.public(), next_hop, "invalid next hop");
                     assert_eq!(forward_hops + 1 - hop, *path_pos as usize, "invalid path position");
                 }
-                ChainPacketComponents::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
+                HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
             }
         }
 
@@ -894,7 +832,7 @@ mod tests {
             let mut re_packet = create_packet_from_surb(forward_hops + 1, recv_surb, re_msg.as_bytes())?;
 
             match &re_packet {
-                ChainPacketComponents::Outgoing { .. } => {}
+                HoprPacket::Outgoing { .. } => {}
                 _ => bail!("invalid packet initial state in reply {i}"),
             }
 
@@ -904,13 +842,13 @@ mod tests {
                     .context(format!("packet decoding failed at hop {hop} in reply {i}"))?;
 
                 match &re_packet {
-                    ChainPacketComponents::Final { plain_text, surbs, .. } => {
+                    HoprPacket::Final { plain_text, surbs, .. } => {
                         assert_eq!(hop, 0, "final packet must be at the last hop for reply {i}");
                         assert!(surbs.is_empty(), "must not receive surbs on reply for reply {i}");
                         received_re_plain_text =
                             plain_text.clone().ok_or(anyhow!("no plaintext found in reply {i}"))?;
                     }
-                    ChainPacketComponents::Forwarded {
+                    HoprPacket::Forwarded {
                         previous_hop,
                         next_hop,
                         path_pos,
@@ -924,7 +862,7 @@ mod tests {
                         assert_eq!(PEERS[hop - 1].1.public(), next_hop, "invalid next hop in reply {i}");
                         assert_eq!(hop, *path_pos as usize, "invalid path position in reply {i}");
                     }
-                    ChainPacketComponents::Outgoing { .. } => bail!("invalid packet state at hop {hop} in reply {i}"),
+                    HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop} in reply {i}"),
                 }
             }
 
