@@ -28,7 +28,7 @@ def pytest_addoption(parser: pytest.Parser):
         "--stress-sources",
         action="store",
         type=str,
-        help="""The JSON string containing the list of dicts with 'url' and 'token' keys for each 
+        help="""The JSON string containing the list of dicts with 'url' and 'token' keys for each
         stress test source node""",
     )
     parser.addoption(
@@ -75,12 +75,11 @@ def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 async def swarm7(request):
     # path is related to where the test is run. Most likely the root of the repo
-    cluster, anvil = await localcluster.bringup(
-        "./sdk/python/localcluster.params.yml", test_mode=True, fully_connected=False
-    )
+    params_path = os.path.join(os.path.dirname(__file__), "../sdk/python/localcluster.params.yml")
+    cluster, anvil = await localcluster.bringup(params_path, test_mode=True, fully_connected=False)
 
     yield cluster.nodes
 
@@ -88,10 +87,11 @@ async def swarm7(request):
     anvil.kill()
 
 
-@pytest.fixture(scope="module", autouse=True)
-async def teardown(swarm7: dict[str, Node]):
+@pytest.fixture(scope="function")
+async def swarm7_reset(swarm7: dict[str, Node]):
     yield
 
+    logging.info("Resetting swarm7 nodes")
     try:
         await asyncio.gather(*[node.api.reset_tickets_statistics() for node in swarm7.values()])
     except Exception as e:
