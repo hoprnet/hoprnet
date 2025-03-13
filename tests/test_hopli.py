@@ -11,6 +11,7 @@ from sdk.python.localcluster.constants import (
     ANVIL_CONFIG_FILE,
     IDENTITY_PREFIX,
     CONTRACTS_ADDRESSES,
+    CONTRACTS_DIR,
     MAIN_DIR,
     NETWORK,
     PASSWORD,
@@ -25,8 +26,6 @@ FIXTURES_PREFIX_NEW = "hopr-node-new_"
 PASSWORD_NEW = "e2e-test-new"
 
 ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
-
-CONTRACTS_DIR = os.path.join(os.path.dirname(__file__), "../ethereum/contracts")
 
 
 def remove_identity(folder: Path, filename: str):
