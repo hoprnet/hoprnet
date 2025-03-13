@@ -1,5 +1,4 @@
 import logging
-import os
 from pathlib import Path
 
 logging.basicConfig(format="%(asctime)s %(message)s")
@@ -19,7 +18,7 @@ PORT_BASE = 3000
 
 SUITE_NAME = "hopr-localcluster"
 MAIN_DIR = Path("/tmp").joinpath(SUITE_NAME)
-CONTRACTS_DIR = Path(__file__).parent.joinpath("../../../ethereum/contracts")
+CONTRACTS_DIR = PWD.joinpath("ethereum/contracts")
 
 ANVIL_FOLDER_NAME = "anvil"
 ANVIL_FOLDER = MAIN_DIR.joinpath(ANVIL_FOLDER_NAME)
