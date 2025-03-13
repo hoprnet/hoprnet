@@ -27,8 +27,6 @@ PASSWORD_NEW = "e2e-test-new"
 
 ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
 
-CONTRACTS_DIR = os.path.join(os.path.dirname(__file__), "../ethereum/contracts")
-
 
 def remove_identity(folder: Path, filename: str):
     run(["rm", "-f", folder.joinpath(filename)], check=True, capture_output=True)
