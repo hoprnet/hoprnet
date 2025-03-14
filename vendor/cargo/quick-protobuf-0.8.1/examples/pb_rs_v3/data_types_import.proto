@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package a.b;
-
-message ImportedMessage {
-    bool i = 1;
-}

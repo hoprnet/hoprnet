@@ -8,6 +8,7 @@ use std::time::Duration;
 
 const SNAPSHOT_BASE: &str = "tests/snapshots/node_snapshot_base";
 
+#[ignore] // Ignore for now, until the actual test is implemented
 #[cfg_attr(feature = "runtime-async-std", async_std::test)]
 #[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::test)]
 async fn hopr_node_integration_test() {

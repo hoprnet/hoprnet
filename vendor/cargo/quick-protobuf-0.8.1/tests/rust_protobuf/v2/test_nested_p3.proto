@@ -1,5 +1,0 @@
-syntax = "proto2";
-
-package test_nested_package_dir.empty.package;
-
-import "test_nested_p2.proto";

@@ -5,5 +5,5 @@ pub mod errors;
 /// Utilities for working with multiaddresses
 pub mod multiaddrs;
 
-pub use libp2p_identity::PeerId;
+pub use libp2p_identity::{Keypair, PeerId};
 pub use multiaddr::Multiaddr;

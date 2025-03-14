@@ -7,6 +7,9 @@
 //!
 //! Both of these traits implemented and realized via the [RpcOperations](rpc::RpcOperations) type,
 //! so this represents the main entry point to all RPC related operations.
+
+extern crate core;
+
 use async_trait::async_trait;
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 use futures::{FutureExt, Stream};
@@ -32,6 +35,7 @@ pub mod client;
 pub mod errors;
 mod helper;
 pub mod indexer;
+pub mod middleware;
 pub mod rpc;
 
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
@@ -235,12 +239,32 @@ impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
 
 /// Abstraction for an HTTP client that performs HTTP POST with serializable request data.
 #[async_trait]
-pub trait HttpPostRequestor: Send + Sync {
+pub trait HttpRequestor: std::fmt::Debug + Send + Sync {
+    /// Performs HTTP request with optional JSON data to the given URL
+    /// and gets the JSON response.
+    async fn http_query<T>(
+        &self,
+        method: http_types::Method,
+        url: &str,
+        data: Option<T>,
+    ) -> std::result::Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync;
+
     /// Performs HTTP POST of JSON data to the given URL
     /// and gets the JSON response.
     async fn http_post<T>(&self, url: &str, data: T) -> std::result::Result<Box<[u8]>, HttpRequestError>
     where
-        T: Serialize + Send + Sync;
+        T: Serialize + Send + Sync,
+    {
+        self.http_query(http_types::Method::Post, url, Some(data)).await
+    }
+
+    /// Performs HTTP GET query to the given URL
+    /// and gets the JSON response.
+    async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError> {
+        self.http_query(http_types::Method::Get, url, Option::<()>::None).await
+    }
 }
 
 /// Common configuration for all native `HttpPostRequestor`s
@@ -371,16 +395,24 @@ pub trait HoprRpcOperations {
     /// Retrieves the node's account balance of the given type.
     async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
 
+    /// Retrieves the minimum incoming ticket winning probability by directly
+    /// calling the network's winning probability oracle.
+    async fn get_minimum_network_winning_probability(&self) -> Result<f64>;
+
+    /// Retrieves the minimum ticket prices by directly calling the network's
+    /// ticket price oracle.
+    async fn get_minimum_network_ticket_price(&self) -> Result<Balance>;
+
     /// Retrieves the node's eligibility status
     async fn get_eligibility_status(&self, address: Address) -> Result<bool>;
 
-    /// Retrieves info of the given node module's target.
+    /// Retrieves information of the given node module's target.
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>>;
 
-    /// Retrieves safe address of the given node address from the registry.
+    /// Retrieves the safe address of the given node address from the registry.
     async fn get_safe_from_node_safe_registry(&self, node: Address) -> Result<Address>;
 
-    /// Retrieves target address of the node module.
+    /// Retrieves the target address of the node module.
     async fn get_module_target_address(&self) -> Result<Address>;
 
     /// Retrieves the notice period of channel closure from the Channels contract.

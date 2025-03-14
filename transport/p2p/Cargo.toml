@@ -15,8 +15,11 @@ prometheus = [
   "dep:hopr-metrics",
   "hopr-transport-protocol/prometheus",
 ]
-runtime-async-std = ["libp2p/async-std"]
-runtime-tokio = ["libp2p/tokio"]
+runtime-async-std = [
+  "libp2p/async-std",
+  "hopr-transport-protocol/runtime-async-std",
+]
+runtime-tokio = ["libp2p/tokio", "hopr-transport-protocol/runtime-tokio"]
 
 [dependencies]
 futures = { workspace = true }
@@ -47,3 +50,8 @@ hopr-transport-protocol = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 async-std = { workspace = true }
+async-trait = { workspace = true }
+test-log = { workspace = true }
+tokio = { workspace = true }
+hopr-crypto-types = { workspace = true }
+hopr-platform = { workspace = true }

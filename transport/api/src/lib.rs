@@ -225,7 +225,7 @@ where
             path_planner: PathPlanner::new(
                 db.clone(),
                 DfsPathSelectorConfig {
-                    quality_threshold: cfg.network.quality_bad_threshold,
+                    quality_threshold: cfg.network.quality_auto_path_threshold,
                     ..Default::default()
                 },
                 channel_graph.clone(),
@@ -517,8 +517,12 @@ where
         processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
 
         // initiate the msg-ack protocol stack over the wire transport
-        let packet_cfg =
-            PacketInteractionConfig::new(&self.me, me_onchain, self.cfg.protocol.outgoing_ticket_winning_prob);
+        let packet_cfg = PacketInteractionConfig::new(
+            &self.me,
+            me_onchain,
+            self.cfg.protocol.outgoing_ticket_winning_prob,
+            self.cfg.protocol.outgoing_ticket_price,
+        );
 
         let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<ApplicationData>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(

@@ -85,7 +85,7 @@ class Cluster:
                 logging.error(f"Node {node} did not return addresses")
 
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
-        logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to connect to all peers")
+        logging.info(f"Waiting up to {2 * GLOBAL_TIMEOUT}s for nodes to connect to all peers")
 
         tasks = []
         for node in self.nodes.values():
@@ -183,9 +183,11 @@ class Cluster:
         await asyncio.gather(*tasks)
 
     async def links(self):
-        print("")
+        links_blocks = ["\n\n"]
         for node in self.nodes.values():
-            await node.links()
+            links_blocks.append(await node.links())
+
+        logging.info("\n".join(links_blocks))
 
     @property
     def size(self):

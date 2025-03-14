@@ -49,7 +49,6 @@ bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_std"] }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 more-asserts = { workspace = true }
-parameterized = { workspace = true }
 serial_test = { workspace = true }
 tracing-test = { workspace = true }
 hopr-transport-mixer = { workspace = true }

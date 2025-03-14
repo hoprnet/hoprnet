@@ -153,7 +153,7 @@ Options:
       --maxBlockRange <MAX_BLOCK_RANGE>
           Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
       --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>
-          Maximum number of RPC requestes that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
+          Maximum number of RPC requests that can be performed per second. [env: HOPRD_MAX_RPC_REQUESTS_PER_SEC=]
       --provider <PROVIDER>
           A custom RPC provider to be used for the node to connect to blockchain [env: HOPRD_PROVIDER=]
       --init...
@@ -177,7 +177,7 @@ Options:
       --safeAddress <HOPRD_SAFE_ADDR>
           Address of Safe that safeguards tokens [env: HOPRD_SAFE_ADDRESS=]
       --moduleAddress <HOPRD_MODULE_ADDR>
-          Address of the node mangement module [env: HOPRD_MODULE_ADDRESS=]
+          Address of the node management module [env: HOPRD_MODULE_ADDRESS=]
       --protocolConfig <HOPRD_PROTOCOL_CONFIG_PATH>
           Path to the protocol-config.json file [env: HOPRD_PROTOCOL_CONFIG_PATH=]
   -h, --help
@@ -203,8 +203,9 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
 - `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
 - `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
+- `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
-- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified).
+- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
 
 ### Example execution
 

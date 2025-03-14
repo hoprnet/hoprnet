@@ -1,4 +1,4 @@
-use futures::{stream, StreamExt};
+use futures::{stream, FutureExt, StreamExt};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
@@ -10,7 +10,9 @@ use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::info::HoprDbInfoOperations;
 use hopr_db_sql::HoprDbGeneralModelOperations;
-use hopr_primitive_types::prelude::*;
+
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_primitive_types::prelude::ToHex;
 
 use crate::{
     errors::{CoreEthereumIndexerError, Result},
@@ -19,25 +21,29 @@ use crate::{
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleGauge;
-
-#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_INDEXER_CURRENT_BLOCK: SimpleGauge =
-        SimpleGauge::new(
+    static ref METRIC_INDEXER_CURRENT_BLOCK: hopr_metrics::metrics::SimpleGauge =
+        hopr_metrics::metrics::SimpleGauge::new(
             "hopr_indexer_block_number",
             "Current last processed block number by the indexer",
     ).unwrap();
-    static ref METRIC_INDEXER_CHECKSUM: SimpleGauge =
-        SimpleGauge::new(
+    static ref METRIC_INDEXER_CHECKSUM: hopr_metrics::metrics::SimpleGauge =
+        hopr_metrics::metrics::SimpleGauge::new(
             "hopr_indexer_checksum",
             "Contains an unsigned integer that represents the low 32-bits of the Indexer checksum"
     ).unwrap();
-    static ref METRIC_INDEXER_SYNC_PROGRESS: SimpleGauge =
-        SimpleGauge::new(
+    static ref METRIC_INDEXER_SYNC_PROGRESS: hopr_metrics::metrics::SimpleGauge =
+        hopr_metrics::metrics::SimpleGauge::new(
             "hopr_indexer_sync_progress",
-            " Sync progress of the historical data by the indexer",
+            "Sync progress of the historical data by the indexer",
     ).unwrap();
+    static ref METRIC_INDEXER_SYNC_SOURCE: hopr_metrics::metrics::MultiGauge =
+        hopr_metrics::metrics::MultiGauge::new(
+            "hopr_indexer_data_source",
+            "Current data source of the Indexer",
+            &["source"],
+    ).unwrap();
+
 }
 
 /// Indexer
@@ -143,6 +149,14 @@ where
             topics: topics.into_iter().map(Hash::from).collect(),
         };
 
+        let is_synced = Arc::new(AtomicBool::new(false));
+        let chain_head = Arc::new(AtomicU64::new(0));
+
+        // update the chain head once at startup to get a reference for initial syncing
+        // progress calculation
+        debug!("Updating chain head at indexer startup");
+        Self::update_chain_head(&rpc, chain_head.clone()).await;
+
         // First, check whether fast sync is enabled and can be performed.
         // If so:
         //   1. Delete the existing indexed data
@@ -152,40 +166,70 @@ where
         let fast_sync_configured = self.cfg.fast_sync;
         let index_empty = self.db.index_is_empty().await?;
 
-        match (fast_sync_configured, index_empty) {
+        #[derive(PartialEq, Eq)]
+        enum FastSyncMode {
+            None,
+            FromScratch,
+            Continue,
+        }
+
+        let will_perform_fast_sync = match (fast_sync_configured, index_empty) {
             (true, false) => {
                 info!("Fast sync is enabled, but the index database is not empty. Fast sync will continue on existing unprocessed logs.");
-
-                let log_block_numbers = self.db.get_logs_block_numbers(None, None, Some(false)).await?;
-                for block_number in log_block_numbers {
-                    Self::process_block_by_id(&db, &logs_handler, block_number).await?;
-                }
+                FastSyncMode::Continue
             }
             (false, true) => {
                 info!("Fast sync is disabled, but the index database is empty. Doing a full re-sync.");
                 // Clean the last processed log from the Log DB, to allow full resync
                 self.db.clear_index_db(None).await?;
                 self.db.set_logs_unprocessed(None, None).await?;
+                FastSyncMode::None
             }
             (false, false) => {
-                info!("Fast sync is disabled and the index database is not empty. Continuing normal sync.")
+                info!("Fast sync is disabled and the index database is not empty. Continuing normal sync.");
+                FastSyncMode::None
             }
             (true, true) => {
                 info!("Fast sync is enabled, starting the fast sync process");
                 // To ensure a proper state, reset any auxiliary data in the database
                 self.db.clear_index_db(None).await?;
                 self.db.set_logs_unprocessed(None, None).await?;
+                FastSyncMode::FromScratch
+            }
+        };
 
-                // Now fast-sync can start
-                let log_block_numbers = self.db.get_logs_block_numbers(None, None, None).await?;
-                for block_number in log_block_numbers {
-                    Self::process_block_by_id(&db, &logs_handler, block_number).await?;
+        let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
+
+        // Perform the fast-sync if requested
+        if FastSyncMode::None != will_perform_fast_sync {
+            let processed = match will_perform_fast_sync {
+                FastSyncMode::FromScratch => None,
+                FastSyncMode::Continue => Some(false),
+                _ => unreachable!(),
+            };
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            {
+                METRIC_INDEXER_SYNC_SOURCE.set(&["fast-sync"], 1.0);
+                METRIC_INDEXER_SYNC_SOURCE.set(&["rpc"], 0.0);
+            }
+
+            let log_block_numbers = self.db.get_logs_block_numbers(None, None, processed).await?;
+            let _first_log_block_number = log_block_numbers.first().copied().unwrap_or(0);
+            let _head = chain_head.load(Ordering::Relaxed);
+            for block_number in log_block_numbers {
+                // Do not pollute the logs with the fast-sync progress
+                Self::process_block_by_id(&db, &logs_handler, block_number).await?;
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    let progress =
+                        (block_number - _first_log_block_number) as f64 / (_head - _first_log_block_number) as f64;
+                    METRIC_INDEXER_SYNC_PROGRESS.set(progress);
                 }
             }
         }
 
         info!("Building rpc indexer background process");
-        let (tx, mut rx) = futures::channel::mpsc::channel::<()>(1);
 
         let next_block_to_process = if let Some(last_log) = self.db.get_last_checksummed_log().await? {
             info!(
@@ -207,27 +251,29 @@ where
         info!(next_block_to_process, "Indexer start point");
 
         let indexing_proc = spawn(async move {
-            let is_synced = Arc::new(AtomicBool::new(false));
-            let chain_head = Arc::new(AtomicU64::new(0));
-
-            // update the chain head once at startup to get a reference for initial synching
-            // progress calculation
+            // Update the chain head once again
             debug!("Updating chain head at indexer startup");
             Self::update_chain_head(&rpc, chain_head.clone()).await;
+
+            #[cfg(all(feature = "prometheus", not(test)))]
+            {
+                METRIC_INDEXER_SYNC_SOURCE.set(&["fast-sync"], 0.0);
+                METRIC_INDEXER_SYNC_SOURCE.set(&["rpc"], 1.0);
+            }
 
             let event_stream = rpc
                 .try_stream_logs(next_block_to_process, log_filter)
                 .expect("block stream should be constructible")
                 .then(|block| {
                     Self::calculate_sync_process(
-                        "rpc",
-                        block.clone(),
+                        block.block_id,
                         &rpc,
                         chain_head.clone(),
                         is_synced.clone(),
                         next_block_to_process,
                         tx.clone(),
                     )
+                    .map(|_| block)
                 })
                 .filter_map(|block| {
                     let db = db.clone();
@@ -235,7 +281,7 @@ where
                     async move {
                         debug!(%block, "storing logs from block");
                         let logs = block.logs.clone();
-                        let logs_vec = logs.into_iter().map(SerializableLog::from).collect();
+                        let logs_vec = logs.into_iter().collect();
                         match db.store_logs(logs_vec).await {
                             Ok(store_results) => {
                                 if let Some(error) = store_results
@@ -455,25 +501,22 @@ where
     /// * `rpc` - The RPC operations handler.
     /// * `chain_head` - The current chain head block number.
     /// * `is_synced` - A boolean indicating whether the indexer is synced.
-    /// * `next_block_to_process` - The next block number to process.
+    /// * `start_block` - The first block number to process.
     /// * `tx` - A sender channel for synchronization notifications.
     ///
     /// # Returns
     ///
     /// The block which was provided as input.
     async fn calculate_sync_process(
-        prefix: &str,
-        block: BlockWithLogs,
+        current_block: u64,
         rpc: &T,
         chain_head: Arc<AtomicU64>,
         is_synced: Arc<AtomicBool>,
-        next_block_to_process: u64,
+        start_block: u64,
         mut tx: futures::channel::mpsc::Sender<()>,
-    ) -> BlockWithLogs
-    where
+    ) where
         T: HoprIndexerRpcOperations + 'static,
     {
-        let current_block = block.block_id;
         #[cfg(all(feature = "prometheus", not(test)))]
         {
             METRIC_INDEXER_CURRENT_BLOCK.set(current_block as f64);
@@ -481,27 +524,26 @@ where
 
         let mut head = chain_head.load(Ordering::Relaxed);
 
-        // We only print out sync progress if we are not yet synced. Once synched, we don't print
-        // out progress anymore.
+        // We only print out sync progress if we are not yet synced.
+        // Once synced, we don't print out progress anymore.
         if !is_synced.load(Ordering::Relaxed) {
-            let mut block_difference = head.saturating_sub(next_block_to_process);
+            let mut block_difference = head.saturating_sub(start_block);
 
             let progress = if block_difference == 0 {
                 // Before we call the sync complete, we check the chain again.
                 head = Self::update_chain_head(rpc, chain_head.clone()).await;
-                block_difference = head.saturating_sub(next_block_to_process);
+                block_difference = head.saturating_sub(start_block);
 
                 if block_difference == 0 {
                     1_f64
                 } else {
-                    (current_block - next_block_to_process) as f64 / block_difference as f64
+                    (current_block - start_block) as f64 / block_difference as f64
                 }
             } else {
-                (current_block - next_block_to_process) as f64 / block_difference as f64
+                (current_block - start_block) as f64 / block_difference as f64
             };
 
             info!(
-                indexer = prefix,
                 progress = progress * 100_f64,
                 block = current_block,
                 head,
@@ -512,15 +554,13 @@ where
             METRIC_INDEXER_SYNC_PROGRESS.set(progress);
 
             if current_block >= head {
-                info!(prefix, "indexer sync completed successfully");
+                info!("indexer sync completed successfully");
                 is_synced.store(true, Ordering::Relaxed);
                 if let Err(e) = tx.try_send(()) {
-                    error!(prefix, error = %e, "failed to notify about achieving indexer synchronization")
+                    error!(error = %e, "failed to notify about achieving indexer synchronization")
                 }
             }
         }
-
-        block
     }
 }
 
@@ -1018,7 +1058,7 @@ mod tests {
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         rpc.expect_block_number()
-            .times(2)
+            .times(3)
             .returning(move || Ok(last_processed_block + 1));
 
         let block = BlockWithLogs {

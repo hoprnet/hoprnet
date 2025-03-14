@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-rpc"
-version = "0.3.2"
+version = "0.5.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Abstraction over Ethereum RPC provider client"
@@ -45,6 +45,7 @@ reqwest = { workspace = true, optional = true, features = [
   "brotli",
   "zstd",
   "gzip",
+  "json",
 ] }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -53,6 +54,7 @@ smart-default = { workspace = true }
 surf = { workspace = true, optional = true }
 surf-governor = { workspace = true, optional = true }
 thiserror = { workspace = true }
+url = { workspace = true }
 validator = { workspace = true }
 
 hopr-bindings = { workspace = true }
@@ -61,6 +63,7 @@ hopr-chain-types = { workspace = true }
 tracing = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
+hopr-internal-types = { workspace = true }
 hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
