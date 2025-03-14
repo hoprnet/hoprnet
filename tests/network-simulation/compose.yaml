@@ -1,3 +1,4 @@
+---
 hoprd-service: &hoprd-service
   image: $HOPRD_IMAGE
   network_mode: "none"
@@ -7,13 +8,13 @@ hoprd-service: &hoprd-service
 
 services:
   hoprd-1:
-    <<: *hoprd-service
+    !!merge <<: *hoprd-service
     container_name: hopr-network-simulation-hoprd-1
   hoprd-2:
-    <<: *hoprd-service
+    !!merge <<: *hoprd-service
     container_name: hopr-network-simulation-hoprd-2
   hoprd-3:
-    <<: *hoprd-service
+    !!merge <<: *hoprd-service
     container_name: hopr-network-simulation-hoprd-3
   ns3:
     container_name: hopr-network-simulation-ns3
@@ -27,4 +28,4 @@ services:
     cap_add:
       - NET_ADMIN
     devices:
-        - /dev/net/tun:/dev/net/tun
+      - /dev/net/tun:/dev/net/tun

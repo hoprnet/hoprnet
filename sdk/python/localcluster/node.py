@@ -145,8 +145,10 @@ class Node:
         trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
         log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
 
-        api_token_env = { "HOPRD_API_TOKEN": self.api_token } if self.api_token else { "HOPRD_DISABLE_API_AUTHENTICATION": "true" }
-        cfg_path_env = { "HOPRD_CONFIGURATION_FILE_PATH": self.cfg_file_path } if self.cfg_file is not None else {}
+        api_token_env = (
+            {"HOPRD_API_TOKEN": self.api_token} if self.api_token else {"HOPRD_DISABLE_API_AUTHENTICATION": "true"}
+        )
+        cfg_path_env = {"HOPRD_CONFIGURATION_FILE_PATH": self.cfg_file_path} if self.cfg_file is not None else {}
 
         custom_env = {
             "HOPRD_ANNOUNCE": "true",
