@@ -155,20 +155,21 @@ pub enum SphinxRecipientMessage<P: Pseudonym> {
     DataOnly,
     /// The packet payload contains only data from a reply message.
     ReplyOnly(P),
-    /// The packet payload contains a SURB followed by data.
-    DataWithSurb(P),
-    /// The packet contains only multiple SURBs with no more data.
-    SurbsOnly(u8, P),
+    /// The packet contains SURBs and optionally some data in the
+    /// remaining packet payload.
+    DataAndSurbs {
+        num_surbs: u16,
+        pseudonym: P,
+        remainder_data: u16,
+    },
 }
 
 impl<P: Pseudonym> SphinxRecipientMessage<P> {
     /// Number of SURBs the message carries.
-    pub fn num_surbs(&self) -> u8 {
+    pub fn num_surbs(&self) -> u16 {
         match self {
-            Self::DataOnly => 0,
-            Self::ReplyOnly(_) => 0,
-            Self::DataWithSurb(_) => 1,
-            Self::SurbsOnly(n, _) => *n,
+            SphinxRecipientMessage::DataAndSurbs {num_surbs,..} => *num_surbs,
+            _ => 0
         }
     }
 }

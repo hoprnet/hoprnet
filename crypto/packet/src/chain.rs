@@ -24,7 +24,7 @@ pub enum HoprPacket {
         packet_tag: PacketTag,
         ack_key: HalfKey,
         previous_hop: OffchainPublicKey,
-        plain_text: Option<Box<[u8]>>,
+        plain_text: Box<[u8]>,
         surbs: Vec<(HoprPseudonym, SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>)>,
     },
     /// The packet must be forwarded
@@ -206,6 +206,10 @@ impl HoprPacket {
         domain_separator: &Hash,
     ) -> Result<(Self, Vec<ReplyOpener>)> {
         if let Some((pseudonym, return_paths)) = surb {
+            if return_paths.is_empty() {
+                return Err(PacketConstructionError("return path cannot be empty".into()));
+            }
+
             if msg.len() + return_paths.len() * HoprSurb::SIZE > PAYLOAD_SIZE {
                 return Err(PacketConstructionError(format!(
                     "message too long to fit with {} surbs into the packet",
@@ -222,17 +226,15 @@ impl HoprPacket {
                 openers.push(opener);
             }
 
-            // TODO: this should be refactored into a better enum
-            let msg_type = if msg.is_empty() {
-                SphinxRecipientMessage::SurbsOnly(return_paths.len() as u8, pseudonym)
-            } else {
-                composed_msg.extend_from_slice(msg);
-                SphinxRecipientMessage::DataWithSurb(pseudonym)
-            };
+            composed_msg.extend(msg);
 
             Self::into_raw_msg(
                 &composed_msg,
-                msg_type,
+                SphinxRecipientMessage::DataAndSurbs {
+                    num_surbs: return_paths.len() as u16,
+                    pseudonym,
+                    remainder_data: msg.len() as u16,
+                },
                 routing,
                 chain_keypair,
                 ticket,
@@ -309,25 +311,31 @@ impl HoprPacket {
                     let ack_key = derive_ack_key_share(&derived_secret);
                     let (surbs, plain_text) = match additional_data {
                         SphinxRecipientMessage::DataOnly | SphinxRecipientMessage::ReplyOnly(_) => {
-                            (Vec::new(), Some(plain_text))
+                            (Vec::with_capacity(0), plain_text)
                         }
-                        d @ SphinxRecipientMessage::DataWithSurb(p) | d @ SphinxRecipientMessage::SurbsOnly(_, p) => {
+                        SphinxRecipientMessage::DataAndSurbs { num_surbs, pseudonym, remainder_data } => {
                             let chunks = plain_text.chunks_exact(HoprSurb::SIZE);
-                            let num_surbs = d.num_surbs();
-                            let data = matches!(d, SphinxRecipientMessage::DataWithSurb(_))
-                                .then(|| Box::from(chunks.remainder()));
+                            if chunks.len() != num_surbs as usize {
+                                return Err(PacketDecodingError("packet has invalid number of surbs".into()));
+                            }
+
+                            if chunks.remainder().len() < remainder_data as usize {
+                                return Err(PacketDecodingError("packet has invalid remainder data".into()));
+                            }
+
+                            let data = if remainder_data > 0 {
+                                Box::from(&chunks.remainder()[..remainder_data as usize])
+                            } else {
+                                Box::default()
+                            };
 
                             let surbs = chunks
                                 .map(|c| {
                                     HoprSurb::try_from(c)
-                                        .map(|s| (p, s))
+                                        .map(|surb| (pseudonym, surb))
                                         .map_err(|_| PacketDecodingError("packet has invalid surb".into()))
                                 })
                                 .collect::<Result<Vec<_>>>()?;
-
-                            if num_surbs != surbs.len() as u8 {
-                                return Err(PacketDecodingError("packet has invalid number of surbs".into()));
-                            }
 
                             (surbs, data)
                         }
@@ -353,7 +361,7 @@ impl HoprPacket {
 mod tests {
     use super::{HoprPacket, PacketRouting};
 
-    use anyhow::{anyhow, bail, Context};
+    use anyhow::{bail, Context};
     use bimap::BiHashMap;
     use hex_literal::hex;
     use hopr_crypto_sphinx::surb::ReplyOpener;
@@ -425,7 +433,7 @@ mod tests {
         pub fn to_bytes(&self) -> Box<[u8]> {
             let dummy_ticket = hex!("67f0ca18102feec505e5bfedcc25963e9c64a6f8a250adcad7d2830dd607585700000000000000000000000000000000000000000000000000000000000000003891bf6fd4a78e868fc7ad477c09b16fc70dd01ea67e18264d17e3d04f6d8576de2e6472b0072e510df6e9fa1dfcc2727cc7633edfeb9ec13860d9ead29bee71d68de3736c2f7a9f42de76ccd57a5f5847bc7349");
             let (packet, ticket) = match self {
-                Self::Final { plain_text, .. } => (plain_text.clone().unwrap(), dummy_ticket.as_ref().into()),
+                Self::Final { plain_text, .. } => (plain_text.clone(), dummy_ticket.as_ref().into()),
                 Self::Forwarded { packet, ticket, .. } => (
                     Vec::from(packet.as_ref()).into_boxed_slice(),
                     ticket.clone().into_boxed(),
@@ -594,7 +602,7 @@ mod tests {
             _ => bail!("invalid packet initial state"),
         }
 
-        let mut actual_plain_text = None;
+        let mut actual_plain_text = Box::default();
         for hop in 1..=hops + 1 {
             packet = process_packet_at_node(hops + 1, hop, false, packet, |_| None)
                 .context(format!("packet decoding failed at hop {hop}"))?;
@@ -602,7 +610,7 @@ mod tests {
             match &packet {
                 HoprPacket::Final { plain_text, .. } => {
                     assert_eq!(hop - 1, hops, "final packet must be at the last hop");
-                    actual_plain_text = plain_text.as_ref().map(|pt| pt.clone());
+                    actual_plain_text = plain_text.clone();
                 }
                 HoprPacket::Forwarded {
                     previous_hop,
@@ -618,7 +626,6 @@ mod tests {
             }
         }
 
-        let actual_plain_text = actual_plain_text.ok_or_else(|| anyhow!("no final packet found"))?;
         assert_eq!(actual_plain_text.as_ref(), msg, "invalid plaintext");
         Ok(())
     }
@@ -644,7 +651,7 @@ mod tests {
             match &packet {
                 HoprPacket::Final { plain_text, surbs, .. } => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
-                    received_plain_text = plain_text.clone().ok_or(anyhow!("no plaintext found"))?;
+                    received_plain_text = plain_text.clone();
                     received_surbs.extend(surbs.clone());
                 }
                 HoprPacket::Forwarded {
@@ -699,7 +706,7 @@ mod tests {
             match &fwd_packet {
                 HoprPacket::Final { plain_text, surbs, .. } => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
-                    received_fwd_plain_text = plain_text.clone().ok_or(anyhow!("no plaintext found"))?;
+                    received_fwd_plain_text = plain_text.clone();
                     received_surbs.extend(surbs.clone());
                 }
                 HoprPacket::Forwarded {
@@ -748,7 +755,7 @@ mod tests {
                 HoprPacket::Final { plain_text, surbs, .. } => {
                     assert_eq!(hop, 0, "final packet must be at the last hop");
                     assert!(surbs.is_empty(), "must not receive surbs on reply");
-                    received_re_plain_text = plain_text.clone().ok_or(anyhow!("no plaintext found"))?;
+                    received_re_plain_text = plain_text.clone();
                 }
                 HoprPacket::Forwarded {
                     previous_hop,
@@ -793,7 +800,7 @@ mod tests {
             match &fwd_packet {
                 HoprPacket::Final { plain_text, surbs, .. } => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
-                    assert!(plain_text.is_none(), "must not receive plaintext on surbs only packet");
+                    assert!(plain_text.is_empty(), "must not receive plaintext on surbs only packet");
                     assert_eq!(2, surbs.len(), "invalid number of received surbs per packet");
                     received_surbs.extend(surbs.clone());
                 }
@@ -845,8 +852,7 @@ mod tests {
                     HoprPacket::Final { plain_text, surbs, .. } => {
                         assert_eq!(hop, 0, "final packet must be at the last hop for reply {i}");
                         assert!(surbs.is_empty(), "must not receive surbs on reply for reply {i}");
-                        received_re_plain_text =
-                            plain_text.clone().ok_or(anyhow!("no plaintext found in reply {i}"))?;
+                        received_re_plain_text = plain_text.clone();
                     }
                     HoprPacket::Forwarded {
                         previous_hop,
