@@ -79,8 +79,8 @@ def random_distinct_pairs_from(values: list, count: int):
 async def swarm7(request):
     logging.info("Starting local cluster")
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
-    cluster, anvil = await localcluster.bringup(params_path, test_mode=True, fully_connected=False,
-        docker_compose=False
+    cluster, anvil = await localcluster.bringup(
+        params_path, test_mode=True, fully_connected=False, docker_compose=False
     )
 
     yield cluster.nodes

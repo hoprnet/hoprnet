@@ -22,8 +22,7 @@ GLOBAL_TIMEOUT = 60
 
 
 class Cluster:
-    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path,
-                 docker_compose: bool = False):
+    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path, docker_compose: bool = False):
         self.anvil_config = anvil_config
         self.protocol_config = protocol_config
         self.nodes: dict[str, Node] = {}
@@ -45,9 +44,9 @@ class Cluster:
                 for node in self.nodes.values():
                     logging.info(f"Disable and delete bridge and tap interfaces for node {node.id}")
                     with ndb.interfaces[node.bridge_interface] as br:
-                        br.set(state='down')
+                        br.set(state="down")
                     with ndb.interfaces[node.tap_interface] as tap:
-                        tap.set(state='down')
+                        tap.set(state="down")
                     ndb.interfaces[node.bridge_interface].remove()
                     ndb.interfaces[node.tap_interface].remove()
 

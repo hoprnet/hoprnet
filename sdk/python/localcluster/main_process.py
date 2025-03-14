@@ -24,8 +24,7 @@ random.seed(SEED)
 
 
 async def bringup(
-    config: str, test_mode: bool = False, fully_connected: bool = False,
-    docker_compose: bool = False
+    config: str, test_mode: bool = False, fully_connected: bool = False, docker_compose: bool = False
 ) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 
@@ -36,9 +35,7 @@ async def bringup(
     with open(config, "r") as f:
         config = yaml.safe_load(f)
 
-    cluster = Cluster(config, ANVIL_CONFIG_FILE,
-                      ANVIL_FOLDER.joinpath("protocol-config.json"),
-                      docker_compose)
+    cluster = Cluster(config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), docker_compose)
     anvil = Anvil(ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"))
     snapshot = Snapshot(PORT_BASE, MAIN_DIR, cluster)
 
