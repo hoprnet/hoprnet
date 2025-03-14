@@ -588,11 +588,8 @@
             settings.formatter.prettier.excludes = [ "ethereum/contracts/*" "*.yml" "*.yaml" ];
 
             programs.rustfmt.enable = true;
-
             programs.nixpkgs-fmt.enable = true;
-
             programs.taplo.enable = true;
-
             programs.ruff-format.enable = true;
 
             settings.formatter.solc = {
