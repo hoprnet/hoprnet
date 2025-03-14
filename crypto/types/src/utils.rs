@@ -1,11 +1,15 @@
 use generic_array::{ArrayLength, GenericArray};
 use hopr_crypto_random::random_array;
+use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
 use k256::elliptic_curve::{Group, PrimeField};
+use k256::Secp256k1;
+use sha3::Sha3_256;
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::errors::CryptoError;
-use crate::errors::CryptoError::InvalidInputValue;
+use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
+use crate::prelude::{HalfKey, SecretKey};
 
 /// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
@@ -41,6 +45,27 @@ pub fn x25519_scalar_from_bytes(bytes: &[u8]) -> crate::errors::Result<curve2551
 /// Note that this function allows zero scalars.
 pub fn k256_scalar_from_bytes(bytes: &[u8]) -> crate::errors::Result<k256::Scalar> {
     Option::from(k256::Scalar::from_repr(*k256::FieldBytes::from_slice(bytes))).ok_or(InvalidInputValue("bytes"))
+}
+
+/// Sample a random secp256k1 field element that can represent a valid secp256k1 point.
+/// The implementation uses `hash_to_field` function as defined in
+/// `<https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-hashing-to-a-finite-field>`
+/// The `secret` must be at least `SecretKey::LENGTH` long.
+/// The `tag` parameter will be used as an additional Domain Separation Tag.
+pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> crate::errors::Result<HalfKey> {
+    if secret.len() >= SecretKey::LENGTH {
+        let scalar = Secp256k1::hash_to_scalar::<ExpandMsgXmd<Sha3_256>>(
+            &[secret],
+            &[b"secp256k1_XMD:SHA3-256_SSWU_RO_", tag.as_bytes()],
+        )
+        .map_err(|_| CalculationError)?;
+        Ok(HalfKey::try_from(scalar.to_bytes().as_ref())?)
+    } else {
+        Err(InvalidParameterSize {
+            name: "secret",
+            expected: SecretKey::LENGTH,
+        })
+    }
 }
 
 /// Represents a secret value of a fixed length that is zeroized on drop.

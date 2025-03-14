@@ -22,12 +22,24 @@
 pub mod derivation;
 /// Implementations of `SphinxSuite` trait for different elliptic curve groups
 pub mod ec_groups;
+/// Contains various errors returned from this crate.
+pub mod errors;
+/// Contains the main implementation of a SPHINX packet.
+pub mod packet;
 /// Implementation of the SPHINX header format
 pub mod routing;
 /// Derivation of shared keys for SPHINX header
 pub mod shared_keys;
 /// Contains Return Path and SURB-related types
 pub mod surb;
+
+pub mod prelude {
+    pub use crate::ec_groups::*;
+    pub use crate::packet::{ForwardedMetaPacket, MetaPacket, MetaPacketRouting};
+    pub use crate::routing::SphinxHeaderSpec;
+    pub use crate::shared_keys::{SharedKeys, SharedSecret, SphinxSuite};
+    pub use crate::surb::*;
+}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -39,7 +51,6 @@ pub(crate) mod tests {
     use hopr_primitive_types::prelude::*;
 
     use crate::routing::SphinxHeaderSpec;
-    use crate::surb::SphinxRecipientMessage;
 
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub(crate) struct WrappedBytes<const N: usize>(pub [u8; N]);
@@ -47,12 +58,6 @@ pub(crate) mod tests {
     impl<const N: usize> Default for WrappedBytes<N> {
         fn default() -> Self {
             Self([0u8; N])
-        }
-    }
-
-    impl<const N: usize> WrappedBytes<N> {
-        pub const fn len(&self) -> usize {
-            N
         }
     }
 
@@ -77,19 +82,8 @@ pub(crate) mod tests {
         const SIZE: usize = N;
     }
 
-    impl<const N: usize> TryFrom<WrappedBytes<N>> for SphinxRecipientMessage<SimplePseudonym> {
-        type Error = GeneralError;
-
-        fn try_from(_: WrappedBytes<N>) -> Result<Self, Self::Error> {
-            unimplemented!("not needed in tests")
-        }
-    }
-
-    pub(crate) struct TestSpec<K, const HOPS: usize, const RELAYER_DATA: usize, const LAST_HOP_DATA: usize>(
-        PhantomData<K>,
-    );
-    impl<K, const HOPS: usize, const RELAYER_DATA: usize, const LAST_HOP_DATA: usize> SphinxHeaderSpec
-        for TestSpec<K, HOPS, RELAYER_DATA, LAST_HOP_DATA>
+    pub(crate) struct TestSpec<K, const HOPS: usize, const RELAYER_DATA: usize>(PhantomData<K>);
+    impl<K, const HOPS: usize, const RELAYER_DATA: usize> SphinxHeaderSpec for TestSpec<K, HOPS, RELAYER_DATA>
     where
         K: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> + BytesRepresentable + Clone,
     {
@@ -97,7 +91,6 @@ pub(crate) mod tests {
         type KeyId = K;
         type Pseudonym = SimplePseudonym;
         type RelayerData = WrappedBytes<RELAYER_DATA>;
-        type LastHopData = WrappedBytes<LAST_HOP_DATA>;
         type SurbReceiverData = WrappedBytes<53>;
         type PRG = ChaCha20;
         type UH = Poly1305;

@@ -1,12 +1,24 @@
-use hopr_crypto_sphinx::{
-    derivation::{derive_ack_key_share, derive_own_key_share},
-    shared_keys::SharedSecret,
-};
+use crate::errors::{PacketError, Result};
+use hopr_crypto_sphinx::shared_keys::SharedSecret;
+use hopr_crypto_types::prelude::{sample_secp256k1_field_element, SecretKey};
 use hopr_crypto_types::types::{Challenge, HalfKey, HalfKeyChallenge, PublicKey, Response};
 use hopr_primitive_types::prelude::*;
 use tracing::error;
 
-use crate::errors::{PacketError, Result};
+const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";
+const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
+
+/// Used in Proof of Relay to derive own half-key (S0)
+/// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
+pub fn derive_own_key_share(secret: &SecretKey) -> HalfKey {
+    sample_secp256k1_field_element(secret.as_ref(), HASH_KEY_OWN_KEY).expect("failed to sample own key share")
+}
+
+/// Used in Proof of Relay to derive the half-key of for the acknowledgement (S1)
+/// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
+pub fn derive_ack_key_share(secret: &SecretKey) -> HalfKey {
+    sample_secp256k1_field_element(secret.as_ref(), HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
+}
 
 /// Proof of Relay secret length is twice the size of secp256k1 public key
 pub const POR_SECRET_LENGTH: usize = 2 * PublicKey::SIZE_COMPRESSED;
@@ -223,10 +235,9 @@ pub fn validate_por_hint(ethereum_challenge: &EthereumChallenge, own_share: &Hal
 #[cfg(test)]
 mod tests {
     use crate::por::{
-        pre_verify, validate_por_half_keys, validate_por_hint, validate_por_response, ProofOfRelayString,
-        ProofOfRelayValues,
+        derive_ack_key_share, pre_verify, validate_por_half_keys, validate_por_hint, validate_por_response,
+        ProofOfRelayString, ProofOfRelayValues,
     };
-    use hopr_crypto_sphinx::derivation::derive_ack_key_share;
     use hopr_crypto_sphinx::shared_keys::SharedSecret;
     use hopr_crypto_types::types::Response;
 

@@ -60,13 +60,13 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
 
     /// Performs KDF expansion from the given group element using HKDF expand
     fn expand_key(&self, salt: &[u8]) -> SharedSecret {
-        let mut out = GenericArray::default();
+        let mut out = SharedSecret::default();
         let ikm = self.to_alpha();
         SimpleHkdf::<Blake2s256>::new(Some(salt), &ikm)
-            .expand(b"", &mut out)
+            .expand(b"", out.as_mut())
             .expect("invalid size of the shared secret output"); // Cannot panic, unless the constants are wrong
 
-        out.into()
+        out
     }
 }
 

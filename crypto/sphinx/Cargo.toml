@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
+bimap = "0.6.3"
 curve25519-dalek = { version = "4.1.3", features = ["serde", "rand_core"] }
 elliptic-curve = { version = "0.13", features = ["serde"] }
 generic-array = { workspace = true }
@@ -22,6 +23,7 @@ k256 = { version = "0.13.0", features = [
   "hash2curve",
   "serde",
 ] }
+thiserror = { workspace = true }
 typenum = { workspace = true }
 zeroize = { workspace = true }
 

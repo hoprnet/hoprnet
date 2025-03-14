@@ -115,18 +115,13 @@ pub fn create_surb<S: SphinxSuite, H: SphinxHeaderSpec>(
     shared_keys: SharedKeys<S::E, S::G>,
     path: &[H::KeyId],
     additional_data_relayer: &[H::RelayerData],
-    additional_data_last_hop: H::LastHopData,
+    pseudonym: H::Pseudonym,
     additional_data_receiver: H::SurbReceiverData,
 ) -> hopr_crypto_types::errors::Result<(SURB<S, H>, ReplyOpener)>
 where
     H::KeyId: Copy,
 {
-    let header = RoutingInfo::<H>::new(
-        path,
-        &shared_keys.secrets,
-        additional_data_relayer,
-        additional_data_last_hop,
-    )?;
+    let header = RoutingInfo::<H>::new(path, &shared_keys.secrets, additional_data_relayer, pseudonym, true)?;
 
     let sender_key = SecretKey16::random();
 
@@ -146,34 +141,6 @@ where
     Ok((surb, local_surb))
 }
 
-/// Represents an additional message delivered to the recipient of a Sphinx packet.
-///
-/// This message serves as an indication of what is included in the packet payload.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SphinxRecipientMessage<P: Pseudonym> {
-    /// The packet payload contains only data from a forward message.
-    DataOnly,
-    /// The packet payload contains only data from a reply message.
-    ReplyOnly(P),
-    /// The packet contains SURBs and optionally some data in the
-    /// remaining packet payload.
-    DataAndSurbs {
-        num_surbs: u16,
-        pseudonym: P,
-        remainder_data: u16,
-    },
-}
-
-impl<P: Pseudonym> SphinxRecipientMessage<P> {
-    /// Number of SURBs the message carries.
-    pub fn num_surbs(&self) -> u16 {
-        match self {
-            SphinxRecipientMessage::DataAndSurbs { num_surbs, .. } => *num_surbs,
-            _ => 0,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,7 +148,7 @@ mod tests {
     use crate::tests::*;
 
     #[allow(type_alias_bounds)]
-    pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66, 17>;
+    pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66>;
 
     fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener)>
     where
@@ -194,7 +161,7 @@ mod tests {
             shares,
             &pub_keys,
             &[Default::default(); 4],
-            Default::default(),
+            SimplePseudonym::random(),
             Default::default(),
         )?)
     }

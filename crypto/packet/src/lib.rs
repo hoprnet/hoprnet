@@ -17,7 +17,6 @@
 
 use hopr_crypto_sphinx::routing::SphinxHeaderSpec;
 use hopr_crypto_sphinx::shared_keys::SphinxSuite;
-use hopr_crypto_types::types;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::marker::PhantomData;
@@ -26,16 +25,14 @@ use std::marker::PhantomData;
 pub mod chain;
 /// Lists all errors in this crate.
 pub mod errors;
-/// Implements SPHINX packet format.
-pub mod packet;
 /// Implements the Proof of Relay.
 pub mod por;
-pub mod return_path;
+pub mod types;
 /// Implements ticket validation logic.
 pub mod validation;
 
 /// Pseudonyms used for the return path.
-pub type HoprPseudonym = types::SimplePseudonym;
+pub type HoprPseudonym = hopr_crypto_types::prelude::SimplePseudonym;
 
 /// Currently used public key cipher suite for Sphinx.
 pub type HoprSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
@@ -48,7 +45,6 @@ impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
     type KeyId = KeyIdent<4>;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
-    type LastHopData = return_path::EncodedRecipientMessage<HoprPseudonym>;
     type SurbReceiverData = por::ProofOfRelayValues;
     type PRG = hopr_crypto_types::primitives::ChaCha20;
     type UH = hopr_crypto_types::primitives::Poly1305;
@@ -61,7 +57,7 @@ pub type HoprSurb = hopr_crypto_sphinx::surb::SURB<HoprSphinxSuite, HoprSphinxHe
 mod tests {
     use super::*;
     use crate::chain::HoprPacket;
-    use crate::packet::MetaPacket;
+    use hopr_crypto_sphinx::prelude::MetaPacket;
 
     #[test]
     fn header_and_packet_lengths() {
@@ -70,7 +66,7 @@ mod tests {
 
         let hopr_packet_len = HoprPacket::SIZE;
         assert_eq!(
-            MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::PACKET_LEN + Ticket::SIZE,
+            MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>::PACKET_LEN + Ticket::SIZE,
             hopr_packet_len
         ); // 1116 bytes
 

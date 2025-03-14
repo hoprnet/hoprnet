@@ -4252,6 +4252,7 @@ name = "hopr-crypto-sphinx"
 version = "0.7.0"
 dependencies = [
  "anyhow",
+ "bimap",
  "curve25519-dalek",
  "elliptic-curve",
  "generic-array",
@@ -4263,6 +4264,7 @@ dependencies = [
  "k256",
  "parameterized",
  "subtle",
+ "thiserror 2.0.11",
  "typenum",
  "zeroize",
 ]

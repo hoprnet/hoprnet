@@ -9,9 +9,10 @@ use typenum::Unsigned;
 
 use crate::derivation::{derive_mac_key, generate_key_iv};
 use crate::shared_keys::SharedSecret;
-use crate::surb::SphinxRecipientMessage;
 
-const RELAYER_END_PREFIX: u8 = 0xff;
+const FORWARD_END_PREFIX: u8 = 0xff;
+
+const REPLY_END_PREFIX: u8 = 0xfe;
 
 const PATH_POSITION_LEN: usize = 1;
 
@@ -31,9 +32,6 @@ pub trait SphinxHeaderSpec {
     /// Type representing additional data for relayers.
     type RelayerData: BytesRepresentable;
 
-    /// Type representing additional data for the recipient (last hop).
-    type LastHopData: BytesRepresentable + TryInto<SphinxRecipientMessage<Self::Pseudonym>, Error = GeneralError>;
-
     /// Type representing additional data delivered with each SURB to its receiver.
     type SurbReceiverData: BytesRepresentable;
 
@@ -45,9 +43,6 @@ pub trait SphinxHeaderSpec {
 
     /// Size of the additional data for relayers.
     const RELAYER_DATA_SIZE: usize = Self::RelayerData::SIZE;
-
-    /// Size of the additional data for the recipient (last hop).
-    const LAST_HOP_DATA_SIZE: usize = Self::LastHopData::SIZE;
 
     /// Size of the additional data included in SURBs.
     const SURB_RECEIVER_DATA_SIZE: usize = Self::SurbReceiverData::SIZE;
@@ -67,12 +62,12 @@ pub trait SphinxHeaderSpec {
     /// Length of the whole Sphinx header.
     ///
     /// **The value shall not be overridden**.
-    const HEADER_LEN: usize = 1 + Self::LAST_HOP_DATA_SIZE + (Self::MAX_HOPS.get() - 1) * Self::ROUTING_INFO_LEN;
+    const HEADER_LEN: usize = 1 + Self::Pseudonym::SIZE + (Self::MAX_HOPS.get() - 1) * Self::ROUTING_INFO_LEN;
 
     /// Extended header size used for computations.
     ///
     /// **The value shall not be overridden**.
-    const EXT_HEADER_LEN: usize = 1 + Self::LAST_HOP_DATA_SIZE + Self::MAX_HOPS.get() * Self::ROUTING_INFO_LEN;
+    const EXT_HEADER_LEN: usize = 1 + Self::Pseudonym::SIZE + Self::MAX_HOPS.get() * Self::ROUTING_INFO_LEN;
 
     fn generate_filler(secrets: &[SharedSecret]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
         if secrets.len() < 2 {
@@ -85,7 +80,7 @@ pub trait SphinxHeaderSpec {
 
         let padding_len = (Self::MAX_HOPS.get() - secrets.len()) * Self::ROUTING_INFO_LEN;
 
-        let mut ret = vec![0u8; Self::HEADER_LEN - padding_len - Self::LAST_HOP_DATA_SIZE - 1];
+        let mut ret = vec![0u8; Self::HEADER_LEN - padding_len - Self::Pseudonym::SIZE - 1];
         let mut length = Self::ROUTING_INFO_LEN;
         let mut start = Self::HEADER_LEN;
 
@@ -156,7 +151,8 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
         path: &[H::KeyId],
         secrets: &[SharedSecret],
         additional_data_relayer: &[H::RelayerData],
-        additional_data_last_hop: H::LastHopData,
+        pseudonym: H::Pseudonym,
+        is_reply: bool,
     ) -> hopr_crypto_types::errors::Result<Self> {
         if path.len() != secrets.len() {
             return Err(CryptoError::InvalidParameterSize {
@@ -164,7 +160,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 expected: secrets.len(),
             });
         }
-        if secrets.len() > H::MAX_HOPS.get() || H::MAX_HOPS.get() > RELAYER_END_PREFIX as usize {
+        if secrets.len() > H::MAX_HOPS.get() || H::MAX_HOPS.get() > FORWARD_END_PREFIX.min(REPLY_END_PREFIX) as usize {
             return Err(CryptoError::InvalidInputValue("secrets.len"));
         }
 
@@ -177,34 +173,24 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
 
             if idx == 0 {
                 // End prefix
-                extended_header[0] = RELAYER_END_PREFIX;
+                extended_header[0] = if is_reply { REPLY_END_PREFIX } else { FORWARD_END_PREFIX };
 
                 // Last hop additional data
-                if H::LAST_HOP_DATA_SIZE > 0 {
-                    if additional_data_last_hop.as_ref().len() != H::LAST_HOP_DATA_SIZE {
-                        return Err(CryptoError::InvalidParameterSize {
-                            name: "additional_data_last_hop",
-                            expected: H::LAST_HOP_DATA_SIZE,
-                        });
-                    }
-                    extended_header[1..1 + H::LAST_HOP_DATA_SIZE].copy_from_slice(additional_data_last_hop.as_ref());
-                }
+                extended_header[1..1 + H::Pseudonym::SIZE].copy_from_slice(pseudonym.as_ref());
 
                 // Random padding for the rest of the extended header
                 let padding_len = (H::MAX_HOPS.get() - secrets.len()) * H::ROUTING_INFO_LEN;
                 if padding_len > 0 {
-                    random_fill(
-                        &mut extended_header[1 + H::LAST_HOP_DATA_SIZE..1 + H::LAST_HOP_DATA_SIZE + padding_len],
-                    );
+                    random_fill(&mut extended_header[1 + H::Pseudonym::SIZE..1 + H::Pseudonym::SIZE + padding_len]);
                 }
 
                 // Encrypt last hop data and padding
-                prg.apply_keystream(&mut extended_header[0..1 + H::LAST_HOP_DATA_SIZE + padding_len]);
+                prg.apply_keystream(&mut extended_header[0..1 + H::Pseudonym::SIZE + padding_len]);
 
                 if secrets.len() > 1 {
                     let filler = H::generate_filler(secrets)?;
-                    extended_header[1 + H::LAST_HOP_DATA_SIZE + padding_len
-                        ..1 + H::LAST_HOP_DATA_SIZE + padding_len + filler.len()]
+                    extended_header
+                        [1 + H::Pseudonym::SIZE + padding_len..1 + H::Pseudonym::SIZE + padding_len + filler.len()]
                         .copy_from_slice(&filler);
                 }
             } else {
@@ -295,8 +281,11 @@ pub enum ForwardedHeader<H: SphinxHeaderSpec> {
 
     /// The packet is at its final destination
     FinalNode {
-        /// Additional data for the final destination
-        additional_data: H::LastHopData,
+        /// Pseudonym of the sender
+        sender: H::Pseudonym,
+        /// Indicates whether this message is a reply and a [`ReplyOpener`](crate::surb::ReplyOpener)
+        /// should be used to further decrypt the message.
+        is_reply: bool,
     },
 }
 
@@ -340,7 +329,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
     let mut prg = H::new_prg(secret)?;
     prg.apply_keystream(&mut header[0..H::HEADER_LEN]);
 
-    if header[0] != RELAYER_END_PREFIX {
+    if header[0] != FORWARD_END_PREFIX && header[0] != REPLY_END_PREFIX {
         // Path position
         let path_pos: u8 = header[0];
 
@@ -380,9 +369,10 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         })
     } else {
         Ok(ForwardedHeader::FinalNode {
-            additional_data: (&header[1..1 + H::LAST_HOP_DATA_SIZE])
+            sender: (&header[1..1 + H::Pseudonym::SIZE])
                 .try_into()
                 .map_err(|_| CryptoError::InvalidInputValue("last_data_last_hop"))?,
+            is_reply: header[0] == REPLY_END_PREFIX,
         })
     }
 }
@@ -401,7 +391,7 @@ pub(crate) mod tests {
     #[test]
     fn test_filler_generate_verify() -> anyhow::Result<()> {
         let per_hop = 3 + OffchainPublicKey::SIZE + <Poly1305 as BlockSizeUser>::BlockSize::USIZE + 1;
-        let last_hop = 4;
+        let last_hop = SimplePseudonym::SIZE;
         let max_hops = 4;
 
         let secrets = (0..max_hops).map(|_| SharedSecret::random()).collect::<Vec<_>>();
@@ -410,7 +400,7 @@ pub(crate) mod tests {
 
         let mut extended_header = vec![0u8; extended_header_len];
 
-        let filler = TestSpec::<OffchainPublicKey, 4, 3, 4>::generate_filler(&secrets)?;
+        let filler = TestSpec::<OffchainPublicKey, 4, 3>::generate_filler(&secrets)?;
 
         extended_header[1 + last_hop..1 + last_hop + filler.len()].copy_from_slice(&filler);
         extended_header.copy_within(0..header_len, per_hop);
@@ -437,24 +427,26 @@ pub(crate) mod tests {
 
         let secrets = (0..hops).map(|_| SharedSecret::random()).collect::<Vec<_>>();
 
-        let first_filler = TestSpec::<OffchainPublicKey, 1, 0, 0>::generate_filler(&secrets)?;
+        let first_filler = TestSpec::<OffchainPublicKey, 1, 0>::generate_filler(&secrets)?;
         assert_eq!(0, first_filler.len());
 
         Ok(())
     }
 
-    fn generic_test_generate_routing_info_and_forward_no_data<S>(keypairs: Vec<S::P>) -> anyhow::Result<()>
+    fn generic_test_generate_routing_info_and_forward<S>(keypairs: Vec<S::P>, reply: bool) -> anyhow::Result<()>
     where
         S: SphinxSuite,
     {
         let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
         let shares = S::new_shared_keys(&pub_keys)?;
+        let pseudonym = SimplePseudonym::random();
 
-        let rinfo = RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 0, 0>>::new(
+        let rinfo = RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 0>>::new(
             &pub_keys,
             &shares.secrets,
             &[],
-            Default::default(),
+            pseudonym,
+            reply,
         )?;
 
         let mut header = rinfo.routing().to_vec();
@@ -463,7 +455,7 @@ pub(crate) mod tests {
         last_mac.copy_from_slice(&rinfo.mac());
 
         for (i, secret) in shares.secrets.iter().enumerate() {
-            let fwd = forward_header::<TestSpec<<S::P as Keypair>::Public, 3, 0, 0>>(secret, &mut header, &last_mac)?;
+            let fwd = forward_header::<TestSpec<<S::P as Keypair>::Public, 3, 0>>(secret, &mut header, &last_mac)?;
 
             match fwd {
                 ForwardedHeader::RelayNode {
@@ -485,71 +477,10 @@ pub(crate) mod tests {
                         "invalid public key of the next node"
                     );
                 }
-                ForwardedHeader::FinalNode { additional_data } => {
+                ForwardedHeader::FinalNode { sender, is_reply } => {
                     assert_eq!(shares.secrets.len() - 1, i, "cannot be a final node");
-                    assert_eq!(0, additional_data.len(), "final node must not have any additional data");
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn generic_test_generate_routing_info_and_forward_with_data<S>(keypairs: Vec<S::P>) -> anyhow::Result<()>
-    where
-        S: SphinxSuite,
-    {
-        let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
-        let shares = S::new_shared_keys(&pub_keys)?;
-
-        let relayer_data = (0..keypairs.len())
-            .map(|i| WrappedBytes([(i + 1) as u8; 32]))
-            .collect::<Vec<WrappedBytes<32>>>();
-        let last_hop_data = WrappedBytes::<32>([0xff_u8; 32]);
-
-        let rinfo = RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 32, 32>>::new(
-            &pub_keys,
-            &shares.secrets,
-            &relayer_data,
-            last_hop_data,
-        )?;
-
-        let mut header = rinfo.routing().to_vec();
-
-        let mut last_mac = [0u8; <Poly1305 as BlockSizeUser>::BlockSize::USIZE];
-        last_mac.copy_from_slice(&rinfo.mac());
-
-        for (i, secret) in shares.secrets.iter().enumerate() {
-            let fwd = forward_header::<TestSpec<<S::P as Keypair>::Public, 3, 32, 32>>(secret, &mut header, &last_mac)?;
-
-            match fwd {
-                ForwardedHeader::RelayNode {
-                    next_header,
-                    next_node,
-                    path_pos,
-                    additional_info,
-                    ..
-                } => {
-                    last_mac.copy_from_slice(&next_header.mac());
-                    assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
-                    assert_eq!(
-                        path_pos,
-                        (shares.secrets.len() - i - 1) as u8,
-                        "invalid path position {path_pos}"
-                    );
-                    assert_eq!(
-                        pub_keys[i + 1].as_ref(),
-                        next_node.as_ref(),
-                        "invalid public key of the next node"
-                    );
-                    assert_eq!(additional_info, relayer_data[i], "invalid additional relayer data");
-                }
-                ForwardedHeader::FinalNode { additional_data } => {
-                    assert_eq!(shares.secrets.len() - 1, i, "cannot be a final node");
-                    assert_eq!(
-                        last_hop_data, additional_data,
-                        "final node must not have any additional data"
-                    );
+                    assert_eq!(pseudonym, sender, "invalid pseudonym");
+                    assert_eq!(is_reply, reply, "invalid reply flag");
                 }
             }
         }
@@ -558,35 +489,29 @@ pub(crate) mod tests {
     }
 
     #[cfg(feature = "ed25519")]
-    #[parameterized(amount = { 3, 2, 1 })]
-    fn test_ed25519_generate_routing_info_and_forward(amount: usize) -> anyhow::Result<()> {
-        generic_test_generate_routing_info_and_forward_no_data::<crate::ec_groups::Ed25519Suite>(
+    #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
+    fn test_ed25519_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
+        generic_test_generate_routing_info_and_forward::<crate::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
-        )?;
-        generic_test_generate_routing_info_and_forward_with_data::<crate::ec_groups::Ed25519Suite>(
-            (0..amount).map(|_| OffchainKeypair::random()).collect(),
+            reply,
         )
     }
 
     #[cfg(feature = "x25519")]
-    #[parameterized(amount = { 3, 2, 1 })]
-    fn test_x25519_generate_routing_info_and_forward(amount: usize) -> anyhow::Result<()> {
-        generic_test_generate_routing_info_and_forward_no_data::<crate::ec_groups::X25519Suite>(
+    #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
+    fn test_x25519_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
+        generic_test_generate_routing_info_and_forward::<crate::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
-        )?;
-        generic_test_generate_routing_info_and_forward_with_data::<crate::ec_groups::X25519Suite>(
-            (0..amount).map(|_| OffchainKeypair::random()).collect(),
+            reply,
         )
     }
 
     #[cfg(feature = "secp256k1")]
-    #[parameterized(amount = { 3, 2, 1 })]
-    fn test_secp256k1_generate_routing_info_and_forward(amount: usize) -> anyhow::Result<()> {
-        generic_test_generate_routing_info_and_forward_no_data::<crate::ec_groups::Secp256k1Suite>(
+    #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
+    fn test_secp256k1_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
+        generic_test_generate_routing_info_and_forward::<crate::ec_groups::Secp256k1Suite>(
             (0..amount).map(|_| ChainKeypair::random()).collect(),
-        )?;
-        generic_test_generate_routing_info_and_forward_with_data::<crate::ec_groups::Secp256k1Suite>(
-            (0..amount).map(|_| ChainKeypair::random()).collect(),
+            reply,
         )
     }
 }
