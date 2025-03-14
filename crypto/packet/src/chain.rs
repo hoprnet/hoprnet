@@ -313,7 +313,11 @@ impl HoprPacket {
                         SphinxRecipientMessage::DataOnly | SphinxRecipientMessage::ReplyOnly(_) => {
                             (Vec::with_capacity(0), plain_text)
                         }
-                        SphinxRecipientMessage::DataAndSurbs { num_surbs, pseudonym, remainder_data } => {
+                        SphinxRecipientMessage::DataAndSurbs {
+                            num_surbs,
+                            pseudonym,
+                            remainder_data,
+                        } => {
                             let chunks = plain_text.chunks_exact(HoprSurb::SIZE);
                             if chunks.len() != num_surbs as usize {
                                 return Err(PacketDecodingError("packet has invalid number of surbs".into()));

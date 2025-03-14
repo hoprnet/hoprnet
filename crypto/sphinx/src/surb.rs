@@ -168,8 +168,8 @@ impl<P: Pseudonym> SphinxRecipientMessage<P> {
     /// Number of SURBs the message carries.
     pub fn num_surbs(&self) -> u16 {
         match self {
-            SphinxRecipientMessage::DataAndSurbs {num_surbs,..} => *num_surbs,
-            _ => 0
+            SphinxRecipientMessage::DataAndSurbs { num_surbs, .. } => *num_surbs,
+            _ => 0,
         }
     }
 }
