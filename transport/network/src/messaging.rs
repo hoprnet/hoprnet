@@ -83,7 +83,7 @@ impl ControlMessage {
 
 #[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct PingMessage {
-    nonce: [u8; hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE],
+    nonce: [u8; PING_PONG_NONCE_SIZE],
 }
 
 impl PingMessage {
@@ -115,7 +115,7 @@ impl TryFrom<&[u8]> for PingMessage {
     }
 }
 
-const PING_MESSAGE_LEN: usize = hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE;
+const PING_MESSAGE_LEN: usize = PING_PONG_NONCE_SIZE;
 impl BytesEncodable<PING_MESSAGE_LEN> for PingMessage {}
 
 #[cfg(test)]
