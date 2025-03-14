@@ -1,9 +1,10 @@
-use crate::errors::{PacketError, Result};
-use hopr_crypto_sphinx::shared_keys::SharedSecret;
+use hopr_crypto_sphinx::prelude::SharedSecret;
 use hopr_crypto_types::prelude::{sample_secp256k1_field_element, SecretKey};
 use hopr_crypto_types::types::{Challenge, HalfKey, HalfKeyChallenge, PublicKey, Response};
 use hopr_primitive_types::prelude::*;
 use tracing::error;
+
+use crate::errors::{PacketError, Result};
 
 const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";
 const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
@@ -238,7 +239,7 @@ mod tests {
         derive_ack_key_share, pre_verify, validate_por_half_keys, validate_por_hint, validate_por_response,
         ProofOfRelayString, ProofOfRelayValues,
     };
-    use hopr_crypto_sphinx::shared_keys::SharedSecret;
+    use hopr_crypto_sphinx::prelude::SharedSecret;
     use hopr_crypto_types::types::Response;
 
     #[test]

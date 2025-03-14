@@ -1,16 +1,12 @@
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
-use hopr_crypto_random::random_fill;
-use hopr_crypto_types::crypto_traits::{Digest, Output};
+use hopr_crypto_types::crypto_traits::Digest;
 use hopr_crypto_types::prelude::*;
 
 // Module-specific constants
 const HASH_KEY_HMAC: &str = "HASH_KEY_HMAC";
 const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
 const HASH_KEY_RAW_KEY: &str = "HASH_KEY_RAW_KEY";
-
-/// Size of the nonce in the Ping sub protocol
-pub const PING_PONG_NONCE_SIZE: usize = 16;
 
 /// Helper function to expand an already cryptographically strong key material using the HKDF expand function.
 /// The size of the secret must be at least the size of the underlying hash function, which in this
@@ -24,20 +20,6 @@ fn hkdf_expand_from_prk<L: ArrayLength<u8>>(secret: &SecretKey, tag: &[u8]) -> G
     hkdf.expand(tag, &mut out).expect("invalid hkdf output size"); // should not happen
 
     out
-}
-
-/// Derives a ping challenge (if no challenge is given) or a pong response to a ping challenge.
-pub fn derive_ping_pong(challenge: Option<&[u8]>) -> Box<[u8]> {
-    let mut ret = Output::<Blake2s256>::default();
-    match challenge {
-        None => random_fill(&mut ret),
-        Some(chal) => {
-            let mut digest = Blake2s256::default();
-            digest.update(chal);
-            digest.finalize_into(&mut ret);
-        }
-    }
-    ret[..PING_PONG_NONCE_SIZE].into()
 }
 
 /// Derives the packet tag used during packet construction by expanding the given secret.

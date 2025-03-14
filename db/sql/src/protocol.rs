@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use hopr_crypto_packet::chain::{HoprPacket, PacketRouting};
+use hopr_crypto_packet::packet::{HoprPacket, PacketRouting};
 use hopr_crypto_packet::validation::validate_unacknowledged_ticket;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
@@ -207,8 +207,11 @@ impl HoprDbProtocolOperations for HoprDb {
                     spawn_fifo_blocking(move || {
                         HoprPacket::into_outgoing(
                             &data,
-                            PacketRouting::ForwardPath(&path),
-                            None,
+                            PacketRouting::ForwardPath {
+                                forward_path: &path,
+                                pseudonym: SimplePseudonym::random(),
+                                return_paths: &[],
+                            },
                             &me,
                             next_ticket,
                             &mapper,

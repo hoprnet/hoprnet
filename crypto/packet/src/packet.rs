@@ -1,4 +1,3 @@
-use hopr_crypto_sphinx::packet::KeyIdMapper;
 use hopr_crypto_sphinx::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -310,7 +309,7 @@ mod tests {
     use anyhow::{bail, Context};
     use bimap::BiHashMap;
     use hex_literal::hex;
-    use hopr_crypto_sphinx::surb::ReplyOpener;
+    use hopr_crypto_sphinx::prelude::ReplyOpener;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;

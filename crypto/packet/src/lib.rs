@@ -15,16 +15,15 @@
 //! In particular, as soon as there's a way to represent `Ed448` PeerIDs, it would be easy to create e.g. `X448Suite`.
 //!
 
-use hopr_crypto_sphinx::routing::SphinxHeaderSpec;
-use hopr_crypto_sphinx::shared_keys::SphinxSuite;
+use hopr_crypto_sphinx::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::marker::PhantomData;
 
-/// Implements the overlay packet intermediary object.
-pub mod chain;
 /// Lists all errors in this crate.
 pub mod errors;
+/// Implements the overlay packet intermediary object.
+pub mod packet;
 /// Implements the Proof of Relay.
 pub mod por;
 pub mod types;
@@ -35,7 +34,7 @@ pub mod validation;
 pub type HoprPseudonym = hopr_crypto_types::prelude::SimplePseudonym;
 
 /// Currently used public key cipher suite for Sphinx.
-pub type HoprSphinxSuite = hopr_crypto_sphinx::ec_groups::X25519Suite;
+pub type HoprSphinxSuite = X25519Suite;
 
 /// Current Sphinx header specification for the HOPR protocol.
 pub struct HoprSphinxHeaderSpec<S: SphinxSuite = HoprSphinxSuite>(PhantomData<S>);
@@ -51,12 +50,12 @@ impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
 }
 
 /// Single Use Reply Block representation for HOPR protocol.
-pub type HoprSurb = hopr_crypto_sphinx::surb::SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
+pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chain::HoprPacket;
+    use crate::packet::HoprPacket;
     use hopr_crypto_sphinx::prelude::MetaPacket;
 
     #[test]

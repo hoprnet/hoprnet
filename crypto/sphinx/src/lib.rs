@@ -19,23 +19,23 @@
 //! In particular, as soon as there's way to represent `Ed448` PeerIDs, it would be easy to create e.g. an `X448Suite`.
 
 /// Contains simple key derivation functions for different purposes
-pub mod derivation;
+mod derivation;
 /// Implementations of `SphinxSuite` trait for different elliptic curve groups
-pub mod ec_groups;
+mod ec_groups;
 /// Contains various errors returned from this crate.
 pub mod errors;
 /// Contains the main implementation of a SPHINX packet.
-pub mod packet;
+mod packet;
 /// Implementation of the SPHINX header format
-pub mod routing;
+mod routing;
 /// Derivation of shared keys for SPHINX header
-pub mod shared_keys;
+mod shared_keys;
 /// Contains Return Path and SURB-related types
-pub mod surb;
+mod surb;
 
 pub mod prelude {
     pub use crate::ec_groups::*;
-    pub use crate::packet::{ForwardedMetaPacket, MetaPacket, MetaPacketRouting};
+    pub use crate::packet::{ForwardedMetaPacket, KeyIdMapper, MetaPacket, MetaPacketRouting};
     pub use crate::routing::SphinxHeaderSpec;
     pub use crate::shared_keys::{SharedKeys, SharedSecret, SphinxSuite};
     pub use crate::surb::*;

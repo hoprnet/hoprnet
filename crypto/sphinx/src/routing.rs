@@ -160,7 +160,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 expected: secrets.len(),
             });
         }
-        if secrets.len() > H::MAX_HOPS.get() || H::MAX_HOPS.get() > FORWARD_END_PREFIX.min(REPLY_END_PREFIX) as usize {
+        if secrets.len() > H::MAX_HOPS.get() || H::MAX_HOPS.get() > REPLY_END_PREFIX as usize {
             return Err(CryptoError::InvalidInputValue("secrets.len"));
         }
 

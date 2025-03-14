@@ -3,19 +3,25 @@ use hopr_crypto_sphinx::prelude::{SphinxHeaderSpec, SphinxSuite, SURB};
 use hopr_primitive_types::prelude::GeneralError;
 use std::marker::PhantomData;
 
+/// Additional encoding of a packet message that can be preceded by a number of [`SURBs`](SURB).
 pub struct PacketMessage<S: SphinxSuite = HoprSphinxSuite, H: SphinxHeaderSpec = HoprSphinxHeaderSpec>(
     Box<[u8]>,
     PhantomData<(S, H)>,
 );
 
+/// Convenience alias for HOPR specific [`PacketMessage`].
 pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
+/// Individual parts of a [`PacketMessage`]: SURBs and the actual message.
+pub type PacketParts<S, H> = (Vec<SURB<S, H>>, Box<[u8]>);
+
 impl<S: SphinxSuite, H: SphinxHeaderSpec> PacketMessage<S, H> {
-    pub fn try_into_parts(self) -> Result<(Vec<SURB<S, H>>, Box<[u8]>), GeneralError> {
+    /// Converts this instance into [`PacketParts`].
+    pub fn try_into_parts(self) -> Result<PacketParts<S, H>, GeneralError> {
         let num_surbs = self.0[0] as usize;
         if num_surbs > 0 {
             let surb_end = num_surbs * SURB::<S, H>::SIZE;
-            if surb_end >= 1 + self.0.len() {
+            if surb_end >= self.0.len() {
                 return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs".into()));
             }
 
@@ -26,7 +32,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PacketMessage<S, H> {
             let surbs = surb_data
                 .as_slice()
                 .chunks_exact(SURB::<S, H>::SIZE)
-                .map(|chunk| SURB::<S, H>::try_from(chunk))
+                .map(SURB::<S, H>::try_from)
                 .collect::<Result<Vec<_>, _>>()?;
 
             Ok((surbs, data.into_boxed_slice()))
@@ -37,6 +43,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PacketMessage<S, H> {
         }
     }
 
+    /// Allocates a new instance from the given parts.
     pub fn from_parts(surbs: Vec<SURB<S, H>>, payload: &[u8]) -> Self {
         let mut ret = Vec::with_capacity(1 + surbs.len() * SURB::<S, H>::SIZE + payload.len());
         ret.push(surbs.len() as u8);
@@ -52,7 +59,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<Box<[u8]>> for PacketMessage<S
     type Error = GeneralError;
     fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
         if !value.is_empty() {
-            Ok(Self(value.into(), PhantomData))
+            Ok(Self(value, PhantomData))
         } else {
             Err(GeneralError::ParseError("HoprPacketMessage".into()))
         }
@@ -72,8 +79,7 @@ mod tests {
     use anyhow::anyhow;
     use bimap::BiHashMap;
     use hex_literal::hex;
-    use hopr_crypto_sphinx::packet::KeyIdMapper;
-    use hopr_crypto_sphinx::surb::create_surb;
+    use hopr_crypto_sphinx::prelude::*;
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 

@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hopr_crypto_packet::chain::HoprPacket;
+use hopr_crypto_packet::packet::HoprPacket;
 use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::{TicketBuilder, PAYLOAD_SIZE};
