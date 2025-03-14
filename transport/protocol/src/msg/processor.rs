@@ -81,7 +81,8 @@ where
             .to_send(
                 data.to_bytes(),
                 self.cfg.chain_keypair.clone(),
-                path?,
+                &path?,
+                &[], // TODO
                 self.determine_actual_outgoing_win_prob().await,
                 self.determine_actual_outgoing_ticket_price().await?,
             )

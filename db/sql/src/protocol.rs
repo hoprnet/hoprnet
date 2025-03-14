@@ -165,7 +165,8 @@ impl HoprDbProtocolOperations for HoprDb {
         &self,
         data: Box<[u8]>,
         me: ChainKeypair,
-        path: Vec<OffchainPublicKey>,
+        path: &[OffchainPublicKey],
+        return_paths: &[&[OffchainPublicKey]],
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData> {
@@ -177,7 +178,7 @@ impl HoprDbProtocolOperations for HoprDb {
             ))
         })?;
 
-        let (components, surb) = self
+        let (components, openers) = self
             .begin_transaction()
             .await?
             .perform(|tx| {
@@ -210,7 +211,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             PacketRouting::ForwardPath {
                                 forward_path: &path,
                                 pseudonym: SimplePseudonym::random(),
-                                return_paths: &[],
+                                return_paths,
                             },
                             &me,
                             next_ticket,
@@ -274,7 +275,7 @@ impl HoprDbProtocolOperations for HoprDb {
         let offchain_keypair = pkt_keypair.clone();
 
         let packet = spawn_fifo_blocking(move || {
-            HoprPacket::from_incoming(&data, &offchain_keypair, sender, &mapper, local_surbs)
+            HoprPacket::from_incoming(&data, &offchain_keypair, sender, &mapper, openers)
                 .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
         })
         .await?;

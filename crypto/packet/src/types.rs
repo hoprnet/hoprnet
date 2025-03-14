@@ -1,21 +1,19 @@
 use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite};
 use hopr_crypto_sphinx::prelude::{SphinxHeaderSpec, SphinxSuite, SURB};
+use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::GeneralError;
 use std::marker::PhantomData;
 
 /// Additional encoding of a packet message that can be preceded by a number of [`SURBs`](SURB).
-pub struct PacketMessage<S: SphinxSuite = HoprSphinxSuite, H: SphinxHeaderSpec = HoprSphinxHeaderSpec>(
-    Box<[u8]>,
-    PhantomData<(S, H)>,
-);
+pub struct PacketMessage<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize>(Box<[u8]>, PhantomData<(S, H)>);
 
 /// Convenience alias for HOPR specific [`PacketMessage`].
-pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec>;
+pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>;
 
 /// Individual parts of a [`PacketMessage`]: SURBs and the actual message.
 pub type PacketParts<S, H> = (Vec<SURB<S, H>>, Box<[u8]>);
 
-impl<S: SphinxSuite, H: SphinxHeaderSpec> PacketMessage<S, H> {
+impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P> {
     /// Converts this instance into [`PacketParts`].
     pub fn try_into_parts(self) -> Result<PacketParts<S, H>, GeneralError> {
         let num_surbs = self.0[0] as usize;
@@ -44,18 +42,26 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PacketMessage<S, H> {
     }
 
     /// Allocates a new instance from the given parts.
-    pub fn from_parts(surbs: Vec<SURB<S, H>>, payload: &[u8]) -> Self {
+    pub fn from_parts(surbs: Vec<SURB<S, H>>, payload: &[u8]) -> Result<Self, GeneralError> {
+        if surbs.len() > 255 {
+            return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs".into()));
+        }
+
+        if surbs.len() * SURB::<S, H>::SIZE + payload.len() > P {
+            return Err(GeneralError::ParseError("HoprPacketMessage.size".into()));
+        }
+
         let mut ret = Vec::with_capacity(1 + surbs.len() * SURB::<S, H>::SIZE + payload.len());
         ret.push(surbs.len() as u8);
-        for surb in surbs.into_iter().take(u8::MAX as usize).map(|s| s.into_boxed()) {
+        for surb in surbs.into_iter().map(|s| s.into_boxed()) {
             ret.extend_from_slice(surb.as_ref());
         }
         ret.extend_from_slice(payload);
-        Self(ret.into_boxed_slice(), PhantomData)
+        Ok(Self(ret.into_boxed_slice(), PhantomData))
     }
 }
 
-impl<S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<Box<[u8]>> for PacketMessage<S, H> {
+impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<Box<[u8]>> for PacketMessage<S, H, P> {
     type Error = GeneralError;
     fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
         if !value.is_empty() {
@@ -66,7 +72,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<Box<[u8]>> for PacketMessage<S
     }
 }
 
-impl<S: SphinxSuite, H: SphinxHeaderSpec> AsRef<[u8]> for PacketMessage<S, H> {
+impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> AsRef<[u8]> for PacketMessage<S, H, P> {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
@@ -104,7 +110,7 @@ mod tests {
     #[test]
     fn hopr_packet_message_message_only() -> anyhow::Result<()> {
         let test_msg = b"test message";
-        let (surbs, msg) = HoprPacketMessage::from_parts(vec![], test_msg).try_into_parts()?;
+        let (surbs, msg) = HoprPacketMessage::from_parts(vec![], test_msg)?.try_into_parts()?;
         assert_eq!(surbs.len(), 0);
         assert_eq!(msg.as_ref(), test_msg);
 
@@ -143,7 +149,7 @@ mod tests {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let (surbs_2, msg) = HoprPacketMessage::from_parts(surbs_1.clone(), &[]).try_into_parts()?;
+        let (surbs_2, msg) = HoprPacketMessage::from_parts(surbs_1.clone(), &[])?.try_into_parts()?;
 
         assert_eq!(surbs_2.len(), surbs_1.len());
         for (surb_1, surb_2) in surbs_1.into_iter().zip(surbs_2.into_iter()) {
@@ -188,7 +194,7 @@ mod tests {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let (surbs_2, msg) = HoprPacketMessage::from_parts(surbs_1.clone(), test_msg).try_into_parts()?;
+        let (surbs_2, msg) = HoprPacketMessage::from_parts(surbs_1.clone(), test_msg)?.try_into_parts()?;
 
         assert_eq!(surbs_2.len(), surbs_1.len());
         for (surb_1, surb_2) in surbs_1.into_iter().zip(surbs_2.into_iter()) {

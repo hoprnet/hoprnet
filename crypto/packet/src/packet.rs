@@ -142,13 +142,6 @@ impl HoprPacket {
                     ));
                 }
 
-                if msg.len() + return_paths.len() * HoprSurb::SIZE > PAYLOAD_SIZE {
-                    return Err(PacketConstructionError(format!(
-                        "message too long to fit with {} surbs into the packet",
-                        return_paths.len()
-                    )));
-                }
-
                 // Create shared secrets and PoR challenge chain
                 let shared_keys = HoprSphinxSuite::new_shared_keys(forward_path)?;
                 let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
@@ -158,12 +151,6 @@ impl HoprPacket {
                     shared_keys.secrets.len() as u8,
                 )?;
 
-                // Update the ticket with the challenge
-                let ticket = ticket
-                    .challenge(por_values.ticket_challenge())
-                    .build_signed(chain_keypair, domain_separator)?
-                    .leak();
-
                 // Create SURBs if some return paths were specified
                 let (surbs, openers): (Vec<_>, Vec<_>) = return_paths
                     .iter()
@@ -172,7 +159,13 @@ impl HoprPacket {
                     .into_iter()
                     .unzip();
 
-                let msg = HoprPacketMessage::from_parts(surbs, msg);
+                let msg = HoprPacketMessage::from_parts(surbs, msg)?;
+
+                // Update the ticket with the challenge
+                let ticket = ticket
+                    .challenge(por_values.ticket_challenge())
+                    .build_signed(chain_keypair, domain_separator)?
+                    .leak();
 
                 Ok((
                     Self::Outgoing {
@@ -194,13 +187,14 @@ impl HoprPacket {
                 ))
             }
             PacketRouting::Surb(surb) => {
+                let msg = HoprPacketMessage::from_parts(vec![], msg)?;
+
                 // Update the ticket with the challenge
                 let ticket = ticket
                     .challenge(surb.additional_data_receiver.ticket_challenge())
                     .build_signed(chain_keypair, domain_separator)?
                     .leak();
 
-                let msg = HoprPacketMessage::from_parts(vec![], msg);
                 Ok((
                     Self::Outgoing {
                         ticket,
