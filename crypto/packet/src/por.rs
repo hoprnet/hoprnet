@@ -1,8 +1,7 @@
 use hopr_crypto_sphinx::prelude::SharedSecret;
 use hopr_crypto_types::prelude::{sample_secp256k1_field_element, SecretKey};
-use hopr_crypto_types::types::{Challenge, HalfKey, HalfKeyChallenge, PublicKey, Response};
+use hopr_crypto_types::types::{Challenge, HalfKey, HalfKeyChallenge, Response};
 use hopr_primitive_types::prelude::*;
-use tracing::error;
 
 use crate::errors::{PacketError, Result};
 
@@ -20,9 +19,6 @@ pub fn derive_own_key_share(secret: &SecretKey) -> HalfKey {
 pub fn derive_ack_key_share(secret: &SecretKey) -> HalfKey {
     sample_secp256k1_field_element(secret.as_ref(), HASH_KEY_ACK_KEY).expect("failed to sample ack key share")
 }
-
-/// Proof of Relay secret length is twice the size of secp256k1 public key
-pub const POR_SECRET_LENGTH: usize = 2 * PublicKey::SIZE_COMPRESSED;
 
 /// Type that contains the challenge for the first ticket sent to the first relayer.
 ///
@@ -172,7 +168,8 @@ impl BytesRepresentable for ProofOfRelayString {
 #[derive(Clone)]
 pub struct ProofOfRelayOutput {
     pub own_key: HalfKey,
-    pub own_share: HalfKeyChallenge,
+    #[allow(dead_code)]
+    pub own_share: HalfKeyChallenge, // TODO: remove this
     pub next_ticket_challenge: EthereumChallenge,
     pub ack_challenge: HalfKeyChallenge,
 }
@@ -208,39 +205,44 @@ pub fn pre_verify(
     }
 }
 
-/// Checks if the given acknowledgement solves the given challenge.
-pub fn validate_por_half_keys(ethereum_challenge: &EthereumChallenge, own_key: &HalfKey, ack: &HalfKey) -> bool {
-    Response::from_half_keys(own_key, ack)
-        .map(|response| validate_por_response(ethereum_challenge, &response))
-        .unwrap_or_else(|e| {
-            error!(error = %e, "failed to validate por half keys");
-            false
-        })
-}
 
-/// Checks if the given response solves the given challenge.
-pub fn validate_por_response(ethereum_challenge: &EthereumChallenge, response: &Response) -> bool {
-    response.to_challenge().to_ethereum_challenge().eq(ethereum_challenge)
-}
-
-/// Checks if the given acknowledgement solves the given challenge.
-pub fn validate_por_hint(ethereum_challenge: &EthereumChallenge, own_share: &HalfKeyChallenge, ack: &HalfKey) -> bool {
-    Challenge::from_own_share_and_half_key(own_share, ack)
-        .map(|c| c.to_ethereum_challenge().eq(ethereum_challenge))
-        .unwrap_or_else(|e| {
-            error!(error = %e,"failed to validate por hint");
-            false
-        })
-}
 
 #[cfg(test)]
 mod tests {
+    use tracing::error;
     use crate::por::{
-        derive_ack_key_share, pre_verify, validate_por_half_keys, validate_por_hint, validate_por_response,
+        derive_ack_key_share, pre_verify,
         ProofOfRelayString, ProofOfRelayValues,
     };
     use hopr_crypto_sphinx::prelude::SharedSecret;
+    use hopr_crypto_types::prelude::{Challenge, HalfKey, HalfKeyChallenge};
     use hopr_crypto_types::types::Response;
+    use hopr_primitive_types::prelude::EthereumChallenge;
+
+    /// Checks if the given acknowledgement solves the given challenge.
+    fn validate_por_half_keys(ethereum_challenge: &EthereumChallenge, own_key: &HalfKey, ack: &HalfKey) -> bool {
+        Response::from_half_keys(own_key, ack)
+            .map(|response| validate_por_response(ethereum_challenge, &response))
+            .unwrap_or_else(|e| {
+                error!(error = %e, "failed to validate por half keys");
+                false
+            })
+    }
+
+    /// Checks if the given response solves the given challenge.
+    fn validate_por_response(ethereum_challenge: &EthereumChallenge, response: &Response) -> bool {
+        response.to_challenge().to_ethereum_challenge().eq(ethereum_challenge)
+    }
+
+    /// Checks if the given acknowledgement solves the given challenge.
+    fn validate_por_hint(ethereum_challenge: &EthereumChallenge, own_share: &HalfKeyChallenge, ack: &HalfKey) -> bool {
+        Challenge::from_own_share_and_half_key(own_share, ack)
+            .map(|c| c.to_ethereum_challenge().eq(ethereum_challenge))
+            .unwrap_or_else(|e| {
+                error!(error = %e,"failed to validate por hint");
+                false
+            })
+    }
 
     #[test]
     fn test_por_preverify_validate() -> anyhow::Result<()> {

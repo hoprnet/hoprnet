@@ -1,11 +1,12 @@
 use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite};
-use hopr_crypto_sphinx::prelude::{SphinxHeaderSpec, SphinxSuite, SURB};
+use hopr_crypto_sphinx::errors::SphinxError;
+use hopr_crypto_sphinx::prelude::{PaddedPayload, SphinxHeaderSpec, SphinxSuite, SURB};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::GeneralError;
 use std::marker::PhantomData;
 
 /// Additional encoding of a packet message that can be preceded by a number of [`SURBs`](SURB).
-pub struct PacketMessage<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize>(Box<[u8]>, PhantomData<(S, H)>);
+pub struct PacketMessage<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize>(PaddedPayload<P>, PhantomData<(S, H)>);
 
 /// Convenience alias for HOPR specific [`PacketMessage`].
 pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>;
@@ -15,15 +16,17 @@ pub type PacketParts<S, H> = (Vec<SURB<S, H>>, Box<[u8]>);
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P> {
     /// Converts this instance into [`PacketParts`].
-    pub fn try_into_parts(self) -> Result<PacketParts<S, H>, GeneralError> {
-        let num_surbs = self.0[0] as usize;
+    pub fn try_into_parts(self) -> Result<PacketParts<S, H>, SphinxError> {
+        let data = self.0.into_unpadded()?;
+        let num_surbs = data[0] as usize;
+
         if num_surbs > 0 {
             let surb_end = num_surbs * SURB::<S, H>::SIZE;
-            if surb_end >= self.0.len() {
-                return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs".into()));
+            if surb_end >= data.len() {
+                return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs".into()).into());
             }
 
-            let mut data = self.0.into_vec();
+            let mut data = data.into_vec();
 
             let surb_data = data.drain(0..=surb_end).skip(1).collect::<Vec<_>>();
 
@@ -35,46 +38,43 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
 
             Ok((surbs, data.into_boxed_slice()))
         } else {
-            let mut data = self.0.into_vec();
+            let mut data = data.into_vec();
             data.remove(0);
             Ok((Vec::with_capacity(0), data.into_boxed_slice()))
         }
     }
 
     /// Allocates a new instance from the given parts.
-    pub fn from_parts(surbs: Vec<SURB<S, H>>, payload: &[u8]) -> Result<Self, GeneralError> {
+    pub fn from_parts(surbs: Vec<SURB<S, H>>, payload: &[u8]) -> Result<Self, SphinxError> {
         if surbs.len() > 255 {
-            return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs".into()));
+            return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs".into()).into());
         }
 
         if surbs.len() * SURB::<S, H>::SIZE + payload.len() > P {
-            return Err(GeneralError::ParseError("HoprPacketMessage.size".into()));
+            return Err(GeneralError::ParseError("HoprPacketMessage.size".into()).into());
         }
 
-        let mut ret = Vec::with_capacity(1 + surbs.len() * SURB::<S, H>::SIZE + payload.len());
+        let mut ret = Vec::with_capacity(1 + surbs.len() * SURB::<S, H>::SIZE + PaddedPayload::<P>::SIZE);
         ret.push(surbs.len() as u8);
         for surb in surbs.into_iter().map(|s| s.into_boxed()) {
             ret.extend_from_slice(surb.as_ref());
         }
         ret.extend_from_slice(payload);
-        Ok(Self(ret.into_boxed_slice(), PhantomData))
+
+        // Save one reallocation by using the vector that we just created
+        Ok(Self(PaddedPayload::new_from_vec(ret)?, PhantomData))
     }
 }
 
-impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> TryFrom<Box<[u8]>> for PacketMessage<S, H, P> {
-    type Error = GeneralError;
-    fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
-        if !value.is_empty() {
-            Ok(Self(value, PhantomData))
-        } else {
-            Err(GeneralError::ParseError("HoprPacketMessage".into()))
-        }
+impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> From<PaddedPayload<P>> for PacketMessage<S, H, P> {
+    fn from(value: PaddedPayload<P>) -> Self {
+        Self(value, PhantomData)
     }
 }
 
-impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> AsRef<[u8]> for PacketMessage<S, H, P> {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
+impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> From<PacketMessage<S, H, P>> for PaddedPayload<P> {
+    fn from(value: PacketMessage<S, H, P>) -> Self {
+        value.0
     }
 }
 
@@ -194,7 +194,8 @@ mod tests {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let (surbs_2, msg) = HoprPacketMessage::from_parts(surbs_1.clone(), test_msg)?.try_into_parts()?;
+        let hopr_msg = HoprPacketMessage::from_parts(surbs_1.clone(), test_msg)?;
+        let (surbs_2, msg) = hopr_msg.try_into_parts()?;
 
         assert_eq!(surbs_2.len(), surbs_1.len());
         for (surb_1, surb_2) in surbs_1.into_iter().zip(surbs_2.into_iter()) {

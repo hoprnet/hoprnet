@@ -23,12 +23,18 @@ use std::marker::PhantomData;
 /// Lists all errors in this crate.
 pub mod errors;
 /// Implements the overlay packet intermediary object.
-pub mod packet;
+mod packet;
 /// Implements the Proof of Relay.
-pub mod por;
-pub mod types;
+mod por;
+/// Contains various helper types.
+mod types;
 /// Implements ticket validation logic.
-pub mod validation;
+mod validation;
+
+pub mod prelude {
+    pub use crate::packet::{HoprPacket, PacketRouting};
+    pub use crate::validation::validate_unacknowledged_ticket;
+}
 
 /// Pseudonyms used for the return path.
 pub type HoprPseudonym = hopr_crypto_types::prelude::SimplePseudonym;

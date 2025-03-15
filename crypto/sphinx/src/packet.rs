@@ -1,6 +1,5 @@
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::borrow::Cow;
 
 use hopr_crypto_types::crypto_traits::StreamCipher;
 use std::fmt::{Debug, Formatter};
@@ -20,53 +19,65 @@ use crate::{
 /// Holds data that are padded up to `P + 1`.
 ///
 /// Data in this instance are guaranteed to be always `P + 1` bytes long.
-///
-/// If the instance is created via [`PaddedPayload::new`] (by padding a slice shorter than `P + 1`),
-/// it takes the ownership of the padded data.
-///
-/// If the instance is created via [`PaddedPayload::from_padded`] (from data already `P+1` bytes long),
-/// the data is not owned, only borrowed.
-struct PaddedPayload<'a, const P: usize>(Cow<'a, [u8]>);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PaddedPayload<const P: usize>(Box<[u8]>);
 
-impl<'a, const P: usize> PaddedPayload<'a, P> {
+impl<const P: usize> PaddedPayload<P> {
     /// Tag used to separate padding from data
     const PADDING_TAG: u8 = 0xaa;
 
+    /// Byte used to pad the data.
+    const PADDING: u8 = 0x00;
+
     /// Size of the padded data.
-    const SIZE: usize = P + size_of_val(&Self::PADDING_TAG);
+    pub const SIZE: usize = P + size_of_val(&Self::PADDING_TAG);
 
     /// Creates a new instance from the given message `msg` shorter than [`PaddedPayload::SIZE`] and pads it.
     ///
     /// The padding consists of prepending a [`PaddedPayload::PADDING_TAG`], preceded by as many zero bytes
     /// to fill it up to [`PaddedPayload::SIZE`]. If data is `P` bytes-long, only the padding tag is prepended.
     ///
-    /// The instance takes ownership of the data.
     /// If the argument's length is greater or equal to [`PaddedPayload::PADDED_SIZE`], [`SphinxError::PaddingError`] is returned.
-    fn new(msg: &[u8]) -> Result<Self, SphinxError> {
+    pub fn new(msg: &[u8]) -> Result<Self, SphinxError> {
         if msg.len() < Self::SIZE {
             // Zeroes followed by the PADDING_TAG and then the message
-            let mut ret = vec![0u8; Self::SIZE];
+            let mut ret = vec![Self::PADDING; Self::SIZE];
             ret[Self::SIZE - msg.len() - 1] = Self::PADDING_TAG;
             ret[Self::SIZE - msg.len()..].copy_from_slice(msg);
-            ret.shrink_to_fit();
 
-            Ok(Self(Cow::Owned(ret)))
+            Ok(Self(ret.into_boxed_slice()))
         } else {
             Err(SphinxError::PaddingError)
         }
     }
 
+    /// Similar like [`PaddedPayload::new`], but creates a new instance from a vector,
+    /// reallocating only if the given vector has insufficient capacity.
+    pub fn new_from_vec(mut msg: Vec<u8>) -> Result<Self, SphinxError> {
+        let len = msg.len();
+        if len >= Self::SIZE {
+            return Err(SphinxError::PaddingError);
+        }
+
+        msg.resize(Self::SIZE, Self::PADDING); // Reallocates only if capacity is not enough
+        msg.copy_within(0..len, Self::SIZE - len);
+        msg[0..Self::SIZE - len].fill(Self::PADDING);
+        msg[Self::SIZE - len - 1] = Self::PADDING_TAG;
+
+        Ok(Self(msg.into_boxed_slice()))
+    }
+
     /// Creates a new instance from an already padded message `msg`.
     ///
-    /// The instance does not take ownership of the data.
     /// This method only checks the length of the argument, it does not verify
     /// the presence of the padding tag. If the padding tag is not present, an error
     /// is later return when [`PaddedPayload::into_unpadded`] is called.
     ///
     /// If the argument's length is not equal to [`PaddedPayload::PADDED_SIZE`], [`SphinxError::PaddingError`] is returned.
-    fn from_padded(msg: &'a [u8]) -> Result<Self, SphinxError> {
-        if msg.len() == Self::SIZE {
-            Ok(Self(Cow::Borrowed(msg)))
+    pub fn from_padded<T: AsRef<[u8]>>(msg: T) -> Result<Self, SphinxError> {
+        let data = msg.as_ref();
+        if data.len() == Self::SIZE {
+            Ok(Self(msg.as_ref().into()))
         } else {
             Err(SphinxError::PaddingError)
         }
@@ -77,12 +88,12 @@ impl<'a, const P: usize> PaddedPayload<'a, P> {
     ///
     /// If the padding tag could not be found, [`SphinxError::PaddingError`] is returned.
     /// This means this instance was created using [`PaddedPayload::from_padded`] with invalid data.
-    fn into_unpadded(self) -> Result<Box<[u8]>, SphinxError> {
+    pub fn into_unpadded(self) -> Result<Box<[u8]>, SphinxError> {
         self.0
             .iter()
             .position(|x| *x == Self::PADDING_TAG)
             .map(|tag_pos| {
-                let mut data = self.0.into_owned();
+                let mut data = self.0.into_vec();
                 data.drain(0..=tag_pos);
                 data.into_boxed_slice()
             })
@@ -90,13 +101,13 @@ impl<'a, const P: usize> PaddedPayload<'a, P> {
     }
 }
 
-impl<const P: usize> AsRef<[u8]> for PaddedPayload<'_, P> {
+impl<const P: usize> AsRef<[u8]> for PaddedPayload<P> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
     }
 }
 
-impl<const P: usize> Deref for PaddedPayload<'_, P> {
+impl<const P: usize> Deref for PaddedPayload<P> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -104,9 +115,9 @@ impl<const P: usize> Deref for PaddedPayload<'_, P> {
     }
 }
 
-impl<const P: usize> DerefMut for PaddedPayload<'_, P> {
+impl<const P: usize> DerefMut for PaddedPayload<P> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.to_mut()
+        self.0.deref_mut()
     }
 }
 
@@ -194,15 +205,15 @@ impl<S, H, const P: usize> Clone for MetaPacket<S, H, P> {
     }
 }
 
-/// Represent a [MetaPacket] with one layer of encryption removed, exposing the details
+/// Represent a [`MetaPacket`] with one layer of encryption removed, exposing the details
 /// about the next hop.
 ///
 /// There are two possible states - either the packet is intended for the recipient,
-/// and is thus [Final], or it is meant to be sent (relayed)
-/// to the next hop - thus it is [Relayed].
+/// and is thus [`ForwardedMetaPacket::Final`], or it is meant to be sent (relayed)
+/// to the next hop - thus it is [`ForwardedMetaPacket::Relayed`].
 #[allow(dead_code)]
 pub enum ForwardedMetaPacket<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> {
-    /// The content is another [MetaPacket] meant to be sent to the next hop.
+    /// The content is another [`MetaPacket`] meant to be sent to the next hop.
     Relayed {
         /// Packet for the next hop.
         packet: MetaPacket<S, H, P>,
@@ -223,7 +234,7 @@ pub enum ForwardedMetaPacket<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize
     /// The content is the actual payload for the packet's destination.
     Final {
         /// Decrypted payload
-        plain_text: Box<[u8]>,
+        plain_text: PaddedPayload<P>,
         /// Pseudonym of the packet sender.
         sender: H::Pseudonym,
         /// Shared secret that was used to encrypt the removed layer.
@@ -242,17 +253,10 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     /// The size of the `msg` must be less or equal `P`, otherwise the
     /// constructor will return an error.
     pub fn new<M: KeyIdMapper<S, H>>(
-        msg: &[u8],
+        mut payload: PaddedPayload<P>,
         routing: MetaPacketRouting<S, H>,
         key_mapper: &M,
     ) -> Result<Self, SphinxError> {
-        if msg.len() > P {
-            return Err(SphinxError::PacketConstructionError(
-                "message too long to fit into a packet".into(),
-            ));
-        }
-
-        let mut payload = PaddedPayload::<P>::new(msg)?;
         match routing {
             MetaPacketRouting::ForwardPath {
                 shared_keys,
@@ -281,14 +285,14 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     prp.apply_keystream(&mut payload);
                 }
 
-                Ok(Self::new_from_parts(shared_keys.alpha, routing_info, payload))
+                Ok(Self::new_from_parts(shared_keys.alpha, routing_info, &payload))
             }
             MetaPacketRouting::Surb(surb) => {
                 // Encrypt the packet using the sender's key from the SURB
                 let mut prp = S::new_reply_prp(&surb.sender_key)?;
                 prp.apply_keystream(&mut payload);
 
-                Ok(Self::new_from_parts(surb.alpha, surb.header, payload))
+                Ok(Self::new_from_parts(surb.alpha, surb.header, &payload))
             }
         }
     }
@@ -296,12 +300,12 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     fn new_from_parts(
         alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
         routing_info: RoutingInfo<H>,
-        payload: PaddedPayload<P>,
+        payload: &[u8],
     ) -> Self {
         let mut packet = Vec::with_capacity(Self::SIZE);
         packet.extend_from_slice(&alpha);
         packet.extend_from_slice(routing_info.as_ref());
-        packet.extend_from_slice(payload.as_ref());
+        packet.extend_from_slice(&payload[0..PaddedPayload::<P>::SIZE]);
 
         Self {
             packet: packet.into_boxed_slice(),
@@ -360,7 +364,6 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         let mut prp = S::new_prp(&secret)?;
         prp.apply_keystream(decrypted);
 
-        let mut padded_payload = PaddedPayload::from_padded(decrypted)?;
         Ok(match fwd_header {
             ForwardedHeader::RelayNode {
                 next_header,
@@ -368,7 +371,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 next_node,
                 additional_info,
             } => ForwardedMetaPacket::Relayed {
-                packet: Self::new_from_parts(alpha, next_header, padded_payload),
+                packet: Self::new_from_parts(alpha, next_header, decrypted),
                 packet_tag: derive_packet_tag(&secret),
                 derived_secret: secret,
                 next_node: key_mapper.map_id_to_public(&next_node).ok_or_else(|| {
@@ -391,18 +394,18 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     // to reverse the decryption done by individual hops
                     for secret in local_surb.shared_keys.into_iter().rev() {
                         let mut prp = S::new_prp(&secret)?;
-                        prp.apply_keystream(&mut padded_payload);
+                        prp.apply_keystream(decrypted);
                     }
 
                     // Invert the initial encryption using the sender key
                     let mut prp = S::new_reply_prp(&local_surb.sender_key)?;
-                    prp.apply_keystream(&mut padded_payload);
+                    prp.apply_keystream(decrypted);
                 }
 
                 ForwardedMetaPacket::Final {
                     packet_tag: derive_packet_tag(&secret),
                     derived_secret: secret,
-                    plain_text: padded_payload.into_unpadded()?,
+                    plain_text: PaddedPayload::from_padded(decrypted)?,
                     sender,
                 }
             }
@@ -466,7 +469,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_padding() -> anyhow::Result<()> {
-        let data = b"test";
+        let data = b"some testing forward message";
         let padded = PaddedPayload::<PAYLOAD_SIZE>::new(data)?;
 
         let mut expected = vec![0u8; PAYLOAD_SIZE - data.len()];
@@ -474,6 +477,9 @@ pub(crate) mod tests {
         expected.extend_from_slice(data);
         assert_eq!(expected.len(), padded.len());
         assert_eq!(&expected, padded.as_ref());
+
+        let padded_from_vec = PaddedPayload::<PAYLOAD_SIZE>::new_from_vec(data.to_vec())?;
+        assert_eq!(padded, padded_from_vec);
 
         let unpadded = padded.into_unpadded()?;
         assert!(!unpadded.is_empty());
@@ -525,7 +531,7 @@ pub(crate) mod tests {
         let msg = b"some random test message";
 
         let mut mp = MetaPacket::<S, TestHeader<S>, PAYLOAD_SIZE>::new(
-            msg,
+            PaddedPayload::new(msg)?,
             MetaPacketRouting::ForwardPath {
                 shared_keys,
                 forward_path: &pubkeys,
@@ -551,7 +557,7 @@ pub(crate) mod tests {
                 }
                 ForwardedMetaPacket::Final { plain_text, .. } => {
                     assert_eq!(keypairs.len() - 1, i);
-                    received_plaintext = plain_text;
+                    received_plaintext = plain_text.into_unpadded()?;
                 }
             }
         }
@@ -587,7 +593,11 @@ pub(crate) mod tests {
 
         let msg = b"some random reply test message";
 
-        let mut mp = MetaPacket::<S, TestHeader<S>, PAYLOAD_SIZE>::new(msg, MetaPacketRouting::Surb(surb), &mapper)?;
+        let mut mp = MetaPacket::<S, TestHeader<S>, PAYLOAD_SIZE>::new(
+            PaddedPayload::new(msg)?,
+            MetaPacketRouting::Surb(surb),
+            &mapper,
+        )?;
 
         let surb_retriever = |p: &SimplePseudonym| {
             assert_eq!(pseudonym, *p);
@@ -608,7 +618,7 @@ pub(crate) mod tests {
                 }
                 ForwardedMetaPacket::Final { plain_text, .. } => {
                     assert_eq!(keypairs.len() - 1, i);
-                    received_plaintext = plain_text;
+                    received_plaintext = plain_text.into_unpadded()?;
                 }
             }
         }
