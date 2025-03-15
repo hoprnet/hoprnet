@@ -205,19 +205,14 @@ pub fn pre_verify(
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-    use tracing::error;
-    use crate::por::{
-        derive_ack_key_share, pre_verify,
-        ProofOfRelayString, ProofOfRelayValues,
-    };
+    use crate::por::{derive_ack_key_share, pre_verify, ProofOfRelayString, ProofOfRelayValues};
     use hopr_crypto_sphinx::prelude::SharedSecret;
     use hopr_crypto_types::prelude::{Challenge, HalfKey, HalfKeyChallenge};
     use hopr_crypto_types::types::Response;
     use hopr_primitive_types::prelude::EthereumChallenge;
+    use tracing::error;
 
     /// Checks if the given acknowledgement solves the given challenge.
     fn validate_por_half_keys(ethereum_challenge: &EthereumChallenge, own_key: &HalfKey, ack: &HalfKey) -> bool {

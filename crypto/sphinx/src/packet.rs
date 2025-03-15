@@ -67,17 +67,18 @@ impl<const P: usize> PaddedPayload<P> {
         Ok(Self(msg.into_boxed_slice()))
     }
 
-    /// Creates a new instance from an already padded message `msg`.
+    /// Creates a new instance from an already padded message `msg` and takes its ownership.
     ///
     /// This method only checks the length of the argument, it does not verify
     /// the presence of the padding tag. If the padding tag is not present, an error
     /// is later return when [`PaddedPayload::into_unpadded`] is called.
     ///
+    /// If the vector has any excess capacity, it will be trimmed.
+    ///
     /// If the argument's length is not equal to [`PaddedPayload::PADDED_SIZE`], [`SphinxError::PaddingError`] is returned.
-    pub fn from_padded<T: AsRef<[u8]>>(msg: T) -> Result<Self, SphinxError> {
-        let data = msg.as_ref();
-        if data.len() == Self::SIZE {
-            Ok(Self(msg.as_ref().into()))
+    pub fn from_padded(msg: Vec<u8>) -> Result<Self, SphinxError> {
+        if msg.len() == Self::SIZE {
+            Ok(Self(msg.into_boxed_slice()))
         } else {
             Err(SphinxError::PaddingError)
         }
@@ -402,10 +403,15 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     prp.apply_keystream(decrypted);
                 }
 
+                // Remove all the data before the actual decrypted payload
+                // and shrink the original allocation.
+                let mut payload = self.packet.into_vec();
+                payload.drain(..<S::G as GroupElement<S::E>>::AlphaLen::USIZE + RoutingInfo::<H>::SIZE);
+
                 ForwardedMetaPacket::Final {
                     packet_tag: derive_packet_tag(&secret),
                     derived_secret: secret,
-                    plain_text: PaddedPayload::from_padded(decrypted)?,
+                    plain_text: PaddedPayload::from_padded(payload)?,
                     sender,
                 }
             }
