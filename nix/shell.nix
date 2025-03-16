@@ -82,6 +82,7 @@ craneLib.devShell {
   '';
   postShellHook = ''
     ${pre-commit-check.shellHook}
+    pip install -r tests/requirements.txt
   '';
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
 }
