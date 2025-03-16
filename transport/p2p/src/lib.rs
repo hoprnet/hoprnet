@@ -65,6 +65,7 @@ pub struct Pong(pub ControlMessage, pub String);
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
+    streams: libp2p_stream::Behaviour,
     discovery: behavior::discovery::Behaviour,
     heartbeat_generator: behavior::heartbeat::Behaviour,
     ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour,
@@ -101,6 +102,7 @@ impl HoprNetworkBehavior {
         W: Stream<Item = behavior::ticket_aggregation::Event> + Send + 'static,
     {
         Self {
+            streams: libp2p_stream::Behaviour::new(),
             discovery: behavior::discovery::Behaviour::new(me, network_events, onchain_events),
             heartbeat_generator: behavior::heartbeat::Behaviour::new(heartbeat_requests),
             ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour::new(
@@ -169,6 +171,13 @@ pub enum HoprNetworkBehaviorEvent {
         libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket, String>>,
     ),
     KeepAlive(void::Void),
+}
+
+// Unexpected libp2p_stream event
+impl From<()> for HoprNetworkBehaviorEvent {
+    fn from(_: ()) -> Self {
+        panic!("Unexpected event: ()")
+    }
 }
 
 impl From<void::Void> for HoprNetworkBehaviorEvent {
