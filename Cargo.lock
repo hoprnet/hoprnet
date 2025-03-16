@@ -4735,6 +4735,7 @@ dependencies = [
  "hopr-transport-protocol",
  "lazy_static",
  "libp2p",
+ "libp2p-stream",
  "moka",
  "serde",
  "test-log",
@@ -6007,6 +6008,20 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "smallvec",
+ "tracing",
+]
+
+[[package]]
+name = "libp2p-stream"
+version = "0.3.0-alpha"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "826716f1ee125895f1fb44911413cba023485b552ff96c7a2159bd037ac619bb"
+dependencies = [
+ "futures",
+ "libp2p-core",
+ "libp2p-identity",
+ "libp2p-swarm",
+ "rand 0.8.5",
  "tracing",
 ]
 
