@@ -107,18 +107,7 @@ mod tests {
             .collect::<BiHashMap<_, _>>();
     }
 
-    #[test]
-    fn hopr_packet_message_message_only() -> anyhow::Result<()> {
-        let test_msg = b"test message";
-        let (surbs, msg) = HoprPacketMessage::from_parts(vec![], test_msg)?.try_into_parts()?;
-        assert_eq!(surbs.len(), 0);
-        assert_eq!(msg.as_ref(), test_msg);
-
-        Ok(())
-    }
-
-    #[test]
-    fn hopr_packet_message_surbs_only() -> anyhow::Result<()> {
+    fn generate_surbs(count: usize) -> anyhow::Result<Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>> {
         let path = PEERS.iter().map(|(_, k)| k.public().clone()).collect::<Vec<_>>();
         let path_ids =
             <BiHashMap<_, _> as KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>::map_keys_to_ids(&*MAPPER, &path)
@@ -127,7 +116,7 @@ mod tests {
                 .collect::<Result<Vec<_>, _>>()?;
         let pseudonym = SimplePseudonym::random();
 
-        let surbs_1 = (0..2)
+        Ok((0..count)
             .into_iter()
             .map(|_| {
                 let shared_keys = HoprSphinxSuite::new_shared_keys(&path)?;
@@ -144,11 +133,26 @@ mod tests {
                     &por_strings,
                     pseudonym,
                     por_values,
+                    None,
                 )
                 .map(|(s, _)| s)
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?)
+    }
 
+    #[test]
+    fn hopr_packet_message_message_only() -> anyhow::Result<()> {
+        let test_msg = b"test message";
+        let (surbs, msg) = HoprPacketMessage::from_parts(vec![], test_msg)?.try_into_parts()?;
+        assert_eq!(surbs.len(), 0);
+        assert_eq!(msg.as_ref(), test_msg);
+
+        Ok(())
+    }
+
+    #[test]
+    fn hopr_packet_message_surbs_only() -> anyhow::Result<()> {
+        let surbs_1 = generate_surbs(2)?;
         let (surbs_2, msg) = HoprPacketMessage::from_parts(surbs_1.clone(), &[])?.try_into_parts()?;
 
         assert_eq!(surbs_2.len(), surbs_1.len());
@@ -164,36 +168,7 @@ mod tests {
     #[test]
     fn hopr_packet_message_surbs_and_msg() -> anyhow::Result<()> {
         let test_msg = b"test message";
-        let path = PEERS.iter().map(|(_, k)| k.public().clone()).collect::<Vec<_>>();
-        let path_ids =
-            <BiHashMap<_, _> as KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>::map_keys_to_ids(&MAPPER, &path)
-                .into_iter()
-                .map(|v| v.ok_or(anyhow!("missing id")))
-                .collect::<Result<Vec<_>, _>>()?;
-        let pseudonym = SimplePseudonym::random();
-
-        let surbs_1 = (0..2)
-            .into_iter()
-            .map(|_| {
-                let shared_keys = HoprSphinxSuite::new_shared_keys(&path)?;
-                let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
-                let por_values = ProofOfRelayValues::new(
-                    &shared_keys.secrets[0],
-                    shared_keys.secrets.get(1),
-                    shared_keys.secrets.len() as u8,
-                )?;
-
-                create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
-                    shared_keys,
-                    &path_ids,
-                    &por_strings,
-                    pseudonym,
-                    por_values,
-                )
-                .map(|(s, _)| s)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
+        let surbs_1 = generate_surbs(2)?;
         let hopr_msg = HoprPacketMessage::from_parts(surbs_1.clone(), test_msg)?;
         let (surbs_2, msg) = hopr_msg.try_into_parts()?;
 
@@ -204,6 +179,21 @@ mod tests {
 
         assert_eq!(msg.as_ref(), test_msg);
 
+        Ok(())
+    }
+
+    #[test]
+    fn hopr_packet_size_msg_size_limit() {
+        let test_msg = [0u8; PAYLOAD_SIZE + 1];
+        let res = HoprPacketMessage::from_parts(vec![], &test_msg);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn hopr_packet_message_surbs_size_limit() -> anyhow::Result<()> {
+        let surbs = generate_surbs(3)?;
+        let res = HoprPacketMessage::from_parts(surbs, &[]);
+        assert!(res.is_err());
         Ok(())
     }
 }

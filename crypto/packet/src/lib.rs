@@ -66,14 +66,11 @@ mod tests {
 
     #[test]
     fn header_and_packet_lengths() {
-        //let packet_len = packet_length::<CurrentSphinxSuite>(INTERMEDIATE_HOPS + 1, POR_SECRET_LENGTH, 0);
-        //assert_eq!(MetaPacket::<CurrentSphinxSuite, HoprSphinxHeader>::PACKET_LEN, packet_len); // 968 bytes
-
         let hopr_packet_len = HoprPacket::SIZE;
         assert_eq!(
             MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>::PACKET_LEN + Ticket::SIZE,
             hopr_packet_len
-        ); // 1116 bytes
+        );
 
         assert!(hopr_packet_len < 1492, "HOPR packet must fit within a layer 4 packet");
     }

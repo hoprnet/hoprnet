@@ -76,6 +76,7 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
     return_path: &[OffchainPublicKey],
     pseudonym: &HoprPseudonym,
     mapper: &M,
+    sender_key: Option<SecretKey16>,
 ) -> Result<(HoprSurb, ReplyOpener)> {
     if return_path.is_empty() {
         return Err(PacketConstructionError("return path cannot be empty".into()));
@@ -102,6 +103,7 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
         &por_strings,
         *pseudonym,
         por_values,
+        sender_key,
     )?)
 }
 
@@ -115,7 +117,6 @@ impl HoprPacket {
     /// # Arguments
     /// * `msg` packet payload
     /// * `routing` routing to the destination
-    /// * `surb` optional SURBs with same pseudonym
     /// * `chain_keypair` private key of the local node
     /// * `ticket` ticket builder for the first hop on the path
     /// * `domain_separator` channels contract domain separator
@@ -152,9 +153,10 @@ impl HoprPacket {
                 )?;
 
                 // Create SURBs if some return paths were specified
+                // TODO: allow sender key passing
                 let (surbs, openers): (Vec<_>, Vec<_>) = return_paths
                     .iter()
-                    .map(|rp| create_surb_for_path(rp, &pseudonym, mapper))
+                    .map(|rp| create_surb_for_path(rp, &pseudonym, mapper, None))
                     .collect::<Result<Vec<_>>>()?
                     .into_iter()
                     .unzip();
@@ -518,9 +520,7 @@ mod tests {
         }
     }
 
-    //#[parameterized(hops = { 0,1,2,3 })]
-    #[test]
-    //fn test_packet_forward_message_no_surb(hops: usize) -> anyhow::Result<()> {
+    #[parameterized(hops = { 0,1,2,3 })]
     fn test_packet_forward_message_no_surb() -> anyhow::Result<()> {
         let hops = 0;
         let msg = b"some testing forward message";

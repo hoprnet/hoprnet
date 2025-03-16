@@ -74,8 +74,7 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
 pub struct SharedKeys<E: Scalar, G: GroupElement<E>> {
     pub alpha: Alpha<G::AlphaLen>,
     pub secrets: Vec<SharedSecret>,
-    _e: PhantomData<E>,
-    _g: PhantomData<G>,
+    _d: PhantomData<(E, G)>,
 }
 
 impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
@@ -122,8 +121,7 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
         Ok(SharedKeys {
             alpha,
             secrets: shared_keys,
-            _e: PhantomData,
-            _g: PhantomData,
+            _d: PhantomData,
         })
     }
 

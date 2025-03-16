@@ -595,7 +595,8 @@ pub(crate) mod tests {
             .map(|v| v.ok_or_else(|| anyhow!("failed to map keys to ids")))
             .collect::<anyhow::Result<Vec<KeyIdent>>>()?;
 
-        let (surb, opener) = create_surb::<S, TestHeader<S>>(shared_keys, &ids, &por_strings, pseudonym, por_values)?;
+        let (surb, opener) =
+            create_surb::<S, TestHeader<S>>(shared_keys, &ids, &por_strings, pseudonym, por_values, None)?;
 
         let msg = b"some random reply test message";
 
