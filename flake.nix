@@ -442,6 +442,9 @@
           hopli-profile-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-profile-docker;
           };
+          pluto-docker-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript pluto-docker;
+          };
           docs = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             buildDocs = true;
           });
@@ -585,11 +588,8 @@
             settings.formatter.prettier.excludes = [ "ethereum/contracts/*" "*.yml" "*.yaml" ];
 
             programs.rustfmt.enable = true;
-
             programs.nixpkgs-fmt.enable = true;
-
             programs.taplo.enable = true;
-
             programs.ruff-format.enable = true;
 
             settings.formatter.solc = {
@@ -631,6 +631,7 @@
             inherit hopli-docker-build-and-upload;
             inherit hopli-debug-docker-build-and-upload;
             inherit hopli-profile-docker-build-and-upload;
+            inherit pluto-docker-docker-build-and-upload;
             inherit update-github-labels;
             check = run-check;
           };
