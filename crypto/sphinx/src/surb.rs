@@ -115,16 +115,15 @@ pub fn create_surb<S: SphinxSuite, H: SphinxHeaderSpec>(
     shared_keys: SharedKeys<S::E, S::G>,
     path: &[H::KeyId],
     additional_data_relayer: &[H::RelayerData],
-    pseudonym: H::Pseudonym,
+    pseudonym: &H::Pseudonym,
     additional_data_receiver: H::SurbReceiverData,
-    sender_key: Option<SecretKey16>,
 ) -> hopr_crypto_types::errors::Result<(SURB<S, H>, ReplyOpener)>
 where
     H::KeyId: Copy,
 {
     let header = RoutingInfo::<H>::new(path, &shared_keys.secrets, additional_data_relayer, pseudonym, true)?;
 
-    let sender_key = sender_key.unwrap_or_else(|| SecretKey16::random());
+    let sender_key = SecretKey16::random();
 
     let surb = SURB {
         sender_key: sender_key.clone(),
@@ -162,9 +161,8 @@ mod tests {
             shares,
             &pub_keys,
             &[Default::default(); 4],
-            SimplePseudonym::random(),
+            &SimplePseudonym::random(),
             Default::default(),
-            None,
         )?)
     }
 

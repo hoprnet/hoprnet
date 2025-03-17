@@ -1255,8 +1255,19 @@ pub trait Pseudonym: BytesRepresentable + hash::Hash + Eq + Display {
 }
 
 /// Represents a simple UUID-like pseudonym consisting of 16 bytes.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SimplePseudonym(pub [u8; Self::SIZE]);
+
+impl SimplePseudonym {
+    /// Generates a random pseudonym with a given prefix.
+    /// The prefix can be up to the half of [`SimplePseudonym::SIZE`].
+    pub fn random_with_prefix(prefix: &[u8]) -> Self {
+        let len = prefix.len().min(Self::SIZE / 2);
+        let mut ret = Self::random();
+        ret.0[0..len].copy_from_slice(prefix);
+        ret
+    }
+}
 
 impl Display for SimplePseudonym {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1281,7 +1292,7 @@ impl<'a> TryFrom<&'a [u8]> for SimplePseudonym {
         value
             .try_into()
             .map(Self)
-            .map_err(|_| ParseError("HoprPseudonym".into()))
+            .map_err(|_| ParseError("SimplePseudonym".into()))
     }
 }
 

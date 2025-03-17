@@ -65,18 +65,17 @@ pub enum PacketRouting<'a> {
     /// Optionally, return paths for attached SURBs can be specified.
     ForwardPath {
         forward_path: &'a [OffchainPublicKey],
-        pseudonym: HoprPseudonym,
+        pseudonym: &'a HoprPseudonym,
         return_paths: &'a [&'a [OffchainPublicKey]],
     },
     /// The packet is routed via an existing SURB.
-    Surb(HoprSurb),
+    Surb(HoprSurb, &'a HoprPseudonym),
 }
 
 fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
     return_path: &[OffchainPublicKey],
     pseudonym: &HoprPseudonym,
     mapper: &M,
-    sender_key: Option<SecretKey16>,
 ) -> Result<(HoprSurb, ReplyOpener)> {
     if return_path.is_empty() {
         return Err(PacketConstructionError("return path cannot be empty".into()));
@@ -101,9 +100,8 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
             })
             .collect::<Result<Vec<_>>>()?,
         &por_strings,
-        *pseudonym,
+        pseudonym,
         por_values,
-        sender_key,
     )?)
 }
 
@@ -153,10 +151,9 @@ impl HoprPacket {
                 )?;
 
                 // Create SURBs if some return paths were specified
-                // TODO: allow sender key passing
                 let (surbs, openers): (Vec<_>, Vec<_>) = return_paths
                     .iter()
-                    .map(|rp| create_surb_for_path(rp, &pseudonym, mapper, None))
+                    .map(|rp| create_surb_for_path(rp, pseudonym, mapper))
                     .collect::<Result<Vec<_>>>()?
                     .into_iter()
                     .unzip();
@@ -188,7 +185,7 @@ impl HoprPacket {
                     openers,
                 ))
             }
-            PacketRouting::Surb(surb) => {
+            PacketRouting::Surb(surb, pseudonym) => {
                 let msg = HoprPacketMessage::from_parts(vec![], msg)?;
 
                 // Update the ticket with the challenge
@@ -209,7 +206,7 @@ impl HoprPacket {
                         ack_challenge: surb.additional_data_receiver.acknowledgement_challenge(),
                         packet: MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>::new(
                             msg.into(),
-                            MetaPacketRouting::Surb(surb),
+                            MetaPacketRouting::Surb(surb, pseudonym),
                             mapper,
                         )?,
                     },
@@ -447,7 +444,7 @@ mod tests {
             PacketRouting::ForwardPath {
                 forward_path: &forward_path,
                 return_paths: &return_paths_refs,
-                pseudonym,
+                pseudonym: &pseudonym,
             },
             &PEERS[0].0,
             ticket,
@@ -456,7 +453,12 @@ mod tests {
         )?)
     }
 
-    fn create_packet_from_surb(sender_node: usize, surb: HoprSurb, msg: &[u8]) -> anyhow::Result<HoprPacket> {
+    fn create_packet_from_surb(
+        sender_node: usize,
+        surb: HoprSurb,
+        hopr_pseudonym: &HoprPseudonym,
+        msg: &[u8],
+    ) -> anyhow::Result<HoprPacket> {
         assert!((1..=4).contains(&sender_node), "sender_node must be between 1 and 4");
 
         let ticket = mock_ticket(
@@ -467,7 +469,7 @@ mod tests {
 
         Ok(HoprPacket::into_outgoing(
             msg,
-            PacketRouting::Surb(surb),
+            PacketRouting::Surb(surb, hopr_pseudonym),
             &PEERS[sender_node].0,
             ticket,
             &*MAPPER,
@@ -675,7 +677,7 @@ mod tests {
 
         // Reply packet
         let re_msg = b"some testing reply message";
-        let mut re_packet = create_packet_from_surb(forward_hops + 1, received_surbs[0].clone(), re_msg)?;
+        let mut re_packet = create_packet_from_surb(forward_hops + 1, received_surbs[0].clone(), &pseudonym, re_msg)?;
 
         let mut openers_fn = |p: &HoprPseudonym| {
             assert_eq!(p, &pseudonym);
@@ -788,7 +790,7 @@ mod tests {
         // Reply packet
         for (i, recv_surb) in received_surbs.into_iter().enumerate() {
             let re_msg = format!("some testing reply message {i}");
-            let mut re_packet = create_packet_from_surb(forward_hops + 1, recv_surb, re_msg.as_bytes())?;
+            let mut re_packet = create_packet_from_surb(forward_hops + 1, recv_surb, &pseudonym, re_msg.as_bytes())?;
 
             match &re_packet {
                 HoprPacket::Outgoing { .. } => {}

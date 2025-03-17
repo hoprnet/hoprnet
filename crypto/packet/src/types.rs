@@ -131,9 +131,8 @@ mod tests {
                     shared_keys,
                     &path_ids,
                     &por_strings,
-                    pseudonym,
+                    &pseudonym,
                     por_values,
-                    None,
                 )
                 .map(|(s, _)| s)
             })

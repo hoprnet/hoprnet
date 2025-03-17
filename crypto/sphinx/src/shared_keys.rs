@@ -178,8 +178,14 @@ pub trait SphinxSuite {
     }
 
     /// Instantiates a new Pseudo-Random Permutation for reply data.
-    fn new_reply_prp(secret: &SecretKey16) -> hopr_crypto_types::errors::Result<Self::PRP> {
-        generate_key_iv(secret, HASH_KEY_REPLY_PRP.as_bytes(), false)
+    fn new_reply_prp<P: Pseudonym>(
+        secret: &SecretKey16,
+        pseudonym: &P,
+    ) -> hopr_crypto_types::errors::Result<Self::PRP> {
+        let mut info = Vec::with_capacity(HASH_KEY_REPLY_PRP.len() + pseudonym.as_ref().len());
+        info.extend_from_slice(HASH_KEY_REPLY_PRP.as_bytes());
+        info.extend_from_slice(pseudonym.as_ref());
+        generate_key_iv(secret, &info, false)
     }
 }
 

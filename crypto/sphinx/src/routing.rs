@@ -151,7 +151,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
         path: &[H::KeyId],
         secrets: &[SharedSecret],
         additional_data_relayer: &[H::RelayerData],
-        pseudonym: H::Pseudonym,
+        pseudonym: &H::Pseudonym,
         is_reply: bool,
     ) -> hopr_crypto_types::errors::Result<Self> {
         if path.len() != secrets.len() {
@@ -445,7 +445,7 @@ pub(crate) mod tests {
             &pub_keys,
             &shares.secrets,
             &[],
-            pseudonym,
+            &pseudonym,
             reply,
         )?;
 

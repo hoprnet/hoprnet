@@ -169,10 +169,11 @@ pub enum MetaPacketRouting<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
         additional_data_relayer: &'a [H::RelayerData],
         /// Pseudonym of the packet sender.
         /// This gets delivered to the packet's final recipient.
-        pseudonym: H::Pseudonym,
+        pseudonym: &'a H::Pseudonym,
     },
-    /// Uses a SURB to deliver the packet.
-    Surb(SURB<S, H>),
+    /// Uses a SURB to deliver the packet and the pseudonym that belongs to the
+    /// recipient's node (origin of the SURB).
+    Surb(SURB<S, H>, &'a H::Pseudonym),
 }
 
 /// An encrypted packet with payload of size `P`.
@@ -288,9 +289,9 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
 
                 Ok(Self::new_from_parts(shared_keys.alpha, routing_info, &payload))
             }
-            MetaPacketRouting::Surb(surb) => {
+            MetaPacketRouting::Surb(surb, pseudonym) => {
                 // Encrypt the packet using the sender's key from the SURB
-                let mut prp = S::new_reply_prp(&surb.sender_key)?;
+                let mut prp = S::new_reply_prp(&surb.sender_key, pseudonym)?;
                 prp.apply_keystream(&mut payload);
 
                 Ok(Self::new_from_parts(surb.alpha, surb.header, &payload))
@@ -399,7 +400,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     }
 
                     // Invert the initial encryption using the sender key
-                    let mut prp = S::new_reply_prp(&local_surb.sender_key)?;
+                    let mut prp = S::new_reply_prp(&local_surb.sender_key, &sender)?;
                     prp.apply_keystream(decrypted);
                 }
 
@@ -542,7 +543,7 @@ pub(crate) mod tests {
                 shared_keys,
                 forward_path: &pubkeys,
                 additional_data_relayer: &por_strings,
-                pseudonym,
+                pseudonym: &pseudonym,
             },
             &mapper,
         )?;
@@ -595,14 +596,13 @@ pub(crate) mod tests {
             .map(|v| v.ok_or_else(|| anyhow!("failed to map keys to ids")))
             .collect::<anyhow::Result<Vec<KeyIdent>>>()?;
 
-        let (surb, opener) =
-            create_surb::<S, TestHeader<S>>(shared_keys, &ids, &por_strings, pseudonym, por_values, None)?;
+        let (surb, opener) = create_surb::<S, TestHeader<S>>(shared_keys, &ids, &por_strings, &pseudonym, por_values)?;
 
         let msg = b"some random reply test message";
 
         let mut mp = MetaPacket::<S, TestHeader<S>, PAYLOAD_SIZE>::new(
             PaddedPayload::new(msg)?,
-            MetaPacketRouting::Surb(surb),
+            MetaPacketRouting::Surb(surb, &pseudonym),
             &mapper,
         )?;
 
