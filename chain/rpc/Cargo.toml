@@ -41,6 +41,7 @@ http-types = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 primitive-types = { workspace = true }
+rust-stream-ext-concurrent = { workspace = true }
 reqwest = { workspace = true, optional = true, features = [
   "brotli",
   "zstd",
