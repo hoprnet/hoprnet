@@ -15,6 +15,10 @@ pub enum HoprTransportError {
     #[error("Db error: {0}")]
     Db(#[from] hopr_db_sql::api::errors::DbError),
 
+    // TODO(20250114): Unify all Databse API functionality in the db_api crate and remove this error.
+    #[error("Db error: {0}")]
+    Database(#[from] hopr_db_sql::errors::DbSqlError),
+
     #[error("Path error: {0}")]
     Path(#[from] core_path::errors::PathError),
 

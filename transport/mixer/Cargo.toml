@@ -1,0 +1,42 @@
+[package]
+name = "hopr-transport-mixer"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Mixer functionality responsible for mixing and delaying packets with a channel-like interface"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
+
+[dependencies]
+futures = { workspace = true }
+futures-timer = { workspace = true }
+lazy_static = { workspace = true, optional = true }
+rust-stream-ext-concurrent = { workspace = true }
+smart-default = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+hopr-crypto-random = { workspace = true }
+hopr-metrics = { workspace = true, optional = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+async-std = { workspace = true, features = ["attributes"] }
+bytesize = { version = "1.3.0", features = ["serde"] }
+criterion = { workspace = true, features = ["async_futures", "async_std"] }
+futures = { workspace = true }
+mockall = { workspace = true }
+more-asserts = { workspace = true }
+tracing-test = { workspace = true }
+
+[[bench]]
+name = "mixer_throughput"
+harness = false

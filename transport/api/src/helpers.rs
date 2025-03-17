@@ -1,5 +1,5 @@
 use async_lock::RwLock;
-use libp2p::{Multiaddr, PeerId};
+use futures::channel::mpsc::Sender;
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
@@ -8,12 +8,14 @@ use core_path::{path::TransportPath, selectors::PathSelector};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;
-use hopr_primitive_types::primitives::Address;
-use hopr_transport_protocol::msg::processor::MsgSender;
-use hopr_transport_session::{errors::TransportSessionError, traits::SendMsg};
-
 use hopr_network_types::prelude::RoutingOptions;
-use hopr_transport_session::errors::SessionManagerError;
+use hopr_primitive_types::primitives::Address;
+use hopr_transport_identity::PeerId;
+use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
+use hopr_transport_session::{
+    errors::{SessionManagerError, TransportSessionError},
+    traits::SendMsg,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -39,12 +41,6 @@ impl From<NetworkRegistryStatus> for PeerEligibility {
             NetworkRegistryStatus::Denied => Self::Ineligible,
         }
     }
-}
-
-/// Indexer events triggered externally from the [`crate::HoprTransport`] object.
-pub enum IndexerTransportEvent {
-    EligibilityUpdate(PeerId, PeerEligibility),
-    Announce(PeerId, Vec<Multiaddr>),
 }
 
 /// Ticket statistics data exposed by the ticket mechanism.
@@ -150,7 +146,7 @@ where
 
 #[derive(Clone)]
 pub(crate) struct MessageSender<T, S> {
-    pub process_packet_send: Arc<OnceLock<MsgSender>>,
+    pub process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     pub resolver: PathPlanner<T, S>,
 }
 
@@ -159,7 +155,10 @@ where
     T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
-    pub fn new(process_packet_send: Arc<OnceLock<MsgSender>>, resolver: PathPlanner<T, S>) -> Self {
+    pub fn new(
+        process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
+        resolver: PathPlanner<T, S>,
+    ) -> Self {
         Self {
             process_packet_send,
             resolver,
