@@ -46,7 +46,7 @@ members = [
 
 [workspace.dependencies]
 aes = "0.8"
-anyhow = "1.0.95"
+anyhow = "1.0.97"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
 async-channel = "2.3.1"
