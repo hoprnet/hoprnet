@@ -19,24 +19,24 @@ use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
-        "hopr_session_num_active_sessions",
+        "hopr_session_active_sessions_count",
         "Number of currently active HOPR sessions"
     ).unwrap();
     static ref METRIC_NUM_ESTABLISHED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
-        "hopr_session_established_sessions",
+        "hopr_session_established_sessions_count",
         "Number of sessions that were successfully established as an Exit node"
     ).unwrap();
     static ref METRIC_NUM_INITIATED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(
-        "hopr_session_initiated_sessions",
+        "hopr_session_initiated_sessions_count",
         "Number of sessions that were successfully initiated as an Entry node"
     ).unwrap();
     static ref METRIC_RECEIVED_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
-        "hopr_session_received_error_counts",
+        "hopr_session_received_error_count",
         "Number of HOPR session errors received from an Exit node",
         &["kind"]
     ).unwrap();
     static ref METRIC_SENT_SESSION_ERRS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
-        "hopr_session_sent_error_counts",
+        "hopr_session_sent_error_count",
         "Number of HOPR session errors sent to an Entry node",
         &["kind"]
     ).unwrap();

@@ -34,7 +34,7 @@ use crate::errors::{CoreEthereumIndexerError, Result};
 lazy_static::lazy_static! {
     static ref METRIC_INDEXER_LOG_COUNTERS: hopr_metrics::MultiCounter =
         hopr_metrics::MultiCounter::new(
-            "hopr_indexer_contract_log_counters",
+            "hopr_indexer_contract_log_count",
             "Counts of different HOPR contract logs processed by the Indexer",
             &["contract"]
     ).unwrap();
