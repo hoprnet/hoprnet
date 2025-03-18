@@ -384,7 +384,7 @@ impl HoprDbTicketOperations for HoprDb {
                                         let unredeemed_value = myself
                                             .caches
                                             .unrealized_value
-                                            .get(channel_id)
+                                            .get(&(*channel_id, *epoch))
                                             .await
                                             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
@@ -395,7 +395,7 @@ impl HoprDbTicketOperations for HoprDb {
                                     }
                                 }
 
-                                myself.caches.unrealized_value.invalidate(channel_id).await;
+                                myself.caches.unrealized_value.invalidate(&(*channel_id, *epoch)).await;
                             } else {
                                 return Err(DbSqlError::LogicalError(format!(
                                     "could not mark {marked_count} ticket as {mark_as}"
