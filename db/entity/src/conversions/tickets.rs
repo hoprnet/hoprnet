@@ -18,7 +18,7 @@ impl TryFrom<&ticket::Model> for AcknowledgedTicket {
             .amount(U256::from_be_bytes(&value.amount))
             .index(U256::from_be_bytes(&value.index).as_u64())
             .index_offset(value.index_offset as u32)
-            .win_prob_encoded(
+            .win_prob(
                 value
                     .winning_probability
                     .as_slice()
