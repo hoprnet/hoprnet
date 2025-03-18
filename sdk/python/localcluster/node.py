@@ -246,13 +246,18 @@ class Node:
     async def links(self):
         addresses = await self.api.addresses()
         admin_ui_params = f"apiEndpoint=http://{self.host_addr}:{self.api_port}&apiToken={self.api_token}"
-        print(f"\t{self}")
-        print(f"\t\tPeer Id:\t{addresses.hopr}")
-        print(f"\t\tAddress:\t{addresses.native}")
-        print(
+
+        output_strings = []
+
+        output_strings.append(f"\t{self}")
+        output_strings.append(f"\t\tPeer Id:\t{addresses.hopr}")
+        output_strings.append(f"\t\tAddress:\t{addresses.native}")
+        output_strings.append(
             f"\t\tRest API:\thttp://{self.host_addr}:{self.api_port}/scalar | http://{self.host_addr}:{self.api_port}/swagger-ui/index.html"
         )
-        print(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}", end="\n\n")
+        output_strings.append(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}\n\n")
+
+        return "\n".join(output_strings)
 
     def __eq__(self, other):
         return self.peer_id == other.peer_id
