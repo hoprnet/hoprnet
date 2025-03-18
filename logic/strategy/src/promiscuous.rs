@@ -56,7 +56,7 @@ lazy_static::lazy_static! {
     static ref METRIC_COUNT_CLOSURES: SimpleCounter =
         SimpleCounter::new("hopr_strategy_promiscuous_closed_channels_count", "Count of close channel decisions").unwrap();
     static ref METRIC_MAX_AUTO_CHANNELS: SimpleGauge =
-        SimpleGauge::new("hopr_strategy_promiscuous_max_auto_channels", "Count of maximum number of channels managed by the strategy").unwrap();
+        SimpleGauge::new("hopr_strategy_promiscuous_max_auto_channels_count", "Count of maximum number of channels managed by the strategy").unwrap();
 }
 
 /// A decision made by the Promiscuous strategy on each tick,
