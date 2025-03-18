@@ -30,13 +30,13 @@ use hopr_chain_actions::ChainActions;
 use hopr_internal_types::prelude::*;
 use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
 
-use crate::aggregating::AggregatingStrategy;
 use crate::auto_funding::AutoFundingStrategy;
 use crate::auto_redeeming::AutoRedeemingStrategy;
 use crate::channel_finalizer::ClosureFinalizerStrategy;
 use crate::errors::Result;
 use crate::promiscuous::PromiscuousStrategy;
 use crate::Strategy;
+use crate::{aggregating::AggregatingStrategy, one_hop_connection::OneHopConnectionStrategy};
 
 use hopr_db_sql::HoprDbAllOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -156,6 +156,11 @@ impl MultiStrategy {
 
         for strategy in cfg.strategies.iter() {
             match strategy {
+                Strategy::OneHopConnection(sub_cfg) => strategies.push(Box::new(OneHopConnectionStrategy::new(
+                    sub_cfg.clone(),
+                    db.clone(),
+                    chain_actions.clone(),
+                ))),
                 Strategy::Promiscuous(sub_cfg) => strategies.push(Box::new(PromiscuousStrategy::new(
                     sub_cfg.clone(),
                     db.clone(),
