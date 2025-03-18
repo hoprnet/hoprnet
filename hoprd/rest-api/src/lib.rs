@@ -44,7 +44,6 @@ use tower_http::{
     cors::{Any, CorsLayer},
     sensitive_headers::SetSensitiveRequestHeadersLayer,
     trace::TraceLayer,
-    validate_request::ValidateRequestHeaderLayer,
 };
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
