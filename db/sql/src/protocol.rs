@@ -1,5 +1,12 @@
+use crate::channels::HoprDbChannelOperations;
+use crate::db::HoprDb;
+use crate::errors::DbSqlError;
+use crate::info::HoprDbInfoOperations;
+use crate::prelude::HoprDbTicketOperations;
+use crate::{HoprDbGeneralModelOperations, OptTx};
 use async_trait::async_trait;
 use hopr_crypto_packet::prelude::*;
+use hopr_crypto_packet::HoprPseudonym;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
 use hopr_db_api::protocol::{
@@ -10,13 +17,6 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::ops::{Mul, Sub};
 use tracing::{instrument, trace, warn};
-
-use crate::channels::HoprDbChannelOperations;
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::info::HoprDbInfoOperations;
-use crate::prelude::HoprDbTicketOperations;
-use crate::{HoprDbGeneralModelOperations, OptTx};
 
 use hopr_parallelize::cpu::spawn_fifo_blocking;
 
@@ -164,6 +164,7 @@ impl HoprDbProtocolOperations for HoprDb {
         &self,
         data: Box<[u8]>,
         me: ChainKeypair,
+        pseudonym: Option<&HoprPseudonym>,
         path: &[OffchainPublicKey],
         return_paths: &[&[OffchainPublicKey]],
         outgoing_ticket_win_prob: f64,
@@ -209,7 +210,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             &data,
                             PacketRouting::ForwardPath {
                                 forward_path: &path,
-                                pseudonym: SimplePseudonym::random(),
+                                pseudonym: pseudonym.unwrap_or_else(|| &SimplePseudonym::random()),
                                 return_paths,
                             },
                             &me,

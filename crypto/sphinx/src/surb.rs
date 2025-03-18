@@ -104,8 +104,8 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
 pub struct ReplyOpener {
     /// Encryption key the other party should use to encrypt the data for us.
     pub sender_key: SecretKey16,
-    /// Shared keys for nodes along the return path.
-    pub shared_keys: Vec<SharedSecret>,
+    /// Shared secrets for nodes along the return path.
+    pub shared_secrets: Vec<SharedSecret>,
 }
 
 /// Creates a pair of [`SURB`] and [`ReplyOpener`].
@@ -133,12 +133,12 @@ where
         alpha: shared_keys.alpha,
     };
 
-    let local_surb = ReplyOpener {
+    let reply_opener = ReplyOpener {
         sender_key: sender_key.clone(),
-        shared_keys: shared_keys.secrets,
+        shared_secrets: shared_keys.secrets,
     };
 
-    Ok((surb, local_surb))
+    Ok((surb, reply_opener))
 }
 
 #[cfg(test)]

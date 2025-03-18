@@ -71,7 +71,7 @@ impl<const P: usize> PaddedPayload<P> {
     ///
     /// This method only checks the length of the argument, it does not verify
     /// the presence of the padding tag. If the padding tag is not present, an error
-    /// is later return when [`PaddedPayload::into_unpadded`] is called.
+    /// is later returned when [`PaddedPayload::into_unpadded`] is called.
     ///
     /// If the vector has any excess capacity, it will be trimmed.
     ///
@@ -394,7 +394,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
 
                     // Encrypt the packet payload using the derived shared secrets,
                     // to reverse the decryption done by individual hops
-                    for secret in local_surb.shared_keys.into_iter().rev() {
+                    for secret in local_surb.shared_secrets.into_iter().rev() {
                         let mut prp = S::new_prp(&secret)?;
                         prp.apply_keystream(decrypted);
                     }

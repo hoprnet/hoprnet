@@ -29,6 +29,7 @@ pub trait HoprDbProtocolOperations {
         &self,
         data: Box<[u8]>,
         me: ChainKeypair,
+        pseudonym: Option<&SimplePseudonym>,
         path: &[OffchainPublicKey],
         return_paths: &[&[OffchainPublicKey]],
         outgoing_ticket_win_prob: f64,
