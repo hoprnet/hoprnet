@@ -335,6 +335,7 @@ async fn build_api(
                 )
                 .layer(middleware::from_fn(prometheus::record))
                 .layer(CompressionLayer::new())
+                .layer(ValidateRequestHeaderLayer::accept("application/json"))
                 .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
         )
 }
