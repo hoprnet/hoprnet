@@ -1,7 +1,7 @@
 use async_stream::stream;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_db_api::tickets::AggregationPrerequisites;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
@@ -1239,39 +1239,23 @@ impl HoprDbTicketOperations for HoprDb {
         let channels = self.get_incoming_channels(None).await?;
 
         for channel in channels.into_iter() {
-            self
-                .nest_transaction_in_db(None, TargetDb::Tickets)
+            let selector = TicketSelector::from(&channel)
+                .with_state(AcknowledgedTicketStatus::BeingRedeemed)
+                .with_index(channel.ticket_index.as_u64());
+
+            self.update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::Untouched)
                 .await?
-                .perform(|tx| {
-                Box::pin(async move {
-                                let maybe_ticket = ticket::Entity::find()
-                                    .filter(WrappedTicketSelector::from(
-                                            TicketSelector::from(&channel).with_state(AcknowledgedTicketStatus::BeingRedeemed).with_index(channel.ticket_index.as_u64())
-                                    ))
-                                    .one(tx.as_ref())
-                                    .await;
-                                if let Ok(Some(ticket)) = maybe_ticket  {
-                                    let active_ticket = ticket::ActiveModel {
-                                        id: Set(ticket.id),
-                                        state: Set(AcknowledgedTicketStatus::Untouched as i8),
-                                        ..Default::default()
-                                    };
-
-                                    let ticket_index = U256::from(ticket.index.as_slice());
-                                    let ticket_amount = U256::from(ticket.amount.as_slice());
-                                    let channel_id = channel.get_id();
-                                    info!(%channel_id, %ticket_index, %ticket_amount, "fix next out-of-sync ticket");
-
-                                    if let Err(e) = active_ticket.update(tx.as_ref()).await {
-                                        error!(%channel_id, %ticket_index, %ticket_amount, "failed to fix next out-of-sync ticket: {e}");
-                                        return Err(DbSqlError::from(e))
-                                    }
-                                }
-                                    Ok(())
-                            }
-                        )
-                }).await?
+                .collect::<Vec<_>>()
+                .await
+                .into_iter()
+                .for_each(|ticket| {
+                    let channel_id = channel.get_id();
+                    let ticket_index = ticket.verified_ticket().index;
+                    let ticket_amount = ticket.verified_ticket().amount;
+                    info!(%channel_id, %ticket_index, %ticket_amount, "fixed next out-of-sync ticket");
+                });
         }
+
         Ok(())
     }
 }
@@ -1309,6 +1293,21 @@ impl HoprDb {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::{anyhow, Context};
+    use futures::{pin_mut, StreamExt};
+    use hex_literal::hex;
+    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
+    use std::ops::Add;
+    use std::sync::atomic::Ordering;
+    use std::time::{Duration, SystemTime};
+
+    use hopr_crypto_types::prelude::*;
+    use hopr_db_api::prelude::{DbError, TicketMarker};
+    use hopr_db_api::{info::DomainSeparator, tickets::ChannelTicketStatistics};
+    use hopr_db_entity::ticket;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
+
     use crate::accounts::HoprDbAccountOperations;
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
@@ -1318,19 +1317,6 @@ mod tests {
         filter_satisfying_ticket_models, AggregationPrerequisites, HoprDbTicketOperations, TicketSelector,
     };
     use crate::{HoprDbGeneralModelOperations, TargetDb};
-    use anyhow::{anyhow, Context};
-    use futures::{pin_mut, StreamExt};
-    use hex_literal::hex;
-    use hopr_crypto_types::prelude::*;
-    use hopr_db_api::prelude::{DbError, TicketMarker};
-    use hopr_db_api::{info::DomainSeparator, tickets::ChannelTicketStatistics};
-    use hopr_db_entity::ticket;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
-    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
-    use std::ops::Add;
-    use std::sync::atomic::Ordering;
-    use std::time::{Duration, SystemTime};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
