@@ -363,7 +363,6 @@ pub enum ForwardedHeader<H: SphinxHeaderSpec> {
 /// # Arguments
 /// * `secret` - the shared secret with the creator of the packet
 /// * `header` - entire sphinx header to be forwarded
-/// * `mac` - current authentication tag of the `header`
 pub fn forward_header<H: SphinxHeaderSpec>(
     secret: &SecretKey,
     header: &mut [u8],
@@ -382,7 +381,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
     uh.verify(header[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE].into())
         .map_err(|_| CryptoError::TagMismatch)?;
 
-    // Decrypt the header using the keystream
+    // Decrypt the header using the key=stream
     let mut prg = H::new_prg(secret)?;
     prg.apply_keystream(&mut header[0..H::HEADER_LEN]);
 
