@@ -54,7 +54,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
             return Err(GeneralError::ParseError("HoprPacketMessage.size".into()).into());
         }
 
-        let mut ret = Vec::with_capacity(1 + surbs.len() * SURB::<S, H>::SIZE + PaddedPayload::<P>::SIZE);
+        let mut ret = Vec::with_capacity(PaddedPayload::<P>::SIZE);
         ret.push(surbs.len() as u8);
         for surb in surbs.into_iter().map(|s| s.into_boxed()) {
             ret.extend_from_slice(surb.as_ref());

@@ -61,15 +61,14 @@ impl Display for HoprPacket {
 /// Determines options on how HOPR packet can be routed to its destination.
 #[derive(Clone)]
 pub enum PacketRouting<'a> {
-    /// The packet is routed directly via the given path and with given sender pseudonym.
+    /// The packet is routed directly via the given path.
     /// Optionally, return paths for attached SURBs can be specified.
     ForwardPath {
         forward_path: &'a [OffchainPublicKey],
-        pseudonym: &'a HoprPseudonym,
         return_paths: &'a [&'a [OffchainPublicKey]],
     },
-    /// The packet is routed via an existing SURB.
-    Surb(HoprSurb, &'a HoprPseudonym),
+    /// The packet is routed via an existing SURB that corresponds to a pseudonym.
+    Surb(HoprSurb),
 }
 
 fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
@@ -123,6 +122,7 @@ impl HoprPacket {
     /// For the given pseudonym, the [`ReplyOpener`] order matters.
     pub fn into_outgoing<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
         msg: &[u8],
+        pseudonym: &HoprPseudonym,
         routing: PacketRouting,
         chain_keypair: &ChainKeypair,
         ticket: TicketBuilder,
@@ -132,7 +132,6 @@ impl HoprPacket {
         match routing {
             PacketRouting::ForwardPath {
                 forward_path,
-                pseudonym,
                 return_paths,
             } => {
                 if forward_path.is_empty() {
@@ -185,7 +184,8 @@ impl HoprPacket {
                     openers,
                 ))
             }
-            PacketRouting::Surb(surb, pseudonym) => {
+            PacketRouting::Surb(surb) => {
+                // Reply message must not contain SURBs
                 let msg = HoprPacketMessage::from_parts(vec![], msg)?;
 
                 // Update the ticket with the challenge
@@ -441,10 +441,10 @@ mod tests {
 
         Ok(HoprPacket::into_outgoing(
             msg,
+            &pseudonym,
             PacketRouting::ForwardPath {
                 forward_path: &forward_path,
                 return_paths: &return_paths_refs,
-                pseudonym: &pseudonym,
             },
             &PEERS[0].0,
             ticket,
@@ -469,7 +469,8 @@ mod tests {
 
         Ok(HoprPacket::into_outgoing(
             msg,
-            PacketRouting::Surb(surb, hopr_pseudonym),
+            hopr_pseudonym,
+            PacketRouting::Surb(surb),
             &PEERS[sender_node].0,
             ticket,
             &*MAPPER,
