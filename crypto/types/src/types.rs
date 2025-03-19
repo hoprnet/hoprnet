@@ -562,7 +562,7 @@ impl TryFrom<&[u8]> for Hash {
 }
 
 impl BytesRepresentable for Hash {
-    /// Size of the digest, which is [`EthDigest::SIZE`].
+    /// Size of the digest is 32 bytes.
     const SIZE: usize = <Keccak256 as OutputSizeUser>::OutputSize::USIZE;
 }
 

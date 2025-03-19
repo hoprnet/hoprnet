@@ -24,10 +24,10 @@ pub struct PaddedPayload<const P: usize>(Box<[u8]>);
 
 impl<const P: usize> PaddedPayload<P> {
     /// Tag used to separate padding from data
-    const PADDING_TAG: u8 = 0xaa;
+    pub const PADDING_TAG: u8 = 0xaa;
 
     /// Byte used to pad the data.
-    const PADDING: u8 = 0x00;
+    pub const PADDING: u8 = 0x00;
 
     /// Size of the padded data.
     pub const SIZE: usize = P + size_of_val(&Self::PADDING_TAG);
@@ -37,7 +37,7 @@ impl<const P: usize> PaddedPayload<P> {
     /// The padding consists of prepending a [`PaddedPayload::PADDING_TAG`], preceded by as many zero bytes
     /// to fill it up to [`PaddedPayload::SIZE`]. If data is `P` bytes-long, only the padding tag is prepended.
     ///
-    /// If the argument's length is greater or equal to [`PaddedPayload::PADDED_SIZE`], [`SphinxError::PaddingError`] is returned.
+    /// If the argument's length is greater or equal to [`PaddedPayload::SIZE`], [`SphinxError::PaddingError`] is returned.
     pub fn new(msg: &[u8]) -> Result<Self, SphinxError> {
         if msg.len() < Self::SIZE {
             // Zeroes followed by the PADDING_TAG and then the message
@@ -75,7 +75,7 @@ impl<const P: usize> PaddedPayload<P> {
     ///
     /// If the vector has any excess capacity, it will be trimmed.
     ///
-    /// If the argument's length is not equal to [`PaddedPayload::PADDED_SIZE`], [`SphinxError::PaddingError`] is returned.
+    /// If the argument's length is not equal to [`PaddedPayload::SIZE`], [`SphinxError::PaddingError`] is returned.
     pub fn from_padded(msg: Vec<u8>) -> Result<Self, SphinxError> {
         if msg.len() == Self::SIZE {
             Ok(Self(msg.into_boxed_slice()))
@@ -250,7 +250,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     /// The fixed length of the padded packet.
     pub const PACKET_LEN: usize = <S::P as Keypair>::Public::SIZE + RoutingInfo::<H>::SIZE + PaddedPayload::<P>::SIZE;
 
-    /// Creates a new outgoing packet with the given payload `msg`, `routing` and `shared_keys` computed along the path.
+    /// Creates a new outgoing packet with the given payload `msg` and `routing`.
     ///
     /// The size of the `msg` must be less or equal `P`, otherwise the
     /// constructor will return an error.
@@ -360,7 +360,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         prp.apply_keystream(decrypted);
 
         Ok(match fwd_header {
-            ForwardedHeader::RelayNode {
+            ForwardedHeader::Relayed {
                 next_header,
                 path_pos,
                 next_node,
@@ -375,7 +375,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 path_pos,
                 additional_info,
             },
-            ForwardedHeader::FinalNode { sender, is_reply } => {
+            ForwardedHeader::Final { sender, is_reply } => {
                 // If the received packet contains a reply message for a pseudonym,
                 // we must perform additional steps to decrypt it
                 if is_reply {

@@ -123,17 +123,17 @@ impl HeaderPrefix {
     }
 
     #[inline]
-    pub const fn is_reply(&self) -> bool {
+    pub fn is_reply(&self) -> bool {
         (self.0 & 0x08) != 0
     }
 
     #[inline]
-    pub const fn path_position(&self) -> u8 {
+    pub fn path_position(&self) -> u8 {
         self.0 & 0x07
     }
 
     #[inline]
-    pub const fn is_final_hop(&self) -> bool {
+    pub fn is_final_hop(&self) -> bool {
         self.path_position() == 0
     }
 }
@@ -311,19 +311,15 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
         Ok(ret)
     }
 
-    pub fn routing(&self) -> &[u8] {
-        &self.0[0..H::HEADER_LEN]
-    }
-
-    pub fn mac(&self) -> &[u8] {
+    fn mac(&self) -> &[u8] {
         &self.0[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE]
     }
 
-    pub(crate) fn routing_mut(&mut self) -> &mut [u8] {
+    fn routing_mut(&mut self) -> &mut [u8] {
         &mut self.0[0..H::HEADER_LEN]
     }
 
-    pub(crate) fn mac_mut(&mut self) -> &mut [u8] {
+    fn mac_mut(&mut self) -> &mut [u8] {
         &mut self.0[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE]
     }
 }
@@ -332,7 +328,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
 /// or if the packet is supposed to be only relayed (`RelayNode`).
 pub enum ForwardedHeader<H: SphinxHeaderSpec> {
     /// The packet is supposed to be relayed
-    RelayNode {
+    Relayed {
         /// Transformed header
         next_header: RoutingInfo<H>,
         /// Position of the relay in the path
@@ -344,7 +340,7 @@ pub enum ForwardedHeader<H: SphinxHeaderSpec> {
     },
 
     /// The packet is at its final destination
-    FinalNode {
+    Final {
         /// Pseudonym of the sender
         sender: H::Pseudonym,
         /// Indicates whether this message is a reply and a [`ReplyOpener`](crate::surb::ReplyOpener)
@@ -416,14 +412,14 @@ pub fn forward_header<H: SphinxHeaderSpec>(
 
         next_header.routing_mut().copy_from_slice(&header[0..H::HEADER_LEN]);
 
-        Ok(ForwardedHeader::RelayNode {
+        Ok(ForwardedHeader::Relayed {
             next_header,
             path_pos: prefix.path_position(),
             next_node,
             additional_info,
         })
     } else {
-        Ok(ForwardedHeader::FinalNode {
+        Ok(ForwardedHeader::Final {
             sender: (&header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::Pseudonym::SIZE])
                 .try_into()
                 .map_err(|_| CryptoError::InvalidInputValue("last_data_last_hop"))?,
@@ -508,7 +504,7 @@ pub(crate) mod tests {
             let fwd = forward_header::<TestSpec<<S::P as Keypair>::Public, 3, 0>>(secret, &mut rinfo.0)?;
 
             match fwd {
-                ForwardedHeader::RelayNode {
+                ForwardedHeader::Relayed {
                     next_header,
                     next_node,
                     path_pos,
@@ -527,7 +523,7 @@ pub(crate) mod tests {
                         "invalid public key of the next node"
                     );
                 }
-                ForwardedHeader::FinalNode { sender, is_reply } => {
+                ForwardedHeader::Final { sender, is_reply } => {
                     assert_eq!(shares.secrets.len() - 1, i, "cannot be a final node");
                     assert_eq!(pseudonym, sender, "invalid pseudonym");
                     assert_eq!(is_reply, reply, "invalid reply flag");

@@ -3,16 +3,15 @@
 //! This crate contains the main packet processing functionality for the HOPR protocol.
 //! It implements the following important protocol building blocks:
 //!
-//! - SPHINX packet format (module [packet])
-//! - Proof of Relay (module [por])
+//! - SPHINX packet format
+//! - Proof of Relay
 //!
 //! Finally, it also implements a utility function which is used to validate tickets (module `validation`).
-//! The ticket validation functionality is dependent on `chain-db`.
 //!
 //! The currently used implementation is selected using the `CurrentSphinxSuite` type in the `packet` module.
 //!
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
-//! In particular, as soon as there's a way to represent `Ed448` PeerIDs, it would be easy to create e.g. `X448Suite`.
+//! In particular, as soon as there's a way to represent `Ed448` PeerIDs, it would be straightforward to create e.g. `X448Suite`.
 //!
 
 use hopr_crypto_sphinx::prelude::*;

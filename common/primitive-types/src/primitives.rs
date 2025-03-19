@@ -52,7 +52,7 @@ impl Address {
     }
 
     /// Turns the address into a checksum-ed address string
-    /// according to https://eips.ethereum.org/EIPS/eip-55>
+    /// according to [EIP-55](https://eips.ethereum.org/EIPS/eip-55).
     pub fn to_checksum(&self) -> String {
         let address_hex = hex::encode(self.0);
 

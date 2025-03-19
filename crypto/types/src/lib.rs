@@ -6,8 +6,7 @@ pub mod errors;
 /// Implements [ChainKeypair](keypairs::ChainKeypair) and [OffchainKeypair](keypairs::OffchainKeypair),
 /// the important representations of chain key and packet key.
 pub mod keypairs;
-/// Implements low-level cryptographic primitives, such as [SimpleStreamCipher](primitives::SimpleStreamCipher),
-/// [SimpleDigest](primitives::SimpleDigest) and [SimpleMac](primitives::SimpleMac).
+/// Re-exports of low-level cryptographic primitives.
 pub mod primitives;
 /// Enables randomized encryption (sealing)
 /// and decryption of data using [`OffchainKeypair`](keypairs::OffchainKeypair).
