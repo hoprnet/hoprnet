@@ -244,6 +244,10 @@ where
                 },
             },
 
+            Action::CloseChannels(channels, direction) => match direction {
+                // TODO (jean): implement closing multiple channels at once
+            },
+
             Action::Withdraw(recipient, amount) => {
                 // Withdrawal is not awaited via the Indexer, but polled for completion,
                 // so no indexer event stream expectation awaiting is needed.

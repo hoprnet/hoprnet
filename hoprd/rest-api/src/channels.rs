@@ -461,6 +461,37 @@ pub(super) async fn close_channel(
     }
 }
 
+/// Closes all channels in a single call.
+#[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{BASE_PATH}/channels"),
+        responses(
+            (status = 200, description = "Channels closed successfully", body = String),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Channels",
+    )]
+pub(super) async fn close_all_channels(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    match hopr
+        .close_all_channels(hopr_lib::ChannelDirection::Outgoing, false)
+        .await
+    {
+        Ok(_) => (StatusCode::OK, Json("All channels closed successfully")).into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
 /// Specifies the amount of HOPR tokens to fund a channel with.
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({

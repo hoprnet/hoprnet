@@ -13,6 +13,7 @@
 //! confirmation of the corresponding operation.
 //! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent)
 //! by the Indexer.
+use anyhow::Ok;
 use async_trait::async_trait;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
@@ -27,7 +28,7 @@ use crate::errors::ChainActionsError::{
     BalanceTooLow, ClosureTimeHasNotElapsed, InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
 };
 use crate::errors::{
-    ChainActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
+    ChainActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, NoChannelToClose},
     Result,
 };
 use crate::redeem::TicketRedeemActions;
@@ -51,6 +52,10 @@ pub trait ChannelActions {
         direction: ChannelDirection,
         redeem_before_close: bool,
     ) -> Result<PendingAction>;
+
+    /// Closes all channels in the given direction. Optionally can issue redeeming of all tickets in those channels.
+    async fn close_all_channels(&self, direction: ChannelDirection, redeem_before_close: bool)
+        -> Result<PendingAction>;
 }
 
 #[async_trait]
@@ -213,6 +218,42 @@ where
                 }
             }
             None => Err(ChannelDoesNotExist),
+        }
+    }
+
+    #[tracing::instrument(level = "debug", skip(self))]
+    async fn close_all_channels(
+        &self,
+        direction: ChannelDirection,
+        redeem_before_close: bool,
+    ) -> Result<Vec<PendingAction>> {
+        let channels = self
+            .db
+            .get_channels_via(None, direction, &self.self_address())
+            .await?
+            .into_iter()
+            .filter(|channel| matches!(channel.status, ChannelStatus::PendingToClose(_) | ChannelStatus::Open))
+            .collect::<Vec<_>>();
+
+        // if the channel is in PendingToClose state, only keep the channels that have passed the closure time
+        let channels = channels
+            .into_iter()
+            .filter(|channel| {
+                if let ChannelStatus::PendingToClose(closure_time) = channel.status {
+                    let remaining_closure_time = channel.remaining_closure_time(closure_time);
+                    info!(%channel, ?remaining_closure_time, "remaining closure time update for a channel");
+                    remaining_closure_time == Some(Duration::ZERO)
+                } else {
+                    true
+                }
+            })
+            .collect::<Vec<_>>();
+
+        if channels.is_empty() {
+            return Err(NoChannelToClose);
+        } else {
+            // TODO (jean): trigger redemption if necessary and close the filtered channels
+            self.tx_sender.send(Action::CloseChannels(channels, direction)).await
         }
     }
 }
