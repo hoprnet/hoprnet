@@ -374,7 +374,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 additional_info,
             } => ForwardedMetaPacket::Relayed {
                 packet: Self::new_from_parts(alpha, next_header, decrypted),
-                packet_tag: derive_packet_tag(&secret),
+                packet_tag: derive_packet_tag(&secret)?,
                 derived_secret: secret,
                 next_node: key_mapper.map_id_to_public(&next_node).ok_or_else(|| {
                     SphinxError::PacketDecodingError(format!("couldn't map id to public key: {}", next_node.to_hex()))
@@ -410,7 +410,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 payload.drain(..<S::G as GroupElement<S::E>>::AlphaLen::USIZE + RoutingInfo::<H>::SIZE);
 
                 ForwardedMetaPacket::Final {
-                    packet_tag: derive_packet_tag(&secret),
+                    packet_tag: derive_packet_tag(&secret)?,
                     derived_secret: secret,
                     plain_text: PaddedPayload::from_padded(payload)?,
                     sender,

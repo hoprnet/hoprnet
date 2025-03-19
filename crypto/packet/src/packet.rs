@@ -113,6 +113,7 @@ impl HoprPacket {
     ///
     /// # Arguments
     /// * `msg` packet payload
+    /// * `pseudonym` our pseudonym as packet sender
     /// * `routing` routing to the destination
     /// * `chain_keypair` private key of the local node
     /// * `ticket` ticket builder for the first hop on the path

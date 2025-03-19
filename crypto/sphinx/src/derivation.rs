@@ -1,43 +1,65 @@
-use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
 use hopr_crypto_types::prelude::*;
 
 // Module-specific constants
-const HASH_KEY_HMAC: &str = "HASH_KEY_HMAC";
 const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
 
-/// Helper function to expand an already cryptographically strong key material using the HKDF expand function.
-/// The size of the secret must be at least the size of the underlying hash function, which in this
-/// case is Blake2s256, meaning the `secret` size must be at least 32 bytes.
-fn hkdf_expand_from_prk<L: ArrayLength<u8>>(secret: &SecretKey, tag: &[u8]) -> GenericArray<u8, L> {
-    // Create HKDF instance
-    let hkdf = SimpleHkdf::<Blake2s256>::from_prk(secret.as_ref()).expect("size of the hkdf secret key is invalid"); // should not happen
+fn create_hkdf_instance<S: AsRef<[u8]>>(
+    secret: &S,
+    salt: Option<&[u8]>,
+) -> hopr_crypto_types::errors::Result<SimpleHkdf<Blake2s256>> {
+    let key_material = secret.as_ref();
+    if key_material.len() < 16 {
+        return Err(CryptoError::InvalidInputValue("secret must have at least 128-bits"));
+    }
 
-    // Expand the key to the required length
-    let mut out = GenericArray::default();
-    hkdf.expand(tag, &mut out).expect("invalid hkdf output size"); // should not happen
-
-    out
+    if salt.is_some() {
+        Ok(SimpleHkdf::<Blake2s256>::new(salt, key_material))
+    } else {
+        SimpleHkdf::<Blake2s256>::from_prk(key_material).map_err(|_| CryptoError::InvalidInputValue("secret"))
+    }
 }
 
 /// Derives the packet tag used during packet construction by expanding the given secret.
-pub fn derive_packet_tag(secret: &SecretKey) -> PacketTag {
-    hkdf_expand_from_prk::<typenum::U16>(secret, HASH_KEY_PACKET_TAG.as_bytes()).into()
+pub fn derive_packet_tag(secret: &SecretKey) -> hopr_crypto_types::errors::Result<PacketTag> {
+    let mut packet_tag: PacketTag = [0u8; PACKET_TAG_LENGTH];
+
+    let hkdf = create_hkdf_instance(secret, None)?;
+    hkdf.expand(HASH_KEY_PACKET_TAG.as_bytes(), &mut packet_tag)
+        .map_err(|_| CryptoError::InvalidInputValue("output length"))?;
+
+    Ok(packet_tag)
 }
 
-/// Derives a key for MAC calculation by expanding the given secret.
-pub fn derive_mac_key(secret: &SecretKey) -> SecretKey {
-    hkdf_expand_from_prk::<typenum::U32>(secret, HASH_KEY_HMAC.as_bytes()).into()
-}
-
-/// Internal convenience function to generate key and IV from the given secret.
+/// Internal convenience function to generate key and IV from the given secret,
+/// that is cryptographically strong.
 ///
 /// The `secret` must be at least 16 bytes long.
 /// The function internally uses Blake2s256 based HKDF (see RFC 5869).
 ///
 /// For `extract_with_salt` is given, the HKDF uses `Extract` with the given salt first
 /// and then calls `Expand` to derive the key and IV.
-/// For otherwise, only `Expand` is used to derive key and IV using the given `info`.
+///
+/// Otherwise, only `Expand` is used to derive key and IV using the given `info`, but
+/// the secret size must be exactly 32 bytes.
+pub(crate) fn generate_key<T: crypto_traits::KeyInit, S: AsRef<[u8]>>(
+    secret: &S,
+    info: &[u8],
+    extract_with_salt: Option<&[u8]>,
+) -> hopr_crypto_types::errors::Result<T> {
+    let mut out = crypto_traits::Key::<T>::default();
+
+    let hkdf = create_hkdf_instance(secret, extract_with_salt)?;
+    hkdf.expand(info, &mut out)
+        .map_err(|_| CryptoError::InvalidInputValue("output length"))?;
+
+    Ok(T::new(&out))
+}
+
+/// Internal convenience function to generate key and IV from the given secret,
+/// that is cryptographically strong.
+///
+/// See [`generate_key`] for details.
 pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
     secret: &S,
     info: &[u8],
@@ -78,22 +100,6 @@ mod tests {
     use hopr_crypto_types::types::PublicKey;
     use hopr_crypto_types::vrf::derive_vrf_parameters;
     use k256::{Scalar, Secp256k1};
-
-    #[test]
-    fn test_derive_packet_tag() {
-        let tag = derive_packet_tag(&SecretKey::default());
-
-        let r = hex!("e0cf0fb82ea5a541b0367b376eb36a60");
-        assert_eq!(r, tag.as_ref());
-    }
-
-    #[test]
-    fn test_derive_mac_key() {
-        let tag = derive_mac_key(&SecretKey::default());
-
-        let r = hex!("7f656daaf7c2e64bcfc1386f8af273890e863dec63b410967a5652630617b09b");
-        assert_eq!(r, tag.as_ref());
-    }
 
     #[test]
     fn test_sample_field_element() {

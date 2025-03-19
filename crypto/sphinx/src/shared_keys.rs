@@ -30,7 +30,7 @@ pub type Alpha<A> = GenericArray<u8, A>;
 /// A group element is considered valid if it is not neutral or a torsion element of small order.
 pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
     /// Length of the Alpha value - a binary representation of the group element.
-    type AlphaLen: ArrayLength<u8>;
+    type AlphaLen: ArrayLength;
 
     /// Converts the group element to a binary format suitable for representing the Alpha value.
     fn to_alpha(&self) -> Alpha<Self::AlphaLen>;

@@ -1,5 +1,5 @@
 use hopr_crypto_random::random_fill;
-use hopr_crypto_types::crypto_traits::{KeyInit, StreamCipher, StreamCipherSeek, UniversalHash};
+use hopr_crypto_types::crypto_traits::{StreamCipher, StreamCipherSeek, UniversalHash};
 use hopr_crypto_types::prelude::*;
 use hopr_crypto_types::types::Pseudonym;
 use hopr_primitive_types::prelude::*;
@@ -7,16 +7,15 @@ use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use typenum::Unsigned;
 
-use crate::derivation::{derive_mac_key, generate_key_iv};
+use crate::derivation::{generate_key, generate_key_iv};
 use crate::shared_keys::SharedSecret;
 
-const FORWARD_END_PREFIX: u8 = 0xff;
-
-const REPLY_END_PREFIX: u8 = 0xfe;
-
-const PATH_POSITION_LEN: usize = 1;
+/// Current version of the header
+const SPHINX_HEADER_VERSION: u8 = 1;
 
 const HASH_KEY_PRG: &str = "HASH_KEY_PRG";
+
+const HASH_KEY_TAG: &str = "HASH_KEY_TAG";
 
 /// Contains the necessary size and type specifications for the Sphinx packet header.
 pub trait SphinxHeaderSpec {
@@ -57,17 +56,19 @@ pub trait SphinxHeaderSpec {
     ///
     /// **The value shall not be overridden**.
     const ROUTING_INFO_LEN: usize =
-        PATH_POSITION_LEN + Self::KEY_ID_SIZE.get() + Self::TAG_SIZE + Self::RELAYER_DATA_SIZE;
+        HeaderPrefix::SIZE + Self::KEY_ID_SIZE.get() + Self::TAG_SIZE + Self::RELAYER_DATA_SIZE;
 
     /// Length of the whole Sphinx header.
     ///
     /// **The value shall not be overridden**.
-    const HEADER_LEN: usize = 1 + Self::Pseudonym::SIZE + (Self::MAX_HOPS.get() - 1) * Self::ROUTING_INFO_LEN;
+    const HEADER_LEN: usize =
+        HeaderPrefix::SIZE + Self::Pseudonym::SIZE + (Self::MAX_HOPS.get() - 1) * Self::ROUTING_INFO_LEN;
 
     /// Extended header size used for computations.
     ///
     /// **The value shall not be overridden**.
-    const EXT_HEADER_LEN: usize = 1 + Self::Pseudonym::SIZE + Self::MAX_HOPS.get() * Self::ROUTING_INFO_LEN;
+    const EXT_HEADER_LEN: usize =
+        HeaderPrefix::SIZE + Self::Pseudonym::SIZE + Self::MAX_HOPS.get() * Self::ROUTING_INFO_LEN;
 
     fn generate_filler(secrets: &[SharedSecret]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
         if secrets.len() < 2 {
@@ -99,6 +100,59 @@ pub trait SphinxHeaderSpec {
     /// Instantiates a new Pseudo-Random Generator.
     fn new_prg(secret: &SecretKey) -> hopr_crypto_types::errors::Result<Self::PRG> {
         generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), None)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct HeaderPrefix(u8);
+
+impl HeaderPrefix {
+    pub const SIZE: usize = 1;
+
+    pub fn new(is_reply: bool, path_pos: u8) -> Result<Self, GeneralError> {
+        // Due to size restriction, we do not allow greater than 7 hop paths.
+        if path_pos > 7 {
+            return Err(GeneralError::ParseError("HeaderPrefixByte".into()));
+        }
+
+        let mut out = 0;
+        out |= (SPHINX_HEADER_VERSION & 0x0f) << 4;
+        out |= (is_reply as u8) << 3;
+        out |= path_pos & 0x07;
+        Ok(Self(out))
+    }
+
+    #[inline]
+    pub const fn is_reply(&self) -> bool {
+        (self.0 & 0x08) != 0
+    }
+
+    #[inline]
+    pub const fn path_position(&self) -> u8 {
+        self.0 & 0x07
+    }
+
+    #[inline]
+    pub const fn is_final_hop(&self) -> bool {
+        self.path_position() == 0
+    }
+}
+
+impl From<HeaderPrefix> for u8 {
+    fn from(value: HeaderPrefix) -> Self {
+        value.0
+    }
+}
+
+impl TryFrom<u8> for HeaderPrefix {
+    type Error = GeneralError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if (value & 0xf0) >> 4 == SPHINX_HEADER_VERSION {
+            Ok(Self(value))
+        } else {
+            Err(GeneralError::ParseError("invalid header version".into()))
+        }
     }
 }
 
@@ -154,13 +208,16 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
         pseudonym: &H::Pseudonym,
         is_reply: bool,
     ) -> hopr_crypto_types::errors::Result<Self> {
+        assert!(H::MAX_HOPS.get() <= 7, "maximum number of hops supported is 7");
+
         if path.len() != secrets.len() {
             return Err(CryptoError::InvalidParameterSize {
                 name: "path",
                 expected: secrets.len(),
             });
         }
-        if secrets.len() > H::MAX_HOPS.get() || H::MAX_HOPS.get() > REPLY_END_PREFIX as usize {
+
+        if secrets.len() > H::MAX_HOPS.get() {
             return Err(CryptoError::InvalidInputValue("secrets.len"));
         }
 
@@ -169,37 +226,43 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
 
         for idx in 0..secrets.len() {
             let inverted_idx = secrets.len() - idx - 1;
+            let prefix = HeaderPrefix::new(is_reply, idx as u8)?;
+
             let mut prg = H::new_prg(&secrets[inverted_idx])?;
 
             if idx == 0 {
-                // End prefix
-                extended_header[0] = if is_reply { REPLY_END_PREFIX } else { FORWARD_END_PREFIX };
+                // Prefix byte
+                extended_header[0] = prefix.into();
 
                 // Last hop additional data
-                extended_header[1..1 + H::Pseudonym::SIZE].copy_from_slice(pseudonym.as_ref());
+                extended_header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::Pseudonym::SIZE]
+                    .copy_from_slice(pseudonym.as_ref());
 
                 // Random padding for the rest of the extended header
                 let padding_len = (H::MAX_HOPS.get() - secrets.len()) * H::ROUTING_INFO_LEN;
                 if padding_len > 0 {
-                    random_fill(&mut extended_header[1 + H::Pseudonym::SIZE..1 + H::Pseudonym::SIZE + padding_len]);
+                    random_fill(
+                        &mut extended_header[HeaderPrefix::SIZE + H::Pseudonym::SIZE
+                            ..HeaderPrefix::SIZE + H::Pseudonym::SIZE + padding_len],
+                    );
                 }
 
                 // Encrypt last hop data and padding
-                prg.apply_keystream(&mut extended_header[0..1 + H::Pseudonym::SIZE + padding_len]);
+                prg.apply_keystream(&mut extended_header[0..HeaderPrefix::SIZE + H::Pseudonym::SIZE + padding_len]);
 
                 if secrets.len() > 1 {
                     let filler = H::generate_filler(secrets)?;
-                    extended_header
-                        [1 + H::Pseudonym::SIZE + padding_len..1 + H::Pseudonym::SIZE + padding_len + filler.len()]
+                    extended_header[HeaderPrefix::SIZE + H::Pseudonym::SIZE + padding_len
+                        ..HeaderPrefix::SIZE + H::Pseudonym::SIZE + padding_len + filler.len()]
                         .copy_from_slice(&filler);
                 }
             } else {
                 // Shift everything to the right to make space for next hop's routing info
                 extended_header.copy_within(0..H::HEADER_LEN, H::ROUTING_INFO_LEN);
 
-                // Path position must come first,to ensure prefix RELAYER_END_PREFIX prefix safety
+                // Prefix byte must come first, to ensure prefix RELAYER_END_PREFIX prefix safety
                 // of Ed25519 public keys.
-                extended_header[0] = idx as u8;
+                extended_header[0] = prefix.into();
 
                 // Each public key identifier must have an equal length
                 let key_ident = path[inverted_idx + 1].as_ref();
@@ -210,11 +273,12 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                     });
                 }
                 // Copy the public key identifier
-                extended_header[PATH_POSITION_LEN..PATH_POSITION_LEN + H::KEY_ID_SIZE.get()].copy_from_slice(key_ident);
+                extended_header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get()]
+                    .copy_from_slice(key_ident);
 
                 // Include the last computed authentication tag
-                extended_header
-                    [PATH_POSITION_LEN + H::KEY_ID_SIZE.get()..PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + H::TAG_SIZE]
+                extended_header[HeaderPrefix::SIZE + H::KEY_ID_SIZE.get()
+                    ..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE]
                     .copy_from_slice(ret.mac());
 
                 // The additional relayer data is optional
@@ -227,8 +291,8 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                             });
                         }
 
-                        extended_header[PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + H::TAG_SIZE
-                            ..PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + H::TAG_SIZE + H::RELAYER_DATA_SIZE]
+                        extended_header[HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE
+                            ..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE + H::RELAYER_DATA_SIZE]
                             .copy_from_slice(relayer_data);
                     }
                 }
@@ -237,7 +301,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 prg.apply_keystream(&mut extended_header[0..H::HEADER_LEN]);
             }
 
-            let mut uh = H::UH::new_from_slice(derive_mac_key(&secrets[inverted_idx]).as_ref())
+            let mut uh: H::UH = generate_key(&secrets[inverted_idx], HASH_KEY_TAG.as_bytes(), None)
                 .map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
             uh.update_padded(&extended_header[0..H::HEADER_LEN]);
             ret.mac_mut().copy_from_slice(&uh.finalize());
@@ -320,8 +384,8 @@ pub fn forward_header<H: SphinxHeaderSpec>(
     }
 
     // Compute and verify the authentication tag
-    let mut uh = H::UH::new_from_slice(derive_mac_key(secret).as_ref())
-        .map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
+    let mut uh: H::UH =
+        generate_key(secret, HASH_KEY_TAG.as_bytes(), None).map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
     uh.update_padded(header);
     uh.verify(mac.into()).map_err(|_| CryptoError::TagMismatch)?;
 
@@ -329,12 +393,11 @@ pub fn forward_header<H: SphinxHeaderSpec>(
     let mut prg = H::new_prg(secret)?;
     prg.apply_keystream(&mut header[0..H::HEADER_LEN]);
 
-    if header[0] != FORWARD_END_PREFIX && header[0] != REPLY_END_PREFIX {
-        // Path position
-        let path_pos: u8 = header[0];
+    let prefix = HeaderPrefix::try_from(header[0])?;
 
+    if !prefix.is_final_hop() {
         // Try to deserialize the public key to validate it
-        let next_node = (&header[PATH_POSITION_LEN..PATH_POSITION_LEN + H::KEY_ID_SIZE.get()])
+        let next_node = (&header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get()])
             .try_into()
             .map_err(|_| CryptoError::InvalidInputValue("next_node"))?;
 
@@ -342,12 +405,12 @@ pub fn forward_header<H: SphinxHeaderSpec>(
 
         // Authentication tag
         next_header.mac_mut().copy_from_slice(
-            &header[PATH_POSITION_LEN + H::KEY_ID_SIZE.get()..PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + H::TAG_SIZE],
+            &header[HeaderPrefix::SIZE + H::KEY_ID_SIZE.get()..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE],
         );
 
         // Optional additional relayer data
-        let additional_info = (&header[PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + H::TAG_SIZE
-            ..PATH_POSITION_LEN + H::KEY_ID_SIZE.get() + H::TAG_SIZE + H::RELAYER_DATA_SIZE])
+        let additional_info = (&header[HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE
+            ..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE + H::RELAYER_DATA_SIZE])
             .try_into()
             .map_err(|_| CryptoError::InvalidInputValue("additional_relayer_data"))?;
 
@@ -363,16 +426,16 @@ pub fn forward_header<H: SphinxHeaderSpec>(
 
         Ok(ForwardedHeader::RelayNode {
             next_header,
-            path_pos,
+            path_pos: prefix.path_position(),
             next_node,
             additional_info,
         })
     } else {
         Ok(ForwardedHeader::FinalNode {
-            sender: (&header[1..1 + H::Pseudonym::SIZE])
+            sender: (&header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::Pseudonym::SIZE])
                 .try_into()
                 .map_err(|_| CryptoError::InvalidInputValue("last_data_last_hop"))?,
-            is_reply: header[0] == REPLY_END_PREFIX,
+            is_reply: prefix.is_reply(),
         })
     }
 }
