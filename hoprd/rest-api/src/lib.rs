@@ -115,7 +115,6 @@ pub(crate) struct InternalState {
         node::configuration,
         node::entry_nodes,
         node::info,
-        node::metrics,
         node::channel_graph,
         node::peers,
         node::version,
@@ -262,10 +261,9 @@ async fn build_api(
                 .route("/eligiblez", get(checks::eligiblez))
                 .with_state(state.into()),
         )
-        .nest(
-            BASE_PATH,
+        .merge(
             Router::new()
-                .route("/node/metrics", get(node::metrics))
+                .route("/metrics", get(node::metrics))
                 .layer(middleware::from_fn_with_state(
                     inner_state.clone(),
                     preconditions::authenticate,
