@@ -2,7 +2,7 @@ use hkdf::SimpleHkdf;
 use hopr_crypto_types::prelude::*;
 
 // Module-specific constants
-const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
+const HASH_KEY_PACKET_TAG: &[u8] = b"HASH_KEY_PACKET_TAG";
 
 fn create_hkdf_instance<S: AsRef<[u8]>>(
     secret: &S,
@@ -25,7 +25,7 @@ pub fn derive_packet_tag(secret: &SecretKey) -> hopr_crypto_types::errors::Resul
     let mut packet_tag: PacketTag = [0u8; PACKET_TAG_LENGTH];
 
     let hkdf = create_hkdf_instance(secret, None)?;
-    hkdf.expand(HASH_KEY_PACKET_TAG.as_bytes(), &mut packet_tag)
+    hkdf.expand(HASH_KEY_PACKET_TAG, &mut packet_tag)
         .map_err(|_| CryptoError::InvalidInputValue("output length"))?;
 
     Ok(packet_tag)

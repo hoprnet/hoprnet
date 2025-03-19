@@ -13,9 +13,9 @@ use crate::shared_keys::SharedSecret;
 /// Current version of the header
 const SPHINX_HEADER_VERSION: u8 = 1;
 
-const HASH_KEY_PRG: &str = "HASH_KEY_PRG";
+const HASH_KEY_PRG: &[u8] = b"HASH_KEY_PRG";
 
-const HASH_KEY_TAG: &str = "HASH_KEY_TAG";
+const HASH_KEY_TAG: &[u8] = b"HASH_KEY_TAG";
 
 /// Contains the necessary size and type specifications for the Sphinx packet header.
 pub trait SphinxHeaderSpec {
@@ -99,7 +99,7 @@ pub trait SphinxHeaderSpec {
 
     /// Instantiates a new Pseudo-Random Generator.
     fn new_prg(secret: &SecretKey) -> hopr_crypto_types::errors::Result<Self::PRG> {
-        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), None)
+        generate_key_iv(secret, HASH_KEY_PRG, None)
     }
 }
 
@@ -301,7 +301,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 prg.apply_keystream(&mut extended_header[0..H::HEADER_LEN]);
             }
 
-            let mut uh: H::UH = generate_key(&secrets[inverted_idx], HASH_KEY_TAG.as_bytes(), None)
+            let mut uh: H::UH = generate_key(&secrets[inverted_idx], HASH_KEY_TAG, None)
                 .map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
             uh.update_padded(&extended_header[0..H::HEADER_LEN]);
             ret.mac_mut().copy_from_slice(&uh.finalize());
@@ -385,7 +385,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
 
     // Compute and verify the authentication tag
     let mut uh: H::UH =
-        generate_key(secret, HASH_KEY_TAG.as_bytes(), None).map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
+        generate_key(secret, HASH_KEY_TAG, None).map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
     uh.update_padded(header);
     uh.verify(mac.into()).map_err(|_| CryptoError::TagMismatch)?;
 
@@ -471,7 +471,7 @@ pub(crate) mod tests {
         for i in 0..max_hops - 1 {
             let idx = secrets.len() - i - 2;
 
-            let mut prg = generate_key_iv::<ChaCha20, _>(&secrets[idx], HASH_KEY_PRG.as_bytes(), None)?;
+            let mut prg = generate_key_iv::<ChaCha20, _>(&secrets[idx], HASH_KEY_PRG, None)?;
             prg.apply_keystream(&mut extended_header);
 
             let mut erased = extended_header.clone();
