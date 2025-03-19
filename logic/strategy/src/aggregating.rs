@@ -23,25 +23,22 @@
 //!
 //!
 //! For details on default parameters see [AggregatingStrategyConfig].
+use async_lock::RwLock;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use std::collections::HashMap;
+use std::fmt::{Debug, Display, Formatter};
+use std::sync::Arc;
+use tracing::{debug, error, info, warn};
+use validator::Validate;
+
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_sql::api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_db_sql::channels::HoprDbChannelOperations;
 use hopr_internal_types::prelude::*;
 use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
-
-use async_lock::RwLock;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::{
-    fmt::{Display, Formatter},
-    sync::Arc,
-};
-use tracing::{debug, error, info, warn};
-use validator::Validate;
 
 use crate::{strategy::SingularStrategy, Strategy};
 

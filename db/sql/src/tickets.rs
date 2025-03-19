@@ -1,16 +1,15 @@
 use async_stream::stream;
+use async_trait::async_trait;
+use futures::stream::BoxStream;
+use futures::TryStreamExt;
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_db_api::tickets::AggregationPrerequisites;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
+use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use std::cmp;
 use std::ops::{Add, Bound};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-
-use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::TryStreamExt;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
-use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use tracing::{debug, error, info, trace, warn};
 
 use hopr_crypto_types::prelude::*;
@@ -1234,6 +1233,46 @@ impl HoprDbTicketOperations for HoprDb {
             .challenge(first_acked_ticket.verified_ticket().challenge)
             .build_signed(me, &domain_separator)
             .map_err(DbSqlError::from)?)
+    }
+
+    async fn fix_channels_next_ticket_state(&self) -> Result<()> {
+        let channels = self.get_incoming_channels(None).await?;
+
+        for channel in channels.into_iter() {
+            self
+                .nest_transaction_in_db(None, TargetDb::Tickets)
+                .await?
+                .perform(|tx| {
+                Box::pin(async move {
+                                let maybe_ticket = ticket::Entity::find()
+                                    .filter(WrappedTicketSelector::from(
+                                            TicketSelector::from(&channel).with_state(AcknowledgedTicketStatus::BeingRedeemed).with_index(channel.ticket_index.as_u64())
+                                    ))
+                                    .one(tx.as_ref())
+                                    .await;
+                                if let Ok(Some(ticket)) = maybe_ticket  {
+                                    let active_ticket = ticket::ActiveModel {
+                                        id: Set(ticket.id),
+                                        state: Set(AcknowledgedTicketStatus::Untouched as i8),
+                                        ..Default::default()
+                                    };
+
+                                    let ticket_index = U256::from(ticket.index.as_slice());
+                                    let ticket_amount = U256::from(ticket.amount.as_slice());
+                                    let channel_id = channel.get_id();
+                                    info!(%channel_id, %ticket_index, %ticket_amount, "fix next out-of-sync ticket");
+
+                                    if let Err(e) = active_ticket.update(tx.as_ref()).await {
+                                        error!(%channel_id, %ticket_index, %ticket_amount, "failed to fix next out-of-sync ticket: {e}");
+                                        return Err(DbSqlError::from(e))
+                                    }
+                                }
+                                    Ok(())
+                            }
+                        )
+                }).await?
+        }
+        Ok(())
     }
 }
 
