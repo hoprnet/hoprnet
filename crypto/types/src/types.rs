@@ -1,7 +1,9 @@
+use cipher::crypto_common::{Output, OutputSizeUser};
 use curve25519_dalek::{
     edwards::{CompressedEdwardsY, EdwardsPoint},
     montgomery::MontgomeryPoint,
 };
+use digest::Digest;
 use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
 use hopr_primitive_types::errors::GeneralError::ParseError;
 use hopr_primitive_types::prelude::*;
@@ -23,10 +25,13 @@ use k256::{
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
 use std::fmt::Debug;
+use std::hash::Hasher;
 use std::sync::OnceLock;
 use std::{
     fmt::{Display, Formatter},
+    hash,
     ops::Add,
+    result,
     str::FromStr,
 };
 use tracing::warn;
@@ -38,10 +43,11 @@ use crate::{
         Result,
     },
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-    primitives::{DigestLike, EthDigest},
 };
 
 pub use libp2p_identity::PeerId;
+use sha3::Keccak256;
+use typenum::Unsigned;
 
 /// Extend support for arbitrary array sizes in serde
 ///
@@ -185,6 +191,12 @@ impl CurvePoint {
             .to_affine();
 
         affine.into()
+    }
+}
+
+impl std::hash::Hash for CurvePoint {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.compressed.hash(state);
     }
 }
 
@@ -527,11 +539,11 @@ impl Hash {
     /// Takes all the byte slices and computes hash of their concatenated value.
     /// Uses the Keccak256 digest.
     pub fn create(inputs: &[&[u8]]) -> Self {
-        let mut hash = EthDigest::default();
+        let mut output = Output::<Keccak256>::default();
+        let mut hash = Keccak256::default();
         inputs.iter().for_each(|v| hash.update(v));
-        let mut ret = Self([0u8; Self::SIZE]);
-        hash.finalize_into(&mut ret.0);
-        ret
+        hash.finalize_into(&mut output);
+        Self(output.into())
     }
 }
 
@@ -550,8 +562,8 @@ impl TryFrom<&[u8]> for Hash {
 }
 
 impl BytesRepresentable for Hash {
-    /// Size of the digest, which is [`EthDigest::SIZE`].
-    const SIZE: usize = EthDigest::SIZE;
+    /// Size of the digest is 32 bytes.
+    const SIZE: usize = <Keccak256 as OutputSizeUser>::OutputSize::USIZE;
 }
 
 impl From<[u8; Self::SIZE]> for Hash {
@@ -673,8 +685,10 @@ impl OffchainPublicKey {
     /// Tries to create the public key from a Ed25519 private key.
     /// The length must be exactly `ed25519_dalek::SECRET_KEY_LENGTH`.
     pub fn from_privkey(private_key: &[u8]) -> Result<Self> {
-        let mut pk: [u8; ed25519_dalek::SECRET_KEY_LENGTH] = private_key.try_into().map_err(|_| InvalidInputValue)?;
-        let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk).map_err(|_| InvalidInputValue)?;
+        let mut pk: [u8; ed25519_dalek::SECRET_KEY_LENGTH] =
+            private_key.try_into().map_err(|_| InvalidInputValue("private_key"))?;
+        let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk)
+            .map_err(|_| InvalidInputValue("private_key"))?;
         let kp: libp2p_identity::ed25519::Keypair = sk.into();
         Ok(Self(
             CompressedEdwardsY::from_slice(&kp.public().to_bytes())
@@ -750,7 +764,7 @@ pub type PacketTag = [u8; PACKET_TAG_LENGTH];
 ///
 /// assert_eq!(from_uncompressed, from_transaction_signature);
 /// ```
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PublicKey(CurvePoint);
 
 impl PublicKey {
@@ -941,7 +955,7 @@ impl From<&PublicKey> for k256::ProjectivePoint {
 }
 
 /// Represents a compressed serializable extension of the `PublicKey` using the secp256k1 curve.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct CompressedPublicKey(pub PublicKey);
 
 impl TryFrom<&[u8]> for CompressedPublicKey {
@@ -1050,12 +1064,8 @@ impl From<[u8; Self::SIZE]> for Response {
 }
 
 /// Represents an EdDSA signature using Ed25519 Edwards curve.
-// TODO: change this to OffchainSignature([u8; Self::SIZE]) in 3.0
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OffchainSignature {
-    #[serde(with = "arrays")]
-    signature: [u8; Self::SIZE],
-}
+pub struct OffchainSignature(#[serde(with = "arrays")] [u8; Self::SIZE]);
 
 impl OffchainSignature {
     /// Sign the given message using the [OffchainKeypair].
@@ -1074,7 +1084,7 @@ impl OffchainSignature {
 
     /// Verify this signature of the given message and [OffchainPublicKey].
     pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
-        let sgn = ed25519_dalek::Signature::from_slice(&self.signature).expect("corrupted OffchainSignature");
+        let sgn = ed25519_dalek::Signature::from_slice(&self.0).expect("corrupted OffchainSignature");
         let pk = ed25519_dalek::VerifyingKey::from_bytes(public_key.0.as_bytes()).unwrap();
         pk.verify_strict(msg, &sgn).is_ok()
     }
@@ -1082,7 +1092,7 @@ impl OffchainSignature {
 
 impl AsRef<[u8]> for OffchainSignature {
     fn as_ref(&self) -> &[u8] {
-        &self.signature
+        &self.0
     }
 }
 
@@ -1103,10 +1113,8 @@ impl BytesRepresentable for OffchainSignature {
 
 impl From<ed25519_dalek::Signature> for OffchainSignature {
     fn from(value: ed25519_dalek::Signature) -> Self {
-        let mut ret = Self {
-            signature: [0u8; Self::SIZE],
-        };
-        ret.signature.copy_from_slice(value.to_bytes().as_ref());
+        let mut ret = Self([0u8; Self::SIZE]);
+        ret.0.copy_from_slice(value.to_bytes().as_ref());
         ret
     }
 }
@@ -1231,6 +1239,64 @@ impl PartialEq for Signature {
 }
 
 impl Eq for Signature {}
+
+/// Pseudonym used to identify the creator of a `SURB`.
+/// This allows indexing `SURB` and `LocalSURBEntry` at both parties.
+///
+/// To maintain anonymity, this must be something else than the sender's
+/// public key or public key identifier.
+pub trait Pseudonym: BytesRepresentable + hash::Hash + Eq + Display {
+    /// Generates a random pseudonym.
+    fn random() -> Self {
+        let mut data = vec![0u8; Self::SIZE];
+        hopr_crypto_random::random_fill(&mut data);
+        Self::try_from(&data).unwrap()
+    }
+}
+
+/// Represents a simple UUID-like pseudonym consisting of 16 bytes.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct SimplePseudonym(pub [u8; Self::SIZE]);
+
+impl SimplePseudonym {
+    /// Generates a random pseudonym with a given prefix.
+    /// The prefix can be up to the half of [`SimplePseudonym::SIZE`].
+    pub fn random_with_prefix(prefix: &[u8]) -> Self {
+        let len = prefix.len().min(Self::SIZE / 2);
+        let mut ret = Self::random();
+        ret.0[0..len].copy_from_slice(prefix);
+        ret
+    }
+}
+
+impl Display for SimplePseudonym {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl BytesRepresentable for SimplePseudonym {
+    const SIZE: usize = 16;
+}
+
+impl AsRef<[u8]> for SimplePseudonym {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for SimplePseudonym {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> result::Result<Self, Self::Error> {
+        value
+            .try_into()
+            .map(Self)
+            .map_err(|_| ParseError("SimplePseudonym".into()))
+    }
+}
+
+impl Pseudonym for SimplePseudonym {}
 
 #[cfg(test)]
 mod tests {

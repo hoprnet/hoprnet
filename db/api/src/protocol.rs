@@ -29,7 +29,9 @@ pub trait HoprDbProtocolOperations {
         &self,
         data: Box<[u8]>,
         me: ChainKeypair,
-        path: Vec<OffchainPublicKey>,
+        pseudonym: Option<&SimplePseudonym>,
+        path: &[OffchainPublicKey],
+        return_paths: &[&[OffchainPublicKey]],
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData, DbError>;
