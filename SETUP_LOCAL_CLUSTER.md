@@ -1,6 +1,7 @@
 # Introduction
 
-The best way to learn and develop the HOPR protocol is by interacting with a HOPR node connected inside the HOPR network. A series of HOPR nodes interconnected (i.e. reachable and with channels opened against each other) is called a HOPR cluster.
+The best way to learn and develop the HOPR protocol is by interacting with a HOPR node connected inside the HOPR network.
+A series of HOPR nodes interconnected (i.e. reachable and with channels opened against each other) is called a HOPR cluster.
 
 Although the HOPR Association provides a [production HOPR cluster](https://status.hoprnet.org/) anyone could talk to in production[^1],
 this setup is not ideal for development as doing so would incur on costs for executing basic operations. Staging networks
@@ -8,7 +9,7 @@ such as görli are too slow to provide meaningful feedback, so the ideal setup f
 ecosystem toolset is running a local HOPR cluster, either in your workstation or via a cloud environment like
 [Gitpod](https://gitpod.io). This way contributors are not constrained by internet connection or blockchain RPC providers.
 
-# Tooling
+## Tooling
 
 As of the time of writing, the best way to set up a local HOPR cluster is by following these steps[^2]. Please bear in mind that these steps
 had been tested only on `Darwin` and `Linux` devices, for Windows please use our cloud setup instead.
