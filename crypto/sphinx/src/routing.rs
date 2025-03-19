@@ -367,16 +367,8 @@ pub enum ForwardedHeader<H: SphinxHeaderSpec> {
 pub fn forward_header<H: SphinxHeaderSpec>(
     secret: &SecretKey,
     header: &mut [u8],
-    mac: &[u8],
 ) -> hopr_crypto_types::errors::Result<ForwardedHeader<H>> {
-    if mac.len() != H::TAG_SIZE {
-        return Err(CryptoError::InvalidParameterSize {
-            name: "mac",
-            expected: H::TAG_SIZE,
-        });
-    }
-
-    if header.len() != H::HEADER_LEN {
+    if header.len() != RoutingInfo::<H>::SIZE {
         return Err(CryptoError::InvalidParameterSize {
             name: "header",
             expected: H::HEADER_LEN,
@@ -386,8 +378,9 @@ pub fn forward_header<H: SphinxHeaderSpec>(
     // Compute and verify the authentication tag
     let mut uh: H::UH =
         generate_key(secret, HASH_KEY_TAG, None).map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
-    uh.update_padded(header);
-    uh.verify(mac.into()).map_err(|_| CryptoError::TagMismatch)?;
+    uh.update_padded(&header[0..H::HEADER_LEN]);
+    uh.verify(header[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE].into())
+        .map_err(|_| CryptoError::TagMismatch)?;
 
     // Decrypt the header using the keystream
     let mut prg = H::new_prg(secret)?;
@@ -415,10 +408,10 @@ pub fn forward_header<H: SphinxHeaderSpec>(
             .map_err(|_| CryptoError::InvalidInputValue("additional_relayer_data"))?;
 
         // Shift the entire header to the left, to discard the data we just read
-        header.copy_within(H::ROUTING_INFO_LEN.., 0);
+        header.copy_within(H::ROUTING_INFO_LEN..H::HEADER_LEN, 0);
 
         // Erase the read data from the header to apply the raw key-stream
-        header[H::HEADER_LEN - H::ROUTING_INFO_LEN..].fill(0);
+        header[H::HEADER_LEN - H::ROUTING_INFO_LEN..H::HEADER_LEN].fill(0);
         prg.seek(H::HEADER_LEN);
         prg.apply_keystream(&mut header[H::HEADER_LEN - H::ROUTING_INFO_LEN..H::HEADER_LEN]);
 
@@ -504,7 +497,7 @@ pub(crate) mod tests {
         let shares = S::new_shared_keys(&pub_keys)?;
         let pseudonym = SimplePseudonym::random();
 
-        let rinfo = RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 0>>::new(
+        let mut rinfo = RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 0>>::new(
             &pub_keys,
             &shares.secrets,
             &[],
@@ -512,13 +505,8 @@ pub(crate) mod tests {
             reply,
         )?;
 
-        let mut header = rinfo.routing().to_vec();
-
-        let mut last_mac = [0u8; <Poly1305 as BlockSizeUser>::BlockSize::USIZE];
-        last_mac.copy_from_slice(&rinfo.mac());
-
         for (i, secret) in shares.secrets.iter().enumerate() {
-            let fwd = forward_header::<TestSpec<<S::P as Keypair>::Public, 3, 0>>(secret, &mut header, &last_mac)?;
+            let fwd = forward_header::<TestSpec<<S::P as Keypair>::Public, 3, 0>>(secret, &mut rinfo.0)?;
 
             match fwd {
                 ForwardedHeader::RelayNode {
@@ -527,7 +515,7 @@ pub(crate) mod tests {
                     path_pos,
                     ..
                 } => {
-                    last_mac.copy_from_slice(&next_header.mac());
+                    rinfo = next_header;
                     assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
                     assert_eq!(
                         path_pos,

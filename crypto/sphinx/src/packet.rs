@@ -8,11 +8,11 @@ use std::ops::{Deref, DerefMut};
 use typenum::Unsigned;
 
 use crate::errors::SphinxError;
-use crate::routing::SphinxHeaderSpec;
+use crate::routing::{forward_header, SphinxHeaderSpec};
 use crate::surb::{ReplyOpener, SURB};
 use crate::{
     derivation::derive_packet_tag,
-    routing::{forward_header, ForwardedHeader, RoutingInfo},
+    routing::{ForwardedHeader, RoutingInfo},
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
 };
 
@@ -322,15 +322,9 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     }
 
     /// Returns the routing information from the packet data as a mutable slice.
-    fn header_mut(&mut self) -> &mut [u8] {
+    fn routing_info_mut(&mut self) -> &mut [u8] {
         let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
-        &mut self.packet[base..base + H::HEADER_LEN]
-    }
-
-    /// Returns the packet checksum (MAC) subslice from the packet data.
-    fn mac(&self) -> &[u8] {
-        let base = <S::G as GroupElement<S::E>>::AlphaLen::USIZE + H::HEADER_LEN;
-        &self.packet[base..base + H::TAG_SIZE]
+        &mut self.packet[base..base + RoutingInfo::<H>::SIZE]
     }
 
     /// Returns the payload subslice from the packet data.
@@ -358,8 +352,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
         )?;
 
         // Forward the packet header
-        let mac_cpy = self.mac().to_vec(); // TODO: change this so we can avoid the re-allocation
-        let fwd_header = forward_header::<H>(&secret, self.header_mut(), &mac_cpy)?;
+        let fwd_header = forward_header::<H>(&secret, self.routing_info_mut())?;
 
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
