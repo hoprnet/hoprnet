@@ -98,7 +98,7 @@ pub trait SphinxHeaderSpec {
 
     /// Instantiates a new Pseudo-Random Generator.
     fn new_prg(secret: &SecretKey) -> hopr_crypto_types::errors::Result<Self::PRG> {
-        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), true)
+        generate_key_iv(secret, HASH_KEY_PRG.as_bytes(), None)
     }
 }
 
@@ -408,7 +408,7 @@ pub(crate) mod tests {
         for i in 0..max_hops - 1 {
             let idx = secrets.len() - i - 2;
 
-            let mut prg = generate_key_iv::<ChaCha20, _>(&secrets[idx], HASH_KEY_PRG.as_bytes(), true)?;
+            let mut prg = generate_key_iv::<ChaCha20, _>(&secrets[idx], HASH_KEY_PRG.as_bytes(), None)?;
             prg.apply_keystream(&mut extended_header);
 
             let mut erased = extended_header.clone();

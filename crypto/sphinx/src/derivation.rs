@@ -1,12 +1,10 @@
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
-use hopr_crypto_types::crypto_traits::Digest;
 use hopr_crypto_types::prelude::*;
 
 // Module-specific constants
 const HASH_KEY_HMAC: &str = "HASH_KEY_HMAC";
 const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
-const HASH_KEY_RAW_KEY: &str = "HASH_KEY_RAW_KEY";
 
 /// Helper function to expand an already cryptographically strong key material using the HKDF expand function.
 /// The size of the secret must be at least the size of the underlying hash function, which in this
@@ -37,26 +35,23 @@ pub fn derive_mac_key(secret: &SecretKey) -> SecretKey {
 /// The `secret` must be at least 16 bytes long.
 /// The function internally uses Blake2s256 based HKDF (see RFC 5869).
 ///
-/// For `secret` shorter than 32 bytes, the HKDF uses `Extract` first and then `Expand`
-/// to derive the key and IV.
-/// For `secret` that is 32 bytes or longer, only `Expand` is used to derive key and IV.
-///
-/// **WARNING**:
-/// The `iv_first` distinguishes if the IV should be sampled before or after the key is sampled.
+/// For `extract_with_salt` is given, the HKDF uses `Extract` with the given salt first
+/// and then calls `Expand` to derive the key and IV.
+/// For otherwise, only `Expand` is used to derive key and IV using the given `info`.
 pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
     secret: &S,
     info: &[u8],
-    iv_first: bool,
+    extract_with_salt: Option<&[u8]>,
 ) -> hopr_crypto_types::errors::Result<T> {
-    let key_mat = secret.as_ref();
-    if key_mat.len() < 16 {
+    let key_material = secret.as_ref();
+    if key_material.len() < 16 {
         return Err(CryptoError::InvalidInputValue("secret must have at least 128-bits"));
     }
 
-    let hkdf = if key_mat.len() < Blake2s256::output_size() {
-        SimpleHkdf::<Blake2s256>::new(Some(HASH_KEY_RAW_KEY.as_bytes()), key_mat)
+    let hkdf = if extract_with_salt.is_some() {
+        SimpleHkdf::<Blake2s256>::new(extract_with_salt, key_material)
     } else {
-        SimpleHkdf::<Blake2s256>::from_prk(key_mat).map_err(|_| CryptoError::InvalidInputValue("secret"))?
+        SimpleHkdf::<Blake2s256>::from_prk(key_material).map_err(|_| CryptoError::InvalidInputValue("secret"))?
     };
 
     let mut key = crypto_traits::Key::<T>::default();
@@ -66,15 +61,9 @@ pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
     hkdf.expand(info, &mut out)
         .map_err(|_| CryptoError::InvalidInputValue("output length"))?;
 
-    if iv_first {
-        let (v_iv, v_key) = out.split_at(iv.len());
-        iv.copy_from_slice(v_iv);
-        key.copy_from_slice(v_key);
-    } else {
-        let (v_key, v_iv) = out.split_at(key.len());
-        key.copy_from_slice(v_key);
-        iv.copy_from_slice(v_iv);
-    }
+    let (v_iv, v_key) = out.split_at(iv.len());
+    iv.copy_from_slice(v_iv);
+    key.copy_from_slice(v_key);
 
     Ok(T::new(&key, &iv))
 }
