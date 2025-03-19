@@ -144,8 +144,7 @@ class HoprdAPI:
     ) -> tuple[bool, Optional[object]]:
         try:
             return await asyncio.wait_for(
-                asyncio.create_task(self.__call(
-                    method, endpoint, data, use_api_path)),
+                asyncio.create_task(self.__call(method, endpoint, data, use_api_path)),
                 timeout=timeout,
             )
 
