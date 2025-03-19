@@ -2,8 +2,6 @@ use async_stream::stream;
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryStreamExt};
-use hopr_db_api::resolver::HoprDbResolverOperations;
-use hopr_db_api::tickets::AggregationPrerequisites;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
 use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use std::cmp;
@@ -14,6 +12,8 @@ use tracing::{debug, error, info, trace, warn};
 
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::{TicketIndexSelector, TicketMarker};
+use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_db_api::tickets::AggregationPrerequisites;
 use hopr_db_api::{
     errors::Result,
     info::DomainSeparator,
@@ -1243,17 +1243,16 @@ impl HoprDbTicketOperations for HoprDb {
                 .with_state(AcknowledgedTicketStatus::BeingRedeemed)
                 .with_index(channel.ticket_index.as_u64());
 
-            self.update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::Untouched)
-                .await?
-                .collect::<Vec<_>>()
-                .await
-                .into_iter()
-                .for_each(|ticket| {
-                    let channel_id = channel.get_id();
-                    let ticket_index = ticket.verified_ticket().index;
-                    let ticket_amount = ticket.verified_ticket().amount;
-                    info!(%channel_id, %ticket_index, %ticket_amount, "fixed next out-of-sync ticket");
-                });
+            let mut tickets_stream = self
+                .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::Untouched)
+                .await?;
+
+            while let Some(ticket) = tickets_stream.next().await {
+                let channel_id = channel.get_id();
+                let ticket_index = ticket.verified_ticket().index;
+                let ticket_amount = ticket.verified_ticket().amount;
+                info!(%channel_id, %ticket_index, %ticket_amount, "fixed next out-of-sync ticket");
+            }
         }
 
         Ok(())
