@@ -44,6 +44,7 @@ use tower_http::{
     cors::{Any, CorsLayer},
     sensitive_headers::SetSensitiveRequestHeadersLayer,
     trace::TraceLayer,
+    validate_request::ValidateRequestHeaderLayer,
 };
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -264,6 +265,34 @@ async fn build_api(
         .nest(
             BASE_PATH,
             Router::new()
+                .route("/node/metrics", get(node::metrics))
+                .layer(middleware::from_fn_with_state(
+                    inner_state.clone(),
+                    preconditions::authenticate,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    inner_state.clone(),
+                    preconditions::cap_websockets,
+                ))
+                .layer(
+                    ServiceBuilder::new()
+                        .layer(TraceLayer::new_for_http())
+                        .layer(
+                            CorsLayer::new()
+                                .allow_methods([Method::GET])
+                                .allow_origin(Any)
+                                .allow_headers(Any)
+                                .max_age(std::time::Duration::from_secs(86400)),
+                        )
+                        .layer(middleware::from_fn(prometheus::record))
+                        .layer(CompressionLayer::new())
+                        .layer(ValidateRequestHeaderLayer::accept("text/plain"))
+                        .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
+                ),
+        )
+        .nest(
+            BASE_PATH,
+            Router::new()
                 .route("/aliases", get(alias::aliases))
                 .route("/aliases", post(alias::set_alias))
                 .route("/aliases", delete(alias::clear_aliases))
@@ -305,7 +334,6 @@ async fn build_api(
                 .route("/node/info", get(node::info))
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
-                .route("/node/metrics", get(node::metrics))
                 .route("/node/graph", get(node::channel_graph))
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/websocket", get(session::websocket))
@@ -318,23 +346,24 @@ async fn build_api(
                     preconditions::authenticate,
                 ))
                 .layer(middleware::from_fn_with_state(
-                    inner_state,
+                    inner_state.clone(),
                     preconditions::cap_websockets,
-                )),
-        )
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
+                ))
                 .layer(
-                    CorsLayer::new()
-                        .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
-                        .allow_origin(Any)
-                        .allow_headers(Any)
-                        .max_age(std::time::Duration::from_secs(86400)),
-                )
-                .layer(middleware::from_fn(prometheus::record))
-                .layer(CompressionLayer::new())
-                .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
+                    ServiceBuilder::new()
+                        .layer(TraceLayer::new_for_http())
+                        .layer(
+                            CorsLayer::new()
+                                .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
+                                .allow_origin(Any)
+                                .allow_headers(Any)
+                                .max_age(std::time::Duration::from_secs(86400)),
+                        )
+                        .layer(middleware::from_fn(prometheus::record))
+                        .layer(CompressionLayer::new())
+                        .layer(ValidateRequestHeaderLayer::accept("application/json"))
+                        .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
+                ),
         )
 }
 
