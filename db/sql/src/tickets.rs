@@ -1391,11 +1391,19 @@ mod tests {
         db: &HoprDb,
         count_tickets: u64,
     ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
+        init_db_with_tickets_and_channel(db, count_tickets, None).await
+    }
+
+    async fn init_db_with_tickets_and_channel(
+        db: &HoprDb,
+        count_tickets: u64,
+        channel_ticket_index: Option<u32>,
+    ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
             BalanceType::HOPR.balance(u32::MAX),
-            0_u32.into(),
+            channel_ticket_index.unwrap_or(0u32).into(),
             ChannelStatus::Open,
             4_u32.into(),
         );
@@ -3395,6 +3403,94 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None).await.expect("must not fail");
         assert_eq!(stats.redeemed_value, BalanceType::HOPR.zero());
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_fix_channels_ticket_state() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        const COUNT_TICKETS: u64 = 1;
+
+        let (_, _) = init_db_with_tickets(&db, COUNT_TICKETS).await?;
+
+        // mark the first ticket as being redeemed
+        let mut ticket = hopr_db_entity::ticket::Entity::find()
+            .one(&db.tickets_db)
+            .await?
+            .context("should have one active model")?
+            .into_active_model();
+        ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as i8);
+        ticket.save(&db.tickets_db).await?;
+
+        assert!(
+            hopr_db_entity::ticket::Entity::find()
+                .one(&db.tickets_db)
+                .await?
+                .context("should have one active model")?
+                .state
+                == AcknowledgedTicketStatus::BeingRedeemed as i8,
+        );
+
+        db.fix_channels_next_ticket_state().await.expect("must not fail");
+
+        assert!(
+            hopr_db_entity::ticket::Entity::find()
+                .one(&db.tickets_db)
+                .await?
+                .context("should have one active model")?
+                .state
+                == AcknowledgedTicketStatus::Untouched as i8,
+        );
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_dont_fix_correct_channels_ticket_state() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        const COUNT_TICKETS: u64 = 2;
+
+        // we set up the channel to have ticket index 1, and ensure that fix does not trigger
+        let (_, _) = init_db_with_tickets_and_channel(&db, COUNT_TICKETS, Some(1u32)).await?;
+
+        // mark the first ticket as being redeemed
+        let mut ticket = hopr_db_entity::ticket::Entity::find()
+            .filter(ticket::Column::Index.eq(0u64.to_be_bytes().to_vec()))
+            .one(&db.tickets_db)
+            .await?
+            .context("should have one active model")?
+            .into_active_model();
+        ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as i8);
+        ticket.save(&db.tickets_db).await?;
+
+        assert!(
+            hopr_db_entity::ticket::Entity::find()
+                .filter(ticket::Column::Index.eq(0u64.to_be_bytes().to_vec()))
+                .one(&db.tickets_db)
+                .await?
+                .context("should have one active model")?
+                .state
+                == AcknowledgedTicketStatus::BeingRedeemed as i8,
+        );
+
+        db.fix_channels_next_ticket_state().await.expect("must not fail");
+
+        // first ticket should still be in BeingRedeemed state
+        let ticket0 = hopr_db_entity::ticket::Entity::find()
+            .filter(ticket::Column::Index.eq(0u64.to_be_bytes().to_vec()))
+            .one(&db.tickets_db)
+            .await?
+            .context("should have one active model")?;
+        assert_eq!(ticket0.state, AcknowledgedTicketStatus::BeingRedeemed as i8);
+
+        // second ticket should be in Untouched state
+        let ticket1 = hopr_db_entity::ticket::Entity::find()
+            .filter(ticket::Column::Index.eq(1u64.to_be_bytes().to_vec()))
+            .one(&db.tickets_db)
+            .await?
+            .context("should have one active model")?;
+        assert_eq!(ticket1.state, AcknowledgedTicketStatus::Untouched as i8);
 
         Ok(())
     }
