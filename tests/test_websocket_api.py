@@ -6,6 +6,7 @@ import time
 from contextlib import closing
 
 import pytest
+import logging
 import websocket
 import websockets
 from websockets.asyncio.client import connect
