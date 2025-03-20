@@ -35,6 +35,7 @@ libp2p = { workspace = true, features = [
   "dns",
   "yamux",
 ] }
+libp2p-stream = { workspace = true }
 moka = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }

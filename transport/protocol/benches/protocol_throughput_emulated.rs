@@ -4,6 +4,7 @@ use common::{create_dbs, create_minimal_topology, random_packets_of_count, resol
 
 use criterion::{async_executor::AsyncExecutor, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::StreamExt;
+use hopr_primitive_types::prelude::{Balance, BalanceType};
 use libp2p::PeerId;
 
 use hopr_crypto_types::keypairs::Keypair;
@@ -62,10 +63,10 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let (api_recv_tx, _api_recv_rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
 
                         let cfg = PacketInteractionConfig {
-                            check_unrealized_balance: true,
                             packet_keypair: (&PEERS[TESTED_PEER_ID]).clone(),
                             chain_keypair: (&PEERS_CHAIN[TESTED_PEER_ID]).clone(),
-                            outgoing_ticket_win_prob: 1.0,
+                            outgoing_ticket_win_prob: Some(1.0),
+                            outgoing_ticket_price: Some(Balance::new(1, BalanceType::HOPR)),
                         };
 
                         let processes = hopr_transport_protocol::run_msg_ack_protocol(
