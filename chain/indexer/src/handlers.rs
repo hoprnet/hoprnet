@@ -16,6 +16,7 @@ use bindings::{
 };
 use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
 use chain_types::ContractAddresses;
+
 use hopr_chain_rpc::{BlockWithLogs, Log};
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::prelude::{Hash, Keypair};

@@ -1,14 +1,15 @@
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryStreamExt};
+use sea_orm::ActiveValue::Set;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::channel;
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
 use hopr_db_entity::prelude::Channel;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 
 use crate::cache::ChannelParties;
 use crate::db::HoprDb;
@@ -165,6 +166,7 @@ impl HoprDbChannelOperations for HoprDb {
     }
 
     async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry> {
+        let epoch = editor.model.epoch.clone();
         let parties = ChannelParties(editor.orig.source, editor.orig.destination);
         let ret = self
             .nest_transaction(tx)
@@ -182,6 +184,18 @@ impl HoprDbChannelOperations for HoprDb {
             })
             .await?;
         self.caches.src_dst_to_channel.invalidate(&parties).await;
+
+        // Finally invalidate any unrealized values from the cache.
+        // This might be a no-op if the channel was not in the cache
+        // like for channels that are not ours.
+        let channel_id = editor.orig.get_id();
+        if let Some(channel_epoch) = epoch.try_as_ref() {
+            self.caches
+                .unrealized_value
+                .invalidate(&(channel_id, channel_epoch.as_slice().into()))
+                .await;
+        }
+
         Ok(ret)
     }
 
@@ -319,6 +333,17 @@ impl HoprDbChannelOperations for HoprDb {
             .await?;
 
         self.caches.src_dst_to_channel.invalidate(&parties).await;
+
+        // Finally invalidate any unrealized values from the cache.
+        // This might be a no-op if the channel was not in the cache
+        // like for channels that are not ours.
+        let channel_id = channel_entry.get_id();
+        let channel_epoch = channel_entry.channel_epoch;
+        self.caches
+            .unrealized_value
+            .invalidate(&(channel_id, channel_epoch))
+            .await;
+
         Ok(())
     }
 }
