@@ -4,17 +4,18 @@
 //!
 //! For details on default parameters, see [AutoRedeemingStrategyConfig].
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+use std::fmt::{Debug, Display, Formatter};
+use tracing::{debug, error, info};
+use validator::Validate;
+
 use chain_actions::redeem::TicketRedeemActions;
 use hopr_db_sql::api::tickets::HoprDbTicketOperations;
 use hopr_db_sql::prelude::TicketSelector;
 use hopr_internal_types::prelude::*;
 use hopr_internal_types::tickets::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_primitive_types::prelude::*;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-use std::fmt::{Debug, Display, Formatter};
-use tracing::{debug, error, info};
-use validator::Validate;
 
 use crate::errors::StrategyError::CriteriaNotSatisfied;
 use crate::strategy::SingularStrategy;

@@ -1,15 +1,15 @@
 use futures::{future::BoxFuture, pin_mut, Sink, SinkExt, StreamExt, TryStreamExt};
-use hopr_db_api::tickets::TicketSelector;
-use hopr_db_entity::ticket;
-use hopr_primitive_types::primitives::{Balance, BalanceType};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use std::sync::{Arc, OnceLock};
 use tracing::{debug, error};
 
 use hopr_async_runtime::prelude::spawn;
+use hopr_db_api::tickets::TicketSelector;
+use hopr_db_entity::ticket;
 use hopr_internal_types::prelude::AcknowledgedTicketStatus;
 use hopr_internal_types::tickets::AcknowledgedTicket;
 use hopr_primitive_types::prelude::ToHex;
+use hopr_primitive_types::primitives::{Balance, BalanceType};
 
 use crate::cache::HoprDbCaches;
 use crate::prelude::DbSqlError;
@@ -219,7 +219,7 @@ impl TicketManager {
 
         self.caches
             .unrealized_value
-            .insert(channel, unrealized_value + value)
+            .insert((channel, epoch.into()), unrealized_value + value)
             .await;
 
         Ok(())
@@ -251,6 +251,7 @@ impl TicketManager {
         }
 
         let channel_id = selector.channel_identifiers[0].0;
+        let channel_epoch = selector.channel_identifiers[0].1;
         let selector: WrappedTicketSelector = selector.into();
 
         let transaction = OpenTransaction(
@@ -265,7 +266,7 @@ impl TicketManager {
         Ok(self
             .caches
             .unrealized_value
-            .try_get_with_by_ref(&channel_id, async move {
+            .try_get_with_by_ref(&(channel_id, channel_epoch), async move {
                 transaction
                     .perform(|tx| {
                         Box::pin(async move {

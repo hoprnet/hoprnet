@@ -355,6 +355,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }) {
                             error!(error = %e, "Failed to notify websockets about a new message");
                         }
+                    } else {
+                        trace!("No active websockets to notify about a new message");
                     }
 
                     if !inbox_clone
