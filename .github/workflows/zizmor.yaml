@@ -1,4 +1,4 @@
-name: GitHub Actions Security Analysis with zizmor
+name: security | zizmor
 
 env:
   needs_nix_setup: false
@@ -15,7 +15,6 @@ permissions: {}
 
 jobs:
   zizmor:
-    name: zizmor latest via Cargo
     runs-on: self-hosted-hoprnet-bigger
     permissions:
       contents: read
@@ -47,7 +46,7 @@ jobs:
           USER: runner
 
       - name: Run zizmor
-        run: nix develop -L -c zizmor --format sarif . > results.sarif
+        run: nix develop -L -c bash -c "zizmor --format sarif . > results.sarif"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
