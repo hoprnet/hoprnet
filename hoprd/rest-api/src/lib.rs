@@ -95,6 +95,7 @@ pub(crate) struct InternalState {
         alias::delete_alias,
         alias::clear_aliases,
         channels::close_channel,
+        channels::close_all_channels,
         channels::fund_channel,
         channels::list_channels,
         channels::open_channel,
