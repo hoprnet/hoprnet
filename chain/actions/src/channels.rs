@@ -13,8 +13,8 @@
 //! confirmation of the corresponding operation.
 //! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent)
 //! by the Indexer.
-use anyhow::Ok;
 use async_trait::async_trait;
+use futures::future::join_all;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::HoprDbAllOperations;
@@ -226,7 +226,7 @@ where
         &self,
         direction: ChannelDirection,
         redeem_before_close: bool,
-    ) -> Result<Vec<PendingAction>> {
+    ) -> Result<PendingAction> {
         let channels = self
             .db
             .get_channels_via(None, direction, &self.self_address())
@@ -235,7 +235,7 @@ where
             .filter(|channel| matches!(channel.status, ChannelStatus::PendingToClose(_) | ChannelStatus::Open))
             .collect::<Vec<_>>();
 
-        // if the channel is in PendingToClose state, only keep the channels that have passed the closure time
+        // Filter out channels that are in pending to close state but not ready to be finalized
         let channels = channels
             .into_iter()
             .filter(|channel| {
@@ -251,10 +251,16 @@ where
 
         if channels.is_empty() {
             return Err(NoChannelToClose);
-        } else {
-            // TODO (jean): trigger redemption if necessary and close the filtered channels
-            self.tx_sender.send(Action::CloseChannels(channels, direction)).await
         }
+
+        if redeem_before_close {
+            join_all(channels.iter().map(|channel| async {
+                // Do not await the redemption, just submit it to the queue
+                self.redeem_tickets_in_channel(channel, false).await
+            }))
+            .await;
+        }
+        self.tx_sender.send(Action::CloseChannels(channels, direction)).await
     }
 }
 #[cfg(test)]

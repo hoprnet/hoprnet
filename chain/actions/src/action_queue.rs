@@ -4,7 +4,7 @@
 //! as they are being popped up from the queue by a runner task.
 use async_channel::{bounded, Receiver, Sender};
 use async_trait::async_trait;
-use futures::future::Either;
+use futures::future::{join_all, Either};
 use futures::{pin_mut, FutureExt, StreamExt};
 use hopr_chain_types::actions::Action;
 use hopr_chain_types::chain_events::ChainEventType;
@@ -245,7 +245,66 @@ where
             },
 
             Action::CloseChannels(channels, direction) => match direction {
-                // TODO (jean): implement closing multiple channels at once
+                ChannelDirection::Incoming => {
+                    // ignore closed channels
+                    let to_close = channels
+                        .into_iter()
+                        .filter(|channel| channel.status != ChannelStatus::Closed)
+                        .collect::<Vec<_>>();
+
+                    let txs_hashes = join_all(
+                        to_close
+                            .into_iter()
+                            .map(|channel| async { self.tx_exec.close_incoming_channel(channel.source).await }),
+                    )
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<Hash>>>()?;
+
+                    // TODO (jean) what to do with all the hashes ? Should I create a TransactionExecutor::close_multi_incoming_channels instead ?
+
+                    IndexerExpectation::default()
+                }
+                ChannelDirection::Outgoing => {
+                    // split Close, PendingToClose and Open channels
+                    let (closed, pending_to_close, open) = channels.into_iter().fold(
+                        (Vec::new(), Vec::new(), Vec::new()),
+                        |(mut closed, mut pending_to_close, mut open), channel| {
+                            match channel.status {
+                                ChannelStatus::Closed => closed.push(channel),
+                                ChannelStatus::PendingToClose(_) => pending_to_close.push(channel),
+                                ChannelStatus::Open => open.push(channel),
+                            }
+                            (closed, pending_to_close, open)
+                        },
+                    );
+
+                    if !closed.is_empty() {
+                        warn!(?closed, "channels already closed");
+                    }
+
+                    let txs_hashes_pending_to_close = join_all(pending_to_close.into_iter().map(|channel| async {
+                        self.tx_exec
+                            .finalize_outgoing_channel_closure(channel.destination)
+                            .await
+                    }))
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<Hash>>>()?;
+
+                    let txs_hashes_open = join_all(open.into_iter().map(|channel| async {
+                        self.tx_exec
+                            .initiate_outgoing_channel_closure(channel.destination)
+                            .await
+                    }))
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<Hash>>>()?;
+
+                    // TODO (jean) what to do with all the hashes ? Should I create a TransactionExecutor::initiate_multi_outgoing_channel_closure / TransactionExecutor::finalize_multi_outgoing_channel_closure  instead ?
+
+                    IndexerExpectation::default()
+                }
             },
 
             Action::Withdraw(recipient, amount) => {

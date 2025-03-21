@@ -1364,7 +1364,7 @@ impl Hopr {
             .close_all_channels(direction, redeem_before_close);
 
         Ok(CloseAllChannelResult {
-            tx_hash: confirmation.tx_hash, // TODO (jean): this is not the correct tx_hash
+            tx_hash: confirmation.tx_hash,
         })
     }
 
