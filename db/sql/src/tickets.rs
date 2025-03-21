@@ -163,7 +163,6 @@ pub(crate) fn filter_satisfying_ticket_models(
 
     let mut to_be_aggregated = Vec::with_capacity(models.len());
     let mut total_balance = BalanceType::HOPR.zero();
-    let mut unaggregated_balance = BalanceType::HOPR.zero();
 
     for m in models {
         let ticket_wp = win_prob_to_f64(
@@ -181,14 +180,12 @@ pub(crate) fn filter_satisfying_ticket_models(
         }
 
         let to_add = BalanceType::HOPR.balance_bytes(&m.amount);
-        // Count only balances of unaggregated tickets
-        if m.index_offset == 1 {
-            unaggregated_balance = unaggregated_balance.add(to_add);
-        }
 
         // Do a balance check to be sure not to aggregate more than the current channel stake
         total_balance = total_balance + to_add;
         if total_balance.gt(&channel_entry.balance) {
+            // Remove last sub-balance which led to the overflow before breaking out of the loop.
+            total_balance = total_balance - to_add;
             break;
         }
 
@@ -218,15 +215,15 @@ pub(crate) fn filter_satisfying_ticket_models(
 
         // Trigger aggregation if unrealized balance greater or equal to X percentage of the current balance
         // and there are at least two tickets
-        if unaggregated_balance.ge(&diminished_balance) {
+        if total_balance.ge(&diminished_balance) {
             if to_be_agg_count > 1 {
-                info!(channel = %channel_id, count = to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check OK: less unrealized than diminished balance");
+                info!(channel = %channel_id, count = to_be_agg_count, balance = ?total_balance, ?diminished_balance, "Aggregation check OK: more unrealized than diminished balance");
                 return Ok(to_be_aggregated);
             } else {
-                debug!(channel = %channel_id, count = to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: more unrealized than diminished balance");
+                debug!(channel = %channel_id, count = to_be_agg_count, balance = ?total_balance, ?diminished_balance, "Aggregation check FAIL: more unrealized than diminished balance but only 1 ticket");
             }
         } else {
-            debug!(channel = %channel_id, count = to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: less unrealized than diminished balance");
+            debug!(channel = %channel_id, count = to_be_agg_count, balance = ?total_balance, ?diminished_balance, "Aggregation check FAIL: less unrealized than diminished balance");
         }
     }
 
