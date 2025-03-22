@@ -234,7 +234,10 @@ class Node:
         if "api_token" in config:
             token = config["api_token"]
 
-        return cls(index, token, config["host"], network, config["identity_path"], config["config_file"], alias)
+        if "api_addr" in config:
+            return cls(index, token, config["host"], network, config["identity_path"], config["config_file"], alias, config["api_addr"])
+        else:
+            return cls(index, token, config["host"], network, config["identity_path"], config["config_file"], alias)
 
     async def alias_peers(self, aliases_dict: dict[str, str]):
         for peer_id, alias in aliases_dict.items():

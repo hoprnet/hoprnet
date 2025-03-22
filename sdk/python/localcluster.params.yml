@@ -9,6 +9,7 @@ networks:
         config_file: 'barebone.cfg.yaml'
         identity_path: './sdk/identities/hopr-node_1.id'
         host: localhost
+        api_addr: '0.0.0.0'
       local2:
         config_file: 'barebone.cfg.yaml'
         identity_path: './sdk/identities/hopr-node_2.id'
