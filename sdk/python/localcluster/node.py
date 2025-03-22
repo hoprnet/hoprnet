@@ -34,7 +34,15 @@ def load_env_file(env_file: str) -> dict:
 
 class Node:
     def __init__(
-        self, id: int, api_token: str, host_addr: str, network: str, identity_path: str, cfg_file: str, alias: str
+        self,
+        id: int,
+        api_token: str,
+        host_addr: str,
+        network: str,
+        identity_path: str,
+        cfg_file: str,
+        alias: str,
+        api_addr: str = "",
     ):
         # initialized
         self.id = id
@@ -46,6 +54,9 @@ class Node:
 
         # optional
         self.cfg_file: str = cfg_file
+        self.api_addr: str = api_addr
+        if api_addr == "":
+            self.api_addr = host_addr
 
         # generated
         self.safe_address: str = None
@@ -65,7 +76,7 @@ class Node:
 
     @property
     def api(self):
-        return HoprdAPI(f"http://{self.host_addr}:{self.api_port}", self.api_token)
+        return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", self.api_token)
 
     def prepare(self):
         self.anvil_port = PORT_BASE
@@ -177,9 +188,9 @@ class Node:
             "--init",
             "--testAnnounceLocalAddresses",
             "--testPreferLocalAddresses",
-            f"--apiPort={self.api_port}",
             f"--data={self.dir}",
             f"--host={self.host_addr}:{self.p2p_port}",
+            f"--api={self.api_addr}:{self.api_port}",
             f"--identity={self.dir.joinpath('hoprd.id')}",
             f"--network={self.network}",
             f"--password={password}",
@@ -245,7 +256,7 @@ class Node:
 
     async def links(self):
         addresses = await self.api.addresses()
-        admin_ui_params = f"apiEndpoint=http://{self.host_addr}:{self.api_port}&apiToken={self.api_token}"
+        admin_ui_params = f"apiEndpoint=http://{self.api_addr}:{self.api_port}&apiToken={self.api_token}"
 
         output_strings = []
 
@@ -253,7 +264,7 @@ class Node:
         output_strings.append(f"\t\tPeer Id:\t{addresses.hopr}")
         output_strings.append(f"\t\tAddress:\t{addresses.native}")
         output_strings.append(
-            f"\t\tRest API:\thttp://{self.host_addr}:{self.api_port}/scalar | http://{self.host_addr}:{self.api_port}/swagger-ui/index.html"
+            f"\t\tRest API:\thttp://{self.api_addr}:{self.api_port}/scalar | http://{self.api_addr}:{self.api_port}/swagger-ui/index.html"
         )
         output_strings.append(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}\n\n")
 
@@ -263,4 +274,4 @@ class Node:
         return self.peer_id == other.peer_id
 
     def __str__(self):
-        return f"{self.alias} @ {self.host_addr}:{self.api_port}"
+        return f"{self.alias} @ {self.api_addr}:{self.api_port}"
