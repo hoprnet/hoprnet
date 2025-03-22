@@ -190,7 +190,8 @@ class Node:
             "--testPreferLocalAddresses",
             f"--data={self.dir}",
             f"--host={self.host_addr}:{self.p2p_port}",
-            f"--api={self.api_addr}:{self.api_port}",
+            f"--apiHost={self.api_addr}",
+            f"--apiPort={self.api_port}",
             f"--identity={self.dir.joinpath('hoprd.id')}",
             f"--network={self.network}",
             f"--password={password}",
@@ -235,7 +236,16 @@ class Node:
             token = config["api_token"]
 
         if "api_addr" in config:
-            return cls(index, token, config["host"], network, config["identity_path"], config["config_file"], alias, config["api_addr"])
+            return cls(
+                index,
+                token,
+                config["host"],
+                network,
+                config["identity_path"],
+                config["config_file"],
+                alias,
+                config["api_addr"],
+            )
         else:
             return cls(index, token, config["host"], network, config["identity_path"], config["config_file"], alias)
 
