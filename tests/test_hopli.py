@@ -370,7 +370,7 @@ class TestHopliWithSwarm:
 
         # on the HOPR token
         if balance_before.hopr > 1 * 1e18:
-            assert balance_after.hopr == balance_before.native
+            assert balance_after.hopr == balance_before.hopr
         else:
             assert balance_after.hopr == int(1 * 1e18)
 
