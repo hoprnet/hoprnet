@@ -36,6 +36,7 @@ from .utils import (
 # used by nodes to get unique port assignments
 PORT_BASE = 19000
 
+
 @asynccontextmanager
 async def create_alias(alias, peer, api):
     """Ensure that the created alias is also released at the end of the test."""
