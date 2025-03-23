@@ -2261,7 +2261,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_only_aggregated_ratio_is_met(
+    async fn test_aggregation_prerequisites_must_return_tickets_when_minimum_incl_aggregated_ratio_is_met(
     ) -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 90;
 
@@ -2287,7 +2287,7 @@ mod tests {
 
         let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
 
-        assert!(filtered_tickets.is_empty(), "must return empty");
+        assert_eq!(filtered_tickets.len(), TICKET_COUNT);
         Ok(())
     }
 
