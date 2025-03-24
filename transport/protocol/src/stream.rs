@@ -113,7 +113,7 @@ where
         let control = control.clone();
 
         while let Some((peer_id, msg)) = rx_out.next().await {
-            let cached = cache.get(&peer_id).await;
+            let cached = cache.get(&peer_id, ).await; // TODO: add get_with
 
             if cached.is_none() {
                 let mut control = control.clone();
