@@ -60,6 +60,9 @@ pub mod msg;
 /// `ticket_aggregation` p2p protocol
 pub mod ticket_aggregation;
 
+/// Stream processing utilities
+mod stream;
+
 pub mod timer;
 use hopr_transport_identity::Multiaddr;
 pub use timer::execute_on_tick;
