@@ -61,6 +61,7 @@ use hopr_db_sql::{
     db::{HoprDb, HoprDbConfig},
     info::{HoprDbInfoOperations, IndexerStateInfo},
     prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
+    registry::HoprDbRegistryOperations,
     HoprDbAllOperations, HoprDbGeneralModelOperations,
 };
 use hopr_platform::file::native::{join, remove_dir_all};
@@ -279,7 +280,7 @@ where
                             }
 
                             if db
-                                .is_allowed_in_network_registry(None, address)
+                                .is_allowed_in_network_registry(None, &address)
                                 .await
                                 .unwrap_or(false)
                             {
@@ -812,16 +813,22 @@ impl Hopr {
 
         {
             // Show onboarding information
-            let my_ethereum_address = self.me_onchain().to_hex();
+            let my_ethereum_address = self.me_onchain();
             let my_peer_id = self.me_peer_id();
             let my_version = crate::constants::APP_VERSION;
 
-            while !self.is_allowed_to_access_network(&my_peer_id).await.unwrap_or(false) {
-                info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.");
+            while !self
+                .db
+                .clone()
+                .is_allowed_in_network_registry(None, &my_ethereum_address)
+                .await
+                .unwrap_or(false)
+            {
+                info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.", my_ethereum_address.to_hex());
 
                 sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 
-                info!(peer_id = %my_peer_id, address = %my_ethereum_address, version = &my_version, "Node information");
+                info!(peer_id = %my_peer_id, address = %my_ethereum_address.to_hex(), version = &my_version, "Node information");
                 info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
             }
         }
@@ -829,7 +836,7 @@ impl Hopr {
 
         info!("Loading initial peers from the storage");
         for (peer, _address, multiaddresses) in self.transport_api.get_public_nodes().await? {
-            if self.is_allowed_to_access_network(&peer).await? {
+            if self.is_allowed_to_access_network(either::Left(&peer)).await? {
                 debug!("Using initial public node '{peer}' with '{:?}'", multiaddresses);
                 if let Err(e) = to_process_tx
                     .send(IndexerTransportEvent::EligibilityUpdate(
@@ -1176,8 +1183,11 @@ impl Hopr {
     }
 
     /// Test whether the peer with PeerId is allowed to access the network
-    pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> errors::Result<bool> {
-        Ok(self.transport_api.is_allowed_to_access_network(peer).await?)
+    pub async fn is_allowed_to_access_network(
+        &self,
+        address_like: either::Either<&PeerId, Address>,
+    ) -> errors::Result<bool> {
+        Ok(self.transport_api.is_allowed_to_access_network(address_like).await?)
     }
 
     /// Ping another node in the network based on the PeerId

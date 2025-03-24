@@ -1,23 +1,23 @@
-use std::sync::Arc;
-
-use crate::cache::HoprDbCaches;
 use futures::channel::mpsc::UnboundedSender;
-use hopr_crypto_types::keypairs::Keypair;
-use hopr_crypto_types::prelude::ChainKeypair;
-use hopr_db_entity::ticket;
-use hopr_internal_types::prelude::{AcknowledgedTicket, AcknowledgedTicketStatus};
-use hopr_primitive_types::primitives::Address;
-use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sea_query::Expr;
 use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
 use sqlx::{ConnectOptions, SqlitePool};
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 use tracing::debug;
 use tracing::log::LevelFilter;
 
+use hopr_crypto_types::keypairs::Keypair;
+use hopr_crypto_types::prelude::ChainKeypair;
+use hopr_db_entity::ticket;
+use hopr_internal_types::prelude::{AcknowledgedTicket, AcknowledgedTicketStatus};
+use hopr_primitive_types::primitives::Address;
+use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
+
+use crate::cache::HoprDbCaches;
 use crate::errors::Result;
 use crate::ticket_manager::TicketManager;
 use crate::HoprDbAllOperations;

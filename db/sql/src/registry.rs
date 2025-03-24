@@ -1,8 +1,9 @@
 use async_trait::async_trait;
-use hopr_db_entity::{network_eligibility, network_registry};
-use hopr_primitive_types::prelude::{Address, ToHex};
 use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set};
 use sea_query::OnConflict;
+
+use hopr_db_entity::{network_eligibility, network_registry};
+use hopr_primitive_types::prelude::{Address, ToHex};
 
 use crate::db::HoprDb;
 use crate::errors::{DbSqlError, Result};
@@ -16,7 +17,10 @@ pub trait HoprDbRegistryOperations {
         -> Result<()>;
 
     /// Returns `true` if the given node is allowed in network registry.
-    async fn is_allowed_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool>;
+    async fn is_allowed_in_network_registry<'a, T>(&'a self, tx: OptTx<'a>, address_like: &T) -> Result<bool>
+    where
+        Address: TryFrom<T>,
+        T: Clone + Sync;
 
     /// Sets or unsets Safe NR eligibility.
     async fn set_safe_eligibility<'a>(&'a self, tx: OptTx<'a>, address: Address, eligible: bool) -> Result<()>;
@@ -67,7 +71,13 @@ impl HoprDbRegistryOperations for HoprDb {
             .await
     }
 
-    async fn is_allowed_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address) -> Result<bool> {
+    async fn is_allowed_in_network_registry<'a, T>(&'a self, tx: OptTx<'a>, address_like: &T) -> Result<bool>
+    where
+        Address: TryFrom<T>,
+        T: Clone + Sync,
+    {
+        let address = Address::try_from((*address_like).clone()).map_err(|_| DbSqlError::DecodingError)?;
+
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
