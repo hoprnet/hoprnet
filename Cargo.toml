@@ -45,7 +45,7 @@ members = [
 ]
 
 [workspace.dependencies]
-aes = "0.8"
+aes = "0.8.4"
 anyhow = "1.0.95"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
