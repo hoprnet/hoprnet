@@ -249,7 +249,6 @@ fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
 /// Retrieve Prometheus metrics from the running node.
 #[utoipa::path(
         get,
-        request_body(content_type = "text/plain"),
         path = const_format::formatcp!("{BASE_PATH}/node/metrics"),
         responses(
             (status = 200, description = "Fetched node metrics", body = String),
