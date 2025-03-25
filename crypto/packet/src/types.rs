@@ -15,6 +15,10 @@ pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec
 pub type PacketParts<S, H> = (Vec<SURB<S, H>>, Box<[u8]>);
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P> {
+    /// Size of the message header - currently 1 byte to indicate the number of SURBs,
+    /// that precede the message.
+    pub const HEADER_LEN: usize = 1;
+
     /// Converts this instance into [`PacketParts`].
     pub fn try_into_parts(self) -> Result<PacketParts<S, H>, SphinxError> {
         let data = self.0.into_unpadded()?;

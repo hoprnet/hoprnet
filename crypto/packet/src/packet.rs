@@ -109,15 +109,21 @@ impl HoprPacket {
     pub const SIZE: usize =
         MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>::PACKET_LEN + Ticket::SIZE;
 
+    /// Maximum message size when no SURBs are present in the packet.
+    ///
+    /// See [`HoprPacket::max_surbs_with_message`].
+    pub const MAX_MSG_SIZE: usize = PAYLOAD_SIZE - HoprPacketMessage::HEADER_LEN;
+
     /// Constructs a new outgoing packet with the given path.
     ///
     /// # Arguments
-    /// * `msg` packet payload
-    /// * `pseudonym` our pseudonym as packet sender
-    /// * `routing` routing to the destination
-    /// * `chain_keypair` private key of the local node
-    /// * `ticket` ticket builder for the first hop on the path
-    /// * `domain_separator` channels contract domain separator
+    /// * `msg` packet payload.
+    /// * `pseudonym` our pseudonym as packet sender.
+    /// * `routing` routing to the destination.
+    /// * `chain_keypair` private key of the local node.
+    /// * `ticket` ticket builder for the first hop on the path.
+    /// * `mapper` of the public key identifiers.
+    /// * `domain_separator` channels contract domain separator.
     ///
     /// **NOTE**
     /// For the given pseudonym, the [`ReplyOpener`] order matters.
@@ -220,7 +226,7 @@ impl HoprPacket {
     /// Calculates how many SURBs can be fitted into a packet that
     /// also carries a message of the given length.
     pub const fn max_surbs_with_message(msg_len: usize) -> usize {
-        (PAYLOAD_SIZE - msg_len) / HoprSurb::SIZE
+        (PAYLOAD_SIZE - HoprPacketMessage::HEADER_LEN - msg_len) / HoprSurb::SIZE
     }
 
     /// Deserializes the packet and performs the forward-transformation, so the
