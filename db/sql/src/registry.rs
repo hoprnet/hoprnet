@@ -149,12 +149,14 @@ impl HoprDbRegistryOperations for HoprDb {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::HoprDb;
-    use crate::registry::HoprDbRegistryOperations;
+    use lazy_static::lazy_static;
+
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
     use hopr_primitive_types::prelude::Address;
-    use lazy_static::lazy_static;
+
+    use crate::db::HoprDb;
+    use crate::registry::HoprDbRegistryOperations;
 
     lazy_static! {
         static ref ADDR_1: Address = "4331eaa9542b6b034c43090d9ec1c2198758dbc3"
@@ -169,28 +171,28 @@ mod tests {
     async fn test_network_registry_db() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_1).await?);
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
 
         db.set_access_in_network_registry(None, *ADDR_1, true).await?;
 
-        assert!(db.is_allowed_in_network_registry(None, *ADDR_1).await?);
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
+        assert!(db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
 
         db.set_access_in_network_registry(None, *ADDR_1, true).await?;
 
-        assert!(db.is_allowed_in_network_registry(None, *ADDR_1).await?);
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
+        assert!(db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
 
         db.set_access_in_network_registry(None, *ADDR_1, false).await?;
 
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_1).await?);
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
 
         db.set_access_in_network_registry(None, *ADDR_1, false).await?;
 
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_1).await?);
-        assert!(!db.is_allowed_in_network_registry(None, *ADDR_2).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_1.as_ref()).await?);
+        assert!(!db.is_allowed_in_network_registry(None, &ADDR_2.as_ref()).await?);
         Ok(())
     }
 
