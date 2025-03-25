@@ -273,9 +273,10 @@ impl<const C: usize> SessionState<C> {
     fn consume_segment(&mut self, segment: Segment) -> crate::errors::Result<()> {
         let id = segment.id();
 
+        trace!(session_id = self.session_id, segment = %id, "RECEIVED: segment");
+
         match self.frame_reassembler.push_segment(segment) {
             Ok(_) => {
-                trace!(session_id = self.session_id, segment = %id, "RECEIVED: segment");
                 match self.incoming_frame_retries.entry(id.0) {
                     Entry::Occupied(e) => {
                         // Receiving a frame segment restarts the retry token for this frame
@@ -287,6 +288,7 @@ impl<const C: usize> SessionState<C> {
                         v.insert(RetryToken::new(Instant::now(), self.cfg.backoff_base));
                     }
                 }
+                trace!(session_id = self.session_id, segment = %id, "RECEIVED: segment pushed");
             }
             // The error here is intentionally not propagated
             Err(e) => warn!(session_id = self.session_id, ?id, error = %e, "segment not pushed"),

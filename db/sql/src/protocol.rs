@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use hopr_crypto_packet::chain::ChainPacketComponents;
 use hopr_crypto_packet::validation::validate_unacknowledged_ticket;
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::errors::Result;
+use hopr_db_api::errors::{DbError, Result};
 use hopr_db_api::protocol::{
     AckResult, HoprDbProtocolOperations, ResolvedAcknowledgement, TransportPacketWithChainData,
 };
@@ -17,7 +17,7 @@ use crate::db::HoprDb;
 use crate::errors::DbSqlError;
 use crate::info::HoprDbInfoOperations;
 use crate::prelude::HoprDbTicketOperations;
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::OptTx;
 
 use hopr_parallelize::cpu::spawn_fifo_blocking;
 
@@ -38,11 +38,7 @@ impl HoprDbProtocolOperations for HoprDb {
         let myself = self.clone();
         let me_ckp = me.clone();
 
-        let result = self
-            .begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
+        let result =  {
                     match myself
                         .caches
                         .unacked_tickets
@@ -58,13 +54,13 @@ impl HoprDbProtocolOperations for HoprDb {
                         PendingAcknowledgement::WaitingAsSender => {
                             trace!("received acknowledgement as sender: first relayer has processed the packet");
 
-                            Ok(ResolvedAcknowledgement::Sending(ack.ack_challenge()))
+                            Ok::<_, DbSqlError>(ResolvedAcknowledgement::Sending(ack.ack_challenge()))
                         }
 
                         PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
                             if myself
                                 .get_channel_by_parties(
-                                    Some(tx),
+                                    None,
                                     unacknowledged.ticket.verified_issuer(),
                                     &myself.me_onchain,
                                     true,
@@ -74,14 +70,14 @@ impl HoprDbProtocolOperations for HoprDb {
                                     c.channel_epoch.as_u32() != unacknowledged.verified_ticket().channel_epoch
                                 })
                             {
-                                return Err(DbSqlError::LogicalError(format!(
+                                return Err(DbError::LogicalError(format!(
                                     "no channel found for  address '{}'",
                                     unacknowledged.ticket.verified_issuer()
                                 )));
                             }
 
                             let domain_separator = myself
-                                .get_indexer_data(Some(tx))
+                                .get_indexer_data(None)
                                 .await?
                                 .channels_dst
                                 .ok_or_else(|| DbSqlError::LogicalError("domain separator missing".into()))?;
@@ -106,9 +102,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             .await
                         }
                     }
-                })
-            })
-            .await?;
+                }?;
 
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
@@ -177,13 +171,9 @@ impl HoprDbProtocolOperations for HoprDb {
             ))
         })?;
 
-        let components =
-            self.begin_transaction()
-                .await?
-                .perform(|tx| {
-                    Box::pin(async move {
+        let components = {
                         let domain_separator =
-                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
+                            myself.get_indexer_data(None).await?.channels_dst.ok_or_else(|| {
                                 DbSqlError::LogicalError("failed to fetch the domain separator".into())
                             })?;
 
@@ -193,7 +183,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         } else {
                             myself
                                 .create_multihop_ticket(
-                                    Some(tx),
+                                    None,
                                     me.public().to_address(),
                                     next_peer,
                                     path.len() as u8,
@@ -212,9 +202,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 })
                         })
                         .await
-                    })
-                })
-                .await?;
+                    }?;
 
         match components {
             ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {
@@ -314,15 +302,11 @@ impl HoprDbProtocolOperations for HoprDb {
                     ))
                 })?;
 
-                let verified_ticket = match self
-                    .begin_transaction()
-                    .await?
-                    .perform(|tx| {
-                        Box::pin(async move {
-                            let chain_data = myself.get_indexer_data(Some(tx)).await?;
+                let verified_ticket =  match {
+                            let chain_data = myself.get_indexer_data(None).await?;
 
                             let channel = myself
-                                .get_channel_by_parties(Some(tx), &previous_hop_addr, &myself.me_onchain, true)
+                                .get_channel_by_parties(None, &previous_hop_addr, &myself.me_onchain, true)
                                 .await?
                                 .ok_or_else(|| {
                                     DbSqlError::LogicalError(format!(
@@ -362,7 +346,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                     &domain_separator,
                                 )
                             })
-                            .await?;
+                            .await.map_err(|e| DbError::LogicalError(e.to_string()))?;
 
                             myself.increment_outgoing_ticket_index(channel.get_id()).await?;
 
@@ -391,7 +375,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 // Therefore, the winning probability can only increase on the path.
                                 myself
                                     .create_multihop_ticket(
-                                        Some(tx),
+                                        None,
                                         myself.me_onchain,
                                         next_hop_addr,
                                         path_pos,
@@ -407,13 +391,11 @@ impl HoprDbProtocolOperations for HoprDb {
                                     .challenge(next_challenge.to_ethereum_challenge())
                                     .build_signed(&me, &domain_separator)
                             })
-                            .await?;
+                            .await.map_err(|e| DbError::LogicalError(e.to_string()))?;
 
                             // forward packet
                             Ok(ticket)
-                        })
-                    })
-                    .await
+                        }
                 {
                     Ok(ticket) => Ok(ticket),
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {
