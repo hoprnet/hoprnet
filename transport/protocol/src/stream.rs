@@ -88,6 +88,44 @@ enum Dispatched<T> {
     In((PeerId, T)),
 }
 
+async fn process_stream_in_task<S, C, T>(
+    peer: PeerId,
+    stream: S,
+    codec: C,
+    tx_in: T,
+) -> futures::channel::mpsc::Sender<<C as Decoder>::Item>
+where
+    C: Default + Encoder + Decoder + Send + Sync + Clone + 'static,
+    <C as Decoder>::Error: Send + 'static,
+    <C as Decoder>::Item: Send + 'static,
+    S: AsyncRead + AsyncWrite + Send + 'static,
+    T: Sink<(PeerId, <C as Decoder>::Item)> + Clone + Send + std::marker::Unpin + 'static,
+{
+    let (a, b) = split_with_codec(stream, codec);
+    let (send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
+
+    hopr_async_runtime::prelude::spawn(
+        recv.map(Dispatched::Out)
+            .merge(b.map(move |v| Dispatched::In((peer, v))))
+            .for_each_concurrent(10, move |v| {
+                let mut tx_in = tx_in.clone();
+
+                async move {
+                    match v {
+                        Dispatched::Out(_) => {
+                            // a.send(msg).await.unwrap();
+                        }
+                        Dispatched::In((peer, msg)) => {
+                            // let result = tx_in.send((peer, msg));
+                        }
+                    }
+                }
+            }),
+    );
+
+    send
+}
+
 async fn dispatch_protocol<T, E, C, V>(
     codec: C,
     control: V,
@@ -148,39 +186,10 @@ where
                             }
                         }),
                 );
-                cache.insert(peer_id, send);
+                cache.insert(peer_id, send).await;
             }
         })
     };
-
-    // let ingress_fut = incoming.for_each(|(peer_id, stream)| {
-    //     // let codec = codec_in.clone();
-    //     // let cache = cache_in.clone();
-    //     // let tx_in = tx_in_in.clone();
-
-    // async move {
-    //         //         // TODO: Duplicated
-    //         //         let (_, b) = split_with_codec(stream, codec);
-    //         let (send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
-
-    //         //         hopr_async_runtime::prelude::spawn(
-    //         //             recv.map(Dispatched::Out)
-    //         //                 .merge(b.map(move |v| Dispatched::In((peer_id, v))))
-    //         //                 .for_each_concurrent(10, move |v| async move {
-    //         //                     match v {
-    //         //                         Dispatched::Out(_) => {
-    //         //                             // a.send(msg).await.unwrap();
-    //         //                         }
-    //         //                         Dispatched::In((_, _)) => {
-    //         //                             // tx_in_clone.send((peer_id, msg)).await.unwrap();
-    //         //                         }
-    //         //                     }
-    //         //                 }),
-    //         //         );
-    //         // cache.insert(peer_id, send);
-
-    // }
-    // });
 
     let ingress_proc = hopr_async_runtime::prelude::spawn(ingress_fut);
 
@@ -227,45 +236,6 @@ where
             }
         }
     }));
-
-    // let egress_proc = hopr_async_runtime::prelude::spawn(async move {
-    //     let cache = egress_cache;
-
-    //     while let Some((peer_id, msg)) = rx_out.next().await {
-    //         let cached = cache.get(&peer_id).await; // TODO: add get_with
-
-    //         if cached.is_none() {
-    //             let r = control.open().await;
-    //             match r {
-    //                 Ok(stream) => {
-    //                     let (a, b) = split_with_codec(stream, codec.clone());
-    //                     let (mut send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
-
-    //                     let mut tx_in_clone = tx_in.clone();
-    //                     hopr_async_runtime::prelude::spawn(
-    //                         recv.map(Dispatched::Out)
-    //                             .merge(b.map(move |v| Dispatched::In((peer_id, v))))
-    //                             .for_each_concurrent(10, move |v| async move {
-    //                                 match v {
-    //                                     Dispatched::Out(msg) => {
-    //                                         // a.send(msg).await.unwrap();
-    //                                     }
-    //                                     Dispatched::In((peer_id, msg)) => {
-    //                                         // tx_in_clone.send((peer_id, msg)).await.unwrap();
-    //                                     }
-    //                                 }
-    //                             }),
-    //                     );
-    //                     cache.insert(peer_id, send);
-    //                 }
-    //                 Err(error) => {
-    //                     tracing::error!(peer = %peer_id, %error, "Error opening stream to peer");
-    //                     continue;
-    //                 }
-    //             }
-    //         }
-    //     }
-    // });
 
     Ok((tx_out, rx_in))
 }
