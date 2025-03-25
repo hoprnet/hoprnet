@@ -1,7 +1,7 @@
+use hopr_crypto_types::crypto_traits::{IvSizeUser, StreamCipher};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-use hopr_crypto_types::crypto_traits::StreamCipher;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
@@ -176,6 +176,157 @@ pub enum MetaPacketRouting<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
     Surb(SURB<S, H>, &'a H::Pseudonym),
 }
 
+/// Represents a packet that is only partially instantiated,
+/// that is - it contains only the routing info and the Alpha value.
+///
+/// This object can be used to pre-compute a packet without a payload,
+/// and possibly serialize it (via [`PartialPacket::into_boxed`]) to be later
+/// deserialized (via `try_from`) and used to construct the final [`MetaPacket`] via
+/// a call to [`PartialPacket::into_meta_packet`].
+pub struct PartialPacket<S: SphinxSuite, H: SphinxHeaderSpec> {
+    alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
+    routing_info: RoutingInfo<H>,
+    prp_inits: Vec<IvKey<S::PRP>>,
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
+    /// Creates a new partial packet using the given routing information and
+    /// public key identifier mapper.
+    pub fn new<M: KeyIdMapper<S, H>>(routing: MetaPacketRouting<S, H>, key_mapper: &M) -> Result<Self, SphinxError> {
+        match routing {
+            MetaPacketRouting::ForwardPath {
+                shared_keys,
+                forward_path,
+                additional_data_relayer,
+                pseudonym,
+            } => {
+                let routing_info = RoutingInfo::<H>::new(
+                    &forward_path
+                        .iter()
+                        .map(|key| {
+                            key_mapper.map_key_to_id(key).ok_or_else(|| {
+                                SphinxError::PacketConstructionError(format!("key id not found for {}", key.to_hex()))
+                            })
+                        })
+                        .collect::<Result<Vec<_>, SphinxError>>()?,
+                    &shared_keys.secrets,
+                    additional_data_relayer,
+                    pseudonym,
+                    false,
+                )?;
+
+                Ok(Self {
+                    alpha: shared_keys.alpha,
+                    routing_info,
+                    prp_inits: shared_keys
+                        .secrets
+                        .into_iter()
+                        .rev()
+                        .map(|key| S::new_prp_init(&key))
+                        .collect::<Result<Vec<_>, _>>()?,
+                })
+            }
+            MetaPacketRouting::Surb(surb, pseudonym) => Ok(Self {
+                alpha: surb.alpha,
+                routing_info: surb.header,
+                prp_inits: vec![S::new_reply_prp_init(&surb.sender_key, pseudonym)?],
+            }),
+        }
+    }
+
+    /// Transform this partial packet into an actual [`MetaPacket`] using the given payload.
+    pub fn into_meta_packet<const P: usize>(self, mut payload: PaddedPayload<P>) -> MetaPacket<S, H, P> {
+        for iv_key in self.prp_inits {
+            let mut prp = iv_key.into_init::<S::PRP>();
+            prp.apply_keystream(&mut payload);
+        }
+
+        MetaPacket::new_from_parts(self.alpha, self.routing_info, &payload)
+    }
+
+    /// Serialize this partial packet as bytes.
+    pub fn into_boxed(self) -> Box<[u8]> {
+        let mut out = Vec::with_capacity(
+            <S::G as GroupElement<S::E>>::AlphaLen::USIZE
+                + RoutingInfo::<H>::SIZE
+                + 1
+                + self.prp_inits.len() * IvKey::<S::PRP>::SIZE,
+        );
+        out.extend_from_slice(self.alpha.as_ref());
+        out.extend_from_slice(self.routing_info.as_ref());
+        out.push(self.prp_inits.len().min(H::MAX_HOPS.get() + 1) as u8);
+        for iv_key in self.prp_inits {
+            out.extend_from_slice(iv_key.0.as_ref());
+            out.extend_from_slice(iv_key.1.as_ref());
+        }
+        out.into_boxed_slice()
+    }
+}
+
+impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for PartialPacket<S, H> {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        let min_len =
+            <S::G as GroupElement<S::E>>::AlphaLen::USIZE + RoutingInfo::<H>::SIZE + 1 + IvKey::<S::PRP>::SIZE;
+        if value.len() >= min_len {
+            let alpha_len = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
+            Ok(Self {
+                alpha: Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(&value[0..alpha_len]).clone(),
+                routing_info: value[alpha_len..alpha_len + RoutingInfo::<H>::SIZE]
+                    .try_into()
+                    .map_err(|_| GeneralError::ParseError("PartialPacket.routing_info".into()))?,
+                prp_inits: (0..(value[alpha_len + RoutingInfo::<H>::SIZE] as usize).min(H::MAX_HOPS.get() + 1))
+                    .map(|i| {
+                        let offset = alpha_len + RoutingInfo::<H>::SIZE + 1 + i * IvKey::<S::PRP>::SIZE;
+                        if offset + IvKey::<S::PRP>::SIZE <= value.len() {
+                            let mut out = IvKey::<S::PRP>::default();
+                            out.0
+                                .copy_from_slice(&value[offset..offset + IvKey::<S::PRP>::iv_size()]);
+                            out.1.copy_from_slice(
+                                &value[offset + IvKey::<S::PRP>::iv_size()..offset + IvKey::<S::PRP>::SIZE],
+                            );
+                            Ok(out)
+                        } else {
+                            Err(GeneralError::ParseError("PartialPacket.prp_inits".into()))
+                        }
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            })
+        } else {
+            Err(GeneralError::ParseError("PartialPacket".into()))
+        }
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> Clone for PartialPacket<S, H> {
+    fn clone(&self) -> Self {
+        Self {
+            alpha: self.alpha.clone(),
+            routing_info: self.routing_info.clone(),
+            prp_inits: self.prp_inits.clone(),
+        }
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> Debug for PartialPacket<S, H> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PartialPacket")
+            .field("alpha", &self.alpha)
+            .field("routing_info", &self.routing_info)
+            .field("prp_inits", &self.prp_inits)
+            .finish()
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialEq for PartialPacket<S, H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.alpha == other.alpha && self.routing_info == other.routing_info && self.prp_inits == other.prp_inits
+    }
+}
+
+impl<S: SphinxSuite, H: SphinxHeaderSpec> Eq for PartialPacket<S, H> {}
+
 /// An encrypted packet with payload of size `P`.
 /// The final packet size is given by [`MetaPacket::SIZE`].
 ///
@@ -255,48 +406,11 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     /// The size of the `msg` must be less or equal `P`, otherwise the
     /// constructor will return an error.
     pub fn new<M: KeyIdMapper<S, H>>(
-        mut payload: PaddedPayload<P>,
+        payload: PaddedPayload<P>,
         routing: MetaPacketRouting<S, H>,
         key_mapper: &M,
     ) -> Result<Self, SphinxError> {
-        match routing {
-            MetaPacketRouting::ForwardPath {
-                shared_keys,
-                forward_path,
-                additional_data_relayer,
-                pseudonym,
-            } => {
-                let routing_info = RoutingInfo::<H>::new(
-                    &forward_path
-                        .iter()
-                        .map(|key| {
-                            key_mapper.map_key_to_id(key).ok_or_else(|| {
-                                SphinxError::PacketConstructionError(format!("key id not found for {}", key.to_hex()))
-                            })
-                        })
-                        .collect::<Result<Vec<_>, SphinxError>>()?,
-                    &shared_keys.secrets,
-                    additional_data_relayer,
-                    pseudonym,
-                    false,
-                )?;
-
-                // Encrypt the packet payload using the derived shared secrets
-                for secret in shared_keys.secrets.into_iter().rev() {
-                    let mut prp = S::new_prp(&secret)?;
-                    prp.apply_keystream(&mut payload);
-                }
-
-                Ok(Self::new_from_parts(shared_keys.alpha, routing_info, &payload))
-            }
-            MetaPacketRouting::Surb(surb, pseudonym) => {
-                // Encrypt the packet using the sender's key from the SURB
-                let mut prp = S::new_reply_prp(&surb.sender_key, pseudonym)?;
-                prp.apply_keystream(&mut payload);
-
-                Ok(Self::new_from_parts(surb.alpha, surb.header, &payload))
-            }
-        }
+        Ok(PartialPacket::new(routing, key_mapper)?.into_meta_packet(payload))
     }
 
     fn new_from_parts(
@@ -356,7 +470,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
 
         // Perform initial decryption over the payload
         let decrypted = self.payload_mut();
-        let mut prp = S::new_prp(&secret)?;
+        let mut prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
         prp.apply_keystream(decrypted);
 
         Ok(match fwd_header {
@@ -388,12 +502,12 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     // Encrypt the packet payload using the derived shared secrets,
                     // to reverse the decryption done by individual hops
                     for secret in local_surb.shared_secrets.into_iter().rev() {
-                        let mut prp = S::new_prp(&secret)?;
+                        let mut prp = S::new_prp_init(&secret)?.into_init::<S::PRP>();
                         prp.apply_keystream(decrypted);
                     }
 
                     // Invert the initial encryption using the sender key
-                    let mut prp = S::new_reply_prp(&local_surb.sender_key, &sender)?;
+                    let mut prp = S::new_reply_prp_init(&local_surb.sender_key, &sender)?.into_init::<S::PRP>();
                     prp.apply_keystream(decrypted);
                 }
 
@@ -507,6 +621,38 @@ pub(crate) mod tests {
         assert_eq!(padded.as_ref()[0], PaddedPayload::<9>::PADDING_TAG);
         assert_eq!(padded.as_ref()[1..], data);
 
+        Ok(())
+    }
+
+    fn generic_test_partial_packet_serialization<S>(keypairs: Vec<S::P>) -> anyhow::Result<()>
+    where
+        S: SphinxSuite,
+        <S::P as Keypair>::Public: Eq + Hash,
+    {
+        let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
+        let mapper = keypairs
+            .iter()
+            .enumerate()
+            .map(|(i, k)| (KeyIdent::from(i as u32), k.public().clone()))
+            .collect::<BiHashMap<_, _>>();
+
+        let shared_keys = S::new_shared_keys(&pubkeys)?;
+        let por_strings = vec![WrappedBytes::<53>::default(); shared_keys.secrets.len() - 1];
+        let pseudonym = SimplePseudonym::random();
+
+        let packet_1 = PartialPacket::<S, TestHeader<S>>::new(
+            MetaPacketRouting::ForwardPath {
+                shared_keys,
+                forward_path: &pubkeys,
+                additional_data_relayer: &por_strings,
+                pseudonym: &pseudonym,
+            },
+            &mapper,
+        )?;
+
+        let packet_2 = PartialPacket::<S, TestHeader<S>>::try_from(packet_1.clone().into_boxed().as_ref())?;
+
+        assert_eq!(packet_1, packet_2);
         Ok(())
     }
 
@@ -644,6 +790,14 @@ pub(crate) mod tests {
         )
     }
 
+    #[cfg(feature = "x25519")]
+    #[parameterized(amount = { 4, 3, 2, 1 })]
+    fn test_x25519_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
+        generic_test_partial_packet_serialization::<crate::ec_groups::X25519Suite>(
+            (0..amount).map(|_| OffchainKeypair::random()).collect(),
+        )
+    }
+
     #[cfg(feature = "ed25519")]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_meta_packet(amount: usize) -> anyhow::Result<()> {
@@ -656,6 +810,14 @@ pub(crate) mod tests {
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_meta_packet_reply_test::<crate::ec_groups::Ed25519Suite>(
+            (0..amount).map(|_| OffchainKeypair::random()).collect(),
+        )
+    }
+
+    #[cfg(feature = "ed25519")]
+    #[parameterized(amount = { 4, 3, 2, 1 })]
+    fn test_ed25519_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
+        generic_test_partial_packet_serialization::<crate::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
         )
     }
@@ -674,6 +836,16 @@ pub(crate) mod tests {
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_secp256k1_reply_meta_packet(amount: usize) -> anyhow::Result<()> {
         generic_meta_packet_reply_test::<crate::ec_groups::Secp256k1Suite>(
+            (0..amount)
+                .map(|_| hopr_crypto_types::keypairs::ChainKeypair::random())
+                .collect(),
+        )
+    }
+
+    #[cfg(feature = "secp256k1")]
+    #[parameterized(amount = { 4, 3, 2, 1 })]
+    fn test_secp256k1_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
+        generic_test_partial_packet_serialization::<crate::ec_groups::Secp256k1Suite>(
             (0..amount)
                 .map(|_| hopr_crypto_types::keypairs::ChainKeypair::random())
                 .collect(),

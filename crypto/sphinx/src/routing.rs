@@ -3,6 +3,7 @@ use hopr_crypto_types::crypto_traits::{StreamCipher, StreamCipherSeek, Universal
 use hopr_crypto_types::prelude::*;
 use hopr_crypto_types::types::Pseudonym;
 use hopr_primitive_types::prelude::*;
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use typenum::Unsigned;
@@ -159,6 +160,12 @@ impl TryFrom<u8> for HeaderPrefix {
 /// Carries routing information for the mixnet packet.
 pub struct RoutingInfo<H: SphinxHeaderSpec>(Box<[u8]>, PhantomData<H>);
 
+impl<H: SphinxHeaderSpec> Debug for RoutingInfo<H> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
 impl<H: SphinxHeaderSpec> Clone for RoutingInfo<H> {
     fn clone(&self) -> Self {
         Self(self.0.clone(), PhantomData)
@@ -170,6 +177,14 @@ impl<H: SphinxHeaderSpec> Default for RoutingInfo<H> {
         Self(vec![0u8; Self::SIZE].into_boxed_slice(), PhantomData)
     }
 }
+
+impl<H: SphinxHeaderSpec> PartialEq for RoutingInfo<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<H: SphinxHeaderSpec> Eq for RoutingInfo<H> {}
 
 impl<H: SphinxHeaderSpec> AsRef<[u8]> for RoutingInfo<H> {
     fn as_ref(&self) -> &[u8] {

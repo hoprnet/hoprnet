@@ -1,3 +1,7 @@
+use crate::crypto_traits::{Key, KeyInit, KeySizeUser};
+use crate::errors::CryptoError;
+use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
+use crate::prelude::{HalfKey, SecretKey};
 use generic_array::{ArrayLength, GenericArray};
 use hopr_crypto_random::random_array;
 use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
@@ -6,10 +10,6 @@ use k256::Secp256k1;
 use sha3::Sha3_256;
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
-
-use crate::errors::CryptoError;
-use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
-use crate::prelude::{HalfKey, SecretKey};
 
 /// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
@@ -138,5 +138,15 @@ impl<L: ArrayLength<u8>> SecretValue<L> {
     /// Generates cryptographically strong random secret value.
     pub fn random() -> Self {
         Self(random_array())
+    }
+}
+
+impl<L: ArrayLength<u8>> KeySizeUser for SecretValue<L> {
+    type KeySize = L;
+}
+
+impl<L: ArrayLength<u8>> KeyInit for SecretValue<L> {
+    fn new(key: &Key<Self>) -> Self {
+        key.clone().into()
     }
 }

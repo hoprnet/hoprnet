@@ -172,16 +172,16 @@ pub trait SphinxSuite {
         SharedKeys::generate(public_keys.iter().map(|pk| pk.into()).collect())
     }
 
-    /// Instantiates a new Pseudo-Random Permutation for general packet data.
-    fn new_prp(secret: &SecretKey) -> hopr_crypto_types::errors::Result<Self::PRP> {
+    /// Instantiates a new Pseudo-Random Permutation IV and key for general packet data.
+    fn new_prp_init(secret: &SecretKey) -> hopr_crypto_types::errors::Result<IvKey<Self::PRP>> {
         generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), None)
     }
 
-    /// Instantiates a new Pseudo-Random Permutation for reply data.
-    fn new_reply_prp<P: Pseudonym>(
+    /// Instantiates a new Pseudo-Random Permutation IV and key for reply data.
+    fn new_reply_prp_init<P: Pseudonym>(
         secret: &SecretKey16,
         pseudonym: &P,
-    ) -> hopr_crypto_types::errors::Result<Self::PRP> {
+    ) -> hopr_crypto_types::errors::Result<IvKey<Self::PRP>> {
         generate_key_iv(secret, HASH_KEY_REPLY_PRP.as_bytes(), Some(pseudonym.as_ref()))
     }
 }

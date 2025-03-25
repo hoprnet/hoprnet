@@ -35,7 +35,9 @@ mod surb;
 
 pub mod prelude {
     pub use crate::ec_groups::*;
-    pub use crate::packet::{ForwardedMetaPacket, KeyIdMapper, MetaPacket, MetaPacketRouting, PaddedPayload};
+    pub use crate::packet::{
+        ForwardedMetaPacket, KeyIdMapper, MetaPacket, MetaPacketRouting, PaddedPayload, PartialPacket,
+    };
     pub use crate::routing::SphinxHeaderSpec;
     pub use crate::shared_keys::{SharedKeys, SharedSecret, SphinxSuite};
     pub use crate::surb::*;
