@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use futures::stream::{BoxStream, Stream, StreamExt};
 use futures_concurrency::stream::Merge;
+use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     swarm::{dial_opts::DialOpts, dummy::ConnectionHandler, CloseConnection, NetworkBehaviour, ToSwarm},
     Multiaddr, PeerId,
@@ -10,8 +11,6 @@ use libp2p::{
 
 use core_network::network::NetworkTriggeredEvent;
 use tracing::debug;
-
-use crate::PeerDiscovery;
 
 #[derive(Debug)]
 pub enum DiscoveryInput {
