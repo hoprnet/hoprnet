@@ -75,6 +75,9 @@ pub enum ChainActionsError {
 
     #[error(transparent)]
     GeneralError(#[from] GeneralError),
+
+    #[error("multisend Error: {0}")]
+    MultisendError(String),
 }
 
 pub type Result<T> = std::result::Result<T, ChainActionsError>;
