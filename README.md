@@ -219,6 +219,7 @@ On top of the default configuration options generated for the command line, the 
 - `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
 - `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
+- `HOPRD_NAT` - indicates whether the host is behind a NAT (default: `false`)
 
 ### Example execution
 

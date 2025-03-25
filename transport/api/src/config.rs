@@ -99,7 +99,21 @@ fn default_multiaddr_transport(port: u16) -> String {
 
 #[cfg(feature = "transport-quic")]
 fn default_multiaddr_transport(port: u16) -> String {
-    format!("udp/{port}/quic-v1")
+    // In case we run on a Dappnode-like devices, presumably behind NAT, we fall back to TCP
+    // to circumvent issues with QUIC in such environments. To make this work reliably we'd need
+    // proper NAT traversal support.
+    let on_dappnode = std::env::var("DAPPNODE")
+        .map(|v| v.to_lowercase() == "true")
+        .unwrap_or(false);
+    let uses_nat = std::env::var("HOPRD_NAT")
+        .map(|v| v.to_lowercase() == "true")
+        .unwrap_or(false);
+
+    if uses_nat || on_dappnode {
+        format!("tcp/{port}")
+    } else {
+        format!("udp/{port}/quic-v1")
+    }
 }
 
 impl TryFrom<&HostConfig> for Multiaddr {
