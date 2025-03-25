@@ -88,6 +88,40 @@ enum Dispatched<T> {
     In((PeerId, T)),
 }
 
+async fn process_logical_in_task<T, U, V>(
+    peer: PeerId,
+    a: impl Sink<U> + Send + 'static,
+    b: impl Stream<Item = V> + Send + 'static,
+    tx_in: T,
+) -> futures::channel::mpsc::Sender<V>
+where
+    T: Sink<(PeerId, V)> + Clone + Send + std::marker::Unpin + 'static,
+    V: Send + 'static,
+{
+    let (send, recv) = futures::channel::mpsc::channel::<V>(1000);
+
+    hopr_async_runtime::prelude::spawn(
+        recv.map(Dispatched::Out)
+            .merge(b.map(move |v| Dispatched::In((peer, v))))
+            .for_each_concurrent(10, move |v| {
+                let mut tx_in = tx_in.clone();
+
+                async move {
+                    match v {
+                        Dispatched::Out(_) => {
+                            // a.send(msg).await.unwrap();
+                        }
+                        Dispatched::In((peer, msg)) => {
+                            // let result = tx_in.send((peer, msg));
+                        }
+                    }
+                }
+            }),
+    );
+
+    send
+}
+
 async fn process_stream_in_task<S, C, T>(
     peer: PeerId,
     stream: S,
@@ -186,6 +220,11 @@ where
                             }
                         }),
                 );
+
+                // let (a, b) = split_with_codec(stream, codec);
+                // let send = process_logical_in_task(peer_id, a, b, tx_in).await;
+
+                // let send = process_stream_in_task(peer_id, stream, codec, tx_in).await;
                 cache.insert(peer_id, send).await;
             }
         })
@@ -227,6 +266,9 @@ where
                                     }
                                 }),
                         );
+
+                        // let send = process_stream_in_task(peer_id, stream, codec, tx_in).await;
+
                         cache.insert(peer_id, send);
                     }
                     Err(error) => {
