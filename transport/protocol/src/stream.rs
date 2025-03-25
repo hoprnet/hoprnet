@@ -243,39 +243,41 @@ where
         let tx_in = tx_in.clone();
 
         async move {
-            let cached = cache.get(&peer_id).await; // TODO: add get_with
-            if cached.is_none() {
-                let r = control.open().await;
-                match r {
-                    Ok(stream) => {
-                        let (a, b) = split_with_codec(stream, codec.clone());
-                        let (mut send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
+            let cached = cache
+                .optionally_get_with(peer_id, async move {
+                    let r = control.open().await;
+                    match r {
+                        Ok(stream) => {
+                            let (a, b) = split_with_codec(stream, codec.clone());
+                            let (mut send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
 
-                        let mut tx_in_clone = tx_in.clone();
-                        hopr_async_runtime::prelude::spawn(
-                            recv.map(Dispatched::Out)
-                                .merge(b.map(move |v| Dispatched::In((peer_id, v))))
-                                .for_each_concurrent(10, move |v| async move {
-                                    match v {
-                                        Dispatched::Out(msg) => {
-                                            // a.send(msg).await.unwrap();
+                            let mut tx_in_clone = tx_in.clone();
+                            hopr_async_runtime::prelude::spawn(
+                                recv.map(Dispatched::Out)
+                                    .merge(b.map(move |v| Dispatched::In((peer_id, v))))
+                                    .for_each_concurrent(10, move |v| async move {
+                                        match v {
+                                            Dispatched::Out(msg) => {
+                                                // a.send(msg).await.unwrap();
+                                            }
+                                            Dispatched::In((peer_id, msg)) => {
+                                                // tx_in_clone.send((peer_id, msg)).await.unwrap();
+                                            }
                                         }
-                                        Dispatched::In((peer_id, msg)) => {
-                                            // tx_in_clone.send((peer_id, msg)).await.unwrap();
-                                        }
-                                    }
-                                }),
-                        );
+                                    }),
+                            );
 
-                        // let send = process_stream_in_task(peer_id, stream, codec, tx_in).await;
+                            // let send = process_stream_in_task(peer_id, stream, codec, tx_in).await;
 
-                        cache.insert(peer_id, send);
+                            Some(send)
+                        }
+                        Err(error) => {
+                            tracing::error!(peer = %peer_id, %error, "Error opening stream to peer");
+                            None
+                        }
                     }
-                    Err(error) => {
-                        tracing::error!(peer = %peer_id, %error, "Error opening stream to peer");
-                    }
-                }
-            }
+                })
+                .await;
         }
     }));
 
