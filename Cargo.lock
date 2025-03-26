@@ -4229,25 +4229,18 @@ version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-std",
- "async-trait",
  "bimap",
  "criterion",
- "hex",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-internal-types",
- "hopr-path",
  "hopr-primitive-types",
  "lazy_static",
- "libp2p-identity",
- "mockall",
  "parameterized",
  "thiserror 2.0.11",
  "tracing",
- "typenum",
 ]
 
 [[package]]
