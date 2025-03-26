@@ -61,7 +61,7 @@ pub mod msg;
 pub mod ticket_aggregation;
 
 /// Stream processing utilities
-mod stream;
+pub mod stream;
 
 pub mod timer;
 use hopr_transport_identity::Multiaddr;
