@@ -110,6 +110,7 @@ num_enum = "0.7.2"
 opentelemetry = { version = "0.24.0" }
 opentelemetry-otlp = { version = "0.17.0", default-features = false }
 opentelemetry_sdk = { version = "0.24.0" }
+temp-env = "0.3.6"
 tracing-opentelemetry = { version = "0.25.0" }
 parameterized = "2.0.0"
 petgraph = { version = "0.6.5", features = ["serde-1"] }
