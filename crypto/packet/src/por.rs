@@ -24,7 +24,8 @@ pub fn derive_ack_key_share(secret: &SecretKey) -> HalfKey {
 ///
 /// This is the first entry of the entire PoR challenge chain generated for the packet.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ProofOfRelayValues([u8; Self::SIZE]);
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ProofOfRelayValues(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl ProofOfRelayValues {
     fn create(
@@ -66,7 +67,7 @@ impl ProofOfRelayValues {
     /// Returns the challenge that must be solved once the acknowledgement
     /// to the packet has been received.
     ///
-    /// This is the [`ProofOfRelayValues::ticket_challenge`] minus hint.
+    /// This is the [`ProofOfRelayValues::ticket_challenge`] minus the Hint.
     pub fn acknowledgement_challenge(&self) -> HalfKeyChallenge {
         HalfKeyChallenge::new(&self.0[1..1 + HalfKeyChallenge::SIZE])
     }

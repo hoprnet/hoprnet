@@ -121,6 +121,8 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
 
 /// Represents an instantiation of the Sphinx protocol using secp256k1 elliptic curve and `ChainKeypair`
 #[cfg(feature = "secp256k1")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Secp256k1Suite;
 
 #[cfg(feature = "secp256k1")]
@@ -133,6 +135,8 @@ impl SphinxSuite for Secp256k1Suite {
 
 /// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainKeypair`
 #[cfg(feature = "ed25519")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ed25519Suite;
 
 #[cfg(feature = "ed25519")]
@@ -145,6 +149,8 @@ impl SphinxSuite for Ed25519Suite {
 
 /// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainKeypair`
 #[cfg(feature = "x25519")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct X25519Suite;
 
 #[cfg(feature = "x25519")]

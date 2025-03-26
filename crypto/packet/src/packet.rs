@@ -21,7 +21,8 @@ use crate::{
 /// This can be used to pre-compute packets for certain destinations,
 /// and [convert](PartialHoprPacket::into_hopr_packet) them to full packets
 /// once the payload is known.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartialHoprPacket {
     partial_packet: PartialPacket<HoprSphinxSuite, HoprSphinxHeaderSpec>,
     surbs: Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>,
@@ -128,7 +129,7 @@ impl PartialHoprPacket {
         }
     }
 
-    /// Turns this partial HOPR packet into a full outgoing [`HoprPacket`] by
+    /// Turns this partial HOPR packet into a full [`Outgoing`](HoprPacket::Outgoing) [`HoprPacket`] by
     /// attaching the given payload.
     pub fn into_hopr_packet(self, msg: &[u8]) -> Result<(HoprPacket, Vec<ReplyOpener>)> {
         let msg = HoprPacketMessage::from_parts(self.surbs, msg)?;

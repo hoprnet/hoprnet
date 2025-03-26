@@ -1,4 +1,5 @@
 use std::fmt::Formatter;
+use std::marker::PhantomData;
 use typenum::Unsigned;
 
 use crate::crypto_traits::{Iv, IvSizeUser, Key, KeyIvInit, KeySizeUser};
@@ -23,7 +24,8 @@ pub type SecretKey = SecretValue<typenum::U32>;
 pub type SecretKey16 = SecretValue<typenum::U16>;
 
 /// Convenience container for IV and key of a given primitive `T`.
-pub struct IvKey<T: KeyIvInit>(pub Iv<T>, pub Key<T>);
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct IvKey<T>(Box<[u8]>, PhantomData<T>);
 
 impl<T: KeyIvInit> KeySizeUser for IvKey<T> {
     type KeySize = T::KeySize;
@@ -35,54 +37,76 @@ impl<T: KeyIvInit> IvSizeUser for IvKey<T> {
 
 impl<T: KeyIvInit> KeyIvInit for IvKey<T> {
     fn new(key: &Key<Self>, iv: &Iv<Self>) -> Self {
-        Self(iv.clone(), key.clone())
-    }
-}
-
-impl<T: KeyIvInit> From<IvKey<T>> for (Iv<T>, Key<T>) {
-    fn from(value: IvKey<T>) -> Self {
-        (value.0, value.1)
+        let mut out = Vec::with_capacity(Self::SIZE);
+        out.extend_from_slice(iv.as_ref());
+        out.extend_from_slice(key.as_ref());
+        Self(out.into_boxed_slice(), PhantomData)
     }
 }
 
 impl<T: KeyIvInit> Default for IvKey<T> {
     fn default() -> Self {
-        Self(Iv::<T>::default(), Key::<T>::default())
+        Self(vec![0u8; Self::SIZE].into_boxed_slice(), PhantomData)
     }
 }
 
-impl<T: KeyIvInit> Clone for IvKey<T> {
+impl<T> Clone for IvKey<T> {
     fn clone(&self) -> Self {
-        Self(self.0.clone(), self.1.clone())
+        Self(self.0.clone(), PhantomData)
     }
 }
+
+impl<T> PartialEq for IvKey<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<T> Eq for IvKey<T> {}
 
 impl<T: KeyIvInit> std::fmt::Debug for IvKey<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IvKey")
             .field("key", &"<redacted>")
-            .field("iv", &self.0)
+            .field("iv", self.iv())
             .finish()
     }
 }
-
-impl<T: KeyIvInit> PartialEq for IvKey<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0 && self.1 == other.1
-    }
-}
-
-impl<T: KeyIvInit> Eq for IvKey<T> {}
 
 impl<T: KeyIvInit> IvKey<T> {
     /// Total size of the key and IV in bytes.
     pub const SIZE: usize = T::KeySize::USIZE + T::IvSize::USIZE;
 
+    /// Returns the IV part.
+    #[inline]
+    pub fn iv(&self) -> &Iv<T> {
+        Iv::<T>::from_slice(&self.0[0..T::IvSize::USIZE])
+    }
+
+    /// Returns IV as a mutable slice.
+    #[inline]
+    pub fn iv_mut(&mut self) -> &mut [u8] {
+        &mut self.0[0..T::IvSize::USIZE]
+    }
+
+    /// Returns the key part.
+    #[inline]
+    pub fn key(&self) -> &Key<T> {
+        Key::<T>::from_slice(&self.0[T::IvSize::USIZE..])
+    }
+
+    /// Returns the key as a mutable slice.
+    #[inline]
+    pub fn key_mut(&mut self) -> &mut [u8] {
+        &mut self.0[T::IvSize::USIZE..]
+    }
+
     /// Turn this instance into another [`KeyIvInit`] with the same IV and key sizes.
+    #[inline]
     pub fn into_init<V>(self) -> V
     where
         V: KeyIvInit<KeySize = T::KeySize, IvSize = T::IvSize>,
     {
-        V::new(&self.1, &self.0)
+        V::new(self.key(), self.iv())
     }
 }

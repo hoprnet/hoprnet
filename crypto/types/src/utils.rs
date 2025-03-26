@@ -3,6 +3,7 @@ use hopr_crypto_random::random_array;
 use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
 use k256::elliptic_curve::{Group, PrimeField};
 use k256::Secp256k1;
+use serde::{Deserializer, Serializer};
 use sha3::Sha3_256;
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -128,6 +129,24 @@ impl<L: ArrayLength> AsMut<[u8]> for SecretValue<L> {
 impl<L: ArrayLength> From<SecretValue<L>> for Box<[u8]> {
     fn from(value: SecretValue<L>) -> Self {
         value.as_ref().into()
+    }
+}
+
+impl<L: ArrayLength> serde::Serialize for SecretValue<L> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de, L: ArrayLength> serde::Deserialize<'de> for SecretValue<L> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Self(GenericArray::deserialize(deserializer)?))
     }
 }
 

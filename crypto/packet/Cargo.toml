@@ -13,8 +13,11 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+serde = ["dep:serde", "dep:serde_bytes"]
 
 [dependencies]
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 

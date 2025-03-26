@@ -42,7 +42,15 @@ pub type HoprPseudonym = hopr_crypto_types::prelude::SimplePseudonym;
 pub type HoprSphinxSuite = X25519Suite;
 
 /// Current Sphinx header specification for the HOPR protocol.
-pub struct HoprSphinxHeaderSpec<S: SphinxSuite = HoprSphinxSuite>(PhantomData<S>);
+#[derive(Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HoprSphinxHeaderSpec<S = HoprSphinxSuite>(PhantomData<S>);
+
+impl<S> Clone for HoprSphinxHeaderSpec<S> {
+    fn clone(&self) -> Self {
+        Self(PhantomData)
+    }
+}
 
 impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();

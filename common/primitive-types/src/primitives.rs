@@ -505,8 +505,8 @@ impl PartialOrd<Self> for SerializableLog {
 }
 
 /// Identifier of public keys.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct KeyIdent<const N: usize = 4>([u8; N]);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct KeyIdent<const N: usize = 4>(#[serde(with = "serde_bytes")] [u8; N]);
 
 impl<const N: usize> Display for KeyIdent<N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

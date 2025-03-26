@@ -1,4 +1,4 @@
-use hopr_crypto_types::crypto_traits::{IvSizeUser, StreamCipher};
+use hopr_crypto_types::crypto_traits::StreamCipher;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -180,9 +180,10 @@ pub enum MetaPacketRouting<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
 /// that is - it contains only the routing information and the Alpha value.
 ///
 /// This object can be used to pre-compute a packet without a payload
-/// and possibly serialize it (via [`PartialPacket::into_boxed`]) to be later
-/// deserialized (via `try_from`) and used to construct the final [`MetaPacket`] via
+/// and possibly serialize it, and later to be
+/// deserialized and used to construct the final [`MetaPacket`] via
 /// a call to [`PartialPacket::into_meta_packet`].
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartialPacket<S: SphinxSuite, H: SphinxHeaderSpec> {
     alpha: Alpha<<S::G as GroupElement<S::E>>::AlphaLen>,
     routing_info: RoutingInfo<H>,
@@ -243,59 +244,15 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
 
         MetaPacket::new_from_parts(self.alpha, self.routing_info, &payload)
     }
-
-    /// Serialize this partial packet as bytes.
-    pub fn into_boxed(self) -> Box<[u8]> {
-        let mut out = Vec::with_capacity(
-            <S::G as GroupElement<S::E>>::AlphaLen::USIZE
-                + RoutingInfo::<H>::SIZE
-                + 1
-                + self.prp_inits.len() * IvKey::<S::PRP>::SIZE,
-        );
-        out.extend_from_slice(self.alpha.as_ref());
-        out.extend_from_slice(self.routing_info.as_ref());
-        out.push(self.prp_inits.len().min(H::MAX_HOPS.get() + 1) as u8);
-        for iv_key in self.prp_inits {
-            out.extend_from_slice(iv_key.0.as_ref());
-            out.extend_from_slice(iv_key.1.as_ref());
-        }
-        out.into_boxed_slice()
-    }
 }
 
-impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for PartialPacket<S, H> {
-    type Error = GeneralError;
-
-    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        let min_len =
-            <S::G as GroupElement<S::E>>::AlphaLen::USIZE + RoutingInfo::<H>::SIZE + 1 + IvKey::<S::PRP>::SIZE;
-        if value.len() >= min_len {
-            let alpha_len = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
-            Ok(Self {
-                alpha: Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(&value[0..alpha_len]).clone(),
-                routing_info: value[alpha_len..alpha_len + RoutingInfo::<H>::SIZE]
-                    .try_into()
-                    .map_err(|_| GeneralError::ParseError("PartialPacket.routing_info".into()))?,
-                prp_inits: (0..(value[alpha_len + RoutingInfo::<H>::SIZE] as usize).min(H::MAX_HOPS.get() + 1))
-                    .map(|i| {
-                        let offset = alpha_len + RoutingInfo::<H>::SIZE + 1 + i * IvKey::<S::PRP>::SIZE;
-                        if offset + IvKey::<S::PRP>::SIZE <= value.len() {
-                            let mut out = IvKey::<S::PRP>::default();
-                            out.0
-                                .copy_from_slice(&value[offset..offset + IvKey::<S::PRP>::iv_size()]);
-                            out.1.copy_from_slice(
-                                &value[offset + IvKey::<S::PRP>::iv_size()..offset + IvKey::<S::PRP>::SIZE],
-                            );
-                            Ok(out)
-                        } else {
-                            Err(GeneralError::ParseError("PartialPacket.prp_inits".into()))
-                        }
-                    })
-                    .collect::<Result<Vec<_>, _>>()?,
-            })
-        } else {
-            Err(GeneralError::ParseError("PartialPacket".into()))
-        }
+impl<S: SphinxSuite, H: SphinxHeaderSpec> Debug for PartialPacket<S, H> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PartialPacket")
+            .field("alpha", &self.alpha)
+            .field("routing_info", &self.routing_info)
+            .field("prp_inits", &self.prp_inits)
+            .finish()
     }
 }
 
@@ -309,16 +266,6 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> Clone for PartialPacket<S, H> {
     }
 }
 
-impl<S: SphinxSuite, H: SphinxHeaderSpec> Debug for PartialPacket<S, H> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PartialPacket")
-            .field("alpha", &self.alpha)
-            .field("routing_info", &self.routing_info)
-            .field("prp_inits", &self.prp_inits)
-            .finish()
-    }
-}
-
 impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialEq for PartialPacket<S, H> {
     fn eq(&self, other: &Self) -> bool {
         self.alpha == other.alpha && self.routing_info == other.routing_info && self.prp_inits == other.prp_inits
@@ -327,7 +274,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialEq for PartialPacket<S, H> {
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec> Eq for PartialPacket<S, H> {}
 
-/// An encrypted packet with payload of size `P`.
+/// An encrypted packet with a payload of size `P`.
 /// The final packet size is given by [`MetaPacket::SIZE`].
 ///
 /// A sender can create a new packet via [`MetaPacket::new`] and send it.
@@ -567,6 +514,8 @@ pub(crate) mod tests {
     use crate::surb::create_surb;
     use crate::tests::WrappedBytes;
 
+    #[derive(Debug, Clone, Copy)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     struct TestHeader<S: SphinxSuite>(PhantomData<S>);
 
     impl<S: SphinxSuite> SphinxHeaderSpec for TestHeader<S> {
@@ -624,9 +573,10 @@ pub(crate) mod tests {
         Ok(())
     }
 
+    #[cfg(feature = "serde")]
     fn generic_test_partial_packet_serialization<S>(keypairs: Vec<S::P>) -> anyhow::Result<()>
     where
-        S: SphinxSuite,
+        S: SphinxSuite + PartialEq,
         <S::P as Keypair>::Public: Eq + Hash,
     {
         let pubkeys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
@@ -650,7 +600,8 @@ pub(crate) mod tests {
             &mapper,
         )?;
 
-        let packet_2 = PartialPacket::<S, TestHeader<S>>::try_from(packet_1.clone().into_boxed().as_ref())?;
+        let encoded_1 = bincode::serialize(&packet_1)?;
+        let packet_2: PartialPacket<S, TestHeader<S>> = bincode::deserialize(&encoded_1)?;
 
         assert_eq!(packet_1, packet_2);
         Ok(())
@@ -790,7 +741,7 @@ pub(crate) mod tests {
         )
     }
 
-    #[cfg(feature = "x25519")]
+    #[cfg(all(feature = "x25519", feature = "serde"))]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_x25519_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
         generic_test_partial_packet_serialization::<crate::ec_groups::X25519Suite>(
@@ -814,7 +765,7 @@ pub(crate) mod tests {
         )
     }
 
-    #[cfg(feature = "ed25519")]
+    #[cfg(all(feature = "ed25519", feature = "serde"))]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_ed25519_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
         generic_test_partial_packet_serialization::<crate::ec_groups::Ed25519Suite>(
@@ -842,7 +793,7 @@ pub(crate) mod tests {
         )
     }
 
-    #[cfg(feature = "secp256k1")]
+    #[cfg(all(feature = "secp256k1", feature = "serde"))]
     #[parameterized(amount = { 4, 3, 2, 1 })]
     fn test_secp256k1_partial_packet_serialize(amount: usize) -> anyhow::Result<()> {
         generic_test_partial_packet_serialization::<crate::ec_groups::Secp256k1Suite>(

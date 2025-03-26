@@ -158,6 +158,7 @@ impl TryFrom<u8> for HeaderPrefix {
 }
 
 /// Carries routing information for the mixnet packet.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RoutingInfo<H: SphinxHeaderSpec>(Box<[u8]>, PhantomData<H>);
 
 impl<H: SphinxHeaderSpec> Debug for RoutingInfo<H> {
@@ -172,19 +173,19 @@ impl<H: SphinxHeaderSpec> Clone for RoutingInfo<H> {
     }
 }
 
+impl<H: SphinxHeaderSpec> PartialEq for RoutingInfo<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<H: SphinxHeaderSpec> Eq for RoutingInfo<H> {}
+
 impl<H: SphinxHeaderSpec> Default for RoutingInfo<H> {
     fn default() -> Self {
         Self(vec![0u8; Self::SIZE].into_boxed_slice(), PhantomData)
     }
 }
-
-impl<H: SphinxHeaderSpec> PartialEq for RoutingInfo<H> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.eq(&other.0)
-    }
-}
-
-impl<H: SphinxHeaderSpec> Eq for RoutingInfo<H> {}
 
 impl<H: SphinxHeaderSpec> AsRef<[u8]> for RoutingInfo<H> {
     fn as_ref(&self) -> &[u8] {

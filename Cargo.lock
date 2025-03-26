@@ -4239,6 +4239,8 @@ dependencies = [
  "hopr-primitive-types",
  "lazy_static",
  "parameterized",
+ "serde",
+ "serde_bytes",
  "thiserror 2.0.11",
  "tracing",
 ]
@@ -4257,6 +4259,7 @@ version = "0.7.0"
 dependencies = [
  "anyhow",
  "bimap",
+ "bincode",
  "curve25519-dalek",
  "elliptic-curve",
  "generic-array 1.2.0",
@@ -4267,6 +4270,8 @@ dependencies = [
  "hopr-primitive-types",
  "k256",
  "parameterized",
+ "serde",
+ "serde_bytes",
  "subtle",
  "thiserror 2.0.11",
  "typenum",
@@ -4583,6 +4588,7 @@ dependencies = [
  "primitive-types",
  "regex",
  "serde",
+ "serde_bytes",
  "sha3",
  "strum",
  "thiserror 2.0.11",

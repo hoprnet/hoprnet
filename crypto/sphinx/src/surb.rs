@@ -7,6 +7,7 @@ use crate::routing::{RoutingInfo, SphinxHeaderSpec};
 use crate::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
 
 /// Single Use Reply Block
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SURB<S: SphinxSuite, H: SphinxHeaderSpec> {
     /// ID of the first relayer.
     pub first_relayer: H::KeyId,
@@ -118,6 +119,7 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
 /// Entry stored locally by the [`SURB`] creator to allow decryption
 /// of received responses.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ReplyOpener {
     /// Encryption key the other party should use to encrypt the data for us.
     pub sender_key: SecretKey16,
