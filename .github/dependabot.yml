@@ -1,0 +1,91 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: daily
+
+  - package-ecosystem: pip
+    directory: /tests
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/forge-std-1.8.1
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/openzeppelin-contracts-4.4.2/contracts
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/openzeppelin-contracts-4.4.2
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/openzeppelin-contracts-4.9.2/contracts
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/openzeppelin-contracts-4.9.2/lib/forge-std/lib/ds-test
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/openzeppelin-contracts-4.9.2/lib/forge-std
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/openzeppelin-contracts-4.9.2
+    schedule:
+      interval: daily
+
+  - package-ecosystem: pip
+    directory: /vendor/solidity/openzeppelin-contracts-4.9.2
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/openzeppelin-contracts-upgradeable-4.9.2/contracts
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/openzeppelin-contracts-upgradeable-4.9.2/lib/forge-std/lib/ds-test
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/openzeppelin-contracts-upgradeable-4.9.2/lib/forge-std
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/openzeppelin-contracts-upgradeable-4.9.2
+    schedule:
+      interval: daily
+
+  - package-ecosystem: pip
+    directory: /vendor/solidity/openzeppelin-contracts-upgradeable-4.9.2
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/safe-contracts-1.4.1
+    schedule:
+      interval: daily
+
+  - package-ecosystem: npm
+    directory: /vendor/solidity/solcrypto
+    schedule:
+      interval: daily
+
+  - package-ecosystem: pip
+    directory: /vendor/solidity/solcrypto
+    schedule:
+      interval: daily
