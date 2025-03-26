@@ -334,7 +334,7 @@ where
 
                                                 if let Ok(key) = key {
                                                     if db
-                                                        .is_allowed_in_network_registry(None, key)
+                                                        .is_allowed_in_network_registry(None, &key)
                                                         .await
                                                         .unwrap_or(false)
                                                     {
@@ -363,7 +363,7 @@ where
 
         let nodes = self.get_public_nodes().await?;
         for (peer, _address, multiaddresses) in nodes {
-            if self.is_allowed_to_access_network(&peer).await? {
+            if self.is_allowed_to_access_network(either::Left(&peer)).await? {
                 debug!(%peer, ?multiaddresses, "Using initial public node");
 
                 internal_discovery_update_tx
@@ -615,7 +615,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
-        if !self.is_allowed_to_access_network(peer).await? {
+        if !self.is_allowed_to_access_network(either::Left(peer)).await? {
             return Err(HoprTransportError::Api(format!(
                 "ping to '{peer}' not allowed due to network registry"
             )));
@@ -764,12 +764,16 @@ where
             .collect())
     }
 
-    pub async fn is_allowed_to_access_network<'a>(&self, peer: &'a PeerId) -> errors::Result<bool>
+    pub async fn is_allowed_to_access_network<'a>(
+        &self,
+        address_like: either::Either<&'a PeerId, Address>,
+    ) -> errors::Result<bool>
     where
         T: 'a,
     {
         let db_clone = self.db.clone();
-        let peer = *peer;
+        let address_like_noref = address_like.map_left(|peer| *peer);
+
         Ok(self
             .db
             .begin_transaction()
@@ -777,15 +781,18 @@ where
             .map_err(hopr_db_sql::api::errors::DbError::from)?
             .perform(|tx| {
                 Box::pin(async move {
-                    let pk = OffchainPublicKey::try_from(peer)?;
-                    if let Some(address) = db_clone.translate_key(Some(tx), pk).await? {
-                        db_clone
-                            .is_allowed_in_network_registry(Some(tx), address.try_into()?)
-                            .await
-                    } else {
-                        Err(hopr_db_sql::errors::DbSqlError::LogicalError(
-                            "cannot translate off-chain key".into(),
-                        ))
+                    match address_like_noref {
+                        either::Left(peer) => {
+                            let pk = OffchainPublicKey::try_from(peer)?;
+                            if let Some(address) = db_clone.translate_key(Some(tx), pk).await? {
+                                db_clone.is_allowed_in_network_registry(Some(tx), &address).await
+                            } else {
+                                Err(hopr_db_sql::errors::DbSqlError::LogicalError(
+                                    "cannot translate off-chain key".into(),
+                                ))
+                            }
+                        }
+                        either::Right(address) => db_clone.is_allowed_in_network_registry(Some(tx), &address).await,
                     }
                 })
             })
