@@ -48,6 +48,8 @@ hopr-transport-identity = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 async-std = { workspace = true }
+async-channel = { workspace = true }
+async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_std"] }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
