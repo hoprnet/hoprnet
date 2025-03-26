@@ -95,7 +95,7 @@ pub(crate) struct InternalState {
         alias::delete_alias,
         alias::clear_aliases,
         channels::close_channel,
-        channels::close_all_channels,
+        channels::close_multiple_channels,
         channels::fund_channel,
         channels::list_channels,
         channels::open_channel,
@@ -138,7 +138,7 @@ pub(crate) struct InternalState {
             ApiError,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest, account::WithdrawResponse,
             alias::PeerIdResponse, alias::AliasDestinationBodyRequest,
-            channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
+            channels::CloseMultipleBodyRequest, channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
             messages::MessagePopAllResponse,
             messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageBodyRequest, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageBodyRequest,
@@ -277,7 +277,7 @@ async fn build_api(
                 .route("/peers/{destination}", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
-                .route("/channels", delete(channels::close_all_channels))
+                .route("/channels", delete(channels::close_multiple_channels))
                 .route("/channels/{channelId}", get(channels::show_channel))
                 .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets))
                 .route("/channels/{channelId}", delete(channels::close_channel))

@@ -1351,9 +1351,10 @@ impl Hopr {
         }
     }
 
-    pub async fn close_all_channels(
+    pub async fn close_multiple_channels(
         &self,
         direction: ChannelDirection,
+        status: ChannelStatus,
         redeem_before_close: bool,
     ) -> errors::Result<CloseAllChannelResult> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
@@ -1361,7 +1362,9 @@ impl Hopr {
         let confirmation = self
             .hopr_chain_api
             .actions_ref()
-            .close_all_channels(direction, redeem_before_close);
+            .close_multiple_channels(direction, status, redeem_before_close)
+            .await?
+            .await?;
 
         Ok(CloseAllChannelResult {
             tx_hash: confirmation.tx_hash,

@@ -2,6 +2,7 @@ use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
 /// Describes status of a channel
@@ -47,10 +48,23 @@ impl PartialEq for ChannelStatus {
 }
 impl Eq for ChannelStatus {}
 
+impl FromStr for ChannelStatus {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Closed" => Ok(ChannelStatus::Closed),
+            "Open" => Ok(ChannelStatus::Open),
+            "PendingToClose" => Ok(ChannelStatus::PendingToClose(SystemTime::now())),
+            _ => Err(GeneralError::InvalidInput),
+        }
+    }
+}
+
 /// Describes a direction of node's own channel.
 /// The direction of a channel that is not own is undefined.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::Display, strum::EnumString)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString)]
 #[strum(serialize_all = "lowercase")]
 pub enum ChannelDirection {
     /// The other party is initiator of the channel.

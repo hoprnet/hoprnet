@@ -54,8 +54,12 @@ pub trait ChannelActions {
     ) -> Result<PendingAction>;
 
     /// Closes all channels in the given direction. Optionally can issue redeeming of all tickets in those channels.
-    async fn close_all_channels(&self, direction: ChannelDirection, redeem_before_close: bool)
-        -> Result<PendingAction>;
+    async fn close_multiple_channels(
+        &self,
+        direction: ChannelDirection,
+        status: ChannelStatus,
+        redeem_before_close: bool,
+    ) -> Result<PendingAction>;
 }
 
 #[async_trait]
@@ -222,9 +226,10 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn close_all_channels(
+    async fn close_multiple_channels(
         &self,
         direction: ChannelDirection,
+        status: ChannelStatus,
         redeem_before_close: bool,
     ) -> Result<PendingAction> {
         let channels = self
@@ -260,7 +265,9 @@ where
             }))
             .await;
         }
-        self.tx_sender.send(Action::CloseChannels(channels, direction)).await
+        self.tx_sender
+            .send(Action::CloseChannels(channels, direction, status))
+            .await
     }
 }
 #[cfg(test)]

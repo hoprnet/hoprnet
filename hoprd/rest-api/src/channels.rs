@@ -461,10 +461,33 @@ pub(super) async fn close_channel(
     }
 }
 
-/// Closes all channels in a single call.
+#[serde_as]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "direction": "outgoing",
+        "status": "Open"
+    }))]
+pub(crate) struct CloseMultipleBodyRequest {
+    /// Direction of the channels to close.
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    direction: hopr_lib::ChannelDirection,
+
+    /// Status of the channels to close.
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    status: hopr_lib::ChannelStatus,
+}
+
+/// Closes multiple channels in a single call.
 #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
+        request_body(
+            content = CloseMultipleBodyRequest,
+            description = "Specifies the direction and status of the channels to close.",
+            content_type = "application/json",
+        ),
         responses(
             (status = 200, description = "Channels closed successfully", body = String),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -477,14 +500,22 @@ pub(super) async fn close_channel(
         ),
         tag = "Channels",
     )]
-pub(super) async fn close_all_channels(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
+
+pub(super) async fn close_multiple_channels(
+    State(state): State<Arc<InternalState>>,
+    Json(req_body): Json<CloseMultipleBodyRequest>,
+) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match hopr
-        .close_all_channels(hopr_lib::ChannelDirection::Outgoing, false)
-        .await
-    {
-        Ok(_) => (StatusCode::OK, Json("All channels closed successfully")).into_response(),
+    let direction = req_body.direction;
+    let status = req_body.status;
+
+    match hopr.close_multiple_channels(direction, status, false).await {
+        Ok(_) => (
+            StatusCode::OK,
+            Json(format!("All {} {} channels closed successfully", direction, status)),
+        )
+            .into_response(),
         Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
