@@ -1,7 +1,3 @@
-use crate::crypto_traits::{Key, KeyInit, KeySizeUser};
-use crate::errors::CryptoError;
-use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
-use crate::prelude::{HalfKey, SecretKey};
 use generic_array::{ArrayLength, GenericArray};
 use hopr_crypto_random::random_array;
 use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
@@ -10,6 +6,10 @@ use k256::Secp256k1;
 use sha3::Sha3_256;
 use subtle::{Choice, ConstantTimeEq};
 use zeroize::{Zeroize, ZeroizeOnDrop};
+
+use crate::errors::CryptoError;
+use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
+use crate::prelude::{HalfKey, SecretKey};
 
 /// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.
@@ -72,33 +72,33 @@ pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> crate::errors
 /// Secret values are always compared in constant time.
 /// The default value is all zeroes.
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
-pub struct SecretValue<L: ArrayLength<u8>>(GenericArray<u8, L>);
+pub struct SecretValue<L: ArrayLength>(GenericArray<u8, L>);
 
-impl<L: ArrayLength<u8>> ConstantTimeEq for SecretValue<L> {
+impl<L: ArrayLength> ConstantTimeEq for SecretValue<L> {
     fn ct_eq(&self, other: &Self) -> Choice {
-        self.0.as_ref().ct_eq(other.0.as_ref())
+        self.0.ct_eq(&other.0)
     }
 }
 
-impl<L: ArrayLength<u8>> AsRef<[u8]> for SecretValue<L> {
+impl<L: ArrayLength> AsRef<[u8]> for SecretValue<L> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
     }
 }
 
-impl<L: ArrayLength<u8>> From<GenericArray<u8, L>> for SecretValue<L> {
+impl<L: ArrayLength> From<GenericArray<u8, L>> for SecretValue<L> {
     fn from(value: GenericArray<u8, L>) -> Self {
         Self(value)
     }
 }
 
-impl<'a, L: ArrayLength<u8>> From<&'a SecretValue<L>> for &'a GenericArray<u8, L> {
+impl<'a, L: ArrayLength> From<&'a SecretValue<L>> for &'a GenericArray<u8, L> {
     fn from(value: &'a SecretValue<L>) -> Self {
         &value.0
     }
 }
 
-impl<L: ArrayLength<u8>> TryFrom<&[u8]> for SecretValue<L> {
+impl<L: ArrayLength> TryFrom<&[u8]> for SecretValue<L> {
     type Error = CryptoError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
@@ -110,7 +110,7 @@ impl<L: ArrayLength<u8>> TryFrom<&[u8]> for SecretValue<L> {
     }
 }
 
-impl<L: ArrayLength<u8>> Default for SecretValue<L> {
+impl<L: ArrayLength> Default for SecretValue<L> {
     fn default() -> Self {
         // Ensure the default value is zeroized
         let mut ret = Self(GenericArray::default());
@@ -119,34 +119,24 @@ impl<L: ArrayLength<u8>> Default for SecretValue<L> {
     }
 }
 
-impl<L: ArrayLength<u8>> AsMut<[u8]> for SecretValue<L> {
+impl<L: ArrayLength> AsMut<[u8]> for SecretValue<L> {
     fn as_mut(&mut self) -> &mut [u8] {
         self.0.as_mut()
     }
 }
 
-impl<L: ArrayLength<u8>> From<SecretValue<L>> for Box<[u8]> {
+impl<L: ArrayLength> From<SecretValue<L>> for Box<[u8]> {
     fn from(value: SecretValue<L>) -> Self {
         value.as_ref().into()
     }
 }
 
-impl<L: ArrayLength<u8>> SecretValue<L> {
+impl<L: ArrayLength> SecretValue<L> {
     /// Length of the secret value in bytes.
     pub const LENGTH: usize = L::USIZE;
 
     /// Generates cryptographically strong random secret value.
     pub fn random() -> Self {
         Self(random_array())
-    }
-}
-
-impl<L: ArrayLength<u8>> KeySizeUser for SecretValue<L> {
-    type KeySize = L;
-}
-
-impl<L: ArrayLength<u8>> KeyInit for SecretValue<L> {
-    fn new(key: &Key<Self>) -> Self {
-        key.clone().into()
     }
 }

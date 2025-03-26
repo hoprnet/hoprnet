@@ -87,8 +87,7 @@ float-cmp = "0.10.0"
 futures = "0.3.31"
 futures-concurrency = "7.6.2"
 futures-timer = "3.0.3"
-generic-array = { version = "0.14.7", features = ["zeroize"] }
-getrandom = "0.2.15"
+generic-array = { version = "1.2.0", features = ["zeroize", "serde"] }
 governor = { version = "0.8" }
 hex = "0.4.3"
 hex-literal = "0.4.1"

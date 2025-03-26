@@ -18,7 +18,7 @@ use crate::utils::{k256_scalar_from_bytes, random_group_element, x25519_scalar_f
 /// Must be comparable in constant time and zeroized on drop.
 pub trait Keypair: ConstantTimeEq + ZeroizeOnDrop + Sized {
     /// Represents the type of the private (secret) key
-    type SecretLen: ArrayLength<u8>;
+    type SecretLen: ArrayLength;
 
     /// Represents the type of the public key
     type Public: BytesRepresentable + Clone + PartialEq;

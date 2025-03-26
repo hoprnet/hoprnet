@@ -55,7 +55,11 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
     /// Extract a keying material from a group element using HKDF extract
     fn extract_key(&self, salt: &[u8]) -> SharedSecret {
         let ikm = self.to_alpha();
-        SimpleHkdf::<Blake2s256>::extract(Some(salt), ikm.as_ref()).0.into()
+        SimpleHkdf::<Blake2s256>::extract(Some(salt), ikm.as_ref())
+            .0
+            .as_slice()
+            .try_into()
+            .expect("Blake2s256 output is not 32 bytes long")
     }
 
     /// Performs KDF expansion from the given group element using HKDF expand
