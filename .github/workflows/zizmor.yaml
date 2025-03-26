@@ -1,11 +1,7 @@
 ---
-#################################################################################
-# Pipeline triggered on every pull request to check lint compliance
-#################################################################################
-name: Lint
+name: security | zizmor
 
 env:
-  RUST_BACKTRACE: "1"
   needs_nix_setup: false
 
 on:
@@ -16,16 +12,14 @@ on:
       - synchronize
       - ready_for_review
 
-concurrency:
-  group: ${{ github.ref }}-lint
-  cancel-in-progress: true
+permissions: {}
 
 jobs:
-  lint:
-    name: Linter
+  zizmor:
     runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 30
-    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
@@ -33,12 +27,14 @@ jobs:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         if: env.needs_nix_setup == true
-        uses: cachix/install-nix-action@v30
+        uses: cachix/install-nix-action@v29
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -50,5 +46,13 @@ jobs:
         env:
           USER: runner
 
-      - name: Run linter
-        run: nix run .#check
+      - name: Run zizmor
+        run: nix develop -L -c bash -c "zizmor --format sarif . > results.sarif"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@5f8171a638ada777af81d42b55959a643bb29017 # v3.28.12
+        with:
+          sarif_file: results.sarif
+          category: zizmor
