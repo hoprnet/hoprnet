@@ -29,6 +29,12 @@ jobs:
       needs_nix_setup: false
       CI: "true"
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -58,6 +64,12 @@ jobs:
       needs_nix_setup: false
       CI: "true"
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -94,6 +106,12 @@ jobs:
     env:
       needs_nix_setup: false
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -132,6 +150,12 @@ jobs:
       needs_nix_setup: true
     if: github.event.pull_request.draft == false
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -221,6 +245,12 @@ jobs:
           - hopli
     if: github.event.pull_request.draft == false
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
