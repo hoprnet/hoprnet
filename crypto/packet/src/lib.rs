@@ -31,7 +31,7 @@ mod types;
 mod validation;
 
 pub mod prelude {
-    pub use crate::packet::{HoprPacket, PacketRouting};
+    pub use crate::packet::{HoprPacket, PacketRouting, PartialHoprPacket};
     pub use crate::validation::validate_unacknowledged_ticket;
 }
 

@@ -23,7 +23,7 @@ pub fn derive_ack_key_share(secret: &SecretKey) -> HalfKey {
 /// Type that contains the challenge for the first ticket sent to the first relayer.
 ///
 /// This is the first entry of the entire PoR challenge chain generated for the packet.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProofOfRelayValues([u8; Self::SIZE]);
 
 impl ProofOfRelayValues {

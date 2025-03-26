@@ -13,7 +13,138 @@ use crate::{
     HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
 };
 
-/// Indicates the packet type.
+/// Represents an outgoing packet that has been only partially instantiated.
+///
+/// It contains [`PartialPacket`], required Proof-of-Relay
+/// fields, and the [`Ticket`], but it does not contain the payload.
+///
+/// This can be used to pre-compute packets for certain destinations,
+/// and [convert](PartialHoprPacket::into_hopr_packet) them to full packets
+/// once the payload is known.
+#[derive(Clone, Debug)]
+pub struct PartialHoprPacket {
+    partial_packet: PartialPacket<HoprSphinxSuite, HoprSphinxHeaderSpec>,
+    surbs: Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>,
+    openers: Vec<ReplyOpener>,
+    ticket: Ticket,
+    next_hop: OffchainPublicKey,
+    ack_challenge: HalfKeyChallenge,
+}
+
+impl PartialHoprPacket {
+    /// Instantiates a new partial HOPR packet.
+    ///
+    /// # Arguments
+    ///
+    /// * `pseudonym` our pseudonym as packet sender.
+    /// * `routing` routing to the destination.
+    /// * `chain_keypair` private key of the local node.
+    /// * `ticket` ticket builder for the first hop on the path.
+    /// * `mapper` of the public key identifiers.
+    /// * `domain_separator` channels contract domain separator.
+    pub fn new<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
+        pseudonym: &HoprPseudonym,
+        routing: PacketRouting,
+        chain_keypair: &ChainKeypair,
+        ticket: TicketBuilder,
+        mapper: &M,
+        domain_separator: &Hash,
+    ) -> Result<Self> {
+        match routing {
+            PacketRouting::ForwardPath {
+                forward_path,
+                return_paths,
+            } => {
+                if forward_path.is_empty() {
+                    return Err(PacketConstructionError(
+                        "packet cannot be routed to an empty path".into(),
+                    ));
+                }
+
+                // Create shared secrets and PoR challenge chain
+                let shared_keys = HoprSphinxSuite::new_shared_keys(forward_path)?;
+                let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
+                let por_values = ProofOfRelayValues::new(
+                    &shared_keys.secrets[0],
+                    shared_keys.secrets.get(1),
+                    shared_keys.secrets.len() as u8,
+                )?;
+
+                // Create SURBs if some return paths were specified
+                let (surbs, openers): (Vec<_>, Vec<_>) = return_paths
+                    .iter()
+                    .map(|rp| create_surb_for_path(rp, pseudonym, mapper))
+                    .collect::<Result<Vec<_>>>()?
+                    .into_iter()
+                    .unzip();
+
+                // Update the ticket with the challenge
+                let ticket = ticket
+                    .challenge(por_values.ticket_challenge())
+                    .build_signed(chain_keypair, domain_separator)?
+                    .leak();
+
+                Ok(Self {
+                    partial_packet: PartialPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::new(
+                        MetaPacketRouting::ForwardPath {
+                            shared_keys,
+                            forward_path,
+                            pseudonym,
+                            additional_data_relayer: &por_strings,
+                        },
+                        mapper,
+                    )?,
+                    surbs,
+                    openers,
+                    ticket,
+                    next_hop: forward_path[0],
+                    ack_challenge: por_values.acknowledgement_challenge(),
+                })
+            }
+            PacketRouting::Surb(surb) => {
+                // Update the ticket with the challenge
+                let ticket = ticket
+                    .challenge(surb.additional_data_receiver.ticket_challenge())
+                    .build_signed(chain_keypair, domain_separator)?
+                    .leak();
+
+                Ok(Self {
+                    ticket,
+                    next_hop: mapper.map_id_to_public(&surb.first_relayer).ok_or_else(|| {
+                        PacketConstructionError(format!(
+                            "failed to map key id {} to public key",
+                            surb.first_relayer.to_hex()
+                        ))
+                    })?,
+                    ack_challenge: surb.additional_data_receiver.acknowledgement_challenge(),
+                    partial_packet: PartialPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::new(
+                        MetaPacketRouting::Surb(surb, pseudonym),
+                        mapper,
+                    )?,
+                    surbs: vec![],
+                    openers: vec![],
+                })
+            }
+        }
+    }
+
+    /// Turns this partial HOPR packet into a full outgoing [`HoprPacket`] by
+    /// attaching the given payload.
+    pub fn into_hopr_packet(self, msg: &[u8]) -> Result<(HoprPacket, Vec<ReplyOpener>)> {
+        let msg = HoprPacketMessage::from_parts(self.surbs, msg)?;
+        Ok((
+            HoprPacket::Outgoing {
+                packet: self.partial_packet.into_meta_packet(msg.into()),
+                ticket: self.ticket,
+                next_hop: self.next_hop,
+                ack_challenge: self.ack_challenge,
+            },
+            self.openers,
+        ))
+    }
+}
+
+/// Contains HOPR packet and its variants.
 #[allow(clippy::large_enum_variant)] // TODO: see if some parts can be boxed
 #[derive(Clone)]
 pub enum HoprPacket {
@@ -136,91 +267,8 @@ impl HoprPacket {
         mapper: &M,
         domain_separator: &Hash,
     ) -> Result<(Self, Vec<ReplyOpener>)> {
-        match routing {
-            PacketRouting::ForwardPath {
-                forward_path,
-                return_paths,
-            } => {
-                if forward_path.is_empty() {
-                    return Err(PacketConstructionError(
-                        "packet cannot be routed to an empty path".into(),
-                    ));
-                }
-
-                // Create shared secrets and PoR challenge chain
-                let shared_keys = HoprSphinxSuite::new_shared_keys(forward_path)?;
-                let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
-                let por_values = ProofOfRelayValues::new(
-                    &shared_keys.secrets[0],
-                    shared_keys.secrets.get(1),
-                    shared_keys.secrets.len() as u8,
-                )?;
-
-                // Create SURBs if some return paths were specified
-                let (surbs, openers): (Vec<_>, Vec<_>) = return_paths
-                    .iter()
-                    .map(|rp| create_surb_for_path(rp, pseudonym, mapper))
-                    .collect::<Result<Vec<_>>>()?
-                    .into_iter()
-                    .unzip();
-
-                let msg = HoprPacketMessage::from_parts(surbs, msg)?;
-
-                // Update the ticket with the challenge
-                let ticket = ticket
-                    .challenge(por_values.ticket_challenge())
-                    .build_signed(chain_keypair, domain_separator)?
-                    .leak();
-
-                Ok((
-                    Self::Outgoing {
-                        packet: MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>::new(
-                            msg.into(),
-                            MetaPacketRouting::ForwardPath {
-                                shared_keys,
-                                forward_path,
-                                pseudonym,
-                                additional_data_relayer: &por_strings,
-                            },
-                            mapper,
-                        )?,
-                        ticket,
-                        next_hop: forward_path[0],
-                        ack_challenge: por_values.acknowledgement_challenge(),
-                    },
-                    openers,
-                ))
-            }
-            PacketRouting::Surb(surb) => {
-                // Reply message must not contain SURBs
-                let msg = HoprPacketMessage::from_parts(vec![], msg)?;
-
-                // Update the ticket with the challenge
-                let ticket = ticket
-                    .challenge(surb.additional_data_receiver.ticket_challenge())
-                    .build_signed(chain_keypair, domain_separator)?
-                    .leak();
-
-                Ok((
-                    Self::Outgoing {
-                        ticket,
-                        next_hop: mapper.map_id_to_public(&surb.first_relayer).ok_or_else(|| {
-                            PacketConstructionError(format!(
-                                "failed to map key id {} to public key",
-                                surb.first_relayer.to_hex()
-                            ))
-                        })?,
-                        ack_challenge: surb.additional_data_receiver.acknowledgement_challenge(),
-                        packet: MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>::new(
-                            msg.into(),
-                            MetaPacketRouting::Surb(surb, pseudonym),
-                            mapper,
-                        )?,
-                    },
-                    Vec::with_capacity(0),
-                ))
-            }
-        }
+        PartialHoprPacket::new(pseudonym, routing, chain_keypair, ticket, mapper, domain_separator)?
+            .into_hopr_packet(msg)
     }
 
     /// Calculates how many SURBs can be fitted into a packet that

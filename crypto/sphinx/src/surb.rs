@@ -1,5 +1,6 @@
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use std::fmt::Formatter;
 use typenum::Unsigned;
 
 use crate::routing::{RoutingInfo, SphinxHeaderSpec};
@@ -65,6 +66,22 @@ where
     }
 }
 
+impl<S: SphinxSuite, H: SphinxHeaderSpec> std::fmt::Debug for SURB<S, H>
+where
+    H::KeyId: std::fmt::Debug,
+    H::SurbReceiverData: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SURB")
+            .field("first_relayer", &self.first_relayer)
+            .field("alpha", &self.alpha)
+            .field("header", &self.header)
+            .field("sender_key", &"<redacted>")
+            .field("additional_data_receiver", &self.additional_data_receiver)
+            .finish()
+    }
+}
+
 impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
     type Error = GeneralError;
 
@@ -106,6 +123,15 @@ pub struct ReplyOpener {
     pub sender_key: SecretKey16,
     /// Shared secrets for nodes along the return path.
     pub shared_secrets: Vec<SharedSecret>,
+}
+
+impl std::fmt::Debug for ReplyOpener {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ReplyOpener")
+            .field("sender_key", &"<redacted>")
+            .field("shared_secrets", &format!("{} <redacted>", self.shared_secrets.len()))
+            .finish()
+    }
 }
 
 /// Creates a pair of [`SURB`] and [`ReplyOpener`].

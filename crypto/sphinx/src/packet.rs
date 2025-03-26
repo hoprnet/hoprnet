@@ -177,9 +177,9 @@ pub enum MetaPacketRouting<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
 }
 
 /// Represents a packet that is only partially instantiated,
-/// that is - it contains only the routing info and the Alpha value.
+/// that is - it contains only the routing information and the Alpha value.
 ///
-/// This object can be used to pre-compute a packet without a payload,
+/// This object can be used to pre-compute a packet without a payload
 /// and possibly serialize it (via [`PartialPacket::into_boxed`]) to be later
 /// deserialized (via `try_from`) and used to construct the final [`MetaPacket`] via
 /// a call to [`PartialPacket::into_meta_packet`].
