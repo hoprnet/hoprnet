@@ -881,12 +881,21 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::ContractEventHandlers;
+
+    use anyhow::{anyhow, Context};
+    use ethers::contract::EthEvent;
+    use ethers::{
+        abi::{encode, Address as EthereumAddress, Token},
+        types::U256 as EthU256,
+    };
+    use hex_literal::hex;
+    use multiaddr::Multiaddr;
+    use primitive_types::H256;
     use std::sync::atomic::Ordering;
     use std::sync::Arc;
     use std::time::SystemTime;
 
-    use super::ContractEventHandlers;
-    use anyhow::{anyhow, Context};
     use bindings::hopr_winning_probability_oracle_events::WinProbUpdatedFilter;
     use bindings::{
         hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
@@ -904,12 +913,6 @@ mod tests {
     };
     use chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
     use chain_types::ContractAddresses;
-    use ethers::contract::EthEvent;
-    use ethers::{
-        abi::{encode, Address as EthereumAddress, Token},
-        types::U256 as EthU256,
-    };
-    use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::accounts::{ChainOrPacketKey, HoprDbAccountOperations};
     use hopr_db_sql::api::{info::DomainSeparator, tickets::HoprDbTicketOperations};
@@ -921,8 +924,6 @@ mod tests {
     use hopr_db_sql::{HoprDbAllOperations, HoprDbGeneralModelOperations};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
-    use multiaddr::Multiaddr;
-    use primitive_types::H256;
 
     lazy_static::lazy_static! {
         static ref SELF_PRIV_KEY: OffchainKeypair = OffchainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -1376,7 +1377,10 @@ mod tests {
             ..test_log()
         };
 
-        assert!(!db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?);
+        assert!(
+            !db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
+                .await?
+        );
 
         let event_type = db
             .begin_transaction()
@@ -1390,7 +1394,8 @@ mod tests {
         );
 
         assert!(
-            db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?,
+            db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
+                .await?,
             "must be allowed in NR"
         );
         Ok(())
@@ -1413,7 +1418,10 @@ mod tests {
             ..test_log()
         };
 
-        assert!(!db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?);
+        assert!(
+            !db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
+                .await?
+        );
 
         let event_type = db
             .begin_transaction()
@@ -1427,7 +1435,8 @@ mod tests {
         );
 
         assert!(
-            db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?,
+            db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
+                .await?,
             "must be allowed in NR"
         );
         Ok(())
@@ -1453,7 +1462,10 @@ mod tests {
             ..test_log()
         };
 
-        assert!(db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?);
+        assert!(
+            db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
+                .await?
+        );
 
         let event_type = db
             .begin_transaction()
@@ -1467,7 +1479,8 @@ mod tests {
         );
 
         assert!(
-            !db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?,
+            !db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
+                .await?,
             "must not be allowed in NR"
         );
         Ok(())
@@ -1493,7 +1506,10 @@ mod tests {
             ..test_log()
         };
 
-        assert!(db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?);
+        assert!(
+            db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
+                .await?
+        );
 
         let event_type = db
             .begin_transaction()
@@ -1507,7 +1523,8 @@ mod tests {
         );
 
         assert!(
-            !db.is_allowed_in_network_registry(None, *SELF_CHAIN_ADDRESS).await?,
+            !db.is_allowed_in_network_registry(None, &SELF_CHAIN_ADDRESS.as_ref())
+                .await?,
             "must not be allowed in NR"
         );
         Ok(())
