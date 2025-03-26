@@ -5,12 +5,13 @@ use axum::{
 };
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use hopr_crypto_types::prelude::Hash;
-use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{collections::HashMap, sync::Arc};
+
+use hopr_crypto_types::prelude::Hash;
+use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
 
 use crate::{
     checksum_address_serializer, option_checksum_address_serializer, ApiError, ApiErrorStatus, InternalState, BASE_PATH,
@@ -430,11 +431,14 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
     let chain_config = hopr.chain_config();
     let safe_config = hopr.get_safe_config();
     let network = hopr.network();
+    let me_address = hopr.me_onchain();
 
     let indexer_state_info = match hopr.get_indexer_state().await {
         Ok(info) => info,
         Err(error) => return Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response()),
     };
+
+    let is_eligible = hopr.is_allowed_to_access_network(either::Right(me_address)).await?;
 
     match hopr.get_channel_closure_notice_period().await {
         Ok(channel_closure_notice_period) => {
@@ -450,7 +454,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
                 hopr_node_safe_registry: chain_config.node_safe_registry,
                 hopr_management_module: chain_config.module_implementation,
                 hopr_node_safe: safe_config.safe_address,
-                is_eligible: hopr.is_allowed_to_access_network(&hopr.me_peer_id()).await?,
+                is_eligible,
                 connectivity_status: hopr.network_health().await,
                 channel_closure_period: channel_closure_notice_period.as_secs(),
                 indexer_block: indexer_state_info.latest_block_number,
@@ -511,7 +515,7 @@ pub(super) async fn entry_nodes(State(state): State<Arc<InternalState>>) -> Resu
                     address.to_string(),
                     EntryNode {
                         multiaddrs: mas,
-                        is_eligible: hopr.is_allowed_to_access_network(&peer_id).await?,
+                        is_eligible: hopr.is_allowed_to_access_network(either::Left(&peer_id)).await?,
                     },
                 );
             }

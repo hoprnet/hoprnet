@@ -1,7 +1,5 @@
 use async_trait::async_trait;
 use futures::TryFutureExt;
-use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_internal_types::prelude::AccountEntry;
 use multiaddr::Multiaddr;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
@@ -10,9 +8,11 @@ use sea_orm::{
 };
 use sea_query::{Condition, IntoCondition, OnConflict};
 
+use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_entity::prelude::{Account, Announcement};
 use hopr_db_entity::{account, announcement};
 use hopr_internal_types::account::AccountType;
+use hopr_internal_types::prelude::AccountEntry;
 use hopr_primitive_types::errors::GeneralError;
 use hopr_primitive_types::prelude::{Address, ToHex};
 

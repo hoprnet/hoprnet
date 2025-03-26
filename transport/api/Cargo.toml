@@ -44,6 +44,7 @@ prometheus = [
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
+either = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["request-response"] }
