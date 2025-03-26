@@ -12,6 +12,9 @@ on:
     paths:
       - .github/workflows/update-flake-lock.yaml
 
+permissions:
+  contents: read
+
 jobs:
   lockfile:
     runs-on: self-hosted-hoprnet-small
