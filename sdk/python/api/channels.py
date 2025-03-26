@@ -25,3 +25,8 @@ class ChannelStatus(Enum):
                 return status
 
         return None
+
+
+class ChannelDirection(Enum):
+    Incoming = "incoming"
+    Outgoing = "outgoing"

@@ -305,8 +305,13 @@ mod tests {
             "48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c"
         ))
         .expect("lazy static keypair should be constructible");
+        static ref EVE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"
+        ))
+        .expect("lazy static keypair should be constructible");
         static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = BOB_KP.public().to_address();
+        static ref EVE: Address = EVE_KP.public().to_address();
     }
 
     #[async_std::test]
@@ -1231,6 +1236,155 @@ mod tests {
                 ChainActionsError::ChannelAlreadyClosed
             ),
             "should fail when channel is already closed"
+        );
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_close_multiple_outgoing_channels_at_once() -> anyhow::Result<()> {
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
+
+        let mut channel_alice_bob =
+            ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let mut channel_alice_eve =
+            ChannelEntry::new(*ALICE, *EVE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+
+        let db: HoprDb = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel_alice_bob).await?;
+                    db_clone.upsert_channel(Some(tx), channel_alice_eve).await
+                })
+            })
+            .await?;
+
+        let mut tx_exec = MockTransactionExecutor::new();
+        let mut seq = Sequence::new();
+        tx_exec
+            .expect_initiate_multiple_outgoing_channels_closure()
+            .times(1)
+            .in_sequence(&mut seq)
+            .withf(move |dsts| vec![*BOB, *EVE].eq(dsts))
+            .returning(move |_| Ok(random_hash));
+
+        tx_exec
+            .expect_finalize_multiple_outgoing_channels_closure()
+            .times(1)
+            .in_sequence(&mut seq)
+            .withf(move |dsts| vec![*BOB, *EVE].eq(dsts))
+            .returning(move |_| Ok(random_hash));
+
+        let mut indexer_action_tracker = MockActionState::new();
+        let mut seq2 = Sequence::new();
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosureInitiated(channel_alice_bob),
+                })
+                .boxed())
+            });
+
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosureInitiated(channel_alice_eve),
+                })
+                .boxed())
+            });
+
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel_alice_bob),
+                })
+                .boxed())
+            });
+
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel_alice_eve),
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_sender = tx_queue.new_sender();
+        async_std::task::spawn(async move {
+            tx_queue.start().await;
+        });
+
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+
+        let tx_res = actions
+            .close_multiple_channels(ChannelDirection::Outgoing, ChannelStatus::Open, false)
+            .await?
+            .await?;
+
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::CloseChannels(_, _, _)),
+            "must be close channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelClosureInitiated(_))),
+            "must correspond to channel chain event"
+        );
+
+        // Transition the channel to the PendingToClose state with the closure time already elapsed
+        channel_alice_bob.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
+        channel_alice_eve.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
+
+        db.upsert_channel(None, channel_alice_bob).await?;
+        db.upsert_channel(None, channel_alice_eve).await?;
+
+        let tx_res = actions
+            .close_multiple_channels(
+                ChannelDirection::Outgoing,
+                ChannelStatus::PendingToClose(SystemTime::now()),
+                false,
+            )
+            .await?
+            .await?;
+
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::CloseChannels(_, _, _)),
+            "must be close channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelClosed(_))),
+            "must correspond to channel chain event"
         );
         Ok(())
     }

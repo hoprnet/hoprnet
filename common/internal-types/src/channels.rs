@@ -336,4 +336,14 @@ mod tests {
             ce.remaining_closure_time(current_time).expect("must have closure time")
         );
     }
+
+    #[test]
+    fn channel_type_from_str() {
+        assert_eq!(ChannelStatus::Closed, ChannelStatus::from_str("Closed").unwrap());
+        assert_eq!(ChannelStatus::Open, ChannelStatus::from_str("Open").unwrap());
+        assert_eq!(
+            ChannelStatus::PendingToClose(SystemTime::now()),
+            ChannelStatus::from_str("PendingToClose").unwrap()
+        );
+    }
 }

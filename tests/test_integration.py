@@ -7,20 +7,20 @@ from contextlib import AsyncExitStack, asynccontextmanager
 import pytest
 
 from sdk.python.api import HoprdAPI
-from sdk.python.api.channelstatus import ChannelStatus
+from sdk.python.api.channels import ChannelDirection, ChannelStatus
 from sdk.python.localcluster.constants import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
     TICKET_PRICE_PER_HOP,
 )
 from sdk.python.localcluster.node import Node
 
-from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
+from .conftest import barebone_nodes, default_nodes, random_distinct_tuples_from
 from .utils import (
-    TICKET_AGGREGATION_THRESHOLD,
     AGGREGATED_TICKET_PRICE,
     MULTIHOP_MESSAGE_SEND_TIMEOUT,
     PARAMETERIZED_SAMPLE_SIZE,
     RESERVED_TAG_UPPER_BOUND,
+    TICKET_AGGREGATION_THRESHOLD,
     check_all_tickets_redeemed,
     check_native_balance_below,
     check_received_packets_with_peek,
@@ -128,7 +128,7 @@ async def test_hoprd_should_contain_self_alias_automatically(peer: str, swarm7: 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+@pytest.mark.parametrize("src, dest", random_distinct_tuples_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: str, dest: str, swarm7: dict[str, Node]):
     response = await swarm7[src].api.ping(swarm7[dest].peer_id)
 
@@ -161,7 +161,7 @@ async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_re
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+@pytest.mark.parametrize("src, dest", random_distinct_tuples_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels(
     src: str, dest: str, swarm7: dict[str, Node]
 ):
@@ -175,7 +175,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+@pytest.mark.parametrize("src, dest", random_distinct_tuples_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_fail_sending_a_message_that_is_too_large(src: str, dest: str, swarm7: dict[str, Node]):
     maximum_payload_size = 500
     random_tag = gen_random_tag()
@@ -318,7 +318,7 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+@pytest.mark.parametrize("src,dest", random_distinct_tuples_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(
     src: str, dest: str, swarm7: dict[str, Node]
 ):
@@ -329,6 +329,29 @@ async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(
     async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR, use_peer_id=True):
         # the context manager handles opening and closing of the channel with verification using counter-party peerID
         assert True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("src,dest1,dest2", random_distinct_tuples_from(barebone_nodes(), PARAMETERIZED_SAMPLE_SIZE, 3))
+async def test_close_multiple_channels_at_once(src: str, dest1: str, dest2: str, swarm7: dict[str, Node]):
+    src: Node = swarm7[src]
+    dest1: Node = swarm7[dest1]
+    dest2: Node = swarm7[dest2]
+
+    await src.api.open_channel(dest1.peer_id, str(OPEN_CHANNEL_FUNDING_VALUE_HOPR))
+    await src.api.open_channel(dest2.peer_id, str(OPEN_CHANNEL_FUNDING_VALUE_HOPR))
+
+    assert len((await src.api.all_channels(include_closed=False)).all) == 2
+
+    # turn all Open channels to PendingToClose
+    await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
+    channels = (await src.api.all_channels(include_closed=False)).all
+    assert all(c.status == ChannelStatus.PendingToClose for c in channels)
+
+    # turn all PendingToClose channels to Closed
+    await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
+    channels = (await src.api.all_channels(include_closed=False)).all
+    assert len(channels) == 0
 
 
 # generate a 1-hop route with a node using strategies in the middle
@@ -457,7 +480,7 @@ async def test_hoprd_check_ticket_price_is_default(peer, swarm7: dict[str, Node]
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tag", [random.randint(0, RESERVED_TAG_UPPER_BOUND) for _ in range(5)])
 async def test_send_message_with_reserved_application_tag_should_fail(tag: int, swarm7: dict[str, Node]):
-    src, dest = random_distinct_pairs_from(barebone_nodes(), count=1)[0]
+    src, dest = random_distinct_tuples_from(barebone_nodes(), count=1)[0]
 
     assert (
         await swarm7[src].api.send_message(
@@ -478,7 +501,7 @@ async def test_inbox_operations_with_reserved_application_tag_should_fail(tag: i
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+@pytest.mark.parametrize("src,dest", random_distinct_tuples_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict[str, Node]):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
     split_index = int(message_count * 0.66)
@@ -521,7 +544,7 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+@pytest.mark.parametrize("src,dest", random_distinct_tuples_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[str, Node]):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
     random_tag = gen_random_tag()
@@ -543,7 +566,7 @@ async def test_send_message_return_timestamp(src: str, dest: str, swarm7: dict[s
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
+@pytest.mark.parametrize("src,dest", random_distinct_tuples_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
 async def test_send_message_with_address_or_peer_id(src: str, dest: str, swarm7: dict[str, Node]):
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
     random_tag = gen_random_tag()

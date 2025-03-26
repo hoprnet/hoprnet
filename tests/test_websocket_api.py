@@ -1,13 +1,9 @@
 import asyncio
-import json
-import random
-import re
 import time
 from contextlib import closing
 
 import pytest
 import websocket
-import websockets
 from websockets.asyncio.client import connect
 
 from sdk.python.localcluster.node import Node

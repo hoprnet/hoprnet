@@ -47,6 +47,13 @@ class OpenChannelBody(ApiRequestObject):
         super().__init__(vars())
 
 
+class CloseChannelsBody(ApiRequestObject):
+    keys = {"direction": "direction", "status": "status"}
+
+    def __init__(self, direction: str, status: str):
+        super().__init__(vars())
+
+
 class FundChannelBody(ApiRequestObject):
     keys = {"amount": "amount"}
 

@@ -2,7 +2,7 @@ import asyncio
 import random
 from contextlib import asynccontextmanager
 
-from sdk.python.api.channelstatus import ChannelStatus
+from sdk.python.api.channels import ChannelStatus
 from sdk.python.localcluster.constants import TICKET_PRICE_PER_HOP
 from sdk.python.localcluster.node import Node
 

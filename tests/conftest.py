@@ -71,8 +71,10 @@ def nodes_with_lower_outgoing_win_prob():
     return ["6"]
 
 
-def random_distinct_pairs_from(values: list, count: int):
-    return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
+def random_distinct_tuples_from(values: list, count: int, tuple_length: int = 2):
+    if tuple_length < 2:
+        raise ValueError("Tuple length must be at least 2")
+    return random.sample([tuple(combination) for combination in itertools.permutations(values, tuple_length)], count)
 
 
 @pytest.fixture(scope="module")

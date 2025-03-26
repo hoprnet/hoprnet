@@ -1,6 +1,6 @@
 from typing import Any
 
-from .channelstatus import ChannelStatus
+from .channels import ChannelStatus
 
 
 def _convert(value: Any):
