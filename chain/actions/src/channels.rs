@@ -14,13 +14,14 @@
 //! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent)
 //! by the Indexer.
 use async_trait::async_trait;
+use std::time::Duration;
+use tracing::{debug, error, info};
+
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::time::Duration;
-use tracing::{debug, error, info};
 
 use crate::action_queue::PendingAction;
 use crate::errors::ChainActionsError::{
@@ -90,7 +91,7 @@ where
                     }
 
                     if db_clone.get_indexer_data(Some(tx)).await?.nr_enabled
-                        && !db_clone.is_allowed_in_network_registry(Some(tx), destination).await?
+                        && !db_clone.is_allowed_in_network_registry(Some(tx), &destination).await?
                     {
                         return Err(PeerAccessDenied);
                     }
