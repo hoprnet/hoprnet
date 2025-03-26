@@ -8,7 +8,7 @@
 //!
 //! Finally, it also implements a utility function which is used to validate tickets (module `validation`).
 //!
-//! The currently used implementation is selected using the `CurrentSphinxSuite` type in the `packet` module.
+//! The currently used implementation is selected using the [`HoprSphinxSuite`] type in the `packet` module.
 //!
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
 //! In particular, as soon as there's a way to represent `Ed448` PeerIDs, it would be straightforward to create e.g. `X448Suite`.
@@ -17,7 +17,6 @@
 use hopr_crypto_sphinx::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::marker::PhantomData;
 
 /// Lists all errors in this crate.
 pub mod errors;
@@ -42,17 +41,11 @@ pub type HoprPseudonym = hopr_crypto_types::prelude::SimplePseudonym;
 pub type HoprSphinxSuite = X25519Suite;
 
 /// Current Sphinx header specification for the HOPR protocol.
-#[derive(Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct HoprSphinxHeaderSpec<S = HoprSphinxSuite>(PhantomData<S>);
+pub struct HoprSphinxHeaderSpec;
 
-impl<S> Clone for HoprSphinxHeaderSpec<S> {
-    fn clone(&self) -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<S: SphinxSuite> SphinxHeaderSpec for HoprSphinxHeaderSpec<S> {
+impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
     const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
     type KeyId = KeyIdent<4>;
     type Pseudonym = HoprPseudonym;
