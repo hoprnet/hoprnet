@@ -4,6 +4,7 @@ pub mod v1 {
     use super::*;
     use hopr_crypto_packet::chain::ChainPacketComponents;
 
+    #[derive(Clone)]
     pub struct MsgCodec;
 
     impl Encoder<Box<[u8]>> for MsgCodec {
