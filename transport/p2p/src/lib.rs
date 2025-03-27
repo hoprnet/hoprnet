@@ -53,8 +53,7 @@ pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ping(pub ControlMessage);
 
-/// `Ping` protocol base type for the pong operation
-
+/// `Pong` protocol base type for the pong operation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pong(pub ControlMessage, pub String);
 
