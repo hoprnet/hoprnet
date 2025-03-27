@@ -11,9 +11,6 @@ env:
 on:
   workflow_call:
     inputs:
-      branch:
-        required: true
-        type: string
       package:
         required: true
         type: string
