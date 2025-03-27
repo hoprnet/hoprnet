@@ -22,7 +22,7 @@ pub async fn process_stream_protocol<C, V>(
     control: V,
 ) -> crate::errors::Result<(
     futures::channel::mpsc::Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
-    impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
+    futures::channel::mpsc::Receiver<(PeerId, <C as Decoder>::Item)>, // impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
 )>
 where
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
@@ -31,8 +31,8 @@ where
     <C as Decoder>::Item: Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
 {
-    let (tx_out, rx_out) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(1000);
-    let (tx_in, rx_in) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(1000);
+    let (tx_out, rx_out) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(10_000);
+    let (tx_in, rx_in) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(10_000);
 
     let cache_out = moka::future::Cache::new(2000);
 
