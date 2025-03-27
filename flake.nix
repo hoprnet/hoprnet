@@ -344,7 +344,7 @@
               (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/test)
             ];
           };
-          pluto-docker = pkgs.dockerTools.buildLayeredImage {
+          hopr-pluto = pkgs.dockerTools.buildLayeredImage {
             name = "hopr-pluto";
             tag = "latest";
             # breaks binary reproducibility, but makes usage easier
@@ -442,8 +442,8 @@
           hopli-profile-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-profile-docker;
           };
-          pluto-docker-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript pluto-docker;
+          hopr-pluto-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript hopr-pluto;
           };
           docs = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             buildDocs = true;
@@ -631,7 +631,7 @@
             inherit hopli-docker-build-and-upload;
             inherit hopli-debug-docker-build-and-upload;
             inherit hopli-profile-docker-build-and-upload;
-            inherit pluto-docker-docker-build-and-upload;
+            inherit hopr-pluto-docker-build-and-upload;
             inherit update-github-labels;
             check = run-check;
           };
@@ -640,7 +640,7 @@
             inherit hoprd hoprd-debug hoprd-docker hoprd-debug-docker hoprd-profile-docker;
             inherit hopli hopli-debug hopli-docker hopli-debug-docker hopli-profile-docker;
             inherit hopr-test hopr-test-nightly;
-            inherit anvil-docker pluto-docker;
+            inherit anvil-docker hopr-pluto;
             inherit smoke-tests docs;
             inherit pre-commit-check;
             inherit hoprd-aarch64-linux hoprd-armv7l-linux hoprd-x86_64-linux;
