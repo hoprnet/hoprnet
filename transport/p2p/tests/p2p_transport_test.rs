@@ -4,7 +4,10 @@ use std::{
 };
 
 use anyhow::Context;
-use futures::StreamExt;
+use futures::{
+    channel::mpsc::{Receiver, Sender},
+    SinkExt, StreamExt,
+};
 use libp2p::{Multiaddr, PeerId};
 
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
@@ -42,23 +45,18 @@ pub(crate) struct Interface {
     #[allow(dead_code)]
     pub send_ticket_aggregation: futures::channel::mpsc::UnboundedSender<TicketAggregationEvent>,
     // ---
-    pub send_msg: futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
-    pub recv_msg: futures::channel::mpsc::UnboundedReceiver<(PeerId, Box<[u8]>)>,
+    pub send_msg: Sender<(PeerId, Box<[u8]>)>,
+    pub recv_msg: Receiver<(PeerId, Box<[u8]>)>,
     #[allow(dead_code)]
-    pub send_ack: futures::channel::mpsc::UnboundedSender<(PeerId, Acknowledgement)>,
+    pub send_ack: Sender<(PeerId, Acknowledgement)>,
     #[allow(dead_code)]
-    pub recv_ack: futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
+    pub recv_ack: Receiver<(PeerId, Acknowledgement)>,
 }
 pub(crate) enum Announcement {
     QUIC,
 }
 
-pub(crate) type TestSwarm = HoprSwarmWithProcessors<
-    futures::channel::mpsc::UnboundedReceiver<(PeerId, Box<[u8]>)>,
-    futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
-    futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
-    futures::channel::mpsc::UnboundedSender<(PeerId, Acknowledgement)>,
->;
+pub(crate) type TestSwarm = HoprSwarmWithProcessors;
 
 async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interface, TestSwarm)> {
     let random_port = random_free_local_ipv4_port().context("could not find a free port")?;
@@ -89,10 +87,15 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     )
     .await;
 
-    let (msg_send_tx, msg_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
-    let (msg_recv_tx, msg_recv_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
-    let (ack_send_tx, ack_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-    let (ack_recv_tx, ack_recv_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
+    let msg_proto_control = swarm.build_protocol_control(hopr_transport_protocol::msg::CURRENT_HOPR_MSG_PROTOCOL);
+    let msg_codec = hopr_transport_protocol::msg::MsgCodec;
+    let (wire_msg_tx, wire_msg_rx) =
+        hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
+
+    let ack_proto_control = swarm.build_protocol_control(hopr_transport_protocol::ack::CURRENT_HOPR_ACK_PROTOCOL);
+    let ack_codec = hopr_transport_protocol::ack::AckCodec::new();
+    let (wire_ack_tx, wire_ack_rx) =
+        hopr_transport_protocol::stream::process_stream_protocol(ack_codec, ack_proto_control).await?;
 
     let (taa_tx, _taa_rx) = futures::channel::mpsc::channel::<
         TicketAggregationToProcess<TicketAggregationResponseType, TicketAggregationRequestType>,
@@ -100,7 +103,7 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     let _taa =
         TicketAggregationActions::<TicketAggregationResponseType, TicketAggregationRequestType> { queue: taa_tx };
 
-    let swarm = swarm.with_processors(ack_send_rx, ack_recv_tx, msg_send_rx, msg_recv_tx, _taa);
+    let swarm = swarm.with_processors(_taa);
 
     let api = Interface {
         me: peer_id,
@@ -109,10 +112,10 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
         update_from_announcements: transport_updates_tx,
         send_heartbeat: heartbeat_requests_tx,
         send_ticket_aggregation: ticket_aggregation_req_tx,
-        send_msg: msg_send_tx,
-        recv_msg: msg_recv_rx,
-        send_ack: ack_send_tx,
-        recv_ack: ack_recv_rx,
+        send_msg: wire_msg_tx,
+        recv_msg: wire_msg_rx,
+        send_ack: wire_ack_tx,
+        recv_ack: wire_ack_rx,
     };
 
     Ok((api, swarm))
@@ -160,7 +163,7 @@ use async_std::{
 #[ignore]
 #[cfg_attr(feature = "runtime-async-std", test_log::test(async_std::test))]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
-    let (api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
+    let (mut api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
     let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
 
     let _sjh1 = SelfClosingJoinHandle::new(swarm1.run("1.0.0".into()));
@@ -189,12 +192,13 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let packet_count: usize = 2 * 1024 * 10;
     for _ in 0..packet_count {
         api1.send_msg
-            .unbounded_send((api2.me, Box::from(RANDOM_GIBBERISH.as_bytes())))
+            .send((api2.me, Box::from(RANDOM_GIBBERISH.as_bytes())))
+            .await
             .context("failed to send message")?;
     }
 
     timeout(
-        std::time::Duration::from_secs(60),
+        std::time::Duration::from_secs(30),
         api2.recv_msg.take(packet_count).collect::<Vec<_>>(),
     )
     .await?;
