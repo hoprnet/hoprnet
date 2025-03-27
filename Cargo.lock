@@ -4743,6 +4743,8 @@ dependencies = [
  "async-trait",
  "futures",
  "futures-concurrency",
+ "hopr-crypto-packet",
+ "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-internal-types",
  "hopr-metrics",
@@ -4755,10 +4757,10 @@ dependencies = [
  "libp2p-stream",
  "moka",
  "serde",
- "test-log",
  "thiserror 2.0.11",
  "tokio",
  "tracing",
+ "tracing-test",
  "void",
 ]
 

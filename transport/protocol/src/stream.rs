@@ -22,7 +22,7 @@ pub async fn process_stream_protocol<C, V>(
     control: V,
 ) -> crate::errors::Result<(
     futures::channel::mpsc::Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
-    impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
+    futures::channel::mpsc::Receiver<(PeerId, <C as Decoder>::Item)>, // impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
 )>
 where
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
@@ -31,8 +31,8 @@ where
     <C as Decoder>::Item: Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
 {
-    let (tx_out, rx_out) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(1000);
-    let (tx_in, rx_in) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(1000);
+    let (tx_out, rx_out) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(10_000);
+    let (tx_in, rx_in) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(10_000);
 
     let cache_out = moka::future::Cache::new(2000);
 
@@ -50,6 +50,8 @@ where
         let codec = codec_ingress.clone();
         let cache = cache_ingress.clone();
         let tx_in = tx_in_ingress.clone();
+
+        tracing::debug!(peer = %peer_id, "Received incoming peer-to-peer stream");
 
         async move {
             let (stream_rx, stream_tx) = stream.split();
@@ -92,6 +94,8 @@ where
                     let r = control.open(peer_id).await;
                     match r {
                         Ok(stream) => {
+                            tracing::debug!(peer = %peer_id, "Opening outgoing peer-to-peer stream");
+
                             let (stream_rx, stream_tx) = stream.split();
                             let (send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
                 

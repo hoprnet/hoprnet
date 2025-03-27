@@ -39,7 +39,7 @@ impl<T: Serialize + for<'de> Deserialize<'de>> Decoder for CborCodec<T> {
     type Error = CborCodecError;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let mut de = serde_cbor::Deserializer::from_slice(&buf);
+        let mut de = serde_cbor::Deserializer::from_slice(buf);
 
         let res: Result<T, _> = serde::de::Deserialize::deserialize(&mut de);
 

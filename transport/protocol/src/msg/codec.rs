@@ -11,6 +11,8 @@ pub mod v1 {
         type Error = std::io::Error;
 
         fn encode(&mut self, item: Box<[u8]>, dst: &mut tokio_util::bytes::BytesMut) -> Result<(), Self::Error> {
+            tracing::trace!(size = item.len(), protocol = "msg", "Encoding data");
+
             dst.extend_from_slice(&item);
             Ok(())
         }
@@ -26,8 +28,14 @@ pub mod v1 {
             if len >= ChainPacketComponents::SIZE {
                 let packet = src.split_to(ChainPacketComponents::SIZE).freeze();
 
-                Ok(Some(Box::from_iter(packet.into_iter())))
+                tracing::trace!(size = packet.len(), protocol = "msg", "Decoding data");
+                Ok(Some(Box::from_iter(packet)))
             } else {
+                tracing::trace!(
+                    available_bytes = len,
+                    protocol = "msg",
+                    "Skipping decoding operation, insufficient bytes available"
+                );
                 Ok(None)
             }
         }
