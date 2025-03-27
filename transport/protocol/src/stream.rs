@@ -2,7 +2,6 @@
 //! individual peer-to-peer [`libp2p::swarm::Stream`]s.
 
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, Sink, SinkExt as _, Stream, StreamExt};
-use futures_concurrency::stream::StreamExt as _;
 use libp2p::PeerId;
 use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
@@ -17,33 +16,7 @@ pub trait BidirectionalStreamControl {
     async fn open(self) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error>;
 }
 
-fn split_with_codec<T, C, U>(channel: T, codec: C) -> (impl Sink<U>, impl Stream<Item = <C as Decoder>::Item>)
-where
-    T: AsyncRead + AsyncWrite,
-    C: Encoder<U> + Decoder + Clone,
-    <C as Decoder>::Error: std::fmt::Display,
-{
-    let (rx, tx) = channel.split();
-    (
-        FramedWrite::new(tx.compat_write(), codec.clone()),
-        FramedRead::new(rx.compat(), codec).filter_map(|read| async move {
-            match read {
-                Ok(v) => Some(v),
-                Err(error) => {
-                    tracing::error!(%error, "Error decoding object from the underlying stream");
-                    None
-                }
-            }
-        }),
-    )
-}
-
-enum Dispatched<T> {
-    Out(T),
-    In((PeerId, T)),
-}
-
-async fn process_stream_protocol<T, E, C, V, U>(
+pub async fn process_stream_protocol<T, E, C, V>(
     codec: C,
     control: V,
 ) -> crate::errors::Result<(
@@ -51,9 +24,9 @@ async fn process_stream_protocol<T, E, C, V, U>(
     impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
 )>
 where
-    C: Default + Encoder<U> + Decoder + Send + Sync + Clone + 'static,
-    U: Send + 'static,
-    <C as Decoder>::Error: std::fmt::Display + Send + 'static,
+    C: Default + Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
+    <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + 'static,
+    <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + 'static,
     <C as Decoder>::Item: Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
 {
@@ -79,27 +52,27 @@ where
         let tx_in = tx_in_ingress.clone();
 
         async move {
-            let (_, b) = split_with_codec(stream, codec);
+            let (stream_rx, stream_tx) = stream.split();
             let (send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
 
             hopr_async_runtime::prelude::spawn(
-                recv.map(Dispatched::Out)
-                    .merge(b.map(move |v| Dispatched::In((peer_id, v))))
-                    .for_each_concurrent(10, move |v| {
-                        let mut tx_in = tx_in.clone();
-
-                        async move {
-                            match v {
-                                Dispatched::Out(_) => {
-                                    // a.send(msg).await.unwrap();
-                                }
-                                Dispatched::In((peer_id, msg)) => {
-                                    tx_in.send((peer_id, msg)).await.unwrap(); // TODO: remove unwrap
-                                }
+                recv.map(Ok)
+                    .forward(FramedWrite::new(stream_tx.compat_write(), codec.clone())),
+            ); // TODO: use spawn_local?
+            hopr_async_runtime::prelude::spawn(
+                FramedRead::new(stream_rx.compat(), codec)
+                    .filter_map(move |v| async move {
+                        match v {
+                            Ok(v) => Some((peer_id, v)),
+                            Err(e) => {
+                                tracing::error!(error = %e, "Error decoding object from the underlying stream");
+                                None
                             }
                         }
-                    }),
-            );
+                    })
+                    .map(Ok)
+                    .forward(tx_in),
+            ); // TODO: use spawn_local?
 
             cache.insert(peer_id, send).await;
         }
@@ -113,33 +86,35 @@ where
         let tx_in = tx_in.clone();
 
         async move {
+            let cache = cache.clone();
+
             let cached = cache
                 .optionally_get_with(peer_id, async move {
                     let r = control.open().await;
                     match r {
                         Ok(stream) => {
-                            let (a, b) = split_with_codec(stream, codec.clone());
+                            let (stream_rx, stream_tx) = stream.split();
                             let (send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
-
+                
                             hopr_async_runtime::prelude::spawn(
-                                recv.map(Dispatched::Out)
-                                    .merge(b.map(move |v| Dispatched::In((peer_id, v))))
-                                    .for_each_concurrent(10, move |v| {
-                                        let mut tx_in = tx_in.clone();
-
-                                        async move {
-                                            match v {
-                                                Dispatched::Out(_) => {
-                                                    // a.send(msg).await.unwrap();
-                                                }
-                                                Dispatched::In((peer_id, msg)) => {
-                                                    tx_in.send((peer_id, msg)).await.unwrap();
-                                                }
+                                recv.map(Ok)
+                                    .forward(FramedWrite::new(stream_tx.compat_write(), codec.clone())),
+                            ); // TODO: use spawn_local?
+                            hopr_async_runtime::prelude::spawn(
+                                FramedRead::new(stream_rx.compat(), codec)
+                                    .filter_map(move |v| async move {
+                                        match v {
+                                            Ok(v) => Some((peer_id, v)),
+                                            Err(e) => {
+                                                tracing::error!(error = %e, "Error decoding object from the underlying stream");
+                                                None
                                             }
                                         }
-                                    }),
-                            );
-
+                                    })
+                                    .map(Ok)
+                                    .forward(tx_in),
+                            ); // TODO: use spawn_local?
+                
                             Some(send)
                         }
                         Err(error) => {
@@ -149,6 +124,14 @@ where
                     }
                 })
                 .await;
+
+            if let Some(mut cached) = cached {
+                cached.send(msg).await.unwrap_or_else(|e| {
+                    tracing::error!(peer = %peer_id, error = %e, "Error sending message to peer");
+                }); 
+            } else {
+                tracing::error!(peer = %peer_id, "Error sending message to peer: the stream failed to be created and cached");
+            }
         }
     }));
 
@@ -158,6 +141,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Context;
     use futures::SinkExt;
 
     struct AsyncBinaryStreamChannel {
@@ -218,14 +202,18 @@ mod tests {
         let expected = [0u8, 1u8, 2u8, 3u8, 4u8, 5u8];
         let value = tokio_util::bytes::BytesMut::from(expected.as_ref());
 
-        let (mut tx, rx) = split_with_codec(stream, codec);
+        let (stream_rx, stream_tx) = stream.split();
+        let (mut tx, rx) = (FramedWrite::new(stream_tx.compat_write(), codec.clone()), FramedRead::new(stream_rx.compat(), codec));
         tx.send(value)
             .await
             .map_err(|_| anyhow::anyhow!("should not fail on send"))?;
 
         futures::pin_mut!(rx);
 
-        assert_eq!(rx.next().await, Some(tokio_util::bytes::BytesMut::from(expected.as_ref())));
+        assert_eq!(
+            rx.next().await.context("Value must be present")??,
+            tokio_util::bytes::BytesMut::from(expected.as_ref())
+        );
 
         Ok(())
     }
