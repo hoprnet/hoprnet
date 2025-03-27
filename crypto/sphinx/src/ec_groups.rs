@@ -77,7 +77,7 @@ impl GroupElement<curve25519_dalek::scalar::Scalar> for curve25519_dalek::edward
     fn from_alpha(alpha: Alpha<typenum::U32>) -> Result<Self> {
         curve25519_dalek::edwards::CompressedEdwardsY(alpha.into())
             .decompress()
-            .ok_or(hopr_crypto_types::errors::CryptoError::InvalidInputValue)
+            .ok_or(hopr_crypto_types::errors::CryptoError::InvalidInputValue("alpha"))
     }
 
     fn generate(scalar: &curve25519_dalek::scalar::Scalar) -> Self {
@@ -107,7 +107,7 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
         let v: &[u8] = alpha.as_ref();
         hopr_crypto_types::types::CurvePoint::try_from(v)
             .map(|c| c.into_projective_point())
-            .map_err(|_| hopr_crypto_types::errors::CryptoError::InvalidInputValue)
+            .map_err(|_| hopr_crypto_types::errors::CryptoError::InvalidInputValue("alpha"))
     }
 
     fn generate(scalar: &k256::Scalar) -> Self {
@@ -121,6 +121,8 @@ impl GroupElement<k256::Scalar> for k256::ProjectivePoint {
 
 /// Represents an instantiation of the Sphinx protocol using secp256k1 elliptic curve and `ChainKeypair`
 #[cfg(feature = "secp256k1")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Secp256k1Suite;
 
 #[cfg(feature = "secp256k1")]
@@ -128,10 +130,13 @@ impl SphinxSuite for Secp256k1Suite {
     type P = hopr_crypto_types::keypairs::ChainKeypair;
     type E = k256::Scalar;
     type G = k256::ProjectivePoint;
+    type PRP = hopr_crypto_types::primitives::ChaCha20;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the ed25519 curve and `OffchainKeypair`
 #[cfg(feature = "ed25519")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ed25519Suite;
 
 #[cfg(feature = "ed25519")]
@@ -139,10 +144,13 @@ impl SphinxSuite for Ed25519Suite {
     type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
+    type PRP = hopr_crypto_types::primitives::ChaCha20;
 }
 
 /// Represents an instantiation of the Sphinx protocol using the Curve25519 curve and `OffchainKeypair`
 #[cfg(feature = "x25519")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct X25519Suite;
 
 #[cfg(feature = "x25519")]
@@ -150,34 +158,39 @@ impl SphinxSuite for X25519Suite {
     type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;
+    type PRP = hopr_crypto_types::primitives::ChaCha20;
 }
 
 #[cfg(test)]
 mod tests {
     use crate::shared_keys::tests::generic_sphinx_suite_test;
-    use crate::shared_keys::GroupElement;
-    use hex_literal::hex;
     use parameterized::parameterized;
 
+    #[cfg(feature = "secp256k1")]
     #[test]
     fn test_extract_key_from_group_element() {
+        use crate::shared_keys::GroupElement;
+
         let salt = [0xde, 0xad, 0xbe, 0xef];
         let pt = k256::ProjectivePoint::GENERATOR;
 
         let key = pt.extract_key(&salt);
 
-        let res = hex!("54bf34178075e153f481ce05b113c1530ecc45a2f1f13a3366d4389f65470de6");
+        let res = hex_literal::hex!("54bf34178075e153f481ce05b113c1530ecc45a2f1f13a3366d4389f65470de6");
         assert_eq!(res, key.as_ref());
     }
 
+    #[cfg(feature = "secp256k1")]
     #[test]
     fn test_expand_key_from_group_element() {
+        use crate::shared_keys::GroupElement;
+
         let salt = [0xde, 0xad, 0xbe, 0xef];
         let pt = k256::ProjectivePoint::GENERATOR;
 
         let key = pt.expand_key(&salt);
 
-        let res = hex!("d138d9367474911f7124b95be844d2f8a6d34e962694e37e8717bdbd3c15690b");
+        let res = hex_literal::hex!("d138d9367474911f7124b95be844d2f8a6d34e962694e37e8717bdbd3c15690b");
         assert_eq!(res, key.as_ref());
     }
 

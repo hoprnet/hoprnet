@@ -18,7 +18,7 @@ use crate::utils::{k256_scalar_from_bytes, random_group_element, x25519_scalar_f
 /// Must be comparable in constant time and zeroized on drop.
 pub trait Keypair: ConstantTimeEq + ZeroizeOnDrop + Sized {
     /// Represents the type of the private (secret) key
-    type SecretLen: ArrayLength<u8>;
+    type SecretLen: ArrayLength;
 
     /// Represents the type of the public key
     type Public: BytesRepresentable + Clone + PartialEq;
@@ -56,7 +56,7 @@ impl Keypair for OffchainKeypair {
 
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
         Ok(Self(
-            bytes.try_into().map_err(|_| InvalidInputValue)?,
+            bytes.try_into().map_err(|_| InvalidInputValue("bytes"))?,
             OffchainPublicKey::from_privkey(bytes)?,
         ))
     }
@@ -129,7 +129,10 @@ impl Keypair for ChainKeypair {
     fn from_secret(bytes: &[u8]) -> errors::Result<Self> {
         let compressed = PublicKey::from_privkey(bytes).map(CompressedPublicKey)?;
 
-        Ok(Self(bytes.try_into().map_err(|_| InvalidInputValue)?, compressed))
+        Ok(Self(
+            bytes.try_into().map_err(|_| InvalidInputValue("bytes"))?,
+            compressed,
+        ))
     }
 
     fn secret(&self) -> &SecretValue<typenum::U32> {

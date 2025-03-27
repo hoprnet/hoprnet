@@ -1,12 +1,10 @@
-use blake2::Blake2s256;
 use generic_array::{ArrayLength, GenericArray};
 use hkdf::SimpleHkdf;
-use hopr_crypto_types::errors::CryptoError::CalculationError;
-use hopr_crypto_types::errors::Result;
-use hopr_crypto_types::keypairs::Keypair;
-use hopr_crypto_types::utils::SecretValue;
+use hopr_crypto_types::prelude::*;
 use std::marker::PhantomData;
 use std::ops::Mul;
+
+use crate::derivation::generate_key_iv;
 
 /// Represents a shared secret with a remote peer.
 pub type SharedSecret = SecretValue<typenum::U32>;
@@ -17,7 +15,7 @@ pub trait Scalar: Mul<Output = Self> + Sized {
     fn random() -> Self;
 
     /// Create scalar from bytes
-    fn from_bytes(bytes: &[u8]) -> Result<Self>;
+    fn from_bytes(bytes: &[u8]) -> hopr_crypto_types::errors::Result<Self>;
 
     /// Convert scalar to bytes.
     fn to_bytes(&self) -> Box<[u8]>;
@@ -32,13 +30,13 @@ pub type Alpha<A> = GenericArray<u8, A>;
 /// A group element is considered valid if it is not neutral or a torsion element of small order.
 pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
     /// Length of the Alpha value - a binary representation of the group element.
-    type AlphaLen: ArrayLength<u8>;
+    type AlphaLen: ArrayLength;
 
     /// Converts the group element to a binary format suitable for representing the Alpha value.
     fn to_alpha(&self) -> Alpha<Self::AlphaLen>;
 
     /// Converts the group element from the binary format representing an Alpha value.
-    fn from_alpha(alpha: Alpha<Self::AlphaLen>) -> Result<Self>;
+    fn from_alpha(alpha: Alpha<Self::AlphaLen>) -> hopr_crypto_types::errors::Result<Self>;
 
     /// Create a group element using the group generator and the given scalar
     fn generate(scalar: &E) -> Self;
@@ -57,18 +55,22 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
     /// Extract a keying material from a group element using HKDF extract
     fn extract_key(&self, salt: &[u8]) -> SharedSecret {
         let ikm = self.to_alpha();
-        SimpleHkdf::<Blake2s256>::extract(Some(salt), ikm.as_ref()).0.into()
+        SimpleHkdf::<Blake2s256>::extract(Some(salt), ikm.as_ref())
+            .0
+            .as_slice()
+            .try_into()
+            .expect("Blake2s256 output is not 32 bytes long")
     }
 
     /// Performs KDF expansion from the given group element using HKDF expand
     fn expand_key(&self, salt: &[u8]) -> SharedSecret {
-        let mut out = GenericArray::default();
+        let mut out = SharedSecret::default();
         let ikm = self.to_alpha();
         SimpleHkdf::<Blake2s256>::new(Some(salt), &ikm)
-            .expand(b"", &mut out)
+            .expand(b"", out.as_mut())
             .expect("invalid size of the shared secret output"); // Cannot panic, unless the constants are wrong
 
-        out.into()
+        out
     }
 }
 
@@ -76,14 +78,13 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
 pub struct SharedKeys<E: Scalar, G: GroupElement<E>> {
     pub alpha: Alpha<G::AlphaLen>,
     pub secrets: Vec<SharedSecret>,
-    _e: PhantomData<E>,
-    _g: PhantomData<G>,
+    _d: PhantomData<(E, G)>,
 }
 
 impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     /// Generates shared secrets given the group element of the peers.
     /// The order of the peer group elements is preserved for resulting shared keys.
-    pub fn generate(peer_group_elements: Vec<G>) -> Result<SharedKeys<E, G>> {
+    pub fn generate(peer_group_elements: Vec<G>) -> hopr_crypto_types::errors::Result<SharedKeys<E, G>> {
         let mut shared_keys = Vec::new();
 
         // coeff_prev becomes: x * b_0 * b_1 * b_2 * ...
@@ -117,25 +118,24 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             coeff_prev = coeff_prev.mul(b_k_checked);
 
             if !alpha_prev.is_valid() {
-                return Err(CalculationError);
+                return Err(CryptoError::CalculationError);
             }
         }
 
         Ok(SharedKeys {
             alpha,
             secrets: shared_keys,
-            _e: PhantomData,
-            _g: PhantomData,
+            _d: PhantomData,
         })
     }
 
-    /// Calculates the forward transformation for the given the local private key.
-    /// The `public_group_element` is a precomputed group element associated to the private key for efficiency.
+    /// Calculates the forward transformation given the local private key.
+    /// The `public_group_element` is a precomputed group element associated with the private key for efficiency.
     pub fn forward_transform(
         alpha: &Alpha<G::AlphaLen>,
         private_scalar: &E,
         public_group_element: &G,
-    ) -> Result<(Alpha<G::AlphaLen>, SharedSecret)> {
+    ) -> hopr_crypto_types::errors::Result<(Alpha<G::AlphaLen>, SharedSecret)> {
         let alpha_point = G::from_alpha(alpha.clone())?;
 
         let s_k = alpha_point.clone().mul(private_scalar);
@@ -151,6 +151,10 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     }
 }
 
+const HASH_KEY_PRP: &str = "HASH_KEY_PRP";
+
+const HASH_KEY_REPLY_PRP: &str = "HASH_KEY_REPLY_PRP";
+
 /// Represents an instantiation of the Spinx protocol using the given EC group and corresponding public key object.
 pub trait SphinxSuite {
     /// Keypair corresponding to the EC group
@@ -162,9 +166,27 @@ pub trait SphinxSuite {
     /// EC group element
     type G: GroupElement<Self::E> + for<'a> From<&'a <Self::P as Keypair>::Public>;
 
+    /// Pseudo-Random Permutation used to encrypt and decrypt packet payload
+    type PRP: crypto_traits::StreamCipher + crypto_traits::KeyIvInit;
+
     /// Convenience function to generate shared keys from the path of public keys.
-    fn new_shared_keys(public_keys: &[<Self::P as Keypair>::Public]) -> Result<SharedKeys<Self::E, Self::G>> {
+    fn new_shared_keys(
+        public_keys: &[<Self::P as Keypair>::Public],
+    ) -> hopr_crypto_types::errors::Result<SharedKeys<Self::E, Self::G>> {
         SharedKeys::generate(public_keys.iter().map(|pk| pk.into()).collect())
+    }
+
+    /// Instantiates a new Pseudo-Random Permutation IV and key for general packet data.
+    fn new_prp_init(secret: &SecretKey) -> hopr_crypto_types::errors::Result<IvKey<Self::PRP>> {
+        generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), None)
+    }
+
+    /// Instantiates a new Pseudo-Random Permutation IV and key for reply data.
+    fn new_reply_prp_init<P: Pseudonym>(
+        secret: &SecretKey16,
+        pseudonym: &P,
+    ) -> hopr_crypto_types::errors::Result<IvKey<Self::PRP>> {
+        generate_key_iv(secret, HASH_KEY_REPLY_PRP.as_bytes(), Some(pseudonym.as_ref()))
     }
 }
 

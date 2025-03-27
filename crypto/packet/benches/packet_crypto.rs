@@ -1,9 +1,10 @@
+use bimap::BiHashMap;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use hopr_crypto_packet::chain::ChainPacketComponents;
-use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
-use hopr_crypto_types::types::Hash;
-use hopr_internal_types::prelude::{TicketBuilder, PAYLOAD_SIZE};
-use hopr_primitive_types::prelude::{Address, BytesEncodable};
+use hopr_crypto_packet::prelude::*;
+use hopr_crypto_packet::HoprPseudonym;
+use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey, Pseudonym};
+use hopr_internal_types::prelude::TicketBuilder;
+use hopr_primitive_types::prelude::{Address, BytesEncodable, KeyIdent};
 
 const SAMPLE_SIZE: usize = 100_000;
 
@@ -15,24 +16,92 @@ pub fn packet_sending_bench(c: &mut Criterion) {
 
     let chain_key = ChainKeypair::random();
     let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
-
     let path = (0..=3)
         .map(|_| OffchainKeypair::random().public().clone())
         .collect::<Vec<_>>();
-    let msg = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>();
+    let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
+        .iter()
+        .enumerate()
+        .map(|(i, k)| (KeyIdent::from(i as u32), k.clone()))
+        .collect::<BiHashMap<_, _>>();
+    let pseudonym = HoprPseudonym::random();
+
+    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
     let dst = Hash::default();
 
     let mut group = c.benchmark_group("packet_sending");
     group.sample_size(SAMPLE_SIZE);
 
     for hop in [0, 1, 2, 3].iter() {
-        group.throughput(Throughput::Elements(1));
+        group.throughput(Throughput::Bytes(msg.len() as u64));
         group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
             b.iter(|| {
                 // The number of hops for ticket creation does not matter for benchmark purposes
                 let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
 
-                ChainPacketComponents::into_outgoing(&msg, &path[0..=hop], &chain_key, tb, &dst)
+                HoprPacket::into_outgoing(
+                    &msg,
+                    &pseudonym,
+                    PacketRouting::ForwardPath {
+                        forward_path: &path[0..=hop],
+                        return_paths: &[],
+                    },
+                    &chain_key,
+                    tb,
+                    &mapper,
+                    &dst,
+                )
+                .unwrap();
+            });
+        });
+    }
+    group.finish();
+}
+
+pub fn packet_sending_precomputed_bench(c: &mut Criterion) {
+    assert!(
+        !hopr_crypto_random::is_rng_fixed(),
+        "RNG must not be fixed for bench tests"
+    );
+
+    let chain_key = ChainKeypair::random();
+    let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
+    let path = (0..=3)
+        .map(|_| OffchainKeypair::random().public().clone())
+        .collect::<Vec<_>>();
+    let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
+        .iter()
+        .enumerate()
+        .map(|(i, k)| (KeyIdent::from(i as u32), k.clone()))
+        .collect::<BiHashMap<_, _>>();
+    let pseudonym = HoprPseudonym::random();
+
+    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
+    let dst = Hash::default();
+
+    let mut group = c.benchmark_group("packet_sending_precomputed");
+    group.sample_size(SAMPLE_SIZE);
+
+    for hop in [0, 1, 2, 3].iter() {
+        group.throughput(Throughput::Bytes(msg.len() as u64));
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
+            // The number of hops for ticket creation does not matter for benchmark purposes
+            let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
+            let precomputed = PartialHoprPacket::new(
+                &pseudonym,
+                PacketRouting::ForwardPath {
+                    forward_path: &path[0..=hop],
+                    return_paths: &[],
+                },
+                &chain_key,
+                tb,
+                &mapper,
+                &dst,
+            )
+            .unwrap();
+
+            b.iter(|| {
+                precomputed.clone().into_hopr_packet(&msg).unwrap();
             });
         });
     }
@@ -52,17 +121,36 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     let relayer = OffchainKeypair::random();
     let recipient = OffchainKeypair::random();
     let path = [relayer.public().clone(), recipient.public().clone()];
+    let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
+        .iter()
+        .enumerate()
+        .map(|(i, k)| (KeyIdent::from((i + 1) as u32), k.clone()))
+        .collect::<BiHashMap<_, _>>();
+    let pseudonym = HoprPseudonym::random();
 
-    let msg = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>();
+    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
     let dst = Hash::default();
 
     // The number of hops for ticket creation does not matter for benchmark purposes
     let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
 
     // Sender
-    let packet = match ChainPacketComponents::into_outgoing(&msg, &path, &chain_key, tb, &dst).unwrap() {
-        ChainPacketComponents::Outgoing { packet, ticket, .. } => {
-            let mut ret = Vec::with_capacity(ChainPacketComponents::SIZE);
+    let packet = match HoprPacket::into_outgoing(
+        &msg,
+        &pseudonym,
+        PacketRouting::ForwardPath {
+            forward_path: &path,
+            return_paths: &[],
+        },
+        &chain_key,
+        tb,
+        &mapper,
+        &dst,
+    )
+    .unwrap()
+    {
+        (HoprPacket::Outgoing { packet, ticket, .. }, _) => {
+            let mut ret = Vec::with_capacity(HoprPacket::SIZE);
             ret.extend_from_slice(packet.as_ref());
             ret.extend_from_slice(&ticket.clone().into_encoded());
             ret.into_boxed_slice()
@@ -73,10 +161,10 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     // Benchmark the relayer
     let mut group = c.benchmark_group("packet_forwarding");
     group.sample_size(SAMPLE_SIZE);
-    group.throughput(Throughput::Elements(1));
+    group.throughput(Throughput::Bytes(msg.len() as u64));
     group.bench_function("any hop", |b| {
         b.iter(|| {
-            ChainPacketComponents::from_incoming(&packet, &relayer, sender.public().clone()).unwrap();
+            HoprPacket::from_incoming(&packet, &relayer, sender.public().clone(), &mapper, |_| None).unwrap();
         })
     });
 }
@@ -94,17 +182,36 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     let relayer = OffchainKeypair::random();
     let recipient = OffchainKeypair::random();
     let path = [relayer.public().clone(), recipient.public().clone()];
+    let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
+        .iter()
+        .enumerate()
+        .map(|(i, k)| (KeyIdent::from(i as u32), k.clone()))
+        .collect::<BiHashMap<_, _>>();
+    let pseudonym = HoprPseudonym::random();
 
-    let msg = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>();
+    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
     let dst = Hash::default();
 
     // The number of hops for ticket creation does not matter for benchmark purposes
     let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
 
     // Sender
-    let packet = match ChainPacketComponents::into_outgoing(&msg, &path, &chain_key, tb, &dst).unwrap() {
-        ChainPacketComponents::Outgoing { packet, ticket, .. } => {
-            let mut ret = Vec::with_capacity(ChainPacketComponents::SIZE);
+    let packet = match HoprPacket::into_outgoing(
+        &msg,
+        &pseudonym,
+        PacketRouting::ForwardPath {
+            forward_path: &path,
+            return_paths: &[],
+        },
+        &chain_key,
+        tb,
+        &mapper,
+        &dst,
+    )
+    .unwrap()
+    {
+        (HoprPacket::Outgoing { packet, ticket, .. }, _) => {
+            let mut ret = Vec::with_capacity(HoprPacket::SIZE);
             ret.extend_from_slice(packet.as_ref());
             ret.extend_from_slice(&ticket.clone().into_encoded());
             ret.into_boxed_slice()
@@ -113,9 +220,10 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     };
 
     // Relayer
-    let packet = match ChainPacketComponents::from_incoming(&packet, &relayer, sender.public().clone()).unwrap() {
-        ChainPacketComponents::Forwarded { packet, ticket, .. } => {
-            let mut ret = Vec::with_capacity(ChainPacketComponents::SIZE);
+    let packet = match HoprPacket::from_incoming(&packet, &relayer, sender.public().clone(), &mapper, |_| None).unwrap()
+    {
+        HoprPacket::Forwarded { packet, ticket, .. } => {
+            let mut ret = Vec::with_capacity(HoprPacket::SIZE);
             ret.extend_from_slice(packet.as_ref());
             ret.extend_from_slice(&ticket.clone().into_encoded());
             ret.into_boxed_slice()
@@ -126,10 +234,10 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     // Benchmark the recipient
     let mut group = c.benchmark_group("packet_receiving");
     group.sample_size(SAMPLE_SIZE);
-    group.throughput(Throughput::Elements(1));
+    group.throughput(Throughput::Bytes(msg.len() as u64));
     group.bench_function("any hop", |b| {
         b.iter(|| {
-            ChainPacketComponents::from_incoming(&packet, &recipient, relayer.public().clone()).unwrap();
+            HoprPacket::from_incoming(&packet, &recipient, relayer.public().clone(), &mapper, |_| None).unwrap();
         })
     });
 }
@@ -137,6 +245,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
 criterion_group!(
     benches,
     packet_sending_bench,
+    packet_sending_precomputed_bench,
     packet_forwarding_bench,
     packet_receiving_bench
 );

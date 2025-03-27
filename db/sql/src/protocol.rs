@@ -1,6 +1,12 @@
+use crate::channels::HoprDbChannelOperations;
+use crate::db::HoprDb;
+use crate::errors::DbSqlError;
+use crate::info::HoprDbInfoOperations;
+use crate::prelude::HoprDbTicketOperations;
+use crate::{HoprDbGeneralModelOperations, OptTx};
 use async_trait::async_trait;
-use hopr_crypto_packet::chain::ChainPacketComponents;
-use hopr_crypto_packet::validation::validate_unacknowledged_ticket;
+use hopr_crypto_packet::prelude::*;
+use hopr_crypto_packet::HoprPseudonym;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
 use hopr_db_api::protocol::{
@@ -11,13 +17,6 @@ use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::ops::{Mul, Sub};
 use tracing::{instrument, trace, warn};
-
-use crate::channels::HoprDbChannelOperations;
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::info::HoprDbInfoOperations;
-use crate::prelude::HoprDbTicketOperations;
-use crate::{HoprDbGeneralModelOperations, OptTx};
 
 use hopr_parallelize::cpu::spawn_fifo_blocking;
 
@@ -165,7 +164,9 @@ impl HoprDbProtocolOperations for HoprDb {
         &self,
         data: Box<[u8]>,
         me: ChainKeypair,
-        path: Vec<OffchainPublicKey>,
+        pseudonym: Option<&HoprPseudonym>,
+        path: &[OffchainPublicKey],
+        return_paths: &[&[OffchainPublicKey]],
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData> {
@@ -177,50 +178,60 @@ impl HoprDbProtocolOperations for HoprDb {
             ))
         })?;
 
-        let components =
-            self.begin_transaction()
-                .await?
-                .perform(|tx| {
-                    Box::pin(async move {
-                        let domain_separator =
-                            myself.get_indexer_data(Some(tx)).await?.channels_dst.ok_or_else(|| {
-                                DbSqlError::LogicalError("failed to fetch the domain separator".into())
-                            })?;
+        let (components, openers) = self
+            .begin_transaction()
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    let domain_separator = myself
+                        .get_indexer_data(Some(tx))
+                        .await?
+                        .channels_dst
+                        .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the domain separator".into()))?;
 
-                        // Decide whether to create a 0-hop or multihop ticket
-                        let next_ticket = if path.len() == 1 {
-                            TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_peer)
-                        } else {
-                            myself
-                                .create_multihop_ticket(
-                                    Some(tx),
-                                    me.public().to_address(),
-                                    next_peer,
-                                    path.len() as u8,
-                                    outgoing_ticket_win_prob,
-                                    outgoing_ticket_price,
-                                )
-                                .await?
-                        };
+                    // Decide whether to create a 0-hop or multihop ticket
+                    let next_ticket = if path.len() == 1 {
+                        TicketBuilder::zero_hop().direction(&myself.me_onchain, &next_peer)
+                    } else {
+                        myself
+                            .create_multihop_ticket(
+                                Some(tx),
+                                me.public().to_address(),
+                                next_peer,
+                                path.len() as u8,
+                                outgoing_ticket_win_prob,
+                                outgoing_ticket_price,
+                            )
+                            .await?
+                    };
 
-                        spawn_fifo_blocking(move || {
-                            ChainPacketComponents::into_outgoing(&data, &path, &me, next_ticket, &domain_separator)
-                                .map_err(|e| {
-                                    DbSqlError::LogicalError(format!(
-                                        "failed to construct chain components for a packet: {e}"
-                                    ))
-                                })
+                    spawn_fifo_blocking(move || {
+                        HoprPacket::into_outgoing(
+                            &data,
+                            pseudonym.unwrap_or_else(|| &SimplePseudonym::random()),
+                            PacketRouting::ForwardPath {
+                                forward_path: &path,
+                                return_paths,
+                            },
+                            &me,
+                            next_ticket,
+                            &mapper,
+                            &domain_separator,
+                        )
+                        .map_err(|e| {
+                            DbSqlError::LogicalError(format!("failed to construct chain components for a packet: {e}"))
                         })
-                        .await
                     })
+                    .await
                 })
-                .await?;
+            })
+            .await?;
 
         match components {
-            ChainPacketComponents::Final { .. } | ChainPacketComponents::Forwarded { .. } => {
+            HoprPacket::Final { .. } | HoprPacket::Forwarded { .. } => {
                 Err(DbSqlError::LogicalError("Must contain an outgoing packet type".into()).into())
             }
-            ChainPacketComponents::Outgoing {
+            HoprPacket::Outgoing {
                 packet,
                 ticket,
                 next_hop,
@@ -232,7 +243,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     .await;
 
                 let payload = spawn_fifo_blocking(move || {
-                    let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
+                    let mut payload = Vec::with_capacity(HoprPacket::SIZE);
                     payload.extend_from_slice(packet.as_ref());
 
                     let ticket_bytes: [u8; Ticket::SIZE] = ticket.into();
@@ -264,13 +275,13 @@ impl HoprDbProtocolOperations for HoprDb {
         let offchain_keypair = pkt_keypair.clone();
 
         let packet = spawn_fifo_blocking(move || {
-            ChainPacketComponents::from_incoming(&data, &offchain_keypair, sender)
+            HoprPacket::from_incoming(&data, &offchain_keypair, sender, &mapper, openers)
                 .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
         })
         .await?;
 
         match packet {
-            ChainPacketComponents::Final {
+            HoprPacket::Final {
                 packet_tag,
                 ack_key,
                 previous_hop,
@@ -287,7 +298,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     ack,
                 })
             }
-            ChainPacketComponents::Forwarded {
+            HoprPacket::Forwarded {
                 packet,
                 ticket,
                 ack_challenge,
@@ -404,7 +415,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             // TODO: benchmark this to confirm, offload a CPU intensive task off the async executor onto a parallelized thread pool
                             let ticket = spawn_fifo_blocking(move || {
                                 ticket_builder
-                                    .challenge(next_challenge.to_ethereum_challenge())
+                                    .challenge(next_challenge)
                                     .build_signed(&me, &domain_separator)
                             })
                             .await?;
@@ -437,7 +448,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 let (ack, payload) = spawn_fifo_blocking(move || {
                     let ack = Acknowledgement::new(ack_key, &offchain_keypair);
 
-                    let mut payload = Vec::with_capacity(ChainPacketComponents::SIZE);
+                    let mut payload = Vec::with_capacity(HoprPacket::SIZE);
                     payload.extend_from_slice(packet.as_ref());
 
                     let ticket_bytes = verified_ticket.leak().into_encoded();
@@ -455,7 +466,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     ack,
                 })
             }
-            ChainPacketComponents::Outgoing { .. } => {
+            HoprPacket::Outgoing { .. } => {
                 Err(DbSqlError::LogicalError("Cannot receive an outgoing packet".into()).into())
             }
         }

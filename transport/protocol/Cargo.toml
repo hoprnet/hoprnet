@@ -17,6 +17,7 @@ prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
+bincode = { workspace = true }
 futures = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
@@ -35,7 +36,7 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-db-api = { workspace = true }
-hopr-internal-types = { workspace = true }
+hopr-internal-types = { workspace = true, features = ["serde"] }
 hopr-metrics = { optional = true, workspace = true }
 hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
