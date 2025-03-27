@@ -23,7 +23,7 @@ use validator::Validate;
 use hopr_bindings::hopr_node_management_module::HoprNodeManagementModule;
 use hopr_chain_types::{utils::DIV_BY_ZERO, ContractAddresses, ContractInstances, NetworkRegistryProxy};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-use hopr_internal_types::prelude::{win_prob_to_f64, EncodedWinProb};
+use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::RpcError::ContractError;
@@ -203,13 +203,9 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprRpcOperations f
         }
     }
 
-    async fn get_minimum_network_winning_probability(&self) -> Result<f64> {
+    async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability> {
         match self.contract_instances.win_prob_oracle.current_win_prob().call().await {
-            Ok(encoded_win_prob) => {
-                let mut encoded: EncodedWinProb = Default::default();
-                encoded.copy_from_slice(&encoded_win_prob.to_be_bytes()[1..]);
-                Ok(win_prob_to_f64(&encoded))
-            }
+            Ok(encoded_win_prob) => Ok(encoded_win_prob.into()),
             Err(e) => Err(ContractError(
                 "WinProbOracle".to_string(),
                 "current_win_prob".to_string(),
@@ -464,7 +460,6 @@ mod tests {
     use hex_literal::hex;
     use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
     use primitive_types::H160;
-    use std::ops::Add;
     use std::sync::Arc;
     use std::time::Duration;
 
