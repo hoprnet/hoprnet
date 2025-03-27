@@ -10,6 +10,12 @@ jobs:
   lockfile:
     runs-on: self-hosted-hoprnet-bigger
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout repository
         uses: actions/checkout@v4
 

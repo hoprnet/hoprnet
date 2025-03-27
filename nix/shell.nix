@@ -44,8 +44,9 @@ craneLib.devShell {
     # github integration
     gh
 
-    # test Github automation
+    # Github automation
     act
+    zizmor
 
     # documentation utilities
     swagger-codegen3
