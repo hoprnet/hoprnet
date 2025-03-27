@@ -35,17 +35,13 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 use hopr_internal_types::legacy;
-use hopr_internal_types::protocol::Acknowledgement;
 use hopr_transport_identity::PeerId;
 use hopr_transport_network::messaging::ControlMessage;
 use hopr_transport_network::network::NetworkTriggeredEvent;
 use hopr_transport_network::ping::PingQueryReplier;
 use hopr_transport_protocol::PeerDiscovery;
 
-use crate::constants::{
-    HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0, HOPR_HEARTBEAT_PROTOCOL_V_0_1_0, HOPR_MESSAGE_PROTOCOL_V_0_1_0,
-    HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0,
-};
+use crate::constants::{HOPR_HEARTBEAT_PROTOCOL_V_0_1_0, HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0};
 
 pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
@@ -107,8 +103,6 @@ pub struct HoprNetworkBehavior {
     heartbeat_generator: behavior::heartbeat::Behaviour,
     ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour,
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
-    pub msg: libp2p::request_response::cbor::Behaviour<Box<[u8]>, ()>,
-    pub ack: libp2p::request_response::cbor::Behaviour<Acknowledgement, ()>,
     pub ticket_aggregation: libp2p::request_response::cbor::Behaviour<
         Vec<legacy::AcknowledgedTicket>,
         std::result::Result<legacy::Ticket, String>,
@@ -152,32 +146,6 @@ impl HoprNetworkBehavior {
                 )],
                 libp2p::request_response::Config::default().with_request_timeout(hb_timeout),
             ),
-            msg: libp2p::request_response::cbor::Behaviour::<Box<[u8]>, ()>::new(
-                [(
-                    StreamProtocol::new(HOPR_MESSAGE_PROTOCOL_V_0_1_0),
-                    libp2p::request_response::ProtocolSupport::Full,
-                )],
-                libp2p::request_response::Config::default()
-                    .with_request_timeout(MSG_ACK_TIMEOUT)
-                    .with_max_concurrent_streams(
-                        std::env::var("HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS")
-                            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                            .unwrap_or(1024 * 10),
-                    ),
-            ),
-            ack: libp2p::request_response::cbor::Behaviour::<Acknowledgement, ()>::new(
-                [(
-                    StreamProtocol::new(HOPR_ACKNOWLEDGE_PROTOCOL_V_0_1_0),
-                    libp2p::request_response::ProtocolSupport::Full,
-                )],
-                libp2p::request_response::Config::default()
-                    .with_request_timeout(MSG_ACK_TIMEOUT)
-                    .with_max_concurrent_streams(
-                        std::env::var("HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS")
-                            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-                            .unwrap_or(1024 * 10),
-                    ),
-            ),
             ticket_aggregation: libp2p::request_response::cbor::Behaviour::<
                 Vec<legacy::AcknowledgedTicket>,
                 std::result::Result<legacy::Ticket, String>,
@@ -202,8 +170,6 @@ pub enum HoprNetworkBehaviorEvent {
     HeartbeatGenerator(behavior::heartbeat::Event),
     TicketAggregationBehavior(behavior::ticket_aggregation::Event),
     Heartbeat(libp2p::request_response::Event<Ping, Pong>),
-    Message(libp2p::request_response::Event<Box<[u8]>, ()>),
-    Acknowledgement(libp2p::request_response::Event<Acknowledgement, ()>),
     TicketAggregation(
         libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket, String>>,
     ),
@@ -247,12 +213,6 @@ impl From<libp2p::request_response::Event<Ping, Pong>> for HoprNetworkBehaviorEv
     }
 }
 
-impl From<libp2p::request_response::Event<Box<[u8]>, ()>> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p::request_response::Event<Box<[u8]>, ()>) -> Self {
-        Self::Message(event)
-    }
-}
-
 impl From<libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket, String>>>
     for HoprNetworkBehaviorEvent
 {
@@ -263,12 +223,6 @@ impl From<libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::
         >,
     ) -> Self {
         Self::TicketAggregation(event)
-    }
-}
-
-impl From<libp2p::request_response::Event<Acknowledgement, ()>> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p::request_response::Event<Acknowledgement, ()>) -> Self {
-        Self::Acknowledgement(event)
     }
 }
 

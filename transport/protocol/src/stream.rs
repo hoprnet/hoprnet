@@ -1,7 +1,7 @@
 //! Infrastructure supporting converting a collection of [`libp2p::PeerId`] split [`libp2p_stream`] managed
 //! individual peer-to-peer [`libp2p::swarm::Stream`]s.
 
-use futures::{AsyncRead, AsyncReadExt, AsyncWrite, Sink, SinkExt as _, Stream, StreamExt};
+use futures::{AsyncRead, AsyncReadExt, AsyncWrite, SinkExt as _, Stream, StreamExt};
 use libp2p::PeerId;
 use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
@@ -17,17 +17,17 @@ pub trait BidirectionalStreamControl: std::fmt::Debug {
     async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error>;
 }
 
-pub async fn process_stream_protocol<T, E, C, V>(
+pub async fn process_stream_protocol<C, V>(
     codec: C,
     control: V,
 ) -> crate::errors::Result<(
-    impl Sink<(PeerId, <C as Decoder>::Item)>,
+    futures::channel::mpsc::Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
     impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
 )>
 where
-    C: Default + Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
-    <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + 'static,
-    <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + 'static,
+    C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
+    <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
+    <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Item: Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
 {
