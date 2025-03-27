@@ -22,6 +22,7 @@ runtime-async-std = [
 runtime-tokio = ["libp2p/tokio", "hopr-transport-protocol/runtime-tokio"]
 
 [dependencies]
+async-trait = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }

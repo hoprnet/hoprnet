@@ -200,6 +200,8 @@ impl HoprSwarm {
         Self { swarm }
     }
 
+    // pub fn build_protocol_control(protocol: &'static str) ->
+
     // TODO: rename to with_outputs
     pub fn with_processors<MS, MR, AS, AR>(
         self,

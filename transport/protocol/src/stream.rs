@@ -9,11 +9,12 @@ use tokio_util::{
 };
 
 #[async_trait::async_trait]
-pub trait BidirectionalStreamControl {
-    async fn accept(
+pub trait BidirectionalStreamControl: std::fmt::Debug {
+    fn accept(
         self,
     ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>;
-    async fn open(self) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error>;
+    
+    async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error>;
 }
 
 pub async fn process_stream_protocol<T, E, C, V>(
@@ -38,7 +39,6 @@ where
     let incoming = control
         .clone()
         .accept()
-        .await
         .map_err(|e| crate::errors::ProtocolError::Logic(format!("failed to listen on protocol: {e}")))?;
 
     let cache_ingress = cache_out.clone();
@@ -58,7 +58,7 @@ where
             hopr_async_runtime::prelude::spawn(
                 recv.map(Ok)
                     .forward(FramedWrite::new(stream_tx.compat_write(), codec.clone())),
-            ); // TODO: use spawn_local?
+            );
             hopr_async_runtime::prelude::spawn(
                 FramedRead::new(stream_rx.compat(), codec)
                     .filter_map(move |v| async move {
@@ -72,8 +72,7 @@ where
                     })
                     .map(Ok)
                     .forward(tx_in),
-            ); // TODO: use spawn_local?
-
+            );
             cache.insert(peer_id, send).await;
         }
     }));
@@ -90,7 +89,7 @@ where
 
             let cached = cache
                 .optionally_get_with(peer_id, async move {
-                    let r = control.open().await;
+                    let r = control.open(peer_id).await;
                     match r {
                         Ok(stream) => {
                             let (stream_rx, stream_tx) = stream.split();
@@ -99,7 +98,7 @@ where
                             hopr_async_runtime::prelude::spawn(
                                 recv.map(Ok)
                                     .forward(FramedWrite::new(stream_tx.compat_write(), codec.clone())),
-                            ); // TODO: use spawn_local?
+                            );
                             hopr_async_runtime::prelude::spawn(
                                 FramedRead::new(stream_rx.compat(), codec)
                                     .filter_map(move |v| async move {
@@ -113,7 +112,7 @@ where
                                     })
                                     .map(Ok)
                                     .forward(tx_in),
-                            ); // TODO: use spawn_local?
+                            );
                 
                             Some(send)
                         }
