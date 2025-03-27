@@ -17,7 +17,6 @@ prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
-asynchronous-codec = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 hex-literal = { workspace = true }
@@ -26,10 +25,12 @@ libp2p = { workspace = true, features = ["noise", "request-response"] }
 moka = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_cbor = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
+tokio-util = { workspace = true, default-features = false, features = ["codec", "compat"] }
 tracing = { workspace = true }
 validator = { workspace = true }
 

@@ -1,10 +1,13 @@
 //! Infrastructure supporting converting a collection of [`libp2p::PeerId`] split [`libp2p_stream`] managed
 //! individual peer-to-peer [`libp2p::swarm::Stream`]s.
 
-use asynchronous_codec::{Decoder, Encoder, FramedRead, FramedWrite};
 use futures::{AsyncRead, AsyncReadExt, AsyncWrite, Sink, SinkExt as _, Stream, StreamExt};
 use futures_concurrency::stream::StreamExt as _;
 use libp2p::PeerId;
+use tokio_util::{
+    codec::{Decoder, Encoder, FramedRead, FramedWrite},
+    compat::{FuturesAsyncReadCompatExt, FuturesAsyncWriteCompatExt},
+};
 
 #[async_trait::async_trait]
 pub trait BidirectionalStreamControl {
@@ -14,22 +17,16 @@ pub trait BidirectionalStreamControl {
     async fn open(self) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error>;
 }
 
-fn split_with_codec<T, C>(
-    channel: T,
-    codec: C,
-) -> (
-    impl Sink<<C as Encoder>::Item<'static>>,
-    impl Stream<Item = <C as Decoder>::Item>,
-)
+fn split_with_codec<T, C, U>(channel: T, codec: C) -> (impl Sink<U>, impl Stream<Item = <C as Decoder>::Item>)
 where
     T: AsyncRead + AsyncWrite,
-    C: Encoder + Decoder + Clone,
+    C: Encoder<U> + Decoder + Clone,
     <C as Decoder>::Error: std::fmt::Display,
 {
     let (rx, tx) = channel.split();
     (
-        FramedWrite::new(tx, codec.clone()),
-        FramedRead::new(rx, codec).filter_map(|read| async move {
+        FramedWrite::new(tx.compat_write(), codec.clone()),
+        FramedRead::new(rx.compat(), codec).filter_map(|read| async move {
             match read {
                 Ok(v) => Some(v),
                 Err(error) => {
@@ -46,7 +43,7 @@ enum Dispatched<T> {
     In((PeerId, T)),
 }
 
-async fn process_stream_protocol<T, E, C, V>(
+async fn process_stream_protocol<T, E, C, V, U>(
     codec: C,
     control: V,
 ) -> crate::errors::Result<(
@@ -54,7 +51,8 @@ async fn process_stream_protocol<T, E, C, V>(
     impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
 )>
 where
-    C: Default + Encoder + Decoder + Send + Sync + Clone + 'static,
+    C: Default + Encoder<U> + Decoder + Send + Sync + Clone + 'static,
+    U: Send + 'static,
     <C as Decoder>::Error: std::fmt::Display + Send + 'static,
     <C as Decoder>::Item: Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
@@ -162,9 +160,6 @@ mod tests {
     use super::*;
     use futures::SinkExt;
 
-    #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-    struct TestStruct(u128);
-
     struct AsyncBinaryStreamChannel {
         read: async_channel_io::ChannelReader,
         write: async_channel_io::ChannelWriter,
@@ -218,9 +213,10 @@ mod tests {
     #[async_std::test]
     async fn split_codec_should_always_produce_correct_data() -> anyhow::Result<()> {
         let stream = AsyncBinaryStreamChannel::new();
-        let codec = asynchronous_codec::CborCodec::<TestStruct, TestStruct>::new();
+        let codec = tokio_util::codec::BytesCodec::new();
 
-        let value = TestStruct(1238123713u128);
+        let expected = [0u8, 1u8, 2u8, 3u8, 4u8, 5u8];
+        let value = tokio_util::bytes::BytesMut::from(expected.as_ref());
 
         let (mut tx, rx) = split_with_codec(stream, codec);
         tx.send(value)
@@ -229,7 +225,7 @@ mod tests {
 
         futures::pin_mut!(rx);
 
-        assert_eq!(rx.next().await, Some(value));
+        assert_eq!(rx.next().await, Some(tokio_util::bytes::BytesMut::from(expected.as_ref())));
 
         Ok(())
     }
