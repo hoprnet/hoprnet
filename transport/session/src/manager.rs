@@ -19,7 +19,7 @@ use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_ACTIVE_SESSIONS: hopr_metrics::SimpleGauge = hopr_metrics::SimpleGauge::new(
-        "hopr_session_active_sessions_count",
+        "hopr_session_num_active_sessions",
         "Number of currently active HOPR sessions"
     ).unwrap();
     static ref METRIC_NUM_ESTABLISHED_SESSIONS: hopr_metrics::SimpleCounter = hopr_metrics::SimpleCounter::new(

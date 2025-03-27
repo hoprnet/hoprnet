@@ -49,7 +49,7 @@ scrape_configs:
 - `hopr_strategy_auto_funding_funding_count`: Count of initiated automatic fundings
 - `hopr_strategy_promiscuous_opened_channels_count`: Count of open channel decisions
 - `hopr_strategy_promiscuous_closed_channels_count`: Count of close channel decisions
-- `hopr_strategy_promiscuous_max_auto_channels_count`: Count of maximum number of channels managed by the strategy
+- `hopr_strategy_promiscuous_max_auto_channels`: Count of maximum number of channels managed by the strategy
 - `hopr_strategy_auto_redeem_redeem_count`: Count of initiated automatic redemptions
 - `hopr_strategy_aggregating_aggregation_count`: Count of initiated automatic aggregations
 - `hopr_transport_p2p_opened_connection_count`: Count of the currently active p2p connections as observed from the rust-libp2p events
@@ -69,7 +69,7 @@ scrape_configs:
 - `hopr_chain_actions_count`: Number of different chain actions and their results, keys: `action`, `result`
 - `hopr_indexer_contract_log_count`: Counts of different HOPR contract logs processed by the Indexer, keys: `contract`
 - `hopr_tickets_incoming_statistics`: Ticket statistics for channels with incoming tickets, keys: `channel`, `statistic`
-- `hopr_session_active_sessions_count`: Number of currently active HOPR sessions
+- `hopr_session_num_active_sessions`: Number of currently active HOPR sessions
 - `hopr_session_received_error_count`: Number of HOPR session errors received from an Exit node, keys: `kind`
 - `hopr_session_sent_error_count`: Number of HOPR session errors sent to an Entry node, keys: `kind`
 - `hopr_session_established_sessions_count`: Number of sessions that were successfully established as an Exit node
