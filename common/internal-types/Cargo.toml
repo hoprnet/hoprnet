@@ -14,13 +14,12 @@ crate-type = ["rlib"]
 [dependencies]
 aquamarine = { workspace = true }
 bloomfilter = { workspace = true }
-bincode = { workspace = true }
 ethers = { workspace = true, default-features = false }
 hex-literal = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = { workspace = true }
-serde = { workspace = true }
-serde_bytes = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
@@ -40,6 +39,7 @@ lazy_static = { workspace = true }
 
 [features]
 default = []
+serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-types/serde"]
 
 [[bench]]
 name = "bloom_filter"

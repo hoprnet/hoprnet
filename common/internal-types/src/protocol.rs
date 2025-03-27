@@ -4,11 +4,10 @@ use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use tracing::warn;
 
-use crate::errors::{CoreTypesError, CoreTypesError::PayloadSizeExceeded, Result};
+use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
@@ -36,7 +35,8 @@ pub type Tag = u16;
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
 
 /// Represents packet acknowledgement
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Acknowledgement {
     ack_signature: OffchainSignature,
     pub ack_key_share: HalfKey,
@@ -52,7 +52,7 @@ impl Acknowledgement {
         }
     }
 
-    /// Generates random, but still a valid acknowledgement.
+    /// Generates random but still a valid acknowledgement.
     pub fn random(offchain_keypair: &OffchainKeypair) -> Self {
         Self::new(HalfKey::random(), offchain_keypair)
     }
@@ -80,7 +80,8 @@ impl Acknowledgement {
 /// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
 /// or information if we wait for the acknowledgement as a sender.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PendingAcknowledgement {
     /// We're waiting for acknowledgement as a sender
     WaitingAsSender,
@@ -93,7 +94,8 @@ pub enum PendingAcknowledgement {
 /// In addition, this structure also holds the number of items in the filter
 /// to determine if the filter needs to be refreshed. Once this happens, packet replays
 /// of past packets might be possible.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TagBloomFilter {
     bloom: Bloom<PacketTag>,
     count: usize,
@@ -158,18 +160,6 @@ impl TagBloomFilter {
         }
     }
 
-    /// Deserializes the filter from the given byte array.
-    pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        bincode::deserialize(data).map_err(|e| CoreTypesError::ParseError(e.to_string()))
-    }
-
-    /// Serializes the filter to the given byte array.
-    pub fn to_bytes(&self) -> Box<[u8]> {
-        bincode::serialize(&self)
-            .expect("serialization must not fail")
-            .into_boxed_slice()
-    }
-
     fn with_capacity(size: usize) -> Self {
         Self {
             bloom: Bloom::new_for_fp_rate_with_seed(size, Self::FALSE_POSITIVE_RATE, &random_bytes()),
@@ -186,11 +176,12 @@ impl Default for TagBloomFilter {
 }
 
 /// Represents the received decrypted packet carrying the application-layer data.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ApplicationData {
     // TODO: 3.0: Remove the Option and replace with the Tag.
     pub application_tag: Option<Tag>,
-    #[serde(with = "serde_bytes")]
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     pub plain_text: Box<[u8]>,
 }
 
@@ -327,7 +318,7 @@ mod tests {
         // Count the number of items in the BF (incl. false positives)
         let match_count_1 = items.iter().filter(|item| filter1.check(item)).count();
 
-        let filter2 = TagBloomFilter::from_bytes(&filter1.to_bytes())?;
+        let filter2: TagBloomFilter = bincode::deserialize(&bincode::serialize(&filter1)?)?;
 
         // Count the number of items in the BF (incl. false positives)
         let match_count_2 = items.iter().filter(|item| filter2.check(item)).count();

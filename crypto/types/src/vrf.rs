@@ -4,10 +4,6 @@ use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use k256::elliptic_curve::ProjectivePoint;
 use k256::{Scalar, Secp256k1};
-use serde::{
-    de::{self, Deserializer, Visitor},
-    Deserialize, Serialize,
-};
 
 use crate::errors::{CryptoError::CalculationError, Result};
 use crate::keypairs::{ChainKeypair, Keypair};
@@ -27,7 +23,8 @@ pub struct VrfParameters {
     pub s: Scalar,
 }
 
-impl Serialize for VrfParameters {
+#[cfg(feature = "serde")]
+impl serde::Serialize for VrfParameters {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -37,30 +34,37 @@ impl Serialize for VrfParameters {
     }
 }
 
-struct VrfParametersVisitor {}
+#[cfg(feature = "serde")]
+mod de {
+    use super::*;
+    use serde::de;
 
-impl Visitor<'_> for VrfParametersVisitor {
-    type Value = VrfParameters;
+    pub(super) struct VrfParametersVisitor {}
 
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_fmt(format_args!("a byte-array with {} elements", VrfParameters::SIZE))
-    }
+    impl de::Visitor<'_> for VrfParametersVisitor {
+        type Value = VrfParameters;
 
-    fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        VrfParameters::try_from(v).map_err(|e| de::Error::custom(e.to_string()))
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_fmt(format_args!("a byte-array with {} elements", VrfParameters::SIZE))
+        }
+
+        fn visit_bytes<E>(self, v: &[u8]) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            VrfParameters::try_from(v).map_err(|e| de::Error::custom(e.to_string()))
+        }
     }
 }
 
 // Use compact deserialization for tickets as they are used very often
-impl<'de> Deserialize<'de> for VrfParameters {
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for VrfParameters {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_bytes(VrfParametersVisitor {})
+        deserializer.deserialize_bytes(de::VrfParametersVisitor {})
     }
 }
 

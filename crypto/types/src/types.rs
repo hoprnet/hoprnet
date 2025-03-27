@@ -22,8 +22,11 @@ use k256::{
     },
     AffinePoint, Secp256k1,
 };
-use serde::{Deserialize, Serialize};
+use libp2p_identity::PeerId;
 use sha2::Sha512;
+use sha3::Keccak256;
+use typenum::Unsigned;
+
 use std::fmt::Debug;
 use std::hash::Hasher;
 use std::sync::OnceLock;
@@ -44,70 +47,6 @@ use crate::{
     },
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
 };
-
-pub use libp2p_identity::PeerId;
-use sha3::Keccak256;
-use typenum::Unsigned;
-
-/// Extend support for arbitrary array sizes in serde
-///
-/// Array of arbitrary sizes are not supported in serde due to backwards compatibility.
-/// Read more in: `<https://github.com/serde-rs/serde/issues/1937>`
-mod arrays {
-    use std::{convert::TryInto, marker::PhantomData};
-
-    use serde::{
-        de::{SeqAccess, Visitor},
-        ser::SerializeTuple,
-        Deserialize, Deserializer, Serialize, Serializer,
-    };
-    pub fn serialize<S: Serializer, T: Serialize, const N: usize>(data: &[T; N], ser: S) -> Result<S::Ok, S::Error> {
-        let mut s = ser.serialize_tuple(N)?;
-        for item in data {
-            s.serialize_element(item)?;
-        }
-        s.end()
-    }
-
-    struct ArrayVisitor<T, const N: usize>(PhantomData<T>);
-
-    impl<'de, T, const N: usize> Visitor<'de> for ArrayVisitor<T, N>
-    where
-        T: Deserialize<'de>,
-    {
-        type Value = [T; N];
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str(&format!("an array of length {}", N))
-        }
-
-        #[inline]
-        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-        where
-            A: SeqAccess<'de>,
-        {
-            // can be optimized using MaybeUninit
-            let mut data = Vec::with_capacity(N);
-            for _ in 0..N {
-                match seq.next_element()? {
-                    Some(val) => data.push(val),
-                    None => return Err(serde::de::Error::invalid_length(N, &self)),
-                }
-            }
-            match data.try_into() {
-                Ok(arr) => Ok(arr),
-                Err(_) => unreachable!(),
-            }
-        }
-    }
-    pub fn deserialize<'de, D, T, const N: usize>(deserializer: D) -> Result<[T; N], D::Error>
-    where
-        D: Deserializer<'de>,
-        T: Deserialize<'de>,
-    {
-        deserializer.deserialize_tuple(N, ArrayVisitor::<T, N>(PhantomData))
-    }
-}
 
 /// Represents an elliptic curve point on the secp256k1 curve
 /// It stores the compressed (and optionally also the uncompressed) form.
@@ -314,7 +253,7 @@ impl From<Challenge> for EthereumChallenge {
 }
 
 impl Challenge {
-    /// Obtains the PoR challenge by adding the two EC points represented by the half-key challenges
+    /// Gets the PoR challenge by adding the two EC points represented by the half-key challenges
     pub fn from_hint_and_share(own_share: &HalfKeyChallenge, hint: &HalfKeyChallenge) -> Result<Self> {
         let curve_point: CurvePoint = PublicKey::combine(&[
             &PublicKey::try_from(own_share.0.as_ref())?,
@@ -324,7 +263,7 @@ impl Challenge {
         Ok(curve_point.into())
     }
 
-    /// Obtains the PoR challenge by converting the given HalfKey into a secp256k1 point and
+    /// Gets the PoR challenge by converting the given HalfKey into a secp256k1 point and
     /// adding it with the given HalfKeyChallenge (which already represents a secp256k1 point).
     pub fn from_own_share_and_half_key(own_share: &HalfKeyChallenge, half_key: &HalfKey) -> Result<Self> {
         Self::from_hint_and_share(own_share, &half_key.to_challenge())
@@ -367,18 +306,15 @@ impl BytesRepresentable for Challenge {
 ///
 /// Half-key is equivalent to a non-zero scalar in the field used by secp256k1, but the type
 /// itself does not validate nor enforce this fact.
-// TODO: change this to HalfKey([u8; Self::SIZE]) in 3.0
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct HalfKey {
-    hkey: [u8; Self::SIZE],
-}
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HalfKey(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Default for HalfKey {
     fn default() -> Self {
-        let mut ret = Self {
-            hkey: [0u8; Self::SIZE],
-        };
-        ret.hkey.copy_from_slice(
+        let mut ret = Self([0u8; Self::SIZE]);
+
+        ret.0.copy_from_slice(
             NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
                 .unwrap()
                 .to_bytes()
@@ -391,15 +327,13 @@ impl Default for HalfKey {
 impl HalfKey {
     /// Generates random half-key, useful for tests.
     pub fn random() -> Self {
-        Self {
-            hkey: random_group_element().0,
-        }
+        Self(random_group_element().0)
     }
 
     /// Converts the non-zero scalar represented by this half-key into the half-key challenge.
     /// This operation naturally enforces the underlying scalar to be non-zero.
     pub fn to_challenge(&self) -> HalfKeyChallenge {
-        CurvePoint::from_exponent(&self.hkey)
+        CurvePoint::from_exponent(&self.0)
             .map(|cp| HalfKeyChallenge::new(cp.as_compressed().as_bytes()))
             .expect("invalid public key")
     }
@@ -407,7 +341,7 @@ impl HalfKey {
 
 impl AsRef<[u8]> for HalfKey {
     fn as_ref(&self) -> &[u8] {
-        &self.hkey
+        &self.0
     }
 }
 
@@ -415,9 +349,7 @@ impl TryFrom<&[u8]> for HalfKey {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self {
-            hkey: value.try_into().map_err(|_| ParseError("HalfKey".into()))?,
-        })
+        Ok(Self(value.try_into().map_err(|_| ParseError("HalfKey".into()))?))
     }
 }
 
@@ -429,8 +361,9 @@ impl BytesRepresentable for HalfKey {
 /// Represents a challenge for the half-key in Proof of Relay.
 /// Half-key challenge is equivalent to a secp256k1 curve point.
 /// Therefore, HalfKeyChallenge can be obtained from a HalfKey.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
-pub struct HalfKeyChallenge(#[serde(with = "arrays")] [u8; Self::SIZE]);
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HalfKeyChallenge(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Display for HalfKeyChallenge {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -450,7 +383,6 @@ impl Default for HalfKeyChallenge {
 
 impl HalfKeyChallenge {
     pub fn new(half_key_challenge: &[u8]) -> Self {
-        assert_eq!(half_key_challenge.len(), Self::SIZE, "invalid length");
         let mut ret = Self::default();
         ret.0.copy_from_slice(half_key_challenge);
         ret
@@ -506,8 +438,9 @@ impl From<HalfKey> for HalfKeyChallenge {
 
 /// Represents an Ethereum 256-bit hash value
 /// This implementation instantiates the hash via Keccak256 digest.
-#[derive(Clone, Copy, Eq, PartialEq, Default, Serialize, Deserialize, PartialOrd, Ord, std::hash::Hash)]
-pub struct Hash([u8; Self::SIZE]);
+#[derive(Clone, Copy, Eq, PartialEq, Default, PartialOrd, Ord, std::hash::Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Hash(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Debug for Hash {
     // Intentionally same as Display
@@ -597,7 +530,8 @@ impl From<primitive_types::H256> for Hash {
 }
 
 /// Represents an Ed25519 public key.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct OffchainPublicKey(CompressedEdwardsY);
 
 impl AsRef<[u8]> for OffchainPublicKey {
@@ -997,19 +931,13 @@ impl CompressedPublicKey {
 
 /// Contains a response upon ticket acknowledgement
 /// It is equivalent to a non-zero secret scalar on secp256k1 (EC private key).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Response([u8; Self::SIZE]);
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Response(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Default for Response {
     fn default() -> Self {
-        let mut ret = Self([0u8; Self::SIZE]);
-        ret.0.copy_from_slice(
-            NonZeroScalar::<Secp256k1>::from_uint(1u16.into())
-                .unwrap()
-                .to_bytes()
-                .as_slice(),
-        );
-        ret
+        Self(HalfKey::default().0)
     }
 }
 
@@ -1064,8 +992,9 @@ impl From<[u8; Self::SIZE]> for Response {
 }
 
 /// Represents an EdDSA signature using Ed25519 Edwards curve.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OffchainSignature(#[serde(with = "arrays")] [u8; Self::SIZE]);
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct OffchainSignature(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl OffchainSignature {
     /// Sign the given message using the [OffchainKeypair].
@@ -1129,16 +1058,16 @@ impl TryFrom<([u8; 32], [u8; 32])> for OffchainSignature {
 
 /// Represents an ECDSA signature based on the secp256k1 curve with a recoverable public key.
 /// This signature encodes the 2-bit recovery information into the
-/// uppermost bits of MSB of the S value, which are never used by this ECDSA
+/// uppermost bits from MSB of the S value, which are never used by this ECDSA
 /// instantiation over secp256k1.
 /// The instance holds the byte array consisting of `R` and `S` values with the recovery bit
 /// already embedded in S.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct Signature(#[serde(with = "arrays")] [u8; Self::SIZE]);
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Signature(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl Signature {
     pub fn new(raw_bytes: &[u8], recovery: u8) -> Signature {
-        assert_eq!(raw_bytes.len(), Self::SIZE, "invalid length");
         assert!(recovery <= 1, "invalid recovery bit");
 
         let mut ret = Self([0u8; Self::SIZE]);
@@ -1256,7 +1185,8 @@ pub trait Pseudonym: BytesRepresentable + hash::Hash + Eq + Display {
 
 /// Represents a simple UUID-like pseudonym consisting of 16 bytes.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct SimplePseudonym(pub [u8; Self::SIZE]);
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SimplePseudonym(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] pub [u8; Self::SIZE]);
 
 impl SimplePseudonym {
     /// Generates a random pseudonym with a given prefix.
@@ -1652,9 +1582,7 @@ mod tests {
 
     #[test]
     fn test_half_key() -> anyhow::Result<()> {
-        let hk1 = HalfKey {
-            hkey: [0u8; HalfKey::SIZE],
-        };
+        let hk1 = HalfKey([0u8; HalfKey::SIZE]);
         let hk2 = HalfKey::try_from(hk1.as_ref())?;
 
         assert_eq!(hk1, hk2, "failed to match deserialized half-key");

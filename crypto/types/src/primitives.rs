@@ -14,6 +14,7 @@ pub use chacha20::ChaCha20;
 pub use poly1305::Poly1305;
 pub use sha3::Keccak256;
 pub use sha3::Sha3_256;
+use zeroize::ZeroizeOnDrop;
 
 /// Represents a 256-bit secret key of fixed length.
 /// The value is auto-zeroized on drop.
@@ -24,7 +25,8 @@ pub type SecretKey = SecretValue<typenum::U32>;
 pub type SecretKey16 = SecretValue<typenum::U16>;
 
 /// Convenience container for IV and key of a given primitive `T`.
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(ZeroizeOnDrop)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IvKey<T>(Box<[u8]>, PhantomData<T>);
 
 impl<T: KeyIvInit> KeySizeUser for IvKey<T> {

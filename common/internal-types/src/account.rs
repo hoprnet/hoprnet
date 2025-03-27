@@ -1,11 +1,11 @@
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
-use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// Type of the node account.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum AccountType {
     /// Node is not announced.
     NotAnnounced,
@@ -33,7 +33,8 @@ impl Display for AccountType {
 
 /// Represents a node announcement entry on the block chain.
 /// This contains node's public key and optional announcement information (multiaddress, block number).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AccountEntry {
     pub public_key: OffchainPublicKey,
     pub chain_addr: Address,

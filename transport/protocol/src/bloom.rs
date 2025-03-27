@@ -16,7 +16,7 @@ impl WrappedTagBloomFilter {
         let tbf = read_file(&path)
             .and_then(|data| {
                 debug!(path = &path, "Found and loading a tag Bloom filter");
-                TagBloomFilter::from_bytes(&data)
+                bincode::deserialize(&data)
                     .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
             })
             .unwrap_or_else(|_| {
@@ -38,8 +38,11 @@ impl WrappedTagBloomFilter {
     pub async fn save(&self) {
         let bloom = self.tbf.read().await.clone(); // Clone to immediately release the lock
 
-        if let Err(e) = write(&self.path, bloom.to_bytes()) {
-            error!(erorr = %e, "Tag Bloom filter save failed")
+        if let Err(e) = bincode::serialize(&bloom)
+            .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
+            .and_then(|d| write(&self.path, &d))
+        {
+            error!(error = %e, "Tag Bloom filter save failed")
         } else {
             info!("Tag Bloom filter saved successfully")
         };

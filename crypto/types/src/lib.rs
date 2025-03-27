@@ -39,5 +39,5 @@ pub mod prelude {
     pub use super::utils::*;
     pub use super::vrf::*;
 
-    //pub use libp2p_identity::PeerId;
+    pub use libp2p_identity::PeerId;
 }

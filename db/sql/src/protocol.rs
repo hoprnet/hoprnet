@@ -208,9 +208,9 @@ impl HoprDbProtocolOperations for HoprDb {
                     spawn_fifo_blocking(move || {
                         HoprPacket::into_outgoing(
                             &data,
+                            pseudonym.unwrap_or_else(|| &SimplePseudonym::random()),
                             PacketRouting::ForwardPath {
                                 forward_path: &path,
-                                pseudonym: pseudonym.unwrap_or_else(|| &SimplePseudonym::random()),
                                 return_paths,
                             },
                             &me,
