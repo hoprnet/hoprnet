@@ -200,7 +200,7 @@
 
             export HOPRD_DEFAULT_SESSION_LISTEN_HOST="''${listen_host}"
 
-            if [ -x "/bin/''${1:-}" ]; then
+            if [ -n "''${1:-}" ] && [ -f "/bin/''${1:-}" ] && [ -x "/bin/''${1:-}" ]; then
               # allow execution of auxiliary commands
               exec "''$@"
             else

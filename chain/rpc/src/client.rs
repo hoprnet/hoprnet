@@ -1308,7 +1308,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn test_client_from_file() -> anyhow::Result<()> {
-        let block_time = Duration::from_secs(1);
+        let block_time = Duration::from_millis(1100);
         let snapshot_file = NamedTempFile::new()?;
 
         let anvil = create_anvil(Some(block_time));
