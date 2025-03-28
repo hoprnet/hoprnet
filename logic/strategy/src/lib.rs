@@ -40,6 +40,7 @@
 //! ```
 
 use hopr_primitive_types::prelude::*;
+use one_hop_connection::OneHopConnectionStrategyConfig;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 
@@ -56,8 +57,10 @@ pub mod auto_funding;
 pub mod auto_redeeming;
 mod channel_finalizer;
 pub mod errors;
+pub mod one_hop_connection;
 pub mod promiscuous;
 pub mod strategy;
+mod types;
 
 /// Lists all possible strategies with their respective configurations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, VariantNames)]
@@ -68,6 +71,7 @@ pub enum Strategy {
     AutoRedeeming(AutoRedeemingStrategyConfig),
     AutoFunding(AutoFundingStrategyConfig),
     ClosureFinalizer(ClosureFinalizerStrategyConfig),
+    OneHopConnection(OneHopConnectionStrategyConfig),
     Multi(MultiStrategyConfig),
     Passive,
 }
