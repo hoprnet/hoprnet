@@ -22,13 +22,13 @@ jobs:
           disable-sudo: false
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
       - name: Install Nix
-        if: env.needs_nix_setup == true
+        if: env.needs_nix_setup == 'true'
         uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
-        if: env.needs_nix_setup == true
+        if: env.needs_nix_setup == 'true'
         with:
           name: hoprnet
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
