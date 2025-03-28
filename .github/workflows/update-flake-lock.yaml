@@ -35,6 +35,11 @@ jobs:
         env:
           USER: runner
 
+      - name: Install NodeJS
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        with:
+          node-version: 20
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
