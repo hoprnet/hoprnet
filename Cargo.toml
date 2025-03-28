@@ -104,7 +104,6 @@ libp2p-identity = { version = "0.2.10", features = [
   "ed25519",
   "rand",
 ] }
-libp2p-mplex = "0.43.0"
 mockall = "0.13.1"
 mockito = "1.6.1"
 moka = { version = "0.12.10", features = ["future"] }
@@ -115,6 +114,7 @@ opentelemetry = { version = "0.27.1" }
 opentelemetry-otlp = { version = "0.27.0", default-features = false }
 opentelemetry_sdk = { version = "0.27.1" }
 tracing-opentelemetry = { version = "0.28.0" }
+temp-env = "0.3.6"
 parameterized = "2.0.0"
 petgraph = { version = "0.7.1", features = ["serde-1"] }
 primitive-types = { version = "0.12.2", features = [
