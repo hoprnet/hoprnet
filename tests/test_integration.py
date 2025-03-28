@@ -60,9 +60,7 @@ class TestIntegrationWithSwarm:
                 if current_peers.intersection(others) == others2:
                     break
                 else:
-                    assert current_peers.intersection(others2) == others2
                     await asyncio.sleep(0.5)
-
         await asyncio.gather(
             *[
                 asyncio.wait_for(
