@@ -51,17 +51,7 @@ jobs:
           install-sdk: 'true'
 
       - name: Cleanup Docker images
-        run: |
-          date=`date +%Y-%m-%d'T'%H:%M'Z' -d "60 days ago"`
-          images=('hopli' 'hoprd')
-          for image in "${images[@]}"; do
-            old_pr_image_tags=$(gcloud artifacts docker images list --include-tags ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | match("-commit.")).version')
-            old_untagged_images=$(gcloud artifacts docker images list --include-tags ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | length == 0).version')
-            old_image_tags=($(echo -e "${old_pr_image_tags}\n${old_untagged_images}" | sed '/^$/d' | tr '\n' ' '))
-            for old_image_tag in "$old_image_tags[@]"; do
-              gcloud artifacts docker images delete --quiet --delete-tags --async ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}@${old_image_tag}
-            done
-          done
+        run: ./scripts/clean-docker-images.sh "${{ vars.DOCKER_IMAGE_REGISTRY }}"
 
   # cleanup-git:
   #   name: Cleanup Git
