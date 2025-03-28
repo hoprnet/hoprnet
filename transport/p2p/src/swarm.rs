@@ -46,23 +46,15 @@ where
 {
     let me_peerid: PeerId = me.public().into();
 
-    let tcp_upgrade = {
-        let num_streams = std::env::var("HOPR_INTERNAL_LIBP2P_YAMUX_MAX_NUM_STREAMS")
-            .and_then(|v| v.parse::<usize>().map_err(|_e| std::env::VarError::NotPresent))
-            .unwrap_or(1024);
-
-        let mut cfg = libp2p::yamux::Config::default();
-        cfg.set_max_num_streams(num_streams);
-        cfg
-    };
-
     #[cfg(feature = "runtime-async-std")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_async_std()
         .with_tcp(
             libp2p::tcp::Config::default().nodelay(true),
             libp2p::noise::Config::new,
-            || tcp_upgrade,
+            // use default yamux configuration to enable auto-tuning
+            // see https://github.com/libp2p/rust-libp2p/pull/4970
+            libp2p::yamux::Config::default,
         )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
@@ -76,7 +68,9 @@ where
         .with_tcp(
             libp2p::tcp::Config::default().nodelay(true),
             libp2p::noise::Config::new,
-            || tcp_upgrade,
+            // use default yamux configuration to enable auto-tuning
+            // see https://github.com/libp2p/rust-libp2p/pull/4970
+            libp2p::yamux::Config::default,
         )
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_quic()
