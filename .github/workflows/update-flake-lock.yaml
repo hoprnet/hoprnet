@@ -23,7 +23,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install NodeJS
-        run: nix-env -iA nodejs_20
+        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        with:
+          node-version: 20
 
       - name: Update flake.lock
         uses: DeterminateSystems/update-flake-lock@a2bbe0274e3a0c4194390a1e445f734c597ebc37 # v24
