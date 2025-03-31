@@ -39,7 +39,7 @@ class TestRestApiWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
-    async def test_metric_endpoint_accepts_plain_text_header(peer: str, swarm7: dict[str, Node]):
+    async def test_metric_endpoint_accepts_plain_text_header(self, peer: str, swarm7: dict[str, Node]):
         url = f"http://{swarm7[peer].host_addr}:{swarm7[peer].api_port}/metrics"
         headers = {"X-Auth-Token": swarm7[peer].api_token}
 
@@ -56,7 +56,7 @@ class TestRestApiWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
-    async def test_info_endpoint_accepts_application_json_header(peer: str, swarm7: dict[str, Node]):
+    async def test_info_endpoint_accepts_application_json_header(self, peer: str, swarm7: dict[str, Node]):
         url = f"http://{swarm7[peer].host_addr}:{swarm7[peer].api_port}/api/v3/node/info"
         headers = {"X-Auth-Token": swarm7[peer].api_token}
 
