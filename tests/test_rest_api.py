@@ -7,7 +7,6 @@ from sdk.python.localcluster.node import Node
 from tests.conftest import nodes_with_auth
 
 
-
 @pytest.mark.usefixtures("swarm7_reset")
 class TestRestApiWithSwarm:
     @pytest.mark.asyncio
