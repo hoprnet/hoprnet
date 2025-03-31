@@ -62,6 +62,7 @@ craneLib.devShell {
     ## python is required by integration tests
     python39
     python39Packages.venvShellHook
+    uv
 
     ## formatting
     config.treefmt.build.wrapper
@@ -90,6 +91,6 @@ craneLib.devShell {
   postShellHook = ''
     ${pre-commit-check.shellHook}
   '';
-  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
+  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl pkgs.pkgsBuildHost.libgcc.lib ];
   RUST_MIN_STACK = "16777216"; # 16MB required to run the tests and compilation
 }
