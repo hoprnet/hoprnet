@@ -1,3 +1,10 @@
+[project]
+name = "hoprnet"
+version = "3.0.0"
+description = "HOPR network"
+readme = "README.md"
+dependencies = []
+
 [tool.black]
 line-length = 120
 target-version = ['py310']
