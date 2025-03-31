@@ -10,6 +10,7 @@ from google.auth.exceptions import DefaultCredentialsError
 import argparse
 import re
 
+
 # Ensure the script exits on errors
 def list_docker_images(client, parent):
     """
@@ -32,6 +33,7 @@ def list_docker_images(client, parent):
         print(f"Error listing docker images: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
+
 def delete_docker_image(client, name, dry_run):
     """
     Deletes a Docker image by its name.
@@ -53,6 +55,7 @@ def delete_docker_image(client, name, dry_run):
     except Exception as e:
         print(f"Error deleting docker image: {str(e)}", file=sys.stderr)
         sys.exit(1)
+
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="Cleanup old Docker images.")
