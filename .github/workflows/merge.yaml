@@ -82,7 +82,8 @@ jobs:
       - build_docker
     uses: ./.github/workflows/load-tests.yaml
     with:
-      test_id: pr-${{ github.event.pull_request.number }}
+      execution_name: pr-${{ github.event.pull_request.number }}
+      test_script: udp
       cluster_nodes: core-rotsee
       topology: receiver
       workload: constant

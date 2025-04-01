@@ -5,9 +5,12 @@
 name: Load Tests
 
 on:
-  workflow_call:
+  workflow_call: # Triggered by other pipeline
     inputs:
-      test_id:
+      execution_name:
+        type: string
+        required: true
+      test_script:
         type: string
         required: true
       cluster_nodes:
@@ -34,12 +37,19 @@ on:
       upload_throughput:
         type: number
         required: true
-  workflow_dispatch:
+  workflow_dispatch: # Manual trigger
     inputs:
-      test_id:
+      execution_name:
         type: string
         required: true
         description: 'Test name'
+      test_script:
+        type: choice
+        options:
+          - udp
+          - tcp
+          - websocket
+        description: 'Test script'
       cluster_nodes:
         type: choice
         options:
@@ -106,10 +116,11 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          if [ -z "${{ github.event.inputs.test_id }}" ]; then
+          if [ -z "${{ github.event.inputs.execution_name }}" ]; then
             echo "The workflow is triggered by other pipeline"
             {
-              echo "TESTID=${{ inputs.test_id }}"
+              echo "K6_EXECUTION_NAME=${{ inputs.execution_name }}"
+              echo "K6_TEST_SCRIPT=${{ inputs.test_script }}"
               echo "K6_CLUSTER_NODES=${{ inputs.cluster_nodes }}"
               echo "K6_TOPOLOGY_NAME=${{ inputs.topology }}"
               echo "K6_WORKLOAD_NAME=${{ inputs.workload }}"
@@ -122,7 +133,8 @@ jobs:
           else
             echo "The workflow is triggered manually"
             {
-              echo "TESTID=${{ github.event.inputs.test_id }}"
+              echo "K6_EXECUTION_NAME=${{ github.event.inputs.execution_name }}"
+              echo "K6_TEST_SCRIPT=${{ github.event.inputs.test_script }}"
               echo "K6_CLUSTER_NODES=${{ github.event.inputs.cluster_nodes }}"
               echo "K6_TOPOLOGY_NAME=${{ github.event.inputs.topology }}"
               echo "K6_WORKLOAD_NAME=${{ github.event.inputs.workload }}"
