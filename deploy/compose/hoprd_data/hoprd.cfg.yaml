@@ -10,14 +10,14 @@ hopr:
     allow_recursive: true
     strategies:
       - !Aggregating
-        aggregation_threshold: 1000
+        aggregation_threshold: 250
         unrealized_balance_ratio: 0.9
         aggregate_on_channel_close: true
       - !AutoRedeeming
         redeem_only_aggregated: true
         minimum_redeem_ticket_value: "2500000000000000000 HOPR"
       - !ClosureFinalizer
-        max_closure_overdue: 300
+        max_closure_overdue: 3600
   chain:
     network: dufour
     provider: # NOTE: Fill in value. Using a local RPC provider, make sure to always include the http:// prefix, followed by the IP address or localhost.
