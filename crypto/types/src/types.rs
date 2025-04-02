@@ -530,13 +530,35 @@ impl From<primitive_types::H256> for Hash {
 }
 
 /// Represents an Ed25519 public key.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct OffchainPublicKey(CompressedEdwardsY);
+pub struct OffchainPublicKey {
+    compressed: CompressedEdwardsY,
+    edwards: EdwardsPoint,
+    montgomery: MontgomeryPoint,
+}
+
+impl std::fmt::Debug for OffchainPublicKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OffchainPublicKey").field("compressed", &self.compressed).finish()
+    }
+}
+
+impl std::hash::Hash for OffchainPublicKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.compressed.hash(state);
+    }
+}
+
+impl PartialEq for OffchainPublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.compressed == other.compressed
+    }
+}
 
 impl AsRef<[u8]> for OffchainPublicKey {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
+        self.compressed.as_bytes()
     }
 }
 
@@ -544,9 +566,13 @@ impl TryFrom<&[u8]> for OffchainPublicKey {
     type Error = GeneralError;
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        Ok(Self(
-            CompressedEdwardsY::from_slice(value).map_err(|_| ParseError("OffchainPublicKey".into()))?,
-        ))
+        let compressed = CompressedEdwardsY::from_slice(value).map_err(|_| ParseError("OffchainPublicKey".into()))?;
+        let edwards = compressed.decompress().ok_or(ParseError("OffchainPublicKey.decompress".into()))?;
+        Ok(Self{
+            compressed,
+            edwards,
+            montgomery: edwards.to_montgomery(),
+        })
     }
 }
 
@@ -577,11 +603,7 @@ impl TryFrom<&PeerId> for OffchainPublicKey {
                         .map(|p| p.to_bytes())
                         .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
                 })
-                .and_then(|pk| {
-                    CompressedEdwardsY::from_slice(&pk)
-                        .map_err(|_| GeneralError::ParseError("invalid ed25519 peerid".into()))
-                })
-                .map(Self)
+                .and_then(|pk| Self::try_from(pk))
         } else {
             Err(GeneralError::ParseError("invalid ed25519 peer id".into()))
         }
@@ -598,7 +620,7 @@ impl TryFrom<PeerId> for OffchainPublicKey {
 
 impl From<OffchainPublicKey> for PeerId {
     fn from(value: OffchainPublicKey) -> Self {
-        let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(value.0.as_bytes()).unwrap();
+        let k = libp2p_identity::ed25519::PublicKey::try_from_bytes(value.compressed.as_bytes()).unwrap();
         PeerId::from_public_key(&k.into())
     }
 }
@@ -624,10 +646,7 @@ impl OffchainPublicKey {
         let sk = libp2p_identity::ed25519::SecretKey::try_from_bytes(&mut pk)
             .map_err(|_| InvalidInputValue("private_key"))?;
         let kp: libp2p_identity::ed25519::Keypair = sk.into();
-        Ok(Self(
-            CompressedEdwardsY::from_slice(&kp.public().to_bytes())
-                .map_err(|_| GeneralError::ParseError("OffchainPublicKey".into()))?,
-        ))
+        Ok(Self::try_from(kp.public().to_bytes())?)
     }
 
     /// Outputs the public key as PeerId represented as Base58 string.
@@ -638,13 +657,13 @@ impl OffchainPublicKey {
 
 impl From<&OffchainPublicKey> for EdwardsPoint {
     fn from(value: &OffchainPublicKey) -> Self {
-        value.0.decompress().unwrap()
+        value.edwards
     }
 }
 
 impl From<&OffchainPublicKey> for MontgomeryPoint {
     fn from(value: &OffchainPublicKey) -> Self {
-        value.0.decompress().unwrap().to_montgomery()
+        value.montgomery
     }
 }
 
@@ -1006,7 +1025,7 @@ impl OffchainSignature {
 
         // Get the verifying key from the SAME keypair, avoiding Double Public Key Signing Function Oracle Attack on Ed25519
         // See https://github.com/MystenLabs/ed25519-unsafe-libs for details
-        let verifying = ed25519_dalek::VerifyingKey::from_bytes(signing_keypair.public().0.as_bytes()).unwrap();
+        let verifying = ed25519_dalek::VerifyingKey::from(signing_keypair.public().edwards);
 
         ed25519_dalek::hazmat::raw_sign::<Sha512>(&expanded_sk, msg, &verifying).into()
     }
@@ -1014,7 +1033,7 @@ impl OffchainSignature {
     /// Verify this signature of the given message and [OffchainPublicKey].
     pub fn verify_message(&self, msg: &[u8], public_key: &OffchainPublicKey) -> bool {
         let sgn = ed25519_dalek::Signature::from_slice(&self.0).expect("corrupted OffchainSignature");
-        let pk = ed25519_dalek::VerifyingKey::from_bytes(public_key.0.as_bytes()).unwrap();
+        let pk = ed25519_dalek::VerifyingKey::from(public_key.edwards);
         pk.verify_strict(msg, &sgn).is_ok()
     }
 }
