@@ -24,9 +24,3 @@ jobs:
 
       - name: Run Audit
         run: nix run .#audit
-      
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-      
-      - name: Run cargo-audit
-        run: cargo audit
