@@ -859,8 +859,7 @@ impl Hopr {
             let mut peer_stream = self
                 .db
                 .get_network_peers(Default::default(), false)
-                .await
-                .map_err(hopr_db_sql::api::errors::DbError::from)?
+                .await?
                 .filter(|status| futures::future::ready(status.quality >= min_quality_to_sync));
 
             while let Some(peer) = peer_stream.next().await {
