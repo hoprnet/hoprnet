@@ -1,22 +1,30 @@
-use hkdf::SimpleHkdf;
 use hopr_crypto_types::prelude::*;
 
 // Module-specific constants
-const HASH_KEY_PACKET_TAG: &[u8] = b"HASH_KEY_PACKET_TAG";
+const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
 
-fn create_hkdf_instance<S: AsRef<[u8]>>(
+pub(crate) fn create_hkdf_instance<S: AsRef<[u8]>>(
     secret: &S,
+    context: &str,
     salt: Option<&[u8]>,
-) -> hopr_crypto_types::errors::Result<SimpleHkdf<Blake2s256>> {
+) -> hopr_crypto_types::errors::Result<Blake3Output> {
     let key_material = secret.as_ref();
     if key_material.len() < 16 {
         return Err(CryptoError::InvalidInputValue("secret must have at least 128-bits"));
     }
 
-    if salt.is_some() {
-        Ok(SimpleHkdf::<Blake2s256>::new(salt, key_material))
+    if let Some(salt) = salt {
+        Ok(Blake3::new_derive_key(context)
+            .update_reader(salt)
+            .map_err(|_| CryptoError::InvalidInputValue("salt"))?
+            .update_reader(key_material)
+            .map_err(|_| CryptoError::InvalidInputValue("key"))?
+            .finalize_xof())
     } else {
-        SimpleHkdf::<Blake2s256>::from_prk(key_material).map_err(|_| CryptoError::InvalidInputValue("secret"))
+        Ok(Blake3::new_derive_key(context)
+            .update_reader(key_material)
+            .map_err(|_| CryptoError::InvalidInputValue("key"))?
+            .finalize_xof())
     }
 }
 
@@ -24,10 +32,8 @@ fn create_hkdf_instance<S: AsRef<[u8]>>(
 pub fn derive_packet_tag(secret: &SecretKey) -> hopr_crypto_types::errors::Result<PacketTag> {
     let mut packet_tag: PacketTag = [0u8; PACKET_TAG_LENGTH];
 
-    let hkdf = create_hkdf_instance(secret, None)?;
-    hkdf.expand(HASH_KEY_PACKET_TAG, &mut packet_tag)
-        .map_err(|_| CryptoError::InvalidInputValue("output length"))?;
-
+    let mut output = create_hkdf_instance(secret, HASH_KEY_PACKET_TAG, None)?;
+    output.fill(&mut packet_tag);
     Ok(packet_tag)
 }
 
@@ -44,14 +50,13 @@ pub fn derive_packet_tag(secret: &SecretKey) -> hopr_crypto_types::errors::Resul
 /// the secret size must be exactly 32 bytes.
 pub(crate) fn generate_key<T: crypto_traits::KeyInit, S: AsRef<[u8]>>(
     secret: &S,
-    info: &[u8],
-    extract_with_salt: Option<&[u8]>,
+    context: &str,
+    with_salt: Option<&[u8]>,
 ) -> hopr_crypto_types::errors::Result<T> {
     let mut out = crypto_traits::Key::<T>::default();
 
-    let hkdf = create_hkdf_instance(secret, extract_with_salt)?;
-    hkdf.expand(info, &mut out)
-        .map_err(|_| CryptoError::InvalidInputValue("output length"))?;
+    let mut output = create_hkdf_instance(secret, context, with_salt)?;
+    output.fill(&mut out);
 
     Ok(T::new(&out))
 }
@@ -62,26 +67,16 @@ pub(crate) fn generate_key<T: crypto_traits::KeyInit, S: AsRef<[u8]>>(
 /// See [`generate_key`] for details.
 pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
     secret: &S,
-    info: &[u8],
-    extract_with_salt: Option<&[u8]>,
+    context: &str,
+    with_salt: Option<&[u8]>,
 ) -> hopr_crypto_types::errors::Result<T> {
-    let key_material = secret.as_ref();
-    if key_material.len() < 16 {
-        return Err(CryptoError::InvalidInputValue("secret must have at least 128-bits"));
-    }
-
-    let hkdf = if extract_with_salt.is_some() {
-        SimpleHkdf::<Blake2s256>::new(extract_with_salt, key_material)
-    } else {
-        SimpleHkdf::<Blake2s256>::from_prk(key_material).map_err(|_| CryptoError::InvalidInputValue("secret"))?
-    };
+    let mut output = create_hkdf_instance(secret, context, with_salt)?;
 
     let mut key = crypto_traits::Key::<T>::default();
     let mut iv = crypto_traits::Iv::<T>::default();
 
     let mut out = vec![0u8; key.len() + iv.len()];
-    hkdf.expand(info, &mut out)
-        .map_err(|_| CryptoError::InvalidInputValue("output length"))?;
+    output.fill(&mut out);
 
     let (v_iv, v_key) = out.split_at(iv.len());
     iv.copy_from_slice(v_iv);

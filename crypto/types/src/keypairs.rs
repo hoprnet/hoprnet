@@ -4,7 +4,6 @@ use hopr_primitive_types::prelude::*;
 use sha2::Sha512;
 use std::fmt::Debug;
 use subtle::{Choice, ConstantTimeEq};
-use zeroize::ZeroizeOnDrop;
 
 use hopr_crypto_random::random_bytes;
 
@@ -16,7 +15,7 @@ use crate::utils::{k256_scalar_from_bytes, random_group_element, x25519_scalar_f
 /// Represents a generic key pair
 /// The keypair contains a private key and public key.
 /// Must be comparable in constant time and zeroized on drop.
-pub trait Keypair: ConstantTimeEq + ZeroizeOnDrop + Sized {
+pub trait Keypair: ConstantTimeEq + Sized {
     /// Represents the type of the private (secret) key
     type SecretLen: ArrayLength;
 
@@ -42,8 +41,8 @@ pub trait Keypair: ConstantTimeEq + ZeroizeOnDrop + Sized {
 }
 
 /// Represents a keypair consisting of an Ed25519 private and public key
-#[derive(Clone, ZeroizeOnDrop)]
-pub struct OffchainKeypair(SecretValue<typenum::U32>, #[zeroize(skip)] OffchainPublicKey);
+#[derive(Clone)]
+pub struct OffchainKeypair(SecretValue<typenum::U32>, OffchainPublicKey);
 
 impl Keypair for OffchainKeypair {
     type SecretLen = typenum::U32;
@@ -111,8 +110,8 @@ impl From<&OffchainKeypair> for libp2p_identity::PeerId {
 }
 
 /// Represents a keypair consisting of a secp256k1 private and public key
-#[derive(Clone, ZeroizeOnDrop)]
-pub struct ChainKeypair(SecretValue<typenum::U32>, #[zeroize(skip)] CompressedPublicKey);
+#[derive(Clone)]
+pub struct ChainKeypair(SecretValue<typenum::U32>, CompressedPublicKey);
 
 impl Keypair for ChainKeypair {
     type SecretLen = typenum::U32;

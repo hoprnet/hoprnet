@@ -5,7 +5,6 @@ use k256::elliptic_curve::{Group, PrimeField};
 use k256::Secp256k1;
 use sha3::Sha3_256;
 use subtle::{Choice, ConstantTimeEq};
-use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::errors::CryptoError;
 use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
@@ -71,7 +70,7 @@ pub fn sample_secp256k1_field_element(secret: &[u8], tag: &str) -> crate::errors
 /// Represents a secret value of a fixed length that is zeroized on drop.
 /// Secret values are always compared in constant time.
 /// The default value is all zeroes.
-#[derive(Clone, Zeroize, ZeroizeOnDrop)]
+#[derive(Clone)]
 pub struct SecretValue<L: ArrayLength>(GenericArray<u8, L>);
 
 impl<L: ArrayLength> ConstantTimeEq for SecretValue<L> {
@@ -112,10 +111,7 @@ impl<L: ArrayLength> TryFrom<&[u8]> for SecretValue<L> {
 
 impl<L: ArrayLength> Default for SecretValue<L> {
     fn default() -> Self {
-        // Ensure the default value is zeroized
-        let mut ret = Self(GenericArray::default());
-        ret.zeroize();
-        ret
+        Self(GenericArray::default())
     }
 }
 

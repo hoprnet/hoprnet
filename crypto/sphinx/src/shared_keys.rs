@@ -1,10 +1,9 @@
 use generic_array::{ArrayLength, GenericArray};
-use hkdf::SimpleHkdf;
 use hopr_crypto_types::prelude::*;
 use std::marker::PhantomData;
 use std::ops::Mul;
 
-use crate::derivation::generate_key_iv;
+use crate::derivation::{create_hkdf_instance, generate_key_iv};
 
 /// Represents a shared secret with a remote peer.
 pub type SharedSecret = SecretValue<typenum::U32>;
@@ -52,24 +51,12 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
         (Self::generate(&scalar), scalar)
     }
 
-    /// Extract a keying material from a group element using HKDF extract
-    fn extract_key(&self, salt: &[u8]) -> SharedSecret {
-        let ikm = self.to_alpha();
-        SimpleHkdf::<Blake2s256>::extract(Some(salt), ikm.as_ref())
-            .0
-            .as_slice()
-            .try_into()
-            .expect("Blake2s256 output is not 32 bytes long")
-    }
-
-    /// Performs KDF expansion from the given group element using HKDF expand
-    fn expand_key(&self, salt: &[u8]) -> SharedSecret {
+    /// Extract a keying material from a group element using a KDF
+    fn extract_key(&self, context: &str, salt: &[u8]) -> SharedSecret {
+        let mut output =
+            create_hkdf_instance(&self.to_alpha(), context, Some(salt)).expect("invalid sphinx key length");
         let mut out = SharedSecret::default();
-        let ikm = self.to_alpha();
-        SimpleHkdf::<Blake2s256>::new(Some(salt), &ikm)
-            .expand(b"", out.as_mut())
-            .expect("invalid size of the shared secret output"); // Cannot panic, unless the constants are wrong
-
+        output.fill(out.as_mut());
         out
     }
 }
@@ -80,6 +67,9 @@ pub struct SharedKeys<E: Scalar, G: GroupElement<E>> {
     pub secrets: Vec<SharedSecret>,
     _d: PhantomData<(E, G)>,
 }
+
+const HASH_KEY_SPHINX_SECRET: &str = "HASH_KEY_SPHINX_SECRET";
+const HASH_KEY_SPHINX_BLINDING: &str = "HASH_KEY_SPHINX_BLINDING";
 
 impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
     /// Generates shared secrets given the group element of the peers.
@@ -102,7 +92,7 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             let shared_secret = group_element.mul(&coeff_prev);
 
             // Extract the shared secret from the computed EC point and copy it into the shared keys structure
-            shared_keys.push(shared_secret.extract_key(&salt));
+            shared_keys.push(shared_secret.extract_key(HASH_KEY_SPHINX_SECRET, &salt));
 
             // Stop here, we don't need to compute anything more
             if i == keys_len - 1 {
@@ -110,7 +100,7 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
             }
 
             // Compute the new blinding factor b_k (alpha needs compressing first)
-            let b_k = shared_secret.expand_key(&alpha_prev.to_alpha());
+            let b_k = shared_secret.extract_key(HASH_KEY_SPHINX_BLINDING, &alpha_prev.to_alpha());
             let b_k_checked = E::from_bytes(b_k.as_ref())?;
 
             // Update coeff_prev and alpha
@@ -140,9 +130,9 @@ impl<E: Scalar, G: GroupElement<E>> SharedKeys<E, G> {
 
         let s_k = alpha_point.clone().mul(private_scalar);
 
-        let secret = s_k.extract_key(&public_group_element.to_alpha());
+        let secret = s_k.extract_key(HASH_KEY_SPHINX_SECRET, &public_group_element.to_alpha());
 
-        let b_k = s_k.expand_key(alpha);
+        let b_k = s_k.extract_key(HASH_KEY_SPHINX_BLINDING, alpha);
 
         let b_k_checked = E::from_bytes(b_k.as_ref())?;
         let alpha_new = alpha_point.mul(&b_k_checked);
@@ -178,7 +168,7 @@ pub trait SphinxSuite {
 
     /// Instantiates a new Pseudo-Random Permutation IV and key for general packet data.
     fn new_prp_init(secret: &SecretKey) -> hopr_crypto_types::errors::Result<IvKey<Self::PRP>> {
-        generate_key_iv(secret, HASH_KEY_PRP.as_bytes(), None)
+        generate_key_iv(secret, HASH_KEY_PRP, None)
     }
 
     /// Instantiates a new Pseudo-Random Permutation IV and key for reply data.
@@ -186,7 +176,7 @@ pub trait SphinxSuite {
         secret: &SecretKey16,
         pseudonym: &P,
     ) -> hopr_crypto_types::errors::Result<IvKey<Self::PRP>> {
-        generate_key_iv(secret, HASH_KEY_REPLY_PRP.as_bytes(), Some(pseudonym.as_ref()))
+        generate_key_iv(secret, HASH_KEY_REPLY_PRP, Some(pseudonym.as_ref()))
     }
 }
 

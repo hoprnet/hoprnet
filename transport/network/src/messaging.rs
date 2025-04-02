@@ -1,6 +1,6 @@
 use hopr_crypto_random::random_fill;
-use hopr_crypto_types::crypto_traits::{Digest, Output};
-use hopr_crypto_types::prelude::Blake2s256;
+use hopr_crypto_types::crypto_traits::Digest;
+use hopr_crypto_types::prelude::blake3_hash;
 use hopr_primitive_types::errors::GeneralError;
 use hopr_primitive_types::prelude::BytesEncodable;
 use serde::{Deserialize, Serialize};
@@ -12,17 +12,16 @@ use crate::errors::Result;
 pub const PING_PONG_NONCE_SIZE: usize = 16;
 
 /// Derives a ping challenge (if no challenge is given) or a pong response to a ping challenge.
-pub fn derive_ping_pong(challenge: Option<&[u8]>) -> Box<[u8]> {
-    let mut ret = Output::<Blake2s256>::default();
+pub fn derive_ping_pong(challenge: Option<&[u8]>) -> [u8; PING_PONG_NONCE_SIZE] {
+    let mut ret = [0u8; PING_PONG_NONCE_SIZE];
     match challenge {
         None => random_fill(&mut ret),
         Some(chal) => {
-            let mut digest = Blake2s256::default();
-            digest.update(chal);
-            digest.finalize_into(&mut ret);
+            let hash = blake3_hash(chal);
+            ret.copy_from_slice(&hash.as_bytes()[0..PING_PONG_NONCE_SIZE]);
         }
     }
-    ret[..PING_PONG_NONCE_SIZE].into()
+    ret
 }
 
 /// Implementation of the Control Message sub-protocol, which currently consists of Ping/Pong

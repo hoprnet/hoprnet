@@ -86,7 +86,7 @@ float-cmp = "0.10.0"
 futures = "0.3.31"
 futures-concurrency = "7.6.2"
 futures-timer = "3.0.3"
-generic-array = { version = "1.2.0", features = ["zeroize"] }
+generic-array = "1.2.0"
 governor = { version = "0.8" }
 hex = "0.4.3"
 hex-literal = "0.4.1"
@@ -186,7 +186,6 @@ url = { version = "2.5.2", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.6", features = ["build"] }
 void = "1.0.2"
-zeroize = { version = "1.8.1" }
 
 
 hopr-async-runtime = { path = "common/async-runtime" }

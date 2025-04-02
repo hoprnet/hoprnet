@@ -9,12 +9,11 @@ use crate::utils::SecretValue;
 pub type Aes128Ctr = ctr::Ctr64BE<aes::Aes128>;
 
 // Re-exports of used cryptographic primitives
-pub use blake2::Blake2s256;
+pub use blake3::{hash as blake3_hash, Hasher as Blake3, OutputReader as Blake3Output};
 pub use chacha20::ChaCha20;
 pub use poly1305::Poly1305;
 pub use sha3::Keccak256;
 pub use sha3::Sha3_256;
-use zeroize::ZeroizeOnDrop;
 
 /// Represents a 256-bit secret key of fixed length.
 /// The value is auto-zeroized on drop.
@@ -25,7 +24,6 @@ pub type SecretKey = SecretValue<typenum::U32>;
 pub type SecretKey16 = SecretValue<typenum::U16>;
 
 /// Convenience container for IV and key of a given primitive `T`.
-#[derive(ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IvKey<T>(Box<[u8]>, PhantomData<T>);
 

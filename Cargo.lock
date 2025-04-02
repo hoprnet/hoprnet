@@ -1002,6 +1002,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake3"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34a796731680be7931955498a16a10b2270c7762963d5d570fdbfe02dcbf314f"
+dependencies = [
+ "arrayref",
+ "arrayvec",
+ "cc",
+ "cfg-if",
+ "constant_time_eq",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1542,6 +1555,12 @@ dependencies = [
  "quote",
  "unicode-xid",
 ]
+
+[[package]]
+name = "constant_time_eq"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 
 [[package]]
 name = "cookie"
@@ -3028,7 +3047,6 @@ checksum = "e8c8444bc9d71b935156cc0ccab7f622180808af7867b1daae6547d773591703"
 dependencies = [
  "serde",
  "typenum",
- "zeroize",
 ]
 
 [[package]]
@@ -4263,8 +4281,8 @@ dependencies = [
  "curve25519-dalek",
  "elliptic-curve",
  "generic-array 1.2.0",
+ "hex",
  "hex-literal",
- "hkdf 0.12.4",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-primitive-types",
@@ -4283,7 +4301,7 @@ version = "0.2.0"
 dependencies = [
  "aes 0.8.4",
  "anyhow",
- "blake2",
+ "blake3",
  "chacha20",
  "cipher 0.4.4",
  "crypto_box",
@@ -4309,7 +4327,6 @@ dependencies = [
  "thiserror 2.0.11",
  "tracing",
  "typenum",
- "zeroize",
 ]
 
 [[package]]
@@ -7294,7 +7311,6 @@ dependencies = [
  "cpufeatures",
  "opaque-debug",
  "universal-hash 0.5.1",
- "zeroize",
 ]
 
 [[package]]

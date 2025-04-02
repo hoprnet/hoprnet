@@ -14,9 +14,9 @@ use crate::shared_keys::SharedSecret;
 /// Current version of the header
 const SPHINX_HEADER_VERSION: u8 = 1;
 
-const HASH_KEY_PRG: &[u8] = b"HASH_KEY_PRG";
+const HASH_KEY_PRG: &str = "HASH_KEY_PRG";
 
-const HASH_KEY_TAG: &[u8] = b"HASH_KEY_TAG";
+const HASH_KEY_TAG: &str = "HASH_KEY_TAG";
 
 /// Contains the necessary size and type specifications for the Sphinx packet header.
 pub trait SphinxHeaderSpec {

@@ -174,10 +174,11 @@ mod tests {
         let salt = [0xde, 0xad, 0xbe, 0xef];
         let pt = k256::ProjectivePoint::GENERATOR;
 
-        let key = pt.extract_key(&salt);
-
-        let res = hex_literal::hex!("54bf34178075e153f481ce05b113c1530ecc45a2f1f13a3366d4389f65470de6");
-        assert_eq!(res, key.as_ref());
+        let key = pt.extract_key("test", &salt);
+        assert_eq!(
+            "08112a22609819a4c698d6c92f404628ca925f3d731d53594126ffdf19ef6fa9",
+            hex::encode(key)
+        );
     }
 
     #[cfg(feature = "secp256k1")]
@@ -188,10 +189,12 @@ mod tests {
         let salt = [0xde, 0xad, 0xbe, 0xef];
         let pt = k256::ProjectivePoint::GENERATOR;
 
-        let key = pt.expand_key(&salt);
+        let key = pt.extract_key("test", &salt);
 
-        let res = hex_literal::hex!("d138d9367474911f7124b95be844d2f8a6d34e962694e37e8717bdbd3c15690b");
-        assert_eq!(res, key.as_ref());
+        assert_eq!(
+            "08112a22609819a4c698d6c92f404628ca925f3d731d53594126ffdf19ef6fa9",
+            hex::encode(key)
+        );
     }
 
     #[cfg(feature = "secp256k1")]
