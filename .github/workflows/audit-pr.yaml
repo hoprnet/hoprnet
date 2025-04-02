@@ -1,13 +1,16 @@
 name: Audit PR
 
 on:
-  pull_request_review:
-    types: [submitted]
+  merge_group:
+    types: [checks_requested]
+  pull_request:
+    types:
+      - synchronize
+      - ready_for_review
 
 jobs:
   cargo-audit:
-    if: github.event.review.state == 'approved' && github.event.review.user.type == 'User' && !contains(github.event.review.user.login, 'coderabbitai')
-      
+    name: Cargo Audit   
     runs-on: self-hosted-hoprnet-bigger
     steps:
       - name: Harden Runner
