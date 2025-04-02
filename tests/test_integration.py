@@ -61,6 +61,7 @@ class TestIntegrationWithSwarm:
                     break
                 else:
                     await asyncio.sleep(0.5)
+
         await asyncio.gather(
             *[
                 asyncio.wait_for(

@@ -36,6 +36,7 @@ class TestRestApiWithSwarm:
         async with aiohttp.ClientSession(headers=headers) as s:
             assert (await s.get(url)).status == 200
 
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("peer", random.sample(nodes_with_auth(), 1))
 async def test_hoprd_rest_api_should_accept_connection_with_valid_token(peer: str, swarm7: dict[str, Node]):

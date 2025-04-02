@@ -481,7 +481,9 @@ The following files in the node's database folder are required:
 
 1. Place the pre-built logs database files in the node's database folder
 2. Enable fast sync mode (enabled by default):
-  - Set `hopr -> chain -> fast_sync` to `true` in the configuration file
+
+   - Set `hopr -> chain -> fast_sync` to `true` in the configuration file
+
 3. Remove any existing index data:
 
    ```shell
