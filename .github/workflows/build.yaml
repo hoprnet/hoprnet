@@ -87,9 +87,8 @@ jobs:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@6463cdb00ee92c05bec55dffc4e1fce250301945 # main on 20.02.2025
         with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
           sync-labels: true
 
   docs:
