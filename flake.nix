@@ -513,6 +513,15 @@
               fi
             '';
           };
+          run-audit = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellApplication {
+              name = "audit";
+              runtimeInputs = [ pkgs.cargo pkgs.cargo-audit ];
+              text = ''
+                cargo audit --deny warnings
+              '';
+            };
+          };
           update-github-labels = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "update-github-labels" ''
               set -eu
@@ -634,6 +643,7 @@
             inherit hopr-pluto-docker-build-and-upload;
             inherit update-github-labels;
             check = run-check;
+            audit = run-audit;
           };
 
           packages = {
