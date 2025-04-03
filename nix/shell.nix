@@ -60,8 +60,8 @@ craneLib.devShell {
     lcov
 
     ## python is required by integration tests
-    python39
-    python39Packages.venvShellHook
+    python313
+    python313Packages.venvShellHook
     uv
 
     ## formatting
