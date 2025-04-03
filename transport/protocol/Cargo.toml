@@ -30,7 +30,10 @@ serde_with = { workspace = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio-util = { workspace = true, default-features = false, features = ["codec", "compat"] }
+tokio-util = { workspace = true, default-features = false, features = [
+  "codec",
+  "compat",
+] }
 tracing = { workspace = true }
 validator = { workspace = true }
 
