@@ -690,7 +690,7 @@ mod tests {
             .amount(1)
             .index(1)
             .index_offset(1)
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .challenge(response.to_challenge().into())
             .build_signed(&chain_key_alice, &domain_separator)?;

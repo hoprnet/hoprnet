@@ -1,4 +1,5 @@
 use hopr_crypto_types::prelude::Hash;
+use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
 /// Contains various on-chain information collected by Indexer,
@@ -15,7 +16,7 @@ pub struct IndexerData {
     /// Current ticket price
     pub ticket_price: Option<Balance>,
     /// Minimum winning probability
-    pub minimum_incoming_ticket_winning_prob: f64,
+    pub minimum_incoming_ticket_winning_prob: WinningProbability,
     /// Network registry state
     pub nr_enabled: bool,
 }
