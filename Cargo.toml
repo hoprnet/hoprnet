@@ -176,7 +176,10 @@ tokio = { version = "1.43.0", features = [
   "macros",
   "tracing",
 ] }
-tokio-util = { version = "0.7.13", default-features = false, features = ["codec", "compat"] }
+tokio-util = { version = "0.7.13", default-features = false, features = [
+  "codec",
+  "compat",
+] }
 tokio-retry = "0.3.0"
 tracing = { version = "0.1.41" }
 tracing-futures = { version = "0.2.5" }

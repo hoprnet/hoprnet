@@ -13,7 +13,7 @@ pub trait BidirectionalStreamControl: std::fmt::Debug {
     fn accept(
         self,
     ) -> Result<impl Stream<Item = (PeerId, impl AsyncRead + AsyncWrite + Send)> + Send, impl std::error::Error>;
-    
+
     async fn open(self, peer: PeerId) -> Result<impl AsyncRead + AsyncWrite + Send, impl std::error::Error>;
 }
 
@@ -98,7 +98,7 @@ where
 
                             let (stream_rx, stream_tx) = stream.split();
                             let (send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
-                
+
                             hopr_async_runtime::prelude::spawn(
                                 recv.map(Ok)
                                     .forward(FramedWrite::new(stream_tx.compat_write(), codec.clone())),
@@ -117,7 +117,7 @@ where
                                     .map(Ok)
                                     .forward(tx_in),
                             );
-                
+
                             Some(send)
                         }
                         Err(error) => {
@@ -131,7 +131,7 @@ where
             if let Some(mut cached) = cached {
                 cached.send(msg).await.unwrap_or_else(|e| {
                     tracing::error!(peer = %peer_id, error = %e, "Error sending message to peer");
-                }); 
+                });
             } else {
                 tracing::error!(peer = %peer_id, "Error sending message to peer: the stream failed to be created and cached");
             }
@@ -206,7 +206,10 @@ mod tests {
         let value = tokio_util::bytes::BytesMut::from(expected.as_ref());
 
         let (stream_rx, stream_tx) = stream.split();
-        let (mut tx, rx) = (FramedWrite::new(stream_tx.compat_write(), codec.clone()), FramedRead::new(stream_rx.compat(), codec));
+        let (mut tx, rx) = (
+            FramedWrite::new(stream_tx.compat_write(), codec.clone()),
+            FramedRead::new(stream_rx.compat(), codec),
+        );
         tx.send(value)
             .await
             .map_err(|_| anyhow::anyhow!("should not fail on send"))?;
