@@ -34,15 +34,7 @@ def load_env_file(env_file: str) -> dict:
 
 class Node:
     def __init__(
-        self,
-        id: int,
-        api_token: str,
-        host_addr: str,
-        network: str,
-        identity_path: str,
-        cfg_file: str,
-        alias: str,
-        use_nat: bool,
+        self, id: int, api_token: str, host_addr: str, network: str, identity_path: str, cfg_file: str, alias: str
     ):
         # initialized
         self.id = id
@@ -51,7 +43,6 @@ class Node:
         self.api_token: str = api_token
         self.network: str = network
         self.identity_path: str = identity_path
-        self.use_nat: bool = use_nat
 
         # optional
         self.cfg_file: str = cfg_file
@@ -160,6 +151,7 @@ class Node:
                 [
                     log_level,
                     "libp2p_swarm=info",
+                    "libp2p_mplex=info",
                     "multistream_select=info",
                     "isahc=error",
                     "sea_orm=warn",
@@ -175,7 +167,6 @@ class Node:
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
             "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}",
-            "HOPRD_NAT": "true" if self.use_nat else "false",
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
 
@@ -214,18 +205,8 @@ class Node:
         ready = False
 
         while not ready:
-            peers_info = await asyncio.wait_for(self.api.peers(), timeout=1)
-            logging.debug(f"Peers info on {self.id}: {peers_info}")
-
-            # filter out peers that are not not well connection yet
-            connected_peers = [p.peer_id for p in peers_info if p.quality >= 0.25]
-            connected_peers.sort()
-            logging.debug(f"Peers connected on {self.id}: {connected_peers}")
-
-            missing_peers = [p for p in required_peers if p not in connected_peers]
-            logging.debug(f"Peers not connected on {self.id}: {missing_peers}")
-
-            ready = missing_peers == []
+            peers = [p.peer_id for p in await asyncio.wait_for(self.api.peers(), timeout=20)]
+            ready = [p for p in required_peers if p not in peers] == []
 
             if not ready:
                 await asyncio.sleep(0.5)
@@ -236,15 +217,13 @@ class Node:
         self.proc.kill()
 
     @classmethod
-    def fromConfig(cls, index: int, alias: str, config: dict, api_token: dict, network: str, use_nat: bool):
+    def fromConfig(cls, index: int, alias: str, config: dict, api_token: dict, network: str):
         token = api_token["default"]
 
         if "api_token" in config:
             token = config["api_token"]
 
-        return cls(
-            index, token, config["host"], network, config["identity_path"], config["config_file"], alias, use_nat
-        )
+        return cls(index, token, config["host"], network, config["identity_path"], config["config_file"], alias)
 
     async def alias_peers(self, aliases_dict: dict[str, str]):
         for peer_id, alias in aliases_dict.items():

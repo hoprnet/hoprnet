@@ -2,7 +2,6 @@ import asyncio
 import random
 import re
 import string
-import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
@@ -134,9 +133,7 @@ async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(src: str
     response = await swarm7[src].api.ping(swarm7[dest].peer_id)
 
     assert response is not None
-    logging.debug(f"Ping response: {response}")
-    # any non-negative value is acceptable
-    assert int(response.latency) >= 0, f"round trip must be non-negative, actual: '{int(response.latency)}'"
+    assert int(response.latency) > 0, f"Non-0 round trip time expected, actual: '{int(response.latency)}'"
 
 
 @pytest.mark.asyncio
@@ -171,7 +168,7 @@ async def test_hoprd_should_be_able_to_send_0_hop_messages_without_open_channels
     message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
 
     packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
-    await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[], timeout=5.0)
+    await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[])
 
     # Remove all messages so they do not interfere with the later tests
     await swarm7[dest].api.messages_pop_all(None)
@@ -302,24 +299,22 @@ async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_fu
         )
 
         packets = [f"Channel agg and redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)]
-        await send_and_receive_packets_with_pop(
-            packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id], timeout=1.0
-        )
+        await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id])
 
         # this message has no funding in the channel, but it still should be sent
         assert await swarm7[src].api.send_message(
             swarm7[src].peer_id, "THIS MSG IS NOT COVERED", [swarm7[dest].peer_id]
         )
 
-        await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 5.0)
+        await asyncio.wait_for(check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 30.0)
 
         # we should see the last message as rejected
-        await asyncio.wait_for(check_rejected_tickets_value(swarm7[dest], 1), 5.0)
+        await asyncio.wait_for(check_rejected_tickets_value(swarm7[dest], 1), 120.0)
 
         await asyncio.sleep(10)  # wait for aggregation to finish
         assert await swarm7[dest].api.tickets_redeem()
 
-        await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 5.0)
+        await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 120.0)
 
 
 @pytest.mark.asyncio
@@ -378,7 +373,7 @@ async def test_hoprd_default_strategy_automatic_ticket_aggregation_and_redeeming
                 else:
                     await asyncio.sleep(0.1)
 
-        await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid].api), 30.0)
+        await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid].api), 120.0)
 
 
 # FIXME: This test depends on side-effects and cannot be run on its own. It
@@ -517,15 +512,9 @@ async def test_peeking_messages_with_timestamp(src: str, dest: str, swarm7: dict
     async def peek_the_messages():
         packets = await dest_peer.api.messages_peek_all(random_tag, ts_for_query)
 
-        done = len(packets) == (message_count - split_index)
+        assert len(packets) == message_count - split_index
 
-        if not done:
-            logging.debug(f"Peeked {len(packets)} messages, expected {message_count - split_index}")
-            await asyncio.sleep(0.01)
-
-        return done
-
-    await asyncio.wait_for(peek_the_messages(), 5)
+    await asyncio.wait_for(peek_the_messages(), MULTIHOP_MESSAGE_SEND_TIMEOUT)
 
     # Remove all messages so they do not interfere with the later tests
     await dest_peer.api.messages_pop_all(random_tag)

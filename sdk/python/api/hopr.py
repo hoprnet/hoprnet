@@ -114,10 +114,8 @@ class HoprdAPI:
         try:
             headers = {"Content-Type": "application/json"}
             async with aiohttp.ClientSession(headers=self.headers) as s:
-                url = f"{self.host}{self.prefix if use_api_path else '/'}{endpoint}"
-                logging.debug(f"Calling {method.value} {url}")
                 async with getattr(s, method.value)(
-                    url=url,
+                    url=f"{self.host}{self.prefix if use_api_path else '/'}{endpoint}",
                     json={} if data is None else data.as_dict,
                     headers=headers,
                 ) as res:

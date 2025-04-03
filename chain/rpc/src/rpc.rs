@@ -464,6 +464,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
     use primitive_types::H160;
+    use std::ops::Add;
     use std::sync::Arc;
     use std::time::Duration;
 
