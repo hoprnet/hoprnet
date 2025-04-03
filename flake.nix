@@ -466,7 +466,7 @@
               foundry-bin
               solcDefault
               hopli-debug
-              hoprd-debug
+              hoprd # must be a release build to circumvent a panic within libp2p-request-response
               python39
             ];
             buildPhase = ''
@@ -498,7 +498,13 @@
             tools = pkgs;
           };
           defaultDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
-          smoketestsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ hoprd-debug hopli-debug tcpdump ]; };
+          smoketestsDevShell = import ./nix/shell.nix {
+            inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [
+            hoprd # must be a release build to circumvent a panic within libp2p-request-response
+            hopli-debug
+            tcpdump
+          ];
+          };
           docsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
