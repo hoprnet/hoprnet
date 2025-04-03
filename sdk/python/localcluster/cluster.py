@@ -21,16 +21,15 @@ GLOBAL_TIMEOUT = 60
 
 
 class Cluster:
-    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path, use_nat):
+    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path):
         self.anvil_config = anvil_config
         self.protocol_config = protocol_config
-        self.use_nat = use_nat
         self.nodes: dict[str, Node] = {}
         index = 1
 
         for network_name, params in config["networks"].items():
             for alias, node in params["nodes"].items():
-                self.nodes[str(index)] = Node.fromConfig(index, alias, node, config["api_token"], network_name, use_nat)
+                self.nodes[str(index)] = Node.fromConfig(index, alias, node, config["api_token"], network_name)
                 index += 1
 
     def clean_up(self):
@@ -78,14 +77,12 @@ class Cluster:
             logging.critical("Not all nodes are ready, interrupting setup")
             raise RuntimeError
 
-        logging.info(f"Retrieve nodes addresses and peer ids")
         for node in self.nodes.values():
             if addresses := await node.api.addresses():
                 node.peer_id = addresses.hopr
                 node.address = addresses.native
             else:
-                logging.critical(f"Node {node} did not return addresses")
-                raise RuntimeError
+                logging.error(f"Node {node} did not return addresses")
 
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
         logging.info(f"Waiting up to {2 * GLOBAL_TIMEOUT}s for nodes to connect to all peers")
@@ -95,11 +92,7 @@ class Cluster:
             required_peers = [n.peer_id for n in self.nodes.values() if n != node and n.network == node.network]
             tasks.append(asyncio.create_task(node.all_peers_connected(required_peers)))
 
-        try:
-            await asyncio.wait_for(asyncio.gather(*tasks), 2 * GLOBAL_TIMEOUT)
-        except asyncio.TimeoutError:
-            logging.critical("Not all nodes are connected to all peers, interrupting setup")
-            raise RuntimeError
+        await asyncio.wait_for(asyncio.gather(*tasks), 2 * GLOBAL_TIMEOUT)
 
     def fund_nodes(self):
         logging.info("Funding nodes")

@@ -3,9 +3,9 @@ hopr:
   # run heartbeats more frequently
   heartbeat:
     max_parallel_probes: 10
-    interval: 3
-    threshold: 2
-    variance: 0
+    interval: 10
+    threshold: 10
+    variance: 1
   network_options:
     # do not ignore in tests at all
     ignore_timeframe: 0

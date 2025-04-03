@@ -81,7 +81,7 @@ class Infos(ApiResponseObject):
 
 
 class ConnectedPeer(ApiResponseObject):
-    keys = {"address": "peerAddress", "peer_id": "peerId", "version": "reportedVersion", "quality": "quality"}
+    keys = {"address": "peerAddress", "peer_id": "peerId", "version": "reportedVersion"}
 
 
 class Channel(ApiResponseObject):
