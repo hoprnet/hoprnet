@@ -296,7 +296,7 @@ impl HoprPacket {
                     let ack_key = derive_ack_key_share(&derived_secret);
 
                     let ticket = Ticket::try_from(pre_ticket)?;
-                    let verification_output = pre_verify(&derived_secret, additional_info.as_ref(), &ticket.challenge)?;
+                    let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
                     Ok(Self::Forwarded {
                         packet,
                         ticket,

@@ -17,6 +17,7 @@ serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-sphinx/serde"]
 benchmarks = []
 
 [dependencies]
+hex = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 thiserror = { workspace = true }
