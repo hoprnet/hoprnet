@@ -5,13 +5,9 @@ use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
 
 use crate::errors::PacketError::{PacketConstructionError, PacketDecodingError};
-use crate::por::derive_ack_key_share;
+use crate::por::{derive_ack_key_share, generate_proof_of_relay, pre_verify};
 use crate::types::HoprPacketMessage;
-use crate::{
-    errors::Result,
-    por::{pre_verify, ProofOfRelayString, ProofOfRelayValues},
-    HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
-};
+use crate::{errors::Result, HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb};
 
 /// Represents an outgoing packet that has been only partially instantiated.
 ///
@@ -64,12 +60,7 @@ impl PartialHoprPacket {
 
                 // Create shared secrets and PoR challenge chain
                 let shared_keys = HoprSphinxSuite::new_shared_keys(forward_path)?;
-                let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
-                let por_values = ProofOfRelayValues::new(
-                    &shared_keys.secrets[0],
-                    shared_keys.secrets.get(1),
-                    shared_keys.secrets.len() as u8,
-                )?;
+                let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
 
                 // Create SURBs if some return paths were specified
                 let (surbs, openers): (Vec<_>, Vec<_>) = return_paths
@@ -213,12 +204,7 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
     }
 
     let shared_keys = HoprSphinxSuite::new_shared_keys(return_path)?;
-    let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
-    let por_values = ProofOfRelayValues::new(
-        &shared_keys.secrets[0],
-        shared_keys.secrets.get(1),
-        shared_keys.secrets.len() as u8,
-    )?;
+    let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
 
     Ok(create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
         shared_keys,

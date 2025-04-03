@@ -32,6 +32,9 @@ mod validation;
 pub mod prelude {
     pub use crate::packet::{HoprPacket, PacketRouting, PartialHoprPacket};
     pub use crate::validation::validate_unacknowledged_ticket;
+
+    #[cfg(feature = "benchmarks")]
+    pub use crate::por::{generate_proof_of_relay, pre_verify};
 }
 
 /// Pseudonyms used for the return path.

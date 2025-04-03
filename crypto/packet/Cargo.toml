@@ -14,6 +14,7 @@ crate-type = ["rlib"]
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-sphinx/serde"]
+benchmarks = []
 
 [dependencies]
 serde = { workspace = true, optional = true }
@@ -44,5 +45,9 @@ hopr-crypto-sphinx = { workspace = true, features = [
 
 
 [[bench]]
-name = "packet_crypto"
+name = "packet_benches"
+harness = false
+
+[[bench]]
+name = "por_benches"
 harness = false

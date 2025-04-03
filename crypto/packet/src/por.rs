@@ -10,7 +10,7 @@ const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";
 
 /// Used in Proof of Relay to derive own half-key (S0)
 /// The function samples a secp256k1 field element using the given `secret` via `sample_field_element`.
-pub fn derive_own_key_share(secret: &SecretKey) -> HalfKey {
+fn derive_own_key_share(secret: &SecretKey) -> HalfKey {
     sample_secp256k1_field_element(secret.as_ref(), HASH_KEY_OWN_KEY).expect("failed to sample own key share")
 }
 
@@ -50,7 +50,7 @@ impl ProofOfRelayValues {
 
     /// Takes the secrets which the first and the second relayer are able to derive from the packet header
     /// and computes the challenge for the first ticket.
-    pub fn new(
+    fn new(
         secret_b: &SharedSecret,
         secret_c: Option<&SharedSecret>,
         chain_length: u8,
@@ -107,7 +107,7 @@ pub struct ProofOfRelayString([u8; Self::SIZE]);
 
 impl ProofOfRelayString {
     /// Creates an instance from the shared secrets with node+2 and node+3
-    pub fn new(secret_c: &SharedSecret, secret_d: Option<&SharedSecret>) -> hopr_crypto_types::errors::Result<Self> {
+    fn new(secret_c: &SharedSecret, secret_d: Option<&SharedSecret>) -> hopr_crypto_types::errors::Result<Self> {
         let s0 = derive_ack_key_share(secret_c); // s0_ack
         let s1 = derive_own_key_share(secret_c); // s1_own
         let s2 = derive_ack_key_share(secret_d.unwrap_or(&SharedSecret::random())); // s2_ack
@@ -127,7 +127,7 @@ impl ProofOfRelayString {
 
     /// Generates Proof of Relay challenges from the shared secrets of the
     /// outgoing packet.
-    pub fn from_shared_secrets(secrets: &[SharedSecret]) -> hopr_crypto_types::errors::Result<Vec<ProofOfRelayString>> {
+    fn from_shared_secrets(secrets: &[SharedSecret]) -> hopr_crypto_types::errors::Result<Vec<ProofOfRelayString>> {
         (1..secrets.len())
             .map(|i| ProofOfRelayString::new(&secrets[i], secrets.get(i + 1)))
             .collect()
@@ -177,10 +177,11 @@ pub struct ProofOfRelayOutput {
 
 /// Verifies that an incoming packet contains all values that are necessary to reconstruct the response to redeem the
 /// incentive for relaying the packet.
+///
 /// # Arguments
 /// * `secret` shared secret with the creator of the packet
 /// * `por_bytes` serialized `ProofOfRelayString` as included within the packet
-/// * `challenge` ticket challenge of the incoming ticket
+/// * `challenge` the ticket challenge of the incoming ticket
 pub fn pre_verify(
     secret: &SharedSecret,
     por_bytes: &[u8],
@@ -204,6 +205,13 @@ pub fn pre_verify(
     } else {
         Err(PacketError::PoRVerificationError)
     }
+}
+
+/// Helper function which generates proof of relay for the given path.
+pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfRelayString>, ProofOfRelayValues)> {
+    let por_strings = ProofOfRelayString::from_shared_secrets(secrets)?;
+    let por_values = ProofOfRelayValues::new(&secrets[0], secrets.get(1), secrets.len() as u8)?;
+    Ok((por_strings, por_values))
 }
 
 #[cfg(test)]

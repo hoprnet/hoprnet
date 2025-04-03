@@ -93,7 +93,7 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 
-    use crate::por::{ProofOfRelayString, ProofOfRelayValues};
+    use crate::por::generate_proof_of_relay;
     use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite};
 
     lazy_static::lazy_static! {
@@ -124,12 +124,8 @@ mod tests {
             .into_iter()
             .map(|_| {
                 let shared_keys = HoprSphinxSuite::new_shared_keys(&path)?;
-                let por_strings = ProofOfRelayString::from_shared_secrets(&shared_keys.secrets)?;
-                let por_values = ProofOfRelayValues::new(
-                    &shared_keys.secrets[0],
-                    shared_keys.secrets.get(1),
-                    shared_keys.secrets.len() as u8,
-                )?;
+                let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)
+                    .map_err(|e| CryptoError::Other(GeneralError::NonSpecificError(e.to_string())))?;
 
                 create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
                     shared_keys,

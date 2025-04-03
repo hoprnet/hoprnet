@@ -540,7 +540,9 @@ pub struct OffchainPublicKey {
 
 impl std::fmt::Debug for OffchainPublicKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OffchainPublicKey").field("compressed", &self.compressed).finish()
+        f.debug_struct("OffchainPublicKey")
+            .field("compressed", &self.compressed)
+            .finish()
     }
 }
 
@@ -567,8 +569,10 @@ impl TryFrom<&[u8]> for OffchainPublicKey {
 
     fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
         let compressed = CompressedEdwardsY::from_slice(value).map_err(|_| ParseError("OffchainPublicKey".into()))?;
-        let edwards = compressed.decompress().ok_or(ParseError("OffchainPublicKey.decompress".into()))?;
-        Ok(Self{
+        let edwards = compressed
+            .decompress()
+            .ok_or(ParseError("OffchainPublicKey.decompress".into()))?;
+        Ok(Self {
             compressed,
             edwards,
             montgomery: edwards.to_montgomery(),
