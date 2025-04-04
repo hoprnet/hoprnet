@@ -4740,7 +4740,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.5.6"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4770,7 +4770,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
