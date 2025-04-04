@@ -78,9 +78,7 @@ def random_distinct_pairs_from(values: list, count: int):
 @pytest.fixture(scope="session")
 async def swarm7(request):
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
-    cluster, anvil = await localcluster.bringup(
-        params_path, test_mode=True, fully_connected=False, use_nat=True
-    )
+    cluster, anvil = await localcluster.bringup(params_path, test_mode=True, fully_connected=False, use_nat=True)
 
     yield cluster.nodes
 
