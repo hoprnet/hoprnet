@@ -110,17 +110,12 @@ class HoprdAPI:
     def log_prefix(cls) -> str:
         return "api"
 
-    async def __call(
-        self,
-        method: HTTPMethod,
-        endpoint: str,
-        data: ApiRequestObject = None,
-    ):
+    async def __call(self, method: HTTPMethod, endpoint: str, data: ApiRequestObject = None, use_api_path: bool = True):
         try:
             headers = {"Content-Type": "application/json"}
             async with aiohttp.ClientSession(headers=self.headers) as s:
                 async with getattr(s, method.value)(
-                    url=f"{self.host}{self.prefix}{endpoint}",
+                    url=f"{self.host}{self.prefix if use_api_path else '/'}{endpoint}",
                     json={} if data is None else data.as_dict,
                     headers=headers,
                 ) as res:
@@ -145,10 +140,11 @@ class HoprdAPI:
         endpoint: str,
         data: ApiRequestObject = None,
         timeout: int = 60,
+        use_api_path: bool = True,
     ) -> tuple[bool, Optional[object]]:
         try:
             return await asyncio.wait_for(
-                asyncio.create_task(self.__call(method, endpoint, data)),
+                asyncio.create_task(self.__call(method, endpoint, data, use_api_path)),
                 timeout=timeout,
             )
 
@@ -377,7 +373,7 @@ class HoprdAPI:
         return is_ok
 
     async def metrics(self):
-        _, response = await self.__call_api(HTTPMethod.GET, "node/metrics")
+        _, response = await self.__call_api(HTTPMethod.GET, "metrics", use_api_path=False)
         return response
 
     async def get_tickets_statistics(self) -> Optional[TicketStatistics]:
