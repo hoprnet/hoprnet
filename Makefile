@@ -98,6 +98,10 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 localcluster: ## spin up the localcluster using the default configuration file
 	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected
 
+.PHONY: localcluster-expose1
+localcluster-expose1: ## spin up the localcluster exposing node 1 API
+	@python -m sdk.python.localcluster --config ./sdk/python/localcluster-expose1.params.yml --fully_connected
+
 .PHONY: create-local-identity
 create-local-identity: id_dir=/tmp/
 create-local-identity: id_password=local
@@ -387,7 +391,7 @@ endif
 		-c /tmp/python-sdk-config.json
 
 	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
-	
+
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
