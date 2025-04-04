@@ -1,8 +1,8 @@
-use std::fmt::Formatter;
 use hopr_crypto_sphinx::prelude::SharedSecret;
 use hopr_crypto_types::prelude::{sample_secp256k1_field_element, SecretKey};
 use hopr_crypto_types::types::{Challenge, HalfKey, HalfKeyChallenge, Response};
 use hopr_primitive_types::prelude::*;
+use std::fmt::Formatter;
 
 use crate::errors::{PacketError, Result};
 
@@ -36,7 +36,6 @@ impl ProofOfRelayValues {
         ret[1 + HalfKeyChallenge::SIZE..].copy_from_slice(ticket_challenge.as_ref());
         Self(ret)
     }
-
 
     /// Length of this PoR challenge chain (number of hops + 1).
     // TODO: needed to know how to price the ticket on the return path, will be fixed in #3765
@@ -189,12 +188,14 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
     let mut por_values = None;
 
     for i in 0..secrets.len() {
-        let hint = last_ack_key_share.unwrap_or_else(|| {
-            derive_ack_key_share(&secrets[i]) // s0_ack
-        }).to_challenge();
+        let hint = last_ack_key_share
+            .unwrap_or_else(|| {
+                derive_ack_key_share(&secrets[i]) // s0_ack
+            })
+            .to_challenge();
 
         let s1 = derive_own_key_share(&secrets[i]); // s1_own
-        let s2 = derive_ack_key_share(secrets.get(i+1).unwrap_or(&SharedSecret::random()));
+        let s2 = derive_ack_key_share(secrets.get(i + 1).unwrap_or(&SharedSecret::random()));
 
         let next_ticket_challenge = Response::from_half_keys(&s1, &s2)? // (s1_own + s2_ack) * G
             .to_challenge()
@@ -203,12 +204,19 @@ pub fn generate_proof_of_relay(secrets: &[SharedSecret]) -> Result<(Vec<ProofOfR
         if i > 0 {
             por_strings.push(ProofOfRelayString::new(&next_ticket_challenge, &hint));
         } else {
-            por_values = Some(ProofOfRelayValues::new(secrets.len() as u8, &hint, &next_ticket_challenge));
+            por_values = Some(ProofOfRelayValues::new(
+                secrets.len() as u8,
+                &hint,
+                &next_ticket_challenge,
+            ));
         }
         last_ack_key_share = Some(s2);
     }
 
-    Ok((por_strings, por_values.ok_or(PacketError::LogicError("no shared secrets".into()))?))
+    Ok((
+        por_strings,
+        por_values.ok_or(PacketError::LogicError("no shared secrets".into()))?,
+    ))
 }
 
 #[cfg(test)]
@@ -229,7 +237,7 @@ mod tests {
                 .to_challenge()
                 .to_ethereum_challenge();
 
-            Ok((Self::new(chain_length,  &ack_challenge, &ticket_challenge), s0))
+            Ok((Self::new(chain_length, &ack_challenge, &ticket_challenge), s0))
         }
     }
 
@@ -295,11 +303,17 @@ mod tests {
             assert_eq!(por_strings.len(), gen_por_strings.len());
 
             for i in 0..por_strings.len() {
-                assert_eq!(por_strings[i].acknowledgement_challenge_or_hint(), gen_por_strings[i].acknowledgement_challenge_or_hint());
+                assert_eq!(
+                    por_strings[i].acknowledgement_challenge_or_hint(),
+                    gen_por_strings[i].acknowledgement_challenge_or_hint()
+                );
 
                 // The ticket challenge is randomly generated, so cannot compare them
                 if i != por_strings.len() - 1 {
-                    assert_eq!(por_strings[i].next_ticket_challenge(), gen_por_strings[i].next_ticket_challenge());
+                    assert_eq!(
+                        por_strings[i].next_ticket_challenge(),
+                        gen_por_strings[i].next_ticket_challenge()
+                    );
                 }
             }
         }
