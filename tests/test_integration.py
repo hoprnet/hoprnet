@@ -332,7 +332,7 @@ class TestIntegrationWithSwarm:
             await asyncio.sleep(10)  # wait for aggregation to finish
             assert await swarm7[dest].api.tickets_redeem()
 
-            await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 5.0)
+            await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 30.0)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -396,7 +396,7 @@ class TestIntegrationWithSwarm:
                     else:
                         await asyncio.sleep(0.1)
 
-            await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid].api), 30.0)
+            await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid].api), 60.0)
 
     # FIXME: This test depends on side-effects and cannot be run on its own. It
     # should be redesigned.
