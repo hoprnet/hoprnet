@@ -94,7 +94,8 @@ jobs:
         uses: actions/checkout@v4
 
       - uses: actions/labeler@6463cdb00ee92c05bec55dffc4e1fce250301945 # main on 20.02.2025
-      - uses: actions/labeler@v5
+        with:
+          sync-labels: true
         with:
           sync-labels: true
 

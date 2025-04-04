@@ -19,7 +19,7 @@ echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'"$
 
 # Ensure target directory exists and is empty
 mkdir -p "${TARGET_DIR}"
-rm -rf "${TARGET_DIR}"/*
+rm -rf "${TARGET_DIR:?}"/*
 
 # create the openapi.spec.json
 hoprd-api-schema >|/tmp/openapi.spec.json
