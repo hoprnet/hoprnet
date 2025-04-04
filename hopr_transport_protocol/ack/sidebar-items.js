@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CURRENT_HOPR_ACK_PROTOCOL"],"mod":["codec","processor"],"type":["AckCodec"]};

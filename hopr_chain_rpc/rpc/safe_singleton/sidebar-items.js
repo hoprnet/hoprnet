@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"static":["SAFESINGLETON_ABI"],"struct":["IsModuleEnabledCall","IsModuleEnabledReturn","SafeSingleton"]};
