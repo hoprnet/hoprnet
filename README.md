@@ -94,8 +94,8 @@ where:
 
 Pull the container image with `docker`:
 
-```shell
-$ docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
+```bash
+docker pull europe-west3-docker.pkg.dev/hoprassociation/docker-images/hoprd:singapore
 ```
 
 It is recommended to setup an alias `hoprd` for the docker command invocation.
@@ -106,23 +106,23 @@ WARNING: This setup should only be used for development or advanced usage withou
 
 Clone and initialize the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository:
 
-```shell
-$ git clone https://github.com/hoprnet/hoprnet
-$ cd hoprnet
+```bash
+git clone https://github.com/hoprnet/hoprnet
+cd hoprnet
 ```
 
 Build and install the `hoprd` binary, e.g. on a UNIX platform:
 
-```shell
-$ nix build
-$ sudo cp result/bin/* /usr/local/bin/
+```bash
+nix build
+sudo cp result/bin/* /usr/local/bin/
 ```
 
 ## Usage
 
 `hoprd` provides various command-line switches to configure its behaviour. For reference these are documented here as well:
 
-```shell
+```bash
 $ hoprd --help
 HOPR node executable.
 
@@ -214,13 +214,13 @@ Running the node without any command-line argument might not work depending on t
 
 Some basic reasonable setup uses a custom identity and enables the REST API of the `hoprd`:
 
-```sh
+```bash
 hoprd --identity /app/hoprd-db/.hopr-identity --password switzerland --init --announce --host "0.0.0.0:9091" --apiToken <MY_TOKEN> --network doufur
 ```
 
 Here is a short breakdown of each argument.
 
-```sh
+```bash
 hoprd
   # store your node identity information in the persisted database folder
   --identity /app/hoprd-db/.hopr-identity
@@ -282,20 +282,20 @@ experimental-features = nix-command flakes
 
 Install the `nix-direnv` package to introduce the `direnv`:
 
-```shell
-$ nix-env -i nix-direnv
+```bash
+nix-env -i nix-direnv
 ```
 
 Append the following line to the shell rc file (depending on the shell used it can be `~\.zshrc`, `~\.bashrc`, `~\.cshrc`, etc.). Modify the `<shell>` variable inside the below command with the currently used (`zsh`, `bash`, `csh`, etc.):
 
-```shell
-$ eval "$(direnv hook <shell>)"
+```bash
+eval "$(direnv hook <shell>)"
 ```
 
 From within the [`hoprnet`](https://github.com/hoprnet/hoprnet) repository's directory, execute the following command.
 
 ```bash
-$ direnv allow .
+direnv allow .
 ```
 
 #### Nix flake outputs
@@ -303,15 +303,15 @@ $ direnv allow .
 We provide a couple of packages, apps and shells to make building and
 development easier, to get the full list execute:. You may get the full list like so:
 
-```shell
-$ nix flake show
+```bash
+nix flake show
 ```
 
 #### Code Formatting
 
 All nix, rust, solidity and python code can be automatically formatted:
 
-```shell
+```bash
 nix fmt
 ```
 
@@ -321,7 +321,7 @@ These formatters are also automatically run as a Git pre-commit check.
 
 All linters can be executed via a Nix flake helper app:
 
-```shell
+```bash
 nix run .#lint
 ```
 
@@ -344,7 +344,8 @@ For usage examples of the generated SDK, refer to the generated README.md file i
 
 Running one node in test mode, with safe and module attached (in an `anvil-localhost` network)
 
-```shell
+```bash
+nix run .#lint
 # clean up, e.g.
 # make kill-anvil
 # make clean
@@ -383,7 +384,7 @@ make run-hopr-admin &
 
 Running one node in test mode, with safe and module attached (in dufour network)
 
-````shell
+```bash
 # build deps and HOPRd code
 make -j deps && make -j build
 
@@ -395,9 +396,9 @@ make -j deps && make -j build
 # Please use the deployer private key as DEPLOYER_PRIVATE_KEY
 # The Ethereum address to the DEPLOYER_PRIVATE_KEY should be a "manager" of the network registry.
 # Role can be checked in the explorer:
-# ```
+
 # echo "https://gnosisscan.io/address/$(jq '.networks.dufour.addresses.network_registry' ./ethereum/contracts/contracts-addresses.json)\#readContract"
-# ```
+
 source ./ethereum/contracts/.env
 
 export HOPR_NETWORK="dufour"
@@ -408,7 +409,7 @@ bash scripts/generate-identity.sh
 
 # start local HOPR admin in a container (and put into background)
 make run-hopr-admin &
-````
+```
 
 ## Local cluster
 
@@ -420,7 +421,7 @@ The best way to test with multiple HOPR nodes is by using a [local cluster of in
 
 Tests both the Rust and Solidity code.
 
-```shell
+```bash
 make test
 ```
 
@@ -432,8 +433,8 @@ Docker environment.
 
 E.g. running the build workflow:
 
-```shell
-$ act -j build
+```bash
+act -j build
 ```
 
 For more information please refer to [act][2]'s documentation.
@@ -450,7 +451,7 @@ Tests are using the `pytest` infrastructure.
 
 If not using `nix`, setup the `pytest` environment:
 
-```shell
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r tests/requirements.txt
@@ -458,7 +459,7 @@ python3 -m pip install -r tests/requirements.txt
 
 To deactivate the activated testing environment if no longer needed:
 
-```shell
+```bash
 deactivate
 ```
 
@@ -466,7 +467,7 @@ deactivate
 
 With the environment activated, execute the tests locally:
 
-```shell
+```bash
 make smoke-tests
 ```
 
@@ -500,7 +501,7 @@ The following files in the node's database folder are required:
 
 3. Remove any existing index data:
 
-   ```shell
+   ```bash
    rm hopr_index.db*
    ```
 

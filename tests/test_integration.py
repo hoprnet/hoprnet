@@ -150,7 +150,8 @@ class TestIntegrationWithSwarm:
         assert response is None, "Pinging self should fail"
 
     @pytest.mark.asyncio
-    async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_registry_UNFINISHED(
+    @pytest.mark.skip(reason="Test not yet implemented")
+    async def test_hoprd_ping_should_not_be_able_to_ping_nodes_not_present_in_the_registry(
         self,
         swarm7: dict[str, Node],
     ):
@@ -556,7 +557,8 @@ class TestIntegrationWithSwarm:
 
 
 @pytest.mark.asyncio
-async def test_hoprd_strategy_UNFINISHED():
+@pytest.mark.skip(reason="Test not yet implemented")
+async def test_hoprd_strategy():
     """
     ## NOTE: strategy testing will require separate setup so commented out for now until moved
     # test_strategy_setting() {
