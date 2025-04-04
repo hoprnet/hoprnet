@@ -6,7 +6,6 @@ networks:
 volumes:
   prometheus_data: {}
   grafana_data: {}
-  hoprd_data: {}
 
 services:
   hoprd:
@@ -31,12 +30,13 @@ services:
     environment:
       - "RUST_LOG=${HOPRD_LOG_LEVEL}"
       - RUST_BACKTRACE=full
-      - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd.cfg.yaml
+      - HOPRD_CONFIGURATION_FILE_PATH=/app/hoprd/conf/hoprd.cfg.yaml
       - "HOPRD_USE_OPENTELEMETRY=${HOPRD_USE_OPENTELEMETRY}"
       - "OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME}"
       - "OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT}"
     volumes:
-      - ./hoprd_data:/app
+      - ./hoprd/data:/app/hoprd/data
+      - ./hoprd/conf:/app/hoprd/conf
     deploy:
       resources:
         reservations:
