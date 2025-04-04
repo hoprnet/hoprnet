@@ -13,7 +13,7 @@ import { HoprLedger } from "./Ledger.sol";
 import { HoprMultiSig } from "./MultiSig.sol";
 import { HoprNodeSafeRegistry } from "./node-stake/NodeSafeRegistry.sol";
 
-uint256 constant TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000; // in milliseconds
+uint256 constant TWENTY_FOUR_HOURS = 24 * 60 * 60; // in seconds
 
 uint256 constant INDEX_SNAPSHOT_INTERVAL = TWENTY_FOUR_HOURS;
 
@@ -230,6 +230,7 @@ contract HoprChannels is
     Timestamp public immutable noticePeriodChannelClosure; // in seconds
 
     /**
+     * @dev This contracts contains ERC1820 implementation logic 'ERC777TokensRecipient' only for itself.
      * @param _token HoprToken address
      * @param _noticePeriodChannelClosure seconds until a channel can be closed
      * @param _safeRegistry address of the contract that maps from accounts to deployed Gnosis Safe instances
