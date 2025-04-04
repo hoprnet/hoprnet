@@ -25,7 +25,6 @@ pub mod network_notifier;
 pub mod proxy;
 
 use async_lock::RwLock;
-use constants::{MAXIMUM_ACK_INCOMING_BUFFER_SIZE, MAXIMUM_MSG_INCOMING_BUFFER_SIZE, MAXIMUM_MSG_OUTGOING_BUFFER_SIZE};
 use futures::{
     channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     future::{select, Either},
@@ -66,6 +65,8 @@ use hopr_transport_protocol::{
     },
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
+
+use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 
 #[cfg(feature = "mixer-stream")]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
@@ -425,10 +426,6 @@ where
         );
 
         // initiate the transport layer
-        let (ack_to_send_tx, ack_to_send_rx) = mpsc::unbounded::<(PeerId, Acknowledgement)>();
-        let (ack_received_tx, ack_received_rx) =
-            mpsc::channel::<(PeerId, Acknowledgement)>(MAXIMUM_ACK_INCOMING_BUFFER_SIZE);
-
         let mixer_cfg = MixerConfig {
             min_delay: std::time::Duration::from_millis(
                 std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
@@ -493,8 +490,6 @@ where
             (tx, rx)
         };
 
-        let (msg_received_tx, msg_received_rx) = mpsc::channel::<(PeerId, Box<[u8]>)>(MAXIMUM_MSG_INCOMING_BUFFER_SIZE);
-
         let transport_layer = HoprSwarm::new(
             (&self.me).into(),
             network_events_rx,
@@ -506,13 +501,22 @@ where
         )
         .await;
 
-        let transport_layer = transport_layer.with_processors(
-            ack_to_send_rx,
-            ack_received_tx,
-            mixing_channel_rx,
-            msg_received_tx,
-            tkt_agg_writer,
-        );
+        let msg_proto_control =
+            transport_layer.build_protocol_control(hopr_transport_protocol::msg::CURRENT_HOPR_MSG_PROTOCOL);
+        let msg_codec = hopr_transport_protocol::msg::MsgCodec;
+        let (wire_msg_tx, wire_msg_rx) =
+            hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
+
+        let _mixing_process_before_sending_out =
+            hopr_async_runtime::prelude::spawn(mixing_channel_rx.map(Ok).forward(wire_msg_tx));
+
+        let ack_proto_control =
+            transport_layer.build_protocol_control(hopr_transport_protocol::ack::CURRENT_HOPR_ACK_PROTOCOL);
+        let ack_codec = hopr_transport_protocol::ack::AckCodec::new();
+        let (wire_ack_tx, wire_ack_rx) =
+            hopr_transport_protocol::stream::process_stream_protocol(ack_codec, ack_proto_control).await?;
+
+        let transport_layer = transport_layer.with_processors(tkt_agg_writer);
 
         processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
 
@@ -529,8 +533,8 @@ where
             packet_cfg,
             self.db.clone(),
             Some(tbf_path),
-            (ack_to_send_tx, ack_received_rx),
-            (mixing_channel_tx, msg_received_rx),
+            (wire_ack_tx, wire_ack_rx),
+            (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, external_msg_rx),
         )
         .await
