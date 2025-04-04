@@ -14,10 +14,6 @@ pub mod channels;
 pub mod errors;
 /// Types related to internal HOPR protocol logic.
 pub mod protocol;
-
-#[doc(hidden)]
-pub mod legacy; // TODO: remove this in 3.0
-
 #[doc(hidden)]
 pub mod prelude {
     pub use super::account::*;

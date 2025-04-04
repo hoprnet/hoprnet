@@ -2,7 +2,7 @@ use tokio_util::codec::{Decoder, Encoder};
 
 pub mod v1 {
     use super::*;
-    use hopr_crypto_packet::chain::ChainPacketComponents;
+    use hopr_crypto_packet::prelude::HoprPacket;
 
     #[derive(Clone)]
     pub struct MsgCodec;
@@ -25,8 +25,8 @@ pub mod v1 {
 
         fn decode(&mut self, src: &mut tokio_util::bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
             let len = src.len();
-            if len >= ChainPacketComponents::SIZE {
-                let packet = src.split_to(ChainPacketComponents::SIZE).freeze();
+            if len >= HoprPacket::SIZE {
+                let packet = src.split_to(HoprPacket::SIZE).freeze();
 
                 tracing::trace!(size = packet.len(), protocol = "msg", "Decoding data");
                 Ok(Some(Box::from_iter(packet)))
@@ -46,14 +46,14 @@ pub mod v1 {
 mod tests {
     use super::*;
     use anyhow::Context;
-    use hopr_crypto_packet::chain::ChainPacketComponents;
+    use hopr_crypto_packet::prelude::HoprPacket;
 
     #[test]
     fn codec_serialization_and_deserialization_are_reverse_operations() -> anyhow::Result<()> {
         let mut codec = v1::MsgCodec;
         let mut buf = tokio_util::bytes::BytesMut::new();
 
-        const PAYLOAD_SIZE: usize = ChainPacketComponents::SIZE;
+        const PAYLOAD_SIZE: usize = HoprPacket::SIZE;
         let random_data_of_expected_packet_size: Box<[u8]> =
             Box::from(hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>());
 
@@ -73,7 +73,7 @@ mod tests {
         let mut codec = v1::MsgCodec;
         let mut buf = tokio_util::bytes::BytesMut::new();
 
-        const LESS_THAN_PAYLOAD_SIZE: usize = ChainPacketComponents::SIZE - 1;
+        const LESS_THAN_PAYLOAD_SIZE: usize = HoprPacket::SIZE - 1;
         let random_data_too_few_bytes: Box<[u8]> =
             Box::from(hopr_crypto_random::random_bytes::<LESS_THAN_PAYLOAD_SIZE>());
 
@@ -94,7 +94,7 @@ mod tests {
         let mut codec = v1::MsgCodec;
         let mut buf = tokio_util::bytes::BytesMut::new();
 
-        const MORE_THAN_PAYLOAD_SIZE: usize = ChainPacketComponents::SIZE + 1;
+        const MORE_THAN_PAYLOAD_SIZE: usize = HoprPacket::SIZE + 1;
         let random_data_more_bytes_than_needed: Box<[u8]> =
             Box::from(hopr_crypto_random::random_bytes::<MORE_THAN_PAYLOAD_SIZE>());
 
@@ -104,10 +104,10 @@ mod tests {
 
         assert_eq!(
             actual[..],
-            random_data_more_bytes_than_needed[..ChainPacketComponents::SIZE]
+            random_data_more_bytes_than_needed[..HoprPacket::SIZE]
         );
 
-        assert_eq!(buf.len(), MORE_THAN_PAYLOAD_SIZE - ChainPacketComponents::SIZE);
+        assert_eq!(buf.len(), MORE_THAN_PAYLOAD_SIZE - HoprPacket::SIZE);
 
         Ok(())
     }

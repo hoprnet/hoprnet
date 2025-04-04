@@ -3,7 +3,7 @@
 
 /// Contains various size-bounded types
 pub mod bounded;
-/// Enumerates all errors in this crate.
+/// Lists all errors in this crate.
 pub mod errors;
 /// Implements the most primitive types, such as [U256](crate::primitives::U256) or [Address](crate::primitives::Address).
 pub mod primitives;

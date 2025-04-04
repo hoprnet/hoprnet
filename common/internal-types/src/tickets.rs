@@ -3,7 +3,6 @@ use hex_literal::hex;
 use hopr_bindings::hopr_channels::RedeemTicketCall;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use tracing::{debug, error};
@@ -328,7 +327,8 @@ impl From<Ticket> for TicketBuilder {
 ///     E --> |into_transferable| F
 ///     F --> |into_redeemable| E
 ///```
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ticket {
     /// Channel ID.
     /// See [generate_channel_id] for how this value is generated.
@@ -546,7 +546,8 @@ impl BytesEncodable<TICKET_SIZE> for Ticket {}
 /// Holds a ticket that has been already verified.
 /// This structure guarantees that [`Ticket::get_hash()`] of [`VerifiedTicket::verified_ticket()`]
 /// is always equal to [`VerifiedTicket::verified_hash`]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VerifiedTicket(Ticket, Hash, Address);
 
 impl VerifiedTicket {
@@ -724,7 +725,8 @@ pub fn f64_to_win_prob(win_prob: f64) -> errors::Result<EncodedWinProb> {
 /// Represents a [VerifiedTicket] with an unknown other part of the [HalfKey].
 /// Once the other [HalfKey] is known (forming a [Response]),
 /// it can be [acknowledged](UnacknowledgedTicket::acknowledge).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UnacknowledgedTicket {
     pub ticket: VerifiedTicket,
     pub(crate) own_key: HalfKey,
@@ -761,13 +763,12 @@ impl UnacknowledgedTicket {
     Default,
     Eq,
     PartialEq,
-    Serialize,
-    Deserialize,
     strum::Display,
     strum::EnumString,
     num_enum::IntoPrimitive,
     num_enum::TryFromPrimitive,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[strum(serialize_all = "PascalCase")]
 pub enum AcknowledgedTicketStatus {
     /// The ticket is available for redeeming or aggregating
@@ -780,9 +781,10 @@ pub enum AcknowledgedTicketStatus {
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AcknowledgedTicket {
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub status: AcknowledgedTicketStatus,
     pub ticket: VerifiedTicket,
     pub response: Response,
@@ -854,7 +856,8 @@ impl Display for AcknowledgedTicket {
 }
 
 /// Represents a winning ticket that can be successfully redeemed on chain.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RedeemableTicket {
     /// Verified ticket that can be redeemed.
     pub ticket: VerifiedTicket,
@@ -903,7 +906,8 @@ impl From<RedeemableTicket> for AcknowledgedTicket {
 /// information about verification.
 /// [TransferableWinningTicket] can be attempted to be converted back to [RedeemableTicket] only
 /// when verified via [`TransferableWinningTicket::into_redeemable`] again.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransferableWinningTicket {
     pub ticket: Ticket,
     pub response: Response,

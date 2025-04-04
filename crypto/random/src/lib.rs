@@ -86,7 +86,7 @@ pub fn random_bytes<const T: usize>() -> [u8; T] {
 }
 
 /// Allocates `GenericArray` of the given size and fills it with random bytes
-pub fn random_array<L: ArrayLength<u8>>() -> GenericArray<u8, L> {
+pub fn random_array<L: ArrayLength>() -> GenericArray<u8, L> {
     let mut ret = GenericArray::default();
     random_fill(&mut ret);
     ret
