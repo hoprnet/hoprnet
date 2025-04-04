@@ -264,10 +264,10 @@ class TestIntegrationWithSwarm:
         #
         # need to close the incoming side to not have to wait for the closure timeout
         # api_close_channel "${second_node_id}" "${node_id}" "${second_node_api}" "${node_addr}" "incoming"
-    
+
         # only fund for 2 tickets
         # channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "200")
-    
+
         # need to wait a little to allow the other side to index the channel open event
         # sleep 10
         # api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
@@ -276,17 +276,17 @@ class TestIntegrationWithSwarm:
         #   api_send_message "${node_api}" "${msg_tag}" "${peer_id}" \
         #       "pendingbalance: hello, world 1 self" "${second_peer_id}"
         # done
-    
+
         # seems like there's slight delay needed for tickets endpoint to return up to date tickets, \
         #       probably because of blockchain sync delay
         # sleep 5
-    
+
         # ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${channel_id} | jq '. | length')
         # if [[ "${ticket_amount}" != "${generated_tickets}" ]]; then
         #   msg "PendingBalance: Ticket amount ${ticket_amount} is different than expected ${generated_tickets}"
         #   exit 1
         # fi
-    
+
         # api_redeem_tickets_in_channel ${second_node_api} ${channel_id}
         # sleep 5
         # api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
@@ -386,6 +386,7 @@ class TestIntegrationWithSwarm:
                     assert statistics_now is not None
 
                     redeemed_value_diff = statistics_now.redeemed_value - statistics_before.redeemed_value
+                    logging.debug(f"redeemed_value diff: {redeemed_value_diff} | before: {statistics_before.redeemed_value} | now: {statistics_now.redeemed_value} | target: {AGGREGATED_TICKET_PRICE}")
 
                     # break out of the loop if the aggregated value is reached
                     if redeemed_value_diff >= AGGREGATED_TICKET_PRICE:
