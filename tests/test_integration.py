@@ -106,7 +106,6 @@ class TestIntegrationWithSwarm:
         assert await swarm7[peer].api.aliases_remove_alias("Alice")
         assert await swarm7[peer].api.aliases_get_alias("Alice") is None
 
-
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_should_not_be_able_to_set_multiple_aliases_to_a_single_peerid(
