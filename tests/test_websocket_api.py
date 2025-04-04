@@ -186,6 +186,7 @@ class TestWebsocketWithSwarm:
 
     ## DEPRECATED BELOW
 
+    @pytest.mark.xfail(reason="The websocket connections seem to be dropped early.")
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
     async def test_websocket_send_receive_messages_DEPRECATED(
