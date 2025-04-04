@@ -81,11 +81,6 @@ jobs:
         with:
           ref: ${{ steps.vars.outputs.GITHUB_REF_NAME }}
 
-      # - name: Replace the crates.io registry with a private proxy registry
-      #   env:
-      #     PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
-      #   run: "cat >> .cargo/config.toml<< EOF        \n[source.hopr-cargo-registry-cache]\nregistry = \"sparse+${PRIVATE_CARGO_REGISTRY_PROXY_URL}\"\n    #magic___^_^___line\n[source.crates-io]\nreplace-with = \"hopr-cargo-registry-cache\"\nEOF\n    #magic___^_^___line\n"
-
       - name: Setup GCP
         id: gcp
         uses: hoprnet/hopr-workflows/actions/setup-gcp@master
@@ -135,7 +130,7 @@ jobs:
       - name: Publish DappNode Package
         id: publish
         run: |
-          docker_tag=$(gcloud artifacts docker tags list "${{ vars.DOCKER_IMAGE_REGISTRY }}/hoprd" --filter="tag:${{ steps.setup.outputs.current_version }}" --format="csv[no-heading](tag,version)" | grep "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
+          docker_tag=$(gcloud artifacts docker tags list "${{ vars.DOCKER_IMAGE_REGISTRY }}/hoprd" --filter="tag:${{ steps.setup.outputs.current_version }}" --format="csv[no-heading](tag,version)" | grep -F "${{ steps.setup.outputs.current_version }}," | sed 's/,/@/')
           yq -i e ".services.node.build.args.UPSTREAM_VERSION |= \"${docker_tag}\"" "./docker-compose.yml"
           npm install
           npx @dappnode/dappnodesdk publish patch  --provider "remote" --upload_to "ipfs" --verbose | tee build.log
