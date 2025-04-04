@@ -2,7 +2,7 @@ import asyncio
 import base64
 import logging
 import random
-from typing import Optional
+from typing import Optional, Union
 
 import aiohttp
 import base58
@@ -30,6 +30,7 @@ from .request_objects import (
 from .response_objects import (
     Addresses,
     Alias,
+    AliasAddress,
     Balances,
     Channel,
     Channels,
@@ -114,8 +115,10 @@ class HoprdAPI:
         try:
             headers = {"Content-Type": "application/json"}
             async with aiohttp.ClientSession(headers=self.headers) as s:
+                url = f"{self.host}{self.prefix if use_api_path else '/'}{endpoint}"
+                logging.debug(f"Calling {method.value} {url}")
                 async with getattr(s, method.value)(
-                    url=f"{self.host}{self.prefix if use_api_path else '/'}{endpoint}",
+                    url=url,
                     json={} if data is None else data.as_dict,
                     headers=headers,
                 ) as res:
@@ -152,13 +155,26 @@ class HoprdAPI:
             logging.error(f"TimeoutError calling {method} {endpoint}")
             return (False, None)
 
-    async def aliases_get_alias(self, alias: str):
+    async def aliases_get_aliases(self, return_address: bool = False):
+        """
+        Returns all aliases.
+        :param: return_address: bool. If true, returns addresses instead of peer_ids
+        :return: aliases: list
+        """
+        endpoint = f"aliases_addresses" if return_address else f"aliases"
+        is_ok, response = await self.__call_api(HTTPMethod.GET, endpoint)
+        return response if is_ok else None
+
+    async def aliases_get_alias(self, alias: str, return_address: bool = False) -> Optional[Union[Alias, AliasAddress]]:
         """
         Returns the peer id recognized by the node.
-        :return: peer_id: str
+        :return: alias: Alias
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, f"aliases/{alias}")
-        return Alias(response) if is_ok else None
+
+        endpoint = f"aliases_addresses/{alias}" if return_address else f"aliases/{alias}"
+        response_class = AliasAddress if return_address else Alias
+        is_ok, response = await self.__call_api(HTTPMethod.GET, endpoint)
+        return response_class(response) if is_ok else None
 
     async def aliases_set_alias(self, alias: str, destination: str):
         """

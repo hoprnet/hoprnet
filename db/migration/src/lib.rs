@@ -19,6 +19,8 @@ mod m20240926_000016_peers_create_peer_store_with_new_sea_orm;
 mod m20240930_000017_logs_create_log;
 mod m20241112_000018_logs_add_index;
 mod m20250107_000019_logs_meta_table;
+mod m20250219_000020_logs_add_index;
+mod m20250219_000021_channels_add_index;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -60,6 +62,9 @@ impl MigratorTrait for Migrator {
             )),
             Box::new(m20240930_000017_logs_create_log::Migration),
             Box::new(m20241112_000018_logs_add_index::Migration),
+            Box::new(m20250107_000019_logs_meta_table::Migration),
+            Box::new(m20250219_000020_logs_add_index::Migration),
+            Box::new(m20250219_000021_channels_add_index::Migration),
         ]
     }
 }
@@ -85,6 +90,7 @@ impl MigratorTrait for MigratorIndex {
             Box::new(m20240226_000007_index_initial_seed::Migration),
             Box::new(m20240810_000014_index_extend_chain_info_with_pre_checksum_block::Migration),
             Box::new(m20240917_000015_add_minimum_incoming_ticket_win_prob_column::Migration),
+            Box::new(m20250219_000021_channels_add_index::Migration),
         ]
     }
 }
@@ -133,6 +139,7 @@ impl MigratorTrait for MigratorChainLogs {
             Box::new(m20240930_000017_logs_create_log::Migration),
             Box::new(m20241112_000018_logs_add_index::Migration),
             Box::new(m20250107_000019_logs_meta_table::Migration),
+            Box::new(m20250219_000020_logs_add_index::Migration),
         ]
     }
 }
