@@ -386,7 +386,9 @@ class TestIntegrationWithSwarm:
                     assert statistics_now is not None
 
                     redeemed_value_diff = statistics_now.redeemed_value - statistics_before.redeemed_value
-                    logging.debug(f"redeemed_value diff: {redeemed_value_diff} | before: {statistics_before.redeemed_value} | now: {statistics_now.redeemed_value} | target: {AGGREGATED_TICKET_PRICE}")
+                    logging.debug(
+                        f"redeemed_value diff: {redeemed_value_diff} | before: {statistics_before.redeemed_value} | now: {statistics_now.redeemed_value} | target: {AGGREGATED_TICKET_PRICE}"
+                    )
 
                     # break out of the loop if the aggregated value is reached
                     if redeemed_value_diff >= AGGREGATED_TICKET_PRICE:
