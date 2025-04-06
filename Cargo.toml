@@ -56,9 +56,10 @@ async-std = { version = "1.13.0", features = ["attributes", "unstable"] }
 async-std-resolver = { version = "0.24.2" }
 async-stream = "0.3.6"
 async-trait = "0.1.85"
+asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 atomic_enum = "0.3.0"
 axum = { version = "0.8.2", features = ["ws", "http2"] }
-axum-extra = { version = "0.11.0", features = ["query"] }
+axum-extra = { version = "0.10.1", features = ["query"] }
 backon = { version = "1.3.0", default-features = false }
 base64 = "0.22.1"
 bimap = "0.6.3"
@@ -83,6 +84,7 @@ ctr = "0.9"
 dashmap = "6.1.0"
 divan = "0.1.15"
 env_logger = "0.11.6"
+either = "1.15.0"
 ethers = { version = "2.0.10", default-features = false }
 flume = "0.11.1"
 float-cmp = "0.10.0"
@@ -103,6 +105,7 @@ libp2p-identity = { version = "0.2.10", features = [
   "ed25519",
   "rand",
 ] }
+libp2p-stream = { version = "0.3.0-alpha" }
 mockall = "0.13.1"
 mockito = "1.6.1"
 moka = { version = "0.12.10", features = ["future"] }
@@ -113,6 +116,7 @@ opentelemetry = { version = "0.27.1" }
 opentelemetry-otlp = { version = "0.27.0", default-features = false }
 opentelemetry_sdk = { version = "0.27.1" }
 tracing-opentelemetry = { version = "0.28.0" }
+temp-env = "0.3.6"
 parameterized = "2.0.0"
 petgraph = { version = "0.7.1", features = ["serde-1"] }
 primitive-types = { version = "0.12.2", features = [
@@ -124,7 +128,7 @@ rand = "0.8.5"
 rand_distr = "0.4.3"
 rayon = "1.10.0"
 regex = "1.11.1"
-reqwest = { version = "0.12.12" }
+reqwest = { version = "0.12.12", features = ["json"] }
 ringbuffer = "0.15.0"
 rpassword = "7.3"
 rust-stream-ext-concurrent = "1.0.0"
@@ -149,6 +153,7 @@ semver = "1.0.25"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11.14"
 serde_json = "1.0.137"
+serde_cbor = "0.11"
 serde_repr = "0.1.19"
 serde_with = { version = "3.12.0", features = ["base64"] }
 serde_yaml = { version = "0.9.33" }
@@ -173,7 +178,10 @@ tokio = { version = "1.43.0", features = [
   "macros",
   "tracing",
 ] }
-tokio-util = { version = "0.7.13", features = ["compat"] }
+tokio-util = { version = "0.7.13", default-features = false, features = [
+  "codec",
+  "compat",
+] }
 tokio-retry = "0.3.0"
 tracing = { version = "0.1.41" }
 tracing-futures = { version = "0.2.5" }
@@ -186,6 +194,7 @@ tracing-subscriber = { version = "0.3.19", features = [
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.17.0"
 uuid = { version = "1.12.1" }
+url = { version = "2.5.2", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.6", features = ["build"] }
 void = "1.0.2"

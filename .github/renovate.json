@@ -10,9 +10,6 @@
     "enabled": true,
     "pinDigests": true
   },
-  "ci": {
-    "enabled": true
-  },
   "rust": {
     "enabled": true
   },
@@ -20,5 +17,5 @@
     "enabled": true
   },
   "semanticCommits": "enabled",
-  "rangeStrategy": "auto"
+  "rangeStrategy": "bump"
 }

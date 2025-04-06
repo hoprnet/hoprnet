@@ -29,8 +29,14 @@ craneLib.devShell {
     yq-go
     curl
     bash
+
+    # anvil
     gnumake
+    lsof
+    coreutils
     which
+    findutils
+    time
 
     # docs utilities
     graphviz
@@ -38,8 +44,9 @@ craneLib.devShell {
     # github integration
     gh
 
-    # test Github automation
+    # Github automation
     act
+    zizmor
 
     # documentation utilities
     swagger-codegen3
@@ -53,8 +60,9 @@ craneLib.devShell {
     lcov
 
     ## python is required by integration tests
-    python39
-    python39Packages.venvShellHook
+    python313
+    python313Packages.venvShellHook
+    uv
 
     ## formatting
     config.treefmt.build.wrapper
@@ -83,6 +91,5 @@ craneLib.devShell {
   postShellHook = ''
     ${pre-commit-check.shellHook}
   '';
-  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
-  RUST_MIN_STACK = "16777216"; # 16MB required to run the tests and compilation
+  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl pkgs.pkgsBuildHost.libgcc.lib ];
 }

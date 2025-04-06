@@ -1,0 +1,7 @@
+version = 1
+requires-python = ">=3.9"
+
+[[package]]
+name = "hoprnet"
+version = "3.0.0"
+source = { virtual = "." }

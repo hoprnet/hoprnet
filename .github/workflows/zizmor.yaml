@@ -1,0 +1,58 @@
+---
+name: security | zizmor
+
+env:
+  needs_nix_setup: false
+
+on:
+  merge_group:
+    types: [checks_requested]
+  pull_request:
+    types:
+      - synchronize
+      - ready_for_review
+
+permissions: {}
+
+jobs:
+  zizmor:
+    runs-on: self-hosted-hoprnet-bigger
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        if: env.needs_nix_setup == true
+        uses: cachix/install-nix-action@v29
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@v15
+        if: env.needs_nix_setup == true
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Run zizmor
+        run: nix develop -L -c bash -c "zizmor --format sarif . > results.sarif"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@5f8171a638ada777af81d42b55959a643bb29017 # v3.28.12
+        with:
+          sarif_file: results.sarif
+          category: zizmor

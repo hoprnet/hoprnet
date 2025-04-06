@@ -79,11 +79,22 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     permissions:
       contents: read
+      # This grants the necessary permissions to manage labels on PRs.
+      # PRs are a type of issue.
+      issues: write
       pull-requests: write
     steps:
-      - uses: actions/labeler@v5
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
         with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - uses: actions/labeler@6463cdb00ee92c05bec55dffc4e1fce250301945 # main on 20.02.2025
+        with:
           sync-labels: true
 
   docs:

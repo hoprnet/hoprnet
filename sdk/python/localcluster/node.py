@@ -34,7 +34,15 @@ def load_env_file(env_file: str) -> dict:
 
 class Node:
     def __init__(
-        self, id: int, api_token: str, host_addr: str, network: str, identity_path: str, cfg_file: str, alias: str
+        self,
+        id: int,
+        api_token: str,
+        host_addr: str,
+        network: str,
+        identity_path: str,
+        cfg_file: str,
+        alias: str,
+        use_nat: bool,
     ):
         # initialized
         self.id = id
@@ -43,6 +51,7 @@ class Node:
         self.api_token: str = api_token
         self.network: str = network
         self.identity_path: str = identity_path
+        self.use_nat: bool = use_nat
 
         # optional
         self.cfg_file: str = cfg_file
@@ -151,7 +160,6 @@ class Node:
                 [
                     log_level,
                     "libp2p_swarm=info",
-                    "libp2p_mplex=info",
                     "multistream_select=info",
                     "isahc=error",
                     "sea_orm=warn",
@@ -167,6 +175,7 @@ class Node:
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
             "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}",
+            "HOPRD_NAT": "true" if self.use_nat else "false",
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
 
@@ -205,8 +214,18 @@ class Node:
         ready = False
 
         while not ready:
-            peers = [p.peer_id for p in await asyncio.wait_for(self.api.peers(), timeout=20)]
-            ready = [p for p in required_peers if p not in peers] == []
+            peers_info = await asyncio.wait_for(self.api.peers(), timeout=1)
+            logging.debug(f"Peers info on {self.id}: {peers_info}")
+
+            # filter out peers that are not not well connection yet
+            connected_peers = [p.peer_id for p in peers_info if p.quality >= 0.25]
+            connected_peers.sort()
+            logging.debug(f"Peers connected on {self.id}: {connected_peers}")
+
+            missing_peers = [p for p in required_peers if p not in connected_peers]
+            logging.debug(f"Peers not connected on {self.id}: {missing_peers}")
+
+            ready = missing_peers == []
 
             if not ready:
                 await asyncio.sleep(0.5)
@@ -217,13 +236,15 @@ class Node:
         self.proc.kill()
 
     @classmethod
-    def fromConfig(cls, index: int, alias: str, config: dict, api_token: dict, network: str):
+    def fromConfig(cls, index: int, alias: str, config: dict, api_token: dict, network: str, use_nat: bool):
         token = api_token["default"]
 
         if "api_token" in config:
             token = config["api_token"]
 
-        return cls(index, token, config["host"], network, config["identity_path"], config["config_file"], alias)
+        return cls(
+            index, token, config["host"], network, config["identity_path"], config["config_file"], alias, use_nat
+        )
 
     async def alias_peers(self, aliases_dict: dict[str, str]):
         for peer_id, alias in aliases_dict.items():
@@ -246,13 +267,18 @@ class Node:
     async def links(self):
         addresses = await self.api.addresses()
         admin_ui_params = f"apiEndpoint=http://{self.host_addr}:{self.api_port}&apiToken={self.api_token}"
-        print(f"\t{self}")
-        print(f"\t\tPeer Id:\t{addresses.hopr}")
-        print(f"\t\tAddress:\t{addresses.native}")
-        print(
+
+        output_strings = []
+
+        output_strings.append(f"\t{self}")
+        output_strings.append(f"\t\tPeer Id:\t{addresses.hopr}")
+        output_strings.append(f"\t\tAddress:\t{addresses.native}")
+        output_strings.append(
             f"\t\tRest API:\thttp://{self.host_addr}:{self.api_port}/scalar | http://{self.host_addr}:{self.api_port}/swagger-ui/index.html"
         )
-        print(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}", end="\n\n")
+        output_strings.append(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}\n\n")
+
+        return "\n".join(output_strings)
 
     def __eq__(self, other):
         return self.peer_id == other.peer_id

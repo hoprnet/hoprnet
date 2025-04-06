@@ -27,6 +27,12 @@ jobs:
     name: Cleanup Actions
     runs-on: self-hosted-hoprnet-small
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -102,12 +108,15 @@ jobs:
     uses: ./.github/workflows/load-tests.yaml
     with:
       test_id: pr-${{ github.event.pull_request.number }}
-      cluster_nodes: core
-      topology: many2many
+      cluster_nodes: core-rotsee
+      topology: receiver
       workload: constant
-      duration: ${{ vars.LOAD_TESTING_DURATION }}
-      vu: ${{ vars.LOAD_TESTING_VU }}
-      rate: ${{ vars.LOAD_TESTING_RATE }}
+      duration: ${{ vars.K6_TEST_DURATION }}
+      echo_service_replicas: ${{ vars.K6_ECHO_SERVERS_REPLICAS }}
+      payload_size: ${{ vars.K6_PAYLOAD_SIZE }}
+      download_throughput: ${{ vars.K6_DOWNLOAD_THROUGHPUT }}
+      upload_throughput: ${{ vars.K6_UPLOAD_THROUGHPUT }}
+
     secrets: inherit
 
   create_release:
@@ -117,6 +126,12 @@ jobs:
     needs:
       - build_docker
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -254,6 +269,21 @@ jobs:
       base_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
 
+  build_pluto:
+    strategy:
+      matrix:
+        package:
+          - hopr-pluto
+    name: Build ${{ matrix.package }}
+    # only run build and tag if the PR is merged, not if its closed
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/build-docker.yaml
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+      package: ${{ matrix.package }}
+      production: true
+    secrets: inherit
+
   docs:
     name: Docs
     needs:
@@ -267,6 +297,12 @@ jobs:
     name: Notify Changes
     runs-on: self-hosted-hoprnet-small
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 

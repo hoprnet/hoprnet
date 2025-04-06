@@ -11,13 +11,19 @@ on:
       - unlabeled
 
 env:
-  GITOPS_BRANCH: master
+  GITOPS_BRANCH: main
 jobs:
   deploy:
     name: deploy
     runs-on: self-hosted-hoprnet-small
     if: github.event.label.name == 'deploy_nodes' && github.event.action == 'labeled'
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -26,11 +32,11 @@ jobs:
       - name: Checkout hoprnet
         uses: actions/checkout@v4
 
-      - name: Checkout hoprnet-ci
+      - name: Checkout products-ci
         uses: actions/checkout@v4
         with:
-          repository: hoprnet/hoprnet-ci
-          path: "./hoprnet-ci"
+          repository: hoprnet/products-ci
+          path: "./products-ci"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: ${{ env.GITOPS_BRANCH }}
 
@@ -48,15 +54,15 @@ jobs:
             echo "Error: Deployment not supported for branch ${base_branch}"
             exit 1
           fi
-          cd ./hoprnet-ci
-          pip install -r ./scripts/requirements.txt
-          python3 ./scripts/sync-deployment.py -a deploy -n ${network} -v ${docker_tag}
+          cd ./products-ci/core-team/scripts
+          pip install -r ./requirements.txt
+          python3 ./sync-deployment.py -a deploy -n ${network} -v ${docker_tag}
 
       - name: Create Deploy Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
-          path: "./hoprnet-ci"
+          path: "./products-ci"
           commit-message: "Creating ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
           branch: "deployments/pr-${{ github.event.pull_request.number }}"
           title: "[Deployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
@@ -69,6 +75,12 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     if: github.event.label.name == 'deploy_nodes' && github.event.action == 'unlabeled'
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -77,25 +89,25 @@ jobs:
       - name: Checkout hoprnet
         uses: actions/checkout@v4
 
-      - name: Checkout hoprnet-ci
+      - name: Checkout products-ci
         uses: actions/checkout@v4
         with:
-          repository: hoprnet/hoprnet-ci
-          path: "./hoprnet-ci"
+          repository: hoprnet/products-ci
+          path: "./products-ci"
           token: ${{ secrets.GH_RUNNER_TOKEN }}
           ref: ${{ env.GITOPS_BRANCH }}
 
       - name: Set up environment
         run: |
           docker_tag=$(./scripts/get-next-version.sh Build | sed 's/+.*/-pr.'${{ github.event.pull_request.number }}'/')
-          cd ./hoprnet-ci
-          pip install -r ./scripts/requirements.txt
-          python3 ./scripts/sync-deployment.py -a undeploy -v ${docker_tag}
+          cd ./products-ci/core-team/scripts
+          pip install -r ./requirements.txt
+          python3 ./sync-deployment.py -a undeploy -v ${docker_tag}
       - name: Create Undeploy Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GH_RUNNER_TOKEN }}
-          path: "./hoprnet-ci"
+          path: "./products-ci"
           commit-message: "Deleting ClusterHoprd for pull request #${{ github.event.pull_request.number }}"
           branch: "undeployments/pr-${{ github.event.pull_request.number }}"
           title: "[Undeployment] #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"

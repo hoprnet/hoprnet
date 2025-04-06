@@ -29,6 +29,12 @@ jobs:
       needs_nix_setup: false
       CI: "true"
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -58,6 +64,12 @@ jobs:
       needs_nix_setup: false
       CI: "true"
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -94,6 +106,12 @@ jobs:
     env:
       needs_nix_setup: false
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -120,7 +138,7 @@ jobs:
           USER: runner
 
       - name: Run tests
-        run: nix develop -c make -j smart-contract-test
+        run: nix develop -L -c make -j smart-contract-test
         env:
           HOPR_NETWORK: anvil-localhost
 
@@ -132,6 +150,12 @@ jobs:
       needs_nix_setup: true
     if: github.event.pull_request.draft == false
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -169,7 +193,7 @@ jobs:
         run: ls -lR /tmp/hopr-localcluster/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests websocket
-        run: nix develop .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
+        run: nix develop -L .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
 
       - name: Upload snapshot
         uses: "google-github-actions/upload-cloud-storage@v2"
@@ -221,6 +245,12 @@ jobs:
           - hopli
     if: github.event.pull_request.draft == false
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
@@ -258,7 +288,7 @@ jobs:
         run: ls -lR /tmp/hopr-localcluster/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests ${{ matrix.suite }}
-        run: nix develop .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
+        run: nix develop -L .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
 
       - name: Upload snapshot
         uses: "google-github-actions/upload-cloud-storage@v2"
