@@ -75,6 +75,25 @@ jobs:
       production: true
     secrets: inherit
 
+  cache_dependencies:
+    name: Cache dependencies
+    if: github.event.pull_request.merged == true
+    runs-on: self-hosted-hoprnet-small
+    needs:
+      - build_docker
+    steps:
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+
+      - name: Replace the crates.io registry with a private proxy registry
+        env:
+          PRIVATE_CARGO_REGISTRY_PROXY_URL: ${{ secrets.PRIVATE_CARGO_REGISTRY_PROXY_URL }}
+        run: "cat >> .cargo/config.toml<< EOF        \n[source.hopr-cargo-registry-cache]\nregistry = \"sparse+${PRIVATE_CARGO_REGISTRY_PROXY_URL}\"\n    #magic___^_^___line\n[source.crates-io]\nreplace-with = \"hopr-cargo-registry-cache\"\nEOF\n    #magic___^_^___line\n"
+
+      - name: Cache dependencies
+        run: |
+          nix develop -c cargo fetch
+
   load_test:
     name: Load tests
     if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
