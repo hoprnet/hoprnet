@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   lockfile:
@@ -47,10 +49,6 @@ jobs:
       - name: Update flake.lock
         uses: DeterminateSystems/update-flake-lock@a2bbe0274e3a0c4194390a1e445f734c597ebc37 # v24
         id: update
-        permissions:
-          contents: read
-          issues: write
-          pull-requests: write
         with:
           pr-title: "chore(nix): update flake.lock"
           pr-labels: |
