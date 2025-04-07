@@ -1,8 +1,8 @@
 import asyncio
+import logging
 import random
 import re
 import string
-import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest

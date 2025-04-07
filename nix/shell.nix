@@ -59,9 +59,7 @@ craneLib.devShell {
     # test coverage generation
     lcov
 
-    ## python is required by integration tests
-    python313
-    python313Packages.venvShellHook
+    # installs all requirements for integration tests
     uv
 
     ## formatting
@@ -69,14 +67,6 @@ craneLib.devShell {
   ] ++
   (lib.attrValues config.treefmt.build.programs) ++
   lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
-  venvDir = "./.venv";
-  postVenvCreation = ''
-    unset SOURCE_DATE_EPOCH
-    pip install -U pip setuptools wheel
-    pip install -r tests/requirements.txt
-  '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-    autoPatchelf ./.venv
-  '';
   preShellHook = ''
     if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
       echo "solc = \"${solcDefault}/bin/solc\""
@@ -88,6 +78,7 @@ craneLib.devShell {
       echo "foundry.toml file already exists!"
     fi
   '';
+  shellHook = "uv sync";
   postShellHook = ''
     ${pre-commit-check.shellHook}
   '';

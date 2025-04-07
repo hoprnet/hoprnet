@@ -193,7 +193,7 @@ jobs:
         run: ls -lR /tmp/hopr-localcluster/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests websocket
-        run: nix develop -L .#smoke-tests -c python3 -m pytest tests/test_websocket_api.py
+        run: nix develop -L .#smoke-tests -c uv run -m pytest tests/test_websocket_api.py
 
       - name: Upload snapshot
         uses: "google-github-actions/upload-cloud-storage@v2"
@@ -288,7 +288,7 @@ jobs:
         run: ls -lR /tmp/hopr-localcluster/snapshot || echo "no snapshot found"
 
       - name: Run smoke tests ${{ matrix.suite }}
-        run: nix develop -L .#smoke-tests -c python3 -m pytest tests/test_${{ matrix.suite }}.py
+        run: nix develop -L .#smoke-tests -c uv run -m pytest tests/test_${{ matrix.suite }}.py
 
       - name: Upload snapshot
         uses: "google-github-actions/upload-cloud-storage@v2"

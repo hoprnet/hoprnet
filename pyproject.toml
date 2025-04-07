@@ -3,7 +3,28 @@ name = "hoprnet"
 version = "3.0.0"
 description = "HOPR network"
 readme = "README.md"
-dependencies = []
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp==3.10.11",
+    "base58==2.1.1",
+    "cryptography==43.0.1",
+    "PyNaCl==1.5.0",
+    "pytest==8.3.3",
+    "pytest-asyncio==0.24.0",
+    "pytest-timeout==2.3.1",
+    "pyyaml==6.0.1",
+    "requests==2.32.3",
+    "urllib3==2.2.3",
+    "websocket-client==1.5.1",
+    "websockets==13.1"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.4",
+]
+lint = [
+    "black==25.1.0",
+]
 
 [tool.black]
 line-length = 120
@@ -15,6 +36,23 @@ line-length = 120
 # Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
 lint.select = ["E", "F"]
 lint.ignore = []
+
+[tool.pytest.ini_options]
+minversion = 7.0
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+# addopts = "-ra -q"
+
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
+log_level = "INFO"
+log_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_date_format = "%Y-%m-%d %H:%M:%S"
+
+testpaths = "tests"
 
 # Exclude a variety of commonly ignored directories.
 exclude = [
