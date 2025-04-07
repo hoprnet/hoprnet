@@ -25,7 +25,6 @@ pub mod network_notifier;
 pub mod proxy;
 
 use async_lock::RwLock;
-use constants::{MAXIMUM_ACK_INCOMING_BUFFER_SIZE, MAXIMUM_MSG_INCOMING_BUFFER_SIZE, MAXIMUM_MSG_OUTGOING_BUFFER_SIZE};
 use futures::{
     channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     future::{select, Either},
@@ -47,7 +46,7 @@ use hopr_db_sql::{
     HoprDbAllOperations,
 };
 use hopr_internal_types::prelude::*;
-use hopr_path::{path::TransportPath, selectors::dfs::DfsPathSelectorConfig};
+use hopr_path::path::TransportPath;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_network::{
@@ -67,9 +66,14 @@ use hopr_transport_protocol::{
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 
+use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
+
 #[cfg(feature = "mixer-stream")]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
+use crate::helpers::PathPlanner;
+
+use hopr_path::selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::types::transfer_session;
 pub use {
@@ -94,7 +98,6 @@ use crate::{
         RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT, SESSION_INITIATION_TIMEOUT_BASE,
     },
     errors::HoprTransportError,
-    helpers::PathPlanner,
 };
 
 pub use crate::{
@@ -176,6 +179,9 @@ where
     }
 }
 
+/// Currently used implementation of [`PathSelector`](hopr_path::selectors::PathSelector).
+type CurrentPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
+
 /// Interface into the physical transport mechanism allowing all off-chain HOPR-related tasks on
 /// the transport, as well as off-chain ticket manipulation.
 pub struct HoprTransport<T>
@@ -189,11 +195,11 @@ where
     ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
     network: Arc<Network<T>>,
     process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
-    path_planner: PathPlanner<T>,
+    path_planner: PathPlanner<T, CurrentPathSelector>,
     my_multiaddresses: Vec<Multiaddr>,
     process_ticket_aggregate:
         Arc<OnceLock<TicketAggregationActions<TicketAggregationResponseType, TicketAggregationRequestType>>>,
-    smgr: SessionManager<helpers::MessageSender<T>>,
+    smgr: SessionManager<helpers::MessageSender<T, CurrentPathSelector>>,
 }
 
 impl<T> HoprTransport<T>
@@ -202,6 +208,7 @@ where
 {
     pub fn new(
         me: &OffchainKeypair,
+        me_onchain: &ChainKeypair,
         cfg: HoprTransportConfig,
         db: T,
         channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
@@ -224,11 +231,16 @@ where
             process_packet_send,
             path_planner: PathPlanner::new(
                 db.clone(),
-                DfsPathSelectorConfig {
-                    quality_threshold: cfg.network.quality_auto_path_threshold,
-                    ..Default::default()
-                },
+                CurrentPathSelector::new(
+                    channel_graph.clone(),
+                    DfsPathSelectorConfig {
+                        node_score_threshold: cfg.network.node_score_auto_path_threshold,
+                        max_first_hop_latency: cfg.network.max_first_hop_latency_threshold,
+                        ..Default::default()
+                    },
+                ),
                 channel_graph.clone(),
+                me_onchain.public().to_address(),
             ),
             db,
             my_multiaddresses,
@@ -323,7 +335,7 @@ where
 
                                                 if let Ok(key) = key {
                                                     if db
-                                                        .is_allowed_in_network_registry(None, key)
+                                                        .is_allowed_in_network_registry(None, &key)
                                                         .await
                                                         .unwrap_or(false)
                                                     {
@@ -352,7 +364,7 @@ where
 
         let nodes = self.get_public_nodes().await?;
         for (peer, _address, multiaddresses) in nodes {
-            if self.is_allowed_to_access_network(&peer).await? {
+            if self.is_allowed_to_access_network(either::Left(&peer)).await? {
                 debug!(%peer, ?multiaddresses, "Using initial public node");
 
                 internal_discovery_update_tx
@@ -425,10 +437,6 @@ where
         );
 
         // initiate the transport layer
-        let (ack_to_send_tx, ack_to_send_rx) = mpsc::unbounded::<(PeerId, Acknowledgement)>();
-        let (ack_received_tx, ack_received_rx) =
-            mpsc::channel::<(PeerId, Acknowledgement)>(MAXIMUM_ACK_INCOMING_BUFFER_SIZE);
-
         let mixer_cfg = MixerConfig {
             min_delay: std::time::Duration::from_millis(
                 std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
@@ -493,8 +501,6 @@ where
             (tx, rx)
         };
 
-        let (msg_received_tx, msg_received_rx) = mpsc::channel::<(PeerId, Box<[u8]>)>(MAXIMUM_MSG_INCOMING_BUFFER_SIZE);
-
         let transport_layer = HoprSwarm::new(
             (&self.me).into(),
             network_events_rx,
@@ -506,13 +512,22 @@ where
         )
         .await;
 
-        let transport_layer = transport_layer.with_processors(
-            ack_to_send_rx,
-            ack_received_tx,
-            mixing_channel_rx,
-            msg_received_tx,
-            tkt_agg_writer,
-        );
+        let msg_proto_control =
+            transport_layer.build_protocol_control(hopr_transport_protocol::msg::CURRENT_HOPR_MSG_PROTOCOL);
+        let msg_codec = hopr_transport_protocol::msg::MsgCodec;
+        let (wire_msg_tx, wire_msg_rx) =
+            hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
+
+        let _mixing_process_before_sending_out =
+            hopr_async_runtime::prelude::spawn(mixing_channel_rx.map(Ok).forward(wire_msg_tx));
+
+        let ack_proto_control =
+            transport_layer.build_protocol_control(hopr_transport_protocol::ack::CURRENT_HOPR_ACK_PROTOCOL);
+        let ack_codec = hopr_transport_protocol::ack::AckCodec::new();
+        let (wire_ack_tx, wire_ack_rx) =
+            hopr_transport_protocol::stream::process_stream_protocol(ack_codec, ack_proto_control).await?;
+
+        let transport_layer = transport_layer.with_processors(tkt_agg_writer);
 
         processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
 
@@ -529,8 +544,8 @@ where
             packet_cfg,
             self.db.clone(),
             Some(tbf_path),
-            (ack_to_send_tx, ack_received_rx),
-            (mixing_channel_tx, msg_received_rx),
+            (wire_ack_tx, wire_ack_rx),
+            (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, external_msg_rx),
         )
         .await
@@ -604,7 +619,7 @@ where
 
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn ping(&self, peer: &PeerId) -> errors::Result<(std::time::Duration, PeerStatus)> {
-        if !self.is_allowed_to_access_network(peer).await? {
+        if !self.is_allowed_to_access_network(either::Left(peer)).await? {
             return Err(HoprTransportError::Api(format!(
                 "ping to '{peer}' not allowed due to network registry"
             )));
@@ -753,12 +768,16 @@ where
             .collect())
     }
 
-    pub async fn is_allowed_to_access_network<'a>(&self, peer: &'a PeerId) -> errors::Result<bool>
+    pub async fn is_allowed_to_access_network<'a>(
+        &self,
+        address_like: either::Either<&'a PeerId, Address>,
+    ) -> errors::Result<bool>
     where
         T: 'a,
     {
         let db_clone = self.db.clone();
-        let peer = *peer;
+        let address_like_noref = address_like.map_left(|peer| *peer);
+
         Ok(self
             .db
             .begin_transaction()
@@ -766,15 +785,18 @@ where
             .map_err(hopr_db_sql::api::errors::DbError::from)?
             .perform(|tx| {
                 Box::pin(async move {
-                    let pk = OffchainPublicKey::try_from(peer)?;
-                    if let Some(address) = db_clone.translate_key(Some(tx), pk).await? {
-                        db_clone
-                            .is_allowed_in_network_registry(Some(tx), address.try_into()?)
-                            .await
-                    } else {
-                        Err(hopr_db_sql::errors::DbSqlError::LogicalError(
-                            "cannot translate off-chain key".into(),
-                        ))
+                    match address_like_noref {
+                        either::Left(peer) => {
+                            let pk = OffchainPublicKey::try_from(peer)?;
+                            if let Some(address) = db_clone.translate_key(Some(tx), pk).await? {
+                                db_clone.is_allowed_in_network_registry(Some(tx), &address).await
+                            } else {
+                                Err(hopr_db_sql::errors::DbSqlError::LogicalError(
+                                    "cannot translate off-chain key".into(),
+                                ))
+                            }
+                        }
+                        either::Right(address) => db_clone.is_allowed_in_network_registry(Some(tx), &address).await,
                     }
                 })
             })

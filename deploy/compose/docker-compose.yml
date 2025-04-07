@@ -23,8 +23,8 @@ services:
       - "${HOPRD_P2P_PORT}:${HOPRD_P2P_PORT}/udp"
       - "${HOPRD_API_PORT}:3001"
       # forward range of session ports, needed if you plan to use session based apps like GnosisVPN
-      # - 50001-50010:50001-50010/tcp
-      # - 50001-50010:50001-50010/udp
+      # - 1421-1430:1421-1430/tcp
+      # - 1421-1430:1421-1430/udp
     env_file:
       - .env-secrets
     environment:

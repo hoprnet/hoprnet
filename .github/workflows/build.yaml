@@ -27,7 +27,6 @@ jobs:
     name: ${{ matrix.package }}
     uses: ./.github/workflows/build-docker.yaml
     with:
-      branch: ${{ github.event.pull_request.head.ref }}
       package: ${{ matrix.package }}
       production: false
     secrets: inherit
@@ -79,6 +78,9 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     permissions:
       contents: read
+      # This grants the necessary permissions to manage labels on PRs.
+      # PRs are a type of issue.
+      issues: write
       pull-requests: write
     steps:
       - name: Harden Runner
@@ -87,9 +89,11 @@ jobs:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
-      - uses: actions/labeler@v5
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/labeler@6463cdb00ee92c05bec55dffc4e1fce250301945 # main on 20.02.2025
         with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
           sync-labels: true
 
   docs:

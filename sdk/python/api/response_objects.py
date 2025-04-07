@@ -66,6 +66,10 @@ class Alias(ApiResponseObject):
     keys = {"peer_id": "peerId"}
 
 
+class AliasAddress(ApiResponseObject):
+    keys = {"address": "address"}
+
+
 class Balances(ApiResponseObject):
     keys = {
         "hopr": "hopr",
@@ -81,7 +85,7 @@ class Infos(ApiResponseObject):
 
 
 class ConnectedPeer(ApiResponseObject):
-    keys = {"address": "peerAddress", "peer_id": "peerId", "version": "reportedVersion"}
+    keys = {"address": "peerAddress", "peer_id": "peerId", "version": "reportedVersion", "quality": "quality"}
 
 
 class Channel(ApiResponseObject):

@@ -18,10 +18,11 @@ PORT_BASE = 3000
 
 SUITE_NAME = "hopr-localcluster"
 MAIN_DIR = Path("/tmp").joinpath(SUITE_NAME)
+CONTRACTS_DIR = PWD.joinpath("ethereum/contracts")
 
 ANVIL_FOLDER_NAME = "anvil"
 ANVIL_FOLDER = MAIN_DIR.joinpath(ANVIL_FOLDER_NAME)
 
 ANVIL_CONFIG_FILE = ANVIL_FOLDER.joinpath("anvil.cfg")
 
-CONTRACTS_ADDRESSES = PWD.joinpath("ethereum", "contracts", "contracts-addresses.json")
+CONTRACTS_ADDRESSES = CONTRACTS_DIR.joinpath("contracts-addresses.json")
