@@ -91,5 +91,6 @@ craneLib.devShell {
   postShellHook = ''
     ${pre-commit-check.shellHook}
   '';
-  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl pkgs.pkgsBuildHost.libgcc.lib ];
+  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.pkgsBuildHost.openssl ] ++
+    pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]);
 }
