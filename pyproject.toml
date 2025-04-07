@@ -3,7 +3,7 @@ name = "hoprnet"
 version = "3.0.0"
 description = "HOPR network"
 readme = "README.md"
-requires-python = "==3.12.9"
+requires-python = ">=3.12.9"
 dependencies = [
     "aiohttp==3.10.11",
     "base58==2.1.1",
