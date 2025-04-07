@@ -58,6 +58,102 @@ pub fn packet_sending_bench(c: &mut Criterion) {
     group.finish();
 }
 
+pub fn packet_precompute_1rp_bench(c: &mut Criterion) {
+    assert!(
+        !hopr_crypto_random::is_rng_fixed(),
+        "RNG must not be fixed for bench tests"
+    );
+
+    let chain_key = ChainKeypair::random();
+    let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
+    let path = (0..=3)
+        .map(|_| OffchainKeypair::random().public().clone())
+        .collect::<Vec<_>>();
+    let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
+        .iter()
+        .enumerate()
+        .map(|(i, k)| (KeyIdent::from(i as u32), k.clone()))
+        .collect::<BiHashMap<_, _>>();
+    let pseudonym = HoprPseudonym::random();
+
+    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
+    let dst = Hash::default();
+
+    let mut group = c.benchmark_group("packet_precompute_1rp");
+    group.sample_size(SAMPLE_SIZE);
+
+    for hop in [0, 1, 2, 3].iter() {
+        group.throughput(Throughput::Elements(1));
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
+            b.iter(|| {
+                // The number of hops for ticket creation does not matter for benchmark purposes
+                let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
+
+                PartialHoprPacket::new(
+                    &pseudonym,
+                    PacketRouting::ForwardPath {
+                        forward_path: &path[0..=hop],
+                        return_paths: &[],
+                    },
+                    &chain_key,
+                    tb,
+                    &mapper,
+                    &dst,
+                ).unwrap();
+            });
+        });
+    }
+    group.finish();
+}
+
+pub fn packet_precompute_2rp_bench(c: &mut Criterion) {
+    assert!(
+        !hopr_crypto_random::is_rng_fixed(),
+        "RNG must not be fixed for bench tests"
+    );
+
+    let chain_key = ChainKeypair::random();
+    let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
+    let path = (0..=3)
+        .map(|_| OffchainKeypair::random().public().clone())
+        .collect::<Vec<_>>();
+    let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
+        .iter()
+        .enumerate()
+        .map(|(i, k)| (KeyIdent::from(i as u32), k.clone()))
+        .collect::<BiHashMap<_, _>>();
+    let pseudonym = HoprPseudonym::random();
+
+    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
+    let dst = Hash::default();
+
+    let mut group = c.benchmark_group("packet_precompute_2rp");
+    group.sample_size(SAMPLE_SIZE);
+
+    for hop in [0, 1, 2, 3].iter() {
+        group.throughput(Throughput::Elements(1));
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
+            b.iter(|| {
+                // The number of hops for ticket creation does not matter for benchmark purposes
+                let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
+
+                PartialHoprPacket::new(
+                    &pseudonym,
+                    PacketRouting::ForwardPath {
+                        forward_path: &path[0..=hop],
+                        return_paths: &[&path[0..=hop], &path[0..=hop]],
+                    },
+                    &chain_key,
+                    tb,
+                    &mapper,
+                    &dst,
+                ).unwrap();
+            });
+        });
+    }
+    group.finish();
+}
+
 pub fn packet_sending_precomputed_bench(c: &mut Criterion) {
     assert!(
         !hopr_crypto_random::is_rng_fixed(),
@@ -244,9 +340,11 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    packet_sending_bench,
-    packet_sending_precomputed_bench,
-    packet_forwarding_bench,
-    packet_receiving_bench
+    //packet_sending_bench,
+    packet_precompute_1rp_bench,
+    packet_precompute_2rp_bench,
+    //packet_sending_precomputed_bench,
+    //packet_forwarding_bench,
+    //packet_receiving_bench
 );
 criterion_main!(benches);
