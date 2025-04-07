@@ -78,9 +78,13 @@ craneLib.devShell {
       echo "foundry.toml file already exists!"
     fi
   '';
-  shellHook = "uv sync";
+  shellHook = ''
+    uv sync
+  '';
   postShellHook = ''
     ${pre-commit-check.shellHook}
+  '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
+    autoPatchelf ./.venv
   '';
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.pkgsBuildHost.openssl ] ++
     pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]);
