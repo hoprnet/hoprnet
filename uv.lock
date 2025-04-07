@@ -305,18 +305,18 @@ lint = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = "==3.10.11" },
-    { name = "base58", specifier = "==2.1.1" },
-    { name = "cryptography", specifier = "==43.0.1" },
-    { name = "pynacl", specifier = "==1.5.0" },
-    { name = "pytest", specifier = "==8.3.3" },
-    { name = "pytest-asyncio", specifier = "==0.24.0" },
-    { name = "pytest-timeout", specifier = "==2.3.1" },
-    { name = "pyyaml", specifier = "==6.0.1" },
-    { name = "requests", specifier = "==2.32.3" },
-    { name = "urllib3", specifier = "==2.2.3" },
-    { name = "websocket-client", specifier = "==1.5.1" },
-    { name = "websockets", specifier = "==13.1" },
+    { name = "aiohttp", specifier = ">=3.10.11" },
+    { name = "base58", specifier = ">=2.1.1" },
+    { name = "cryptography", specifier = ">=43.0.1" },
+    { name = "pynacl", specifier = ">=1.5.0" },
+    { name = "pytest", specifier = ">=8.3.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24.0" },
+    { name = "pytest-timeout", specifier = ">=2.3.1" },
+    { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "requests", specifier = ">=2.32.3" },
+    { name = "urllib3", specifier = ">=2.2.3" },
+    { name = "websocket-client", specifier = ">=1.5.1" },
+    { name = "websockets", specifier = ">=13.1" },
 ]
 
 [package.metadata.requires-dev]
