@@ -55,7 +55,7 @@ async-signal = "0.2.8"
 async-std = { version = "1.13.0", features = ["attributes", "unstable"] }
 async-std-resolver = { version = "0.24.2" }
 async-stream = "0.3.6"
-async-trait = "0.1.85"
+async-trait = "0.1.88"
 asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 atomic_enum = "0.3.0"
 axum = { version = "0.8.2", features = ["ws", "http2"] }
