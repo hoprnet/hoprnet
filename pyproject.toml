@@ -5,22 +5,28 @@ description = "HOPR network"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-  "aiohttp>=3.10.11",
-  "base58>=2.1.1",
-  "cryptography>=43.0.1",
-  "PyNaCl>=1.5.0",
-  "pytest>=8.3.3",
-  "pytest-asyncio>=0.24.0",
-  "pytest-timeout>=2.3.1",
-  "pyyaml>=6.0.1",
-  "requests>=2.32.3",
-  "urllib3>=2.2.3",
-  "websocket-client>=1.5.1",
-  "websockets>=13.1",
+  "sdk-localcluster",
+  "sdk-api",
+
+]
+
+[tool.uv.sources]
+sdk-localcluster = { workspace = true }
+sdk-api = { workspace = true }
+tests = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+  "sdk/python/localcluster",
+  "sdk/python/api",
+  "tests"
 ]
 
 [dependency-groups]
-dev = ["ruff>=0.11.4"]
+dev = [
+  "ruff>=0.11.4",
+  "tests"
+]
 lint = ["black==25.1.0"]
 
 [tool.black]
@@ -34,19 +40,4 @@ line-length = 120
 lint.select = ["E", "F"]
 lint.ignore = []
 
-[tool.pytest.ini_options]
-minversion = "7.0"
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "session"
-addopts = ["-ra", "-q"]
 
-log_cli = true
-log_cli_level = "INFO"
-log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
-log_cli_date_format = "%Y-%m-%d %H:%M:%S"
-
-log_level = "INFO"
-log_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
-log_date_format = "%Y-%m-%d %H:%M:%S"
-
-testpaths = "tests"

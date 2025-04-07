@@ -474,7 +474,7 @@
               unset SOURCE_DATE_EPOCH
             '';
             checkPhase = ''
-              uv run -m pytest
+              uv run -m pytest tests/
             '';
             doCheck = true;
           };
