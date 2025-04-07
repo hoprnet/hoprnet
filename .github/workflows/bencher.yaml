@@ -1,6 +1,6 @@
 ---
 #################################################################################
-# Pipeline triggered on every pull request to check Benchher compliance
+# Pipeline triggered on pull request merge to check benchmark results 
 #################################################################################
 name: Bencher
 
@@ -33,7 +33,9 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
 
-      - uses: bencherdev/bencher@main
+      - name: Setup Bencher
+        uses: bencherdev/bencher@main
+
       - name: Track base branch benchmarks with Bencher
         run: |
           bencher run \
@@ -45,7 +47,7 @@ jobs:
           --err \
           --adapter rust_criterion \
           --github-actions '${{ secrets.GITHUB_TOKEN }}' \
-          cargo bench -F testing
+          "cargo bench -F testing"
         env:
             BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
             BENCHER_BRANCH: ${{ github.event.pull_request.head.ref }}
