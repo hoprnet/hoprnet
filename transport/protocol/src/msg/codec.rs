@@ -102,10 +102,7 @@ mod tests {
 
         let actual = codec.decode(&mut buf)?.context("The value should be available")?;
 
-        assert_eq!(
-            actual[..],
-            random_data_more_bytes_than_needed[..HoprPacket::SIZE]
-        );
+        assert_eq!(actual[..], random_data_more_bytes_than_needed[..HoprPacket::SIZE]);
 
         assert_eq!(buf.len(), MORE_THAN_PAYLOAD_SIZE - HoprPacket::SIZE);
 

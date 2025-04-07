@@ -76,7 +76,6 @@ pub fn packet_precompute_1rp_bench(c: &mut Criterion) {
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
-    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
     let dst = Hash::default();
 
     let mut group = c.benchmark_group("packet_precompute_1rp");
@@ -99,7 +98,8 @@ pub fn packet_precompute_1rp_bench(c: &mut Criterion) {
                     tb,
                     &mapper,
                     &dst,
-                ).unwrap();
+                )
+                .unwrap();
             });
         });
     }
@@ -124,7 +124,6 @@ pub fn packet_precompute_2rp_bench(c: &mut Criterion) {
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
-    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
     let dst = Hash::default();
 
     let mut group = c.benchmark_group("packet_precompute_2rp");
@@ -147,7 +146,8 @@ pub fn packet_precompute_2rp_bench(c: &mut Criterion) {
                     tb,
                     &mapper,
                     &dst,
-                ).unwrap();
+                )
+                .unwrap();
             });
         });
     }
@@ -340,11 +340,11 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    //packet_sending_bench,
+    packet_sending_bench,
     packet_precompute_1rp_bench,
     packet_precompute_2rp_bench,
-    //packet_sending_precomputed_bench,
-    //packet_forwarding_bench,
-    //packet_receiving_bench
+    packet_sending_precomputed_bench,
+    packet_forwarding_bench,
+    packet_receiving_bench
 );
 criterion_main!(benches);
