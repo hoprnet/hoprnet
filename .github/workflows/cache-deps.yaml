@@ -33,6 +33,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           ref: ${{ inputs.branch }}
+          persist-credentials: false
 
       - name: Replace the crates.io registry with a private proxy registry
         env:
