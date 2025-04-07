@@ -1,6 +1,6 @@
 ---
 #################################################################################
-# Pipeline triggered on pull request merge to check benchmark results 
+# Pipeline triggered on pull request approval to check benchmark results 
 #################################################################################
 name: Bencher
 
@@ -8,10 +8,12 @@ env:
   RUST_BACKTRACE: "1"
 
 on:
+  merge_group:
+    types: [checks_requested]
   pull_request:
     types:
-      - closed
-      # - synchronize
+      - synchronize
+      - ready_for_review
 
 concurrency:
   group: ${{ github.ref }}-bencher
