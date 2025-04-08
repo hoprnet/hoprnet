@@ -84,8 +84,8 @@ class Node:
         self.anvil_port = PORT_BASE
         self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")
         self.cfg_file_path = MAIN_DIR.joinpath(self.cfg_file)
-        self.api_port = PORT_BASE + (self.id * 10) + 1
-        self.p2p_port = PORT_BASE + (self.id * 10) + 2
+        self.api_port = PORT_BASE + self.id
+        self.p2p_port = PORT_BASE + 100 + self.id
 
     def load_addresses(self):
         loaded_env = load_env_file(self.dir.joinpath(".env"))
