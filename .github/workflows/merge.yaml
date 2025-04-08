@@ -81,6 +81,14 @@ jobs:
       production: true
     secrets: inherit
 
+  cache_deps:
+    name: Cache deps
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/cache-deps.yaml
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+    secrets: inherit
+
   load_test:
     name: Load tests
     if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
