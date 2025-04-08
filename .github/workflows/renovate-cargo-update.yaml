@@ -10,6 +10,11 @@ env:
 on:
   push:
     branches: ['renovate/**']
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - ready_for_review
 
 jobs:
   cargo-update:
