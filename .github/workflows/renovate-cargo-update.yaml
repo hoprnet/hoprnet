@@ -40,17 +40,16 @@ jobs:
         env:
           USER: runner
 
-      - name: Update vendored cargo dependencies
+      - name: Generate the lockfile
         run: |
           mkdir -p ethereum/bindings/src/
           touch ethereum/bindings/src/lib.rs
-          nix develop -c make cargo-download
-          nix develop -c make cargo-update
+          nix develop -c cargo generate-lockfile
 
       - name: Commit changes
         # only commit changes when not running via act
         if: ${{ !env.ACT }}
         run: ./scripts/commit-and-push-all-changes.sh
         env:
-          HOPR_GIT_MSG: 'chore(cargo): updated vendored dependencies'
+          HOPR_GIT_MSG: 'chore(cargo): updated Cargo.lock'
           HOPR_GITHUB_REF: ${{ github.ref }}
