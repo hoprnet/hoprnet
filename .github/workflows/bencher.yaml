@@ -52,7 +52,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Bencher
-        uses: bencherdev/bencher@main
+        uses: bencherdev/bencher@v0.5.0
 
       - name: Track base branch benchmarks with Bencher
         run: |
