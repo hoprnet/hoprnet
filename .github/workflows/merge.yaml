@@ -286,6 +286,13 @@ jobs:
     with:
       publish: true
 
+  bencher:
+    name: Benchmarks
+    uses: ./.github/workflows/bencher.yaml
+    secrets: inherit
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+
   notify:
     name: Notify Changes
     runs-on: self-hosted-hoprnet-small

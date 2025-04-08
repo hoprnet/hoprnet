@@ -150,7 +150,7 @@ jobs:
 
   tests-smoke-websocket:
     # FIXME: smoke tests currently cannot be executed on the bigger runners
-    runs-on: self-hosted-hoprnet-big
+    runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     env:
       needs_nix_setup: true
@@ -233,7 +233,7 @@ jobs:
 
   tests-smoke:
     # FIXME: smoke tests currently cannot be executed on the bigger runners
-    runs-on: self-hosted-hoprnet-big
+    runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     # the websocket suite is completed first so that the build artifacts can be
     # reused for the other suites
@@ -245,11 +245,11 @@ jobs:
       fail-fast: false
       matrix:
         suite:
+          - win_prob
           - integration
           - redeeming
           - rest_api
           - session
-          - win_prob
           - hopli
     if: github.event.pull_request.draft == false
     steps:
