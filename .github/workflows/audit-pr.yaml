@@ -1,3 +1,4 @@
+---
 name: Audit PR
 
 on:
@@ -10,7 +11,7 @@ on:
 
 jobs:
   cargo-audit:
-    name: Cargo Audit   
+    name: Cargo Audit
     runs-on: self-hosted-hoprnet-bigger
     steps:
       - name: Harden Runner
