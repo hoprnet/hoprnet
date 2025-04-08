@@ -43,7 +43,7 @@ class Node:
         cfg_file: str,
         alias: str,
         api_addr: str = "",
-        use_nat: bool = false
+        use_nat: bool = False,
     ):
         # initialized
         self.id = id
@@ -241,8 +241,9 @@ class Node:
         self.proc.kill()
 
     @classmethod
-    def fromConfig(cls, index: int, alias: str, config: dict, api_token: dict, network: str, use_nat: bool):
-        token = api_token["default"]
+    def fromConfig(cls, index: int, alias: str, config: dict, defaults: dict, network: str, use_nat: bool):
+        token = config.get("api_token", defaults.get("api_token"))
+        api_addr = config.get("api_addr", defaults.get("api_addr", ""))
 
         if "api_token" in config:
             token = config["api_token"]
@@ -256,8 +257,8 @@ class Node:
                 config["identity_path"],
                 config["config_file"],
                 alias,
-                api_addr = config["api_addr"],
-                use_nat = use_nat
+                api_addr=api_addr,
+                use_nat=use_nat,
             )
         else:
             return cls(index, token, config["host"], network, config["identity_path"], config["config_file"], alias)

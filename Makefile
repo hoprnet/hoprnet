@@ -98,10 +98,6 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 localcluster: ## spin up the localcluster using the default configuration file
 	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected
 
-.PHONY: localcluster-expose1
-localcluster-expose1: ## spin up the localcluster exposing node 1 API
-	@python -m sdk.python.localcluster --config ./sdk/python/localcluster-expose1.params.yml --fully_connected
-
 .PHONY: create-local-identity
 create-local-identity: id_dir=/tmp/
 create-local-identity: id_password=local

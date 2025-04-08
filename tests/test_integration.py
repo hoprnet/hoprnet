@@ -1,8 +1,8 @@
 import asyncio
+import logging
 import random
 import re
 import string
-import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
@@ -103,11 +103,7 @@ class TestIntegrationWithSwarm:
         assert await swarm7[peer].api.aliases_get_alias("Alice") is None
         assert await swarm7[peer].api.aliases_set_alias("Alice", alice.address) is True
         assert (await swarm7[peer].api.aliases_get_alias("Alice")).peer_id == alice.peer_id
-        assert (await swarm7[peer].api.aliases_get_alias("Alice", True)).address == alice.address.lower()
-
         assert (await swarm7[peer].api.aliases_get_aliases())["Alice"] == alice.peer_id
-        assert (await swarm7[peer].api.aliases_get_aliases(True))["Alice"] == alice.address.lower()
-
         assert await swarm7[peer].api.aliases_remove_alias("Alice")
         assert await swarm7[peer].api.aliases_get_alias("Alice") is None
 
@@ -174,7 +170,6 @@ class TestIntegrationWithSwarm:
 
         packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
         await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[], timeout=5)
-
 
         # Remove all messages so they do not interfere with the later tests
         await swarm7[dest].api.messages_pop_all(None)

@@ -30,7 +30,7 @@ class Cluster:
 
         for network_name, params in config["networks"].items():
             for alias, node in params["nodes"].items():
-                self.nodes[str(index)] = Node.fromConfig(index, alias, node, config["api_token"], network_name, use_nat)
+                self.nodes[str(index)] = Node.fromConfig(index, alias, node, config["defaults"], network_name, use_nat)
                 index += 1
 
     def clean_up(self):
