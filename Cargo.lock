@@ -4337,7 +4337,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "2.2.3"
+version = "2.2.4"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -4662,7 +4662,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd"
-version = "2.2.3"
+version = "2.2.4"
 dependencies = [
  "anyhow",
  "async-broadcast",
