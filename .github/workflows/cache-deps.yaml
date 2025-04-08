@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   docker:
-    runs-on: self-hosted-hoprnet-smaller
+    runs-on: self-hosted-hoprnet-small
     timeout-minutes: 60
     steps:
       - name: Harden Runner
