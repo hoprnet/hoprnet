@@ -8,9 +8,11 @@ on:
   workflow_dispatch: # allows manual triggering
   schedule:
     - cron: '0 0 * * 0' # runs weekly on Sunday at 00:00
-  push: # runs when the action itself was changed
-    paths:
-      - .github/workflows/update-flake-lock.yaml
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   lockfile:
@@ -21,6 +23,7 @@ jobs:
         with:
           disable-sudo: false
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
         uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31

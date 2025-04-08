@@ -11,6 +11,7 @@ from sdk.python.localcluster.constants import (
     ANVIL_CONFIG_FILE,
     IDENTITY_PREFIX,
     CONTRACTS_ADDRESSES,
+    CONTRACTS_DIR,
     MAIN_DIR,
     NETWORK,
     PASSWORD,
@@ -59,7 +60,7 @@ def faucet(private_key: str, hopr_amount: str, native_amount: str):
         "--identity-directory",
         MAIN_DIR,
         "--contracts-root",
-        "./ethereum/contracts",
+        CONTRACTS_DIR,
         "--hopr-amount",
         hopr_amount,
         "--native-amount",
@@ -87,7 +88,7 @@ def manager_deregister(private_key: str, node_addr: str):
             "--node-address",
             node_addr,
             "--contracts-root",
-            "./ethereum/contracts",
+            CONTRACTS_DIR,
             "--provider-url",
             ANVIL_ENDPOINT,
         ],
@@ -110,7 +111,7 @@ def manager_register(private_key: str, node_addr: str, safe_addr: str):
             "--network",
             NETWORK,
             "--contracts-root",
-            "./ethereum/contracts",
+            CONTRACTS_DIR,
             "--node-address",
             node_addr,
             "--safe-address",
@@ -139,7 +140,7 @@ def manager_force_sync(private_key: str, safes: str, eligibility: str):
             "--safe-address",
             safes,
             "--contracts-root",
-            "./ethereum/contracts",
+            CONTRACTS_DIR,
             "--eligibility",
             eligibility,
             "--provider-url",
@@ -239,7 +240,7 @@ def create_safe_module(extra_prefix: str, private_key: str, manager_private_key:
             "--identity-directory",
             MAIN_DIR.joinpath("test_hopli"),
             "--contracts-root",
-            "./ethereum/contracts",
+            CONTRACTS_DIR,
             "--allowance",
             "10.5",
             "--native-amount",
@@ -287,7 +288,7 @@ def migrate_safe_module(private_key: str, manager_private_key: str, safe: str, m
             "--identity-directory",
             MAIN_DIR.joinpath("test_hopli"),
             "--contracts-root",
-            "./ethereum/contracts",
+            CONTRACTS_DIR,
             "--safe-address",
             safe,
             "--module-address",
@@ -315,7 +316,7 @@ def manager_set_win_prob(private_key: str, win_prob: str):
             "--winning-probability",
             win_prob,
             "--contracts-root",
-            "./ethereum/contracts",
+            CONTRACTS_DIR,
             "--provider-url",
             ANVIL_ENDPOINT,
         ],
@@ -335,7 +336,7 @@ def get_win_prob():
             "--network",
             NETWORK,
             "--contracts-root",
-            "./ethereum/contracts",
+            CONTRACTS_DIR,
             "--provider-url",
             ANVIL_ENDPOINT,
         ],
@@ -343,86 +344,149 @@ def get_win_prob():
     )
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-@pytest.mark.xfail(reason="race-conditions lead to incorrect balances on nodes")
-async def test_hopli_should_be_able_to_fund_nodes(peer: str, swarm7: dict[str, Node]):
-    private_key = load_private_key(ANVIL_CONFIG_FILE)
+@pytest.mark.usefixtures("swarm7_reset")
+class TestHopliWithSwarm:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+    @pytest.mark.xfail(reason="race-conditions lead to incorrect balances on nodes")
+    async def test_hopli_should_be_able_to_fund_nodes(self, peer: str, swarm7: dict[str, Node]):
+        private_key = load_private_key(ANVIL_CONFIG_FILE)
 
-    balance_before = await swarm7[peer].api.balances()
-    logging.debug(f"balance_before of {peer} / {swarm7[peer].address}: {balance_before}")
+        balance_before = await swarm7[peer].api.balances()
+        logging.debug(f"balance_before of {peer} / {swarm7[peer].address}: {balance_before}")
 
-    # fund node with 1 HOPR token and 10 native token
-    faucet(private_key, "1.0", "10.0")
+        # fund node with 1 HOPR token and 10 native token
+        faucet(private_key, "1.0", "10.0")
 
-    balance_after = await swarm7[peer].api.balances()
-    logging.debug(f"balance_after of {peer} / {swarm7[peer].address}: {balance_after}")
+        balance_after = await swarm7[peer].api.balances()
+        logging.debug(f"balance_after of {peer} / {swarm7[peer].address}: {balance_after}")
 
-    # Check if `hopli faucet` funds node to the desired amount
-    # on the native token
-    if balance_before.native > 10 * 1e18:
-        assert balance_after.native == balance_before.native
-    else:
-        assert balance_after.native == int(10 * 1e18)
+        # Check if `hopli faucet` funds node to the desired amount
+        # on the native token
+        if balance_before.native > 10 * 1e18:
+            assert balance_after.native == balance_before.native
+        else:
+            assert balance_after.native == int(10 * 1e18)
 
-    # on the HOPR token
-    if balance_before.hopr > 1 * 1e18:
-        assert balance_after.hopr == balance_before.native
-    else:
-        assert balance_after.hopr == int(1 * 1e18)
+        # on the HOPR token
+        if balance_before.hopr > 1 * 1e18:
+            assert balance_after.hopr == balance_before.hopr
+        else:
+            assert balance_after.hopr == int(1 * 1e18)
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+    async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(self, peer: str, swarm7: dict[str, Node]):
+        private_key = load_private_key(ANVIL_CONFIG_FILE)
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(peer: str, swarm7: dict[str, Node]):
-    private_key = load_private_key(ANVIL_CONFIG_FILE)
+        with open(CONTRACTS_ADDRESSES, "r") as file:
+            address_data: dict = json.load(file)
+            network_registry_contract = address_data["networks"][NETWORK]["addresses"]["network_registry"]
 
-    with open(CONTRACTS_ADDRESSES, "r") as file:
-        address_data: dict = json.load(file)
-        network_registry_contract = address_data["networks"][NETWORK]["addresses"]["network_registry"]
+        res_before = run_cast_cmd(
+            "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
+        )
 
-    res_before = run_cast_cmd(
-        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
-    )
+        # check the returned value is address safe
+        assert res_before.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
 
-    # check the returned value is address safe
-    assert res_before.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
+        # remove node from the network registry
+        manager_deregister(private_key, swarm7[peer].address)
 
-    # remove node from the network registry
-    manager_deregister(private_key, swarm7[peer].address)
+        # Check if nodes are removed from the network
+        run_cast_cmd("code", [network_registry_contract])
+        res_after_deregster = run_cast_cmd(
+            "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
+        )
 
-    # Check if nodes are removed from the network
-    run_cast_cmd("code", [network_registry_contract])
-    res_after_deregster = run_cast_cmd(
-        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
-    )
+        # check the returned value is address zero
+        assert (
+            res_after_deregster.stdout.decode("utf-8").split("\n")[0].lower()
+            == "0x0000000000000000000000000000000000000000"
+        )
 
-    # check the returned value is address zero
-    assert (
-        res_after_deregster.stdout.decode("utf-8").split("\n")[0].lower()
-        == "0x0000000000000000000000000000000000000000"
-    )
+        # register node to the network registry
+        manager_register(private_key, swarm7[peer].address, swarm7[peer].safe_address)
 
-    # register node to the network registry
-    manager_register(private_key, swarm7[peer].address, swarm7[peer].safe_address)
+        # Check if nodes are removed from the network
+        run_cast_cmd("code", [network_registry_contract])
+        res_after_register = run_cast_cmd(
+            "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
+        )
 
-    # Check if nodes are removed from the network
-    run_cast_cmd("code", [network_registry_contract])
-    res_after_register = run_cast_cmd(
-        "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address]
-    )
+        # check the returned value is address safe
+        assert res_after_register.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
 
-    # check the returned value is address safe
-    assert res_after_register.stdout.decode("utf-8").split("\n")[0].lower() == swarm7[peer].safe_address.lower()
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
+    async def test_hopli_should_be_able_to_sync_eligibility_for_all_nodes(self, peer: str, swarm7: dict[str, Node]):
+        private_key = load_private_key(ANVIL_CONFIG_FILE)
 
+        # remove all the nodes from the network registry
+        manager_force_sync(private_key, swarm7[peer].safe_address, "true")
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-async def test_hopli_should_be_able_to_sync_eligibility_for_all_nodes(peer: str, swarm7: dict[str, Node]):
-    private_key = load_private_key(ANVIL_CONFIG_FILE)
+    @pytest.mark.asyncio
+    async def test_hopli_should_be_able_to_create_safe_module(self, swarm7: dict[str, Node]):
+        manager_private_key = load_private_key(ANVIL_CONFIG_FILE)
+        private_key = load_private_key(ANVIL_CONFIG_FILE, 1)
+        extra_prefix = "two"
 
-    # remove all the nodes from the network registry
-    manager_force_sync(private_key, swarm7[peer].safe_address, "true")
+        # READ CONTRACT ADDRESS
+        with open(CONTRACTS_ADDRESSES, "r") as file:
+            address_data: dict = json.load(file)
+            network_registry_contract_1 = address_data["networks"][NETWORK]["addresses"]["network_registry"]
+            # network_registry_contract_2 = address_data["networks"][NETWORK2]["addresses"]["network_registry"]
+
+        # create identity
+        new_identity(extra_prefix)
+
+        # read the identity
+        new_node = read_identity(extra_prefix, PASSWORD)
+
+        # create safe and module
+        safe_address, module_address = create_safe_module(extra_prefix, private_key, manager_private_key)
+        run_cast_cmd("balance", [new_node])
+        run_cast_cmd("code", [safe_address])
+        run_cast_cmd("code", [module_address])
+
+        # Check the node node is registered with the new safe
+        res_check_created_safe_registration = run_cast_cmd(
+            "call", [network_registry_contract_1, "nodeRegisterdToAccount(address)(address)", new_node]
+        )
+        res_registration = res_check_created_safe_registration.stdout.decode("utf-8").split("\n")[0].lower()
+        assert res_registration == safe_address.lower()
+
+        # Remove the created identity
+        remove_identity(MAIN_DIR.joinpath("test_hopli"), f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
+
+    @pytest.mark.asyncio
+    async def test_hopli_should_be_able_to_set_and_read_win_prob(self, swarm7: dict[str, Node]):
+        # READ CONTRACT ADDRESS
+        with open(CONTRACTS_ADDRESSES, "r") as file:
+            address_data: dict = json.load(file)
+            win_prob_oracle = address_data["networks"][NETWORK]["addresses"]["winning_probability_oracle"]
+
+        # get current win prob
+        get_win_prob()
+        old_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
+        logging.info("old_win_prob %s", old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
+        assert (
+            old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
+            == "0x00000000000000000000000000000000000000000000000000ffffffffffffff"
+        )
+
+        # set new win prob
+        private_key = load_private_key(ANVIL_CONFIG_FILE)
+        manager_set_win_prob(private_key, "0.5")
+
+        # get new win prob
+        get_win_prob()
+        new_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
+        logging.info("new_win_prob %s", new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
+        assert (
+            new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
+            == "0x000000000000000000000000000000000000000000000000007fffffffffffff"
+        )
 
 
 @pytest.mark.asyncio
@@ -445,68 +509,3 @@ async def test_hopli_create_update_read_identity():
 
     # Remove the created identity
     remove_identity(MAIN_DIR.joinpath("test_hopli"), f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
-
-
-@pytest.mark.asyncio
-async def test_hopli_should_be_able_to_create_safe_module(swarm7: dict[str, Node]):
-    manager_private_key = load_private_key(ANVIL_CONFIG_FILE)
-    private_key = load_private_key(ANVIL_CONFIG_FILE, 1)
-    extra_prefix = "two"
-
-    # READ CONTRACT ADDRESS
-    with open(CONTRACTS_ADDRESSES, "r") as file:
-        address_data: dict = json.load(file)
-        network_registry_contract_1 = address_data["networks"][NETWORK]["addresses"]["network_registry"]
-        # network_registry_contract_2 = address_data["networks"][NETWORK2]["addresses"]["network_registry"]
-
-    # create identity
-    new_identity(extra_prefix)
-
-    # read the identity
-    new_node = read_identity(extra_prefix, PASSWORD)
-
-    # create safe and module
-    safe_address, module_address = create_safe_module(extra_prefix, private_key, manager_private_key)
-    run_cast_cmd("balance", [new_node])
-    run_cast_cmd("code", [safe_address])
-    run_cast_cmd("code", [module_address])
-
-    # Check the node node is registered with the new safe
-    res_check_created_safe_registration = run_cast_cmd(
-        "call", [network_registry_contract_1, "nodeRegisterdToAccount(address)(address)", new_node]
-    )
-    res_registration = res_check_created_safe_registration.stdout.decode("utf-8").split("\n")[0].lower()
-    assert res_registration == safe_address.lower()
-
-    # Remove the created identity
-    remove_identity(MAIN_DIR.joinpath("test_hopli"), f"{FIXTURES_PREFIX_NEW}{extra_prefix}0.id")
-
-
-@pytest.mark.asyncio
-async def test_hopli_should_be_able_to_set_and_read_win_prob():
-    # READ CONTRACT ADDRESS
-    with open(CONTRACTS_ADDRESSES, "r") as file:
-        address_data: dict = json.load(file)
-        win_prob_oracle = address_data["networks"][NETWORK]["addresses"]["winning_probability_oracle"]
-
-    # get current win prob
-    get_win_prob()
-    old_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
-    logging.info("old_win_prob %s", old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
-    assert (
-        old_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
-        == "0x00000000000000000000000000000000000000000000000000ffffffffffffff"
-    )
-
-    # set new win prob
-    private_key = load_private_key(ANVIL_CONFIG_FILE)
-    manager_set_win_prob(private_key, "0.5")
-
-    # get new win prob
-    get_win_prob()
-    new_win_prob = run_cast_cmd("call", [win_prob_oracle, "currentWinProb()()"])
-    logging.info("new_win_prob %s", new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower())
-    assert (
-        new_win_prob.stdout.decode("utf-8").split("is")[0].split("\n")[0].lower()
-        == "0x000000000000000000000000000000000000000000000000007fffffffffffff"
-    )

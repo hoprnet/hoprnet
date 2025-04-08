@@ -59,9 +59,10 @@ use hopr_db_sql::{
     db::{HoprDb, HoprDbConfig},
     info::{HoprDbInfoOperations, IndexerStateInfo},
     prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
+    registry::HoprDbRegistryOperations,
     HoprDbAllOperations, HoprDbGeneralModelOperations,
 };
-use hopr_path::channel_graph::ChannelGraph;
+use hopr_path::channel_graph::{ChannelGraph, ChannelGraphConfig, NodeScoreUpdate};
 use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 use hopr_transport::{
@@ -430,10 +431,14 @@ impl Hopr {
 
         let (tx_indexer_events, rx_indexer_events) = async_channel::unbounded::<SignificantChainEvent>();
 
-        let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(me_onchain.public().to_address())));
+        let channel_graph = Arc::new(RwLock::new(ChannelGraph::new(
+            me_onchain.public().to_address(),
+            ChannelGraphConfig::default(),
+        )));
 
         let hopr_transport_api = HoprTransport::new(
             me,
+            me_onchain,
             HoprTransportConfig {
                 transport: cfg.transport.clone(),
                 network: cfg.network_options.clone(),
@@ -714,16 +719,22 @@ impl Hopr {
 
         {
             // Show onboarding information
-            let my_ethereum_address = self.me_onchain().to_hex();
+            let my_ethereum_address = self.me_onchain();
             let my_peer_id = self.me_peer_id();
             let my_version = crate::constants::APP_VERSION;
 
-            while !self.is_allowed_to_access_network(&my_peer_id).await.unwrap_or(false) {
-                info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={my_ethereum_address}, or by manually entering the node address of your node on https://hub.hoprnet.org/.");
+            while !self
+                .db
+                .clone()
+                .is_allowed_in_network_registry(None, &my_ethereum_address)
+                .await
+                .unwrap_or(false)
+            {
+                info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.", my_ethereum_address.to_hex());
 
                 sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 
-                info!(peer_id = %my_peer_id, address = %my_ethereum_address, version = &my_version, "Node information");
+                info!(peer_id = %my_peer_id, address = %my_ethereum_address.to_hex(), version = &my_version, "Node information");
                 info!("Node Ethereum address: {my_ethereum_address} <- put this into staking hub");
             }
         }
@@ -832,13 +843,29 @@ impl Hopr {
                 }
             }
 
-            // Sync all the qualities there too
+            // Initialize node latencies and scores in the channel graph:
+            // Sync only those nodes that we know that had a good quality
+            // Other nodes will be repopulated into the channel graph during heartbeat
+            // rounds.
             info!("Syncing peer qualities from the previous runs");
-            let mut peer_stream = self.db.get_network_peers(Default::default(), false).await?;
+            let min_quality_to_sync: f64 = std::env::var("HOPR_MIN_PEER_QUALITY_TO_SYNC")
+                .map_err(|e| e.to_string())
+                .and_then(|v| std::str::FromStr::from_str(&v).map_err(|_| "parse error".to_string()))
+                .unwrap_or_else(|error| {
+                    warn!(error, "invalid value for HOPR_MIN_PEER_QUALITY_TO_SYNC env variable");
+                    constants::DEFAULT_MIN_QUALITY_TO_SYNC
+                });
+
+            let mut peer_stream = self
+                .db
+                .get_network_peers(Default::default(), false)
+                .await?
+                .filter(|status| futures::future::ready(status.quality >= min_quality_to_sync));
 
             while let Some(peer) = peer_stream.next().await {
                 if let Some(ChainKey(key)) = self.db.translate_key(None, peer.id.0).await? {
-                    cg.update_node_quality(&key, peer.get_quality());
+                    // For nodes that had a good quality, we assign a perfect score
+                    cg.update_node_score(&key, NodeScoreUpdate::Initialize(peer.last_seen_latency, 1.0));
                 } else {
                     error!(peer = %peer.id.1, "Could not translate peer information");
                 }
@@ -935,6 +962,14 @@ impl Hopr {
             ))),
         );
 
+        // NOTE: after the chain is synched we can reset tickets which are considered
+        // redeemed but on-chain state does not align with that. This implies there was a problem
+        // right when the transaction was sent on-chain. In such cases we simply let it retry and
+        // handle errors appropriately.
+        if let Err(e) = self.db.fix_channels_next_ticket_state().await {
+            error!(error = %e, "failed to fix channels ticket states");
+        }
+
         // NOTE: strategy ticks must start after the chain is synced, otherwise
         // the strategy would react to historical data and drain through the native
         // balance on chain operations not relevant for the present network state
@@ -1014,8 +1049,11 @@ impl Hopr {
     }
 
     /// Test whether the peer with PeerId is allowed to access the network
-    pub async fn is_allowed_to_access_network(&self, peer: &PeerId) -> errors::Result<bool> {
-        Ok(self.transport_api.is_allowed_to_access_network(peer).await?)
+    pub async fn is_allowed_to_access_network(
+        &self,
+        address_like: either::Either<&PeerId, Address>,
+    ) -> errors::Result<bool> {
+        Ok(self.transport_api.is_allowed_to_access_network(address_like).await?)
     }
 
     /// Ping another node in the network based on the PeerId

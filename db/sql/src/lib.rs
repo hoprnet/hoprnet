@@ -193,12 +193,12 @@ pub trait HoprDbAllOperations:
     + HoprDbAccountOperations
     + HoprDbChannelOperations
     + HoprDbInfoOperations
-    + HoprDbRegistryOperations
-    + HoprDbTicketOperations
-    + HoprDbPeersOperations
-    + HoprDbResolverOperations
-    + HoprDbProtocolOperations
     + HoprDbLogOperations
+    + HoprDbPeersOperations
+    + HoprDbProtocolOperations
+    + HoprDbRegistryOperations
+    + HoprDbResolverOperations
+    + HoprDbTicketOperations
 {
 }
 
