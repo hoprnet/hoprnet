@@ -66,9 +66,6 @@ jobs:
       - name: Setup Bencher
         uses: bencherdev/bencher@v0.5.0
 
-      - name: Build ${{ steps.vars.outputs.binary }} binaries
-        run: nix build -L .#hoprd-x86_64-linux
-
       - name: Track base branch benchmarks with Bencher
         run: |
           bencher run \
