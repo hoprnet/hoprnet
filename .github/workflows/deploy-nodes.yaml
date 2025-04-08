@@ -31,11 +31,11 @@ jobs:
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@72b6f30b6d0e2fa7298034156f503f2a2bd0f9c6 # master
         with:
           google-credentials: ${{ secrets.GCP_SA_TERRAFORM_JSON }}
           login-artifact-registry: 'true'
