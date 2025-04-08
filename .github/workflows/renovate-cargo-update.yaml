@@ -58,5 +58,7 @@ jobs:
         with:
           new_branch: ${{ github.ref }}
           message: 'chore(cargo): updated Cargo.lock'
+          author_name: Hopr Bot
+          author_email: bot@hoprnet.org
           pathspec_error_handling: exitImmediately
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_RUNNER_TOKEN }}
