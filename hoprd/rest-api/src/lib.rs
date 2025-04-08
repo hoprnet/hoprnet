@@ -139,7 +139,7 @@ pub(crate) struct InternalState {
         schemas(
             ApiError,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest, account::WithdrawResponse,
-            alias::PeerIdResponse, alias::AliasDestinationBodyRequest,
+            alias::PeerIdResponse, alias::AliasDestinationBodyRequest, alias::AddressResponse, alias::DeleteAliasRequest, alias::GetAliasRequest,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
             messages::MessagePopAllResponse,
