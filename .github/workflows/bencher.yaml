@@ -77,7 +77,7 @@ jobs:
           --err \
           --adapter rust_criterion \
           --github-actions '${{ secrets.GITHUB_TOKEN }}' \
-          "cargo bench -F testing"
+          "nix develop -c 'cargo bench -F testing'"
         env:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           BENCHER_BRANCH: ${{ steps.vars.outputs.GITHUB_REF_NAME }}
