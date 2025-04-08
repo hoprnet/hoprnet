@@ -528,6 +528,15 @@
               '';
             };
           };
+          run-bench = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellApplication {
+              name = "bench";
+              runtimeInputs = [ pkgs.cargo  ];
+              text = ''
+                cargo bench -F testing
+              '';
+            };
+          };
           update-github-labels = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "update-github-labels" ''
               set -eu
@@ -650,6 +659,7 @@
             inherit update-github-labels;
             check = run-check;
             audit = run-audit;
+            bench = run-bench;
           };
 
           packages = {

@@ -66,6 +66,9 @@ jobs:
       - name: Setup Bencher
         uses: bencherdev/bencher@v0.5.0
 
+      - name: Build ${{ steps.vars.outputs.binary }} binaries
+        run: nix build -L .#hoprd-x86_64-linux
+
       - name: Track base branch benchmarks with Bencher
         run: |
           bencher run \
@@ -77,7 +80,7 @@ jobs:
           --err \
           --adapter rust_criterion \
           --github-actions '${{ secrets.GITHUB_TOKEN }}' \
-          "nix develop -c 'cargo bench -F testing'"
+          nix run .#bench
         env:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           BENCHER_BRANCH: ${{ steps.vars.outputs.GITHUB_REF_NAME }}
