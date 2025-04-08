@@ -48,10 +48,9 @@ jobs:
           touch ethereum/bindings/src/lib.rs
           nix develop -c cargo generate-lockfile
 
-      - name: Commit changes
-        # only commit changes when not running via act
-        if: ${{ !env.ACT }}
-        run: ./scripts/commit-and-push-all-changes.sh
-        env:
-          HOPR_GIT_MSG: 'chore(cargo): updated Cargo.lock'
-          HOPR_GITHUB_REF: ${{ github.ref }}
+      - name: Commit & Push changes
+        uses: EndBug/add-and-commit@a94899bca583c204427a224a7af87c02f9b325d5 # v9.1.4
+        with:
+          new_branch: ${{ github.ref }}
+          message: 'chore(cargo): updated Cargo.lock'
+          pathspec_error_handling: exitImmediately
