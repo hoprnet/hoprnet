@@ -8,9 +8,11 @@ on:
   workflow_dispatch: # allows manual triggering
   schedule:
     - cron: '0 0 * * 0' # runs weekly on Sunday at 00:00
-  push: # runs when the action itself was changed
-    paths:
-      - .github/workflows/update-flake-lock.yaml
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 
 jobs:
   lockfile:
@@ -43,6 +45,8 @@ jobs:
 
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Update flake.lock
         uses: DeterminateSystems/update-flake-lock@a2bbe0274e3a0c4194390a1e445f734c597ebc37 # v24
