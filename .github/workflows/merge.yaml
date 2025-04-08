@@ -35,6 +35,8 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Cleanup
         run: |
@@ -123,6 +125,8 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup GCP
         id: gcp
@@ -282,6 +286,13 @@ jobs:
     with:
       publish: true
 
+  bencher:
+    name: Benchmarks
+    uses: ./.github/workflows/bencher.yaml
+    secrets: inherit
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+
   notify:
     name: Notify Changes
     runs-on: self-hosted-hoprnet-small
@@ -294,6 +305,8 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Check for changes in specific folder
         id: folder_changes

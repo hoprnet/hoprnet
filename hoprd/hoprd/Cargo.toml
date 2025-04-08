@@ -1,6 +1,6 @@
 [package]
 name = "hoprd"
-version = "2.2.3"
+version = "3.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "HOPR node executable."
