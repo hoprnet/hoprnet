@@ -237,11 +237,11 @@ jobs:
       fail-fast: false
       matrix:
         suite:
+          - win_prob
           - integration
           - redeeming
           - rest_api
           - session
-          - win_prob
           - hopli
     if: github.event.pull_request.draft == false
     steps:
