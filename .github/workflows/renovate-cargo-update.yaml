@@ -59,3 +59,4 @@ jobs:
           new_branch: ${{ github.ref }}
           message: 'chore(cargo): updated Cargo.lock'
           pathspec_error_handling: exitImmediately
+          github_token: ${{ secrets.GITHUB_TOKEN }}
