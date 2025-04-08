@@ -1,0 +1,29 @@
+---
+name: Audit PR
+
+on:
+  merge_group:
+    types: [checks_requested]
+  pull_request:
+    types:
+      - synchronize
+      - ready_for_review
+
+jobs:
+  cargo-audit:
+    name: Cargo Audit
+    runs-on: self-hosted-hoprnet-big
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run Audit
+        run: nix run .#audit
