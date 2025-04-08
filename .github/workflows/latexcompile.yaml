@@ -42,7 +42,8 @@ jobs:
         run: make -j build-yellowpaper
 
       - name: Commit & Push changes
-        run: ./scripts/commit-and-push-all-changes.sh
-        env:
-          HOPR_GIT_MSG: 'chore(build): update yellowpaper'
-          HOPR_GITHUB_REF: ${{ github.ref }}
+        uses: EndBug/add-and-commit@a94899bca583c204427a224a7af87c02f9b325d5 # v9.1.4
+        with:
+          new_branch: ${{ github.ref }}
+          message: 'chore(build): update yellowpaper'
+          pathspec_error_handling: exitImmediately
