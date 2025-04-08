@@ -42,7 +42,7 @@ class Node:
         identity_path: str,
         cfg_file: str,
         alias: str,
-        api_addr: str = "",
+        api_addr: str = None,
         use_nat: bool = False,
     ):
         # initialized
@@ -57,7 +57,7 @@ class Node:
         # optional
         self.cfg_file: str = cfg_file
         self.api_addr: str = api_addr
-        if api_addr == "":
+        if api_addr is None:
             self.api_addr = host_addr
 
         # generated
@@ -241,27 +241,22 @@ class Node:
         self.proc.kill()
 
     @classmethod
-    def fromConfig(cls, index: int, alias: str, config: dict, defaults: dict, network: str, use_nat: bool):
+    def fromConfig(
+        cls, index: int, alias: str, config: dict, defaults: dict, network: str, use_nat: bool, exposed: bool
+    ):
         token = config.get("api_token", defaults.get("api_token"))
-        api_addr = config.get("api_addr", defaults.get("api_addr", ""))
 
-        if "api_token" in config:
-            token = config["api_token"]
-
-        if "api_addr" in config:
-            return cls(
-                index,
-                token,
-                config["host"],
-                network,
-                config["identity_path"],
-                config["config_file"],
-                alias,
-                api_addr=api_addr,
-                use_nat=use_nat,
-            )
-        else:
-            return cls(index, token, config["host"], network, config["identity_path"], config["config_file"], alias)
+        return cls(
+            index,
+            token,
+            config["host"],
+            network,
+            config["identity_path"],
+            config["config_file"],
+            alias,
+            api_addr="0.0.0.0" if exposed else None,
+            use_nat=use_nat,
+        )
 
     async def alias_peers(self, aliases_dict: dict[str, str]):
         for peer_id, alias in aliases_dict.items():

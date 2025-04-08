@@ -1,7 +1,6 @@
 ---
 defaults:
   api_token: e2e-API-token^^
-  api_addr: '0.0.0.0'
 
 networks:
   anvil-localhost:
