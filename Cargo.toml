@@ -196,7 +196,7 @@ typenum = "1.17.0"
 uuid = { version = "1.12.1" }
 url = { version = "2.5.2", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
-vergen-gix = { version = "1.0.6", features = ["build"] }
+vergen-gix = { version = "1.0.8", features = ["build"] }
 void = "1.0.2"
 zeroize = { version = "1.8.1" }
 
