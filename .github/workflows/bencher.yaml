@@ -2,7 +2,7 @@
 #################################################################################
 # Pipeline triggered on pull request approval to check benchmark results 
 #################################################################################
-name: Bencher
+name: Benchmarks
 
 env:
   RUST_BACKTRACE: "1"
