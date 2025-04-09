@@ -47,7 +47,7 @@ async fn generate_the_first_ack_ticket(
         .balance(price)
         .index(0)
         .index_offset(1)
-        .win_prob(1.0)
+        .win_prob(WinningProbability::ALWAYS)
         .channel_epoch(1)
         .challenge(Challenge::from(cp_sum).into())
         .build_signed(counterparty, &domain_separator)?
