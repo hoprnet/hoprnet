@@ -10,6 +10,10 @@ env:
 on:
   schedule:
     - cron: "30 1 * * *"
+  pull_request:
+    types:
+      - synchronize
+      - ready_for_review
 
 jobs:
   stale:
@@ -45,6 +49,11 @@ jobs:
           disable-sudo: false
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Setup GCP
         id: gcp
         uses: hoprnet/hopr-workflows/actions/setup-gcp@72b6f30b6d0e2fa7298034156f503f2a2bd0f9c6 # master
@@ -69,18 +78,3 @@ jobs:
 
       - name: Cleanup Docker images
         run: nix develop -c ./scripts/clean-docker-images.py "${{ vars.DOCKER_IMAGE_REGISTRY }}"
-
-  # cleanup-git:
-  #   name: Cleanup Git
-  #   runs-on: self-hosted-hoprnet-small
-  #   steps:
-  #     - name: Checkout hoprnet repository
-  #       uses: actions/checkout@v3
-
-  #     - name: Cleanup git branches older than a year
-  #       run: |
-  #         for branch in $(git branch -al | sed /release/d | sed /HEAD/d ); do
-  #           if [[ -z "$(git log -1 --since='1 year ago' -s $branch)" ]] then
-  #             git push origin -d ${branch/remotes\/origin\/}
-  #           fi
-  #         done
