@@ -123,7 +123,7 @@ primitive-types = { version = "0.12.2", features = [
   "serde",
 ] } # cannot be updated until the ethers-rs is replaced with alloy-rs
 proc-macro-regex = "~1.1.0"
-prometheus = "0.13.4"
+prometheus = "0.14.0"
 rand = "0.8.5"
 rand_distr = "0.4.3"
 rayon = "1.10.0"
