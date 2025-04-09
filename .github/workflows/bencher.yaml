@@ -68,7 +68,7 @@ jobs:
 
       - name: Execute benchmarks
         run: |
-          nix build .#hoprd-bench
+          nix develop -c cargo bench -F testing
 
       - name: Track base branch benchmarks with Bencher
         run: |
