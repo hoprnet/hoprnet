@@ -83,6 +83,7 @@ craneLib.devShell {
     uv sync
   '';
   postShellHook = ''
+    unset SOURCE_DATE_EPOCH
     ${pre-commit-check.shellHook}
   '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
     autoPatchelf ./.venv
