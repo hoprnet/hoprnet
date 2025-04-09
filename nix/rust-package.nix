@@ -5,6 +5,7 @@
 , craneLib
 , curl
 , depsSrc
+, depsOnly ? false
 , foundryBin
 , git
 , html-tidy
@@ -120,12 +121,24 @@ let
     });
   };
 
-  args = if buildDocs then sharedArgs // docsArgs else sharedArgs // defaultArgs;
+  args = if buildDocs then sharedArgs // docsArgs
+  else if depsOnly then {
+    inherit pname pnameSuffix version CARGO_PROFILE;
+
+    # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
+    # this dependency
+    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl pkgs.cacert libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
+    buildInputs = [ openssl pkgs.cacert ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
+
+    src = depsSrc;
+  }
+  else sharedArgs // defaultArgs;
 
   builder =
     if runTests then craneLib.cargoTest
     else if runClippy then craneLib.cargoClippy
     else if buildDocs then craneLib.cargoDoc
+    else if depsOnly then craneLib.buildDepsOnly
     else craneLib.buildPackage;
 in
 builder (args // {

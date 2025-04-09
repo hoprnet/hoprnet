@@ -145,6 +145,9 @@
           hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
           });
+          hoprd-deps-only = rust-builder-local.callPackage ./nix/rust-package.nix hoprdBuildArgs // {
+            depsOnly = true;
+          };
 
           hopliBuildArgs = {
             inherit src depsSrc rev;
@@ -648,6 +651,7 @@
           packages = {
             inherit hoprd hoprd-debug hoprd-docker hoprd-debug-docker hoprd-profile-docker;
             inherit hopli hopli-debug hopli-docker hopli-debug-docker hopli-profile-docker;
+            inherit hoprd-deps-only;
             inherit hopr-test hopr-test-nightly;
             inherit anvil-docker hopr-pluto;
             inherit smoke-tests docs;
