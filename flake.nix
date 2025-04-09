@@ -145,7 +145,8 @@
           hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
           });
-
+hoprd-bench = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runBench = true; });
+            
           hopliBuildArgs = {
             inherit src depsSrc rev;
             cargoToml = ./hopli/Cargo.toml;
@@ -528,29 +529,29 @@
               '';
             };
           };
-          run-bench = flake-utils.lib.mkApp {
-            drv = pkgs.writeShellApplication {
-              name = "bench";
-              runtimeInputs = [ 
-              pkgs.cargo
-              pkgs.coreutils
-              pkgs.stdenv
-              pkgs.gcc
-              pkgs.pkg-config
-              pkgs.openssl.dev
-              pkgs.openssl
-              pkgs.rust-bin.stable.latest.default ];
-              text = ''
-                export RUST_BACKTRACE=full
-                export CARGO_PROFILE_BENCH_BUILD_OVERRIDE_DEBUG=true
-                export OPENSSL_DIR=${pkgs.openssl.dev}
-                export OPENSSL_LIB_DIR=${pkgs.openssl.out}/lib
-                export OPENSSL_INCLUDE_DIR=${pkgs.openssl.dev}/include
-                export PKG_CONFIG_PATH=${pkgs.openssl.dev}/lib/pkgconfig
-                cargo bench -F testing
-              '';
-            };
-          };
+          # run-bench = flake-utils.lib.mkApp {
+          #   drv = pkgs.writeShellApplication {
+          #     name = "bench";
+          #     runtimeInputs = [ 
+          #     pkgs.cargo
+          #     pkgs.coreutils
+          #     pkgs.stdenv
+          #     pkgs.gcc
+          #     pkgs.pkg-config
+          #     pkgs.openssl.dev
+          #     pkgs.openssl
+          #     pkgs.rust-bin.stable.latest.default ];
+          #     text = ''
+          #       export RUST_BACKTRACE=full
+          #       export CARGO_PROFILE_BENCH_BUILD_OVERRIDE_DEBUG=true
+          #       export OPENSSL_DIR=${pkgs.openssl.dev}
+          #       export OPENSSL_LIB_DIR=${pkgs.openssl.out}/lib
+          #       export OPENSSL_INCLUDE_DIR=${pkgs.openssl.dev}/include
+          #       export PKG_CONFIG_PATH=${pkgs.openssl.dev}/lib/pkgconfig
+          #       cargo bench -F testing
+          #     '';
+          #   };
+          # };
           update-github-labels = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "update-github-labels" ''
               set -eu
@@ -673,7 +674,7 @@
             inherit update-github-labels;
             check = run-check;
             audit = run-audit;
-            bench = run-bench;
+            # bench = run-bench;
           };
 
           packages = {
@@ -689,6 +690,7 @@
             # Follow https://github.com/nixos/nixpkgs/pull/256590
             inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
             inherit hopli-aarch64-darwin hopli-x86_64-darwin;
+            inherit hoprd-bench;
             default = hoprd;
           };
 
