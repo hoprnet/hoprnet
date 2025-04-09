@@ -29,6 +29,7 @@ craneLib.devShell {
     yq-go
     curl
     bash
+    cargo-audit
 
     # anvil
     gnumake
