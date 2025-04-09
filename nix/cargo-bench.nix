@@ -3,7 +3,7 @@ mkCargoDerivation
 }:
 
 { cargoArtifacts
-, cargoExtraArgs ? "--locked -F testing"
+
 , ...
 }@origArgs:
 let
@@ -15,7 +15,7 @@ mkCargoDerivation (args // {
   inherit cargoArtifacts;
   pnameSuffix = "-bench";
 
-  buildPhaseCargoCommand = "cargoWithProfile bench ${cargoExtraArgs}";
+  buildPhaseCargoCommand = "cargoWithProfile bench -F testing -F benchmarks";
 
   nativeBuildInputs = (args.nativeBuildInputs or [ ]);
 })
