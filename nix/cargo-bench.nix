@@ -1,5 +1,5 @@
 { 
-, mkCargoDerivation
+mkCargoDerivation
 }:
 
 { cargoArtifacts
