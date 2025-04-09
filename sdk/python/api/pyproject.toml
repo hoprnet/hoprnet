@@ -1,0 +1,10 @@
+[project]
+name = "sdk-api"
+version = "1.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "aiohttp>=3.10.11",
+  "base58>=2.1.1",
+  "cryptography>=43.0.1",
+  "PyNaCl>=1.5.0",
+]
