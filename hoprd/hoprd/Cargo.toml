@@ -29,7 +29,6 @@ runtime-async-std = [
   "hopr-lib/runtime-async-std",
   "hopr-network-types/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
-  "opentelemetry_sdk?/rt-async-std",
 ]
 runtime-tokio = [
   "dep:tokio",
