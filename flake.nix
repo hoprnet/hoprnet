@@ -412,7 +412,8 @@
               ];
               ExposedPorts = {
                 "8545/tcp" = { };
-                "3011-3061" = { };
+                "3001-3006/tcp" = { };
+                "10001-10101/tcp" = { };
               };
             };
           };
@@ -506,6 +507,7 @@
           ];
           };
           docsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
+          clusterDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
               set -e
@@ -671,6 +673,7 @@
           devShells.default = defaultDevShell;
           devShells.smoke-tests = smoketestsDevShell;
           devShells.docs = docsDevShell;
+          devShells.cluster = clusterDevShell;
 
           formatter = config.treefmt.build.wrapper;
         };
