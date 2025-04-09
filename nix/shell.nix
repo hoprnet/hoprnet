@@ -30,6 +30,7 @@ craneLib.devShell {
     curl
     bash
     cargo-audit
+    gnuplot
 
     # anvil
     gnumake
