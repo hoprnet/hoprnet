@@ -68,7 +68,7 @@ jobs:
 
       - name: Execute benchmarks
         run: |
-          nix run .#bench
+          nix build .#hoprd-bench
 
       - name: Track base branch benchmarks with Bencher
         run: |
