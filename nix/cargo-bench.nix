@@ -15,7 +15,7 @@ mkCargoDerivation (args // {
   inherit cargoArtifacts;
   pnameSuffix = "-bench";
 
-  buildPhaseCargoCommand = "cargo bench -F testing -F benchmarks";
+  buildPhaseCargoCommand = "cargo bench -F testing";
 
   nativeBuildInputs = (args.nativeBuildInputs or [ ]);
 })
