@@ -531,7 +531,7 @@
           run-bench = flake-utils.lib.mkApp {
             drv = pkgs.writeShellApplication {
               name = "bench";
-              runtimeInputs = [ pkgs.cargo coreutils pkgs.rust-bin.stable.latest.default ];
+              runtimeInputs = [ pkgs.cargo pkgs.coreutils pkgs.rust-bin.stable.latest.default ];
               text = ''
                 cargo bench -F testing
               '';
