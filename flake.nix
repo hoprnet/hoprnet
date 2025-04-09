@@ -535,8 +535,11 @@
               pkgs.cargo
               pkgs.coreutils
               pkgs.gcc
+              pkgs.pkg-config
+              pkgs.openssl.dev
               pkgs.rust-bin.stable.latest.default ];
               text = ''
+                export OPENSSL_DIR=${pkgs.openssl.dev}
                 cargo bench -F testing
               '';
             };
