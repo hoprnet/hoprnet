@@ -2,7 +2,7 @@
 #################################################################################
 # Pipeline triggered on pull request approval to check benchmark results 
 #################################################################################
-name: Bencher
+name: Benchmarks
 
 env:
   RUST_BACKTRACE: "1"
@@ -51,8 +51,24 @@ jobs:
           ref: ${{ steps.vars.outputs.GITHUB_REF_NAME }}
           persist-credentials: false
 
+      - name: Install Nix
+        uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@ad2ddac53f961de1989924296a1f236fcfbaa4fc # v15
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
       - name: Setup Bencher
         uses: bencherdev/bencher@v0.5.0
+
+      - name: Execute benchmarks
+        run: |
+          nix develop -c cargo bench -F testing
 
       - name: Track base branch benchmarks with Bencher
         run: |
@@ -63,9 +79,9 @@ jobs:
           --threshold-upper-boundary 0.99 \
           --thresholds-reset \
           --err \
+          --dir target/criterion \
           --adapter rust_criterion \
-          --github-actions '${{ secrets.GITHUB_TOKEN }}' \
-          "cargo bench -F testing"
+          --github-actions '${{ secrets.GITHUB_TOKEN }}'
         env:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           BENCHER_BRANCH: ${{ steps.vars.outputs.GITHUB_REF_NAME }}
