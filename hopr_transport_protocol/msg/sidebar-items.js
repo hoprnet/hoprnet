@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["CURRENT_HOPR_MSG_PROTOCOL"],"mod":["packet","processor"],"struct":["MsgCodec"]};

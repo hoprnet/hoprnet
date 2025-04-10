@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["TicketIndexSelector","TicketMarker"],"struct":["AggregationPrerequisites","ChannelTicketStatistics","TicketSelector"],"trait":["HoprDbTicketOperations"]};

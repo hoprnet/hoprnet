@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprChannelsEventsEvents"],"static":["HOPRCHANNELSEVENTS_ABI"],"struct":["ChannelBalanceDecreasedFilter","ChannelBalanceIncreasedFilter","ChannelClosedFilter","ChannelOpenedFilter","DomainSeparatorUpdatedFilter","HoprChannelsEvents","OutgoingChannelClosureInitiatedFilter","TicketRedeemedFilter"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"derive":["Encode"],"enum":["IsNull"],"trait":["Encode"]};
