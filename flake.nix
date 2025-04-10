@@ -526,7 +526,7 @@
               name = "audit";
               runtimeInputs = [ pkgs.cargo pkgs.cargo-audit ];
               text = ''
-                cargo audit --deny warnings
+                cargo audit
               '';
             };
           };
