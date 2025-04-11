@@ -3,12 +3,15 @@
 # dependencies = ["google-cloud-artifact-registry==1.15.2","google-auth==2.38.0"]
 # ///
 
-import sys
-from datetime import datetime, timedelta
-from google.cloud import artifactregistry_v1
+from datetime import UTC, datetime, timedelta
 from google.auth.exceptions import DefaultCredentialsError
+from google.cloud import artifactregistry_v1
 import argparse
+import asyncio
+import itertools
 import re
+import subprocess
+import sys
 
 
 # Ensure the script exits on errors
@@ -27,33 +30,47 @@ def list_docker_images(client, parent):
         SystemExit: If an error occurs while listing Docker images.
     """
     try:
+        print(f"Listing Docker images in {parent}")
         request = artifactregistry_v1.ListDockerImagesRequest(parent=parent)
         return [image for image in client.list_docker_images(request=request)]
     except Exception as e:
-        print(f"Error listing docker images: {str(e)}", file=sys.stderr)
+        print(f"Error listing Docker images: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
+async def delete_docker_images_list(images):
+    await asyncio.gather(
+        *[
+            asyncio.wait_for(
+                delete_docker_image(client, img.uri, dry_run)
 
-def delete_docker_image(client, name, dry_run):
+            )
+            for img in images
+        ]
+    )
+
+def delete_docker_image(client, uri, dry_run):
     """
-    Deletes a Docker image by its name.
+    Deletes a Docker image by its uri.
 
     Args:
         client: Artifact Registry client instance.
-        name: The name of the Docker image to delete.
+        uri: The uri of the Docker image to delete.
         dry_run: If True, simulates the deletion without making changes.
 
     Raises:
         SystemExit: If an error occurs while deleting the Docker image.
     """
     if dry_run:
-        print(f"Dry-run mode: Would delete image {name}")
+        print(f"Dry-run mode: Would delete image {uri}")
         return
     try:
-        request = artifactregistry_v1.DeleteDockerImageRequest(name=name)
-        client.delete_docker_image(request=request)
+        print(f"Deleting Docker image {uri}")
+        # need to use gcloud cli because docker image deletion is not
+        # supported by the Artifact Registry client
+        cmd = f"gcloud artifacts docker images delete {uri} --async --delete-tags -q"
+        subprocess.run(cmd.split(), check=True)
     except Exception as e:
-        print(f"Error deleting docker image: {str(e)}", file=sys.stderr)
+        print(f"Error deleting Docker image: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -68,7 +85,7 @@ args = parser.parse_args()
 registry = args.registry
 dry_run = args.dry_run
 days = args.days
-date = datetime.utcnow() - timedelta(days=days)
+date = datetime.now(UTC) - timedelta(days=days)
 images = ["hopli", "hoprd"]
 
 # Example registry URL: europe-west3-docker.pkg.dev/my-project/my-repo
@@ -106,10 +123,20 @@ old_untagged_images = [
 ]
 old_image_tags = old_pr_image_tags + old_untagged_images
 
+
+# prepare tasks list for main loop
+tasks = []
+
 # Filter and delete old images
 for image in images:
     old_images = [img for img in old_image_tags if img.uri.startswith(f"{registry}/{image}@")]
 
-    for img in old_images:
-        print(f"Deleting image {img.uri}")
-        delete_docker_image(client, img.name, dry_run)
+    for old_images_part in itertools.batched(old_images, 20):
+        tasks.append(
+            delete_docker_images_list(old_images_part)
+        )
+
+# run all tasks in parallel
+loop = asyncio.new_event_loop()
+loop.run_until_complete(asyncio.wait(tasks))
+loop.close()

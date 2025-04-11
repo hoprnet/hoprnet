@@ -502,6 +502,7 @@
             tcpdump
           ];
           };
+          ciShell = import ./nix/ciShell.nix;
           docsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
           clusterDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
           run-check = flake-utils.lib.mkApp {
@@ -667,6 +668,7 @@
           };
 
           devShells.default = defaultDevShell;
+          devShells.ci = ciShell;
           devShells.smoke-tests = smoketestsDevShell;
           devShells.docs = docsDevShell;
           devShells.cluster = clusterDevShell;
