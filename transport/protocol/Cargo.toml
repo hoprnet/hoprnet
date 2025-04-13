@@ -18,7 +18,6 @@ prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
 libp2p = { workspace = true, features = ["noise", "request-response"] }
