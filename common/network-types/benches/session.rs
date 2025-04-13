@@ -60,10 +60,14 @@ pub fn session_one_way_reliable_send_recv_benchmark(c: &mut Criterion) {
         thread_rng().fill(&mut data[..]);
 
         group.throughput(Throughput::Bytes(*size as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(size), &data, |b, data| {
-            b.to_async(&runtime)
-                .iter(|| send_one_way(network_cfg, session_cfg.clone(), data));
-        });
+        group.bench_with_input(
+            BenchmarkId::from_parameter(bytesize::ByteSize::b(*size as u64).to_string().replace(" ", "_")),
+            &data,
+            |b, data| {
+                b.to_async(&runtime)
+                    .iter(|| send_one_way(network_cfg, session_cfg.clone(), data));
+            },
+        );
     }
     group.finish();
 }
