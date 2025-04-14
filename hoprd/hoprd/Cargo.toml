@@ -29,7 +29,6 @@ runtime-async-std = [
   "hopr-lib/runtime-async-std",
   "hopr-network-types/runtime-async-std",
   "hopr-async-runtime/runtime-async-std",
-  "opentelemetry_sdk?/rt-async-std",
 ]
 runtime-tokio = [
   "dep:tokio",
@@ -74,7 +73,6 @@ serde_yaml = { workspace = true }
 serde_json = { workspace = true }
 signal-hook = { workspace = true }
 smart-default = { workspace = true }
-strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-retry = { workspace = true, optional = true }
