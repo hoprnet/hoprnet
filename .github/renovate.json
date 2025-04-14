@@ -11,6 +11,7 @@
   "rangeStrategy": "bump",
   "packageRules": [
     { "matchCategories": ["rust"], "enabled": true },
-    { "matchCategories": ["docker"], "enabled": true, "pinDigests": true }
+    { "matchCategories": ["docker"], "enabled": true, "pinDigests": true },
+    { "matchPackageNames": ["serde_yaml"], "enabled": false }
   ]
 }
