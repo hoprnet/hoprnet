@@ -19,7 +19,7 @@ runtime-tokio = [
   "dep:tokio",
   "dep:tokio-util",
   "hopr-async-runtime/runtime-tokio",
-  "hickory-resolver/tokio",
+  "hickory-resolver/tokio-runtime",
 ]
 prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 testing = []

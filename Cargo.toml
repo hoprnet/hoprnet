@@ -96,7 +96,7 @@ getrandom = "0.3.2"
 governor = { version = "0.10" }
 hex = "0.4.3"
 hex-literal = "1.0.0"
-hickory-resolver = "0.24.4"   # cannot be updated, until libp2p-dns is updated
+hickory-resolver = "0.24.4" # cannot be updated, until libp2p-dns is updated
 http-types = "2.12.0"
 lazy_static = "1.5.0"
 libp2p = { version = "0.55.0" }
@@ -121,11 +121,11 @@ parameterized = "2.0.0"
 petgraph = { version = "0.8.1", features = ["serde-1"] }
 primitive-types = { version = "0.12.2", features = [ # primitive-types 0.13 not compatible with ethers.rs
   "serde",
-] } 
+] }
 proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
-rand = "0.8.5"    # cannot be updated, dependencies reference old ones
-rand_distr = "0.4.3"  # cannot be updated, dependencies reference old ones
+rand = "0.8.5" # cannot be updated, dependencies reference old ones
+rand_distr = "0.4.3" # cannot be updated, dependencies reference old ones
 rayon = "1.10.0"
 regex = "1.11.1"
 reqwest = { version = "0.12.15", features = ["json"] }
@@ -133,7 +133,7 @@ ringbuffer = "0.15.0"
 rpassword = "7.3"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
-sea-orm = { version = "1.1.10", features = [   # ?
+sea-orm = { version = "1.1.10", features = [ # ?
   "sqlx-sqlite",
   "with-chrono",
   "debug-print",
