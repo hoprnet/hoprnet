@@ -11,6 +11,9 @@ env:
 on:
   workflow_call:
     inputs:
+      branch:
+        required: true
+        type: string
       package:
         required: true
         type: string
@@ -36,6 +39,9 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.branch }}
 
       # - name: Replace the crates.io registry with a private proxy registry
       #   env:

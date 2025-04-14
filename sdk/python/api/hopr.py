@@ -161,7 +161,7 @@ class HoprdAPI:
         :param: return_address: bool. If true, returns addresses instead of peer_ids
         :return: aliases: list
         """
-        endpoint = f"aliases_addresses" if return_address else f"aliases"
+        endpoint = "aliases_addresses" if return_address else "aliases"
         is_ok, response = await self.__call_api(HTTPMethod.GET, endpoint)
         return response if is_ok else None
 

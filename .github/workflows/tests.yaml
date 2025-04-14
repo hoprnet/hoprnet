@@ -37,6 +37,8 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
@@ -72,6 +74,8 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Set up Google Cloud Credentials
         id: auth
@@ -114,6 +118,8 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Set up Google Cloud Credentials
         id: auth
@@ -144,7 +150,7 @@ jobs:
 
   tests-smoke-websocket:
     # FIXME: smoke tests currently cannot be executed on the bigger runners
-    runs-on: self-hosted-hoprnet-big
+    runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     env:
       needs_nix_setup: true
@@ -158,6 +164,8 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup GCP
         id: gcp
@@ -225,7 +233,7 @@ jobs:
 
   tests-smoke:
     # FIXME: smoke tests currently cannot be executed on the bigger runners
-    runs-on: self-hosted-hoprnet-big
+    runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     # the websocket suite is completed first so that the build artifacts can be
     # reused for the other suites
@@ -237,11 +245,11 @@ jobs:
       fail-fast: false
       matrix:
         suite:
+          - win_prob
           - integration
           - redeeming
           - rest_api
           - session
-          - win_prob
           - hopli
     if: github.event.pull_request.draft == false
     steps:
@@ -253,6 +261,8 @@ jobs:
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup GCP
         id: gcp

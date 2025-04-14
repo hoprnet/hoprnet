@@ -85,16 +85,19 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
                     .with_timeout(std::time::Duration::from_secs(5))
                     .build()?;
 
-                let tracer = opentelemetry_sdk::trace::TracerProvider::builder()
-                    .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+                let tracer = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+                    .with_batch_exporter(exporter)
                     .with_sampler(Sampler::AlwaysOn)
                     .with_id_generator(RandomIdGenerator::default())
                     .with_max_events_per_span(64)
                     .with_max_attributes_per_span(16)
-                    .with_resource(opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
-                        "service.name",
-                        std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
-                    )]))
+                    .with_resource(
+                        opentelemetry_sdk::Resource::builder()
+                            .with_service_name(
+                                std::env::var("OTEL_SERVICE_NAME").unwrap_or(env!("CARGO_PKG_NAME").into()),
+                            )
+                            .build(),
+                    )
                     .build()
                     .tracer(env!("CARGO_PKG_NAME"));
 
