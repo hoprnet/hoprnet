@@ -95,8 +95,13 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	lsof -i :$(port) -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: localcluster
+localcluster: args=
 localcluster: ## spin up the localcluster using the default configuration file
-	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected
+	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected $(args)
+
+.PHONY: localcluster-exposed
+localcluster-exposed: ## spin up the localcluster using the default configuration file, exposing all nodes in the local network
+	@make localcluster args="--exposed"
 
 .PHONY: create-local-identity
 create-local-identity: id_dir=/tmp/
@@ -365,7 +370,7 @@ ifeq ($(script),)
 	echo "parameter <script> missing" >&2 && exit 1
 endif
 	bash "${script}"
-	
+
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
