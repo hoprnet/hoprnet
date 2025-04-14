@@ -46,7 +46,7 @@ members = [
 
 [workspace.dependencies]
 aes = "0.8"
-anyhow = "1.0.95"
+anyhow = "1.0.98"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
 async-channel = "2.3.1"
@@ -68,8 +68,8 @@ bitvec = "1.0.1"
 bloomfilter = { version = "2.0.0", features = ["serde"] }
 bytesize = { version = "2.0.1", features = ["serde"] }
 cbor4ii = { version = "1.0.0" }
-chrono = { version = "0.4.39", default-features = false }
-clap = { version = "4.5.35", features = ["derive", "env", "string"] }
+chrono = { version = "0.4.40", default-features = false }
+clap = { version = "4.5.36", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.5.1", features = [
@@ -133,13 +133,13 @@ ringbuffer = "0.15.0"
 rpassword = "7.3"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
-sea-orm = { version = "1.1.4", features = [
+sea-orm = { version = "1.1.9", features = [
   "sqlx-sqlite",
   "with-chrono",
   "debug-print",
 ] }
-sea-orm-cli = { version = "1.1.4", features = ["codegen"] }
-sea-orm-migration = { version = "1.1.4", features = [
+sea-orm-cli = { version = "1.1.9", features = ["codegen"] }
+sea-orm-migration = { version = "1.1.9", features = [
   "sqlx-sqlite",
   "with-chrono",
 ] }
@@ -162,7 +162,7 @@ sha3 = "0.10"
 signal-hook = "0.3.17"
 smart-default = "0.7.1"
 socket2 = "0.5.9"
-sqlx = { version = "0.8.3", default-features = false, features = [
+sqlx = { version = "=0.8.3", default-features = false, features = [
   "sqlite",
   "macros",
   "migrate",
@@ -196,7 +196,7 @@ typenum = "1.17.0"
 uuid = { version = "1.16.0" }
 url = { version = "2.5.2", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
-vergen-gix = { version = "1.0.8", features = ["build"] }
+vergen-gix = { version = "1.0.9", features = ["build"] }
 void = "1.0.2"
 zeroize = { version = "1.8.1" }
 
