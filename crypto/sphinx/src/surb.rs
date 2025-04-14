@@ -7,6 +7,20 @@ use crate::routing::{RoutingInfo, SphinxHeaderSpec};
 use crate::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
 
 /// Single Use Reply Block
+///
+/// This is delivered to the recipient, so they are able to send reply messages back
+/// anonymously (via the return path inside that SURB).
+///
+/// [`SURB`] is always created in a pair with [`ReplyOpener`], so that the sending
+/// party knows how to decrypt the data.
+///
+/// The SURB sent to the receiving party must be accompanied
+/// by a `Pseudonym`, and once the receiving party uses that SURB to send a reply, it
+/// must be accompanied by the same `Pseudonym`.
+/// Upon receiving such a reply, the reply recipient (= sender of the SURB)
+/// uses the `Pseudonym` to find the `ReplyOpener` created with the SURB to read the reply.
+///
+/// Always use [`create_surb`] to create the [`SURB`] and [`ReplyOpener`] pair.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SURB<S: SphinxSuite, H: SphinxHeaderSpec> {
     /// ID of the first relayer.
@@ -22,12 +36,14 @@ pub struct SURB<S: SphinxSuite, H: SphinxHeaderSpec> {
 }
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec> SURB<S, H> {
+    /// Size of the SURB in bytes.
     pub const SIZE: usize = H::KEY_ID_SIZE.get()
         + <S::G as GroupElement<S::E>>::AlphaLen::USIZE
         + RoutingInfo::<H>::SIZE
         + SecretKey16::LENGTH
         + H::SURB_RECEIVER_DATA_SIZE;
 
+    /// Serializes SURB into wire format.
     pub fn into_boxed(self) -> Box<[u8]> {
         let alpha_len = <S::G as GroupElement<S::E>>::AlphaLen::USIZE;
 
@@ -48,6 +64,19 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> SURB<S, H> {
             .copy_from_slice(self.additional_data_receiver.as_ref());
 
         ret.into_boxed_slice()
+    }
+
+    /// Computes Keccak256 hash of the SURB.
+    ///
+    /// The given `context` is appended to the input.
+    pub fn get_hash(&self, context: &[u8]) -> Hash {
+        Hash::create(&[
+            self.first_relayer.as_ref(),
+            self.alpha.as_ref(),
+            self.sender_key.as_ref(),
+            self.header.as_ref(),
+            context
+        ])
     }
 }
 

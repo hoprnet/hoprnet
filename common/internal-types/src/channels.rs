@@ -59,6 +59,9 @@ pub enum ChannelDirection {
     Outgoing = 1,
 }
 
+/// Alias for the [`Hash`] representing a channel ID.
+pub type ChannelId = Hash;
+
 /// Overall description of a channel
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -69,7 +72,7 @@ pub struct ChannelEntry {
     pub ticket_index: U256,
     pub status: ChannelStatus,
     pub channel_epoch: U256,
-    id: Hash,
+    id: ChannelId,
 }
 
 impl ChannelEntry {
@@ -94,7 +97,7 @@ impl ChannelEntry {
     }
 
     /// Generates the channel ID using the source and destination address
-    pub fn get_id(&self) -> Hash {
+    pub fn get_id(&self) -> ChannelId {
         self.id
     }
 

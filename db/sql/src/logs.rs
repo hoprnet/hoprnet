@@ -157,6 +157,10 @@ impl HoprDbLogOperations for HoprDb {
         let max_block_number = block_offset.map(|v| min_block_number + v + 1);
 
         Log::find()
+            .select_only()
+            .column(log::Column::BlockNumber)
+            .column(log::Column::TransactionIndex)
+            .column(log::Column::LogIndex)
             .filter(log::Column::BlockNumber.gte(min_block_number.to_be_bytes().to_vec()))
             .apply_if(max_block_number, |q, v| {
                 q.filter(log::Column::BlockNumber.lt(v.to_be_bytes().to_vec()))
@@ -358,7 +362,12 @@ impl HoprDbLogOperations for HoprDb {
             .await?
             .perform(|tx| {
                 Box::pin(async move {
+                    // keep selected columns to a minimum to reduce copy overhead in db
                     let log_count = Log::find()
+                        .select_only()
+                        .column(log::Column::BlockNumber)
+                        .column(log::Column::TransactionIndex)
+                        .column(log::Column::LogIndex)
                         .count(tx.as_ref())
                         .await
                         .map_err(|e| DbError::from(DbSqlError::from(e)))?;
