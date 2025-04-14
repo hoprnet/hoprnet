@@ -5,8 +5,6 @@ use curve25519_dalek::{
 };
 use digest::Digest;
 use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
-use hopr_primitive_types::errors::GeneralError::ParseError;
-use hopr_primitive_types::prelude::*;
 use k256::elliptic_curve::group::prime::PrimeCurveAffine;
 use k256::{
     ecdsa::{
@@ -38,6 +36,9 @@ use std::{
     str::FromStr,
 };
 use tracing::warn;
+
+use hopr_primitive_types::errors::GeneralError::ParseError;
+use hopr_primitive_types::prelude::*;
 
 use crate::utils::random_group_element;
 use crate::{

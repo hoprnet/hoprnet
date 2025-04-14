@@ -241,7 +241,7 @@ impl<T, U> TicketAggregationActions<T, U> {
             } else if e.is_disconnected() {
                 TransportError("queue is closed".to_string())
             } else {
-                TransportError(format!("Unknown error: {}", e))
+                TransportError(format!("Unknown error: {e}"))
             }
         })
     }
@@ -291,25 +291,28 @@ where
                         let opk: std::result::Result<OffchainPublicKey, hopr_primitive_types::errors::GeneralError> =
                             destination.try_into();
                         match opk {
-                            Ok(opk) => match db.aggregate_tickets(opk, acked_tickets, &chain_key).await {
-                                Ok(ticket) => Some(TicketAggregationProcessed::Reply(
-                                    destination,
-                                    Ok(ticket.leak()),
-                                    response,
-                                )),
-                                Err(DbError::TicketAggregationError(e)) => {
-                                    // forward error to counterparty
-                                    Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
-                                }
-                                Err(e) => {
-                                    error!(error = %e, "Dropping tickets aggregation request due to an error");
-                                    None
+                            Ok(opk) => {
+                                let count = acked_tickets.len();
+                                match db.aggregate_tickets(opk, acked_tickets, &chain_key).await {
+                                    Ok(ticket) => Some(TicketAggregationProcessed::Reply(
+                                        destination,
+                                        Ok(ticket.leak()),
+                                        response,
+                                    )),
+                                    Err(DbError::TicketAggregationError(e)) => {
+                                        // forward error to counterparty
+                                        Some(TicketAggregationProcessed::Reply(destination, Err(e), response))
+                                    }
+                                    Err(e) => {
+                                        error!(error = %e, %destination, count, "Dropping tickets aggregation request due to an error");
+                                        None
+                                    }
                                 }
                             },
                             Err(e) => {
                                 error!(
-                                    ?destination, error = %e,
-                                    "Failed to deserialize the destination to an offchain public key"
+                                    %destination, error = %e,
+                                    "Failed to aggregate tickets due to destination deserialization error from an offchain public key"
                                 );
                                 None
                             }
@@ -323,12 +326,12 @@ where
                                     Some(TicketAggregationProcessed::Receive(destination, acked_ticket, request))
                                 }
                                 Err(e) => {
-                                    error!(error = %e, "Error while handling aggregated ticket");
+                                    error!(error = %e, counterparty = %destination, "Error while handling aggregated ticket");
                                     None
                                 }
                             },
                             Err(e) => {
-                                warn!(error = %e, "Counterparty refused to aggregate tickets");
+                                warn!(error = %e, counterparty = %destination, "Counterparty refused to aggregate tickets");
                                 None
                             }
                         }

@@ -12,6 +12,10 @@ on:
       - synchronize
       - ready_for_review
 
+concurrency:
+  group: ${{ github.ref }}-zizmor
+  cancel-in-progress: true
+
 permissions: {}
 
 jobs:
@@ -34,11 +38,11 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == true
-        uses: cachix/install-nix-action@v29
+        uses: cachix/install-nix-action@9f70348d77d0422624097c4b7a75563948901306 # v29
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@ad2ddac53f961de1989924296a1f236fcfbaa4fc # v15
         if: env.needs_nix_setup == true
         with:
           name: hoprnet

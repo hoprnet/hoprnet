@@ -29,6 +29,7 @@ craneLib.devShell {
     yq-go
     curl
     bash
+    cargo-audit
 
     # anvil
     gnumake
@@ -60,8 +61,8 @@ craneLib.devShell {
     lcov
 
     ## python is required by integration tests
-    python39
-    python39Packages.venvShellHook
+    python313
+    python313Packages.venvShellHook
     uv
 
     ## formatting
@@ -91,6 +92,6 @@ craneLib.devShell {
   postShellHook = ''
     ${pre-commit-check.shellHook}
   '';
-  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl pkgs.pkgsBuildHost.libgcc.lib ];
-  RUST_MIN_STACK = "16777216"; # 16MB required to run the tests and compilation
+  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.pkgsBuildHost.openssl ] ++
+    pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]);
 }
