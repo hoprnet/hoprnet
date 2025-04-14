@@ -1,5 +1,4 @@
 use hopr_crypto_random::random_fill;
-use hopr_crypto_types::crypto_traits::Digest;
 use hopr_crypto_types::prelude::blake3_hash;
 use hopr_primitive_types::errors::GeneralError;
 use hopr_primitive_types::prelude::BytesEncodable;
