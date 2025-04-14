@@ -68,7 +68,7 @@ craneLib.devShell {
   ] ++
   (lib.attrValues config.treefmt.build.programs) ++
   lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
-  preShellHook = ''
+  shellHook = ''
     if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
       echo "solc = \"${solcDefault}/bin/solc\""
       echo "Generating foundry.toml file!"
@@ -78,15 +78,13 @@ craneLib.devShell {
     else
       echo "foundry.toml file already exists!"
     fi
-  '';
-  shellHook = ''
+  '' + ''
     uv sync
     unset SOURCE_DATE_EPOCH
   '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
     autoPatchelf ./.venv
-  '';
-  postShellHook = ''
-    ${pre-commit-check.shellHook}
+  '' + ''
+      ${pre-commit-check.shellHook}
   '';
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.pkgsBuildHost.openssl ] ++
     pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]);
