@@ -84,7 +84,7 @@ craneLib.devShell {
   '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
     autoPatchelf ./.venv
   '' + ''
-      ${pre-commit-check.shellHook}
+    ${pre-commit-check.shellHook}
   '';
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.pkgsBuildHost.openssl ] ++
     pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]);
