@@ -178,6 +178,10 @@ impl HoprDbProtocolOperations for HoprDb {
             ))
         })?;
 
+        let pseudonym = pseudonym.map(|p| *p).unwrap_or_else(|| HoprPseudonym::random());
+        let path = path.to_vec();
+        let return_paths = return_paths.iter().map(|p| p.to_vec()).collect::<Vec<_>>();
+
         let (components, openers) = self
             .begin_transaction()
             .await?
@@ -208,14 +212,14 @@ impl HoprDbProtocolOperations for HoprDb {
                     spawn_fifo_blocking(move || {
                         HoprPacket::into_outgoing(
                             &data,
-                            pseudonym.unwrap_or_else(|| &SimplePseudonym::random()),
+                            &pseudonym,
                             PacketRouting::ForwardPath {
                                 forward_path: &path,
-                                return_paths,
+                                return_paths: &return_paths.iter().map(|p| &p[..]).collect::<Vec<_>>(),
                             },
                             &me,
                             next_ticket,
-                            &mapper,
+                            &myself.caches.key_id_mapper,
                             &domain_separator,
                         )
                         .map_err(|e| {
@@ -226,6 +230,10 @@ impl HoprDbProtocolOperations for HoprDb {
                 })
             })
             .await?;
+
+        openers
+            .into_iter()
+            .for_each(|p| self.caches.pseudonym_openers.insert(pseudonym, p));
 
         match components {
             HoprPacket::Final { .. } | HoprPacket::Forwarded { .. } => {
@@ -273,10 +281,13 @@ impl HoprDbProtocolOperations for HoprDb {
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData> {
         let offchain_keypair = pkt_keypair.clone();
+        let myself = self.clone();
 
         let packet = spawn_fifo_blocking(move || {
-            HoprPacket::from_incoming(&data, &offchain_keypair, sender, &mapper, openers)
-                .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
+            HoprPacket::from_incoming(&data, &offchain_keypair, sender, &myself.caches.key_id_mapper, |p| {
+                myself.caches.pseudonym_openers.remove(p)
+            })
+            .map_err(|e| DbSqlError::LogicalError(format!("failed to construct an incoming packet: {e}")))
         })
         .await?;
 

@@ -216,6 +216,12 @@ impl TransportPath {
         assert!(!hops.is_empty(), "must not be empty");
         Self { hops }
     }
+
+    pub fn invert(self) -> Self {
+        Self {
+            hops: self.hops.into_iter().rev().collect(),
+        }
+    }
 }
 
 impl Path<PeerId> for TransportPath {

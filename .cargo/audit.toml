@@ -1,10 +1,10 @@
 [advisories]
 ignore = [
-    "RUSTSEC-2020-0056",     # 'stdweb' dependency in 'http-types'
-    "RUSTSEC-2021-0059",     # 'aesni' dependency in 'http-types'
-    "RUSTSEC-2021-0060",     # 'aes-soft' dependency in 'http-types'
-    "RUSTSEC-2021-0064",     # 'cpuid-bool' dependency in 'http-types'
-    "RUSTSEC-2024-0384",     # 'instant' dependency in 'futures-lite'
+  "RUSTSEC-2020-0056", # 'stdweb' dependency in 'http-types'
+  "RUSTSEC-2021-0059", # 'aesni' dependency in 'http-types'
+  "RUSTSEC-2021-0060", # 'aes-soft' dependency in 'http-types'
+  "RUSTSEC-2021-0064", # 'cpuid-bool' dependency in 'http-types'
+  "RUSTSEC-2024-0384", # 'instant' dependency in 'futures-lite'
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"
@@ -18,14 +18,20 @@ stale = false
 [output]
 deny = ["warnings"]
 format = "terminal" # "terminal" (human readable report) or "json"
-quiet = false # Only print information on error
-show_tree = true # Show inverse dependency trees along with advisories (default: true)
+quiet = false       # Only print information on error
+show_tree = true    # Show inverse dependency trees along with advisories (default: true)
 
 [target]
-arch = ["x86_64", "aarch64"] # Ignore advisories for CPU architectures other than these
-os = ["linux", "windows", "macos"] # Ignore advisories for operating systems other than these
+arch = [
+  "x86_64",
+  "aarch64",
+] # Ignore advisories for CPU architectures other than these
+os = [
+  "linux",
+  "windows",
+  "macos",
+] # Ignore advisories for operating systems other than these
 
 [yanked]
-enabled = true # Warn for yanked crates in Cargo.lock (default: true)
+enabled = true      # Warn for yanked crates in Cargo.lock (default: true)
 update_index = true # Auto-update the crates.io index (default: true)
-

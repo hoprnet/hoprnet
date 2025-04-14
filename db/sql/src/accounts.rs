@@ -233,6 +233,8 @@ impl HoprDbAccountOperations for HoprDb {
                     {
                         // Proceed if succeeded or already exists
                         Ok(_) | Err(DbErr::RecordNotInserted) => {
+                            myself.caches.key_id_mapper.insert_account(&account)?;
+
                             myself
                                 .caches
                                 .chain_to_offchain
@@ -253,6 +255,7 @@ impl HoprDbAccountOperations for HoprDb {
                                     .insert_announcement(Some(tx), account.chain_addr, multiaddr, updated_block)
                                     .await?;
                             }
+
                             Ok::<(), DbSqlError>(())
                         }
                         Err(e) => Err(e.into()),

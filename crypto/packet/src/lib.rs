@@ -29,13 +29,17 @@ mod types;
 /// Implements ticket validation logic.
 mod validation;
 
+#[doc(hidden)]
 pub mod prelude {
+    pub use super::*;
     pub use crate::packet::{HoprPacket, PacketRouting, PartialHoprPacket};
     pub use crate::validation::validate_unacknowledged_ticket;
 
     #[cfg(feature = "benchmarks")]
     pub use crate::por::{generate_proof_of_relay, pre_verify};
 }
+
+pub use hopr_crypto_sphinx::prelude::{KeyIdMapper, ReplyOpener};
 
 /// Pseudonyms used for the return path.
 pub type HoprPseudonym = hopr_crypto_types::prelude::SimplePseudonym;

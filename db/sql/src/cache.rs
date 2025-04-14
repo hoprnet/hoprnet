@@ -1,13 +1,14 @@
+use dashmap::{DashMap, Entry};
+use hopr_crypto_packet::{HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, ReplyOpener};
+use hopr_crypto_types::prelude::*;
+use hopr_db_api::info::{IndexerData, SafeInfo};
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::{Address, Balance, KeyIdent, U256};
 use moka::future::Cache;
 use moka::Expiry;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Duration;
-
-use hopr_crypto_types::prelude::*;
-use hopr_db_api::info::{IndexerData, SafeInfo};
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::{Address, Balance, U256};
 
 use crate::errors::DbSqlError;
 
@@ -56,7 +57,7 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
 /// Contains all caches used by the [crate::db::HoprDb].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct HoprDbCaches {
     pub(crate) single_values: Cache<CachedValueDiscriminants, CachedValue>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
@@ -67,6 +68,8 @@ pub struct HoprDbCaches {
     pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
     pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
     pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
+    pub(crate) key_id_mapper: CacheKeyMapper,
+    pub(crate) pseudonym_openers: moka::sync::Cache<HoprPseudonym, ReplyOpener>,
 }
 
 impl Default for HoprDbCaches {
@@ -97,6 +100,11 @@ impl Default for HoprDbCaches {
             .max_capacity(10_000)
             .build();
 
+        let pseudonym_openers = moka::sync::Cache::builder()
+            .max_capacity(100_000)
+            .time_to_live(Duration::from_secs(60))
+            .build();
+
         Self {
             single_values,
             unacked_tickets,
@@ -105,6 +113,8 @@ impl Default for HoprDbCaches {
             chain_to_offchain,
             offchain_to_chain,
             src_dst_to_channel,
+            pseudonym_openers,
+            key_id_mapper: CacheKeyMapper::with_capacity(10_000),
         }
     }
 }
@@ -118,5 +128,68 @@ impl HoprDbCaches {
         self.chain_to_offchain.invalidate_all();
         self.offchain_to_chain.invalidate_all();
         self.src_dst_to_channel.invalidate_all();
+        // NOTE: key_id_mapper intentionally not invalidated
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct CacheKeyMapper(
+    DashMap<KeyIdent<4>, OffchainPublicKey>,
+    DashMap<OffchainPublicKey, KeyIdent<4>>,
+);
+
+impl CacheKeyMapper {
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self(DashMap::with_capacity(capacity), DashMap::with_capacity(capacity))
+    }
+
+    /// Creates key id mapping for a public key of an [`AccountType::Announced`] account.
+    ///
+    /// Does nothing the account is [`AccountType::NotAnnounced`].
+    pub fn insert_account(&self, account: &AccountEntry) -> Result<(), DbSqlError> {
+        if let AccountType::Announced { updated_block, .. } = account.entry_type {
+            let id_hash = Hash::create(&[
+                account.public_key.as_ref(),
+                account.chain_addr.as_ref(),
+                &updated_block.to_be_bytes(),
+            ]);
+
+            let id: KeyIdent = u32::from_be_bytes(
+                id_hash.as_ref()[0..std::mem::size_of::<u32>()]
+                    .try_into()
+                    .map_err(|_| DbSqlError::LogicalError("cannot build key id".into()))?,
+            )
+            .into();
+
+            match self.0.entry(id) {
+                Entry::Vacant(v) => {
+                    v.insert(account.public_key);
+                    self.1.insert(account.public_key, id);
+                    Ok(())
+                }
+                Entry::Occupied(v) => Err(DbSqlError::LogicalError(format!(
+                    "attempt to insert key {} with key-id {id} already exists for the key {}",
+                    account.public_key,
+                    v.get()
+                ))),
+            }
+        } else {
+            // Insertion of unannounced accounts is simply skipped
+            tracing::debug!(
+                "skipping account insertion for an unannounced account with public key {}",
+                account.public_key
+            );
+            Ok(())
+        }
+    }
+}
+
+impl hopr_crypto_packet::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for CacheKeyMapper {
+    fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<KeyIdent<4>> {
+        self.1.get(key).map(|k| *k.value())
+    }
+
+    fn map_id_to_public(&self, id: &KeyIdent<4>) -> Option<OffchainPublicKey> {
+        self.0.get(id).map(|k| *k.value())
     }
 }
