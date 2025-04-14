@@ -96,7 +96,7 @@ getrandom = "0.3.2"
 governor = { version = "0.10" }
 hex = "0.4.3"
 hex-literal = "1.0.0"
-hickory-resolver = "0.24.4"
+hickory-resolver = "0.24.4"   # cannot be updated, until libp2p-dns is updated
 http-types = "2.12.0"
 lazy_static = "1.4.0"
 libp2p = { version = "0.55.0" }
@@ -119,9 +119,9 @@ tracing-opentelemetry = { version = "0.30.0" }
 temp-env = "0.3.6"
 parameterized = "2.0.0"
 petgraph = { version = "0.8.1", features = ["serde-1"] }
-primitive-types = { version = "0.12.2", features = [
+primitive-types = { version = "0.12.2", features = [ # primitive-types 0.13 not compatible with ethers.rs
   "serde",
-] } # cannot be updated until the ethers-rs is replaced with alloy-rs
+] } 
 proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
 rand = "0.8.5"
@@ -162,12 +162,12 @@ sha3 = "0.10"
 signal-hook = "0.3.17"
 smart-default = "0.7.1"
 socket2 = "0.5.9"
-# sqlx 0.8.4 not compatible with the sea-orm crates yet
-sqlx = { version = "=0.8.3", default-features = false, features = [
+
+sqlx = { version = "=0.8.3", default-features = false, features = [ # sqlx 0.8.4 not compatible with sea-orm crates
   "sqlite",
   "macros",
   "migrate",
-] } # specific version needed by the sea-orm crates
+] }
 strum = { version = "0.27.1", features = ["derive"] }
 surf = { version = "2.3.2" }
 surf-governor = { version = "0.2.0" }
