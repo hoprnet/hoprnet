@@ -43,7 +43,7 @@ pub mod prelude {
     pub use crate::surb::*;
 
     #[cfg(feature = "benchmarks")]
-    pub use crate::routing::{RoutingInfo, forward_header};
+    pub use crate::routing::{forward_header, RoutingInfo};
 }
 
 #[cfg(test)]

@@ -75,7 +75,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> SURB<S, H> {
             self.alpha.as_ref(),
             self.sender_key.as_ref(),
             self.header.as_ref(),
-            context
+            context,
         ])
     }
 }
