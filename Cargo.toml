@@ -119,7 +119,7 @@ tracing-opentelemetry = { version = "0.30.0" }
 temp-env = "0.3.6"
 parameterized = "2.0.0"
 petgraph = { version = "0.8.1", features = ["serde-1"] }
-primitive-types = { version = "0.12.2", features = [ # primitive-types 0.13 not compatible with ethers.rs
+primitive-types = { version = "0.13.1", features = [ # primitive-types 0.13 not compatible with ethers.rs
   "serde",
 ] }
 proc-macro-regex = "~1.1.0"
