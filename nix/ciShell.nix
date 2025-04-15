@@ -6,7 +6,6 @@ let
   mkShell = import ./mkShell.nix { };
   packages = with pkgs; [
     act
-    dive
     gh
     google-cloud-sdk
     graphviz
