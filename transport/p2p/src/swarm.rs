@@ -1,6 +1,10 @@
 use futures::{select, Stream, StreamExt};
-use libp2p::swarm::NetworkInfo;
-use libp2p::{request_response::OutboundRequestId, request_response::ResponseChannel, swarm::SwarmEvent};
+use libp2p::autonat;
+use libp2p::swarm::{dial_opts::DialOpts, NetworkInfo};
+use libp2p::{
+    multiaddr::Protocol, request_response::OutboundRequestId, request_response::ResponseChannel, swarm::SwarmEvent,
+};
+use std::net::Ipv4Addr;
 use std::num::NonZeroU8;
 use tracing::{debug, error, info, trace, warn};
 
@@ -47,7 +51,7 @@ where
     let me_peerid: PeerId = me.public().into();
 
     #[cfg(feature = "runtime-async-std")]
-    let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
+    let builder = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_async_std()
         .with_tcp(
             libp2p::tcp::Config::default().nodelay(true),
@@ -63,7 +67,7 @@ where
     // Both features could be enabled during testing, therefore we only use tokio when its
     // exclusively enabled.
     #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-    let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
+    let builder = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
         .with_tcp(
             libp2p::tcp::Config::default().nodelay(true),
@@ -76,7 +80,7 @@ where
         .with_quic()
         .with_dns();
 
-    Ok(swarm
+    let swarm = builder
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_behaviour(|_key| {
             HoprNetworkBehavior::new(
@@ -111,7 +115,9 @@ where
                     .unwrap_or(constants::HOPR_SWARM_IDLE_CONNECTION_TIMEOUT),
             )
         })
-        .build())
+        .build();
+
+    Ok(swarm)
 }
 
 pub type TicketAggregationWriter =
@@ -147,41 +153,54 @@ impl HoprSwarm {
         .await
         .expect("swarm must be constructible");
 
-        for multiaddress in my_multiaddresses.iter() {
-            match resolve_dns_if_any(multiaddress) {
-                Ok(ma) => {
-                    if let Err(e) = swarm.listen_on(ma.clone()) {
-                        warn!(%multiaddress, listen_on=%ma, error = %e, "Failed to listen_on, will try to use an unspecified address");
+        // for multiaddress in my_multiaddresses.iter() {
+        //     match resolve_dns_if_any(multiaddress) {
+        //         Ok(ma) => {
+        //             if let Err(e) = swarm.listen_on(ma.clone()) {
+        //                 warn!(%multiaddress, listen_on=%ma, error = %e, "Failed to listen_on, will try to use an unspecified address");
 
-                        match replace_transport_with_unspecified(&ma) {
-                            Ok(ma) => {
-                                if let Err(e) = swarm.listen_on(ma.clone()) {
-                                    warn!(multiaddress = %ma, error = %e, "Failed to listen_on using the unspecified multiaddress",);
-                                } else {
-                                    info!(
-                                        listen_on = ?ma,
-                                        multiaddress = ?multiaddress,
-                                        "Listening for p2p connections"
-                                    );
-                                    swarm.add_external_address(multiaddress.clone());
-                                }
-                            }
-                            Err(e) => {
-                                error!(multiaddress = %ma, error = %e, "Failed to transform the multiaddress")
-                            }
-                        }
-                    } else {
-                        info!(
-                            listen_on = ?ma,
-                            multiaddress = ?multiaddress,
-                            "Listening for p2p connections"
-                        );
-                        swarm.add_external_address(multiaddress.clone());
-                    }
-                }
-                Err(e) => error!(%multiaddress, error = %e, "Failed to transform the multiaddress"),
-            }
-        }
+        //                 match replace_transport_with_unspecified(&ma) {
+        //                     Ok(ma) => {
+        //                         if let Err(e) = swarm.listen_on(ma.clone()) {
+        //                             warn!(multiaddress = %ma, error = %e, "Failed to listen_on using the unspecified multiaddress",);
+        //                         } else {
+        //                             info!(
+        //                                 listen_on = ?ma,
+        //                                 multiaddress = ?multiaddress,
+        //                                 "Listening for p2p connections"
+        //                             );
+        //                             swarm.add_external_address(multiaddress.clone());
+        //                         }
+        //                     }
+        //                     Err(e) => {
+        //                         error!(multiaddress = %ma, error = %e, "Failed to transform the multiaddress")
+        //                     }
+        //                 }
+        //             } else {
+        //                 info!(
+        //                     listen_on = ?ma,
+        //                     multiaddress = ?multiaddress,
+        //                     "Listening for p2p connections"
+        //                 );
+        //                 swarm.add_external_address(multiaddress.clone());
+        //             }
+        //         }
+        //         Err(e) => error!(%multiaddress, error = %e, "Failed to transform the multiaddress"),
+        //     }
+        // }
+        swarm
+            .listen_on(
+                Multiaddr::empty()
+                    .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
+                    .with(Protocol::Tcp(9191)), // TODO: replace with a configurable port
+            )
+            .expect("Failed to listen on unspecified address");
+
+        let server_address = Multiaddr::empty(); // TODO (jean) replace with an announced node multiaddress
+
+        swarm
+            .dial(DialOpts::unknown_peer_id().address(server_address).build())
+            .expect("Failed to dial the server");
 
         // TODO: perform this check
         // NOTE: This would be a valid check but is not immediate
@@ -414,6 +433,24 @@ impl HoprSwarmWithProcessors {
                             }
                         }
                     }
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatClient(autonat::v2::client::Event {
+                        server,
+                        tested_addr,
+                        bytes_sent,
+                        result,
+                    })) => {
+                        match result {
+                            Ok(_) => {
+                                debug!(%server, %tested_addr, %bytes_sent, "Autonat server successfully tested");
+                            }
+                            Err(e) => {
+                                warn!(%server, %tested_addr, %bytes_sent, %e, "Autonat server test failed");
+                            }
+                        }
+                    }
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatServer(event)) => {
+                        warn!(?event, "Autonat server event");
+                    }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::HeartbeatGenerator(event)) => {
                         let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior", behavior="heartbeat generator");
 
@@ -517,10 +554,10 @@ impl HoprSwarmWithProcessors {
                     } => {
                         debug!(peer = ?peer_id, %connection_id, transport="libp2p", "dialing")
                     }
+                    SwarmEvent::ExternalAddrConfirmed { address } => {
+                        info!(%address, "External address confirmed");
+                    }
                     SwarmEvent::NewExternalAddrCandidate {
-                        ..  // address: Multiaddr
-                    } => {}
-                    SwarmEvent::ExternalAddrConfirmed {
                         ..  // address: Multiaddr
                     } => {}
                     SwarmEvent::ExternalAddrExpired {

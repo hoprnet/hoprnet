@@ -32,12 +32,14 @@ libp2p = { workspace = true, features = [
   "cbor",
   "macros",
   "tcp",
+  "autonat",
   "quic",
   "dns",
   "yamux",
 ] }
 libp2p-stream = { workspace = true }
 moka = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
