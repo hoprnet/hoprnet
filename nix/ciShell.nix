@@ -3,7 +3,7 @@
 , ...
 }@args:
 let
-  mkShell = import ./mkShell.nix {};
+  mkShell = import ./mkShell.nix { };
   packages = with pkgs; [
     act
     dive
@@ -28,6 +28,7 @@ let
   cleanArgs = removeAttrs args [
     "extraPackages"
   ];
-in mkShell (cleanArgs // {
+in
+mkShell (cleanArgs // {
   inherit shellPackages;
 })

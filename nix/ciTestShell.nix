@@ -15,6 +15,7 @@ let
     "hoprd"
     "hopli"
   ];
-in import ./testShell.nix (cleanArgs // {
+in
+import ./testShell.nix (cleanArgs // {
   extraPackages = packages ++ extraPackages;
 })

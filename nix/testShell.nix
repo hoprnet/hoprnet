@@ -5,7 +5,7 @@
 , ...
 }@args:
 let
-  mkShell = import ./mkShell.nix {};
+  mkShell = import ./mkShell.nix { };
   finalShellHook = ''
     if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
       echo "solc = \"${solcDefault}/bin/solc\""
@@ -31,7 +31,8 @@ let
     "extraPackages"
     "shellHook"
   ];
-in mkShell (cleanArgs // {
+in
+mkShell (cleanArgs // {
   inherit shellPackages;
   shellHook = finalShellHook;
 })
