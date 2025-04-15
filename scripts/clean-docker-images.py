@@ -3,6 +3,30 @@
 # dependencies = ["google-cloud-artifact-registry==1.15.2","google-auth==2.38.0"]
 # ///
 
+"""
+clean-docker-images.py
+
+This script cleans up old Docker images from a Google Cloud Artifact Registry.
+It lists Docker images in the specified registry, identifies images older than
+a specified number of days, and deletes them. The script can also run in dry-run
+mode to simulate deletions without making any changes.
+
+Dependencies:
+- google-cloud-artifact-registry==1.15.2
+- google-auth==2.38.0
+
+Usage:
+    ./clean-docker-images.py <registry> [-n | --dry-run] [-d | --days <days>]
+
+Arguments:
+    registry: The Docker image registry in the format `location-docker.pkg.dev/project/repo`.
+    -n, --dry-run: Simulate the deletion without making any changes.
+    -d, --days: Number of days to consider an image old (default: 60).
+
+Example:
+    ./clean-docker-images.py europe-west3-docker.pkg.dev/my-project/my-repo -d 30 --dry-run
+"""
+
 from datetime import UTC, datetime, timedelta
 from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import artifactregistry_v1
@@ -14,21 +38,8 @@ import subprocess
 import sys
 
 
-# Ensure the script exits on errors
 def list_docker_images(client, parent):
-    """
-    Lists Docker images under the specified parent path.
-
-    Args:
-        client: Artifact Registry client instance.
-        parent: The parent path in the format `projects/{project}/locations/{location}/repositories/{repo}`.
-
-    Returns:
-        A list of Docker images.
-
-    Raises:
-        SystemExit: If an error occurs while listing Docker images.
-    """
+    """Lists Docker images under the specified parent path."""
     try:
         print(f"Listing Docker images in {parent}")
         request = artifactregistry_v1.ListDockerImagesRequest(parent=parent)
@@ -38,28 +49,19 @@ def list_docker_images(client, parent):
         sys.exit(1)
 
 
-async def delete_docker_images_list(images):
+async def delete_docker_images_list(images, dry_run):
+    """Deletes a list of Docker images asynchronously."""
     asyncio.gather(*[asyncio.wait_for(delete_docker_image(img.uri, dry_run), timeout=60) for img in images])
 
 
 def delete_docker_image(uri, dry_run):
-    """
-    Deletes a Docker image by its uri.
-
-    Args:
-        uri: The uri of the Docker image to delete.
-        dry_run: If True, simulates the deletion without making changes.
-
-    Raises:
-        SystemExit: If an error occurs while deleting the Docker image.
-    """
+    """Deletes a Docker image by its URI."""
     if dry_run:
         print(f"Dry-run mode: Would delete image {uri}")
         return
     try:
         print(f"Deleting Docker image {uri}")
-        # need to use gcloud cli because docker image deletion is not
-        # supported by the Artifact Registry client
+        # Use gcloud CLI because Docker image deletion is not supported by the Artifact Registry client
         cmd = f"gcloud artifacts docker images delete {uri} --async --delete-tags -q"
         subprocess.run(cmd.split(), check=True)
     except Exception as e:
@@ -96,7 +98,7 @@ repo = match.group("repo")
 
 
 async def main():
-    # Initialize the Artifact Registry client
+    """Main function to clean up old Docker images."""
     try:
         client = artifactregistry_v1.ArtifactRegistryClient()
     except DefaultCredentialsError as e:
@@ -107,26 +109,17 @@ async def main():
     parent = f"projects/{project}/locations/{location}/repositories/{repo}"
     docker_images = list_docker_images(client, parent)
 
-    # Identify old images based on update time and tags
-    old_pr_image_tags = [
+    old_images = [
         img
         for img in docker_images
         if img.update_time.timestamp_pb().ToDatetime().astimezone(UTC) < date
-        and any("commit" in tag for tag in img.tags)
+        and (any("commit" in tag for tag in img.tags) or len(img.tags) == 0)
     ]
-    old_untagged_images = [
-        img
-        for img in docker_images
-        if img.update_time.timestamp_pb().ToDatetime().astimezone(UTC) < date and len(img.tags) == 0
-    ]
-    old_image_tags = old_pr_image_tags + old_untagged_images
 
-    # Filter and delete old images
     for image in images:
-        old_images = [img for img in old_image_tags if img.uri.startswith(f"{registry}/{image}@")]
-
-        for old_images_part in itertools.batched(old_images, 20):
-            await delete_docker_images_list(old_images_part)
+        filtered_images = [img for img in old_images if img.uri.startswith(f"{registry}/{image}@")]
+        for batch in itertools.batched(filtered_images, 20):
+            await delete_docker_images_list(batch, dry_run)
 
 
 asyncio.run(main())
