@@ -162,13 +162,13 @@ sha3 = "0.10.8"
 signal-hook = "0.3.17"
 smart-default = "0.7.1"
 socket2 = "0.5.9"
-
 sqlx = { version = "0.8.4", default-features = false, features = [
   "sqlite",
   "macros",
   "migrate",
 ] }
 strum = { version = "0.27.1", features = ["derive"] }
+subtle = "2.6.1"
 surf = { version = "2.3.2" }
 surf-governor = { version = "0.2.0" }
 tempfile = "3.19.1"

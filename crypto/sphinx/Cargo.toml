@@ -38,7 +38,7 @@ hopr-primitive-types = { workspace = true }
 anyhow = { workspace = true }
 hex-literal = { workspace = true }
 parameterized = { workspace = true }
-subtle = "2.5.0"
+subtle = { workspace = true }
 
 [features]
 default = ["x25519"]
