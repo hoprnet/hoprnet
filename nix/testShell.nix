@@ -24,6 +24,8 @@ let
   '' + shellHook;
   packages = with pkgs; [
     uv
+    solcDefault
+    foundry-bin
   ];
   shellPackages = packages ++ extraPackages;
   cleanArgs = removeAttrs args [

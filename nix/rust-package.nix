@@ -121,18 +121,19 @@ let
     });
   };
 
-  args = if buildDocs then sharedArgs // docsArgs
-  else if depsOnly then {
-    inherit pname pnameSuffix version CARGO_PROFILE;
+  args =
+    if buildDocs then sharedArgs // docsArgs
+    else if depsOnly then {
+      inherit pname pnameSuffix version CARGO_PROFILE;
 
-    # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
-    # this dependency
-    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl pkgs.cacert libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
-    buildInputs = [ openssl pkgs.cacert ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
+      # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
+      # this dependency
+      nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl pkgs.cacert libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
+      buildInputs = [ openssl pkgs.cacert ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
-    src = depsSrc;
-  }
-  else sharedArgs // defaultArgs;
+      src = depsSrc;
+    }
+    else sharedArgs // defaultArgs;
 
   builder =
     if runTests then craneLib.cargoTest

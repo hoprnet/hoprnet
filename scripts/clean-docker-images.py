@@ -51,22 +51,21 @@ def list_docker_images(client, parent):
 
 async def delete_docker_images_list(images, dry_run):
     """Deletes a list of Docker images asynchronously."""
-    asyncio.gather(*[asyncio.wait_for(delete_docker_image(img.uri, dry_run), timeout=60) for img in images])
+    await asyncio.gather(*[asyncio.wait_for(delete_docker_image(img, dry_run), timeout=60) for img in images])
 
 
-def delete_docker_image(uri, dry_run):
+async def delete_docker_image(img, dry_run):
     """Deletes a Docker image by its URI."""
     if dry_run:
-        print(f"Dry-run mode: Would delete image {uri}")
+        print(f"Dry-run mode: Would delete image {img.uri}")
         return
     try:
-        print(f"Deleting Docker image {uri}")
+        print(f"Deleting Docker image {img.uri}")
         # Use gcloud CLI because Docker image deletion is not supported by the Artifact Registry client
-        cmd = f"gcloud artifacts docker images delete {uri} --async --delete-tags -q"
+        cmd = f"gcloud artifacts docker images delete {img.uri} --delete-tags -q"
         subprocess.run(cmd.split(), check=True)
     except Exception as e:
         print(f"Error deleting Docker image: {str(e)}", file=sys.stderr)
-        sys.exit(1)
 
 
 # Parse command-line arguments
@@ -109,16 +108,28 @@ async def main():
     parent = f"projects/{project}/locations/{location}/repositories/{repo}"
     docker_images = list_docker_images(client, parent)
 
+    # we are fine deleting images without tags, with a single "commit" or "pr"
+    # tag or with both
+    tag_filter = re.compile(r"^(.*-commit\..*)|(.*-pr\..*)")
     old_images = [
         img
         for img in docker_images
         if img.update_time.timestamp_pb().ToDatetime().astimezone(UTC) < date
-        and (any("commit" in tag for tag in img.tags) or len(img.tags) == 0)
+        # this check will also allow untagged images
+        and all(tag_filter.match(tag) for tag in img.tags)
     ]
 
     for image in images:
         filtered_images = [img for img in old_images if img.uri.startswith(f"{registry}/{image}@")]
-        for batch in itertools.batched(filtered_images, 20):
+        tagged_filtered_images = [img for img in filtered_images if len(img.tags) > 0]
+        untagged_filtered_images = [img for img in filtered_images if len(img.tags) == 0]
+
+        print(f"Found {len(filtered_images)} old images for {image} in {registry}")
+        print(f"Found {len(tagged_filtered_images)} tagged images for {image} in {registry}")
+        print(f"Found {len(untagged_filtered_images)} untagged images for {image} in {registry}")
+        for batch in itertools.batched(tagged_filtered_images, 20):
+            await delete_docker_images_list(batch, dry_run)
+        for batch in itertools.batched(untagged_filtered_images, 20):
             await delete_docker_images_list(batch, dry_run)
 
 
