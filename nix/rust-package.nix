@@ -52,9 +52,9 @@ let
 
   crateInfo = craneLib.crateNameFromCargoToml { inherit cargoToml; };
   pname = crateInfo.pname;
-  pnameSuffix =
-    if CARGO_PROFILE == "release" then ""
-    else "-${CARGO_PROFILE}";
+  pnameSuffix = if CARGO_PROFILE == "release" then "" else "-${CARGO_PROFILE}";
+  pnameDeps = if CARGO_PROFILE == "release" then pname else "${pname}-${CARGO_PROFILE}";
+
   version = lib.strings.concatStringsSep "." (lib.lists.take 3 (builtins.splitVersion crateInfo.version));
 
   isDarwinForDarwin = buildPlatform.isDarwin && hostPlatform.isDarwin;
@@ -121,6 +121,7 @@ let
 
   defaultArgs = {
     cargoArtifacts = craneLib.buildDepsOnly (sharedArgs // {
+      pname = pnameDeps;
       src = depsSrc;
     });
   };
