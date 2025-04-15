@@ -12,6 +12,7 @@
 , lib
 , libiconv
 , makeSetupHook
+, mold
 , openssl
 , pandoc
 , pkg-config
@@ -76,7 +77,7 @@ let
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
-    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl pkgs.cacert libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
+    nativeBuildInputs = [ mold solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl pkgs.cacert libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
     buildInputs = [ openssl pkgs.cacert ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
@@ -94,7 +95,10 @@ let
       cargoTestExtraArgs = "--workspace -F runtime-async-std -F runtime-tokio";
       doCheck = true;
     }
-    else if runClippy then sharedArgsBase // { cargoClippyExtraArgs = "-- -Dwarnings"; }
+    else if runClippy then sharedArgsBase // {
+      cargoClippyExtraArgs = "-- -Dwarnings";
+      CARGO_PROFILE = "dev";
+    }
     else sharedArgsBase;
 
   docsArgs = {
@@ -103,6 +107,7 @@ let
     cargoDocExtraArgs = "--workspace --no-deps";
     RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
     CARGO_TARGET_DIR = "target/";
+    CARGO_PROFILE = "dev";
     LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
     postBuild = ''
       ${pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html

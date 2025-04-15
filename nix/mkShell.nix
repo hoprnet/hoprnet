@@ -24,6 +24,7 @@ let
     gnumake
     jq
     lsof
+    mold
     openssl
     patchelf
     pkg-config

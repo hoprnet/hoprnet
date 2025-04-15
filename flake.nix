@@ -145,6 +145,9 @@
           hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
           });
+          hoprd-prerelease = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            CARGO_PROFILE = "prelease";
+          });
 
           hopliBuildArgs = {
             inherit src depsSrc rev;
@@ -167,6 +170,9 @@
           hopli-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // { runClippy = true; });
           hopli-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
             CARGO_PROFILE = "dev";
+          });
+          hopli-prerelease = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
+            CARGO_PROFILE = "prerelease";
           });
 
           profileDeps = with pkgs; [
@@ -468,10 +474,10 @@
               foundry-bin
               solcDefault
               hopli-debug
-              hoprd # must be a release build to circumvent a panic within libp2p-request-response
-              python39
+              hoprd-debug
             ];
             buildPhase = ''
+              uv sync
               unset SOURCE_DATE_EPOCH
             '';
             checkPhase = ''
@@ -648,6 +654,7 @@
           packages = {
             inherit hoprd hoprd-debug hoprd-docker hoprd-debug-docker hoprd-profile-docker;
             inherit hopli hopli-debug hopli-docker hopli-debug-docker hopli-profile-docker;
+            inherit hoprd-prerelease hopli-prerelease;
             inherit hopr-test hopr-test-nightly;
             inherit anvil-docker hopr-pluto;
             inherit smoke-tests docs;

@@ -59,6 +59,7 @@ let
     CARGO_BUILD_TARGET = cargoTarget;
     "CARGO_TARGET_${envCase cargoTarget}_LINKER" = "${pkgs.stdenv.cc.targetPrefix}cc";
     HOST_CC = "${pkgs.stdenv.cc.nativePrefix}cc";
+    CARGO_BUILD_RUSTFLAGS = "-C link-arg=-fuse-ld=mold";
   };
 in
 {
