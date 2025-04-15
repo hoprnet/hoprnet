@@ -63,8 +63,7 @@ async def delete_docker_image(img, dry_run):
         print(f"Deleting Docker image {img.uri}")
         # Use gcloud CLI because Docker image deletion is not supported by the Artifact Registry client
         cmd = f"gcloud artifacts docker images delete {img.uri} --delete-tags -q"
-        subprocess.run(cmd.split(), check=True)
-    except Exception as e:
+        subprocess.run(shlex.split(cmd), check=True)
         print(f"Error deleting Docker image: {str(e)}", file=sys.stderr)
 
 
