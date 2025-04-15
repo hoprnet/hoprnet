@@ -47,7 +47,7 @@ strum = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { version = "0.1.15", features = ["net"] }
 tower = "0.5.2"
-tower-http = { version = "0.6.1", features = [
+tower-http = { version = "0.6.2", features = [
   "validate-request",
   "compression-full",
   "cors",
