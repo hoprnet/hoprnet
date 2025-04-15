@@ -143,7 +143,7 @@ sea-orm-migration = { version = "1.1.10", features = [
   "sqlx-sqlite",
   "with-chrono",
 ] }
-sea-query = { version = "0.32.1", default-features = false }
+sea-query = { version = "0.32.3", default-features = false }
 sea-query-binder = { version = "0.7.0", default-features = false, features = [
   "with-chrono",
   "sqlx-sqlite",
