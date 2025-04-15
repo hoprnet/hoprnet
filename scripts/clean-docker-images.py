@@ -31,6 +31,7 @@ from datetime import UTC, datetime, timedelta
 from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import artifactregistry_v1
 import argparse
+import shlex
 import asyncio
 import itertools
 import re
@@ -64,6 +65,7 @@ async def delete_docker_image(img, dry_run):
         # Use gcloud CLI because Docker image deletion is not supported by the Artifact Registry client
         cmd = f"gcloud artifacts docker images delete {img.uri} --delete-tags -q"
         subprocess.run(shlex.split(cmd), check=True)
+    except subprocess.CalledProcessError as e:
         print(f"Error deleting Docker image: {str(e)}", file=sys.stderr)
 
 
