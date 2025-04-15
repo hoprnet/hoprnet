@@ -1,7 +1,9 @@
 { pkgs
 , extraPackages ? [ ]
+, ...
 }@args:
 let
+  mkShell = import ./mkShell.nix {};
   packages = with pkgs; [
     act
     dive
@@ -20,5 +22,6 @@ let
     # docker image inspection and handling
     dive
   ];
-in import ./mkShell.nix (args  // { extraPackages = packages ++
-extraPackages;});
+in mkShell (args  // {
+  extraPackages = packages ++ extraPackages;
+})
