@@ -330,8 +330,8 @@ jobs:
           email: ${{ secrets.ZULIP_EMAIL }}
           organization-url: "https://hopr.zulipchat.com"
           type: "stream"
-          to: "Products"
-          topic: "uHTTP"
+          to: "GnosisVPN"
+          topic: "gnosisvpn-js"
           content: |
             The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
             Review the changes manually and update the `uhttp-docker` repository accordingly.

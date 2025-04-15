@@ -375,7 +375,7 @@ pub async fn deploy_one_safe_one_module_and_setup_for_testing<M: Middleware>(
         .unwrap();
 
     // only deploy contracts when needed
-    if code.len() == 0 {
+    if code.is_empty() {
         debug!("deploying safe code");
         // Deploy Safe diamond deployment proxy singleton
         let safe_diamond_proxy_address = {
