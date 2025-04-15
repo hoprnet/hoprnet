@@ -494,17 +494,11 @@
             };
             tools = pkgs;
           };
-          defaultDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
-          smoketestsDevShell = import ./nix/shell.nix {
-            inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [
-            hoprd # must be a release build to circumvent a panic within libp2p-request-response
-            hopli-debug
-            tcpdump
-          ];
-          };
-          ciShell = import ./nix/ciShell.nix;
-          docsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
-          clusterDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
+          devShell = import ./nix/devShell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
+          ciShell = import ./nix/ciShell.nix { inherit pkgs config crane; };
+          testShell = import ./nix/testShell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
+          ciTestShell = import ./nix/ciTestShell.nix { inherit pkgs config crane pre-commit-check solcDefault; hoprd = hoprd-debug; hopli = hopli-debug; };
+          docsShell = import ./nix/devShell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
               set -e
@@ -667,11 +661,11 @@
             default = hoprd;
           };
 
-          devShells.default = defaultDevShell;
+          devShells.default = devShell;
           devShells.ci = ciShell;
-          devShells.smoke-tests = smoketestsDevShell;
-          devShells.docs = docsDevShell;
-          devShells.cluster = clusterDevShell;
+          devShells.test = testShell;
+          devShells.citest = ciTestShell;
+          devShells.docs = docsShell;
 
           formatter = config.treefmt.build.wrapper;
         };

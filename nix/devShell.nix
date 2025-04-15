@@ -8,6 +8,7 @@ let
   shellHook = ''
     ${pre-commit-check.shellHook}
   '';
+  packages = [];
   shellPackages = packages ++ extraPackages;
   cleanArgs = removeAttrs args [
     "pre-commit-check"

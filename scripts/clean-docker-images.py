@@ -38,22 +38,21 @@ def list_docker_images(client, parent):
         sys.exit(1)
 
 async def delete_docker_images_list(images):
-    await asyncio.gather(
+    asyncio.gather(
         *[
             asyncio.wait_for(
-                delete_docker_image(client, img.uri, dry_run)
-
+                delete_docker_image(img.uri, dry_run),
+                timeout=60
             )
             for img in images
         ]
     )
 
-def delete_docker_image(client, uri, dry_run):
+def delete_docker_image(uri, dry_run):
     """
     Deletes a Docker image by its uri.
 
     Args:
-        client: Artifact Registry client instance.
         uri: The uri of the Docker image to delete.
         dry_run: If True, simulates the deletion without making changes.
 
@@ -101,42 +100,34 @@ location = match.group("location")
 project = match.group("project")
 repo = match.group("repo")
 
-# Initialize the Artifact Registry client
-try:
-    client = artifactregistry_v1.ArtifactRegistryClient()
-except DefaultCredentialsError as e:
-    print(f"Error with credentials: {str(e)}", file=sys.stderr)
-    sys.exit(1)
-
-# Construct the parent path for listing Docker images
-parent = f"projects/{project}/locations/{location}/repositories/{repo}"
-docker_images = list_docker_images(client, parent)
-
-# Identify old images based on update time and tags
-old_pr_image_tags = [
-    img
-    for img in docker_images
-    if img.update_time.timestamp_pb().ToDatetime() < date and any("commit" in tag for tag in img.tags)
-]
-old_untagged_images = [
-    img for img in docker_images if img.update_time.timestamp_pb().ToDatetime() < date and len(img.tags) == 0
-]
-old_image_tags = old_pr_image_tags + old_untagged_images
-
-
-# prepare tasks list for main loop
-tasks = []
-
-# Filter and delete old images
-for image in images:
-    old_images = [img for img in old_image_tags if img.uri.startswith(f"{registry}/{image}@")]
-
-    for old_images_part in itertools.batched(old_images, 20):
-        tasks.append(
-            delete_docker_images_list(old_images_part)
-        )
-
-# run all tasks in parallel
-loop = asyncio.new_event_loop()
-loop.run_until_complete(asyncio.wait(tasks))
-loop.close()
+async def main():
+    # Initialize the Artifact Registry client
+    try:
+        client = artifactregistry_v1.ArtifactRegistryClient()
+    except DefaultCredentialsError as e:
+        print(f"Error with credentials: {str(e)}", file=sys.stderr)
+        sys.exit(1)
+    
+    # Construct the parent path for listing Docker images
+    parent = f"projects/{project}/locations/{location}/repositories/{repo}"
+    docker_images = list_docker_images(client, parent)
+    
+    # Identify old images based on update time and tags
+    old_pr_image_tags = [
+        img
+        for img in docker_images
+        if img.update_time.timestamp_pb().ToDatetime().astimezone(UTC) < date and any("commit" in tag for tag in img.tags)
+    ]
+    old_untagged_images = [
+        img for img in docker_images if img.update_time.timestamp_pb().ToDatetime().astimezone(UTC) < date and len(img.tags) == 0
+    ]
+    old_image_tags = old_pr_image_tags + old_untagged_images
+    
+    # Filter and delete old images
+    for image in images:
+        old_images = [img for img in old_image_tags if img.uri.startswith(f"{registry}/{image}@")]
+    
+        for old_images_part in itertools.batched(old_images, 20):
+            await delete_docker_images_list(old_images_part)
+    
+asyncio.run(main())
