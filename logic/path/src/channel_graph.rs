@@ -6,8 +6,6 @@ use petgraph::prelude::StableDiGraph;
 use petgraph::stable_graph::NodeIndex;
 use petgraph::visit::{EdgeFiltered, EdgeRef, NodeFiltered};
 use petgraph::Direction;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
@@ -38,7 +36,8 @@ lazy_static::lazy_static! {
 
 /// Structure that adds additional data to a `ChannelEntry`, which
 /// can be used to compute edge weights and traverse the `ChannelGraph`.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChannelEdge {
     /// Underlying channel
     pub channel: ChannelEntry,
@@ -62,7 +61,8 @@ impl std::fmt::Display for ChannelEdge {
 /// Represents a node in the Channel Graph.
 /// This is typically represented by an on-chain address and ping quality, which
 /// represents some kind of node's liveness as perceived by us.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Node {
     /// Node's on-chain address.
     pub address: Address,
@@ -117,7 +117,8 @@ impl std::fmt::Display for Node {
 }
 
 /// Configuration for the [`ChannelGraph`].
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, smart_default::SmartDefault)]
+#[derive(Clone, Copy, Debug, PartialEq, smart_default::SmartDefault)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChannelGraphConfig {
     /// Length of the Simple Moving Average window for node latencies.
     #[default(20)]
@@ -136,7 +137,8 @@ pub struct ChannelGraphConfig {
 }
 
 /// Describes an update of the [`Node`]'s score.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum NodeScoreUpdate {
     /// Node is reachable with the given latency.
     Reachable(Duration),
@@ -172,11 +174,13 @@ impl<T> From<Result<Duration, T>> for NodeScoreUpdate {
 ///
 /// When a node reaches zero [quality](Node) and there are no edges (channels) containing this node,
 /// it is removed from the graph entirely.
-#[serde_as]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+
+#[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_with::serde_as)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug)]
 pub struct ChannelGraph {
     me: Address,
-    #[serde_as(as = "Vec<(_, _)>")]
+    #[cfg_attr(feature = "serde", serde_as(as = "Vec<(_, _)>"))]
     indices: HashMap<Address, u32>,
     graph: StableDiGraph<Node, ChannelEdge>,
     cfg: ChannelGraphConfig,

@@ -217,6 +217,7 @@ impl TransportPath {
         Self { hops }
     }
 
+    /// Returns the path with hops in the reverse order.
     pub fn invert(self) -> Self {
         Self {
             hops: self.hops.into_iter().rev().collect(),

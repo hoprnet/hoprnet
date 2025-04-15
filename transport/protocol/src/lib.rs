@@ -165,7 +165,6 @@ where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     let me = packet_cfg.packet_keypair.clone();
-    let me_onchain = &packet_cfg.chain_keypair.clone();
 
     let mut processes = HashMap::new();
 
@@ -201,7 +200,7 @@ where
         bloom::WrappedTagBloomFilter::new("no_tbf".into())
     };
 
-    let ack_processor_read = ack::processor::AcknowledgementProcessor::new(db.clone(), me_onchain);
+    let ack_processor_read = ack::processor::AcknowledgementProcessor::new(db.clone());
     let ack_processor_write = ack_processor_read.clone();
     let msg_processor_read = msg::processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
     let msg_processor_write = msg_processor_read.clone();

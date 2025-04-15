@@ -80,7 +80,6 @@ where
             .db
             .to_send(
                 data.to_bytes(),
-                self.cfg.chain_keypair.clone(),
                 None, // TODO
                 &path?,
                 &[], // TODO
@@ -114,7 +113,6 @@ where
             .db
             .from_recv(
                 data,
-                self.cfg.chain_keypair.clone(),
                 &self.cfg.packet_keypair,
                 previous_hop,
                 self.determine_actual_outgoing_win_prob().await,

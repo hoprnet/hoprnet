@@ -15,8 +15,7 @@ pub trait HoprDbProtocolOperations {
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair)
-        -> crate::errors::Result<AckResult>;
+    async fn handle_acknowledgement(&self, ack: Acknowledgement) -> crate::errors::Result<AckResult>;
 
     /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
     async fn get_network_winning_probability(&self) -> crate::errors::Result<f64>;
@@ -28,7 +27,6 @@ pub trait HoprDbProtocolOperations {
     async fn to_send(
         &self,
         data: Box<[u8]>,
-        me: ChainKeypair,
         pseudonym: Option<&SimplePseudonym>,
         path: &[OffchainPublicKey],
         return_paths: &[&[OffchainPublicKey]],
@@ -41,7 +39,6 @@ pub trait HoprDbProtocolOperations {
     async fn from_recv(
         &self,
         data: Box<[u8]>,
-        me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: f64,

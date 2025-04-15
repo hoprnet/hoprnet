@@ -13,6 +13,14 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+serde = [
+  "dep:serde",
+  "dep:serde_with",
+  "dep:cfg_eval",
+  "hopr-internal-types/serde",
+  "hopr-crypto-types/serde",
+  "petgraph/serde-1",
+]
 runtime-async-std = ["hopr-db-sql/runtime-async-std"]
 runtime-tokio = ["hopr-db-sql/runtime-tokio"]
 prometheus = ["dep:hopr-metrics", "hopr-db-sql/prometheus"]
@@ -20,12 +28,13 @@ prometheus = ["dep:hopr-metrics", "hopr-db-sql/prometheus"]
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
+cfg_eval = { version = "0.1.2", optional = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 libp2p-identity = { workspace = true }
-petgraph = { workspace = true, features = ["serde-1"] }
-serde = { workspace = true }
-serde_with = { workspace = true }
+petgraph = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

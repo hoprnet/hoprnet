@@ -32,7 +32,9 @@ mod validation;
 #[doc(hidden)]
 pub mod prelude {
     pub use super::*;
-    pub use crate::packet::{HoprPacket, HoprForwardedPacket, HoprOutgoingPacket, HoprIncomingPacket, PacketRouting, PartialHoprPacket};
+    pub use crate::packet::{
+        HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
+    };
     pub use crate::validation::validate_unacknowledged_ticket;
 
     #[cfg(feature = "benchmarks")]

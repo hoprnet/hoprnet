@@ -1278,6 +1278,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
+name = "cfg_eval"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45565fc9416b9896014f5732ac776f810ee53a66730c17e4020c3ec064a8f88f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "chacha20"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4497,6 +4508,7 @@ dependencies = [
  "parameterized",
  "serde",
  "serde_bytes",
+ "strum 0.27.1",
  "thiserror 2.0.12",
  "tracing",
 ]
@@ -4808,6 +4820,7 @@ dependencies = [
  "async-lock 3.4.0",
  "async-std",
  "async-trait",
+ "cfg_eval",
  "futures",
  "hex-literal",
  "hopr-crypto-random",
@@ -5413,7 +5426,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2 0.5.9",
  "tokio",
  "tower-service",
  "tracing",

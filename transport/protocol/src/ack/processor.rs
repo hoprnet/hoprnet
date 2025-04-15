@@ -12,15 +12,11 @@ use crate::errors::{ProtocolError, Result};
 #[derive(Clone)]
 pub struct AcknowledgementProcessor<Db: HoprDbProtocolOperations> {
     db: Db,
-    chain_key: ChainKeypair,
 }
 
 impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
-    pub fn new(db: Db, chain_key: &ChainKeypair) -> Self {
-        Self {
-            db,
-            chain_key: chain_key.clone(),
-        }
+    pub fn new(db: Db) -> Self {
+        Self { db }
     }
 
     /// Processes the outgoing acknowledgement.
@@ -39,7 +35,7 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
             return Err(ProtocolError::InvalidSignature);
         };
 
-        self.db.handle_acknowledgement(ack, &self.chain_key).await.map_err(|e| {
+        self.db.handle_acknowledgement(ack).await.map_err(|e| {
             trace!(error = %e, "Failed to process a received acknowledgement");
             let error: ProtocolError = e.into();
             error
