@@ -130,7 +130,7 @@ rayon = "1.10.0"
 regex = "1.11.1"
 reqwest = { version = "0.12.15", features = ["json"] }
 ringbuffer = "0.15.0"
-rpassword = "7.3"
+rpassword = "7.3.1"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
 sea-orm = { version = "1.1.10", features = [ # ?
