@@ -27,7 +27,12 @@ let
   packages = with pkgs; [
     uv
   ];
-  extraPackages = packages ++ extraPackages;
-in mkShell (args  // {
-  inherit shellHook extraPackages;
+  shellPackages = packages ++ extraPackages;
+  cleanArgs = removeAttrs args [
+    "solcDefault"
+    "pre-commit-check"
+    "extraPackages"
+  ];
+in mkShell (cleanArgs // {
+  inherit shellHook shellPackages;
 })

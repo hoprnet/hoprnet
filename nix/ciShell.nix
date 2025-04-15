@@ -22,6 +22,10 @@ let
     # docker image inspection and handling
     dive
   ];
-in mkShell (args  // {
-  extraPackages = packages ++ extraPackages;
+  shellPackages = packages ++ extraPackages;
+  cleanArgs = removeAttrs args [
+    "extraPackages"
+  ];
+in mkShell (cleanArgs // {
+  inherit shellPackages;
 })

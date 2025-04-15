@@ -34,63 +34,8 @@ let
     config.treefmt.build.wrapper
   ] ++
   (lib.attrValues config.treefmt.build.programs) ++
-<<<<<<< HEAD
   lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
   shellHook = ''
-||||||| parent of b3b73bebc8 (nix: Fix clean docker script)
-  lib.optionals stdenv.isLinux [ autoPatchelfHook ] ++ extraPackages;
-  venvDir = "./.venv";
-  postVenvCreation = ''
-    unset SOURCE_DATE_EPOCH
-    pip install -U pip setuptools wheel
-    pip install -r tests/requirements.txt
-  '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-    autoPatchelf ./.venv
-  '';
-  preShellHook = ''
-=======
-  lib.optionals stdenv.isLinux [ autoPatchelfHook ];
-  pythonScriptPackages = with pkgs; [
-    python313
-    python313Packages.venvShellHook
-    python313Packages.uv
-  ];
-  ciPackages = with pkgs; [
-    act
-    dive
-    gh
-    google-cloud-sdk
-    graphviz
-    lcov
-    skopeo
-    swagger-codegen3
-    vacuum-go
-    zizmor
-
-    # testing utilities
-    cargo-audit
-
-    # docker image inspection and handling
-    dive
-  ];
-  devPackages = with pkgs; [ foundry-bin solcDefault ];
-in
-craneLib.devShell {
-  packages = minimumPackages ++ 
-    pythonScriptPackages ++
-    devPackages ++
-    ciPackages ++
-    extraPackages;
-  venvDir = "./.venv";
-  postVenvCreation = ''
-    unset SOURCE_DATE_EPOCH
-    pip install -U pip setuptools wheel
-    pip install -r tests/requirements.txt
-  '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-    autoPatchelf ./.venv
-  '';
-  preShellHook = ''
->>>>>>> b3b73bebc8 (nix: Fix clean docker script)
     if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
       echo "solc = \"${solcDefault}/bin/solc\""
       echo "Generating foundry.toml file!"
@@ -110,4 +55,5 @@ craneLib.devShell {
   '';
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.pkgsBuildHost.openssl ] ++
     pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]);
+  }
 }

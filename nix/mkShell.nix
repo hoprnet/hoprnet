@@ -3,9 +3,8 @@
 { config
 , pkgs
 , crane
-, pre-commit-check
-, solcDefault
-, extraPackages ? [ ]
+, shellHook ? ""
+, shellPackages ? [ ]
 , useRustNightly ? false
 }:
 let
@@ -37,37 +36,10 @@ let
   ] ++
   (lib.attrValues config.treefmt.build.programs) ++
   lib.optionals stdenv.isLinux [ autoPatchelfHook ];
-  pythonScriptPackages = with pkgs; [
-    python313
-    python313Packages.venvShellHook
-    python313Packages.uv
-  ];
-  devPackages = with pkgs; [ foundry-bin solcDefault ];
+  packages = minimumPackages ++ shellPackages;
 in
 craneLib.devShell {
-  packages = minimumPackages ++ extraPackages;
-  venvDir = "./.venv";
-  postVenvCreation = ''
-    unset SOURCE_DATE_EPOCH
-    pip install -U pip setuptools wheel
-    pip install -r tests/requirements.txt
-  '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
-    autoPatchelf ./.venv
-  '';
-  preShellHook = ''
-    if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
-      echo "solc = \"${solcDefault}/bin/solc\""
-      echo "Generating foundry.toml file!"
-      sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-        ethereum/contracts/foundry.in.toml >| \
-        ethereum/contracts/foundry.toml
-    else
-      echo "foundry.toml file already exists!"
-    fi
-  '';
-  postShellHook = ''
-    ${pre-commit-check.shellHook}
-  '';
+  inherit shellHook packages;
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.pkgsBuildHost.openssl ] ++
     pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]);
 }
