@@ -38,7 +38,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == true
-        uses: cachix/install-nix-action@9f70348d77d0422624097c4b7a75563948901306 # v29
+        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
