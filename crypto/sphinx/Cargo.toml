@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 aes = { workspace = true }
-blake2 = "0.10"
+blake2 = "0.10.6"
 ctr = { workspace = true }
 curve25519-dalek = { version = "4.1.3", features = ["serde", "rand_core"] }
 digest = "0.10"
