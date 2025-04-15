@@ -21,6 +21,8 @@ let
 
     # docker image inspection and handling
     dive
+
+    uv
   ];
   shellPackages = packages ++ extraPackages;
   cleanArgs = removeAttrs args [

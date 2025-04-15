@@ -2,19 +2,16 @@
 , extraPackages ? [ ]
 , pre-commit-check
 , solcDefault
-, hoprd
-, hopli
 , ...
 }@args:
 let
-  packages = with pkgs; [
-    hoprd
-    hopli
-  ];
+  shellHook = ''
+    ${pre-commit-check.shellHook}
+  '';
+  shellPackages = packages ++ extraPackages;
   cleanArgs = removeAttrs args [
-    "hoprd"
-    "hopli"
+    "pre-commit-check"
   ];
 in import ./testShell.nix (cleanArgs // {
-  extraPackages = packages ++ extraPackages;
+  inherit shellHook shellPackages;
 })

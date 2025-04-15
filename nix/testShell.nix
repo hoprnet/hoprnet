@@ -1,12 +1,12 @@
 { pkgs
 , extraPackages ? [ ]
-, pre-commit-check
 , solcDefault
+, shellHook ? ""
 , ...
 }@args:
 let
   mkShell = import ./mkShell.nix {};
-  shellHook = ''
+  finalShellHook = ''
     if ! grep -q "solc = \"${solcDefault}/bin/solc\"" ethereum/contracts/foundry.toml; then
       echo "solc = \"${solcDefault}/bin/solc\""
       echo "Generating foundry.toml file!"
@@ -21,18 +21,17 @@ let
     unset SOURCE_DATE_EPOCH
   '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
     autoPatchelf ./.venv
-  '' + ''
-    ${pre-commit-check.shellHook}
-  '';
+  '' + shellHook;
   packages = with pkgs; [
     uv
   ];
   shellPackages = packages ++ extraPackages;
   cleanArgs = removeAttrs args [
     "solcDefault"
-    "pre-commit-check"
     "extraPackages"
+    "shellHook"
   ];
 in mkShell (cleanArgs // {
-  inherit shellHook shellPackages;
+  inherit shellPackages;
+  shellHook = finalShellHook;
 })
