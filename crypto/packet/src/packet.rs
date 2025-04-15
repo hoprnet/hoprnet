@@ -125,50 +125,79 @@ impl PartialHoprPacket {
     pub fn into_hopr_packet(self, msg: &[u8]) -> Result<(HoprPacket, Vec<ReplyOpener>)> {
         let msg = HoprPacketMessage::from_parts(self.surbs, msg)?;
         Ok((
-            HoprPacket::Outgoing {
+            HoprPacket::Outgoing(HoprOutgoingPacket {
                 packet: self.partial_packet.into_meta_packet(msg.into()),
                 ticket: self.ticket,
                 next_hop: self.next_hop,
                 ack_challenge: self.ack_challenge,
-            },
+            }.into()),
             self.openers,
         ))
     }
 }
 
-/// Contains HOPR packet and its variants.
-#[allow(clippy::large_enum_variant)] // TODO: see if some parts can be boxed
+/// Represents a packet incoming to its final destination.
 #[derive(Clone)]
+pub struct HoprIncomingPacket {
+    /// Packets authentication tag.
+    pub packet_tag: PacketTag,
+    /// Acknowledgement to be sent to the previous hop.
+    pub ack_key: HalfKey,
+    /// Address of the previous hop.
+    pub previous_hop: OffchainPublicKey,
+    /// Decrypted packet payload.
+    pub plain_text: Box<[u8]>,
+    /// Pseudonym of the packet creator.
+    pub sender: HoprPseudonym,
+    /// List of [`SURBs`](SURB) to be used for replies sent to the packet creator.
+    pub surbs: Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>,
+}
+
+/// Represents a packet destined for another node.
+#[derive(Clone)]
+pub struct HoprOutgoingPacket {
+    /// Encrypted packet.
+    pub packet: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>,
+    /// Ticket for this node.
+    pub ticket: Ticket,
+    /// Next hop this packet should be sent to.
+    pub next_hop: OffchainPublicKey,
+    /// Acknowledgement challenge solved once the next hop sends us an acknowledgement.
+    pub ack_challenge: HalfKeyChallenge,
+}
+
+/// Represents a [`HoprOutgoingPacket`] with additional forwarding information.
+#[derive(Clone)]
+pub struct HoprForwardedPacket {
+    /// Packet to be sent.
+    pub outgoing: HoprOutgoingPacket,
+    /// Authentication tag of the packet's header.
+    pub packet_tag: PacketTag,
+    /// Acknowledgement to be sent to the previous hop.
+    pub ack_key: HalfKey,
+    /// Sender of this packet.
+    pub previous_hop: OffchainPublicKey,
+    /// Key used to verify our challenge.
+    pub own_key: HalfKey,
+    /// Challenge for the next hop.
+    pub next_challenge: EthereumChallenge,
+    /// Our position in the path.
+    pub path_pos: u8,
+}
+
+/// Contains HOPR packet and its variants.
+///
+/// See [`HoprIncomingPacket`], [`HoprForwardedPacket`] and [`HoprOutgoingPacket`] for details.
+///
+/// The members are intentionally boxed to equalize the variant sizes.
+#[derive(Clone, strum::EnumTryAs, strum::EnumIs)]
 pub enum HoprPacket {
     /// The packet is intended for us
-    Final {
-        packet_tag: PacketTag,
-        ack_key: HalfKey,
-        previous_hop: OffchainPublicKey,
-        plain_text: Box<[u8]>,
-        sender: HoprPseudonym,
-        surbs: Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>,
-    },
+    Final(Box<HoprIncomingPacket>),
     /// The packet must be forwarded
-    Forwarded {
-        packet: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>,
-        ticket: Ticket,
-        ack_challenge: HalfKeyChallenge,
-        packet_tag: PacketTag,
-        ack_key: HalfKey,
-        previous_hop: OffchainPublicKey,
-        own_key: HalfKey,
-        next_hop: OffchainPublicKey,
-        next_challenge: EthereumChallenge,
-        path_pos: u8,
-    },
+    Forwarded(Box<HoprForwardedPacket>),
     /// The packet that is being sent out by us
-    Outgoing {
-        packet: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>,
-        ticket: Ticket,
-        next_hop: OffchainPublicKey,
-        ack_challenge: HalfKeyChallenge,
-    },
+    Outgoing(Box<HoprOutgoingPacket>),
 }
 
 impl Display for HoprPacket {
@@ -297,18 +326,20 @@ impl HoprPacket {
 
                     let ticket = Ticket::try_from(pre_ticket)?;
                     let verification_output = pre_verify(&derived_secret, &additional_info, &ticket.challenge)?;
-                    Ok(Self::Forwarded {
-                        packet,
-                        ticket,
+                    Ok(Self::Forwarded(HoprForwardedPacket {
+                        outgoing: HoprOutgoingPacket {
+                            packet,
+                            ticket,
+                            next_hop: next_node,
+                            ack_challenge: verification_output.ack_challenge,
+                        },
                         packet_tag,
                         ack_key,
                         previous_hop,
                         path_pos,
                         own_key: verification_output.own_key,
-                        next_hop: next_node,
                         next_challenge: verification_output.next_ticket_challenge,
-                        ack_challenge: verification_output.ack_challenge,
-                    })
+                    }.into()))
                 }
                 ForwardedMetaPacket::Final {
                     packet_tag,
@@ -320,14 +351,14 @@ impl HoprPacket {
                     let (surbs, plain_text) = HoprPacketMessage::from(plain_text).try_into_parts()?;
 
                     // The pre_ticket is not parsed nor verified on the final hop
-                    Ok(Self::Final {
+                    Ok(Self::Final(HoprIncomingPacket {
                         packet_tag,
                         ack_key,
                         previous_hop,
                         plain_text,
                         surbs,
                         sender,
-                    })
+                    }.into()))
                 }
             }
         } else {
@@ -338,18 +369,12 @@ impl HoprPacket {
 
 #[cfg(test)]
 mod tests {
-    use super::{HoprPacket, PacketRouting};
+    use super::*;
 
     use anyhow::{bail, Context};
     use bimap::BiHashMap;
     use hex_literal::hex;
-    use hopr_crypto_sphinx::prelude::ReplyOpener;
-    use hopr_crypto_types::prelude::*;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
     use parameterized::parameterized;
-
-    use crate::{HoprPseudonym, HoprSurb};
 
     lazy_static::lazy_static! {
         static ref PEERS: [(ChainKeypair, OffchainKeypair); 5] = [
@@ -368,58 +393,34 @@ mod tests {
     }
 
     fn forward(
-        packet: HoprPacket,
+        mut packet: HoprPacket,
         chain_keypair: &ChainKeypair,
         next_ticket: TicketBuilder,
         domain_separator: &Hash,
     ) -> HoprPacket {
-        match packet {
-            HoprPacket::Forwarded {
-                next_challenge,
-                packet,
-                ack_challenge,
-                packet_tag,
-                ack_key,
-                previous_hop,
-                own_key,
-                next_hop,
-                path_pos,
-                ..
-            } => {
-                let ticket = next_ticket
-                    .challenge(next_challenge)
-                    .build_signed(chain_keypair, domain_separator)
-                    .expect("ticket should create")
-                    .leak();
-                HoprPacket::Forwarded {
-                    packet,
-                    ticket,
-                    ack_challenge,
-                    packet_tag,
-                    ack_key,
-                    previous_hop,
-                    own_key,
-                    next_hop,
-                    next_challenge,
-                    path_pos,
-                }
-            }
-            _ => packet,
+        if let HoprPacket::Forwarded(fwd) = &mut packet {
+            fwd.outgoing.ticket = next_ticket
+                .challenge(fwd.next_challenge)
+                .build_signed(chain_keypair, domain_separator)
+                .expect("ticket should create")
+                .leak();
         }
+
+        packet
     }
 
     impl HoprPacket {
         pub fn to_bytes(&self) -> Box<[u8]> {
             let dummy_ticket = hex!("67f0ca18102feec505e5bfedcc25963e9c64a6f8a250adcad7d2830dd607585700000000000000000000000000000000000000000000000000000000000000003891bf6fd4a78e868fc7ad477c09b16fc70dd01ea67e18264d17e3d04f6d8576de2e6472b0072e510df6e9fa1dfcc2727cc7633edfeb9ec13860d9ead29bee71d68de3736c2f7a9f42de76ccd57a5f5847bc7349");
             let (packet, ticket) = match self {
-                Self::Final { plain_text, .. } => (plain_text.clone(), dummy_ticket.as_ref().into()),
-                Self::Forwarded { packet, ticket, .. } => (
-                    Vec::from(packet.as_ref()).into_boxed_slice(),
-                    ticket.clone().into_boxed(),
+                Self::Final(packet) => (packet.plain_text.clone(), dummy_ticket.as_ref().into()),
+                Self::Forwarded(fwd) => (
+                    Vec::from(fwd.outgoing.packet.as_ref()).into_boxed_slice(),
+                    fwd.outgoing.ticket.clone().into_boxed(),
                 ),
-                Self::Outgoing { packet, ticket, .. } => (
-                    Vec::from(packet.as_ref()).into_boxed_slice(),
-                    ticket.clone().into_boxed(),
+                Self::Outgoing(out) => (
+                    Vec::from(out.packet.as_ref()).into_boxed_slice(),
+                    out.ticket.clone().into_boxed(),
                 ),
             };
 
@@ -544,8 +545,8 @@ mod tests {
             .context(format!("deserialization failure at hop {node_pos}"))?;
 
         match &packet {
-            HoprPacket::Final { .. } => Ok(packet),
-            HoprPacket::Forwarded { .. } => {
+            HoprPacket::Final(_) => Ok(packet),
+            HoprPacket::Forwarded(_) => {
                 let next_hop = match (node_pos, is_reply) {
                     (3, false) => PEERS[4].0.public().0.clone(),
                     (_, false) => PEERS[node_pos + 1].0.public().0.clone(),
@@ -561,7 +562,7 @@ mod tests {
                     &Hash::default(),
                 ))
             }
-            HoprPacket::Outgoing { .. } => bail!("invalid packet state"),
+            HoprPacket::Outgoing(_) => bail!("invalid packet state"),
         }
     }
 
@@ -584,21 +585,16 @@ mod tests {
                 .context(format!("packet decoding failed at hop {hop}"))?;
 
             match &packet {
-                HoprPacket::Final { plain_text, .. } => {
+                HoprPacket::Final(packet) => {
                     assert_eq!(hop - 1, hops, "final packet must be at the last hop");
-                    actual_plain_text = plain_text.clone();
+                    actual_plain_text = packet.plain_text.clone();
                 }
-                HoprPacket::Forwarded {
-                    previous_hop,
-                    next_hop,
-                    path_pos,
-                    ..
-                } => {
-                    assert_eq!(PEERS[hop - 1].1.public(), previous_hop, "invalid previous hop");
-                    assert_eq!(PEERS[hop + 1].1.public(), next_hop, "invalid next hop");
-                    assert_eq!(hops + 1 - hop, *path_pos as usize, "invalid path position");
+                HoprPacket::Forwarded(fwd) => {
+                    assert_eq!(PEERS[hop - 1].1.public(), &fwd.previous_hop, "invalid previous hop");
+                    assert_eq!(PEERS[hop + 1].1.public(), &fwd.outgoing.next_hop, "invalid next hop");
+                    assert_eq!(hops + 1 - hop, fwd.path_pos as usize, "invalid path position");
                 }
-                HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
+                HoprPacket::Outgoing(_) => bail!("invalid packet state at hop {hop}"),
             }
         }
 
@@ -625,28 +621,18 @@ mod tests {
                 .context(format!("packet decoding failed at hop {hop}"))?;
 
             match &packet {
-                HoprPacket::Final {
-                    plain_text,
-                    surbs,
-                    sender,
-                    ..
-                } => {
+                HoprPacket::Final(packet) => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
-                    assert_eq!(pseudonym, *sender, "invalid sender");
-                    received_plain_text = plain_text.clone();
-                    received_surbs.extend(surbs.clone());
+                    assert_eq!(pseudonym, packet.sender, "invalid sender");
+                    received_plain_text = packet.plain_text.clone();
+                    received_surbs.extend(packet.surbs.clone());
                 }
-                HoprPacket::Forwarded {
-                    previous_hop,
-                    next_hop,
-                    path_pos,
-                    ..
-                } => {
-                    assert_eq!(PEERS[hop - 1].1.public(), previous_hop, "invalid previous hop");
-                    assert_eq!(PEERS[hop + 1].1.public(), next_hop, "invalid next hop");
-                    assert_eq!(forward_hops + 1 - hop, *path_pos as usize, "invalid path position");
+                HoprPacket::Forwarded(fwd) => {
+                    assert_eq!(PEERS[hop - 1].1.public(), &fwd.previous_hop, "invalid previous hop");
+                    assert_eq!(PEERS[hop + 1].1.public(), &fwd.outgoing.next_hop, "invalid next hop");
+                    assert_eq!(forward_hops + 1 - hop, fwd.path_pos as usize, "invalid path position");
                 }
-                HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
+                HoprPacket::Outgoing(_) => bail!("invalid packet state at hop {hop}"),
             }
         }
 
@@ -685,26 +671,16 @@ mod tests {
                 .context(format!("packet decoding failed at hop {hop}"))?;
 
             match &fwd_packet {
-                HoprPacket::Final {
-                    plain_text,
-                    surbs,
-                    sender,
-                    ..
-                } => {
+                HoprPacket::Final(incoming) => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
-                    assert_eq!(pseudonym, *sender, "invalid sender");
-                    received_fwd_plain_text = plain_text.clone();
-                    received_surbs.extend(surbs.clone());
+                    assert_eq!(pseudonym, incoming.sender, "invalid sender");
+                    received_fwd_plain_text = incoming.plain_text.clone();
+                    received_surbs.extend(incoming.surbs.clone());
                 }
-                HoprPacket::Forwarded {
-                    previous_hop,
-                    next_hop,
-                    path_pos,
-                    ..
-                } => {
-                    assert_eq!(PEERS[hop - 1].1.public(), previous_hop, "invalid previous hop");
-                    assert_eq!(PEERS[hop + 1].1.public(), next_hop, "invalid next hop");
-                    assert_eq!(forward_hops + 1 - hop, *path_pos as usize, "invalid path position");
+                HoprPacket::Forwarded (fwd) => {
+                    assert_eq!(PEERS[hop - 1].1.public(), &fwd.previous_hop, "invalid previous hop");
+                    assert_eq!(PEERS[hop + 1].1.public(), &fwd.outgoing.next_hop, "invalid next hop");
+                    assert_eq!(forward_hops + 1 - hop, fwd.path_pos as usize, "invalid path position");
                 }
                 HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
             }
@@ -738,33 +714,22 @@ mod tests {
                 .context(format!("packet decoding failed at hop {hop}"))?;
 
             match &re_packet {
-                HoprPacket::Final {
-                    plain_text,
-                    surbs,
-                    sender,
-                    ..
-                } => {
+                HoprPacket::Final(incoming) => {
                     assert_eq!(hop, 0, "final packet must be at the last hop");
-                    assert_eq!(pseudonym, *sender, "invalid sender");
-                    assert!(surbs.is_empty(), "must not receive surbs on reply");
-                    received_re_plain_text = plain_text.clone();
+                    assert_eq!(pseudonym, incoming.sender, "invalid sender");
+                    assert!(incoming.surbs.is_empty(), "must not receive surbs on reply");
+                    received_re_plain_text = incoming.plain_text.clone();
                 }
-                HoprPacket::Forwarded {
-                    previous_hop,
-                    next_hop,
-                    path_pos,
-                    ..
-                } => {
-                    assert_eq!(PEERS[hop + 1].1.public(), previous_hop, "invalid previous hop");
-                    assert_eq!(PEERS[hop - 1].1.public(), next_hop, "invalid next hop");
-                    assert_eq!(hop, *path_pos as usize, "invalid path position");
+                HoprPacket::Forwarded(fwd) => {
+                    assert_eq!(PEERS[hop + 1].1.public(), &fwd.previous_hop, "invalid previous hop");
+                    assert_eq!(PEERS[hop - 1].1.public(), &fwd.outgoing.next_hop, "invalid next hop");
+                    assert_eq!(hop, fwd.path_pos as usize, "invalid path position");
                 }
-                HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
+                HoprPacket::Outgoing(_) => bail!("invalid packet state at hop {hop}"),
             }
         }
 
         assert_eq!(received_re_plain_text.as_ref(), re_msg, "invalid plaintext");
-
         Ok(())
     }
 
@@ -790,27 +755,17 @@ mod tests {
                 .context(format!("packet decoding failed at hop {hop}"))?;
 
             match &fwd_packet {
-                HoprPacket::Final {
-                    plain_text,
-                    surbs,
-                    sender,
-                    ..
-                } => {
+                HoprPacket::Final(incoming) => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
-                    assert!(plain_text.is_empty(), "must not receive plaintext on surbs only packet");
-                    assert_eq!(2, surbs.len(), "invalid number of received surbs per packet");
-                    assert_eq!(pseudonym, *sender, "invalid sender");
-                    received_surbs.extend(surbs.clone());
+                    assert!(incoming.plain_text.is_empty(), "must not receive plaintext on surbs only packet");
+                    assert_eq!(2, incoming.surbs.len(), "invalid number of received surbs per packet");
+                    assert_eq!(pseudonym, incoming.sender, "invalid sender");
+                    received_surbs.extend(incoming.surbs.clone());
                 }
-                HoprPacket::Forwarded {
-                    previous_hop,
-                    next_hop,
-                    path_pos,
-                    ..
-                } => {
-                    assert_eq!(PEERS[hop - 1].1.public(), previous_hop, "invalid previous hop");
-                    assert_eq!(PEERS[hop + 1].1.public(), next_hop, "invalid next hop");
-                    assert_eq!(forward_hops + 1 - hop, *path_pos as usize, "invalid path position");
+                HoprPacket::Forwarded(fwd) => {
+                    assert_eq!(PEERS[hop - 1].1.public(), &fwd.previous_hop, "invalid previous hop");
+                    assert_eq!(PEERS[hop + 1].1.public(), &fwd.outgoing.next_hop, "invalid next hop");
+                    assert_eq!(forward_hops + 1 - hop, fwd.path_pos as usize, "invalid path position");
                 }
                 HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop}"),
             }
@@ -846,26 +801,21 @@ mod tests {
                     .context(format!("packet decoding failed at hop {hop} in reply {i}"))?;
 
                 match &re_packet {
-                    HoprPacket::Final { plain_text, surbs, .. } => {
+                    HoprPacket::Final(incoming) => {
                         assert_eq!(hop, 0, "final packet must be at the last hop for reply {i}");
-                        assert!(surbs.is_empty(), "must not receive surbs on reply for reply {i}");
-                        received_re_plain_text = plain_text.clone();
+                        assert!(incoming.surbs.is_empty(), "must not receive surbs on reply for reply {i}");
+                        received_re_plain_text = incoming.plain_text.clone();
                     }
-                    HoprPacket::Forwarded {
-                        previous_hop,
-                        next_hop,
-                        path_pos,
-                        ..
-                    } => {
+                    HoprPacket::Forwarded(fwd) => {
                         assert_eq!(
                             PEERS[hop + 1].1.public(),
-                            previous_hop,
+                            &fwd.previous_hop,
                             "invalid previous hop in reply {i}"
                         );
-                        assert_eq!(PEERS[hop - 1].1.public(), next_hop, "invalid next hop in reply {i}");
-                        assert_eq!(hop, *path_pos as usize, "invalid path position in reply {i}");
+                        assert_eq!(PEERS[hop - 1].1.public(), &fwd.outgoing.next_hop, "invalid next hop in reply {i}");
+                        assert_eq!(hop, fwd.path_pos as usize, "invalid path position in reply {i}");
                     }
-                    HoprPacket::Outgoing { .. } => bail!("invalid packet state at hop {hop} in reply {i}"),
+                    HoprPacket::Outgoing(_) => bail!("invalid packet state at hop {hop} in reply {i}"),
                 }
             }
 

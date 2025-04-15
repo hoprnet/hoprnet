@@ -18,6 +18,7 @@ benchmarks = []
 
 [dependencies]
 hex = { workspace = true }
+strum = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 thiserror = { workspace = true }
