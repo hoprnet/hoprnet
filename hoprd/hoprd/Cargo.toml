@@ -64,7 +64,7 @@ async-std = { workspace = true, features = [
 chrono = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
-home = "0.5.9"
+home = "0.5.11"
 lazy_static = { workspace = true, optional = true }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
