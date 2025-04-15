@@ -125,7 +125,7 @@ primitive-types = { version = "0.12.2", features = [ # primitive-types 0.13 not 
 proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
 rand = "0.8.5" # cannot be updated, dependencies reference old ones
-rand_distr = "0.4.3" # cannot be updated, dependencies reference old ones
+rand_distr = "0.5.1" # cannot be updated, dependencies reference old ones
 rayon = "1.10.0"
 regex = "1.11.1"
 reqwest = { version = "0.12.15", features = ["json"] }
