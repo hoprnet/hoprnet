@@ -17,7 +17,7 @@ let
       echo "foundry.toml file already exists!"
     fi
   '' + ''
-    uv sync
+    uv sync --frozen
     unset SOURCE_DATE_EPOCH
   '' + pkgs.lib.optionalString pkgs.stdenv.isLinux ''
     autoPatchelf ./.venv

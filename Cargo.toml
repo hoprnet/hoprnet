@@ -252,7 +252,7 @@ hoprd-db-migration = { path = "hoprd/db/migration" }
 panic = "abort"
 
 # this profile focuses on speed of compilation
-[profile.prerelease]
+[profile.candidate]
 inherits = "release"
 codegen-units = 16   # normal release default
 lto = false          # do the smallest amount of link-time optimization

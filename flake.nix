@@ -145,8 +145,8 @@
           hoprd-dev = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
           });
-          hoprd-prerelease = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
-            CARGO_PROFILE = "prelease";
+          hoprd-candidate = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            CARGO_PROFILE = "candidate";
           });
 
           hopliBuildArgs = {
@@ -171,8 +171,8 @@
           hopli-dev = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
             CARGO_PROFILE = "dev";
           });
-          hopli-prerelease = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
-            CARGO_PROFILE = "prerelease";
+          hopli-candidate = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
+            CARGO_PROFILE = "candidate";
           });
 
           profileDeps = with pkgs; [
@@ -477,7 +477,7 @@
               hoprd-dev
             ];
             buildPhase = ''
-              uv sync
+              uv sync --frozen
               unset SOURCE_DATE_EPOCH
             '';
             checkPhase = ''
@@ -654,7 +654,7 @@
           packages = {
             inherit hoprd hoprd-dev hoprd-docker hoprd-dev-docker hoprd-profile-docker;
             inherit hopli hopli-dev hopli-docker hopli-dev-docker hopli-profile-docker;
-            inherit hoprd-prerelease hopli-prerelease;
+            inherit hoprd-candidate hopli-candidate;
             inherit hopr-test hopr-test-nightly;
             inherit anvil-docker hopr-pluto;
             inherit smoke-tests docs;
