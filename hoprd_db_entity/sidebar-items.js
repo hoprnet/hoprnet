@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["aliases","conversions","errors","prelude","types"]};

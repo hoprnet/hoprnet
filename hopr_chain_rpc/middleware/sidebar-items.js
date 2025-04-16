@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS","EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS"],"struct":["GnosisScan","Response","ResponseResult"]};
