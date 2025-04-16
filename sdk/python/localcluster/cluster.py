@@ -98,8 +98,7 @@ class Cluster:
         try:
             await asyncio.wait_for(asyncio.gather(*tasks), 2 * GLOBAL_TIMEOUT)
         except asyncio.TimeoutError:
-            raise RuntimeError(
-                "Not all nodes are connected to all peers, interrupting setup")
+            raise RuntimeError("Not all nodes are connected to all peers, interrupting setup")
 
     def fund_nodes(self):
         logging.info("Funding nodes")
