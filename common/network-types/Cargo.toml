@@ -35,6 +35,7 @@ dashmap = { workspace = true }
 flume = { workspace = true }
 futures = { workspace = true }
 governor = { workspace = true }
+bytesize = { workspace = true }
 hex = { workspace = true }
 hickory-resolver = { workspace = true }
 lazy_static = { workspace = true, optional = true }

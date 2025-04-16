@@ -25,8 +25,8 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(*bytes as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(format!(
-                "random data with size {}",
-                bytesize::ByteSize::b(*bytes as u64)
+                "random_data_size_{}",
+                bytesize::ByteSize::b(*bytes as u64).to_string().replace(" ", "_")
             )),
             bytes,
             |b, bytes| {

@@ -4702,6 +4702,7 @@ dependencies = [
  "async-std-resolver 0.24.4",
  "async-stream",
  "bitvec",
+ "bytesize",
  "criterion",
  "crossbeam-queue",
  "crossbeam-skiplist",
