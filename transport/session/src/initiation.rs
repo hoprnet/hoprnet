@@ -111,7 +111,7 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
             StartProtocol::SessionEstablished(est) => {
                 bincode::serde::encode_to_vec(&est, SESSION_BINCODE_CONFIGURATION)
             }
-            StartProtocol::SessionError(err) => bincode::serde::encode_to_vec(&err, SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::SessionError(err) => bincode::serde::encode_to_vec(err, SESSION_BINCODE_CONFIGURATION),
             StartProtocol::CloseSession(id) => bincode::serde::encode_to_vec(&id, SESSION_BINCODE_CONFIGURATION),
         }?;
 

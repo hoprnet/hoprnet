@@ -193,7 +193,7 @@ impl TagBloomFilter {
 
     /// Serializes the filter to the given byte array.
     pub fn to_bytes(&self) -> Box<[u8]> {
-        bincode::serde::encode_to_vec(&self, TAGBLOOM_BINCODE_CONFIGURATION)
+        bincode::serde::encode_to_vec(self, TAGBLOOM_BINCODE_CONFIGURATION)
             .expect("serialization of bloom filter must not fail")
             .into_boxed_slice()
     }

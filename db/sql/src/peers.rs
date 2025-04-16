@@ -79,7 +79,7 @@ impl HoprDbPeersOperations for HoprDb {
             backoff: sea_orm::ActiveValue::Set(Some(backoff)),
             quality_sma: sea_orm::ActiveValue::Set(Some(
                 bincode::serde::encode_to_vec(
-                    &SingleSumSMA::<f64>::new(quality_window as usize),
+                    SingleSumSMA::<f64>::new(quality_window as usize),
                     DB_BINCODE_CONFIGURATION,
                 )
                 .map_err(|_| crate::errors::DbSqlError::DecodingError)?,
