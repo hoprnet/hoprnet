@@ -5114,6 +5114,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-transport-ticket-aggregation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-channel 2.3.1",
+ "async-std",
+ "async-trait",
+ "async_channel_io",
+ "bytesize",
+ "criterion",
+ "futures",
+ "hex-literal",
+ "hopr-async-runtime",
+ "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-db-sql",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-primitive-types",
+ "hopr-transport-identity",
+ "hopr-transport-mixer",
+ "lazy_static",
+ "libp2p",
+ "more-asserts",
+ "rust-stream-ext-concurrent",
+ "serial_test",
+ "thiserror 2.0.12",
+ "tracing",
+ "tracing-test",
+]
+
+[[package]]
 name = "hoprd"
 version = "3.0.0"
 dependencies = [
