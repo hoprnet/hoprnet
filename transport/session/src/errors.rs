@@ -13,8 +13,11 @@ pub enum TransportSessionError {
     #[error("incorrect data size")]
     PayloadSize,
 
-    #[error("serializer error: {0}")]
-    Serializer(#[from] bincode::Error),
+    #[error("serializer encoding error: {0}")]
+    SerializerEncoding(#[from] bincode::error::EncodeError),
+
+    #[error("serializer decoding error: {0}")]
+    SerializerDecoding(#[from] bincode::error::DecodeError),
 
     #[error("invalid peer id")]
     PeerId,
