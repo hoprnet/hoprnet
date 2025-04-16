@@ -17,7 +17,6 @@
         "serde_yaml",
         "serde_cbor",
         "libp2p-stream",
-        "bloomfilter",
         "generic-array",
         "hickory-resolver",
         "primitive-types",

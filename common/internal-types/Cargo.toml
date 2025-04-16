@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 aquamarine = { workspace = true }
-bloomfilter = { workspace = true }
+bloomfilter = { workspace = true, features = ["serde"] }
 bincode = { workspace = true }
 ethers = { workspace = true, default-features = false }
 hex-literal = { workspace = true }

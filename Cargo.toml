@@ -65,7 +65,7 @@ base64 = "0.22.1"
 bimap = "0.6.3"
 bincode = { version = "2.0.1", features = ["serde"] }
 bitvec = "1.0.1"
-bloomfilter = { version = "2.0.0", features = ["serde"] } # ignored in renovate
+bloomfilter = { version = "3.0.1", features = ["serde"] }
 bytesize = { version = "2.0.1", features = ["serde"] }
 cbor4ii = { version = "1.0.0" }
 chrono = { version = "0.4.40", default-features = false }
