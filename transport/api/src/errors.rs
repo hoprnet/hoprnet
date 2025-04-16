@@ -36,6 +36,9 @@ pub enum HoprTransportError {
 
     #[error("Network monitoring error: {0}")]
     NetworkError(#[from] hopr_transport_network::errors::NetworkingError),
+
+    #[error("Ticket aggregation error: {0}")]
+    TicketAggregationError(#[from] hopr_transport_ticket_aggregation::TicketAggregationError),
 }
 
 /// Result produced by the crate, uses the [HoprTransportError] as the error type.

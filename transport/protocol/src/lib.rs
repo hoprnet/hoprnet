@@ -57,8 +57,6 @@ pub mod ack;
 pub mod heartbeat;
 /// `msg` p2p protocol
 pub mod mix;
-/// `ticket_aggregation` p2p protocol
-pub mod ticket_aggregation;
 
 /// Stream processing utilities
 pub mod stream;

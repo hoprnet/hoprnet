@@ -17,11 +17,14 @@ runtime-async-std = [
   "hopr-async-runtime/runtime-async-std",
   "hopr-db-sql/runtime-async-std",
   "hopr-transport-protocol/runtime-async-std",
+  "hopr-transport-ticket-aggregation/runtime-async-std",
 ]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
+  "hopr-transport-ticket-aggregation/runtime-tokio",
+
 ]
 prometheus = [
   "dep:hopr-metrics",
@@ -29,6 +32,7 @@ prometheus = [
   "hopr-db-sql/prometheus",
   "hopr-transport-network/prometheus",
   "hopr-transport-protocol/prometheus",
+  "hopr-transport-ticket-aggregation/prometheus",
 ]
 
 [dependencies]
@@ -57,6 +61,7 @@ hopr-metrics = { workspace = true, optional = true, default-features = false }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport-protocol = { workspace = true }
+hopr-transport-ticket-aggregation = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
