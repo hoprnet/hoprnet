@@ -10,7 +10,7 @@ use libp2p::PeerId;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
 use hopr_path::path::TransportPath;
-use hopr_transport_protocol::msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
+use hopr_transport_protocol::mix::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
 
 const SAMPLE_SIZE: usize = 20;
 
