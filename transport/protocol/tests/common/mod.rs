@@ -24,7 +24,7 @@ use hopr_path::{channel_graph::ChannelGraph, ChainPath, Path, PathAddressResolve
 use hopr_primitive_types::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
-    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
+    mix::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
     DEFAULT_PRICE_PER_PACKET,
 };
 use tracing::debug;

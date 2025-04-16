@@ -88,8 +88,8 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     )
     .await;
 
-    let msg_proto_control = swarm.build_protocol_control(hopr_transport_protocol::msg::CURRENT_HOPR_MSG_PROTOCOL);
-    let msg_codec = hopr_transport_protocol::msg::MsgCodec;
+    let msg_proto_control = swarm.build_protocol_control(hopr_transport_protocol::mix::CURRENT_HOPR_MSG_PROTOCOL);
+    let msg_codec = hopr_transport_protocol::mix::MsgCodec;
     let (wire_msg_tx, wire_msg_rx) =
         hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
 

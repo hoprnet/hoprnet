@@ -59,7 +59,7 @@ use hopr_transport_p2p::{
 };
 use hopr_transport_protocol::{
     errors::ProtocolError,
-    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
+    mix::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
     ticket_aggregation::processor::{
         AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
     },
@@ -518,8 +518,8 @@ where
         .await;
 
         let msg_proto_control =
-            transport_layer.build_protocol_control(hopr_transport_protocol::msg::CURRENT_HOPR_MSG_PROTOCOL);
-        let msg_codec = hopr_transport_protocol::msg::MsgCodec;
+            transport_layer.build_protocol_control(hopr_transport_protocol::mix::CURRENT_HOPR_MSG_PROTOCOL);
+        let msg_codec = hopr_transport_protocol::mix::MsgCodec;
         let (wire_msg_tx, wire_msg_rx) =
             hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
 
