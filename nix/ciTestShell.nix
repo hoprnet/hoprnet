@@ -1,7 +1,5 @@
 { pkgs
 , extraPackages ? [ ]
-, pre-commit-check
-, solcDefault
 , hoprd
 , hopli
 , ...

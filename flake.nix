@@ -502,8 +502,8 @@
           };
           devShell = import ./nix/devShell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
           ciShell = import ./nix/ciShell.nix { inherit pkgs config crane; };
-          testShell = import ./nix/testShell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
-          ciTestShell = import ./nix/ciTestShell.nix { inherit pkgs config crane pre-commit-check solcDefault; hoprd = hoprd-dev; hopli = hopli-dev; };
+          testShell = import ./nix/testShell.nix { inherit pkgs config crane solcDefault; };
+          ciTestShell = import ./nix/ciTestShell.nix { inherit pkgs config crane solcDefault; hoprd = hoprd-dev; hopli = hopli-dev; };
           docsShell = import ./nix/devShell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
