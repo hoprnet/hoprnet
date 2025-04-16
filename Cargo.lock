@@ -4225,7 +4225,7 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4273,7 +4273,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-actions"
-version = "0.7.3"
+version = "0.7.4"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -4306,7 +4306,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-api"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "async-channel 2.3.1",
  "async-std",
@@ -4367,7 +4367,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-rpc"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4429,7 +4429,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4518,7 +4518,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4536,7 +4536,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-entity"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4606,7 +4606,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "aquamarine",

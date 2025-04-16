@@ -25,6 +25,7 @@ use std::pin::Pin;
 use std::time::Duration;
 
 use hopr_crypto_types::types::Hash;
+use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::RpcError::{ProviderError, TransactionDropped};
@@ -397,7 +398,7 @@ pub trait HoprRpcOperations {
 
     /// Retrieves the minimum incoming ticket winning probability by directly
     /// calling the network's winning probability oracle.
-    async fn get_minimum_network_winning_probability(&self) -> Result<f64>;
+    async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability>;
 
     /// Retrieves the minimum ticket prices by directly calling the network's
     /// ticket price oracle.
