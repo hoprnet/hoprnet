@@ -4,6 +4,7 @@ use std::{fmt::Debug, result::Result};
 use crate::prelude::DbError;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
+use hopr_path::ValidatedPath;
 use hopr_primitive_types::prelude::Balance;
 
 /// Trait defining all DB functionality needed by packet/acknowledgement processing pipeline.
@@ -28,8 +29,8 @@ pub trait HoprDbProtocolOperations {
         &self,
         data: Box<[u8]>,
         pseudonym: Option<&SimplePseudonym>,
-        path: &[OffchainPublicKey],
-        return_paths: &[&[OffchainPublicKey]],
+        path: ValidatedPath,
+        return_paths: Vec<ValidatedPath>,
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData, DbError>;

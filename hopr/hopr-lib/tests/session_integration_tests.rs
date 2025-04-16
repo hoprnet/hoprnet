@@ -10,7 +10,7 @@ use tokio::net::UdpSocket;
 use hopr_lib::SendMsg;
 use hopr_network_types::prelude::protocol::SessionMessage;
 use hopr_transport::{Session, SessionId, TransportSessionError};
-use hopr_transport_session::types::{transfer_session, unwrap_offchain_key};
+use hopr_transport_session::types::{transfer_session, unwrap_chain_address};
 use hopr_transport_session::Capability;
 
 struct BufferingMsgSender {
@@ -25,7 +25,7 @@ impl SendMsg for BufferingMsgSender {
         _destination: PeerId,
         _options: RoutingOptions,
     ) -> Result<(), TransportSessionError> {
-        let (_, data) = unwrap_offchain_key(data.plain_text)?;
+        let (_, data) = unwrap_chain_address(data.plain_text)?;
 
         let len = data.len();
         self.buffer.unbounded_send(data).expect("buffer unbounded error");

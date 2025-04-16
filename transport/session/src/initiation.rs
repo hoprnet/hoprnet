@@ -3,9 +3,9 @@
 use crate::errors::TransportSessionError;
 use crate::types::SessionTarget;
 use crate::Capability;
-use hopr_crypto_types::prelude::PeerId;
 use hopr_internal_types::prelude::ApplicationData;
 use hopr_network_types::prelude::RoutingOptions;
+use hopr_primitive_types::prelude::Address;
 use std::collections::HashSet;
 
 /// Challenge that identifies a Start initiation protocol message.
@@ -46,7 +46,7 @@ pub struct StartInitiation {
     /// session initiator.
     ///
     /// **NOTE:** This will not be used when the Return Path is introduced.
-    pub back_routing: Option<(RoutingOptions, PeerId)>,
+    pub back_routing: Option<(RoutingOptions, Address)>,
 }
 
 /// Message of the Start protocol that confirms the establishment of a session.

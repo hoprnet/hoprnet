@@ -21,6 +21,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
+hopr-path = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-internal-types = { workspace = true }
 

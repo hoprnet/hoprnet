@@ -1107,7 +1107,7 @@ impl Hopr {
     pub async fn send_message(
         &self,
         msg: Box<[u8]>,
-        destination: PeerId,
+        destination: Address,
         options: RoutingOptions,
         application_tag: Option<u16>,
     ) -> errors::Result<()> {

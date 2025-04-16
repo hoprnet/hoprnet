@@ -13,7 +13,7 @@ use hopr_crypto_packet::errors::{
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
-use hopr_path::path::{Path, TransportPath};
+use hopr_path::ValidatedPath;
 use hopr_primitive_types::prelude::*;
 
 use super::packet::OutgoingPacket;
@@ -28,7 +28,7 @@ lazy_static::lazy_static! {
 pub trait PacketWrapping {
     type Input;
 
-    async fn send(&self, data: ApplicationData, path: TransportPath) -> Result<(PeerId, Box<[u8]>)>;
+    async fn send(&self, data: ApplicationData, path: ValidatedPath) -> Result<(PeerId, Box<[u8]>)>;
 }
 
 pub struct SendPkt {
@@ -72,17 +72,14 @@ where
     type Input = ApplicationData;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn send(&self, data: ApplicationData, path: TransportPath) -> Result<(PeerId, Box<[u8]>)> {
-        let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
-            path.hops().iter().map(OffchainPublicKey::try_from).collect();
-
+    async fn send(&self, data: ApplicationData, path: ValidatedPath) -> Result<(PeerId, Box<[u8]>)> {
         let packet = self
             .db
             .to_send(
                 data.to_bytes(),
                 None, // TODO
-                &path?,
-                &[], // TODO
+                path,
+                vec![], // TODO
                 self.determine_actual_outgoing_win_prob().await,
                 self.determine_actual_outgoing_ticket_price().await?,
             )
@@ -281,7 +278,7 @@ impl PacketSendAwaiter {
     }
 }
 
-pub type SendMsgInput = (ApplicationData, TransportPath, PacketSendFinalizer);
+pub type SendMsgInput = (ApplicationData, ValidatedPath, PacketSendFinalizer);
 
 #[derive(Debug, Clone)]
 pub struct MsgSender<T>
@@ -301,7 +298,7 @@ where
 
     /// Pushes a new packet into processing.
     #[tracing::instrument(level = "trace", skip(self, data))]
-    pub async fn send_packet(&self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
+    pub async fn send_packet(&self, data: ApplicationData, path: ValidatedPath) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 
         self.tx

@@ -75,7 +75,7 @@ use tracing::error;
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
-use hopr_path::path::TransportPath;
+use hopr_path::ValidatedPath;
 use hopr_transport_identity::PeerId;
 
 pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
@@ -158,7 +158,7 @@ pub async fn run_msg_ack_protocol<Db>(
     ),
     api: (
         impl futures::Sink<ApplicationData> + Send + Sync + 'static,
-        impl futures::Stream<Item = (ApplicationData, TransportPath, PacketSendFinalizer)> + Send + Sync + 'static,
+        impl futures::Stream<Item = (ApplicationData, ValidatedPath, PacketSendFinalizer)> + Send + Sync + 'static,
     ),
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::prelude::JoinHandle<()>>
 where

@@ -3,17 +3,20 @@
 /// Defines the graph of HOPR payment channels.
 pub mod channel_graph;
 pub mod errors;
-/// Defines the two most important types: [TransportPath](crate::path::TransportPath) and [ChannelPath](crate::path::ChannelPath).
-mod path;
 /// Implements different path selectors in the [ChannelGraph](crate::channel_graph::ChannelGraph).
 pub mod selectors;
 
-use std::collections::HashSet;
-use std::fmt::Display;
-use std::hash::{Hash, RandomState};
-use libp2p_identity::PeerId;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_primitive_types::prelude::{Address, GeneralError};
+use hopr_internal_types::channels::ChannelStatus;
+use hopr_primitive_types::prelude::{Address, ToHex};
+use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
+use std::hash::{Hash, RandomState};
+use std::ops::Deref;
+
+use crate::channel_graph::ChannelGraph;
+use crate::errors::PathError;
+use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 
 /// Base implementation of an abstract path.
 ///
@@ -22,16 +25,11 @@ pub trait Path<N>: Clone + Eq + PartialEq
 where
     N: Copy + Eq + PartialEq + Hash,
 {
-    /// Creates the instance from an iterable list of hops.
-    ///
-    /// Returns an error if the size of the list is invalid for the given path type.
-    fn from_hops<T: IntoIterator<Item = N>>(hops: T) -> errors::Result<Self>;
-
     /// Individual hops in the path.
     /// There must be always at least one hop.
     fn hops(&self) -> &[N];
 
-    /// Shorthand for number of hops.
+    /// Shorthand for the number of hops.
     fn length(&self) -> usize {
         self.hops().len()
     }
@@ -51,53 +49,161 @@ where
     }
 
     /// Returns the path with the hops in reverse order.
-    fn invert(self) -> Self {
-        Self::from_hops(self.hops().iter().rev().cloned())
-            .expect("reversing path must not fail")
-    }
+    fn invert(self) -> Self;
 }
 
-impl Path<Address> for Vec<Address> {
-    fn from_hops<T: IntoIterator<Item = Address>>(hops: T) -> errors::Result<Self> {
-        Ok(hops.into_iter().collect())
+impl<T: Copy + Eq + PartialEq + Hash> Path<T> for Vec<T> {
+    fn hops(&self) -> &[T] {
+        &self
     }
 
-    fn hops(&self) -> &[Address] {
-        &self
+    fn invert(self) -> Self {
+        self.into_iter().rev().collect()
     }
 }
 
 pub type ChannelPath = Vec<Address>;
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct TransportPath {
-    path: Vec<OffchainPublicKey>,
-    peers: Vec<PeerId>,
-    channels: Option<ChannelPath>
+pub type TransportPath = Vec<OffchainPublicKey>;
+
+#[async_trait::async_trait]
+pub trait TransportKeyResolver {
+    async fn resolve_transport_key(&self, address: &Address) -> Result<Option<OffchainPublicKey>, PathError>;
 }
 
-impl Path<PeerId> for TransportPath {
-    fn from_hops<T: IntoIterator<Item=PeerId>>(hops: T) -> errors::Result<Self> {
-        let peers: Vec<PeerId> = hops.into_iter().collect();
-        if !peers.is_empty() {
-            let path = peers.iter()
-                .map(|p| OffchainPublicKey::try_from(*p))
-                .collect::<Result<Vec<_>, GeneralError>>()?;
-            Ok(Self {
-                path,
-                peers,
-                channels: None
-            })
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FullPath(Vec<Address>);
+
+impl FullPath {
+    pub fn new<T, I>(path: I) -> errors::Result<Self>
+    where
+        T: Into<Address>,
+        I: IntoIterator<Item = T>,
+    {
+        let hops = path.into_iter().map(|t| t.into()).collect::<Vec<_>>();
+        if !hops.is_empty() {
+            Ok(Self(hops))
         } else {
-            Err(errors::PathError::PathNotValid)
+            Err(PathNotValid)
         }
     }
 
-    fn hops(&self) -> &[PeerId] {
-        &self.peers
+    pub fn from_channel_path(mut path: ChannelPath, destination: Address) -> Self {
+        path.push(destination);
+        Self(path)
+    }
+
+    pub fn direct(destination: Address) -> Self {
+        Self(vec![destination])
+    }
+
+    /// Turns this transport path into a [`ValidatedPath`], checking
+    /// that all addresses and channels on the path exist and resolving the corresponding [`OffchainPublicKeys`](OffchainPublicKey).
+    pub async fn validate<R: TransportKeyResolver>(
+        self,
+        cg: &ChannelGraph,
+        resolver: &R,
+    ) -> errors::Result<ValidatedPath> {
+        let mut ticket_receiver;
+        let mut ticket_issuer = cg.my_address();
+
+        let mut keys = Vec::with_capacity(self.0.len());
+
+        for (i, hop) in self.0.iter().enumerate() {
+            ticket_receiver = *hop;
+
+            // Check for loops
+            if ticket_issuer == ticket_receiver {
+                return Err(LoopsNotAllowed(ticket_receiver.to_hex()));
+            }
+
+            // Check if the channel is opened, if not the last hop
+            if i < self.0.len() - 1 {
+                let channel = cg
+                    .get_channel(&ticket_issuer, &ticket_receiver)
+                    .ok_or(MissingChannel(ticket_issuer.to_hex(), ticket_receiver.to_hex()))?;
+
+                if channel.status != ChannelStatus::Open {
+                    return Err(ChannelNotOpened(ticket_issuer.to_hex(), ticket_receiver.to_hex()));
+                }
+            }
+
+            ticket_issuer = ticket_receiver;
+
+            keys.push(
+                resolver
+                    .resolve_transport_key(&hop)
+                    .await?
+                    .ok_or(InvalidPeer(hop.to_hex()))?,
+            );
+        }
+
+        Ok(ValidatedPath(keys, self))
     }
 }
 
-impl TransportPath {
+impl Display for FullPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "full path [{}]",
+            self.0.iter().map(|p| p.to_hex()).collect::<Vec<String>>().join(", ")
+        )
+    }
+}
 
+impl From<FullPath> for ChannelPath {
+    fn from(value: FullPath) -> Self {
+        let len = value.0.len();
+        value.0.into_iter().take(len - 1).collect()
+    }
+}
+
+impl Path<Address> for FullPath {
+    fn hops(&self) -> &[Address] {
+        &self.0
+    }
+
+    fn invert(self) -> Self {
+        Self(self.0.into_iter().rev().collect())
+    }
+}
+
+/// Represents a [`TransportPath`] that has been resolved and [validated](TransportPath::validate).
+///
+/// Such a path can be directly used to deliver packets.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ValidatedPath(Vec<OffchainPublicKey>, FullPath);
+
+impl ValidatedPath {
+    pub fn transport_path(&self) -> &impl Path<OffchainPublicKey> {
+        &self.0
+    }
+
+    pub fn full_path(&self) -> &FullPath {
+        &self.1
+    }
+
+    pub fn length(&self) -> usize {
+        debug_assert_eq!(self.0.len(), self.1 .0.len(), "validated path must have equal lengths");
+        self.0.len()
+    }
+}
+
+impl Deref for ValidatedPath {
+    type Target = [OffchainPublicKey];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Display for ValidatedPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "validated full path [{}]",
+            self.1 .0.iter().map(|p| p.to_hex()).collect::<Vec<String>>().join(", ")
+        )
+    }
 }

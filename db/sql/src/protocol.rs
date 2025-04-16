@@ -12,13 +12,14 @@ use hopr_primitive_types::prelude::*;
 use std::ops::{Mul, Sub};
 use tracing::{instrument, trace, warn};
 
-use hopr_parallelize::cpu::spawn_fifo_blocking;
-
 use crate::channels::HoprDbChannelOperations;
 use crate::db::HoprDb;
 use crate::errors::DbSqlError;
 use crate::info::HoprDbInfoOperations;
 use crate::prelude::HoprDbTicketOperations;
+use hopr_parallelize::cpu::spawn_fifo_blocking;
+use hopr_path::errors::PathError;
+use hopr_path::{TransportKeyResolver, ValidatedPath};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -279,35 +280,27 @@ impl HoprDbProtocolOperations for HoprDb {
         })?)
     }
 
-    #[tracing::instrument(level = "trace", skip(self, data, path))]
+    #[tracing::instrument(level = "trace", skip(self, data, forward_path, return_paths))]
     async fn to_send(
         &self,
         data: Box<[u8]>,
         pseudonym: Option<&HoprPseudonym>,
-        path: &[OffchainPublicKey],
-        return_paths: &[&[OffchainPublicKey]],
+        forward_path: ValidatedPath,
+        return_paths: Vec<ValidatedPath>,
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData> {
-        if path.is_empty() {
-            return Err(DbSqlError::LogicalError("path must not be empty".into()).into());
-        }
-
-        let next_peer = self.resolve_chain_key(&path[0]).await?.ok_or_else(|| {
+        let next_peer = self.resolve_chain_key(&forward_path[0]).await?.ok_or_else(|| {
             DbSqlError::LogicalError(format!(
                 "failed to find chain key for packet key {} on previous hop",
-                path[0].to_peerid_str()
+                forward_path[0].to_peerid_str()
             ))
         })?;
 
         let pseudonym = pseudonym.map(|p| *p).unwrap_or_else(|| HoprPseudonym::random());
 
-        // TODO: pass already owned values into this function
-        let path = path.to_vec();
-        let return_paths = return_paths.iter().map(|p| p.to_vec()).collect::<Vec<_>>();
-
         // Decide whether to create a multi-hop or a zero-hop ticket
-        let next_ticket = if path.len() > 1 {
+        let next_ticket = if forward_path.length() > 1 {
             let channel = self
                 .get_channel_by_parties(None, &self.me_onchain, &next_peer, true)
                 .await?
@@ -317,7 +310,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 channel,
                 self.me_onchain,
                 next_peer,
-                path.len() as u8,
+                forward_path.length() as u8,
                 outgoing_ticket_win_prob,
                 outgoing_ticket_price,
             )
@@ -339,8 +332,8 @@ impl HoprDbProtocolOperations for HoprDb {
                 &data,
                 &pseudonym,
                 PacketRouting::ForwardPath {
-                    forward_path: &path,
-                    return_paths: &return_paths.iter().map(|p| &p[..]).collect::<Vec<_>>(),
+                    forward_path,
+                    return_paths,
                 },
                 &myself.chain_key,
                 next_ticket,
@@ -484,5 +477,17 @@ impl HoprDb {
             .channel_epoch(channel.channel_epoch.as_u32());
 
         Ok(ticket_builder)
+    }
+}
+
+#[async_trait::async_trait]
+impl TransportKeyResolver for HoprDb {
+    async fn resolve_transport_key(
+        &self,
+        address: &Address,
+    ) -> std::result::Result<Option<OffchainPublicKey>, PathError> {
+        self.resolve_packet_key(address)
+            .await
+            .map_err(|e| PathError::InvalidPeer(format!("{address}: {e}")))
     }
 }

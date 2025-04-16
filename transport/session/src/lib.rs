@@ -14,7 +14,7 @@ pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
 use crate::types::SessionTarget;
 use hopr_network_types::prelude::state::SessionFeature;
 pub use hopr_network_types::types::*;
-use libp2p_identity::PeerId;
+use hopr_primitive_types::prelude::Address;
 pub use types::{IncomingSession, Session, SessionId, SESSION_USABLE_MTU_SIZE};
 #[cfg(feature = "serde")]
 use {
@@ -67,7 +67,7 @@ impl IntoIterator for Capability {
 pub struct SessionClientConfig {
     /// The peer to which the session should be established.
     #[cfg_attr(feature = "serde", serde(with = "As::<DisplayFromStr>"))]
-    pub peer: PeerId,
+    pub peer: Address,
 
     /// The fixed path options for the session.
     pub path_options: RoutingOptions,

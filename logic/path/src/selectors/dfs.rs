@@ -10,8 +10,8 @@ use tracing::trace;
 
 use crate::channel_graph::{ChannelEdge, ChannelGraph, Node};
 use crate::errors::{PathError, Result};
-use crate::path::ChannelPath;
 use crate::selectors::{EdgeWeighting, PathSelector};
+use crate::ChannelPath;
 
 /// Holds a weighted channel path and auxiliary information for the graph traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -274,7 +274,7 @@ where
             );
             if current_len == max_hops || current.fully_explored || iters > self.cfg.max_iterations {
                 return if current_len >= min_hops && current_len <= max_hops {
-                    Ok(ChannelPath::new_valid(current.path))
+                    Ok(ChannelPath::from_iter(current.path))
                 } else {
                     trace!(current_len, min_hops, max_hops, iters, "path not found");
                     Err(PathError::PathNotFound(

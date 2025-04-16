@@ -13,7 +13,12 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-sphinx/serde"]
+serde = [
+  "dep:serde",
+  "dep:serde_bytes",
+  "hopr-crypto-sphinx/serde",
+  "hopr-path/serde",
+]
 benchmarks = []
 
 [dependencies]
@@ -27,6 +32,7 @@ tracing = { workspace = true }
 hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
+hopr-path = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]

@@ -46,7 +46,7 @@ use hopr_db_sql::{
     HoprDbAllOperations,
 };
 use hopr_internal_types::prelude::*;
-use hopr_path::path::TransportPath;
+use hopr_path::{TransportKeyResolver, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_network::{
@@ -186,7 +186,7 @@ type CurrentPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 /// the transport, as well as off-chain ticket manipulation.
 pub struct HoprTransport<T>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+    T: HoprDbAllOperations + TransportKeyResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     me: OffchainKeypair,
     me_peerid: PeerId, // Cache to avoid an expensive conversion: OffchainPublicKey -> PeerId
@@ -204,7 +204,7 @@ where
 
 impl<T> HoprTransport<T>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+    T: HoprDbAllOperations + TransportKeyResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     pub fn new(
         me: &OffchainKeypair,
@@ -217,6 +217,7 @@ where
         let process_packet_send = Arc::new(OnceLock::new());
 
         let me_peerid: PeerId = me.into();
+        let me_chain_addr = me_onchain.public().to_address();
 
         Self {
             me: me.clone(),
@@ -240,13 +241,13 @@ where
                     },
                 ),
                 channel_graph.clone(),
-                me_onchain.public().to_address(),
+                me_chain_addr,
             ),
             db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             smgr: SessionManager::new(
-                me_peerid,
+                me_chain_addr,
                 SessionManagerConfig {
                     session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
                     initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
@@ -413,7 +414,7 @@ where
         let tkt_agg_writer = ticket_agg_proc.writer();
 
         let (external_msg_send, external_msg_rx) =
-            mpsc::channel::<(ApplicationData, TransportPath, PacketSendFinalizer)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+            mpsc::channel::<(ApplicationData, ValidatedPath, PacketSendFinalizer)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
         self.process_packet_send
             .clone()
@@ -684,7 +685,7 @@ where
     pub async fn send_message(
         &self,
         msg: Box<[u8]>,
-        destination: PeerId,
+        destination: Address,
         options: RoutingOptions,
         application_tag: Option<u16>,
     ) -> errors::Result<()> {

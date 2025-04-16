@@ -1,7 +1,9 @@
 use hopr_crypto_sphinx::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
+use hopr_path::ValidatedPath;
 use hopr_primitive_types::prelude::*;
+
 use std::fmt::{Display, Formatter};
 
 use crate::errors::PacketError::{PacketConstructionError, PacketDecodingError};
@@ -52,14 +54,8 @@ impl PartialHoprPacket {
                 forward_path,
                 return_paths,
             } => {
-                if forward_path.is_empty() {
-                    return Err(PacketConstructionError(
-                        "packet cannot be routed to an empty path".into(),
-                    ));
-                }
-
                 // Create shared secrets and PoR challenge chain
-                let shared_keys = HoprSphinxSuite::new_shared_keys(forward_path)?;
+                let shared_keys = HoprSphinxSuite::new_shared_keys(&forward_path)?;
                 let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
 
                 // Create SURBs if some return paths were specified
@@ -80,7 +76,7 @@ impl PartialHoprPacket {
                     partial_packet: PartialPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::new(
                         MetaPacketRouting::ForwardPath {
                             shared_keys,
-                            forward_path,
+                            forward_path: &forward_path,
                             pseudonym,
                             additional_data_relayer: &por_strings,
                         },
@@ -215,12 +211,12 @@ impl Display for HoprPacket {
 
 /// Determines options on how HOPR packet can be routed to its destination.
 #[derive(Clone)]
-pub enum PacketRouting<'a> {
+pub enum PacketRouting {
     /// The packet is routed directly via the given path.
     /// Optionally, return paths for attached SURBs can be specified.
     ForwardPath {
-        forward_path: &'a [OffchainPublicKey],
-        return_paths: &'a [&'a [OffchainPublicKey]],
+        forward_path: ValidatedPath,
+        return_paths: Vec<ValidatedPath>,
     },
     /// The packet is routed via an existing SURB that corresponds to a pseudonym.
     Surb(HoprSurb),

@@ -1,20 +1,20 @@
-use futures::channel::mpsc::UnboundedSender;
-use futures::future::Either;
-use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
-use hopr_internal_types::prelude::{ApplicationData, Tag};
-use hopr_network_types::prelude::*;
-use std::ops::Range;
-use std::sync::{Arc, OnceLock};
-use std::time::Duration;
-use tracing::{debug, error, info, trace, warn};
-
 use crate::errors::{SessionManagerError, TransportSessionError};
 use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
 };
 use crate::traits::SendMsg;
-use crate::types::unwrap_offchain_key;
+use crate::types::unwrap_chain_address;
 use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
+use futures::channel::mpsc::UnboundedSender;
+use futures::future::Either;
+use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
+use hopr_internal_types::prelude::{ApplicationData, Tag};
+use hopr_network_types::prelude::*;
+use hopr_primitive_types::prelude::Address;
+use std::ops::Range;
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
+use tracing::{debug, error, info, trace, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -73,7 +73,7 @@ pub struct SessionManagerConfig {
 
 fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
     msg_sender: Arc<OnceLock<S>>,
-    me: PeerId,
+    me: Address,
     session_id: SessionId,
     session_data: CachedSession,
     cause: moka::notification::RemovalCause,
@@ -89,7 +89,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                 reason = ?r,
                 "session termination due to eviction from the cache"
             );
-            let data = match ApplicationData::try_from(StartProtocol::CloseSession(session_id.with_peer(me))) {
+            let data = match ApplicationData::try_from(StartProtocol::CloseSession(session_id.with_address(me))) {
                 Ok(data) => data,
                 Err(e) => {
                     error!(
@@ -215,7 +215,7 @@ pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<(UnboundedSender<IncomingSession>, UnboundedSender<SessionId>)>>,
     sessions: moka::future::Cache<SessionId, CachedSession>,
-    me: PeerId,
+    me: Address,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
 }
@@ -242,7 +242,7 @@ pub const MIN_SESSION_TAG_RANGE_RESERVATION: Tag = 16;
 
 impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
-    pub fn new(me: PeerId, mut cfg: SessionManagerConfig) -> Self {
+    pub fn new(me: Address, mut cfg: SessionManagerConfig) -> Self {
         // Accommodate the lower bound if too low.
         if cfg.session_tag_range.start < MIN_SESSION_TAG_RANGE_RESERVATION {
             let diff = MIN_SESSION_TAG_RANGE_RESERVATION - cfg.session_tag_range.start;
@@ -478,7 +478,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     .await
                     .map(|_| DispatchResult::Processed);
             } else if self.cfg.session_tag_range.contains(app_tag) {
-                let (peer, data) = unwrap_offchain_key(data.plain_text.clone())?;
+                let (peer, data) = unwrap_chain_address(data.plain_text.clone())?;
 
                 let session_id = SessionId::new(*app_tag, peer);
 
@@ -569,7 +569,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     // Set our peer ID in the session ID sent back to them.
                     let data = StartProtocol::SessionEstablished(StartEstablished {
                         orig_challenge: session_req.challenge,
-                        session_id: session_id.with_peer(self.me),
+                        session_id: session_id.with_address(self.me),
                     });
 
                     msg_sender
@@ -688,7 +688,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     .get()
                     .ok_or(SessionManagerError::NotStarted)?
                     .send_message(
-                        StartProtocol::CloseSession(session_id.with_peer(self.me)).try_into()?,
+                        StartProtocol::CloseSession(session_id.with_address(self.me)).try_into()?,
                         *session_id.peer(),
                         session_data.routing_opts,
                     )

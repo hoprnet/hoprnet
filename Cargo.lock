@@ -4503,6 +4503,7 @@ dependencies = [
  "hopr-crypto-sphinx",
  "hopr-crypto-types",
  "hopr-internal-types",
+ "hopr-path",
  "hopr-primitive-types",
  "lazy_static",
  "parameterized",
@@ -4587,6 +4588,7 @@ dependencies = [
  "futures",
  "hopr-crypto-types",
  "hopr-internal-types",
+ "hopr-path",
  "hopr-primitive-types",
  "libp2p-identity",
  "multiaddr",
@@ -4814,7 +4816,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-path"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4825,7 +4827,6 @@ dependencies = [
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
- "hopr-db-api",
  "hopr-db-sql",
  "hopr-internal-types",
  "hopr-metrics",

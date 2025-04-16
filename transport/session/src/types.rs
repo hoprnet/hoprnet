@@ -1,10 +1,11 @@
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use hopr_network_types::prelude::{RoutingOptions, SealedHost};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
+use hopr_primitive_types::prelude::Address;
 use hopr_primitive_types::traits::BytesRepresentable;
-use libp2p_identity::PeerId;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
@@ -18,8 +19,6 @@ use std::{
     task::Poll,
 };
 use tracing::{debug, error};
-
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -44,7 +43,7 @@ const MAX_SESSION_ID_STR_LEN: usize = 64;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SessionId {
     tag: u16,
-    peer: PeerId,
+    peer: Address,
     // Since this SessionId is commonly represented as a string,
     // we cache its string representation here.
     // Also by using a statically allocated ArrayString, we allow the SessionId to remain Copy.
@@ -53,7 +52,7 @@ pub struct SessionId {
 }
 
 impl SessionId {
-    pub fn new(tag: u16, peer: PeerId) -> Self {
+    pub fn new(tag: u16, peer: Address) -> Self {
         let mut cached = format!("{peer}:{tag}");
         cached.truncate(MAX_SESSION_ID_STR_LEN);
 
@@ -68,11 +67,11 @@ impl SessionId {
         self.tag
     }
 
-    pub fn peer(&self) -> &PeerId {
+    pub fn peer(&self) -> &Address {
         &self.peer
     }
 
-    pub fn with_peer(self, peer: PeerId) -> Self {
+    pub fn with_address(self, peer: Address) -> Self {
         Self::new(self.tag, peer)
     }
 
@@ -158,7 +157,7 @@ pub struct Session {
 impl Session {
     pub fn new(
         id: SessionId,
-        me: PeerId,
+        me: Address,
         routing_options: RoutingOptions,
         capabilities: HashSet<Capability>,
         tx: Arc<dyn SendMsg + Send + Sync>,
@@ -315,7 +314,7 @@ type FuturesBuffer = futures::stream::FuturesUnordered<
 >;
 pub struct InnerSession {
     id: SessionId,
-    me: PeerId,
+    me: Address,
     options: RoutingOptions,
     rx: UnboundedReceiver<Box<[u8]>>,
     tx: Arc<dyn SendMsg + Send + Sync>,
@@ -329,7 +328,7 @@ pub struct InnerSession {
 impl InnerSession {
     pub fn new(
         id: SessionId,
-        me: PeerId,
+        me: Address,
         options: RoutingOptions,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
@@ -396,7 +395,7 @@ impl futures::AsyncWrite for InnerSession {
             let start = i * SESSION_USABLE_MTU_SIZE;
             let end = ((i + 1) * SESSION_USABLE_MTU_SIZE).min(buf.len());
 
-            let payload = wrap_with_offchain_key(&self.me, buf[start..end].to_vec().into_boxed_slice())
+            let payload = wrap_with_chain_address(&self.me, buf[start..end].to_vec().into_boxed_slice())
                 .map_err(|e| {
                     error!(error = %e, "failed to wrap the payload with offchain key");
                     Error::new(ErrorKind::InvalidData, e)
@@ -503,32 +502,26 @@ impl futures::AsyncRead for InnerSession {
 }
 
 // TODO: 3.0 remove once return path is implemented
-pub fn wrap_with_offchain_key(peer: &PeerId, data: Box<[u8]>) -> crate::errors::Result<Vec<u8>> {
-    if data.len() > PAYLOAD_SIZE.saturating_sub(OffchainPublicKey::SIZE) {
+pub fn wrap_with_chain_address(peer: &Address, data: Box<[u8]>) -> crate::errors::Result<Vec<u8>> {
+    if data.len() > PAYLOAD_SIZE.saturating_sub(Address::SIZE) {
         return Err(TransportSessionError::PayloadSize);
     }
 
-    let opk = OffchainPublicKey::try_from(peer).map_err(|_e| TransportSessionError::PeerId)?;
-
     let mut packet: Vec<u8> = Vec::with_capacity(PAYLOAD_SIZE);
-    packet.extend_from_slice(opk.as_ref());
+    packet.extend_from_slice(peer.as_ref());
     packet.extend_from_slice(data.as_ref());
 
     Ok(packet)
 }
 
 // TODO: 3.0 remove if return path is implemented
-pub fn unwrap_offchain_key(payload: Box<[u8]>) -> crate::errors::Result<(PeerId, Box<[u8]>)> {
+pub fn unwrap_chain_address(payload: Box<[u8]>) -> crate::errors::Result<(Address, Box<[u8]>)> {
     if payload.len() > PAYLOAD_SIZE {
         return Err(TransportSessionError::PayloadSize);
     }
 
-    let mut payload = payload.into_vec();
-    let data = payload.split_off(OffchainPublicKey::SIZE).into_boxed_slice();
-
-    let opk = OffchainPublicKey::try_from(payload.as_slice()).map_err(|_e| TransportSessionError::PeerId)?;
-
-    Ok((opk.into(), data))
+    let (addr, data) = payload.split_at(Address::SIZE);
+    Ok((Address::new(addr), data.to_vec().into_boxed_slice()))
 }
 
 /// Convenience function to copy data in both directions between a [Session] and arbitrary
@@ -591,9 +584,9 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        let wrapped = wrap_with_offchain_key(&peer, data.clone())?;
+        let wrapped = wrap_with_chain_address(&peer, data.clone())?;
 
-        let (peer_id, unwrapped) = unwrap_offchain_key(wrapped.into_boxed_slice())?;
+        let (peer_id, unwrapped) = unwrap_chain_address(wrapped.into_boxed_slice())?;
 
         assert_eq!(peer, peer_id);
         assert_eq!(data, unwrapped);
@@ -609,7 +602,7 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        let wrapped = wrap_with_offchain_key(&peer, data.clone());
+        let wrapped = wrap_with_chain_address(&peer, data.clone());
 
         assert!(matches!(wrapped, Ok(_)));
     }
@@ -622,7 +615,7 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        let wrapped = wrap_with_offchain_key(&peer, data.clone());
+        let wrapped = wrap_with_chain_address(&peer, data.clone());
 
         assert!(matches!(wrapped, Err(TransportSessionError::PeerId)));
     }
@@ -636,7 +629,7 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        let wrapped = wrap_with_offchain_key(&peer, data.clone());
+        let wrapped = wrap_with_chain_address(&peer, data.clone());
 
         assert!(matches!(wrapped, Err(TransportSessionError::PayloadSize)));
     }
@@ -649,7 +642,7 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        let unwrapped = unwrap_offchain_key(data.clone());
+        let unwrapped = unwrap_chain_address(data.clone());
 
         assert!(matches!(unwrapped, Err(TransportSessionError::PayloadSize)));
     }
@@ -753,7 +746,7 @@ mod tests {
         mock.expect_send_message()
             .times(1)
             .withf(move |data, _peer, options| {
-                let (_peer_id, data) = unwrap_offchain_key(data.plain_text.clone()).expect("Unwrapping should work");
+                let (_peer_id, data) = unwrap_chain_address(data.plain_text.clone()).expect("Unwrapping should work");
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
                 assert_eq!(
                     options,
