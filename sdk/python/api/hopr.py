@@ -350,7 +350,7 @@ class HoprdAPI:
         """
         is_ok, response = await self.__call_api(HTTPMethod.GET, "node/configuration")
 
-        return Configuration(response) if is_ok else None
+        return Configuration(response["config"]) if is_ok else None
 
     async def node_info(self) -> Optional[Infos]:
         """
@@ -389,8 +389,9 @@ class HoprdAPI:
         return is_ok
 
     async def metrics(self):
-        _, response = await self.__call_api(HTTPMethod.GET, "metrics", use_api_path=False)
-        return response
+        is_ok, response = await self.__call_api(HTTPMethod.GET, "metrics", use_api_path=False)
+        
+        return response["metrics"] if is_ok else None
 
     async def get_tickets_statistics(self) -> Optional[TicketStatistics]:
         """

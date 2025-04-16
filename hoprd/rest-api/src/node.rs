@@ -53,7 +53,7 @@ pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl Int
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/configuration"),
         responses(
-            (status = 200, description = "Fetched node configuration", body = String),
+            (status = 200, description = "Fetched node configuration", body = HashMap<String, String>),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
@@ -63,7 +63,7 @@ pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl Int
         tag = "Configuration"
     )]
 pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    (StatusCode::OK, state.hoprd_cfg.clone()).into_response()
+    (StatusCode::OK, Json(state.hoprd_cfg.clone())).into_response()
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
@@ -239,6 +239,23 @@ pub(super) async fn peers(
     Ok((StatusCode::OK, Json(body)).into_response())
 }
 
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "metrics": "
+            # HELP hopr_aggregated_tickets_count Number of aggregated tickets
+            # TYPE hopr_aggregated_tickets_count counter
+            hopr_aggregated_tickets_count 363950
+            # HELP hopr_aggregations_count Number of performed ticket aggregations
+            # TYPE hopr_aggregations_count counter
+            hopr_aggregations_count 1449
+            ...
+        ", 
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NodeMetricsResponse {
+    metrics: String,
+}
+
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::gather_all_metrics as collect_hopr_metrics;
 
@@ -252,7 +269,7 @@ fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/metrics"),
         responses(
-            (status = 200, description = "Fetched node metrics", body = String),
+            (status = 200, description = "Fetched node metrics", body = NodeMetricsResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -264,7 +281,7 @@ fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
     )]
 pub(super) async fn metrics() -> impl IntoResponse {
     match collect_hopr_metrics() {
-        Ok(metrics) => (StatusCode::OK, metrics).into_response(),
+        Ok(metrics) => (StatusCode::OK, Json(NodeMetricsResponse { metrics })).into_response(),
         Err(error) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response(),
     }
 }
@@ -305,13 +322,25 @@ impl From<GraphExportQuery> for GraphExportConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "graph": "
+        ...
+        242 -> 381 [ label = 'Open channel 0x82a72e271cdedd56c29e970ced3517ba93b679869c729112b5a56fa08698df8f; stake=100000000000000000 HOPR; score=None; status=open;' ]
+        ...",
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NodeGraphResponse {
+    graph: String,
+}
+
 /// Retrieve node's channel graph in DOT or JSON format.
 #[utoipa::path(
     get,
     path = const_format::formatcp!("{BASE_PATH}/node/graph"),
     params(GraphExportQuery),
     responses(
-            (status = 200, description = "Fetched channel graph", body = String),
+            (status = 200, description = "Fetched channel graph", body = NodeGraphResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
     ),
     security(
@@ -326,7 +355,7 @@ pub(super) async fn channel_graph(
 ) -> impl IntoResponse {
     if args.raw_graph {
         match state.hopr.export_raw_channel_graph().await {
-            Ok(raw_graph) => (StatusCode::OK, raw_graph).into_response(),
+            Ok(raw_graph) => (StatusCode::OK, Json(NodeGraphResponse { graph: raw_graph })).into_response(),
             Err(error) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 ApiErrorStatus::UnknownFailure(error.to_string()),
