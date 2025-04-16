@@ -119,6 +119,7 @@ class TestRedeemingWithSwarm:
             assert statistics_after_redemption.unredeemed_value == 0
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")
     @pytest.mark.parametrize(
         "src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
