@@ -1,5 +1,4 @@
 version = 1
-revision = 1
 requires-python = "==3.12.*"
 
 [manifest]
@@ -160,7 +159,7 @@ name = "click"
 version = "8.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "colorama", marker = "platform_system == 'Windows'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593 }
 wheels = [
@@ -518,7 +517,7 @@ dependencies = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.10.11" },
     { name = "base58", specifier = ">=2.1.1" },
-    { name = "cryptography", specifier = ">=43.0.1" },
+    { name = "cryptography", specifier = ">=44.0.2" },
     { name = "pynacl", specifier = ">=1.5.0" },
 ]
 
@@ -531,7 +530,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pyyaml", specifier = ">=6.0.1" }]
+requires-dist = [{ name = "pyyaml", specifier = ">=6.0.2" }]
 
 [[package]]
 name = "tests"

@@ -96,6 +96,10 @@ pub enum StartProtocol<T> {
     CloseSession(T),
 }
 
+const SESSION_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+    .with_little_endian()
+    .with_variable_int_encoding();
+
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
     /// Serialize the message into a message tag and message data.
@@ -103,10 +107,12 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
     pub fn encode(self) -> crate::errors::Result<(u16, Box<[u8]>)> {
         let disc = StartProtocolDiscriminants::from(&self) as u8 + 1;
         let inner = match self {
-            StartProtocol::StartSession(init) => bincode::serialize(&init),
-            StartProtocol::SessionEstablished(est) => bincode::serialize(&est),
-            StartProtocol::SessionError(err) => bincode::serialize(&err),
-            StartProtocol::CloseSession(id) => bincode::serialize(&id),
+            StartProtocol::StartSession(init) => bincode::serde::encode_to_vec(&init, SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::SessionEstablished(est) => {
+                bincode::serde::encode_to_vec(&est, SESSION_BINCODE_CONFIGURATION)
+            }
+            StartProtocol::SessionError(err) => bincode::serde::encode_to_vec(err, SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::CloseSession(id) => bincode::serde::encode_to_vec(&id, SESSION_BINCODE_CONFIGURATION),
         }?;
 
         Ok((disc as u16, inner.into_boxed_slice()))
@@ -120,12 +126,18 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
         }
 
         match StartProtocolDiscriminants::from_repr(tag as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
-            StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(bincode::deserialize(data)?)),
-            StartProtocolDiscriminants::SessionEstablished => {
-                Ok(StartProtocol::SessionEstablished(bincode::deserialize(data)?))
-            }
-            StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(bincode::deserialize(data)?)),
-            StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(bincode::deserialize(data)?)),
+            StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(
+                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+            )),
+            StartProtocolDiscriminants::SessionEstablished => Ok(StartProtocol::SessionEstablished(
+                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+            )),
+            StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(
+                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+            )),
+            StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(
+                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+            )),
         }
     }
 }
