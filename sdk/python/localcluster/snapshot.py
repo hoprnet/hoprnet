@@ -81,7 +81,7 @@ class Snapshot:
 
         for f in expected_files:
             if not f.exists():
-                logging.info(f"Cannot find {f} in snapshot")
+                logging.warning(f"Cannot find {f} in snapshot")
                 return False
 
         return True

@@ -360,7 +360,6 @@
               jq
               lsof
               plutoSrc
-              python39
               runtimeShellPackage
               solcDefault
               time
@@ -469,7 +468,6 @@
               solcDefault
               hopli-debug
               hoprd # must be a release build to circumvent a panic within libp2p-request-response
-              python39
             ];
             buildPhase = ''
               unset SOURCE_DATE_EPOCH
