@@ -4567,7 +4567,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.12.2"
+version = "0.12.3"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4607,7 +4607,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5018,7 +5018,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "aquamarine",
