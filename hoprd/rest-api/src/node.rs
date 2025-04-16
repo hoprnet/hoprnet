@@ -239,23 +239,6 @@ pub(super) async fn peers(
     Ok((StatusCode::OK, Json(body)).into_response())
 }
 
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-#[schema(example = json!({
-        "metrics": "
-            # HELP hopr_aggregated_tickets_count Number of aggregated tickets
-            # TYPE hopr_aggregated_tickets_count counter
-            hopr_aggregated_tickets_count 363950
-            # HELP hopr_aggregations_count Number of performed ticket aggregations
-            # TYPE hopr_aggregations_count counter
-            hopr_aggregations_count 1449
-            ...
-        ", 
-    }))]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct NodeMetricsResponse {
-    metrics: String,
-}
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::gather_all_metrics as collect_hopr_metrics;
 
@@ -269,7 +252,7 @@ fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/metrics"),
         responses(
-            (status = 200, description = "Fetched node metrics", body = NodeMetricsResponse),
+            (status = 200, description = "Fetched node metrics", body = String),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 422, description = "Unknown failure", body = ApiError)
         ),
@@ -281,7 +264,7 @@ fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
     )]
 pub(super) async fn metrics() -> impl IntoResponse {
     match collect_hopr_metrics() {
-        Ok(metrics) => (StatusCode::OK, Json(NodeMetricsResponse { metrics })).into_response(),
+        Ok(metrics) => (StatusCode::OK, metrics).into_response(),
         Err(error) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response(),
     }
 }

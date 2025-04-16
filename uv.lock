@@ -515,7 +515,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = ">=3.10.11" },
+    { name = "aiohttp", specifier = ">=3.11.16" },
     { name = "base58", specifier = ">=2.1.1" },
     { name = "cryptography", specifier = ">=44.0.2" },
     { name = "pynacl", specifier = ">=1.5.0" },

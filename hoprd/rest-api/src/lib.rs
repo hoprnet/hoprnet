@@ -145,7 +145,7 @@ pub(crate) struct InternalState {
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery, node::NodeMetricsResponse, node::NodeGraphResponse,
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery, node::NodeGraphResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
