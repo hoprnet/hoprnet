@@ -88,6 +88,10 @@ pub enum PendingAcknowledgement {
     WaitingAsRelayer(UnacknowledgedTicket),
 }
 
+const TAGBLOOM_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+    .with_little_endian()
+    .with_variable_int_encoding();
+
 /// Bloom filter for packet tags to detect packet replays.
 ///
 /// In addition, this structure also holds the number of items in the filter
@@ -160,13 +164,15 @@ impl TagBloomFilter {
 
     /// Deserializes the filter from the given byte array.
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        bincode::deserialize(data).map_err(|e| CoreTypesError::ParseError(e.to_string()))
+        bincode::serde::borrow_decode_from_slice(data, TAGBLOOM_BINCODE_CONFIGURATION)
+            .map(|(v, _bytes)| v)
+            .map_err(|e| CoreTypesError::ParseError(e.to_string()))
     }
 
     /// Serializes the filter to the given byte array.
     pub fn to_bytes(&self) -> Box<[u8]> {
-        bincode::serialize(&self)
-            .expect("serialization must not fail")
+        bincode::serde::encode_to_vec(&self, TAGBLOOM_BINCODE_CONFIGURATION)
+            .expect("serialization of bloom filter must not fail")
             .into_boxed_slice()
     }
 
