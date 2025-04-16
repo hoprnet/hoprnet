@@ -16,36 +16,7 @@ use crate::channel_graph::ChannelGraph;
 use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 use crate::errors::Result;
-
-/// Base implementation of an abstract path.
-/// Must contain always at least a single entry.
-pub trait Path<N>: Display + Clone + Eq + PartialEq
-where
-    N: Copy + Clone + Eq + PartialEq + Hash,
-{
-    /// Individual hops in the path.
-    /// There must be always at least one hop.
-    fn hops(&self) -> &[N];
-
-    /// Shorthand for number of hops.
-    fn length(&self) -> usize {
-        self.hops().len()
-    }
-
-    /// Gets the last hop
-    fn last_hop(&self) -> &N {
-        // Path must contain at least one hop
-        self.hops().last().expect("path is invalid")
-    }
-
-    /// Checks if all the hops in this path are to distinct addresses.
-    /// Returns `true` if there are duplicate Addresses on this path.
-    /// Note that the duplicate Addresses can never be adjacent.
-    fn contains_cycle(&self) -> bool {
-        let set = HashSet::<&N, RandomState>::from_iter(self.hops().iter());
-        set.len() != self.hops().len()
-    }
-}
+use crate::Path;
 
 /// Represents an on-chain path in the [ChannelGraph].
 ///
@@ -135,6 +106,10 @@ impl ChannelPath {
 }
 
 impl Path<Address> for ChannelPath {
+    fn from_hops<T: IntoIterator<Item=Address>>(hops: T) -> Result<Self> {
+        Ok(Self::new_valid(hops.into_iter().collect()))
+    }
+
     fn hops(&self) -> &[Address] {
         &self.hops
     }
@@ -226,6 +201,15 @@ impl TransportPath {
 }
 
 impl Path<PeerId> for TransportPath {
+    fn from_hops<T: IntoIterator<Item=PeerId>>(hops: T) -> Result<Self> {
+        let hops: Vec<PeerId> = hops.into_iter().collect();
+        if !hops.is_empty() {
+            Ok(Self::new_valid(hops))
+        } else {
+            Err(PathNotValid)
+        }
+    }
+
     /// The `TransportPath` always returns one extra hop to the destination.
     /// So it contains one more hop than a [ChannelPath] (the final hop does not require a channel).
     fn hops(&self) -> &[PeerId] {
