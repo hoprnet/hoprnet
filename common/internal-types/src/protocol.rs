@@ -7,6 +7,7 @@ use std::fmt::{Display, Formatter};
 use tracing::warn;
 
 use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
+use crate::prelude::UnacknowledgedTicket;
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
@@ -88,31 +89,6 @@ pub enum PendingAcknowledgement {
     WaitingAsRelayer(UnacknowledgedTicket),
 }
 
-const TAGBLOOM_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
-    .with_little_endian()
-    .with_variable_int_encoding();
-
-#[derive(Debug, Clone)]
-struct SerializableBloomWrapper(Bloom<PacketTag>);
-
-impl Serialize for SerializableBloomWrapper {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        bloomfilter::serialize(&self.0, serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for SerializableBloomWrapper {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        bloomfilter::deserialize(deserializer).map(Self)
-    }
-}
-
 /// Bloom filter for packet tags to detect packet replays.
 ///
 /// In addition, this structure also holds the number of items in the filter
@@ -124,6 +100,29 @@ pub struct TagBloomFilter {
     bloom: SerializableBloomWrapper,
     count: usize,
     capacity: usize,
+}
+
+#[derive(Debug, Clone)]
+struct SerializableBloomWrapper(Bloom<PacketTag>);
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for SerializableBloomWrapper {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        bloomfilter::serialize(&self.0, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for SerializableBloomWrapper {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        bloomfilter::deserialize(deserializer).map(Self)
+    }
 }
 
 impl TagBloomFilter {
@@ -323,6 +322,10 @@ mod tests {
     const ZEROS_TAG: [u8; PACKET_TAG_LENGTH] = [0; PACKET_TAG_LENGTH];
     const ONES_TAG: [u8; PACKET_TAG_LENGTH] = [1; PACKET_TAG_LENGTH];
 
+    const TAGBLOOM_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+        .with_little_endian()
+        .with_variable_int_encoding();
+
     #[test]
     fn test_packet_tag_bloom_filter() -> anyhow::Result<()> {
         let mut filter1 = TagBloomFilter::default();
@@ -345,7 +348,11 @@ mod tests {
         // Count the number of items in the BF (incl. false positives)
         let match_count_1 = items.iter().filter(|item| filter1.check(item)).count();
 
-        let filter2: TagBloomFilter = bincode::deserialize(&bincode::serialize(&filter1)?)?;
+        let filter2: TagBloomFilter = bincode::serde::decode_from_slice(
+            &bincode::serde::encode_to_vec(&filter1, TAGBLOOM_BINCODE_CONFIGURATION)?,
+            TAGBLOOM_BINCODE_CONFIGURATION,
+        )?
+        .0;
 
         // Count the number of items in the BF (incl. false positives)
         let match_count_2 = items.iter().filter(|item| filter2.check(item)).count();

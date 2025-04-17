@@ -138,7 +138,7 @@ pub(super) async fn send_message(
     })?;
 
     let peer_id = match HoprIdentifier::new_with(args.destination, hopr.peer_resolver()).await {
-        Ok(destination) => destination.peer_id,
+        Ok(destination) => destination.address,
         Err(e) => return Err(e.into_response()),
     };
 
@@ -167,7 +167,7 @@ pub(super) async fn send_message(
                     .into_response()
             })?
             .into_iter()
-            .map(|v| v.peer_id)
+            .map(|v| v.address)
             .collect::<Vec<_>>();
 
         RoutingOptions::IntermediatePath(
