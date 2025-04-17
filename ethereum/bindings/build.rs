@@ -68,7 +68,8 @@ fn main() -> anyhow::Result<()> {
             "--bindings-path",
             bindings_codegen_path_str,
             "--module",
-            "--ethers",
+            "--skip-extra-derives",
+            "--alloy",
             "--overwrite",
             "--select",
             "^Hopr.*?(Boost|[^t])$"
