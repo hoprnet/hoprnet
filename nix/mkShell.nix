@@ -38,9 +38,13 @@ let
   (lib.attrValues config.treefmt.build.programs) ++
   lib.optionals stdenv.isLinux [ autoPatchelfHook ];
   packages = minimumPackages ++ shellPackages;
+
+  # mold is only supported on Linux, so falling back to lld on Darwin
+  linker = if pkgs.stdenv.buildPlatform.isDarwin then "lld" else "mold";
 in
 craneLib.devShell {
   inherit shellHook packages;
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.pkgsBuildHost.openssl pkgs.pkgsBuildHost.curl ] ++
     pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]);
+  CARGO_BUILD_RUSTFLAGS = "-C link-arg=-fuse-ld=${linker}";
 }
