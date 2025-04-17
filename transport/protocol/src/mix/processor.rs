@@ -1,23 +1,25 @@
 use futures::{future::Either, SinkExt};
 use futures::{pin_mut, Sink};
-use hopr_crypto_packet::errors::PacketError;
-use hopr_db_api::protocol::TransportPacketWithChainData;
-use hopr_transport_identity::PeerId;
-use tracing::error;
+use tracing::{error, trace};
 
 use hopr_async_runtime::prelude::sleep;
+use hopr_crypto_packet::errors::PacketError;
 use hopr_crypto_packet::errors::{
     PacketError::{TagReplay, TransportError},
     Result,
 };
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
+pub use hopr_db_api::protocol::AckResult;
+use hopr_db_api::protocol::TransportPacketWithChainData;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
+use hopr_transport_identity::PeerId;
 
 use super::packet::OutgoingPacket;
 use crate::bloom;
+use crate::errors::ProtocolError;
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -347,6 +349,42 @@ impl PacketInteractionConfig {
     }
 }
 
+/// Implements protocol acknowledgement logic for acknowledgements
+#[derive(Clone)]
+pub struct AcknowledgementProcessor<Db: HoprDbProtocolOperations> {
+    db: Db,
+}
+
+impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
+    pub fn new(db: Db) -> Self {
+        Self { db }
+    }
+
+    /// Processes the outgoing acknowledgement.
+    #[inline]
+    #[tracing::instrument(level = "debug", skip(self, ack))]
+    pub async fn send(&self, peer: &PeerId, ack: Acknowledgement) -> Acknowledgement {
+        ack
+    }
+
+    /// Processes the incoming acknowledgement.
+    #[tracing::instrument(level = "debug", skip(self, ack))]
+    pub async fn recv(&self, peer: &PeerId, ack: Acknowledgement) -> crate::errors::Result<AckResult> {
+        let remote_pk = OffchainPublicKey::try_from(peer)?;
+
+        let ack = ack.validate(&remote_pk).map_err(|_e| {
+            tracing::error!("Failed to verify signature on received acknowledgement");
+            ProtocolError::InvalidSignature
+        })?;
+
+        self.db.handle_acknowledgement(ack).await.map_err(|e| {
+            trace!(error = %e, "Failed to process a received acknowledgement");
+            let error: ProtocolError = e.into();
+            error
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,6 +396,11 @@ mod tests {
     use hopr_internal_types::prelude::HoprPseudonym;
     use hopr_path::ValidatedPath;
     use std::time::Duration;
+
+    // #[test]
+    // fn multiple_acknowledgements_fit_into_a_message_sized_payload() {
+    //     assert_eq!(std::mem::size_of::<Acknowledgement>(), 1);
+    // }
 
     #[async_std::test]
     pub async fn packet_send_finalizer_is_triggered() {

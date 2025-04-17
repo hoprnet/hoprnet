@@ -39,6 +39,7 @@ members = [
   "transport/identity",
   "transport/mixer",
   "transport/network",
+  "transport/packet",
   "transport/p2p",
   "transport/protocol",
   "transport/session",
@@ -238,6 +239,7 @@ hopr-transport-identity = { path = "transport/identity" }
 hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
 hopr-transport-protocol = { path = "transport/protocol" }
+hopr-transport-packet = { path = "transport/packet" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
 hopr-transport-ticket-aggregation = { path = "transport/ticket-aggregation" } # dead package waiting for reimplementation as a session protocol

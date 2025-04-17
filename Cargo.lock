@@ -5037,6 +5037,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-transport-packet"
+version = "0.1.0"
+dependencies = [
+ "hopr-internal-types",
+ "libp2p-identity",
+]
+
+[[package]]
 name = "hopr-transport-protocol"
 version = "0.5.0"
 dependencies = [
