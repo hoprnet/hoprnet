@@ -21,13 +21,15 @@ use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, M
 /// Base implementation of an abstract path.
 ///
 /// Must contain always at least a single entry.
-pub trait Path<N>: Clone + Eq + PartialEq
+pub trait Path<N>: Clone + Eq + PartialEq + Deref<Target = [N]>
 where
     N: Copy + Eq + PartialEq + Hash,
 {
     /// Individual hops in the path.
     /// There must be always at least one hop.
-    fn hops(&self) -> &[N];
+    fn hops(&self) -> &[N] {
+        self.deref()
+    }
 
     /// Shorthand for the number of hops.
     fn length(&self) -> usize {
@@ -48,17 +50,13 @@ where
         set.len() != self.hops().len()
     }
 
-    /// Returns the path with the hops in reverse order.
-    fn invert(self) -> Self;
+    /// Returns the path with the hops in reverse order if it is possible.
+    fn invert(self) -> Option<Self>;
 }
 
 impl<T: Copy + Eq + PartialEq + Hash> Path<T> for Vec<T> {
-    fn hops(&self) -> &[T] {
-        &self
-    }
-
-    fn invert(self) -> Self {
-        self.into_iter().rev().collect()
+    fn invert(self) -> Option<Self> {
+        Some(self.into_iter().rev().collect())
     }
 }
 
@@ -142,6 +140,14 @@ impl FullPath {
     }
 }
 
+impl Deref for FullPath {
+    type Target = [Address];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl Display for FullPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -160,12 +166,8 @@ impl From<FullPath> for ChannelPath {
 }
 
 impl Path<Address> for FullPath {
-    fn hops(&self) -> &[Address] {
-        &self.0
-    }
-
-    fn invert(self) -> Self {
-        Self(self.0.into_iter().rev().collect())
+    fn invert(self) -> Option<Self> {
+        Some(Self(self.0.into_iter().rev().collect()))
     }
 }
 
@@ -176,10 +178,6 @@ impl Path<Address> for FullPath {
 pub struct ValidatedPath(Vec<OffchainPublicKey>, FullPath);
 
 impl ValidatedPath {
-    pub fn transport_path(&self) -> &impl Path<OffchainPublicKey> {
-        &self.0
-    }
-
     pub fn full_path(&self) -> &FullPath {
         &self.1
     }
@@ -198,6 +196,15 @@ impl Deref for ValidatedPath {
     }
 }
 
+impl Path<OffchainPublicKey> for ValidatedPath {
+    /// Returns always `None`.
+    ///
+    /// A validated path cannot be inverted, as the inverted path could be invalid.
+    fn invert(self) -> Option<Self> {
+        None
+    }
+}
+
 impl Display for ValidatedPath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -206,4 +213,9 @@ impl Display for ValidatedPath {
             self.1 .0.iter().map(|p| p.to_hex()).collect::<Vec<String>>().join(", ")
         )
     }
+}
+
+#[cfg(test)]
+mod tests {
+    //use super::*;
 }

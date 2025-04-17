@@ -1,7 +1,7 @@
 use hopr_crypto_sphinx::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_path::ValidatedPath;
+use hopr_path::{Path, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 
 use std::fmt::{Display, Formatter};
@@ -41,9 +41,9 @@ impl PartialHoprPacket {
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
     /// * `domain_separator` channels contract domain separator.
-    pub fn new<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
+    pub fn new<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: Path<OffchainPublicKey>>(
         pseudonym: &HoprPseudonym,
-        routing: PacketRouting,
+        routing: PacketRouting<P>,
         chain_keypair: &ChainKeypair,
         ticket: TicketBuilder,
         mapper: &M,
@@ -54,6 +54,10 @@ impl PartialHoprPacket {
                 forward_path,
                 return_paths,
             } => {
+                if forward_path.is_empty() {
+                    return Err(PacketConstructionError("forward path cannot be empty".into()));
+                }
+                
                 // Create shared secrets and PoR challenge chain
                 let shared_keys = HoprSphinxSuite::new_shared_keys(&forward_path)?;
                 let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
@@ -211,19 +215,19 @@ impl Display for HoprPacket {
 
 /// Determines options on how HOPR packet can be routed to its destination.
 #[derive(Clone)]
-pub enum PacketRouting {
+pub enum PacketRouting<P: Path<OffchainPublicKey>> {
     /// The packet is routed directly via the given path.
     /// Optionally, return paths for attached SURBs can be specified.
     ForwardPath {
-        forward_path: ValidatedPath,
-        return_paths: Vec<ValidatedPath>,
+        forward_path: P,
+        return_paths: Vec<P>,
     },
     /// The packet is routed via an existing SURB that corresponds to a pseudonym.
     Surb(HoprSurb),
 }
 
-fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
-    return_path: &[OffchainPublicKey],
+fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: Path<OffchainPublicKey>>(
+    return_path: &P,
     pseudonym: &HoprPseudonym,
     mapper: &M,
 ) -> Result<(HoprSurb, ReplyOpener)> {
@@ -231,7 +235,7 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
         return Err(PacketConstructionError("return path cannot be empty".into()));
     }
 
-    let shared_keys = HoprSphinxSuite::new_shared_keys(return_path)?;
+    let shared_keys = HoprSphinxSuite::new_shared_keys(&return_path)?;
     let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
 
     Ok(create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
@@ -273,10 +277,10 @@ impl HoprPacket {
     ///
     /// **NOTE**
     /// For the given pseudonym, the [`ReplyOpener`] order matters.
-    pub fn into_outgoing<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>(
+    pub fn into_outgoing<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: Path<OffchainPublicKey>>(
         msg: &[u8],
         pseudonym: &HoprPseudonym,
-        routing: PacketRouting,
+        routing: PacketRouting<P>,
         chain_keypair: &ChainKeypair,
         ticket: TicketBuilder,
         mapper: &M,
@@ -474,13 +478,13 @@ mod tests {
         let ticket = mock_ticket(&PEERS[1].0.public().0, forward_hops + 1, &PEERS[0].0)?;
         let forward_path = PEERS[1..=forward_hops + 1]
             .iter()
-            .map(|kp| *kp.0.public().to_address())
-            .collect::<Vec<Address>>();
+            .map(|kp| *kp.1.public())
+            .collect::<Vec<_>>();
 
         let return_paths = return_hops
             .into_iter()
-            .map(|h| PEERS[0..=h].iter().rev().map(|kp| *kp.0.public().to_address()).collect::<Vec<_>>())
-            .collect::<Vec<Address>>();
+            .map(|h| PEERS[0..=h].iter().rev().map(|kp| *kp.1.public()).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
 
         let return_paths_refs = return_paths
             .iter()
@@ -491,8 +495,8 @@ mod tests {
             msg,
             &pseudonym,
             PacketRouting::ForwardPath {
-                forward_path: &forward_path,
-                return_paths: &return_paths_refs,
+                forward_path: forward_path.as_slice(),
+                return_paths: return_paths_refs,
             },
             &PEERS[0].0,
             ticket,
