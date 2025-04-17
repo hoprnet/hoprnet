@@ -5040,6 +5040,8 @@ dependencies = [
 name = "hopr-transport-packet"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "hopr-crypto-packet",
  "hopr-internal-types",
  "libp2p-identity",
 ]
@@ -5073,6 +5075,7 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-transport-identity",
  "hopr-transport-mixer",
+ "hopr-transport-packet",
  "lazy_static",
  "libp2p",
  "moka",

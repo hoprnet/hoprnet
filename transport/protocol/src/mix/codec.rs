@@ -49,11 +49,11 @@ mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
 
     #[test]
-    fn codec_serialization_and_deserialization_are_reverse_operations() -> anyhow::Result<()> {
+    fn codec_v1_serialization_and_deserialization_are_reverse_operations() -> anyhow::Result<()> {
         let mut codec = v1::MsgCodec;
         let mut buf = tokio_util::bytes::BytesMut::new();
 
-        const PAYLOAD_SIZE: usize = HoprPacket::SIZE;
+        const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE;
         let random_data_of_expected_packet_size: Box<[u8]> =
             Box::from(hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>());
 
@@ -69,11 +69,11 @@ mod tests {
     }
 
     #[test]
-    fn codec_deserialization_of_an_incomplete_byte_sequence_should_not_produce_an_item() -> anyhow::Result<()> {
+    fn codec_v1_deserialization_of_an_incomplete_byte_sequence_should_not_produce_an_item() -> anyhow::Result<()> {
         let mut codec = v1::MsgCodec;
         let mut buf = tokio_util::bytes::BytesMut::new();
 
-        const LESS_THAN_PAYLOAD_SIZE: usize = HoprPacket::SIZE - 1;
+        const LESS_THAN_PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE - 1;
         let random_data_too_few_bytes: Box<[u8]> =
             Box::from(hopr_crypto_random::random_bytes::<LESS_THAN_PAYLOAD_SIZE>());
 
@@ -89,12 +89,12 @@ mod tests {
     }
 
     #[test]
-    fn codec_deserialization_of_too_many_bytes_should_produce_the_value_from_only_the_bytes_needed_for_an_item(
+    fn codec_v1_deserialization_of_too_many_bytes_should_produce_the_value_from_only_the_bytes_needed_for_an_item(
     ) -> anyhow::Result<()> {
         let mut codec = v1::MsgCodec;
         let mut buf = tokio_util::bytes::BytesMut::new();
 
-        const MORE_THAN_PAYLOAD_SIZE: usize = HoprPacket::SIZE + 1;
+        const MORE_THAN_PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE + 1;
         let random_data_more_bytes_than_needed: Box<[u8]> =
             Box::from(hopr_crypto_random::random_bytes::<MORE_THAN_PAYLOAD_SIZE>());
 
@@ -102,9 +102,12 @@ mod tests {
 
         let actual = codec.decode(&mut buf)?.context("The value should be available")?;
 
-        assert_eq!(actual[..], random_data_more_bytes_than_needed[..HoprPacket::SIZE]);
+        assert_eq!(
+            actual[..],
+            random_data_more_bytes_than_needed[..HoprPacket::PAYLOAD_SIZE]
+        );
 
-        assert_eq!(buf.len(), MORE_THAN_PAYLOAD_SIZE - HoprPacket::SIZE);
+        assert_eq!(buf.len(), MORE_THAN_PAYLOAD_SIZE - HoprPacket::PAYLOAD_SIZE);
 
         Ok(())
     }
