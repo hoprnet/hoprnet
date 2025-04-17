@@ -47,6 +47,7 @@ hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport-identity = { workspace = true }
+hopr-transport-packet = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

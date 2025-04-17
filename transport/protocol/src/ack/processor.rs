@@ -32,17 +32,19 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
 
     /// Processes the incoming acknowledgement.
     #[tracing::instrument(level = "debug", skip(self, ack))]
-    pub async fn recv(&self, peer: &PeerId, mut ack: Acknowledgement) -> Result<AckResult> {
+    pub async fn recv(&self, peer: &PeerId, ack: Acknowledgement) -> Result<AckResult> {
         let remote_pk = OffchainPublicKey::try_from(peer)?;
-        if !ack.validate(&remote_pk) {
-            tracing::error!("Failed to verify signature on received acknowledgement");
-            return Err(ProtocolError::InvalidSignature);
-        };
+        let ack = ack.validate(&remote_pk).map_err(|error| {
+            tracing::error!(%error, "Failed to verify signature on received acknowledgement");
+            ProtocolError::InvalidSignature
+        })?;
 
-        self.db.handle_acknowledgement(ack, &self.chain_key).await.map_err(|e| {
-            trace!(error = %e, "Failed to process a received acknowledgement");
-            let error: ProtocolError = e.into();
-            error
-        })
+        self.db
+            .handle_acknowledgement(ack, &self.chain_key)
+            .await
+            .map_err(|error| {
+                trace!(%error, "Failed to process a received acknowledgement");
+                error.into()
+            })
     }
 }
