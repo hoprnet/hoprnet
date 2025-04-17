@@ -474,13 +474,13 @@ mod tests {
         let ticket = mock_ticket(&PEERS[1].0.public().0, forward_hops + 1, &PEERS[0].0)?;
         let forward_path = PEERS[1..=forward_hops + 1]
             .iter()
-            .map(|kp| *kp.1.public())
-            .collect::<Vec<_>>();
+            .map(|kp| *kp.0.public().to_address())
+            .collect::<Vec<Address>>();
 
         let return_paths = return_hops
             .into_iter()
-            .map(|h| PEERS[0..=h].iter().rev().map(|kp| *kp.1.public()).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
+            .map(|h| PEERS[0..=h].iter().rev().map(|kp| *kp.0.public().to_address()).collect::<Vec<_>>())
+            .collect::<Vec<Address>>();
 
         let return_paths_refs = return_paths
             .iter()

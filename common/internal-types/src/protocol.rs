@@ -6,7 +6,7 @@ use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
 use tracing::warn;
 
-use crate::errors::{CoreTypesError::PayloadSizeExceeded, Result};
+use crate::errors::{CoreTypesError, CoreTypesError::PayloadSizeExceeded, Result};
 use crate::prelude::UnacknowledgedTicket;
 
 /// Number of intermediate hops: 3 relayers and 1 destination
@@ -35,21 +35,44 @@ pub type Tag = u16;
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;
 
 /// Represents packet acknowledgement
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Acknowledgement {
-    ack_signature: OffchainSignature,
-    pub ack_key_share: HalfKey,
-    validated: bool,
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    data: [u8; Self::SIZE],
+    #[cfg_attr(feature = "serde", serde(skip))]
+    validated: bool
+}
+
+impl AsRef<[u8]> for Acknowledgement {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl TryFrom<&[u8]> for Acknowledgement {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        if value.len() == Self::SIZE {
+            Ok(Self {
+                data: value.try_into().unwrap(),
+                validated: false,
+            })
+        } else {
+            Err(GeneralError::ParseError("Acknowledgement".into()))
+        }
+    }
 }
 
 impl Acknowledgement {
     pub fn new(ack_key_share: HalfKey, node_keypair: &OffchainKeypair) -> Self {
-        Self {
-            ack_signature: OffchainSignature::sign_message(ack_key_share.as_ref(), node_keypair),
-            ack_key_share,
-            validated: true,
-        }
+        let signature = OffchainSignature::sign_message(ack_key_share.as_ref(), node_keypair);
+        let mut data = [0u8; Self::SIZE];
+        data[0..HalfKey::SIZE].copy_from_slice(ack_key_share.as_ref());
+        data[HalfKey::SIZE..OffchainSignature::SIZE].copy_from_slice(signature.as_ref());
+
+        Self { data, validated: true }
     }
 
     /// Generates random but still a valid acknowledgement.
@@ -60,21 +83,52 @@ impl Acknowledgement {
     /// Validates the acknowledgement.
     ///
     /// Must be called immediately after deserialization, or otherwise
-    /// any operations with the deserialized acknowledgement will panic.
+    /// any operations with the deserialized acknowledgement return an error.
     #[tracing::instrument(level = "debug", skip(self, sender_node_key))]
-    pub fn validate(&mut self, sender_node_key: &OffchainPublicKey) -> bool {
-        self.validated = self
-            .ack_signature
-            .verify_message(self.ack_key_share.as_ref(), sender_node_key);
+    pub fn validate(self, sender_node_key: &OffchainPublicKey) -> Result<Self> {
+        if !self.validated {
+            let signature = OffchainSignature::try_from(&self.data[HalfKey::SIZE..OffchainSignature::SIZE])?;
+            if signature.verify_message(&self.data[0..HalfKey::SIZE], sender_node_key) {
+                Ok(Self {
+                    data: self.data,
+                    validated: true,
+                })
+            } else {
+                Err(CoreTypesError::InvalidAcknowledgement)
+            }
+        } else {
+            Ok(self)
+        }
+    }
 
+    /// Gets the acknowledged key out of this acknowledgment.
+    ///
+    /// Returns [`InvalidAcknowledgement`]
+    /// if the acknowledgement has not been [validated](Acknowledgement::validate).
+    pub fn ack_key_share(&self) -> Result<HalfKey> {
+        if self.validated {
+            Ok(HalfKey::try_from(&self.data[0..HalfKey::SIZE])?)
+        } else {
+            Err(CoreTypesError::InvalidAcknowledgement)
+        }
+    }
+
+    /// Gets the acknowledgement challenge out of this acknowledgement.
+    ///
+    /// Returns [`InvalidAcknowledgement`]
+    /// if the acknowledgement has not been [validated](Acknowledgement::validate).
+    pub fn ack_challenge(&self) -> Result<HalfKeyChallenge> {
+        Ok(self.ack_key_share()?.to_challenge())
+    }
+    
+    /// Indicates whether the acknowledgement has been [validated](Acknowledgement::validate).
+    pub fn is_validated(&self) -> bool {
         self.validated
     }
+}
 
-    /// Obtains the acknowledged challenge out of this acknowledgment.
-    pub fn ack_challenge(&self) -> HalfKeyChallenge {
-        assert!(self.validated, "acknowledgement not validated");
-        self.ack_key_share.to_challenge()
-    }
+impl BytesRepresentable for Acknowledgement {
+    const SIZE: usize = HalfKey::SIZE + OffchainSignature::SIZE;
 }
 
 /// Contains either unacknowledged ticket if we're waiting for the acknowledgement as a relayer
@@ -279,29 +333,7 @@ impl ApplicationData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hopr_crypto_random::random_bytes;
-
-    use hex_literal::hex;
-
-    const PRIVATE_KEY: [u8; 32] = hex!("51d3003d908045a4d76d0bfc0d84f6ff946b5934b7ea6a2958faf02fead4567a");
-
-    #[test]
-    fn acknowledgement_binary_compatibility_with_the_v2_format() -> anyhow::Result<()> {
-        let offchain_kp = OffchainKeypair::from_secret(&PRIVATE_KEY)?;
-        let mut ack = Acknowledgement::new(HalfKey::default(), &offchain_kp);
-
-        assert!(ack.validate(offchain_kp.public()));
-
-        let buf = Vec::new();
-        let serialized = cbor4ii::serde::to_vec(buf, &ack)?;
-
-        const EXPECTED_V2_BINARY_REPRESENTATION_CBOR_HEX: [u8; 213] = hex!("a36d61636b5f7369676e6174757265a1697369676e617475726598401859182418be184818a218c318cb1869186018270218391853186c18ff18e018b518d9187b187900188218da184e1869187518ec1828181b081821187718bb0c18ba18f418331218ea187c1880182318d6189f189f18d7141876186a1890186b1885189718a718b9189018fc18bc18260918e318a5182a006d61636b5f6b65795f7368617265a164686b6579982000000000000000000000000000000000000000000000000000000000000000016976616c696461746564f5");
-
-        assert_eq!(&serialized, &EXPECTED_V2_BINARY_REPRESENTATION_CBOR_HEX);
-
-        Ok(())
-    }
-
+    
     #[test]
     fn test_application_data() -> anyhow::Result<()> {
         let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8])?;
@@ -322,11 +354,13 @@ mod tests {
     const ZEROS_TAG: [u8; PACKET_TAG_LENGTH] = [0; PACKET_TAG_LENGTH];
     const ONES_TAG: [u8; PACKET_TAG_LENGTH] = [1; PACKET_TAG_LENGTH];
 
+    #[cfg(feature = "serde")]
     const TAGBLOOM_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
         .with_little_endian()
         .with_variable_int_encoding();
 
     #[test]
+    #[cfg(feature = "serde")]
     fn test_packet_tag_bloom_filter() -> anyhow::Result<()> {
         let mut filter1 = TagBloomFilter::default();
 
@@ -342,9 +376,7 @@ mod tests {
         items.iter().for_each(|item| filter1.set(item));
 
         assert_eq!(items.len(), filter1.count(), "invalid number of items in bf");
-
-        //let len = filter1.to_bytes().len();
-
+        
         // Count the number of items in the BF (incl. false positives)
         let match_count_1 = items.iter().filter(|item| filter1.check(item)).count();
 

@@ -161,20 +161,19 @@ impl HoprDb {
         let pending_ack = self
             .caches
             .unacked_tickets
-            .remove(&ack.ack_challenge())
+            .remove(&ack.ack_challenge()?)
             .await
             .ok_or_else(|| {
                 DbSqlError::AcknowledgementValidationError(format!(
-                    "received unexpected acknowledgement for half key challenge {} - half key {}",
-                    ack.ack_challenge().to_hex(),
-                    ack.ack_key_share.to_hex()
+                    "received unexpected acknowledgement for half key challenge {}",
+                    ack.to_hex()
                 ))
             })?;
 
         match pending_ack {
             PendingAcknowledgement::WaitingAsSender => {
                 trace!("received acknowledgement as sender: first relayer has processed the packet");
-                Ok(ResolvedAcknowledgement::Sending(ack.ack_challenge()))
+                Ok(ResolvedAcknowledgement::Sending(*ack))
             }
 
             PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
@@ -199,7 +198,7 @@ impl HoprDb {
                         // solves the challenge on the ticket. It must be done before we
                         // check that the ticket is winning, which is a lengthy operation
                         // and should not be done for bogus unacknowledged tickets
-                        let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share)?;
+                        let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share()?)?;
 
                         if ack_ticket.is_winning(&myself.chain_key, &domain_separator) {
                             trace!("Found a winning ticket");

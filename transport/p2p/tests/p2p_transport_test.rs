@@ -11,7 +11,6 @@ use futures::{
 use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 
-use hopr_crypto_packet::chain::ChainPacketComponents;
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_internal_types::protocol::Acknowledgement;
 use hopr_platform::time::native::current_time;

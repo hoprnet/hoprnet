@@ -49,7 +49,7 @@ pub trait HoprDbProtocolOperations {
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum AckResult {
-    Sender(HalfKeyChallenge),
+    Sender(Acknowledgement),
     RelayerWinning(AcknowledgedTicket),
     RelayerLosing,
 }
@@ -90,7 +90,7 @@ pub enum TransportPacketWithChainData {
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum ResolvedAcknowledgement {
-    Sending(HalfKeyChallenge),
+    Sending(Acknowledgement),
     RelayingWin(AcknowledgedTicket),
     RelayingLoss(Hash),
 }
@@ -98,7 +98,7 @@ pub enum ResolvedAcknowledgement {
 impl From<ResolvedAcknowledgement> for AckResult {
     fn from(value: ResolvedAcknowledgement) -> Self {
         match value {
-            ResolvedAcknowledgement::Sending(ack_challenge) => AckResult::Sender(ack_challenge),
+            ResolvedAcknowledgement::Sending(ack) => AckResult::Sender(ack),
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => AckResult::RelayerWinning(ack_ticket),
             ResolvedAcknowledgement::RelayingLoss(_) => AckResult::RelayerLosing,
         }

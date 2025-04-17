@@ -999,6 +999,7 @@ pub mod tests {
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be constructible");
     }
 
+    #[cfg(feature = "serde")]
     const BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
         .with_little_endian()
         .with_variable_int_encoding();
@@ -1096,8 +1097,9 @@ pub mod tests {
         );
         Ok(())
     }
-
+    
     #[test]
+    #[cfg(feature = "serde")]
     pub fn test_ticket_serialize_deserialize_serde() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
@@ -1247,7 +1249,8 @@ pub mod tests {
     }
 
     #[test]
-    fn test_acknowledged_ticket() -> anyhow::Result<()> {
+    #[cfg(feature = "serde")]
+    fn test_acknowledged_ticket_serde() -> anyhow::Result<()> {
         let response =
             Response::try_from(hex!("876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73").as_ref())?;
 

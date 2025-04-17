@@ -11,13 +11,16 @@ pub enum CoreTypesError {
     #[error("failed to parse/deserialize the data of {0}")]
     ParseError(String),
 
-    #[error("Arithmetic error: {0}")]
+    #[error("arithmetic error: {0}")]
     ArithmeticError(String),
 
-    #[error("Invalid ticket signature or wrong ticket recipient")]
+    #[error("invalid ticket signature or wrong ticket recipient")]
     InvalidTicketRecipient,
 
-    #[error("Cannot acknowledge self-signed tickets. Ticket sender and recipient must be different")]
+    #[error("packet acknowledgement could not be verified")]
+    InvalidAcknowledgement,
+    
+    #[error("cannot acknowledge self-signed tickets. Ticket sender and recipient must be different")]
     LoopbackTicket,
 
     #[error("size of the packet payload has been exceeded")]
