@@ -1,23 +1,25 @@
 use futures::{future::Either, SinkExt};
 use futures::{pin_mut, Sink};
-use hopr_crypto_packet::errors::PacketError;
-use hopr_db_api::protocol::TransportPacketWithChainData;
-use hopr_transport_identity::PeerId;
-use tracing::error;
+use tracing::{error, trace};
 
 use hopr_async_runtime::prelude::sleep;
+use hopr_crypto_packet::errors::PacketError;
 use hopr_crypto_packet::errors::{
     PacketError::{TagReplay, TransportError},
     Result,
 };
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
+pub use hopr_db_api::protocol::AckResult;
+use hopr_db_api::protocol::TransportPacketWithChainData;
 use hopr_internal_types::prelude::*;
 use hopr_path::path::{Path, TransportPath};
 use hopr_primitive_types::prelude::*;
+use hopr_transport_identity::PeerId;
 
 use super::packet::OutgoingPacket;
 use crate::bloom;
+use crate::errors::ProtocolError;
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -341,6 +343,47 @@ impl PacketInteractionConfig {
     }
 }
 
+/// Implements protocol acknowledgement logic for acknowledgements
+#[derive(Clone)]
+pub struct AcknowledgementProcessor<Db: HoprDbProtocolOperations> {
+    db: Db,
+    chain_key: ChainKeypair,
+}
+
+impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
+    pub fn new(db: Db, chain_key: &ChainKeypair) -> Self {
+        Self {
+            db,
+            chain_key: chain_key.clone(),
+        }
+    }
+
+    /// Processes the outgoing acknowledgement.
+    #[inline]
+    #[tracing::instrument(level = "debug", skip(self, ack))]
+    pub async fn send(&self, peer: &PeerId, ack: Acknowledgement) -> Acknowledgement {
+        ack
+    }
+
+    /// Processes the incoming acknowledgement.
+    #[tracing::instrument(level = "debug", skip(self, ack))]
+    pub async fn recv(&self, peer: &PeerId, ack: Acknowledgement) -> crate::errors::Result<AckResult> {
+        let remote_pk = OffchainPublicKey::try_from(peer)?;
+        let ack = ack.validate(&remote_pk).map_err(|error| {
+            tracing::error!(%error, "Failed to verify signature on received acknowledgement");
+            ProtocolError::InvalidSignature
+        })?;
+
+        self.db
+            .handle_acknowledgement(ack, &self.chain_key)
+            .await
+            .map_err(|error| {
+                trace!(%error, "Failed to process a received acknowledgement");
+                error.into()
+            })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
@@ -349,6 +392,11 @@ mod tests {
 
     use super::*;
     use std::time::Duration;
+
+    // #[test]
+    // fn multiple_acknowledgements_fit_into_a_message_sized_payload() {
+    //     assert_eq!(std::mem::size_of::<Acknowledgement>(), 1);
+    // }
 
     #[async_std::test]
     pub async fn packet_send_finalizer_is_triggered() {

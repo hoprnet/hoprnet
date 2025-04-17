@@ -18,7 +18,4 @@ pub struct ProtocolConfig {
     /// `heartbeat` protocol config
     #[serde(default)]
     pub heartbeat: crate::heartbeat::config::HeartbeatProtocolConfig,
-    /// `ticket_aggregation` protocol config
-    #[serde(default)]
-    pub ticket_aggregation: crate::ticket_aggregation::config::TicketAggregationProtocolConfig,
 }

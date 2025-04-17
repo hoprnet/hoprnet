@@ -4,7 +4,7 @@
 //!
 //! Supported protocol configurations:
 //!
-//! - `msg`
+//! - `mix`
 //! - `ack`
 //! - `heartbeat`
 //! - `ticket_aggregation`
@@ -56,9 +56,7 @@ pub mod ack;
 /// `heartbeat` p2p protocol
 pub mod heartbeat;
 /// `msg` p2p protocol
-pub mod msg;
-/// `ticket_aggregation` p2p protocol
-pub mod ticket_aggregation;
+pub mod mix;
 
 /// Stream processing utilities
 pub mod stream;
@@ -78,8 +76,8 @@ use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
 use hopr_path::path::TransportPath;
 use hopr_transport_identity::PeerId;
 
-pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
-use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+pub use mix::processor::DEFAULT_PRICE_PER_PACKET;
+use mix::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
@@ -145,7 +143,7 @@ pub enum PeerDiscovery {
 /// overlayed on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
-    packet_cfg: msg::processor::PacketInteractionConfig,
+    packet_cfg: mix::processor::PacketInteractionConfig,
     db: Db,
     bloom_filter_persistent_path: Option<String>,
     wire_ack: (
@@ -203,7 +201,7 @@ where
 
     let ack_processor_read = ack::processor::AcknowledgementProcessor::new(db.clone(), me_onchain);
     let ack_processor_write = ack_processor_read.clone();
-    let msg_processor_read = msg::processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
+    let msg_processor_read = mix::processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
 
     processes.insert(
@@ -312,7 +310,7 @@ where
                     async move {
                         match v {
                             Ok(v) => match v {
-                                msg::processor::RecvOperation::Receive { data, ack } => {
+                                mix::processor::RecvOperation::Receive { data, ack } => {
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     {
                                         METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
@@ -323,7 +321,7 @@ where
                                     });
                                     Some(data)
                                 }
-                                msg::processor::RecvOperation::Forward { msg, ack } => {
+                                mix::processor::RecvOperation::Forward { msg, ack } => {
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     {
                                         METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);

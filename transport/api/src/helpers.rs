@@ -11,7 +11,7 @@ use hopr_network_types::prelude::RoutingOptions;
 use hopr_path::{path::TransportPath, selectors::PathSelector};
 use hopr_primitive_types::primitives::Address;
 use hopr_transport_identity::PeerId;
-use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
+use hopr_transport_protocol::mix::processor::{MsgSender, SendMsgInput};
 use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
     traits::SendMsg,

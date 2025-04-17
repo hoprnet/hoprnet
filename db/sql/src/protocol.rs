@@ -38,6 +38,13 @@ impl HoprDbProtocolOperations for HoprDb {
         let myself = self.clone();
         let me_ckp = me.clone();
 
+        let ack_challenge = ack
+            .ack_challenge()
+            .map_err(|e| hopr_db_api::errors::DbError::LogicalError(e.to_string()))?;
+        let ack_key_share = ack
+            .ack_key_share()
+            .map_err(|e| hopr_db_api::errors::DbError::LogicalError(e.to_string()))?;
+
         let result = self
             .begin_transaction()
             .await?
@@ -46,19 +53,19 @@ impl HoprDbProtocolOperations for HoprDb {
                     match myself
                         .caches
                         .unacked_tickets
-                        .remove(&ack.ack_challenge())
+                        .remove(&ack_challenge)
                         .await
                         .ok_or_else(|| {
                             DbSqlError::AcknowledgementValidationError(format!(
                                 "received unexpected acknowledgement for half key challenge {} - half key {}",
-                                ack.ack_challenge().to_hex(),
-                                ack.ack_key_share.to_hex()
+                                ack_challenge.to_hex(),
+                                ack_key_share.to_hex()
                             ))
                         })? {
                         PendingAcknowledgement::WaitingAsSender => {
                             trace!("received acknowledgement as sender: first relayer has processed the packet");
 
-                            Ok(ResolvedAcknowledgement::Sending(ack.ack_challenge()))
+                            Ok(ResolvedAcknowledgement::Sending(ack_challenge))
                         }
 
                         PendingAcknowledgement::WaitingAsRelayer(unacknowledged) => {
@@ -91,7 +98,7 @@ impl HoprDbProtocolOperations for HoprDb {
                                 // solves the challenge on the ticket. It must be done before we
                                 // check that the ticket is winning, which is a lengthy operation
                                 // and should not be done for bogus unacknowledged tickets
-                                let ack_ticket = unacknowledged.acknowledge(&ack.ack_key_share)?;
+                                let ack_ticket = unacknowledged.acknowledge(&ack_key_share)?;
 
                                 if ack_ticket.is_winning(&me_ckp, &domain_separator) {
                                     trace!("Found a winning ticket");

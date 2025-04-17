@@ -16,17 +16,8 @@ use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_internal_types::protocol::Acknowledgement;
 use hopr_platform::time::native::current_time;
 use hopr_transport_network::{network::NetworkTriggeredEvent, ping::PingQueryReplier};
-use hopr_transport_p2p::{
-    swarm::{
-        HoprSwarmWithProcessors, TicketAggregationEvent, TicketAggregationRequestType, TicketAggregationResponseType,
-    },
-    HoprSwarm,
-};
-use hopr_transport_protocol::{
-    config::ProtocolConfig,
-    ticket_aggregation::processor::{TicketAggregationActions, TicketAggregationToProcess},
-    PeerDiscovery,
-};
+use hopr_transport_p2p::HoprSwarm;
+use hopr_transport_protocol::{config::ProtocolConfig, PeerDiscovery};
 
 pub fn random_free_local_ipv4_port() -> Option<u16> {
     let socket = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0);
@@ -44,8 +35,6 @@ pub(crate) struct Interface {
     pub update_from_announcements: futures::channel::mpsc::UnboundedSender<PeerDiscovery>,
     #[allow(dead_code)]
     pub send_heartbeat: futures::channel::mpsc::UnboundedSender<(PeerId, PingQueryReplier)>,
-    #[allow(dead_code)]
-    pub send_ticket_aggregation: futures::channel::mpsc::UnboundedSender<TicketAggregationEvent>,
     // ---
     pub send_msg: Sender<(PeerId, Box<[u8]>)>,
     pub recv_msg: Receiver<(PeerId, Box<[u8]>)>,
@@ -58,7 +47,7 @@ pub(crate) enum Announcement {
     QUIC,
 }
 
-pub(crate) type TestSwarm = HoprSwarmWithProcessors;
+pub(crate) type TestSwarm = HoprSwarm;
 
 async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interface, TestSwarm)> {
     let random_port = random_free_local_ipv4_port().context("could not find a free port")?;
@@ -70,8 +59,6 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     let (transport_updates_tx, transport_updates_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
     let (heartbeat_requests_tx, heartbeat_requests_rx) =
         futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
-    let (ticket_aggregation_req_tx, ticket_aggregation_req_rx) =
-        futures::channel::mpsc::unbounded::<TicketAggregationEvent>();
 
     let multiaddress = match announcement {
         Announcement::QUIC => format!("/ip4/127.0.0.1/udp/{random_port}/quic-v1"),
@@ -83,14 +70,13 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
         network_events_rx,
         transport_updates_rx,
         heartbeat_requests_rx,
-        ticket_aggregation_req_rx,
         vec![multiaddress.clone()],
         ProtocolConfig::default(),
     )
     .await;
 
-    let msg_proto_control = swarm.build_protocol_control(hopr_transport_protocol::msg::CURRENT_HOPR_MSG_PROTOCOL);
-    let msg_codec = hopr_transport_protocol::msg::MsgCodec;
+    let msg_proto_control = swarm.build_protocol_control(hopr_transport_protocol::mix::CURRENT_HOPR_MSG_PROTOCOL);
+    let msg_codec = hopr_transport_protocol::mix::MsgCodec;
     let (wire_msg_tx, wire_msg_rx) =
         hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
 
@@ -99,21 +85,12 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     let (wire_ack_tx, wire_ack_rx) =
         hopr_transport_protocol::stream::process_stream_protocol(ack_codec, ack_proto_control).await?;
 
-    let (taa_tx, _taa_rx) = futures::channel::mpsc::channel::<
-        TicketAggregationToProcess<TicketAggregationResponseType, TicketAggregationRequestType>,
-    >(100);
-    let _taa =
-        TicketAggregationActions::<TicketAggregationResponseType, TicketAggregationRequestType> { queue: taa_tx };
-
-    let swarm = swarm.with_processors(_taa);
-
     let api = Interface {
         me: peer_id,
         address: multiaddress,
         update_from_network: network_events_tx,
         update_from_announcements: transport_updates_tx,
         send_heartbeat: heartbeat_requests_tx,
-        send_ticket_aggregation: ticket_aggregation_req_tx,
         send_msg: wire_msg_tx,
         recv_msg: wire_msg_rx,
         send_ack: wire_ack_tx,
