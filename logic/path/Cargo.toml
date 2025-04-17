@@ -29,13 +29,12 @@ prometheus = ["dep:hopr-metrics", "hopr-db-sql/prometheus"]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 cfg_eval = { version = "0.1.2", optional = true }
-futures = { workspace = true }
 lazy_static = { workspace = true }
-libp2p-identity = { workspace = true }
 petgraph = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 smart-default = { workspace = true }
+strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
@@ -51,3 +50,4 @@ async-std = { workspace = true }
 hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 hex-literal = { workspace = true }
 regex = { workspace = true }
+mockall = { workspace = true }

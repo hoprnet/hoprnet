@@ -504,15 +504,15 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> BytesRepresentable for
 pub(crate) mod tests {
     use super::*;
 
+    use crate::surb::create_surb;
+    use crate::tests::WrappedBytes;
     use anyhow::anyhow;
     use bimap::BiHashMap;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use parameterized::parameterized;
     use std::hash::Hash;
     use std::num::NonZeroUsize;
-
-    use crate::surb::create_surb;
-    use crate::tests::WrappedBytes;
 
     #[derive(Debug, Clone, Copy)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

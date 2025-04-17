@@ -322,14 +322,16 @@ where
 mod tests {
     use super::*;
 
-    use crate::channel_graph::NodeScoreUpdate;
-    use crate::path::Path;
     use async_lock::RwLock;
-    use core::panic;
+    use hex_literal::hex;
+    use hopr_crypto_types::types::OffchainPublicKey;
     use regex::Regex;
     use std::ops::Deref;
     use std::str::FromStr;
     use std::sync::Arc;
+
+    use crate::channel_graph::NodeScoreUpdate;
+    use crate::{ChainPath, Path, PathAddressResolver, ValidatedPath};
 
     lazy_static::lazy_static! {
         static ref ADDRESSES: [Address; 6] = [
@@ -340,16 +342,54 @@ mod tests {
             Address::from_str("0x4000a288c38fa8a0f4b79127747257af4a03a623").unwrap(),
             Address::from_str("0x50002f462ec709cf181bbe44a7e952487bd4591d").unwrap(),
         ];
+        static ref PEERS: [OffchainPublicKey; 6] = [
+            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
+            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
+            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
+            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
+            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
+            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
+        ];
+    }
+
+    struct TestResolver;
+
+    #[async_trait]
+    impl PathAddressResolver for TestResolver {
+        async fn resolve_transport_address(
+            &self,
+            address: &Address,
+        ) -> std::result::Result<Option<OffchainPublicKey>, PathError> {
+            Ok(ADDRESSES
+                .iter()
+                .enumerate()
+                .find(|(_, &a)| a.eq(address))
+                .map(|(i, _)| PEERS[i].clone()))
+        }
+
+        async fn resolve_chain_address(
+            &self,
+            key: &OffchainPublicKey,
+        ) -> std::result::Result<Option<Address>, PathError> {
+            Ok(PEERS
+                .iter()
+                .enumerate()
+                .find(|(_, &k)| k.eq(key))
+                .map(|(i, _)| ADDRESSES[i].clone()))
+        }
     }
 
     fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: Balance) -> ChannelEntry {
         ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero())
     }
 
-    fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) -> anyhow::Result<()> {
-        let other = ChannelPath::new(path.hops().into(), graph)?;
-        assert_eq!(other, path.clone(), "valid paths must be equal");
-        assert!(!path.contains_cycle(), "path must not be cyclic");
+    async fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) -> anyhow::Result<()> {
+        let _ = ValidatedPath::new(ChainPath::from_channel_path(path.clone(), dst), graph, &TestResolver).await?;
+
+        assert!(
+            path.iter().all(|hop| path.iter().filter(|&h| hop == h).count() == 1),
+            "path must not be cyclic"
+        );
         assert!(!path.hops().contains(&dst), "path must not contain destination");
 
         Ok(())
@@ -596,8 +636,8 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
         let path = selector.select_path(ADDRESSES[1], ADDRESSES[5], 1, 2).await?;
 
-        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
-        assert_eq!(2, path.length(), "should have 2 hops");
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
+        assert_eq!(2, path.num_hops(), "should have 2 hops");
 
         Ok(())
     }
@@ -613,8 +653,8 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
-        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
-        assert_eq!(3, path.length(), "should have 3 hops");
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
+        assert_eq!(3, path.num_hops(), "should have 3 hops");
 
         Ok(())
     }
@@ -630,8 +670,8 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
-        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
-        assert_eq!(3, path.length(), "should have 3 hops");
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
+        assert_eq!(3, path.num_hops(), "should have 3 hops");
 
         Ok(())
     }
@@ -647,8 +687,8 @@ mod tests {
         let selector = DfsPathSelector::<RandomizedEdgeWeighting>::new(graph.clone(), Default::default());
 
         let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
-        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
-        assert_eq!(3, path.length(), "should have 3 hops");
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
+        assert_eq!(3, path.num_hops(), "should have 3 hops");
 
         Ok(())
     }

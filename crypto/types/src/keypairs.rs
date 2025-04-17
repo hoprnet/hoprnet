@@ -84,7 +84,7 @@ impl ConstantTimeEq for OffchainKeypair {
 impl From<&OffchainKeypair> for curve25519_dalek::scalar::Scalar {
     /// Transforms the secret to be equivalent with the EdDSA public key used for signing.
     /// This is required so that the secret keys used to generate Sphinx shared secrets
-    /// are corresponding to the public keys we obtain from the Ed25519 peer ids.
+    /// correspond to the public keys we get from the Ed25519 peer ids.
     fn from(value: &OffchainKeypair) -> Self {
         let mut h: Sha512 = Sha512::default();
         h.update(&value.0);

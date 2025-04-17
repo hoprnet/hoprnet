@@ -448,12 +448,12 @@ pub fn forward_header<H: SphinxHeaderSpec>(
 pub(crate) mod tests {
     use super::*;
 
+    use crate::shared_keys::SphinxSuite;
+    use crate::tests::*;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::crypto_traits::BlockSizeUser;
     use hopr_crypto_types::keypairs::OffchainKeypair;
     use parameterized::parameterized;
-
-    use crate::shared_keys::SphinxSuite;
-    use crate::tests::*;
 
     #[test]
     fn test_filler_generate_verify() -> anyhow::Result<()> {

@@ -8,16 +8,13 @@ use crate::derivation::{create_hkdf_instance, generate_key_iv};
 /// Represents a shared secret with a remote peer.
 pub type SharedSecret = SecretValue<typenum::U32>;
 
-/// Types representing a valid non-zero scalar an additive abelian group.
+/// Types representing a valid non-zero scalar of an additive abelian group.
 pub trait Scalar: Mul<Output = Self> + Sized {
     /// Generates a random scalar using a cryptographically secure RNG.
     fn random() -> Self;
 
     /// Create scalar from bytes
     fn from_bytes(bytes: &[u8]) -> hopr_crypto_types::errors::Result<Self>;
-
-    /// Convert scalar to bytes.
-    fn to_bytes(&self) -> Box<[u8]>;
 }
 
 /// Represents the Alpha value of a certain length in the Sphinx protocol

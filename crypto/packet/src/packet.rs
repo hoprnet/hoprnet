@@ -1,7 +1,7 @@
 use hopr_crypto_sphinx::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_path::{Path, ValidatedPath};
+use hopr_path::{NonEmptyPath, TransportPath};
 use hopr_primitive_types::prelude::*;
 
 use std::fmt::{Display, Formatter};
@@ -41,7 +41,7 @@ impl PartialHoprPacket {
     /// * `ticket` ticket builder for the first hop on the path.
     /// * `mapper` of the public key identifiers.
     /// * `domain_separator` channels contract domain separator.
-    pub fn new<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: Path<OffchainPublicKey>>(
+    pub fn new<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
         pseudonym: &HoprPseudonym,
         routing: PacketRouting<P>,
         chain_keypair: &ChainKeypair,
@@ -54,10 +54,6 @@ impl PartialHoprPacket {
                 forward_path,
                 return_paths,
             } => {
-                if forward_path.is_empty() {
-                    return Err(PacketConstructionError("forward path cannot be empty".into()));
-                }
-                
                 // Create shared secrets and PoR challenge chain
                 let shared_keys = HoprSphinxSuite::new_shared_keys(&forward_path)?;
                 let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
@@ -215,26 +211,20 @@ impl Display for HoprPacket {
 
 /// Determines options on how HOPR packet can be routed to its destination.
 #[derive(Clone)]
-pub enum PacketRouting<P: Path<OffchainPublicKey>> {
+pub enum PacketRouting<P: NonEmptyPath<OffchainPublicKey> = TransportPath> {
     /// The packet is routed directly via the given path.
-    /// Optionally, return paths for attached SURBs can be specified.
-    ForwardPath {
-        forward_path: P,
-        return_paths: Vec<P>,
-    },
+    /// Optionally, return paths for
+    /// attached SURBs can be specified.
+    ForwardPath { forward_path: P, return_paths: Vec<P> },
     /// The packet is routed via an existing SURB that corresponds to a pseudonym.
     Surb(HoprSurb),
 }
 
-fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: Path<OffchainPublicKey>>(
+fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
     return_path: &P,
     pseudonym: &HoprPseudonym,
     mapper: &M,
 ) -> Result<(HoprSurb, ReplyOpener)> {
-    if return_path.is_empty() {
-        return Err(PacketConstructionError("return path cannot be empty".into()));
-    }
-
     let shared_keys = HoprSphinxSuite::new_shared_keys(&return_path)?;
     let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
 
@@ -277,7 +267,7 @@ impl HoprPacket {
     ///
     /// **NOTE**
     /// For the given pseudonym, the [`ReplyOpener`] order matters.
-    pub fn into_outgoing<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: Path<OffchainPublicKey>>(
+    pub fn into_outgoing<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
         msg: &[u8],
         pseudonym: &HoprPseudonym,
         routing: PacketRouting<P>,
@@ -383,6 +373,8 @@ mod tests {
     use anyhow::{bail, Context};
     use bimap::BiHashMap;
     use hex_literal::hex;
+    use hopr_crypto_random::Randomizable;
+    use hopr_path::TransportPath;
     use parameterized::parameterized;
 
     lazy_static::lazy_static! {
@@ -476,27 +468,19 @@ mod tests {
         );
 
         let ticket = mock_ticket(&PEERS[1].0.public().0, forward_hops + 1, &PEERS[0].0)?;
-        let forward_path = PEERS[1..=forward_hops + 1]
-            .iter()
-            .map(|kp| *kp.1.public())
-            .collect::<Vec<_>>();
+        let forward_path = TransportPath::new(PEERS[1..=forward_hops + 1].iter().map(|kp| *kp.1.public()))?;
 
         let return_paths = return_hops
             .into_iter()
-            .map(|h| PEERS[0..=h].iter().rev().map(|kp| *kp.1.public()).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
-
-        let return_paths_refs = return_paths
-            .iter()
-            .map(|return_path| return_path.as_slice())
-            .collect::<Vec<_>>();
+            .map(|h| TransportPath::new(PEERS[0..=h].iter().rev().map(|kp| *kp.1.public())))
+            .collect::<std::result::Result<Vec<_>, hopr_path::errors::PathError>>()?;
 
         Ok(HoprPacket::into_outgoing(
             msg,
             &pseudonym,
             PacketRouting::ForwardPath {
-                forward_path: forward_path.as_slice(),
-                return_paths: return_paths_refs,
+                forward_path,
+                return_paths,
             },
             &PEERS[0].0,
             ticket,
@@ -522,7 +506,7 @@ mod tests {
         Ok(HoprPacket::into_outgoing(
             msg,
             hopr_pseudonym,
-            PacketRouting::Surb(surb),
+            PacketRouting::<TransportPath>::Surb(surb),
             &PEERS[sender_node].0,
             ticket,
             &*MAPPER,

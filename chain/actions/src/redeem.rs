@@ -254,7 +254,7 @@ mod tests {
     use hex_literal::hex;
     use hopr_chain_types::chain_events::ChainEventType::TicketRedeemed;
     use hopr_chain_types::chain_events::SignificantChainEvent;
-    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_random::{random_bytes, Randomizable};
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::api::info::DomainSeparator;
     use hopr_db_sql::db::HoprDb;

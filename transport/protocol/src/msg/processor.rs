@@ -340,11 +340,11 @@ impl PacketInteractionConfig {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use anyhow::Context;
     use async_std::future::timeout;
     use futures::StreamExt;
-
-    use super::*;
     use std::time::Duration;
 
     #[async_std::test]
@@ -368,7 +368,10 @@ mod tests {
         let sender = MsgSender::new(tx);
 
         let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03])?;
-        let expected_path = TransportPath::direct(PeerId::random());
+        let expected_path = ValidatedPath::direct(
+            *OffchainKeypair::random().public(),
+            ChainKeypair::random().public().to_address(),
+        );
 
         let result = sender.send_packet(expected_data.clone(), expected_path.clone()).await;
         assert!(result.is_ok());

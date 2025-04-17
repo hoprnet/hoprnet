@@ -3,8 +3,6 @@
 //!
 //! Instead of relying on external crates, all HOPR crates in this monorepo should
 //! exclusively rely on randomness functions only from this crate.
-//! Besides that, the `OsRng` type exported from this crate can be used if a type implementing
-//! random traits is necessary.
 
 use generic_array::{ArrayLength, GenericArray};
 use rand::CryptoRng;
@@ -90,6 +88,12 @@ pub fn random_array<L: ArrayLength>() -> GenericArray<u8, L> {
     let mut ret = GenericArray::default();
     random_fill(&mut ret);
     ret
+}
+
+/// Trait for types that can be randomly generated.
+pub trait Randomizable {
+    /// Generates random value of this type using a cryptographically strong RNG.
+    fn random() -> Self;
 }
 
 #[cfg(test)]

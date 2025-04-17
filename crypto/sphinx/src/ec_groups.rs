@@ -16,10 +16,6 @@ impl Scalar for curve25519_dalek::scalar::Scalar {
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         hopr_crypto_types::utils::x25519_scalar_from_bytes(bytes)
     }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        self.to_bytes().into()
-    }
 }
 
 #[cfg(feature = "secp256k1")]
@@ -37,11 +33,6 @@ impl Scalar for k256::Scalar {
 
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         hopr_crypto_types::utils::k256_scalar_from_bytes(bytes)
-    }
-
-    fn to_bytes(&self) -> Box<[u8]> {
-        let ret = self.to_bytes();
-        Box::<[u8]>::from(ret.as_slice())
     }
 }
 

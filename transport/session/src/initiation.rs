@@ -169,6 +169,8 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<Application
 mod tests {
     use super::*;
     use crate::SessionId;
+    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::prelude::Keypair;
     use hopr_internal_types::prelude::PAYLOAD_SIZE;
     use hopr_network_types::prelude::SealedHost;
 
@@ -180,8 +182,8 @@ mod tests {
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:1234".parse()?)),
             capabilities: Default::default(),
             back_routing: Some((
-                RoutingOptions::IntermediatePath(vec![PeerId::random()].try_into()?),
-                PeerId::random(),
+                RoutingOptions::IntermediatePath(vec![(&ChainKeypair::random()).into()].try_into()?),
+                (&ChainKeypair::random()).into(),
             )),
         });
 
@@ -253,9 +255,14 @@ mod tests {
             capabilities: HashSet::from_iter([Capability::Retransmission, Capability::Segmentation]),
             back_routing: Some((
                 RoutingOptions::IntermediatePath(
-                    vec![PeerId::random(), PeerId::random(), PeerId::random()].try_into()?,
+                    vec![
+                        (&ChainKeypair::random()).into(),
+                        (&ChainKeypair::random()).into(),
+                        (&ChainKeypair::random()).into(),
+                    ]
+                    .try_into()?,
                 ),
-                PeerId::random(),
+                (&ChainKeypair::random()).into(),
             )),
         });
 
@@ -266,7 +273,7 @@ mod tests {
 
         let msg = StartProtocol::SessionEstablished(StartEstablished {
             orig_challenge: StartChallenge::MAX,
-            session_id: SessionId::new(u16::MAX, PeerId::random()),
+            session_id: SessionId::new(u16::MAX, (&ChainKeypair::random()).into()),
         });
 
         assert!(
@@ -284,7 +291,7 @@ mod tests {
             "SessionError must fit within {PAYLOAD_SIZE}"
         );
 
-        let msg = StartProtocol::CloseSession(SessionId::new(u16::MAX, PeerId::random()));
+        let msg = StartProtocol::CloseSession(SessionId::new(u16::MAX, (&ChainKeypair::random()).into()));
         assert!(
             msg.encode()?.1.len() <= PAYLOAD_SIZE,
             "CloseSession must fit within {PAYLOAD_SIZE}"

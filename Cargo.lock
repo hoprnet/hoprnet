@@ -4501,7 +4501,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-random"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "generic-array 1.2.0",
  "rand 0.8.5",
@@ -4658,7 +4658,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.6.2"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -4666,9 +4666,8 @@ dependencies = [
  "bloomfilter",
  "cbor4ii 1.0.0",
  "criterion",
- "ethers",
+ "hex",
  "hex-literal",
- "hopr-bindings",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-primitive-types",
@@ -4808,7 +4807,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "cfg_eval",
- "futures",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -4817,12 +4815,13 @@ dependencies = [
  "hopr-metrics",
  "hopr-primitive-types",
  "lazy_static",
- "libp2p-identity",
+ "mockall",
  "petgraph",
  "regex",
  "serde",
  "serde_with",
  "smart-default",
+ "strum 0.27.1",
  "thiserror 2.0.12",
  "tracing",
 ]

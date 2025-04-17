@@ -1,6 +1,5 @@
 use bloomfilter::Bloom;
-use ethers::utils::hex;
-use hopr_crypto_random::random_bytes;
+use hopr_crypto_random::{random_bytes, Randomizable};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
@@ -25,7 +24,7 @@ pub const DEFAULT_MAXIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0; // TODO: change t
 /// Default ticket winning probability that will be printed on outgoing tickets
 pub const DEFAULT_OUTGOING_TICKET_WIN_PROB: f64 = 1.0;
 
-/// The lowest possible ticket winning probability due to SC representation limit.
+/// The lowest possible ticket-winning probability due to SC representation limit.
 pub const LOWEST_POSSIBLE_WINNING_PROB: f64 = 0.00000001;
 
 /// Tags are currently 16-bit unsigned integers
@@ -41,7 +40,7 @@ pub struct Acknowledgement {
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     data: [u8; Self::SIZE],
     #[cfg_attr(feature = "serde", serde(skip))]
-    validated: bool
+    validated: bool,
 }
 
 impl AsRef<[u8]> for Acknowledgement {
@@ -120,7 +119,7 @@ impl Acknowledgement {
     pub fn ack_challenge(&self) -> Result<HalfKeyChallenge> {
         Ok(self.ack_key_share()?.to_challenge())
     }
-    
+
     /// Indicates whether the acknowledgement has been [validated](Acknowledgement::validate).
     pub fn is_validated(&self) -> bool {
         self.validated
@@ -333,7 +332,7 @@ impl ApplicationData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_application_data() -> anyhow::Result<()> {
         let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8])?;
@@ -376,7 +375,7 @@ mod tests {
         items.iter().for_each(|item| filter1.set(item));
 
         assert_eq!(items.len(), filter1.count(), "invalid number of items in bf");
-        
+
         // Count the number of items in the BF (incl. false positives)
         let match_count_1 = items.iter().filter(|item| filter1.check(item)).count();
 

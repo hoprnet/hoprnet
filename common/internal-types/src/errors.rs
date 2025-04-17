@@ -19,7 +19,7 @@ pub enum CoreTypesError {
 
     #[error("packet acknowledgement could not be verified")]
     InvalidAcknowledgement,
-    
+
     #[error("cannot acknowledge self-signed tickets. Ticket sender and recipient must be different")]
     LoopbackTicket,
 

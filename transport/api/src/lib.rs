@@ -46,7 +46,7 @@ use hopr_db_sql::{
     HoprDbAllOperations,
 };
 use hopr_internal_types::prelude::*;
-use hopr_path::{TransportKeyResolver, ValidatedPath};
+use hopr_path::{PathAddressResolver, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_network::{
@@ -186,7 +186,7 @@ type CurrentPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 /// the transport, as well as off-chain ticket manipulation.
 pub struct HoprTransport<T>
 where
-    T: HoprDbAllOperations + TransportKeyResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     me: OffchainKeypair,
     me_peerid: PeerId, // Cache to avoid an expensive conversion: OffchainPublicKey -> PeerId
@@ -204,7 +204,7 @@ where
 
 impl<T> HoprTransport<T>
 where
-    T: HoprDbAllOperations + TransportKeyResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     pub fn new(
         me: &OffchainKeypair,

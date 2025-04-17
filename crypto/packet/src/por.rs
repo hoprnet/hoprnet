@@ -1,10 +1,10 @@
+use crate::errors::{PacketError, Result};
 use hopr_crypto_sphinx::prelude::SharedSecret;
+use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_crypto_types::prelude::{sample_secp256k1_field_element, SecretKey};
 use hopr_crypto_types::types::{Challenge, HalfKey, HalfKeyChallenge, Response};
 use hopr_primitive_types::prelude::*;
 use std::fmt::Formatter;
-
-use crate::errors::{PacketError, Result};
 
 const HASH_KEY_OWN_KEY: &str = "HASH_KEY_OWN_KEY";
 const HASH_KEY_ACK_KEY: &str = "HASH_KEY_ACK_KEY";

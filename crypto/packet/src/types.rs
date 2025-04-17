@@ -89,6 +89,7 @@ mod tests {
     use anyhow::anyhow;
     use bimap::BiHashMap;
     use hex_literal::hex;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_sphinx::prelude::*;
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;

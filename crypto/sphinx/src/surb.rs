@@ -1,10 +1,10 @@
+use crate::routing::{RoutingInfo, SphinxHeaderSpec};
+use crate::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
+use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::fmt::Formatter;
 use typenum::Unsigned;
-
-use crate::routing::{RoutingInfo, SphinxHeaderSpec};
-use crate::shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite};
 
 /// Single Use Reply Block
 ///
@@ -203,6 +203,7 @@ mod tests {
     use super::*;
     use crate::ec_groups::X25519Suite;
     use crate::tests::*;
+    use hopr_crypto_random::Randomizable;
 
     #[allow(type_alias_bounds)]
     pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66>;

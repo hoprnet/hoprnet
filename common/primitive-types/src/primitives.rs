@@ -88,7 +88,7 @@ impl TryFrom<&[u8]> for Address {
 }
 
 impl BytesRepresentable for Address {
-    /// Fixed size of the address when encoded as bytes (e.g., via `as_ref()`).
+    /// Fixed the size of the address when encoded as bytes (e.g., via `as_ref()`).
     const SIZE: usize = 20;
 }
 

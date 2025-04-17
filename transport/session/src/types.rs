@@ -563,22 +563,14 @@ where
 #[cfg(test)]
 mod tests {
     use futures::{AsyncReadExt, AsyncWriteExt};
-    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 
     use super::*;
     use crate::traits::MockSendMsg;
 
     #[test]
-    fn use_the_offchain_binary_form_because_it_is_more_compact() {
-        let opk = OffchainKeypair::random().public().clone();
-        let peer: PeerId = OffchainKeypair::random().public().into();
-
-        assert!(opk.as_ref().len() < peer.to_bytes().len());
-    }
-
-    #[test]
     fn wrapping_and_unwrapping_with_offchain_key_should_be_an_identity() -> anyhow::Result<()> {
-        let peer: PeerId = OffchainKeypair::random().public().into();
+        let peer: Address = (&ChainKeypair::random()).into();
         let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
             .as_ref()
             .to_vec()
@@ -596,7 +588,7 @@ mod tests {
 
     #[test]
     fn wrapping_with_offchain_key_should_succeed_for_valid_peer_id_and_valid_payload_size() {
-        let peer: PeerId = OffchainKeypair::random().public().into();
+        let peer: Address = (&ChainKeypair::random()).into();
         let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
             .as_ref()
             .to_vec()
@@ -609,7 +601,7 @@ mod tests {
 
     #[test]
     fn wrapping_with_offchain_key_should_fail_for_invalid_peer_id() {
-        let peer: PeerId = PeerId::random();
+        let peer: Address = (&ChainKeypair::random()).into();
         let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
             .as_ref()
             .to_vec()
@@ -623,7 +615,7 @@ mod tests {
     #[test]
     fn wrapping_with_offchain_key_should_fail_for_invalid_payload_size() {
         const INVALID_PAYLOAD_SIZE: usize = PAYLOAD_SIZE + 1;
-        let peer: PeerId = OffchainKeypair::random().public().into();
+        let peer: Address = (&ChainKeypair::random()).into();
         let data = hopr_crypto_random::random_bytes::<INVALID_PAYLOAD_SIZE>()
             .as_ref()
             .to_vec()
@@ -649,13 +641,13 @@ mod tests {
 
     #[test]
     fn session_should_identify_with_its_own_id() -> anyhow::Result<()> {
-        let id = SessionId::new(1, PeerId::random());
+        let id = SessionId::new(1, (&ChainKeypair::random()).into());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
         let session = InnerSession::new(
             id,
-            PeerId::random(),
+            (&ChainKeypair::random()).into(),
             RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
@@ -668,13 +660,13 @@ mod tests {
 
     #[async_std::test]
     async fn session_should_read_data_in_one_swoop_if_the_buffer_is_sufficiently_large() -> anyhow::Result<()> {
-        let id = SessionId::new(1, PeerId::random());
+        let id = SessionId::new(1, (&ChainKeypair::random()).into());
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
         let mut session = InnerSession::new(
             id,
-            PeerId::random(),
+            (&ChainKeypair::random()).into(),
             RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
@@ -700,13 +692,13 @@ mod tests {
     #[async_std::test]
     async fn session_should_read_data_in_multiple_rounds_if_the_buffer_is_not_sufficiently_large() -> anyhow::Result<()>
     {
-        let id = SessionId::new(1, PeerId::random());
+        let id = SessionId::new(1, (&ChainKeypair::random()).into());
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
         let mut session = InnerSession::new(
             id,
-            PeerId::random(),
+            (&ChainKeypair::random()).into(),
             RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
@@ -737,7 +729,7 @@ mod tests {
 
     #[async_std::test]
     async fn session_should_write_data() -> anyhow::Result<()> {
-        let id = SessionId::new(1, OffchainKeypair::random().public().into());
+        let id = SessionId::new(1, (&ChainKeypair::random()).into());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
 
@@ -758,7 +750,7 @@ mod tests {
 
         let mut session = InnerSession::new(
             id,
-            OffchainKeypair::random().public().into(),
+            (&ChainKeypair::random()).into(),
             RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,
@@ -776,7 +768,7 @@ mod tests {
     ) -> anyhow::Result<()> {
         const TO_SEND: usize = SESSION_USABLE_MTU_SIZE * 2 + 10;
 
-        let id = SessionId::new(1, OffchainKeypair::random().public().into());
+        let id = SessionId::new(1, (&ChainKeypair::random()).into());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
 
@@ -789,7 +781,7 @@ mod tests {
 
         let mut session = InnerSession::new(
             id,
-            OffchainKeypair::random().public().into(),
+            (&ChainKeypair::random()).into(),
             RoutingOptions::Hops(1_u32.try_into()?),
             Arc::new(mock),
             rx,

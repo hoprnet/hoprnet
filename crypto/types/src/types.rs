@@ -25,6 +25,9 @@ use sha2::Sha512;
 use sha3::Keccak256;
 use typenum::Unsigned;
 
+use hopr_crypto_random::Randomizable;
+use hopr_primitive_types::errors::GeneralError::ParseError;
+use hopr_primitive_types::prelude::*;
 use std::fmt::Debug;
 use std::hash::Hasher;
 use std::sync::OnceLock;
@@ -36,9 +39,6 @@ use std::{
     str::FromStr,
 };
 use tracing::warn;
-
-use hopr_primitive_types::errors::GeneralError::ParseError;
-use hopr_primitive_types::prelude::*;
 
 use crate::utils::random_group_element;
 use crate::{
@@ -326,17 +326,18 @@ impl Default for HalfKey {
 }
 
 impl HalfKey {
-    /// Generates random half-key, useful for tests.
-    pub fn random() -> Self {
-        Self(random_group_element().0)
-    }
-
     /// Converts the non-zero scalar represented by this half-key into the half-key challenge.
     /// This operation naturally enforces the underlying scalar to be non-zero.
     pub fn to_challenge(&self) -> HalfKeyChallenge {
         CurvePoint::from_exponent(&self.0)
             .map(|cp| HalfKeyChallenge::new(cp.as_compressed().as_bytes()))
             .expect("invalid public key")
+    }
+}
+
+impl Randomizable for HalfKey {
+    fn random() -> Self {
+        Self(random_group_element().0)
     }
 }
 
@@ -807,14 +808,6 @@ impl PublicKey {
         new_pk.try_into().expect("tweak add resulted in an invalid public key")
     }
 
-    /// Generates a new random public key.
-    /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
-    pub fn random() -> Self {
-        let (_, cp) = random_group_element();
-        cp.try_into()
-            .expect("random_group_element cannot generate identity points")
-    }
-
     /// Converts the public key to an Ethereum address
     pub fn to_address(&self) -> Address {
         let uncompressed = self.to_bytes(false);
@@ -834,6 +827,16 @@ impl PublicKey {
     pub fn to_hex(&self, compressed: bool) -> String {
         let offset = if compressed { 0 } else { 1 };
         format!("0x{}", hex::encode(&self.to_bytes(compressed)[offset..]))
+    }
+}
+
+impl Randomizable for PublicKey {
+    /// Generates a new random public key.
+    /// Because the corresponding private key is discarded, this might be useful only for testing purposes.
+    fn random() -> Self {
+        let (_, cp) = random_group_element();
+        cp.try_into()
+            .expect("random_group_element cannot generate identity points")
     }
 }
 
@@ -1198,14 +1201,7 @@ impl Eq for Signature {}
 ///
 /// To maintain anonymity, this must be something else than the sender's
 /// public key or public key identifier.
-pub trait Pseudonym: BytesRepresentable + hash::Hash + Eq + Display {
-    /// Generates a random pseudonym.
-    fn random() -> Self {
-        let mut data = vec![0u8; Self::SIZE];
-        hopr_crypto_random::random_fill(&mut data);
-        Self::try_from(&data).unwrap()
-    }
-}
+pub trait Pseudonym: BytesRepresentable + hash::Hash + Eq + Display + Randomizable {}
 
 /// Represents a simple UUID-like pseudonym consisting of 16 bytes.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -1247,6 +1243,15 @@ impl<'a> TryFrom<&'a [u8]> for SimplePseudonym {
             .try_into()
             .map(Self)
             .map_err(|_| ParseError("SimplePseudonym".into()))
+    }
+}
+
+impl Randomizable for SimplePseudonym {
+    /// Generates a random pseudonym.
+    fn random() -> Self {
+        let mut data = vec![0u8; Self::SIZE];
+        hopr_crypto_random::random_fill(&mut data);
+        Self::try_from(data.as_slice()).unwrap()
     }
 }
 

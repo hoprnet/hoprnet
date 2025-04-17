@@ -1,5 +1,5 @@
 use generic_array::{ArrayLength, GenericArray};
-use hopr_crypto_random::random_array;
+use hopr_crypto_random::{random_array, Randomizable};
 use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
 use k256::elliptic_curve::{Group, PrimeField};
 use k256::Secp256k1;
@@ -150,9 +150,11 @@ impl<'de, L: ArrayLength> serde::Deserialize<'de> for SecretValue<L> {
 impl<L: ArrayLength> SecretValue<L> {
     /// Length of the secret value in bytes.
     pub const LENGTH: usize = L::USIZE;
+}
 
+impl<L: ArrayLength> Randomizable for SecretValue<L> {
     /// Generates cryptographically strong random secret value.
-    pub fn random() -> Self {
+    fn random() -> Self {
         Self(random_array())
     }
 }

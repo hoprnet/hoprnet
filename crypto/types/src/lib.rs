@@ -25,6 +25,7 @@ pub mod crypto_traits {
         BlockSizeUser, Iv, IvSizeUser, Key, KeyInit, KeyIvInit, KeySizeUser, StreamCipher, StreamCipherSeek,
     };
     pub use digest::{Digest, FixedOutput, FixedOutputReset, Output, OutputSizeUser, Update};
+    pub use hopr_crypto_random::Randomizable;
     pub use poly1305::universal_hash::UniversalHash;
 }
 

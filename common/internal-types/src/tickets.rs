@@ -1,6 +1,4 @@
-use ethers::contract::EthCall;
 use hex_literal::hex;
-use hopr_bindings::hopr_channels::RedeemTicketCall;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::cmp::Ordering;
@@ -269,7 +267,7 @@ impl TicketBuilder {
         }
     }
 
-    /// Validates all input and builds the [VerifiedTicket] by **assuming** the previously
+    /// Validates all inputs and builds the [VerifiedTicket] by **assuming** the previously
     /// set [signature](TicketBuilder::signature) is valid and belongs to the given ticket `hash`.
     /// It does **not** check whether `hash` matches the input data nor that the signature verifies
     /// the given hash.
@@ -348,7 +346,7 @@ pub struct Ticket {
     /// Epoch of the channel this ticket belongs to.
     /// Always between 0 and 2^24.
     pub channel_epoch: u32, // 24 bits
-    /// Represent the Proof of Relay challenge encoded as Ethereum address.
+    /// Represent the Proof of Relay challenge encoded as an Ethereum address.
     pub challenge: EthereumChallenge,
     /// ECDSA secp256k1 signature of all the above values.
     pub signature: Option<Signature>,
@@ -421,7 +419,8 @@ impl Ticket {
     /// must be equal to on-chain computation
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
         let ticket_hash = Hash::create(&[self.encode_without_signature().as_ref()]); // cannot fail
-        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], ticket_hash.as_ref()]);
+                                                                                     // This contains on-chain prefix: RedeemTicketCall::selector() and zeroes
+        let hash_struct = Hash::create(&[&[252u8, 183u8, 121u8, 111u8], &[0u8; 28], ticket_hash.as_ref()]);
         Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
 
@@ -919,7 +918,7 @@ impl TransferableWinningTicket {
     /// Attempts to transform this ticket back into a [RedeemableTicket].
     ///
     /// Verifies that the `signer` matches the `expected_issuer` and that the
-    /// ticket has valid signature from the `signer`.
+    /// ticket has a valid signature from the `signer`.
     /// Then it verifies if the ticket is winning and therefore if it can be successfully
     /// redeemed on-chain.
     pub fn into_redeemable(
@@ -987,6 +986,7 @@ pub mod tests {
     use super::*;
     use crate::prelude::LOWEST_POSSIBLE_WINNING_PROB;
     use hex_literal::hex;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, Response},
@@ -1097,7 +1097,7 @@ pub mod tests {
         );
         Ok(())
     }
-    
+
     #[test]
     #[cfg(feature = "serde")]
     pub fn test_ticket_serialize_deserialize_serde() -> anyhow::Result<()> {

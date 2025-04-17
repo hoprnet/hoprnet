@@ -30,10 +30,13 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
     #[tracing::instrument(level = "debug", skip(self, ack))]
     pub async fn recv(&self, peer: &PeerId, ack: Acknowledgement) -> Result<AckResult> {
         let remote_pk = OffchainPublicKey::try_from(peer)?;
-        self.db.handle_acknowledgement(ack.validate(&remote_pk)?).await.map_err(|e| {
-            trace!(error = %e, "Failed to process a received acknowledgement");
-            let error: ProtocolError = e.into();
-            error
-        })
+        self.db
+            .handle_acknowledgement(ack.validate(&remote_pk)?)
+            .await
+            .map_err(|e| {
+                trace!(error = %e, "Failed to process a received acknowledgement");
+                let error: ProtocolError = e.into();
+                error
+            })
     }
 }

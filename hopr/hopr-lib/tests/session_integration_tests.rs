@@ -9,6 +9,7 @@ use tokio::net::UdpSocket;
 
 use hopr_lib::SendMsg;
 use hopr_network_types::prelude::protocol::SessionMessage;
+use hopr_primitive_types::prelude::Address;
 use hopr_transport::{Session, SessionId, TransportSessionError};
 use hopr_transport_session::types::{transfer_session, unwrap_chain_address};
 use hopr_transport_session::Capability;
@@ -22,7 +23,7 @@ impl SendMsg for BufferingMsgSender {
     async fn send_message(
         &self,
         data: ApplicationData,
-        _destination: PeerId,
+        _destination: Address,
         _options: RoutingOptions,
     ) -> Result<(), TransportSessionError> {
         let (_, data) = unwrap_chain_address(data.plain_text)?;
@@ -37,13 +38,13 @@ impl SendMsg for BufferingMsgSender {
 
 #[test_log::test(tokio::test)]
 async fn udp_session_bridging() -> anyhow::Result<()> {
-    let id = SessionId::new(1, OffchainKeypair::random().public().into());
+    let id = SessionId::new(1, (&ChainKeypair::random()).into());
     let (_tx, rx) = futures::channel::mpsc::unbounded();
     let (buffer_tx, mut buffer_rx) = futures::channel::mpsc::unbounded();
 
     let mut session = Session::new(
         id,
-        OffchainKeypair::random().public().into(),
+        (&ChainKeypair::random()).into(),
         RoutingOptions::Hops(0_u32.try_into()?),
         HashSet::new(),
         Arc::new(BufferingMsgSender { buffer: buffer_tx }),
@@ -95,13 +96,13 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
 
 #[test_log::test(tokio::test)]
 async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
-    let id = SessionId::new(1, OffchainKeypair::random().public().into());
+    let id = SessionId::new(1, (&ChainKeypair::random()).into());
     let (_tx, rx) = futures::channel::mpsc::unbounded();
     let (buffer_tx, mut buffer_rx) = futures::channel::mpsc::unbounded();
 
     let mut session = Session::new(
         id,
-        OffchainKeypair::random().public().into(),
+        (&ChainKeypair::random()).into(),
         RoutingOptions::Hops(0_u32.try_into()?),
         HashSet::from_iter([Capability::Segmentation]),
         Arc::new(BufferingMsgSender { buffer: buffer_tx }),

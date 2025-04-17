@@ -18,10 +18,8 @@ use hopr_db_sql::{
     accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
 };
 use hopr_internal_types::prelude::*;
-use hopr_path::{
-    channel_graph::ChannelGraph,
-    path::{Path, TransportPath},
-};
+use hopr_path::errors::PathError;
+use hopr_path::{channel_graph::ChannelGraph, ChainPath, Path, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
@@ -152,7 +150,7 @@ pub type WireChannels = (
 );
 
 pub type LogicalChannels = (
-    futures::channel::mpsc::UnboundedSender<(ApplicationData, TransportPath, PacketSendFinalizer)>,
+    futures::channel::mpsc::UnboundedSender<(ApplicationData, ValidatedPath, PacketSendFinalizer)>,
     futures::channel::mpsc::UnboundedReceiver<ApplicationData>,
 );
 
@@ -200,7 +198,7 @@ pub async fn peer_setup_for(
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath, PacketSendFinalizer)>();
+            futures::channel::mpsc::unbounded::<(ApplicationData, ValidatedPath, PacketSendFinalizer)>();
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
 
         let opk: &OffchainKeypair = &PEERS[i];
@@ -304,20 +302,30 @@ impl HoprDbResolverOperations for TestResolver {
     }
 }
 
+#[async_trait]
+impl PathAddressResolver for TestResolver {
+    async fn resolve_transport_address(&self, address: &Address) -> Result<Option<OffchainPublicKey>, PathError> {
+        self.resolve_packet_key(address)
+            .await
+            .map_err(|_| PathError::InvalidPeer(address.to_hex()))
+    }
+
+    async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> Result<Option<Address>, PathError> {
+        self.resolve_chain_key(key)
+            .await
+            .map_err(|_| PathError::InvalidPeer(key.to_hex()))
+    }
+}
+
 pub async fn resolve_mock_path(
     me: Address,
-    peers_offchain: Vec<PeerId>,
+    peers_offchain: Vec<OffchainPublicKey>,
     peers_onchain: Vec<Address>,
-) -> anyhow::Result<TransportPath> {
+) -> anyhow::Result<ValidatedPath> {
     let peers_addrs = peers_offchain
         .iter()
-        .zip(peers_onchain)
-        .map(|(peer_id, addr)| {
-            (
-                OffchainPublicKey::try_from(peer_id).expect("should be valid PeerId"),
-                addr,
-            )
-        })
+        .copied()
+        .zip(peers_onchain.iter().copied())
         .collect::<Vec<_>>();
 
     let mut cg = ChannelGraph::new(me, Default::default());
@@ -334,9 +342,8 @@ pub async fn resolve_mock_path(
         cg.update_channel(c);
         last_addr = *addr;
     }
-    Ok(TransportPath::resolve(peers_offchain, &TestResolver(peers_addrs), &cg)
-        .await?
-        .0)
+
+    Ok(ValidatedPath::new(ChainPath::new(peers_onchain)?, &cg, &TestResolver(peers_addrs)).await?)
 }
 
 pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
@@ -364,7 +371,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
     // Peer 1: start sending out packets
     let packet_path = resolve_mock_path(
         PEERS_CHAIN[0].public().to_address(),
-        PEERS[1..peer_count].iter().map(|p| p.public().into()).collect(),
+        PEERS[1..peer_count].iter().map(|p| *p.public()).collect(),
         PEERS_CHAIN[1..peer_count]
             .iter()
             .map(|key| key.public().to_address())
@@ -372,7 +379,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
     )
     .await?;
 
-    assert_eq!(peer_count - 1, packet_path.length(), "path has invalid length");
+    assert_eq!(peer_count - 1, packet_path.num_hops(), "path has invalid length");
 
     async_std::task::spawn(emulate_channel_communication(packet_count, wire_apis));
 

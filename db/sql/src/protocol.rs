@@ -1,6 +1,12 @@
+use crate::channels::HoprDbChannelOperations;
+use crate::db::HoprDb;
+use crate::errors::DbSqlError;
+use crate::info::HoprDbInfoOperations;
+use crate::prelude::HoprDbTicketOperations;
 use async_trait::async_trait;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_packet::HoprPseudonym;
+use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
 use hopr_db_api::protocol::{
@@ -8,18 +14,12 @@ use hopr_db_api::protocol::{
 };
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::prelude::*;
+use hopr_parallelize::cpu::spawn_fifo_blocking;
+use hopr_path::errors::PathError;
+use hopr_path::{Path, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use std::ops::{Mul, Sub};
 use tracing::{instrument, trace, warn};
-
-use crate::channels::HoprDbChannelOperations;
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::info::HoprDbInfoOperations;
-use crate::prelude::HoprDbTicketOperations;
-use hopr_parallelize::cpu::spawn_fifo_blocking;
-use hopr_path::errors::PathError;
-use hopr_path::{TransportKeyResolver, ValidatedPath};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -299,7 +299,7 @@ impl HoprDbProtocolOperations for HoprDb {
         let pseudonym = pseudonym.map(|p| *p).unwrap_or_else(|| HoprPseudonym::random());
 
         // Decide whether to create a multi-hop or a zero-hop ticket
-        let next_ticket = if forward_path.length() > 1 {
+        let next_ticket = if forward_path.num_hops() > 1 {
             let channel = self
                 .get_channel_by_parties(None, &self.me_onchain, &next_peer, true)
                 .await?
@@ -309,7 +309,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 channel,
                 self.me_onchain,
                 next_peer,
-                forward_path.length() as u8,
+                forward_path.num_hops() as u8,
                 outgoing_ticket_win_prob,
                 outgoing_ticket_price,
             )
@@ -480,13 +480,19 @@ impl HoprDb {
 }
 
 #[async_trait::async_trait]
-impl TransportKeyResolver for HoprDb {
-    async fn resolve_transport_key(
+impl PathAddressResolver for HoprDb {
+    async fn resolve_transport_address(
         &self,
         address: &Address,
     ) -> std::result::Result<Option<OffchainPublicKey>, PathError> {
         self.resolve_packet_key(address)
             .await
-            .map_err(|e| PathError::InvalidPeer(format!("{address}: {e}")))
+            .map_err(|_| PathError::InvalidPeer(address.to_string()))
+    }
+
+    async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> std::result::Result<Option<Address>, PathError> {
+        self.resolve_chain_key(key)
+            .await
+            .map_err(|_| PathError::InvalidPeer(key.to_string()))
     }
 }

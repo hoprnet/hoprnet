@@ -7,7 +7,7 @@ use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;
 use hopr_network_types::prelude::RoutingOptions;
-use hopr_path::{selectors::PathSelector, FullPath, TransportKeyResolver, ValidatedPath};
+use hopr_path::{selectors::PathSelector, ChainPath, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::primitives::Address;
 use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
 use hopr_transport_session::{
@@ -61,7 +61,7 @@ pub(crate) struct PathPlanner<T, S> {
 
 impl<T, S> PathPlanner<T, S>
 where
-    T: HoprDbAllOperations + TransportKeyResolver + std::fmt::Debug + Send + Sync + 'static,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
     pub(crate) fn new(
@@ -91,34 +91,39 @@ where
         let cg = self.channel_graph.read().await;
         let path = match options {
             RoutingOptions::IntermediatePath(path) => {
-                trace!(full_path = ?path, "resolved a specific path");
+                trace!(?path, "resolving a specific path");
 
-                FullPath::new(path.into_iter().chain(std::iter::once(destination)))?
-                    .validate(&cg, &self.db)
-                    .await?
+                ValidatedPath::new(
+                    ChainPath::new(path.into_iter().chain(std::iter::once(destination)))?,
+                    &cg,
+                    &self.db,
+                )
+                .await?
             }
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
-                trace!(hops = 0, "resolved zero-hop path");
+                trace!(hops = 0, "resolving zero-hop path");
 
-                FullPath::direct(destination).validate(&cg, &self.db).await?
+                ValidatedPath::new(ChainPath::direct(destination), &cg, &self.db).await?
             }
             RoutingOptions::Hops(hops) => {
-                trace!(%hops, "resolved path using hop count");
+                trace!(%hops, "resolving path using hop count");
 
                 let cp = self
                     .selector
                     .select_path(self.me, destination, hops.into(), hops.into())
                     .await?;
 
-                let full_path = FullPath::from_channel_path(cp, destination);
-
-                trace!(%full_path, "resolved automatic path");
-                full_path.validate(&cg, &self.db).await?
+                ValidatedPath::new(ChainPath::from_channel_path(cp, destination), &cg, &self.db).await?
             }
         };
 
         #[cfg(all(feature = "prometheus", not(test)))]
-        hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.length() - 1) as f64);
+        {
+            use hopr_path::Path;
+            hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
+        }
+
+        trace!(%path, "validated resolved path");
 
         Ok(path)
     }
@@ -132,7 +137,7 @@ pub(crate) struct MessageSender<T, S> {
 
 impl<T, S> MessageSender<T, S>
 where
-    T: HoprDbAllOperations + TransportKeyResolver + std::fmt::Debug + Send + Sync + 'static,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
     pub fn new(
@@ -149,7 +154,7 @@ where
 #[async_trait::async_trait]
 impl<T, S> SendMsg for MessageSender<T, S>
 where
-    T: HoprDbAllOperations + TransportKeyResolver + std::fmt::Debug + Send + Sync + 'static,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
     #[tracing::instrument(level = "debug", skip(self, data))]

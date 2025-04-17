@@ -313,6 +313,7 @@ impl TicketManager {
 mod tests {
     use futures::StreamExt;
     use hex_literal::hex;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
     use hopr_db_api::info::DomainSeparator;
     use hopr_internal_types::prelude::*;

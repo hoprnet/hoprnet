@@ -723,6 +723,8 @@ mod tests {
     use async_std::prelude::FutureExt;
     use async_trait::async_trait;
     use futures::AsyncWriteExt;
+    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::prelude::Keypair;
     use hopr_primitive_types::bounded::BoundedSize;
 
     mockall::mock! {
@@ -735,7 +737,7 @@ mod tests {
             async fn send_message(
                 &self,
                 data: ApplicationData,
-                destination: PeerId,
+                destination: Address,
                 options: RoutingOptions,
             ) -> std::result::Result<(), TransportSessionError>;
         }
@@ -766,8 +768,8 @@ mod tests {
     #[test_log::test(async_std::test)]
     async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> anyhow::Result<()>
     {
-        let alice_peer = PeerId::random();
-        let bob_peer = PeerId::random();
+        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let alice_mgr = SessionManager::new(alice_peer, Default::default());
         let bob_mgr = SessionManager::new(bob_peer, Default::default());
@@ -885,8 +887,8 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn session_manager_should_close_idle_session_automatically() -> anyhow::Result<()> {
-        let alice_peer = PeerId::random();
-        let bob_peer = PeerId::random();
+        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
             idle_timeout: Duration::from_millis(200),
@@ -1008,8 +1010,8 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn session_manager_should_not_allow_establish_session_when_tag_range_is_used_up() -> anyhow::Result<()> {
-        let alice_peer = PeerId::random();
-        let bob_peer = PeerId::random();
+        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
             session_tag_range: 16..17, // Slot for exactly one session
@@ -1088,8 +1090,8 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn session_manager_should_timeout_new_session_attempt_when_no_response() -> anyhow::Result<()> {
-        let alice_peer = PeerId::random();
-        let bob_peer = PeerId::random();
+        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
             initiation_timeout_base: Duration::from_millis(100),

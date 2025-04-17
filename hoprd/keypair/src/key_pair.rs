@@ -1,5 +1,5 @@
 //use hex;
-use hopr_crypto_random::random_bytes;
+use hopr_crypto_random::{random_bytes, Randomizable};
 use hopr_crypto_types::crypto_traits::{Digest, KeyIvInit, StreamCipher, Update};
 use hopr_crypto_types::prelude::*;
 use hopr_platform::file::native::{metadata, read_to_string, write};
@@ -200,17 +200,19 @@ impl PartialEq for HoprKeys {
     }
 }
 
-impl HoprKeys {
+impl Randomizable for HoprKeys {
     /// Creates two new keypairs, one for off-chain affairs and
     /// another one to be used within the smart contract
-    pub fn random() -> Self {
+    fn random() -> Self {
         Self {
             packet_key: OffchainKeypair::random(),
             chain_key: ChainKeypair::random(),
             id: Uuid::new_v4(),
         }
     }
+}
 
+impl HoprKeys {
     /// Initializes HoprKeys using the provided retrieval mode
     fn init(retrieval_mode: IdentityRetrievalModes) -> Result<Self> {
         match retrieval_mode {
@@ -457,12 +459,12 @@ impl Debug for HoprKeys {
 mod tests {
     use std::fs;
 
+    use super::HoprKeys;
     use anyhow::Context;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
     use tempfile::tempdir;
     use uuid::Uuid;
-
-    use super::HoprKeys;
 
     const DEFAULT_PASSWORD: &str = "dummy password for unit testing";
 

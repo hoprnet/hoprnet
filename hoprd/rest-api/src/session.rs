@@ -923,7 +923,7 @@ mod tests {
     use super::*;
     use anyhow::Context;
     use futures::channel::mpsc::UnboundedSender;
-    use hopr_lib::{ApplicationData, Keypair, PeerId, SendMsg};
+    use hopr_lib::{ApplicationData, SendMsg};
     use hopr_transport_session::errors::TransportSessionError;
     use std::collections::HashSet;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -944,7 +944,7 @@ mod tests {
         async fn send_message(
             &self,
             data: ApplicationData,
-            _destination: PeerId,
+            _destination: Address,
             _options: hopr_lib::RoutingOptions,
         ) -> std::result::Result<(), TransportSessionError> {
             let (_peer, data) = hopr_transport_session::types::unwrap_chain_address(data.plain_text)?;
