@@ -11,6 +11,19 @@
   "rangeStrategy": "bump",
   "packageRules": [
     { "matchCategories": ["rust"], "enabled": true },
-    { "matchCategories": ["docker"], "enabled": true, "pinDigests": true }
+    { "matchCategories": ["docker"], "enabled": true, "pinDigests": true },
+    {
+      "matchPackageNames": [
+        "serde_yaml",
+        "serde_cbor",
+        "libp2p-stream",
+        "generic-array",
+        "hickory-resolver",
+        "primitive-types",
+        "rand",
+        "rand_distr"
+      ],
+      "enabled": false
+    }
   ]
 }

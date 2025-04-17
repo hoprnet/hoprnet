@@ -1,4 +1,3 @@
-use crate::tickets::UnacknowledgedTicket;
 use bloomfilter::Bloom;
 use ethers::utils::hex;
 use hopr_crypto_random::random_bytes;
@@ -89,6 +88,31 @@ pub enum PendingAcknowledgement {
     WaitingAsRelayer(UnacknowledgedTicket),
 }
 
+const TAGBLOOM_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+    .with_little_endian()
+    .with_variable_int_encoding();
+
+#[derive(Debug, Clone)]
+struct SerializableBloomWrapper(Bloom<PacketTag>);
+
+impl Serialize for SerializableBloomWrapper {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        bloomfilter::serialize(&self.0, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for SerializableBloomWrapper {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        bloomfilter::deserialize(deserializer).map(Self)
+    }
+}
+
 /// Bloom filter for packet tags to detect packet replays.
 ///
 /// In addition, this structure also holds the number of items in the filter
@@ -97,7 +121,7 @@ pub enum PendingAcknowledgement {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TagBloomFilter {
-    bloom: Bloom<PacketTag>,
+    bloom: SerializableBloomWrapper,
     count: usize,
     capacity: usize,
 }
@@ -123,36 +147,36 @@ impl TagBloomFilter {
     pub fn set(&mut self, tag: &PacketTag) {
         if self.count == self.capacity {
             warn!("maximum number of items in the Bloom filter reached!");
-            self.bloom.clear();
+            self.bloom.0.clear();
             self.count = 0;
         }
 
-        self.bloom.set(tag);
+        self.bloom.0.set(tag);
         self.count += 1;
     }
 
     /// Check if the packet tag is in the Bloom filter.
     /// False positives are possible.
     pub fn check(&self, tag: &PacketTag) -> bool {
-        self.bloom.check(tag)
+        self.bloom.0.check(tag)
     }
 
     /// Checks and sets a packet tag (if not present) in a single operation.
     pub fn check_and_set(&mut self, tag: &PacketTag) -> bool {
         // If we're at full capacity, we do only "check" and conditionally reset with the new entry
         if self.count == self.capacity {
-            let is_present = self.bloom.check(tag);
+            let is_present = self.bloom.0.check(tag);
             if !is_present {
                 // There cannot be false negatives, so we can reset the filter
                 warn!("maximum number of items in the Bloom filter reached!");
-                self.bloom.clear();
-                self.bloom.set(tag);
+                self.bloom.0.clear();
+                self.bloom.0.set(tag);
                 self.count = 1;
             }
             is_present
         } else {
             // If not at full capacity, we can do check_and_set
-            let was_present = self.bloom.check_and_set(tag);
+            let was_present = self.bloom.0.check_and_set(tag);
             if !was_present {
                 self.count += 1;
             }
@@ -162,7 +186,10 @@ impl TagBloomFilter {
 
     fn with_capacity(size: usize) -> Self {
         Self {
-            bloom: Bloom::new_for_fp_rate_with_seed(size, Self::FALSE_POSITIVE_RATE, &random_bytes()),
+            bloom: SerializableBloomWrapper(
+                Bloom::new_for_fp_rate_with_seed(size, Self::FALSE_POSITIVE_RATE, &random_bytes())
+                    .expect("bloom filter with the specified capacity is constructible"),
+            ),
             count: 0,
             capacity: size,
         }

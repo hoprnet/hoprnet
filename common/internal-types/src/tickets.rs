@@ -986,7 +986,6 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 pub mod tests {
     use super::*;
     use crate::prelude::LOWEST_POSSIBLE_WINNING_PROB;
-    use crate::tickets::AcknowledgedTicket;
     use hex_literal::hex;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
@@ -999,6 +998,10 @@ pub mod tests {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be constructible");
     }
+
+    const BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+        .with_little_endian()
+        .with_variable_int_encoding();
 
     #[test]
     pub fn test_win_prob_to_f64() {
@@ -1108,7 +1111,11 @@ pub mod tests {
 
         assert_eq!(
             initial_ticket,
-            bincode::deserialize(&bincode::serialize(&initial_ticket)?)?
+            bincode::serde::decode_from_slice(
+                &bincode::serde::encode_to_vec(&initial_ticket, BINCODE_CONFIGURATION)?,
+                BINCODE_CONFIGURATION
+            )
+            .map(|v| v.0)?
         );
         Ok(())
     }
@@ -1255,7 +1262,11 @@ pub mod tests {
 
         let acked_ticket = ticket.into_acknowledged(response);
 
-        let mut deserialized_ticket = bincode::deserialize::<AcknowledgedTicket>(&bincode::serialize(&acked_ticket)?)?;
+        let mut deserialized_ticket = bincode::serde::decode_from_slice(
+            &bincode::serde::encode_to_vec(&acked_ticket, BINCODE_CONFIGURATION)?,
+            BINCODE_CONFIGURATION,
+        )
+        .map(|v| v.0)?;
         assert_eq!(acked_ticket, deserialized_ticket);
 
         assert!(deserialized_ticket.is_winning(&BOB, &dst));
@@ -1264,7 +1275,11 @@ pub mod tests {
 
         assert_eq!(
             deserialized_ticket,
-            bincode::deserialize(&bincode::serialize(&deserialized_ticket)?)?
+            bincode::serde::decode_from_slice(
+                &bincode::serde::encode_to_vec(&deserialized_ticket, BINCODE_CONFIGURATION)?,
+                BINCODE_CONFIGURATION,
+            )
+            .map(|v| v.0)?
         );
         Ok(())
     }

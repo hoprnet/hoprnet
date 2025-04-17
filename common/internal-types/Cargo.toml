@@ -1,6 +1,6 @@
 [package]
 name = "hopr-internal-types"
-version = "0.6.1"
+version = "0.6.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types required internally by the HOPR library, these are not generic enough to be used in the external APIs"
 edition = "2021"
@@ -13,7 +13,7 @@ crate-type = ["rlib"]
 
 [dependencies]
 aquamarine = { workspace = true }
-bloomfilter = { workspace = true }
+bloomfilter = { workspace = true, features = ["serde"] }
 ethers = { workspace = true, default-features = false }
 hex-literal = { workspace = true }
 num_enum = { workspace = true }
