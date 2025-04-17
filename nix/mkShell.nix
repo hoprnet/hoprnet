@@ -41,6 +41,6 @@ let
 in
 craneLib.devShell {
   inherit shellHook packages;
-  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.pkgsBuildHost.openssl ] ++
+  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath ([ pkgs.pkgsBuildHost.openssl pkgs.pkgsBuildHost.curl ] ++
     pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.pkgsBuildHost.libgcc.lib ]);
 }

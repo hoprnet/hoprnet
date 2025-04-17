@@ -53,8 +53,9 @@ let
 
   crateInfo = craneLib.crateNameFromCargoToml { inherit cargoToml; };
   pname = crateInfo.pname;
-  pnameSuffix = if CARGO_PROFILE == "release" then "" else "-${CARGO_PROFILE}";
-  pnameDeps = if CARGO_PROFILE == "release" then pname else "${pname}-${CARGO_PROFILE}";
+  actualCargoProfile = if runTests then "test" else if runClippy then "dev" else if buildDocs then "dev" else CARGO_PROFILE;
+  pnameSuffix = if actualCargoProfile == "release" then "" else "-${actualCargoProfile}";
+  pnameDeps = if actualCargoProfile == "release" then pname else "${pname}-${actualCargoProfile}";
 
   version = lib.strings.concatStringsSep "." (lib.lists.take 3 (builtins.splitVersion crateInfo.version));
 
@@ -74,7 +75,8 @@ let
       [ setupHookDarwin ] else [ ];
 
   sharedArgsBase = {
-    inherit pname pnameSuffix version CARGO_PROFILE;
+    inherit pname pnameSuffix version;
+    CARGO_PROFILE = actualCargoProfile;
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
@@ -95,10 +97,10 @@ let
     if runTests then sharedArgsBase // {
       cargoTestExtraArgs = "--workspace -F runtime-async-std -F runtime-tokio";
       doCheck = true;
+      LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
     }
     else if runClippy then sharedArgsBase // {
       cargoClippyExtraArgs = "-- -Dwarnings";
-      CARGO_PROFILE = "dev";
     }
     else sharedArgsBase;
 
@@ -108,7 +110,6 @@ let
     cargoDocExtraArgs = "--workspace --no-deps";
     RUSTDOCFLAGS = "--enable-index-page -Z unstable-options";
     CARGO_TARGET_DIR = "target/";
-    CARGO_PROFILE = "dev";
     LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
     postBuild = ''
       ${pandoc}/bin/pandoc -f markdown+hard_line_breaks -t html README.md > readme.html
