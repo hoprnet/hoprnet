@@ -77,7 +77,7 @@ jobs:
       - name: Determine build options
         id: options
         run: |
-          nix_debug_option="-debug"
+          nix_debug_option="-dev"
           if [[ "${{ inputs.production }}" = "true" || -n "${GITHUB_PR_LABEL_DOCKER_PRODUCTION_BUILD}" ]]; then
             nix_debug_option=""
           fi
