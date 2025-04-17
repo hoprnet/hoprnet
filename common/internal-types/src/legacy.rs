@@ -2,9 +2,10 @@
 //! from business objects (AcknowledgedTicket), to ensure backwards compatibility of
 //! Ticket Aggregation in 2.x releases
 
-use ethers::core::k256::AffinePoint;
-use ethers::prelude::k256::elliptic_curve::sec1::FromEncodedPoint;
-use ethers::prelude::k256::Scalar;
+use k256::elliptic_curve::sec1::FromEncodedPoint;
+use k256::AffinePoint;
+use k256::Scalar;
+
 use serde::de::Visitor;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
@@ -186,7 +187,7 @@ impl From<AcknowledgedTicket> for crate::tickets::TransferableWinningTicket {
 mod tests {
     use crate::legacy::{Ticket, VrfParameters};
     use crate::tickets::{TicketBuilder, TransferableWinningTicket};
-    use ethers::utils::hex;
+    use alloy::hex;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::{ChainKeypair, Challenge, CurvePoint, HalfKey, Hash, Keypair};
     use hopr_primitive_types::prelude::{BalanceType, EthereumChallenge};

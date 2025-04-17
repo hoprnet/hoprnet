@@ -1,5 +1,5 @@
+use alloy::hex;
 use bloomfilter::Bloom;
-use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use tracing::warn;
