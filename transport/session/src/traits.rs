@@ -10,6 +10,7 @@ pub trait SendMsg {
         &self,
         data: ApplicationData,
         destination: Address,
-        options: RoutingOptions,
+        forward_options: RoutingOptions,
+        return_options: Option<RoutingOptions>,
     ) -> std::result::Result<(), TransportSessionError>;
 }

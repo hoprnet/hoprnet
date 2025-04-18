@@ -24,7 +24,7 @@ use hopr_primitive_types::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
     msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-    DEFAULT_PRICE_PER_PACKET,
+    RoutingValues, DEFAULT_PRICE_PER_PACKET,
 };
 use tracing::debug;
 
@@ -150,7 +150,7 @@ pub type WireChannels = (
 );
 
 pub type LogicalChannels = (
-    futures::channel::mpsc::UnboundedSender<(ApplicationData, ValidatedPath, PacketSendFinalizer)>,
+    futures::channel::mpsc::UnboundedSender<(ApplicationData, RoutingValues, PacketSendFinalizer)>,
     futures::channel::mpsc::UnboundedReceiver<ApplicationData>,
 );
 
@@ -198,7 +198,7 @@ pub async fn peer_setup_for(
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationData, ValidatedPath, PacketSendFinalizer)>();
+            futures::channel::mpsc::unbounded::<(ApplicationData, RoutingValues, PacketSendFinalizer)>();
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
 
         let opk: &OffchainKeypair = &PEERS[i];
@@ -349,7 +349,11 @@ pub async fn resolve_mock_path(
 pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
     (0..size)
         .map(|i| ApplicationData {
-            application_tag: (i == 0).then(|| random_integer(1, Some(65535)) as Tag),
+            application_tag: if i == 0 {
+                random_integer(1, Some(65535)) as Tag
+            } else {
+                0
+            },
             plain_text: random_bytes::<300>().into(),
         })
         .collect::<Vec<_>>()
@@ -386,8 +390,13 @@ pub async fn send_relay_receive_channel_of_n_peers(
     let mut sent_packet_count = 0;
     for i in 0..packet_count {
         let sender = MsgSender::new(apis[0].0.clone());
+        let routing = RoutingValues {
+            pseudonym: None,
+            forward_path: packet_path.clone(),
+            return_paths: vec![],
+        };
 
-        let awaiter = sender.send_packet(test_msgs[i].clone(), packet_path.clone()).await?;
+        let awaiter = sender.send_packet(test_msgs[i].clone(), routing).await?;
 
         if awaiter
             .consume_and_wait(std::time::Duration::from_millis(500))

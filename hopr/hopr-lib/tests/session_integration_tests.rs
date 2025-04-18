@@ -24,7 +24,8 @@ impl SendMsg for BufferingMsgSender {
         &self,
         data: ApplicationData,
         _destination: Address,
-        _options: RoutingOptions,
+        _fw_options: RoutingOptions,
+        _rp_options: Option<RoutingOptions>,
     ) -> Result<(), TransportSessionError> {
         let (_, data) = unwrap_chain_address(data.plain_text)?;
 
@@ -94,7 +95,7 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[ignore]
+#[ignore] // TODO: fix this test
 #[test_log::test(tokio::test)]
 async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
     let id = SessionId::new(1, (&ChainKeypair::random()).into());

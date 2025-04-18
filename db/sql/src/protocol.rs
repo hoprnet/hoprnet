@@ -283,7 +283,7 @@ impl HoprDbProtocolOperations for HoprDb {
     async fn to_send(
         &self,
         data: Box<[u8]>,
-        pseudonym: Option<&HoprPseudonym>,
+        pseudonym: Option<HoprPseudonym>,
         forward_path: ValidatedPath,
         return_paths: Vec<ValidatedPath>,
         outgoing_ticket_win_prob: f64,
@@ -296,7 +296,7 @@ impl HoprDbProtocolOperations for HoprDb {
             ))
         })?;
 
-        let pseudonym = pseudonym.map(|p| *p).unwrap_or_else(|| HoprPseudonym::random());
+        let pseudonym = pseudonym.map(|p| p).unwrap_or_else(|| HoprPseudonym::random());
 
         // Decide whether to create a multi-hop or a zero-hop ticket
         let next_ticket = if forward_path.num_hops() > 1 {

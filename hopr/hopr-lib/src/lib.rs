@@ -66,8 +66,8 @@ use hopr_path::channel_graph::{ChannelGraph, ChannelGraphConfig, NodeScoreUpdate
 use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 use hopr_transport::{
-    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession,
-    OffchainKeypair, PeerDiscovery, PeerStatus,
+    execute_on_tick, ChainKeypair, Hash, HoprPseudonym, HoprTransport, HoprTransportConfig, HoprTransportProcess,
+    IncomingSession, OffchainKeypair, PeerDiscovery, PeerStatus,
 };
 pub use {
     hopr_chain_actions::errors::ChainActionsError,
@@ -1108,13 +1108,22 @@ impl Hopr {
         &self,
         msg: Box<[u8]>,
         destination: Address,
-        options: RoutingOptions,
-        application_tag: Option<u16>,
+        forward_options: RoutingOptions,
+        return_options: Option<RoutingOptions>,
+        application_tag: Tag,
+        pseudonym: Option<HoprPseudonym>,
     ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         self.transport_api
-            .send_message(msg, destination, options, application_tag)
+            .send_message(
+                msg,
+                destination,
+                forward_options,
+                return_options,
+                application_tag,
+                pseudonym,
+            )
             .await?;
 
         Ok(())

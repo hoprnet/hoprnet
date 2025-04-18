@@ -401,7 +401,7 @@ impl futures::AsyncWrite for InnerSession {
                     Error::new(ErrorKind::InvalidData, e)
                 })
                 .and_then(move |payload| {
-                    ApplicationData::new_from_owned(Some(tag), payload.into_boxed_slice()).map_err(|e| {
+                    ApplicationData::new_from_owned(tag, payload.into_boxed_slice()).map_err(|e| {
                         error!(error = %e, "failed to extract application data from the payload");
                         Error::new(ErrorKind::InvalidData, e)
                     })
@@ -411,9 +411,10 @@ impl futures::AsyncWrite for InnerSession {
             let peer_id = *self.id.peer();
             let options = self.options.clone();
 
-            self.tx_buffer.push(Box::pin(
-                async move { sender.send_message(payload, peer_id, options).await },
-            ));
+            // TODO: add RP support to the Session protocol
+            self.tx_buffer.push(Box::pin(async move {
+                sender.send_message(payload, peer_id, options, None).await
+            }));
 
             self.tx_bytes += end - start;
         }
@@ -724,7 +725,7 @@ mod tests {
 
         mock.expect_send_message()
             .times(1)
-            .withf(move |data, _peer, options| {
+            .withf(move |data, _peer, options, _rp_options| {
                 let (_peer_id, data) = unwrap_chain_address(data.plain_text.clone()).expect("Unwrapping should work");
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
                 assert_eq!(
@@ -733,7 +734,7 @@ mod tests {
                 );
                 true
             })
-            .returning(|_, _, _| Ok(()));
+            .returning(|_, _, _, _| Ok(()));
 
         let mut session = InnerSession::new(
             id,
@@ -764,7 +765,7 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        mock.expect_send_message().times(3).returning(|_, _, _| Ok(()));
+        mock.expect_send_message().times(3).returning(|_, _, _, _| Ok(()));
 
         let mut session = InnerSession::new(
             id,

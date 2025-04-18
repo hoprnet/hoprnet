@@ -13,11 +13,10 @@ use hopr_crypto_packet::errors::{
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
-use hopr_path::ValidatedPath;
 use hopr_primitive_types::prelude::*;
 
 use super::packet::OutgoingPacket;
-use crate::bloom;
+use crate::{bloom, RoutingValues};
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -28,7 +27,7 @@ lazy_static::lazy_static! {
 pub trait PacketWrapping {
     type Input;
 
-    async fn send(&self, data: ApplicationData, path: ValidatedPath) -> Result<(PeerId, Box<[u8]>)>;
+    async fn send(&self, data: ApplicationData, routing: RoutingValues) -> Result<(PeerId, Box<[u8]>)>;
 }
 
 pub struct SendPkt {
@@ -72,14 +71,14 @@ where
     type Input = ApplicationData;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn send(&self, data: ApplicationData, path: ValidatedPath) -> Result<(PeerId, Box<[u8]>)> {
+    async fn send(&self, data: ApplicationData, routing: RoutingValues) -> Result<(PeerId, Box<[u8]>)> {
         let packet = self
             .db
             .to_send(
                 data.to_bytes(),
-                None, // TODO
-                path,
-                vec![], // TODO
+                routing.pseudonym,
+                routing.forward_path,
+                routing.return_paths,
                 self.determine_actual_outgoing_win_prob().await,
                 self.determine_actual_outgoing_ticket_price().await?,
             )
@@ -278,7 +277,7 @@ impl PacketSendAwaiter {
     }
 }
 
-pub type SendMsgInput = (ApplicationData, ValidatedPath, PacketSendFinalizer);
+pub type SendMsgInput = (ApplicationData, RoutingValues, PacketSendFinalizer);
 
 #[derive(Debug, Clone)]
 pub struct MsgSender<T>
@@ -298,12 +297,12 @@ where
 
     /// Pushes a new packet into processing.
     #[tracing::instrument(level = "trace", skip(self, data))]
-    pub async fn send_packet(&self, data: ApplicationData, path: ValidatedPath) -> Result<PacketSendAwaiter> {
+    pub async fn send_packet(&self, data: ApplicationData, routing: RoutingValues) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 
         self.tx
             .clone()
-            .send((data, path, tx.into()))
+            .send((data, routing, tx.into()))
             .await
             .map_err(|_| TransportError("Failed to send a message".into()))
             .map(move |_| {
@@ -345,6 +344,7 @@ mod tests {
     use anyhow::Context;
     use async_std::future::timeout;
     use futures::StreamExt;
+    use hopr_path::ValidatedPath;
     use std::time::Duration;
 
     #[async_std::test]
@@ -373,7 +373,13 @@ mod tests {
             ChainKeypair::random().public().to_address(),
         );
 
-        let result = sender.send_packet(expected_data.clone(), expected_path.clone()).await;
+        let routing = RoutingValues {
+            pseudonym: None,
+            forward_path: expected_path.clone(),
+            return_paths: vec![],
+        };
+
+        let result = sender.send_packet(expected_data.clone(), routing.clone()).await;
         assert!(result.is_ok());
 
         let received = rx.next();
@@ -383,7 +389,7 @@ mod tests {
             .context("value should be present")?;
 
         assert_eq!(data, expected_data);
-        assert_eq!(path, expected_path);
+        assert_eq!(path.forward_path, expected_path);
 
         async_std::task::spawn(async move {
             async_std::task::sleep(Duration::from_millis(3)).await;

@@ -100,22 +100,21 @@ impl Display for HostConfig {
     }
 }
 
-#[cfg(feature = "transport-quic")]
 fn default_multiaddr_transport(port: u16) -> String {
-    // In case we run on a Dappnode-like devices, presumably behind NAT, we fall back to TCP
-    // to circumvent issues with QUIC in such environments. To make this work reliably we'd need
-    // proper NAT traversal support.
-    let on_dappnode = std::env::var("DAPPNODE")
-        .map(|v| v.to_lowercase() == "true")
-        .unwrap_or(false);
-
-    // Using HOPRD_NAT a user can overwrite the default behaviour even on a Dappnode-like device
-    let uses_nat = std::env::var("HOPRD_NAT")
-        .map(|v| v.to_lowercase() == "true")
-        .unwrap_or(on_dappnode);
-
     cfg_if::cfg_if! {
         if #[cfg(feature = "transport-quic")] {
+            // In case we run on a Dappnode-like device, presumably behind NAT, we fall back to TCP
+            // to circumvent issues with QUIC in such environments. To make this work reliably,
+            // we would need proper NAT traversal support.
+            let on_dappnode = std::env::var("DAPPNODE")
+                .map(|v| v.to_lowercase() == "true")
+                .unwrap_or(false);
+
+            // Using HOPRD_NAT a user can overwrite the default behaviour even on a Dappnode-like device
+            let uses_nat = std::env::var("HOPRD_NAT")
+                .map(|v| v.to_lowercase() == "true")
+                .unwrap_or(on_dappnode);
+
             if uses_nat {
                 format!("tcp/{port}")
             } else {

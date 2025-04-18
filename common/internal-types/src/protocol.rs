@@ -259,14 +259,13 @@ impl Default for TagBloomFilter {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ApplicationData {
-    // TODO: 3.0: Remove the Option and replace with the Tag.
-    pub application_tag: Option<Tag>,
+    pub application_tag: Tag,
     #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
     pub plain_text: Box<[u8]>,
 }
 
 impl ApplicationData {
-    pub fn new(application_tag: Option<Tag>, plain_text: &[u8]) -> Result<Self> {
+    pub fn new(application_tag: Tag, plain_text: &[u8]) -> Result<Self> {
         if plain_text.len() <= PAYLOAD_SIZE - Self::SIZE {
             Ok(Self {
                 application_tag,
@@ -277,7 +276,7 @@ impl ApplicationData {
         }
     }
 
-    pub fn new_from_owned(application_tag: Option<Tag>, plain_text: Box<[u8]>) -> Result<Self> {
+    pub fn new_from_owned(application_tag: Tag, plain_text: Box<[u8]>) -> Result<Self> {
         if plain_text.len() <= PAYLOAD_SIZE - Self::SIZE {
             Ok(Self {
                 application_tag,
@@ -287,16 +286,15 @@ impl ApplicationData {
             Err(PayloadSizeExceeded)
         }
     }
+
+    pub fn len(&self) -> usize {
+        size_of::<Tag>() + self.plain_text.len()
+    }
 }
 
 impl Display for ApplicationData {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "({}): {}",
-            self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG),
-            hex::encode(&self.plain_text)
-        )
+        write!(f, "({}): {}", self.application_tag, hex::encode(&self.plain_text))
     }
 }
 
@@ -305,16 +303,13 @@ impl ApplicationData {
 
     pub fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
-            let mut tag = [0u8; 2];
-            tag.copy_from_slice(&data[0..2]);
-            let tag = u16::from_be_bytes(tag);
             Ok(Self {
-                application_tag: if tag != DEFAULT_APPLICATION_TAG {
-                    Some(tag)
-                } else {
-                    None
-                },
-                plain_text: (&data[2..]).into(),
+                application_tag: Tag::from_be_bytes(
+                    data[0..Self::SIZE]
+                        .try_into()
+                        .map_err(|_| GeneralError::ParseError("ApplicationData.tag".into()))?,
+                ),
+                plain_text: Box::from(&data[Self::SIZE..]),
             })
         } else {
             Err(GeneralError::ParseError("ApplicationData".into()))
@@ -323,8 +318,7 @@ impl ApplicationData {
 
     pub fn to_bytes(&self) -> Box<[u8]> {
         let mut buf = Vec::with_capacity(Self::SIZE + self.plain_text.len());
-        let tag = self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG);
-        buf.extend_from_slice(&tag.to_be_bytes());
+        buf.extend_from_slice(&self.application_tag.to_be_bytes());
         buf.extend_from_slice(&self.plain_text);
         buf.into_boxed_slice()
     }
@@ -336,15 +330,15 @@ mod tests {
 
     #[test]
     fn test_application_data() -> anyhow::Result<()> {
-        let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8])?;
+        let ad_1 = ApplicationData::new(10, &[0_u8, 1_u8])?;
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(None, &[])?;
+        let ad_1 = ApplicationData::new(0, &[])?;
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(Some(10), &[0_u8, 1_u8])?;
+        let ad_1 = ApplicationData::new(10, &[0_u8, 1_u8])?;
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 

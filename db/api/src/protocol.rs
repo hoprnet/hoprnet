@@ -28,7 +28,7 @@ pub trait HoprDbProtocolOperations {
     async fn to_send(
         &self,
         data: Box<[u8]>,
-        pseudonym: Option<&SimplePseudonym>,
+        pseudonym: Option<SimplePseudonym>,
         path: ValidatedPath,
         return_paths: Vec<ValidatedPath>,
         outgoing_ticket_win_prob: f64,

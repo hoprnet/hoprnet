@@ -945,7 +945,8 @@ mod tests {
             &self,
             data: ApplicationData,
             _destination: Address,
-            _options: hopr_lib::RoutingOptions,
+            _fw_options: hopr_lib::RoutingOptions,
+            _rp_options: Option<hopr_lib::RoutingOptions>,
         ) -> std::result::Result<(), TransportSessionError> {
             let (_peer, data) = hopr_transport_session::types::unwrap_chain_address(data.plain_text)?;
 

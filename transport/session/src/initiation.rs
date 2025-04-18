@@ -146,9 +146,9 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<StartProtoc
     type Error = TransportSessionError;
 
     fn try_from(value: StartProtocol<T>) -> Result<Self, Self::Error> {
-        let (tag, plain_text) = value.encode()?;
+        let (application_tag, plain_text) = value.encode()?;
         Ok(ApplicationData {
-            application_tag: Some(tag),
+            application_tag,
             plain_text,
         })
     }
@@ -158,10 +158,7 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<Application
     type Error = TransportSessionError;
 
     fn try_from(value: ApplicationData) -> Result<Self, Self::Error> {
-        Self::decode(
-            value.application_tag.ok_or(TransportSessionError::Tag)?,
-            &value.plain_text,
-        )
+        Self::decode(value.application_tag, &value.plain_text)
     }
 }
 
