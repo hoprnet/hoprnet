@@ -64,6 +64,8 @@ impl Debug for AckResult {
     }
 }
 
+// TODO: create 3 separate objects and use them Boxed in the enum variants
+#[allow(clippy::large_enum_variant)]
 pub enum TransportPacketWithChainData {
     /// Packet is intended for us
     Final {

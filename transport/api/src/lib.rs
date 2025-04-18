@@ -708,13 +708,14 @@ where
             )));
         }
 
-        if msg.len() > PAYLOAD_SIZE {
+        if msg.len() > HoprPacket::PAYLOAD_SIZE {
             return Err(HoprTransportError::Api(format!(
-                "Message exceeds the maximum allowed size of {PAYLOAD_SIZE} bytes"
+                "Message exceeds the maximum allowed size of {} bytes",
+                HoprPacket::PAYLOAD_SIZE
             )));
         }
 
-        let app_data = ApplicationData::new_from_owned(application_tag, msg)?;
+        let app_data = ApplicationData::new_from_owned(application_tag, msg);
         let return_paths = if let Some(return_opts) = return_opts {
             let num_possible_surbs = HoprPacket::max_surbs_with_message(app_data.len());
             trace!(%destination, num_possible_surbs, data_len = app_data.len(), "resolving routing for packet");

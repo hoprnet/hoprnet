@@ -65,7 +65,7 @@ impl HoprDb {
 
         // Check: is the ticket in the packet really for the given channel?
         if !fwd.outgoing.ticket.channel_id.eq(&incoming_channel.get_id()) {
-            return Err(DbSqlError::LogicalError("invalid ticket for channel".into()).into());
+            return Err(DbSqlError::LogicalError("invalid ticket for channel".into()));
         }
 
         let chain_data = self.get_indexer_data(None).await?;
@@ -192,7 +192,7 @@ impl HoprDb {
                         .ok_or_else(|| DbSqlError::LogicalError("domain separator missing".into()))?;
 
                     let myself = self.clone();
-                    let ack = ack.clone();
+                    let ack = *ack;
                     hopr_parallelize::cpu::spawn_blocking(move || {
                         // This explicitly checks whether the acknowledgement
                         // solves the challenge on the ticket. It must be done before we
@@ -215,8 +215,7 @@ impl HoprDb {
                     Err(DbSqlError::LogicalError(format!(
                         "no channel found for  address '{}' with a matching epoch",
                         unacknowledged.ticket.verified_issuer()
-                    ))
-                    .into())
+                    )))
                 }
             }
         }
@@ -296,7 +295,7 @@ impl HoprDbProtocolOperations for HoprDb {
             ))
         })?;
 
-        let pseudonym = pseudonym.map(|p| p).unwrap_or_else(|| HoprPseudonym::random());
+        let pseudonym = pseudonym.unwrap_or_else(HoprPseudonym::random);
 
         // Decide whether to create a multi-hop or a zero-hop ticket
         let next_ticket = if forward_path.num_hops() > 1 {
@@ -393,7 +392,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 packet_tag: incoming.packet_tag,
                 previous_hop: incoming.previous_hop,
                 plain_text: incoming.plain_text,
-                ack: Acknowledgement::new(incoming.ack_key, &pkt_keypair),
+                ack: Acknowledgement::new(incoming.ack_key, pkt_keypair),
             }),
             HoprPacket::Forwarded(fwd) => {
                 match self
@@ -410,7 +409,7 @@ impl HoprDbProtocolOperations for HoprDb {
                             previous_hop: fwd.previous_hop,
                             next_hop: fwd.outgoing.next_hop,
                             data: payload.into_boxed_slice(),
-                            ack: Acknowledgement::new(fwd.ack_key, &pkt_keypair),
+                            ack: Acknowledgement::new(fwd.ack_key, pkt_keypair),
                         })
                     }
                     Err(DbSqlError::TicketValidationError(boxed_error)) => {

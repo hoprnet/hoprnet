@@ -165,11 +165,12 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<Application
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SessionId;
+    use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
-    use hopr_internal_types::prelude::PAYLOAD_SIZE;
     use hopr_network_types::prelude::SealedHost;
+
+    use crate::SessionId;
 
     #[cfg(feature = "serde")]
     #[test]
@@ -264,8 +265,9 @@ mod tests {
         });
 
         assert!(
-            msg.encode()?.1.len() <= PAYLOAD_SIZE,
-            "StartSession must fit within {PAYLOAD_SIZE}"
+            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
+            "StartSession must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
         );
 
         let msg = StartProtocol::SessionEstablished(StartEstablished {
@@ -274,8 +276,9 @@ mod tests {
         });
 
         assert!(
-            msg.encode()?.1.len() <= PAYLOAD_SIZE,
-            "SessionEstablished must fit within {PAYLOAD_SIZE}"
+            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
+            "SessionEstablished must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
         );
 
         let msg = StartProtocol::<i32>::SessionError(StartErrorType {
@@ -284,14 +287,16 @@ mod tests {
         });
 
         assert!(
-            msg.encode()?.1.len() <= PAYLOAD_SIZE,
-            "SessionError must fit within {PAYLOAD_SIZE}"
+            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
+            "SessionError must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
         );
 
         let msg = StartProtocol::CloseSession(SessionId::new(u16::MAX, (&ChainKeypair::random()).into()));
         assert!(
-            msg.encode()?.1.len() <= PAYLOAD_SIZE,
-            "CloseSession must fit within {PAYLOAD_SIZE}"
+            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
+            "CloseSession must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
         );
 
         Ok(())

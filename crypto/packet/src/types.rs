@@ -1,22 +1,23 @@
-use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite};
 use hopr_crypto_sphinx::errors::SphinxError;
 use hopr_crypto_sphinx::prelude::{PaddedPayload, SphinxHeaderSpec, SphinxSuite, SURB};
-use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::GeneralError;
 use std::marker::PhantomData;
+
+use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
 
 /// Additional encoding of a packet message that can be preceded by a number of [`SURBs`](SURB).
 pub struct PacketMessage<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize>(PaddedPayload<P>, PhantomData<(S, H)>);
 
 /// Convenience alias for HOPR specific [`PacketMessage`].
-pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>;
+pub type HoprPacketMessage = PacketMessage<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>;
 
 /// Individual parts of a [`PacketMessage`]: SURBs and the actual message.
 pub type PacketParts<S, H> = (Vec<SURB<S, H>>, Box<[u8]>);
 
 impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P> {
-    /// Size of the message header - currently 1 byte to indicate the number of SURBs,
-    /// that precede the message.
+    /// Size of the message header.
+    ///
+    /// This is currently 1 byte to indicate the number of SURBs, that precede the message.
     pub const HEADER_LEN: usize = 1;
 
     /// Converts this instance into [`PacketParts`].
@@ -54,7 +55,8 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
             return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs".into()).into());
         }
 
-        if surbs.len() * SURB::<S, H>::SIZE + payload.len() > P {
+        // The total size of the packet message must not exceed the maximum packet size.
+        if Self::HEADER_LEN + surbs.len() * SURB::<S, H>::SIZE + payload.len() > P {
             return Err(GeneralError::ParseError("HoprPacketMessage.size".into()).into());
         }
 
@@ -94,6 +96,7 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 
+    use crate::packet::HoprPacket;
     use crate::por::generate_proof_of_relay;
     use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite};
 
@@ -184,7 +187,7 @@ mod tests {
 
     #[test]
     fn hopr_packet_size_msg_size_limit() {
-        let test_msg = [0u8; PAYLOAD_SIZE + 1];
+        let test_msg = [0u8; HoprPacket::PAYLOAD_SIZE + 1];
         let res = HoprPacketMessage::from_parts(vec![], &test_msg);
         assert!(res.is_err());
     }

@@ -1,5 +1,7 @@
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
-use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_internal_types::protocol::ApplicationData;
 use hopr_network_types::prelude::{RoutingOptions, SealedHost};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::prelude::Address;
@@ -17,8 +19,6 @@ use std::{
     task::Poll,
 };
 use tracing::{debug, error};
-
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -109,7 +109,7 @@ impl Hash for SessionId {
 
 /// Inner MTU size of what the HOPR payload can take (payload - peer address - application_tag)
 pub const SESSION_USABLE_MTU_SIZE: usize =
-    PAYLOAD_SIZE - Address::SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
+    HoprPacket::PAYLOAD_SIZE - Address::SIZE - size_of::<hopr_internal_types::protocol::Tag>();
 
 /// Helper trait to allow Box aliasing
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
@@ -320,7 +320,7 @@ pub struct InnerSession {
     tx: Arc<dyn SendMsg + Send + Sync>,
     tx_bytes: usize,
     tx_buffer: FuturesBuffer,
-    rx_buffer: [u8; PAYLOAD_SIZE],
+    rx_buffer: [u8; HoprPacket::PAYLOAD_SIZE],
     rx_buffer_range: (usize, usize),
     closed: bool,
 }
@@ -341,7 +341,7 @@ impl InnerSession {
             tx,
             tx_bytes: 0,
             tx_buffer: futures::stream::FuturesUnordered::new(),
-            rx_buffer: [0; PAYLOAD_SIZE],
+            rx_buffer: [0; HoprPacket::PAYLOAD_SIZE],
             rx_buffer_range: (0, 0),
             closed: false,
         }
@@ -395,17 +395,12 @@ impl futures::AsyncWrite for InnerSession {
             let start = i * SESSION_USABLE_MTU_SIZE;
             let end = ((i + 1) * SESSION_USABLE_MTU_SIZE).min(buf.len());
 
-            let payload = wrap_with_chain_address(&self.me, buf[start..end].to_vec().into_boxed_slice())
+            let payload = wrap_with_chain_address(&self.me, &buf[start..end])
                 .map_err(|e| {
-                    error!(error = %e, "failed to wrap the payload with offchain key");
+                    error!(error = %e, "failed to wrap the payload with chain key");
                     Error::new(ErrorKind::InvalidData, e)
                 })
-                .and_then(move |payload| {
-                    ApplicationData::new_from_owned(tag, payload.into_boxed_slice()).map_err(|e| {
-                        error!(error = %e, "failed to extract application data from the payload");
-                        Error::new(ErrorKind::InvalidData, e)
-                    })
-                })?;
+                .map(move |payload| ApplicationData::new_from_owned(tag, payload.into_boxed_slice()))?;
 
             let sender = self.tx.clone();
             let peer_id = *self.id.peer();
@@ -503,12 +498,12 @@ impl futures::AsyncRead for InnerSession {
 }
 
 // TODO: 3.0 remove once return path is implemented
-pub fn wrap_with_chain_address(peer: &Address, data: Box<[u8]>) -> crate::errors::Result<Vec<u8>> {
-    if data.len() > PAYLOAD_SIZE.saturating_sub(Address::SIZE) {
+pub fn wrap_with_chain_address(peer: &Address, data: &[u8]) -> crate::errors::Result<Vec<u8>> {
+    if data.len() > HoprPacket::PAYLOAD_SIZE.saturating_sub(Address::SIZE) {
         return Err(TransportSessionError::PayloadSize);
     }
 
-    let mut packet: Vec<u8> = Vec::with_capacity(PAYLOAD_SIZE);
+    let mut packet: Vec<u8> = Vec::with_capacity(HoprPacket::PAYLOAD_SIZE);
     packet.extend_from_slice(peer.as_ref());
     packet.extend_from_slice(data.as_ref());
 
@@ -516,8 +511,8 @@ pub fn wrap_with_chain_address(peer: &Address, data: Box<[u8]>) -> crate::errors
 }
 
 // TODO: 3.0 remove if return path is implemented
-pub fn unwrap_chain_address(payload: Box<[u8]>) -> crate::errors::Result<(Address, Box<[u8]>)> {
-    if payload.len() > PAYLOAD_SIZE {
+pub fn unwrap_chain_address(payload: &[u8]) -> crate::errors::Result<(Address, Box<[u8]>)> {
+    if payload.len() > HoprPacket::PAYLOAD_SIZE {
         return Err(TransportSessionError::PayloadSize);
     }
 
@@ -602,7 +597,7 @@ mod tests {
 
     #[test]
     fn wrapping_with_chain_key_should_fail_for_invalid_payload_size() {
-        const INVALID_PAYLOAD_SIZE: usize = PAYLOAD_SIZE + 1;
+        const INVALID_PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE + 1;
         let peer: Address = (&ChainKeypair::random()).into();
         let data = hopr_crypto_random::random_bytes::<INVALID_PAYLOAD_SIZE>()
             .as_ref()
@@ -616,7 +611,7 @@ mod tests {
 
     #[test]
     fn unwrapping_chain_key_should_fail_for_invalid_payload_size() {
-        const INVALID_PAYLOAD_SIZE: usize = PAYLOAD_SIZE + 1;
+        const INVALID_PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE + 1;
         let data = hopr_crypto_random::random_bytes::<INVALID_PAYLOAD_SIZE>()
             .as_ref()
             .to_vec()
@@ -660,14 +655,14 @@ mod tests {
             rx,
         );
 
-        let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
+        let random_data = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>()
             .as_ref()
             .to_vec()
             .into_boxed_slice();
 
         assert!(tx.unbounded_send(random_data.clone()).is_ok());
 
-        let mut buffer = vec![0; PAYLOAD_SIZE * 2];
+        let mut buffer = vec![0; HoprPacket::PAYLOAD_SIZE * 2];
 
         let bytes_read = session.read(&mut buffer[..]).await?;
 
@@ -692,14 +687,14 @@ mod tests {
             rx,
         );
 
-        let random_data = hopr_crypto_random::random_bytes::<PAYLOAD_SIZE>()
+        let random_data = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>()
             .as_ref()
             .to_vec()
             .into_boxed_slice();
 
         assert!(tx.unbounded_send(random_data.clone()).is_ok());
 
-        const BUFFER_SIZE: usize = PAYLOAD_SIZE - 1;
+        const BUFFER_SIZE: usize = HoprPacket::PAYLOAD_SIZE - 1;
         let mut buffer = vec![0; BUFFER_SIZE];
 
         let bytes_read = session.read(&mut buffer[..]).await?;
@@ -709,7 +704,7 @@ mod tests {
 
         let bytes_read = session.read(&mut buffer[..]).await?;
 
-        assert_eq!(bytes_read, PAYLOAD_SIZE - BUFFER_SIZE);
+        assert_eq!(bytes_read, HoprPacket::PAYLOAD_SIZE - BUFFER_SIZE);
         assert_eq!(&buffer[..bytes_read], &random_data[BUFFER_SIZE..]);
 
         Ok(())

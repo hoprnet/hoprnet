@@ -609,7 +609,7 @@ impl TryFrom<&PeerId> for OffchainPublicKey {
                         .map(|p| p.to_bytes())
                         .map_err(|_| GeneralError::ParseError("invalid ed25519 peer id".into()))
                 })
-                .and_then(|pk| Self::try_from(pk))
+                .and_then(Self::try_from)
         } else {
             Err(GeneralError::ParseError("invalid ed25519 peer id".into()))
         }
@@ -670,6 +670,29 @@ impl From<&OffchainPublicKey> for EdwardsPoint {
 impl From<&OffchainPublicKey> for MontgomeryPoint {
     fn from(value: &OffchainPublicKey) -> Self {
         value.montgomery
+    }
+}
+
+/// Compact representation of [`OffchainPublicKey`] suitable for use in enums.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CompactOffchainPublicKey(CompressedEdwardsY);
+
+impl From<OffchainPublicKey> for CompactOffchainPublicKey {
+    fn from(value: OffchainPublicKey) -> Self {
+        Self(value.compressed)
+    }
+}
+
+impl CompactOffchainPublicKey {
+    /// Performs an **expensive** operation of converting back to the [`OffchainPublicKey`].
+    pub fn into_offchain_public_key(self) -> OffchainPublicKey {
+        let decompressed = self.0.decompress().expect("decompression must not fail");
+        OffchainPublicKey {
+            compressed: self.0,
+            edwards: decompressed,
+            montgomery: decompressed.to_montgomery(),
+        }
     }
 }
 

@@ -18,6 +18,7 @@ use crate::errors::PathError;
 use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
 
 /// Represents a type that determines a hop on a [`Path`].
+#[allow(clippy::large_enum_variant)] // TODO: use CompactOffchainPublicKey
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, strum::EnumTryAs, strum::EnumIs)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PathAddress {

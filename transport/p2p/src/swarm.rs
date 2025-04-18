@@ -298,7 +298,6 @@ impl HoprSwarmWithProcessors {
                                     } => {
                                         trace!(%peer, %request_id, %connection_id, "Received a ticket aggregation request");
 
-                                        let request = request.into_iter().map(TransferableWinningTicket::from).collect::<Vec<_>>();
                                         if let Err(e) = aggregation_writer.receive_aggregation_request(peer, request, channel) {
                                             error!(%peer, %request_id, %connection_id, error = %e, "Failed to process a ticket aggregation request");
                                         }

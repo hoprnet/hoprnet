@@ -22,6 +22,7 @@ use crate::errors::{DbSqlError, Result};
 use crate::{HoprDbGeneralModelOperations, OptTx};
 
 /// A type that can represent both [chain public key](Address) and [packet public key](OffchainPublicKey).
+#[allow(clippy::large_enum_variant)] // TODO: use CompactOffchainPublicKey
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ChainOrPacketKey {
     /// Represents [chain public key](Address).

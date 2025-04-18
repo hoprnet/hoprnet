@@ -23,9 +23,6 @@ pub enum CoreTypesError {
     #[error("cannot acknowledge self-signed tickets. Ticket sender and recipient must be different")]
     LoopbackTicket,
 
-    #[error("size of the packet payload has been exceeded")]
-    PayloadSizeExceeded,
-
     #[error(transparent)]
     InvalidMultiaddr(#[from] MultiaddrError),
 

@@ -26,7 +26,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
-    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
+    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
     let dst = Hash::default();
 
     let mut group = c.benchmark_group("packet_sending");
@@ -172,7 +172,7 @@ pub fn packet_sending_precomputed_bench(c: &mut Criterion) {
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
-    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
+    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
     let dst = Hash::default();
 
     let mut group = c.benchmark_group("packet_sending_precomputed");
@@ -224,7 +224,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
-    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
+    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
     let dst = Hash::default();
 
     // The number of hops for ticket creation does not matter for benchmark purposes
@@ -285,7 +285,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
-    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::MAX_MSG_SIZE }>();
+    let msg = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>();
     let dst = Hash::default();
 
     // The number of hops for ticket creation does not matter for benchmark purposes

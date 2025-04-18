@@ -67,6 +67,13 @@ impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
 /// Single Use Reply Block representation for HOPR protocol.
 pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
+/// Size of the maximum packet payload.
+///
+/// Adjust this value to change the maximum packet size.
+///
+/// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
+pub(crate) const PAYLOAD_SIZE_INT: usize = 800;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -77,7 +84,7 @@ mod tests {
     fn header_and_packet_lengths() {
         let hopr_packet_len = HoprPacket::SIZE;
         assert_eq!(
-            MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>::PACKET_LEN + Ticket::SIZE,
+            MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>::PACKET_LEN + Ticket::SIZE,
             hopr_packet_len
         );
 

@@ -490,7 +490,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 .await
                 .map(|_| DispatchResult::Processed);
         } else if self.cfg.session_tag_range.contains(&data.application_tag) {
-            let (peer, session_payload) = unwrap_chain_address(data.plain_text.clone())?;
+            let (peer, session_payload) = unwrap_chain_address(&data.plain_text)?;
 
             let session_id = SessionId::new(data.application_tag, peer);
 

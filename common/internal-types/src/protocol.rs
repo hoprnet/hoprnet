@@ -5,14 +5,11 @@ use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
 use tracing::warn;
 
-use crate::errors::{CoreTypesError, CoreTypesError::PayloadSizeExceeded, Result};
+use crate::errors::{CoreTypesError, Result};
 use crate::prelude::UnacknowledgedTicket;
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
-
-/// Maximum size of the packet payload in bytes.
-pub const PAYLOAD_SIZE: usize = 799;
 
 /// Default required minimum incoming ticket winning probability
 pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0;
@@ -265,30 +262,23 @@ pub struct ApplicationData {
 }
 
 impl ApplicationData {
-    pub fn new(application_tag: Tag, plain_text: &[u8]) -> Result<Self> {
-        if plain_text.len() <= PAYLOAD_SIZE - Self::SIZE {
-            Ok(Self {
-                application_tag,
-                plain_text: plain_text.into(),
-            })
-        } else {
-            Err(PayloadSizeExceeded)
+    pub fn new(application_tag: Tag, plain_text: &[u8]) -> Self {
+        Self {
+            application_tag,
+            plain_text: plain_text.into(),
         }
     }
 
-    pub fn new_from_owned(application_tag: Tag, plain_text: Box<[u8]>) -> Result<Self> {
-        if plain_text.len() <= PAYLOAD_SIZE - Self::SIZE {
-            Ok(Self {
-                application_tag,
-                plain_text,
-            })
-        } else {
-            Err(PayloadSizeExceeded)
+    pub fn new_from_owned(application_tag: Tag, plain_text: Box<[u8]>) -> Self {
+        Self {
+            application_tag,
+            plain_text,
         }
     }
 
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
-        size_of::<Tag>() + self.plain_text.len()
+        Self::TAG_SIZE + self.plain_text.len()
     }
 }
 
@@ -299,17 +289,17 @@ impl Display for ApplicationData {
 }
 
 impl ApplicationData {
-    const SIZE: usize = 2; // minimum size
+    const TAG_SIZE: usize = size_of::<Tag>(); // minimum size
 
     pub fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
-        if data.len() <= PAYLOAD_SIZE && data.len() >= Self::SIZE {
+        if data.len() >= Self::TAG_SIZE {
             Ok(Self {
                 application_tag: Tag::from_be_bytes(
-                    data[0..Self::SIZE]
+                    data[0..Self::TAG_SIZE]
                         .try_into()
                         .map_err(|_| GeneralError::ParseError("ApplicationData.tag".into()))?,
                 ),
-                plain_text: Box::from(&data[Self::SIZE..]),
+                plain_text: Box::from(&data[Self::TAG_SIZE..]),
             })
         } else {
             Err(GeneralError::ParseError("ApplicationData".into()))
@@ -317,7 +307,7 @@ impl ApplicationData {
     }
 
     pub fn to_bytes(&self) -> Box<[u8]> {
-        let mut buf = Vec::with_capacity(Self::SIZE + self.plain_text.len());
+        let mut buf = Vec::with_capacity(Self::TAG_SIZE + self.plain_text.len());
         buf.extend_from_slice(&self.application_tag.to_be_bytes());
         buf.extend_from_slice(&self.plain_text);
         buf.into_boxed_slice()
@@ -330,15 +320,15 @@ mod tests {
 
     #[test]
     fn test_application_data() -> anyhow::Result<()> {
-        let ad_1 = ApplicationData::new(10, &[0_u8, 1_u8])?;
+        let ad_1 = ApplicationData::new(10, &[0_u8, 1_u8]);
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(0, &[])?;
+        let ad_1 = ApplicationData::new(0, &[]);
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(10, &[0_u8, 1_u8])?;
+        let ad_1 = ApplicationData::new(10, &[0_u8, 1_u8]);
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 

@@ -9,7 +9,7 @@ use std::fmt::{Display, Formatter};
 use crate::errors::PacketError::{PacketConstructionError, PacketDecodingError};
 use crate::por::{derive_ack_key_share, generate_proof_of_relay, pre_verify};
 use crate::types::HoprPacketMessage;
-use crate::{errors::Result, HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb};
+use crate::{errors::Result, HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT};
 
 /// Represents an outgoing packet that has been only partially instantiated.
 ///
@@ -156,7 +156,7 @@ pub struct HoprIncomingPacket {
 #[derive(Clone)]
 pub struct HoprOutgoingPacket {
     /// Encrypted packet.
-    pub packet: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>,
+    pub packet: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>,
     /// Ticket for this node.
     pub ticket: Ticket,
     /// Next hop this packet should be sent to.
@@ -225,7 +225,7 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P
     pseudonym: &HoprPseudonym,
     mapper: &M,
 ) -> Result<(HoprSurb, ReplyOpener)> {
-    let shared_keys = HoprSphinxSuite::new_shared_keys(&return_path)?;
+    let shared_keys = HoprSphinxSuite::new_shared_keys(return_path)?;
     let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
 
     Ok(create_surb::<HoprSphinxSuite, HoprSphinxHeaderSpec>(
@@ -247,12 +247,12 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P
 impl HoprPacket {
     /// The size of the packet including header, padded payload, ticket, and ack challenge.
     pub const SIZE: usize =
-        MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>::PACKET_LEN + Ticket::SIZE;
+        MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>::PACKET_LEN + Ticket::SIZE;
 
     /// Maximum message size when no SURBs are present in the packet.
     ///
     /// See [`HoprPacket::max_surbs_with_message`].
-    pub const MAX_MSG_SIZE: usize = PAYLOAD_SIZE - HoprPacketMessage::HEADER_LEN;
+    pub const PAYLOAD_SIZE: usize = PAYLOAD_SIZE_INT - HoprPacketMessage::HEADER_LEN;
 
     /// Constructs a new outgoing packet with the given path.
     ///
@@ -283,7 +283,7 @@ impl HoprPacket {
     /// Calculates how many SURBs can be fitted into a packet that
     /// also carries a message of the given length.
     pub const fn max_surbs_with_message(msg_len: usize) -> usize {
-        (PAYLOAD_SIZE - HoprPacketMessage::HEADER_LEN - msg_len) / HoprSurb::SIZE
+        (HoprPacket::PAYLOAD_SIZE - msg_len) / HoprSurb::SIZE
     }
 
     /// Deserializes the packet and performs the forward-transformation, so the
@@ -301,9 +301,10 @@ impl HoprPacket {
     {
         if data.len() == Self::SIZE {
             let (pre_packet, pre_ticket) =
-                data.split_at(MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE>::PACKET_LEN);
+                data.split_at(MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>::PACKET_LEN);
 
-            let mp: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE> = MetaPacket::try_from(pre_packet)?;
+            let mp: MetaPacket<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT> =
+                MetaPacket::try_from(pre_packet)?;
 
             match mp.into_forwarded(node_keypair, mapper, reply_openers)? {
                 ForwardedMetaPacket::Relayed {
