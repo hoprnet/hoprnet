@@ -25,10 +25,11 @@ pub mod network_notifier;
 pub mod proxy;
 
 use async_lock::RwLock;
+use futures::stream::FuturesUnordered;
 use futures::{
     channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     future::{select, Either},
-    pin_mut, FutureExt, SinkExt, StreamExt,
+    pin_mut, FutureExt, SinkExt, StreamExt, TryStreamExt,
 };
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 use hopr_transport_mixer::MixerConfig;
@@ -46,7 +47,7 @@ use hopr_db_sql::{
     HoprDbAllOperations,
 };
 use hopr_internal_types::prelude::*;
-use hopr_path::path::TransportPath;
+use hopr_path::{PathAddressResolver, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_network::{
@@ -63,6 +64,7 @@ use hopr_transport_protocol::{
     ticket_aggregation::processor::{
         AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
     },
+    RoutingValues,
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 
@@ -74,9 +76,19 @@ use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use crate::helpers::PathPlanner;
 
 use hopr_path::selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting};
+
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::types::transfer_session;
+
+use crate::{
+    constants::{
+        RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT, SESSION_INITIATION_TIMEOUT_BASE,
+    },
+    errors::HoprTransportError,
+};
+use hopr_crypto_packet::prelude::HoprPacket;
 pub use {
+    hopr_crypto_packet::HoprPseudonym,
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
@@ -91,13 +103,6 @@ pub use {
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
         SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
     },
-};
-
-use crate::{
-    constants::{
-        RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT, SESSION_INITIATION_TIMEOUT_BASE,
-    },
-    errors::HoprTransportError,
 };
 
 pub use crate::{
@@ -186,10 +191,11 @@ type CurrentPathSelector = DfsPathSelector<RandomizedEdgeWeighting>;
 /// the transport, as well as off-chain ticket manipulation.
 pub struct HoprTransport<T>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     me: OffchainKeypair,
     me_peerid: PeerId, // Cache to avoid an expensive conversion: OffchainPublicKey -> PeerId
+    me_chain_addr: Address,
     cfg: HoprTransportConfig,
     db: T,
     ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
@@ -204,7 +210,7 @@ where
 
 impl<T> HoprTransport<T>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     pub fn new(
         me: &OffchainKeypair,
@@ -217,10 +223,12 @@ where
         let process_packet_send = Arc::new(OnceLock::new());
 
         let me_peerid: PeerId = me.into();
+        let me_chain_addr = me_onchain.public().to_address();
 
         Self {
             me: me.clone(),
             me_peerid,
+            me_chain_addr,
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(Network::new(
                 me_peerid,
@@ -240,13 +248,12 @@ where
                     },
                 ),
                 channel_graph.clone(),
-                me_onchain.public().to_address(),
             ),
             db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             smgr: SessionManager::new(
-                me_peerid,
+                me_chain_addr,
                 SessionManagerConfig {
                     session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
                     initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
@@ -413,7 +420,7 @@ where
         let tkt_agg_writer = ticket_agg_proc.writer();
 
         let (external_msg_send, external_msg_rx) =
-            mpsc::channel::<(ApplicationData, TransportPath, PacketSendFinalizer)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
+            mpsc::channel::<(ApplicationData, RoutingValues, PacketSendFinalizer)>(MAXIMUM_MSG_OUTGOING_BUFFER_SIZE);
 
         self.process_packet_send
             .clone()
@@ -554,7 +561,11 @@ where
             processes.insert(HoprTransportProcess::Protocol(k), v);
         }
 
-        let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
+        let msg_sender = helpers::MessageSender::new(
+            self.process_packet_send.clone(),
+            self.path_planner.clone(),
+            self.me_chain_addr,
+        );
 
         self.smgr
             .start(msg_sender, on_incoming_session)
@@ -684,36 +695,62 @@ where
     pub async fn send_message(
         &self,
         msg: Box<[u8]>,
-        destination: PeerId,
-        options: RoutingOptions,
-        application_tag: Option<u16>,
+        destination: Address,
+        forward_opts: RoutingOptions,
+        return_opts: Option<RoutingOptions>,
+        application_tag: Tag,
+        pseudonym: Option<HoprPseudonym>,
     ) -> errors::Result<()> {
         // The send_message logic will be entirely removed in 3.0
-        if let Some(application_tag) = application_tag {
-            if application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT {
-                return Err(HoprTransportError::Api(format!(
-                    "Application tag must not be lower than {RESERVED_SESSION_TAG_UPPER_LIMIT}"
-                )));
-            }
-        }
-
-        if msg.len() > PAYLOAD_SIZE {
+        if application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT {
             return Err(HoprTransportError::Api(format!(
-                "Message exceeds the maximum allowed size of {PAYLOAD_SIZE} bytes"
+                "Application tag must not be lower than {RESERVED_SESSION_TAG_UPPER_LIMIT}"
             )));
         }
 
-        let app_data = ApplicationData::new_from_owned(application_tag, msg)?;
+        if msg.len() > HoprPacket::PAYLOAD_SIZE {
+            return Err(HoprTransportError::Api(format!(
+                "Message exceeds the maximum allowed size of {} bytes",
+                HoprPacket::PAYLOAD_SIZE
+            )));
+        }
+
+        let app_data = ApplicationData::new_from_owned(application_tag, msg);
+        let return_paths = if let Some(return_opts) = return_opts {
+            let num_possible_surbs = HoprPacket::max_surbs_with_message(app_data.len());
+            trace!(%destination, num_possible_surbs, data_len = app_data.len(), "resolving routing for packet");
+
+            (0..num_possible_surbs)
+                .map(|_| {
+                    self.path_planner
+                        .resolve_path(destination, self.me_chain_addr, return_opts.clone())
+                })
+                .collect::<FuturesUnordered<_>>()
+                .try_collect::<Vec<ValidatedPath>>()
+                .await?
+        } else {
+            vec![]
+        };
+
+        // Resolve only as many return paths as we can fit into the packet
+        let routing = RoutingValues {
+            pseudonym,
+            forward_path: self
+                .path_planner
+                .resolve_path(self.me_chain_addr, destination, forward_opts)
+                .await?,
+            return_paths,
+        };
+        trace!(%destination, num_resolved_surbs = routing.return_paths.len(), "resolved routing for packet");
 
         // Here we do not use msg_sender directly,
         // since it internally follows Session-oriented logic
-        let path = self.path_planner.resolve_path(destination, options).await?;
         let sender = self.process_packet_send.get().ok_or_else(|| {
             HoprTransportError::Api("send msg: failed because message processing is not yet initialized".into())
         })?;
 
         sender
-            .send_packet(app_data, path)
+            .send_packet(app_data, routing)
             .await
             .map_err(|e| HoprTransportError::Api(format!("send msg failed to enqueue msg: {e}")))?
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)

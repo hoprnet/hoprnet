@@ -47,6 +47,7 @@ mixer-channel = []
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
+cfg-if = { workspace = true }
 either = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }

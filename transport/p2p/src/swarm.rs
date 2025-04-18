@@ -243,10 +243,8 @@ impl From<(PeerId, Box<[u8]>)> for Inputs {
     }
 }
 
-use hopr_internal_types::legacy;
-
 pub type TicketAggregationRequestType = OutboundRequestId;
-pub type TicketAggregationResponseType = ResponseChannel<std::result::Result<legacy::Ticket, String>>;
+pub type TicketAggregationResponseType = ResponseChannel<std::result::Result<Ticket, String>>;
 
 pub struct HoprSwarmWithProcessors {
     swarm: HoprSwarm,
@@ -289,42 +287,41 @@ impl HoprSwarmWithProcessors {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::TicketAggregation(event)) => {
                         let _span = tracing::span!(tracing::Level::DEBUG, "swarm protocol", protocol = "/hopr/ticket_aggregation/0.1.0");
                         match event {
-                            libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::Message {
+                            libp2p::request_response::Event::<Vec<TransferableWinningTicket>, std::result::Result<Ticket,String>>::Message {
                                 peer,
                                 message,
                                 connection_id
                             } => {
                                 match message {
-                                    libp2p::request_response::Message::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::Request {
+                                    libp2p::request_response::Message::<Vec<TransferableWinningTicket>, std::result::Result<Ticket,String>>::Request {
                                         request_id, request, channel
                                     } => {
                                         trace!(%peer, %request_id, %connection_id, "Received a ticket aggregation request");
 
-                                        let request = request.into_iter().map(TransferableWinningTicket::from).collect::<Vec<_>>();
                                         if let Err(e) = aggregation_writer.receive_aggregation_request(peer, request, channel) {
                                             error!(%peer, %request_id, %connection_id, error = %e, "Failed to process a ticket aggregation request");
                                         }
                                     },
-                                    libp2p::request_response::Message::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket, String>>::Response {
+                                    libp2p::request_response::Message::<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>::Response {
                                         request_id, response
                                     } => {
-                                        if let Err(e) = aggregation_writer.receive_ticket(peer, response.map(|t| t.0), request_id) {
+                                        if let Err(e) = aggregation_writer.receive_ticket(peer, response, request_id) {
                                             error!(%peer, %request_id, %connection_id, error = %e,  "Failed to receive aggregated ticket");
                                         }
                                     }
                                 }
                             },
-                            libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::OutboundFailure {
+                            libp2p::request_response::Event::<Vec<TransferableWinningTicket>, std::result::Result<Ticket,String>>::OutboundFailure {
                                 peer, request_id, error, connection_id
                             } => {
                                 error!(%peer, %request_id, %connection_id, %error, "Failed to send an aggregation request");
                             },
-                            libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::InboundFailure {
+                            libp2p::request_response::Event::<Vec<TransferableWinningTicket>, std::result::Result<Ticket,String>>::InboundFailure {
                                 peer, request_id, error, connection_id
                             } => {
                                 warn!(%peer, %request_id, %connection_id, %error, "Failed to receive an aggregated ticket");
                             },
-                            libp2p::request_response::Event::<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket,String>>::ResponseSent {..} => {
+                            libp2p::request_response::Event::<Vec<TransferableWinningTicket>, std::result::Result<Ticket,String>>::ResponseSent {..} => {
                                 // trace!("Discarded messages not relevant for the protocol!");
                             },
                         }
@@ -397,7 +394,7 @@ impl HoprSwarmWithProcessors {
                             },
                             TicketAggregationProcessed::Reply(peer, ticket, response) => {
                                 debug!(%peer, "Enqueuing a response'");
-                                if swarm.behaviour_mut().ticket_aggregation.send_response(response, ticket.map(legacy::Ticket)).is_err() {
+                                if swarm.behaviour_mut().ticket_aggregation.send_response(response, ticket).is_err() {
                                     error!(%peer, "Failed to enqueue response");
                                 }
                             },

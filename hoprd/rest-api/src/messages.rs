@@ -138,7 +138,7 @@ pub(super) async fn send_message(
     })?;
 
     let peer_id = match HoprIdentifier::new_with(args.destination, hopr.peer_resolver()).await {
-        Ok(destination) => destination.peer_id,
+        Ok(destination) => destination.address,
         Err(e) => return Err(e.into_response()),
     };
 
@@ -167,7 +167,7 @@ pub(super) async fn send_message(
                     .into_response()
             })?
             .into_iter()
-            .map(|v| v.peer_id)
+            .map(|v| v.address)
             .collect::<Vec<_>>();
 
         RoutingOptions::IntermediatePath(
@@ -201,8 +201,9 @@ pub(super) async fn send_message(
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
+    // NOTE: The return path is not introduced to, because the send_message API will be deprecated
     match hopr
-        .send_message(args.body.into_boxed_slice(), peer_id, options, Some(args.tag))
+        .send_message(args.body.into_boxed_slice(), peer_id, options, None, args.tag, None)
         .await
     {
         Ok(_) => Ok((
@@ -300,17 +301,13 @@ pub(crate) struct MessagePopResponse {
 }
 
 fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Result<MessagePopResponse, String> {
-    if let Some(tag) = data.application_tag {
-        match std::str::from_utf8(&data.plain_text) {
-            Ok(data_str) => Ok(MessagePopResponse {
-                tag,
-                body: data_str.into(),
-                received_at,
-            }),
-            Err(error) => Err(format!("Failed to deserialize data into string: {error}")),
-        }
-    } else {
-        Err("No application tag was present despite picking from a tagged inbox".into())
+    match std::str::from_utf8(&data.plain_text) {
+        Ok(data_str) => Ok(MessagePopResponse {
+            tag: data.application_tag,
+            body: data_str.into(),
+            received_at,
+        }),
+        Err(error) => Err(format!("Failed to deserialize data into string: {error}")),
     }
 }
 

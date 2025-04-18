@@ -10,8 +10,8 @@ use tracing::trace;
 
 use crate::channel_graph::{ChannelEdge, ChannelGraph, Node};
 use crate::errors::{PathError, Result};
-use crate::path::ChannelPath;
 use crate::selectors::{EdgeWeighting, PathSelector};
+use crate::ChannelPath;
 
 /// Holds a weighted channel path and auxiliary information for the graph traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -274,7 +274,7 @@ where
             );
             if current_len == max_hops || current.fully_explored || iters > self.cfg.max_iterations {
                 return if current_len >= min_hops && current_len <= max_hops {
-                    Ok(ChannelPath::new_valid(current.path))
+                    Ok(ChannelPath::from_iter(current.path))
                 } else {
                     trace!(current_len, min_hops, max_hops, iters, "path not found");
                     Err(PathError::PathNotFound(
@@ -322,33 +322,28 @@ where
 mod tests {
     use super::*;
 
-    use crate::channel_graph::NodeScoreUpdate;
-    use crate::path::Path;
     use async_lock::RwLock;
-    use core::panic;
     use regex::Regex;
     use std::ops::Deref;
     use std::str::FromStr;
     use std::sync::Arc;
 
-    lazy_static::lazy_static! {
-        static ref ADDRESSES: [Address; 6] = [
-            Address::from_str("0x0000c178cf70d966be0a798e666ce2782c7b2288").unwrap(),
-            Address::from_str("0x1000d5786d9e6799b3297da1ad55605b91e2c882").unwrap(),
-            Address::from_str("0x200060ddced1e33c9647a71f4fc2cf4ed33e4a9d").unwrap(),
-            Address::from_str("0x30004105095c8c10f804109b4d1199a9ac40ed46").unwrap(),
-            Address::from_str("0x4000a288c38fa8a0f4b79127747257af4a03a623").unwrap(),
-            Address::from_str("0x50002f462ec709cf181bbe44a7e952487bd4591d").unwrap(),
-        ];
-    }
+    use crate::channel_graph::NodeScoreUpdate;
+    use crate::tests::{ADDRESSES, PATH_ADDRS};
+    use crate::{ChainPath, Path, ValidatedPath};
 
     fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: Balance) -> ChannelEntry {
         ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero())
     }
 
-    fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) -> anyhow::Result<()> {
-        let other = ChannelPath::new(path.hops().into(), graph)?;
-        assert_eq!(other, path.clone(), "valid paths must be equal");
+    async fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) -> anyhow::Result<()> {
+        let _ = ValidatedPath::new(
+            ChainPath::from_channel_path(path.clone(), dst),
+            graph,
+            PATH_ADDRS.deref(),
+        )
+        .await?;
+
         assert!(!path.contains_cycle(), "path must not be cyclic");
         assert!(!path.hops().contains(&dst), "path must not contain destination");
 
@@ -363,7 +358,8 @@ mod tests {
     /// `0 <- [1] 1` => edge from `1` to `0` with edge weight `1`
     /// `0 [1] <-> [2] 1` => edge from `0` to `1` with edge weight `1` and edge from `1` to `0` with edge weight `2`
     ///
-    /// ```rust
+    /// # Example
+    /// ```ignore
     /// let star = define_graph(
     ///     "0 [1] <-> [2] 1, 0 [1] <-> [3] 2, 0 [1] <-> [4] 3, 0 [1] <-> [5] 4",
     ///     "0x1223d5786d9e6799b3297da1ad55605b91e2c882".parse().unwrap(),
@@ -596,8 +592,8 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
         let path = selector.select_path(ADDRESSES[1], ADDRESSES[5], 1, 2).await?;
 
-        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
-        assert_eq!(2, path.length(), "should have 2 hops");
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
+        assert_eq!(2, path.num_hops(), "should have 2 hops");
 
         Ok(())
     }
@@ -613,8 +609,8 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
-        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
-        assert_eq!(3, path.length(), "should have 3 hops");
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
+        assert_eq!(3, path.num_hops(), "should have 3 hops");
 
         Ok(())
     }
@@ -630,8 +626,8 @@ mod tests {
         let selector = DfsPathSelector::<TestWeights>::new(graph.clone(), Default::default());
 
         let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
-        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
-        assert_eq!(3, path.length(), "should have 3 hops");
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
+        assert_eq!(3, path.num_hops(), "should have 3 hops");
 
         Ok(())
     }
@@ -647,8 +643,8 @@ mod tests {
         let selector = DfsPathSelector::<RandomizedEdgeWeighting>::new(graph.clone(), Default::default());
 
         let path = selector.select_path(ADDRESSES[0], ADDRESSES[5], 3, 3).await?;
-        check_path(&path, graph.read().await.deref(), ADDRESSES[5])?;
-        assert_eq!(3, path.length(), "should have 3 hops");
+        check_path(&path, graph.read().await.deref(), ADDRESSES[5]).await?;
+        assert_eq!(3, path.num_hops(), "should have 3 hops");
 
         Ok(())
     }

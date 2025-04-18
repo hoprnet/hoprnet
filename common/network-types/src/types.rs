@@ -1,12 +1,12 @@
+use crate::errors::NetworkTypeError;
 use hickory_resolver::name_server::ConnectionProvider;
 use hickory_resolver::AsyncResolver;
 use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
+use hopr_primitive_types::prelude::Address;
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::str::FromStr;
-
-use crate::errors::NetworkTypeError;
 
 /// Lists some of the IP protocols.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumString)]
@@ -286,7 +286,7 @@ impl std::fmt::Display for SealedHost {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RoutingOptions {
     /// A fixed intermediate path consisting of at most [`RoutingOptions::MAX_INTERMEDIATE_HOPS`] hops.
-    IntermediatePath(BoundedVec<PeerId, { RoutingOptions::MAX_INTERMEDIATE_HOPS }>),
+    IntermediatePath(BoundedVec<Address, { RoutingOptions::MAX_INTERMEDIATE_HOPS }>),
     /// Random intermediate path with at least the given number of hops,
     /// but at most [`RoutingOptions::MAX_INTERMEDIATE_HOPS`].
     Hops(BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }>),

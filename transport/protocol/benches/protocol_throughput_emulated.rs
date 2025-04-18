@@ -4,18 +4,18 @@ use common::{create_dbs, create_minimal_topology, random_packets_of_count, resol
 
 use criterion::{async_executor::AsyncExecutor, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::StreamExt;
-use hopr_primitive_types::prelude::{Balance, BalanceType};
-use libp2p::PeerId;
-
+use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
 use hopr_path::path::TransportPath;
+use hopr_primitive_types::prelude::{Balance, BalanceType};
 use hopr_transport_protocol::msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
+use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 20;
 
 pub fn protocol_throughput_sender(c: &mut Criterion) {
-    const PAYLOAD_SIZE: usize = 490;
+    const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE;
     const PEER_COUNT: usize = 3;
     const TESTED_PEER_ID: usize = 0;
 

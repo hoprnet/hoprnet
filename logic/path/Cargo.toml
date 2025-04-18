@@ -1,6 +1,6 @@
 [package]
 name = "hopr-path"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Contains mixnet path construction and path selection logic"
@@ -13,26 +13,31 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = ["hopr-db-sql/runtime-async-std"]
-runtime-tokio = ["hopr-db-sql/runtime-tokio"]
-prometheus = ["dep:hopr-metrics", "hopr-db-sql/prometheus"]
+serde = [
+  "dep:serde",
+  "dep:serde_with",
+  "dep:cfg_eval",
+  "hopr-internal-types/serde",
+  "hopr-crypto-types/serde",
+  "petgraph/serde-1",
+]
+prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
-futures = { workspace = true }
-lazy_static = { workspace = true }
-libp2p-identity = { workspace = true }
-petgraph = { workspace = true, features = ["serde-1"] }
-serde = { workspace = true }
-serde_with = { workspace = true }
+cfg_eval = { version = "0.1.2", optional = true }
+lazy_static = { workspace = true, optional = true }
+petgraph = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_with = { workspace = true, optional = true }
 smart-default = { workspace = true }
+strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
-hopr-db-api = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
@@ -40,6 +45,9 @@ hopr-primitive-types = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 async-std = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+bimap = { workspace = true }
 hex-literal = { workspace = true }
+lazy_static = { workspace = true }
+parameterized = { workspace = true }
 regex = { workspace = true }
+mockall = { workspace = true }

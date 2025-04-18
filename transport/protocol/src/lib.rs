@@ -73,9 +73,10 @@ use std::collections::HashMap;
 use tracing::error;
 
 use hopr_async_runtime::prelude::spawn;
+use hopr_crypto_packet::HoprPseudonym;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
-use hopr_path::path::TransportPath;
+use hopr_path::ValidatedPath;
 use hopr_transport_identity::PeerId;
 
 pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
@@ -139,6 +140,13 @@ pub enum PeerDiscovery {
     Announce(PeerId, Vec<Multiaddr>),
 }
 
+#[derive(Debug, Clone)]
+pub struct RoutingValues {
+    pub pseudonym: Option<HoprPseudonym>,
+    pub forward_path: ValidatedPath,
+    pub return_paths: Vec<ValidatedPath>,
+}
+
 /// Run all processes responsible for handling the msg and acknowledgment protocols.
 ///
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
@@ -158,14 +166,13 @@ pub async fn run_msg_ack_protocol<Db>(
     ),
     api: (
         impl futures::Sink<ApplicationData> + Send + Sync + 'static,
-        impl futures::Stream<Item = (ApplicationData, TransportPath, PacketSendFinalizer)> + Send + Sync + 'static,
+        impl futures::Stream<Item = (ApplicationData, RoutingValues, PacketSendFinalizer)> + Send + Sync + 'static,
     ),
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::prelude::JoinHandle<()>>
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     let me = packet_cfg.packet_keypair.clone();
-    let me_onchain = &packet_cfg.chain_keypair.clone();
 
     let mut processes = HashMap::new();
 
@@ -201,7 +208,7 @@ where
         bloom::WrappedTagBloomFilter::new("no_tbf".into())
     };
 
-    let ack_processor_read = ack::processor::AcknowledgementProcessor::new(db.clone(), me_onchain);
+    let ack_processor_read = ack::processor::AcknowledgementProcessor::new(db.clone());
     let ack_processor_write = ack_processor_read.clone();
     let msg_processor_read = msg::processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
@@ -265,11 +272,11 @@ where
         spawn(async move {
             let _neverending = api
                 .1
-                .then_concurrent(|(data, path, finalizer)| {
+                .then_concurrent(|(data, routing, finalizer)| {
                     let msg_processor = msg_processor_write.clone();
 
                     async move {
-                        match PacketWrapping::send(&msg_processor, data, path).await {
+                        match PacketWrapping::send(&msg_processor, data, routing).await {
                             Ok(v) => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {

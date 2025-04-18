@@ -79,6 +79,10 @@ impl<T: BytesRepresentable> ToHex for T {
     }
 }
 
+impl<const N: usize> BytesRepresentable<std::array::TryFromSliceError> for [u8; N] {
+    const SIZE: usize = N;
+}
+
 /// Allows type to be multiplied and divided by a float in range [0.0, 1.0].
 pub trait UnitaryFloatOps: Sized {
     /// Multiply with float in the interval [0.0, 1.0]
