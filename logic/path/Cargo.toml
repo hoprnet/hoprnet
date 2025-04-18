@@ -21,15 +21,13 @@ serde = [
   "hopr-crypto-types/serde",
   "petgraph/serde-1",
 ]
-runtime-async-std = ["hopr-db-sql/runtime-async-std"]
-runtime-tokio = ["hopr-db-sql/runtime-tokio"]
-prometheus = ["dep:hopr-metrics", "hopr-db-sql/prometheus"]
+prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
 cfg_eval = { version = "0.1.2", optional = true }
-lazy_static = { workspace = true }
+lazy_static = { workspace = true, optional = true }
 petgraph = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
@@ -47,7 +45,9 @@ hopr-primitive-types = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 async-std = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+bimap = { workspace = true }
 hex-literal = { workspace = true }
+lazy_static = { workspace = true }
+parameterized = { workspace = true }
 regex = { workspace = true }
 mockall = { workspace = true }

@@ -1,6 +1,4 @@
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
-use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::{ApplicationData, PAYLOAD_SIZE};
 use hopr_network_types::prelude::{RoutingOptions, SealedHost};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
@@ -19,6 +17,8 @@ use std::{
     task::Poll,
 };
 use tracing::{debug, error};
+
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -107,9 +107,9 @@ impl Hash for SessionId {
     }
 }
 
-/// Inner MTU size of what the HOPR payload can take (payload - peer_id - application_tag)
+/// Inner MTU size of what the HOPR payload can take (payload - peer address - application_tag)
 pub const SESSION_USABLE_MTU_SIZE: usize =
-    PAYLOAD_SIZE - OffchainPublicKey::SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
+    PAYLOAD_SIZE - Address::SIZE - std::mem::size_of::<hopr_internal_types::protocol::Tag>();
 
 /// Helper trait to allow Box aliasing
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
@@ -569,7 +569,7 @@ mod tests {
     use crate::traits::MockSendMsg;
 
     #[test]
-    fn wrapping_and_unwrapping_with_offchain_key_should_be_an_identity() -> anyhow::Result<()> {
+    fn wrapping_and_unwrapping_with_chain_key_should_be_an_identity() -> anyhow::Result<()> {
         let peer: Address = (&ChainKeypair::random()).into();
         let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
             .as_ref()
@@ -587,7 +587,7 @@ mod tests {
     }
 
     #[test]
-    fn wrapping_with_offchain_key_should_succeed_for_valid_peer_id_and_valid_payload_size() {
+    fn wrapping_with_chain_key_should_succeed_for_valid_peer_id_and_valid_payload_size() {
         let peer: Address = (&ChainKeypair::random()).into();
         let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
             .as_ref()
@@ -600,20 +600,7 @@ mod tests {
     }
 
     #[test]
-    fn wrapping_with_offchain_key_should_fail_for_invalid_peer_id() {
-        let peer: Address = (&ChainKeypair::random()).into();
-        let data = hopr_crypto_random::random_bytes::<SESSION_USABLE_MTU_SIZE>()
-            .as_ref()
-            .to_vec()
-            .into_boxed_slice();
-
-        let wrapped = wrap_with_chain_address(&peer, data.clone());
-
-        assert!(matches!(wrapped, Err(TransportSessionError::PeerId)));
-    }
-
-    #[test]
-    fn wrapping_with_offchain_key_should_fail_for_invalid_payload_size() {
+    fn wrapping_with_chain_key_should_fail_for_invalid_payload_size() {
         const INVALID_PAYLOAD_SIZE: usize = PAYLOAD_SIZE + 1;
         let peer: Address = (&ChainKeypair::random()).into();
         let data = hopr_crypto_random::random_bytes::<INVALID_PAYLOAD_SIZE>()
@@ -627,7 +614,7 @@ mod tests {
     }
 
     #[test]
-    fn unwrapping_offchain_key_should_fail_for_invalid_payload_size() {
+    fn unwrapping_chain_key_should_fail_for_invalid_payload_size() {
         const INVALID_PAYLOAD_SIZE: usize = PAYLOAD_SIZE + 1;
         let data = hopr_crypto_random::random_bytes::<INVALID_PAYLOAD_SIZE>()
             .as_ref()

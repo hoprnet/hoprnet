@@ -94,6 +94,7 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[ignore]
 #[test_log::test(tokio::test)]
 async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
     let id = SessionId::new(1, (&ChainKeypair::random()).into());

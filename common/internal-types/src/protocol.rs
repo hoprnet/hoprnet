@@ -69,7 +69,7 @@ impl Acknowledgement {
         let signature = OffchainSignature::sign_message(ack_key_share.as_ref(), node_keypair);
         let mut data = [0u8; Self::SIZE];
         data[0..HalfKey::SIZE].copy_from_slice(ack_key_share.as_ref());
-        data[HalfKey::SIZE..OffchainSignature::SIZE].copy_from_slice(signature.as_ref());
+        data[HalfKey::SIZE..HalfKey::SIZE + OffchainSignature::SIZE].copy_from_slice(signature.as_ref());
 
         Self { data, validated: true }
     }
@@ -86,7 +86,8 @@ impl Acknowledgement {
     #[tracing::instrument(level = "debug", skip(self, sender_node_key))]
     pub fn validate(self, sender_node_key: &OffchainPublicKey) -> Result<Self> {
         if !self.validated {
-            let signature = OffchainSignature::try_from(&self.data[HalfKey::SIZE..OffchainSignature::SIZE])?;
+            let signature =
+                OffchainSignature::try_from(&self.data[HalfKey::SIZE..HalfKey::SIZE + OffchainSignature::SIZE])?;
             if signature.verify_message(&self.data[0..HalfKey::SIZE], sender_node_key) {
                 Ok(Self {
                     data: self.data,
@@ -100,7 +101,7 @@ impl Acknowledgement {
         }
     }
 
-    /// Gets the acknowledged key out of this acknowledgment.
+    /// Gets the acknowledged key out of this acknowledgement.
     ///
     /// Returns [`InvalidAcknowledgement`]
     /// if the acknowledgement has not been [validated](Acknowledgement::validate).

@@ -533,42 +533,14 @@ pub struct GraphExportConfig {
 mod tests {
     use super::*;
 
-    use crate::channel_graph::ChannelGraph;
     use anyhow::{anyhow, Context};
-    use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+    use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
     use hopr_primitive_types::prelude::*;
-    use lazy_static::lazy_static;
     use std::ops::Add;
-    use std::str::FromStr;
     use std::time::{Duration, SystemTime};
 
-    lazy_static! {
-        static ref ADDRESSES: [Address; 6] = [
-            Address::from_str("0xafe8c178cf70d966be0a798e666ce2782c7b2288")
-                .expect("lazy static address should be valid"),
-            Address::from_str("0x1223d5786d9e6799b3297da1ad55605b91e2c882")
-                .expect("lazy static address should be valid"),
-            Address::from_str("0x0e3e60ddced1e33c9647a71f4fc2cf4ed33e4a9d")
-                .expect("lazy static address should be valid"),
-            Address::from_str("0x27644105095c8c10f804109b4d1199a9ac40ed46")
-                .expect("lazy static address should be valid"),
-            Address::from_str("0x4701a288c38fa8a0f4b79127747257af4a03a623")
-                .expect("lazy static address should be valid"),
-            Address::from_str("0xfddd2f462ec709cf181bbe44a7e952487bd4591d")
-                .expect("lazy static address should be valid"),
-        ];
-    }
-
-    fn dummy_channel(src: Address, dst: Address, status: ChannelStatus) -> ChannelEntry {
-        ChannelEntry::new(
-            src,
-            dst,
-            Balance::new_from_str("1", BalanceType::HOPR),
-            1u32.into(),
-            status,
-            1u32.into(),
-        )
-    }
+    use crate::channel_graph::ChannelGraph;
+    use crate::tests::{dummy_channel, ADDRESSES};
 
     #[test]
     fn channel_graph_self_addr() {

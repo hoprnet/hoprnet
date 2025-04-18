@@ -323,73 +323,28 @@ mod tests {
     use super::*;
 
     use async_lock::RwLock;
-    use hex_literal::hex;
-    use hopr_crypto_types::types::OffchainPublicKey;
     use regex::Regex;
     use std::ops::Deref;
     use std::str::FromStr;
     use std::sync::Arc;
 
     use crate::channel_graph::NodeScoreUpdate;
-    use crate::{ChainPath, Path, PathAddressResolver, ValidatedPath};
-
-    lazy_static::lazy_static! {
-        static ref ADDRESSES: [Address; 6] = [
-            Address::from_str("0x0000c178cf70d966be0a798e666ce2782c7b2288").unwrap(),
-            Address::from_str("0x1000d5786d9e6799b3297da1ad55605b91e2c882").unwrap(),
-            Address::from_str("0x200060ddced1e33c9647a71f4fc2cf4ed33e4a9d").unwrap(),
-            Address::from_str("0x30004105095c8c10f804109b4d1199a9ac40ed46").unwrap(),
-            Address::from_str("0x4000a288c38fa8a0f4b79127747257af4a03a623").unwrap(),
-            Address::from_str("0x50002f462ec709cf181bbe44a7e952487bd4591d").unwrap(),
-        ];
-        static ref PEERS: [OffchainPublicKey; 6] = [
-            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
-            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
-            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
-            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
-            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
-            OffchainPublicKey::from_privkey(&hex!("00")).unwrap(),
-        ];
-    }
-
-    struct TestResolver;
-
-    #[async_trait]
-    impl PathAddressResolver for TestResolver {
-        async fn resolve_transport_address(
-            &self,
-            address: &Address,
-        ) -> std::result::Result<Option<OffchainPublicKey>, PathError> {
-            Ok(ADDRESSES
-                .iter()
-                .enumerate()
-                .find(|(_, &a)| a.eq(address))
-                .map(|(i, _)| PEERS[i].clone()))
-        }
-
-        async fn resolve_chain_address(
-            &self,
-            key: &OffchainPublicKey,
-        ) -> std::result::Result<Option<Address>, PathError> {
-            Ok(PEERS
-                .iter()
-                .enumerate()
-                .find(|(_, &k)| k.eq(key))
-                .map(|(i, _)| ADDRESSES[i].clone()))
-        }
-    }
+    use crate::tests::{ADDRESSES, PATH_ADDRS};
+    use crate::{ChainPath, Path, ValidatedPath};
 
     fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: Balance) -> ChannelEntry {
         ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero())
     }
 
     async fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) -> anyhow::Result<()> {
-        let _ = ValidatedPath::new(ChainPath::from_channel_path(path.clone(), dst), graph, &TestResolver).await?;
+        let _ = ValidatedPath::new(
+            ChainPath::from_channel_path(path.clone(), dst),
+            graph,
+            PATH_ADDRS.deref(),
+        )
+        .await?;
 
-        assert!(
-            path.iter().all(|hop| path.iter().filter(|&h| hop == h).count() == 1),
-            "path must not be cyclic"
-        );
+        assert!(!path.contains_cycle(), "path must not be cyclic");
         assert!(!path.hops().contains(&dst), "path must not contain destination");
 
         Ok(())
@@ -403,7 +358,8 @@ mod tests {
     /// `0 <- [1] 1` => edge from `1` to `0` with edge weight `1`
     /// `0 [1] <-> [2] 1` => edge from `0` to `1` with edge weight `1` and edge from `1` to `0` with edge weight `2`
     ///
-    /// ```rust
+    /// # Example
+    /// ```ignore
     /// let star = define_graph(
     ///     "0 [1] <-> [2] 1, 0 [1] <-> [3] 2, 0 [1] <-> [4] 3, 0 [1] <-> [5] 4",
     ///     "0x1223d5786d9e6799b3297da1ad55605b91e2c882".parse().unwrap(),
