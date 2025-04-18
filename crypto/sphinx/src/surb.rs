@@ -178,7 +178,14 @@ pub fn create_surb<S: SphinxSuite, H: SphinxHeaderSpec>(
 where
     H::KeyId: Copy,
 {
-    let header = RoutingInfo::<H>::new(path, &shared_keys.secrets, additional_data_relayer, pseudonym, true)?;
+    let header = RoutingInfo::<H>::new(
+        path,
+        &shared_keys.secrets,
+        additional_data_relayer,
+        pseudonym,
+        true,
+        false,
+    )?;
 
     let sender_key = SecretKey16::random();
 

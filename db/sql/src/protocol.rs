@@ -278,6 +278,56 @@ impl HoprDbProtocolOperations for HoprDb {
         })?)
     }
 
+    #[tracing::instrument(level = "trace", skip(self, data))]
+    async fn to_probe(&self, data: Box<[u8]>, destination: &OffchainPublicKey) -> Result<TransportPacketWithChainData> {
+        let next_peer = self.resolve_chain_key(destination).await?.ok_or_else(|| {
+            DbSqlError::LogicalError(format!(
+                "failed to find chain key for packet key {} on previous hop",
+                destination.to_peerid_str()
+            ))
+        })?;
+
+        let pseudonym = HoprPseudonym::random();
+        let next_ticket = TicketBuilder::zero_hop().direction(&self.me_onchain, &next_peer);
+
+        let domain_separator = self
+            .get_indexer_data(None)
+            .await?
+            .channels_dst
+            .ok_or_else(|| DbSqlError::LogicalError("failed to fetch the domain separator".into()))?;
+
+        // Construct the outgoing packet
+        let myself = self.clone();
+        let destination = *destination;
+        let (packet, _) = spawn_fifo_blocking(move || {
+            HoprPacket::into_outgoing(
+                &data,
+                &pseudonym,
+                PacketRouting::Probe::<ValidatedPath>(destination),
+                &myself.chain_key,
+                next_ticket,
+                &myself.caches.key_id_mapper,
+                &domain_separator,
+            )
+            .map_err(|e| DbSqlError::LogicalError(format!("failed to construct chain components for a packet: {e}")))
+        })
+        .await?;
+
+        if let Some(out) = packet.try_as_outgoing() {
+            let mut transport_payload = Vec::with_capacity(HoprPacket::SIZE);
+            transport_payload.extend_from_slice(out.packet.as_ref());
+            transport_payload.extend_from_slice(&out.ticket.into_encoded());
+
+            Ok(TransportPacketWithChainData::Outgoing {
+                next_hop: out.next_hop,
+                ack_challenge: out.ack_challenge,
+                data: transport_payload.into_boxed_slice(),
+            })
+        } else {
+            Err(DbSqlError::LogicalError("must be an outgoing packet".into()).into())
+        }
+    }
+
     #[tracing::instrument(level = "trace", skip(self, data, forward_path, return_paths))]
     async fn to_send(
         &self,
@@ -392,7 +442,8 @@ impl HoprDbProtocolOperations for HoprDb {
                 packet_tag: incoming.packet_tag,
                 previous_hop: incoming.previous_hop,
                 plain_text: incoming.plain_text,
-                ack: Acknowledgement::new(incoming.ack_key, pkt_keypair),
+                ack_key: incoming.ack_key,
+                is_probe: incoming.is_probe,
             }),
             HoprPacket::Forwarded(fwd) => {
                 match self

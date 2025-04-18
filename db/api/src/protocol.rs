@@ -1,11 +1,12 @@
 use async_trait::async_trait;
 use std::{fmt::Debug, result::Result};
 
-use crate::prelude::DbError;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_path::ValidatedPath;
 use hopr_primitive_types::prelude::Balance;
+
+use crate::prelude::DbError;
 
 /// Trait defining all DB functionality needed by packet/acknowledgement processing pipeline.
 #[async_trait]
@@ -23,6 +24,11 @@ pub trait HoprDbProtocolOperations {
 
     /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
     async fn get_network_ticket_price(&self) -> crate::errors::Result<Balance>;
+    async fn to_probe(
+        &self,
+        data: Box<[u8]>,
+        destination: &OffchainPublicKey,
+    ) -> Result<TransportPacketWithChainData, DbError>;
 
     /// Process the data into an outgoing packet
     async fn to_send(
@@ -64,7 +70,7 @@ impl Debug for AckResult {
     }
 }
 
-// TODO: create 3 separate objects and use them Boxed in the enum variants
+// TODO: create 4 separate objects and use them Boxed in the enum variants
 #[allow(clippy::large_enum_variant)]
 pub enum TransportPacketWithChainData {
     /// Packet is intended for us
@@ -72,7 +78,8 @@ pub enum TransportPacketWithChainData {
         packet_tag: PacketTag,
         previous_hop: OffchainPublicKey,
         plain_text: Box<[u8]>,
-        ack: Acknowledgement,
+        ack_key: HalfKey,
+        is_probe: bool,
     },
     /// Packet must be forwarded
     Forwarded {

@@ -572,9 +572,9 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        let wrapped = wrap_with_chain_address(&peer, data.clone())?;
+        let wrapped = wrap_with_chain_address(&peer, &data)?;
 
-        let (peer_id, unwrapped) = unwrap_chain_address(wrapped.into_boxed_slice())?;
+        let (peer_id, unwrapped) = unwrap_chain_address(&wrapped)?;
 
         assert_eq!(peer, peer_id);
         assert_eq!(data, unwrapped);
@@ -590,7 +590,7 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        let wrapped = wrap_with_chain_address(&peer, data.clone());
+        let wrapped = wrap_with_chain_address(&peer, &data);
 
         assert!(matches!(wrapped, Ok(_)));
     }
@@ -604,7 +604,7 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        let wrapped = wrap_with_chain_address(&peer, data.clone());
+        let wrapped = wrap_with_chain_address(&peer, &data);
 
         assert!(matches!(wrapped, Err(TransportSessionError::PayloadSize)));
     }
@@ -617,7 +617,7 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        let unwrapped = unwrap_chain_address(data.clone());
+        let unwrapped = unwrap_chain_address(&data);
 
         assert!(matches!(unwrapped, Err(TransportSessionError::PayloadSize)));
     }
@@ -721,7 +721,7 @@ mod tests {
         mock.expect_send_message()
             .times(1)
             .withf(move |data, _peer, options, _, _| {
-                let (_peer_id, data) = unwrap_chain_address(data.plain_text.clone()).expect("Unwrapping should work");
+                let (_peer_id, data) = unwrap_chain_address(&data.plain_text).expect("Unwrapping should work");
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
                 assert_eq!(
                     options,

@@ -28,7 +28,7 @@ impl SendMsg for BufferingMsgSender {
         _rp_options: Option<RoutingOptions>,
         _pseudonym: Option<HoprPseudonym>,
     ) -> Result<(), TransportSessionError> {
-        let (_, data) = unwrap_chain_address(data.plain_text)?;
+        let (_, data) = unwrap_chain_address(&data.plain_text)?;
 
         let len = data.len();
         self.buffer.unbounded_send(data).expect("buffer unbounded error");

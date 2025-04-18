@@ -170,6 +170,8 @@ pub enum MetaPacketRouting<'a, S: SphinxSuite, H: SphinxHeaderSpec> {
         /// Pseudonym of the packet sender.
         /// This gets delivered to the packet's final recipient.
         pseudonym: &'a H::Pseudonym,
+        /// Special flag used for acknowledgement signaling to the recipient
+        no_ack: bool,
     },
     /// Uses a SURB to deliver the packet and the pseudonym that belongs to the
     /// recipient's node (origin of the SURB).
@@ -200,6 +202,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
                 forward_path,
                 additional_data_relayer,
                 pseudonym,
+                no_ack,
             } => {
                 let routing_info = RoutingInfo::<H>::new(
                     &forward_path
@@ -214,6 +217,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec> PartialPacket<S, H> {
                     additional_data_relayer,
                     pseudonym,
                     false,
+                    no_ack,
                 )?;
 
                 Ok(Self {
@@ -341,6 +345,8 @@ pub enum ForwardedMetaPacket<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize
         derived_secret: SharedSecret,
         /// Packet checksum.
         packet_tag: PacketTag,
+        /// Special flag used for acknowledgement signaling to the recipient
+        no_ack: bool,
     },
 }
 
@@ -436,7 +442,11 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                 path_pos,
                 additional_info,
             },
-            ForwardedHeader::Final { sender, is_reply } => {
+            ForwardedHeader::Final {
+                sender,
+                is_reply,
+                no_ack,
+            } => {
                 // If the received packet contains a reply message for a pseudonym,
                 // we must perform additional steps to decrypt it
                 if is_reply {
@@ -468,6 +478,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
                     derived_secret: secret,
                     plain_text: PaddedPayload::from_padded(payload)?,
                     sender,
+                    no_ack,
                 }
             }
         })
@@ -634,6 +645,7 @@ pub(crate) mod tests {
                 forward_path: &pubkeys,
                 additional_data_relayer: &por_strings,
                 pseudonym: &pseudonym,
+                no_ack: false,
             },
             &mapper,
         )?;

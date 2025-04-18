@@ -950,7 +950,7 @@ mod tests {
             _rp_options: Option<hopr_lib::RoutingOptions>,
             _pseudonym: Option<SimplePseudonym>,
         ) -> std::result::Result<(), TransportSessionError> {
-            let (_peer, data) = hopr_transport_session::types::unwrap_chain_address(data.plain_text)?;
+            let (_peer, data) = hopr_transport_session::types::unwrap_chain_address(&data.plain_text)?;
 
             self.tx
                 .clone()

@@ -137,16 +137,23 @@ where
             TransportPacketWithChainData::Final {
                 previous_hop,
                 plain_text,
-                ack,
+                ack_key,
+                is_probe,
                 ..
             } => {
-                let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
-                RecvOperation::Receive {
-                    data: app_data,
-                    ack: SendAck {
-                        peer: previous_hop.into(),
-                        ack,
-                    },
+                // If this is not a probe packet, send an acknowledgement back to the previous hop
+                if !is_probe {
+                    let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
+                    RecvOperation::Receive {
+                        data: app_data,
+                        ack: SendAck {
+                            peer: previous_hop.into(),
+                            ack: Acknowledgement::new(ack_key, &self.cfg.packet_keypair),
+                        },
+                    }
+                } else {
+                    // TODO: implement no-acknowledgement (probe) packet handling
+                    unimplemented!()
                 }
             }
             TransportPacketWithChainData::Forwarded {

@@ -104,20 +104,25 @@ pub trait SphinxHeaderSpec {
     }
 }
 
+/// Sphinx header byte prefix
+///
+/// ### Layout (MSB first)
+/// `Version (3 bits), No Ack flag (1 bit), Reply flag (1 bit), Path position (3 bits)`
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct HeaderPrefix(u8);
 
 impl HeaderPrefix {
     pub const SIZE: usize = 1;
 
-    pub fn new(is_reply: bool, path_pos: u8) -> Result<Self, GeneralError> {
+    pub fn new(is_reply: bool, no_ack: bool, path_pos: u8) -> Result<Self, GeneralError> {
         // Due to size restriction, we do not allow greater than 7 hop paths.
         if path_pos > 7 {
             return Err(GeneralError::ParseError("HeaderPrefixByte".into()));
         }
 
         let mut out = 0;
-        out |= (SPHINX_HEADER_VERSION & 0x0f) << 4;
+        out |= (SPHINX_HEADER_VERSION & 0x07) << 5;
+        out |= (no_ack as u8) << 4;
         out |= (is_reply as u8) << 3;
         out |= path_pos & 0x07;
         Ok(Self(out))
@@ -126,6 +131,11 @@ impl HeaderPrefix {
     #[inline]
     pub fn is_reply(&self) -> bool {
         (self.0 & 0x08) != 0
+    }
+
+    #[inline]
+    pub fn is_no_ack(&self) -> bool {
+        (self.0 & 0x10) != 0
     }
 
     #[inline]
@@ -149,7 +159,7 @@ impl TryFrom<u8> for HeaderPrefix {
     type Error = GeneralError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        if (value & 0xf0) >> 4 == SPHINX_HEADER_VERSION {
+        if (value & 0xe0) >> 5 == SPHINX_HEADER_VERSION {
             Ok(Self(value))
         } else {
             Err(GeneralError::ParseError("invalid header version".into()))
@@ -216,13 +226,16 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
     /// * `path` IDs of the nodes along the path (usually its public key or public key identifier).
     /// * `secrets` shared secrets with the nodes along the path
     /// * `additional_data_relayer` additional data for each relayer
-    /// * `additional_data_last_hop` additional data for the final recipient
+    /// * `pseudonym` pseudonym of the sender
+    /// * `is_reply` flag indicating whether this is a reply packet
+    /// * `no_ack` special flag used for acknowledgement signaling to the recipient
     pub fn new(
         path: &[H::KeyId],
         secrets: &[SharedSecret],
         additional_data_relayer: &[H::RelayerData],
         pseudonym: &H::Pseudonym,
         is_reply: bool,
+        no_ack: bool,
     ) -> hopr_crypto_types::errors::Result<Self> {
         assert!(H::MAX_HOPS.get() <= 7, "maximum number of hops supported is 7");
 
@@ -242,7 +255,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
 
         for idx in 0..secrets.len() {
             let inverted_idx = secrets.len() - idx - 1;
-            let prefix = HeaderPrefix::new(is_reply, idx as u8)?;
+            let prefix = HeaderPrefix::new(is_reply, no_ack, idx as u8)?;
 
             let mut prg = H::new_prg(&secrets[inverted_idx])?;
 
@@ -273,10 +286,10 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                         .copy_from_slice(&filler);
                 }
             } else {
-                // Shift everything to the right to make space for next hop's routing info
+                // Shift everything to the right to make space for the next hop's routing info
                 extended_header.copy_within(0..H::HEADER_LEN, H::ROUTING_INFO_LEN);
 
-                // Prefix byte must come first, to ensure prefix RELAYER_END_PREFIX prefix safety
+                // Prefix byte must come first to ensure prefix RELAYER_END_PREFIX prefix safety
                 // of Ed25519 public keys.
                 extended_header[0] = prefix.into();
 
@@ -362,6 +375,8 @@ pub enum ForwardedHeader<H: SphinxHeaderSpec> {
         /// Indicates whether this message is a reply and a [`ReplyOpener`](crate::surb::ReplyOpener)
         /// should be used to further decrypt the message.
         is_reply: bool,
+        /// Special flag used for acknowledgement signaling.
+        no_ack: bool,
     },
 }
 
@@ -440,6 +455,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
                 .try_into()
                 .map_err(|_| CryptoError::InvalidInputValue("last_data_last_hop"))?,
             is_reply: prefix.is_reply(),
+            no_ack: prefix.is_no_ack(),
         })
     }
 }
@@ -507,6 +523,7 @@ pub(crate) mod tests {
         let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
         let shares = S::new_shared_keys(&pub_keys)?;
         let pseudonym = SimplePseudonym::random();
+        let no_ack_flag = true;
 
         let mut rinfo = RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 0>>::new(
             &pub_keys,
@@ -514,6 +531,7 @@ pub(crate) mod tests {
             &[],
             &pseudonym,
             reply,
+            no_ack_flag,
         )?;
 
         for (i, secret) in shares.secrets.iter().enumerate() {
@@ -539,10 +557,15 @@ pub(crate) mod tests {
                         "invalid public key of the next node"
                     );
                 }
-                ForwardedHeader::Final { sender, is_reply } => {
+                ForwardedHeader::Final {
+                    sender,
+                    is_reply,
+                    no_ack,
+                } => {
                     assert_eq!(shares.secrets.len() - 1, i, "cannot be a final node");
                     assert_eq!(pseudonym, sender, "invalid pseudonym");
                     assert_eq!(is_reply, reply, "invalid reply flag");
+                    assert_eq!(no_ack, no_ack_flag, "invalid no_ack flag");
                 }
             }
         }

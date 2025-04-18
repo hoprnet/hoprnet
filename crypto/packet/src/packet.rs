@@ -79,6 +79,7 @@ impl PartialHoprPacket {
                             forward_path: &forward_path,
                             pseudonym,
                             additional_data_relayer: &por_strings,
+                            no_ack: false,
                         },
                         mapper,
                     )?,
@@ -113,6 +114,35 @@ impl PartialHoprPacket {
                     openers: vec![],
                 })
             }
+            PacketRouting::Probe(destination) => {
+                // Create shared secrets and PoR challenge chain
+                let shared_keys = HoprSphinxSuite::new_shared_keys(&[destination])?;
+                let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
+
+                // Update the ticket with the challenge
+                let ticket = ticket
+                    .challenge(por_values.ticket_challenge())
+                    .build_signed(chain_keypair, domain_separator)?
+                    .leak();
+
+                Ok(Self {
+                    partial_packet: PartialPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::new(
+                        MetaPacketRouting::ForwardPath {
+                            shared_keys,
+                            forward_path: &[destination],
+                            pseudonym,
+                            additional_data_relayer: &por_strings,
+                            no_ack: true, // Indicate this is a no acknowledgement probe packet
+                        },
+                        mapper,
+                    )?,
+                    ticket,
+                    next_hop: destination,
+                    ack_challenge: por_values.acknowledgement_challenge(),
+                    surbs: vec![],
+                    openers: vec![],
+                })
+            }
         }
     }
 
@@ -138,7 +168,7 @@ impl PartialHoprPacket {
 /// Represents a packet incoming to its final destination.
 #[derive(Clone)]
 pub struct HoprIncomingPacket {
-    /// Packets authentication tag.
+    /// Packet's authentication tag.
     pub packet_tag: PacketTag,
     /// Acknowledgement to be sent to the previous hop.
     pub ack_key: HalfKey,
@@ -150,6 +180,8 @@ pub struct HoprIncomingPacket {
     pub sender: HoprPseudonym,
     /// List of [`SURBs`](SURB) to be used for replies sent to the packet creator.
     pub surbs: Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>,
+    /// Indicates whether the packet is a probe packet and should not be acknowledged.
+    pub is_probe: bool,
 }
 
 /// Represents a packet destined for another node.
@@ -218,6 +250,8 @@ pub enum PacketRouting<P: NonEmptyPath<OffchainPublicKey> = TransportPath> {
     ForwardPath { forward_path: P, return_paths: Vec<P> },
     /// The packet is routed via an existing SURB that corresponds to a pseudonym.
     Surb(HoprSurb),
+    /// Probe packet: a special type of 0-hop packet that is not going to be acknowledged but can carry a payload.
+    Probe(OffchainPublicKey),
 }
 
 fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P: NonEmptyPath<OffchainPublicKey>>(
@@ -343,19 +377,19 @@ impl HoprPacket {
                     plain_text,
                     derived_secret,
                     sender,
+                    no_ack,
                 } => {
-                    let ack_key = derive_ack_key_share(&derived_secret);
-                    let (surbs, plain_text) = HoprPacketMessage::from(plain_text).try_into_parts()?;
-
                     // The pre_ticket is not parsed nor verified on the final hop
+                    let (surbs, plain_text) = HoprPacketMessage::from(plain_text).try_into_parts()?;
                     Ok(Self::Final(
                         HoprIncomingPacket {
                             packet_tag,
-                            ack_key,
+                            ack_key: derive_ack_key_share(&derived_secret),
                             previous_hop,
                             plain_text,
                             surbs,
                             sender,
+                            is_probe: no_ack,
                         }
                         .into(),
                     ))
@@ -581,6 +615,7 @@ mod tests {
             match &packet {
                 HoprPacket::Final(packet) => {
                     assert_eq!(hop - 1, hops, "final packet must be at the last hop");
+                    assert!(!packet.is_probe, "must not be a probe packet");
                     actual_plain_text = packet.plain_text.clone();
                 }
                 HoprPacket::Forwarded(fwd) => {
@@ -618,6 +653,7 @@ mod tests {
                 HoprPacket::Final(packet) => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
                     assert_eq!(pseudonym, packet.sender, "invalid sender");
+                    assert!(!packet.is_probe, "must not be a probe packet");
                     received_plain_text = packet.plain_text.clone();
                     received_surbs.extend(packet.surbs.clone());
                 }
@@ -668,6 +704,7 @@ mod tests {
                 HoprPacket::Final(incoming) => {
                     assert_eq!(hop - 1, forward_hops, "final packet must be at the last hop");
                     assert_eq!(pseudonym, incoming.sender, "invalid sender");
+                    assert!(!incoming.is_probe, "must not be a probe packet");
                     received_fwd_plain_text = incoming.plain_text.clone();
                     received_surbs.extend(incoming.surbs.clone());
                 }
@@ -711,6 +748,7 @@ mod tests {
                 HoprPacket::Final(incoming) => {
                     assert_eq!(hop, 0, "final packet must be at the last hop");
                     assert_eq!(pseudonym, incoming.sender, "invalid sender");
+                    assert!(!incoming.is_probe, "must not be a probe packet");
                     assert!(incoming.surbs.is_empty(), "must not receive surbs on reply");
                     received_re_plain_text = incoming.plain_text.clone();
                 }
@@ -755,6 +793,7 @@ mod tests {
                         incoming.plain_text.is_empty(),
                         "must not receive plaintext on surbs only packet"
                     );
+                    assert!(!incoming.is_probe, "must not be a probe packet");
                     assert_eq!(2, incoming.surbs.len(), "invalid number of received surbs per packet");
                     assert_eq!(pseudonym, incoming.sender, "invalid sender");
                     received_surbs.extend(incoming.surbs.clone());
@@ -800,6 +839,7 @@ mod tests {
                 match &re_packet {
                     HoprPacket::Final(incoming) => {
                         assert_eq!(hop, 0, "final packet must be at the last hop for reply {i}");
+                        assert!(!incoming.is_probe, "must not be a probe packet");
                         assert!(
                             incoming.surbs.is_empty(),
                             "must not receive surbs on reply for reply {i}"
