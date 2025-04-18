@@ -131,7 +131,6 @@ pub(crate) struct MessageSender<T, S> {
     pub process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     pub resolver: PathPlanner<T, S>,
     me: Address,
-    pseudonym: HoprPseudonym,
 }
 
 impl<T, S> MessageSender<T, S>
@@ -143,12 +142,10 @@ where
         process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
         resolver: PathPlanner<T, S>,
         me: Address,
-        pseudonym: HoprPseudonym,
     ) -> Self {
         Self {
             process_packet_send,
             resolver,
-            pseudonym,
             me,
         }
     }
@@ -167,6 +164,7 @@ where
         destination: Address,
         forward_options: RoutingOptions,
         return_options: Option<RoutingOptions>,
+        pseudonym: Option<HoprPseudonym>,
     ) -> std::result::Result<(), TransportSessionError> {
         let return_paths = if let Some(return_options) = return_options {
             let num_possible_surbs = HoprPacket::max_surbs_with_message(data.len());
@@ -183,7 +181,7 @@ where
         };
 
         let routing = RoutingValues {
-            pseudonym: Some(self.pseudonym),
+            pseudonym,
             forward_path: self
                 .resolver
                 .resolve_path(self.me, destination, forward_options)

@@ -112,6 +112,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                         *session_id.peer(),
                         session_data.routing_opts,
                         None, // TODO: add RP support to the Session protocol
+                        None,
                     )
                     .await
                 {
@@ -282,7 +283,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     }
 
     /// Starts the instance with the given [transport](SendMsg) implementation
-    /// and a channel that is used to notify when new incoming session is opened to us.
+    /// and a channel that is used to notify when a new incoming session is opened to us.
     ///
     /// This method must be called prior to any calls to [`SessionManager::new_session`] or
     /// [`SessionManager::dispatch_message`].
@@ -388,6 +389,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             target: cfg.target,
             capabilities: cfg.capabilities.iter().copied().collect(),
             // Back-routing currently uses the same (inverted) route as session initiation
+            // TODO: remove this once RP support is enabled
             back_routing: Some((cfg.path_options.clone().invert(), self.me)),
         });
 
@@ -399,6 +401,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 cfg.peer,
                 cfg.path_options.clone(),
                 None, // TODO: add RP support to the Session protocol
+                None,
             )
             .await?;
 
@@ -473,7 +476,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         }
     }
 
-    /// Main method to be called whenever data are received.
+    /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
     /// the Session protocol or Start protocol messages.
@@ -582,7 +585,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                     // TODO: add RP support to the Session protocol
                     msg_sender
-                        .send_message(data.try_into()?, peer, route, None)
+                        .send_message(data.try_into()?, peer, route, None, None)
                         .await
                         .map_err(|e| {
                             SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
@@ -610,7 +613,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                     // TODO: add RP support to the Session protocol
                     msg_sender
-                        .send_message(data.try_into()?, peer, route, None)
+                        .send_message(data.try_into()?, peer, route, None, None)
                         .await
                         .map_err(|e| {
                             SessionManagerError::Other(format!(
@@ -702,6 +705,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         *session_id.peer(),
                         session_data.routing_opts,
                         None, // TODO: add RP support to the Session protocol
+                        None,
                     )
                     .await?;
             }
@@ -735,7 +739,7 @@ mod tests {
     use async_trait::async_trait;
     use futures::AsyncWriteExt;
     use hopr_crypto_types::keypairs::ChainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
+    use hopr_crypto_types::prelude::{Keypair, SimplePseudonym};
     use hopr_primitive_types::bounded::BoundedSize;
 
     mockall::mock! {
@@ -751,6 +755,7 @@ mod tests {
                 destination: Address,
                 fwd_options: RoutingOptions,
                 ret_options: Option<RoutingOptions>,
+                pseudonym: Option<SimplePseudonym>
             ) -> std::result::Result<(), TransportSessionError>;
         }
     }
@@ -796,8 +801,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == bob_peer)
-            .returning(move |data, _, _, _| {
+            .withf(move |_, peer, _, _, _| *peer == bob_peer)
+            .returning(move |data, _, _, _, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -815,8 +820,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == alice_peer)
-            .returning(move |data, _, _, _| {
+            .withf(move |_, peer, _, _, _| *peer == alice_peer)
+            .returning(move |data, _, _, _, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -834,8 +839,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == bob_peer)
-            .returning(move |data, _, _, _| {
+            .withf(move |_, peer, _, _, _| *peer == bob_peer)
+            .returning(move |data, _, _, _, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -846,8 +851,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == alice_peer)
-            .returning(move |data, _, _, _| {
+            .withf(move |_, peer, _, _, _| *peer == alice_peer)
+            .returning(move |data, _, _, _, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -920,8 +925,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == bob_peer)
-            .returning(move |data, _, _, _| {
+            .withf(move |_, peer, _, _, _| *peer == bob_peer)
+            .returning(move |data, _, _, _, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -939,8 +944,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == alice_peer)
-            .returning(move |data, _, _, _| {
+            .withf(move |_, peer, _, _, _| *peer == alice_peer)
+            .returning(move |data, _, _, _, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -958,8 +963,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == bob_peer)
-            .returning(move |data, _, _, _| {
+            .withf(move |_, peer, _, _, _| *peer == bob_peer)
+            .returning(move |data, _, _, _, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -970,8 +975,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == alice_peer)
-            .returning(move |data, _, _, _| {
+            .withf(move |_, peer, _, _, _| *peer == alice_peer)
+            .returning(move |data, _, _, _, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1056,8 +1061,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == bob_peer)
-            .returning(move |data, _, _, _| {
+            .withf(move |_, peer, _, _, _| *peer == bob_peer)
+            .returning(move |data, _, _, _, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1068,8 +1073,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == alice_peer)
-            .returning(move |data, _, _, _| {
+            .withf(move |_, peer, _, _, _| *peer == alice_peer)
+            .returning(move |data, _, _, _, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1122,8 +1127,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _| *peer == bob_peer)
-            .returning(|_, _, _, _| Ok(()));
+            .withf(move |_, peer, _, _, _| *peer == bob_peer)
+            .returning(|_, _, _, _, _| Ok(()));
 
         let mut jhs = Vec::new();
 

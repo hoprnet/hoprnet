@@ -923,6 +923,7 @@ mod tests {
     use super::*;
     use anyhow::Context;
     use futures::channel::mpsc::UnboundedSender;
+    use hopr_crypto_types::types::SimplePseudonym;
     use hopr_lib::{ApplicationData, SendMsg};
     use hopr_transport_session::errors::TransportSessionError;
     use std::collections::HashSet;
@@ -947,6 +948,7 @@ mod tests {
             _destination: Address,
             _fw_options: hopr_lib::RoutingOptions,
             _rp_options: Option<hopr_lib::RoutingOptions>,
+            _pseudonym: Option<SimplePseudonym>,
         ) -> std::result::Result<(), TransportSessionError> {
             let (_peer, data) = hopr_transport_session::types::unwrap_chain_address(data.plain_text)?;
 

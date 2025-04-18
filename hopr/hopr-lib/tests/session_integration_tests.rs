@@ -10,7 +10,7 @@ use tokio::net::UdpSocket;
 use hopr_lib::SendMsg;
 use hopr_network_types::prelude::protocol::SessionMessage;
 use hopr_primitive_types::prelude::Address;
-use hopr_transport::{Session, SessionId, TransportSessionError};
+use hopr_transport::{HoprPseudonym, Session, SessionId, TransportSessionError};
 use hopr_transport_session::types::{transfer_session, unwrap_chain_address};
 use hopr_transport_session::Capability;
 
@@ -26,6 +26,7 @@ impl SendMsg for BufferingMsgSender {
         _destination: Address,
         _fw_options: RoutingOptions,
         _rp_options: Option<RoutingOptions>,
+        _pseudonym: Option<HoprPseudonym>,
     ) -> Result<(), TransportSessionError> {
         let (_, data) = unwrap_chain_address(data.plain_text)?;
 

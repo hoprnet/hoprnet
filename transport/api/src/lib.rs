@@ -87,7 +87,6 @@ use crate::{
     errors::HoprTransportError,
 };
 use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_crypto_types::crypto_traits::Randomizable;
 pub use {
     hopr_crypto_packet::HoprPseudonym,
     hopr_crypto_types::{
@@ -566,7 +565,6 @@ where
             self.process_packet_send.clone(),
             self.path_planner.clone(),
             self.me_chain_addr,
-            HoprPseudonym::random(),
         );
 
         self.smgr

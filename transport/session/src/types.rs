@@ -413,7 +413,7 @@ impl futures::AsyncWrite for InnerSession {
 
             // TODO: add RP support to the Session protocol
             self.tx_buffer.push(Box::pin(async move {
-                sender.send_message(payload, peer_id, options, None).await
+                sender.send_message(payload, peer_id, options, None, None).await
             }));
 
             self.tx_bytes += end - start;
@@ -725,16 +725,17 @@ mod tests {
 
         mock.expect_send_message()
             .times(1)
-            .withf(move |data, _peer, options, _rp_options| {
+            .withf(move |data, _peer, options, _, _| {
                 let (_peer_id, data) = unwrap_chain_address(data.plain_text.clone()).expect("Unwrapping should work");
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
                 assert_eq!(
                     options,
                     &RoutingOptions::Hops(1_u32.try_into().expect("must be convertible"))
                 );
+                // TODO: also test RP options here
                 true
             })
-            .returning(|_, _, _, _| Ok(()));
+            .returning(|_, _, _, _, _| Ok(()));
 
         let mut session = InnerSession::new(
             id,
@@ -765,7 +766,7 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        mock.expect_send_message().times(3).returning(|_, _, _, _| Ok(()));
+        mock.expect_send_message().times(3).returning(|_, _, _, _, _| Ok(()));
 
         let mut session = InnerSession::new(
             id,
