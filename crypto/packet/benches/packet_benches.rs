@@ -2,8 +2,10 @@ use bimap::BiHashMap;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_packet::HoprPseudonym;
-use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey, Pseudonym};
+use hopr_crypto_random::Randomizable;
+use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey};
 use hopr_internal_types::prelude::TicketBuilder;
+use hopr_path::TransportPath;
 use hopr_primitive_types::prelude::{Address, BytesEncodable, KeyIdent};
 
 const SAMPLE_SIZE: usize = 100_000;
@@ -43,8 +45,8 @@ pub fn packet_sending_bench(c: &mut Criterion) {
                     &msg,
                     &pseudonym,
                     PacketRouting::ForwardPath {
-                        forward_path: &path[0..=hop],
-                        return_paths: &[],
+                        forward_path: TransportPath::new(path[0..=hop]).unwrap(),
+                        return_paths: vec![],
                     },
                     &chain_key,
                     tb,
@@ -91,8 +93,8 @@ pub fn packet_precompute_1rp_bench(c: &mut Criterion) {
                 PartialHoprPacket::new(
                     &pseudonym,
                     PacketRouting::ForwardPath {
-                        forward_path: &path[0..=hop],
-                        return_paths: &[],
+                        forward_path: TransportPath::new(path[0..=hop]).unwrap(),
+                        return_paths: vec![],
                     },
                     &chain_key,
                     tb,
@@ -139,8 +141,11 @@ pub fn packet_precompute_2rp_bench(c: &mut Criterion) {
                 PartialHoprPacket::new(
                     &pseudonym,
                     PacketRouting::ForwardPath {
-                        forward_path: &path[0..=hop],
-                        return_paths: &[&path[0..=hop], &path[0..=hop]],
+                        forward_path: TransportPath::new(path[0..=hop]).unwrap(),
+                        return_paths: vec![
+                            TransportPath::new(path[0..=hop]).unwrap(),
+                            TransportPath::new(path[0..=hop]).unwrap(),
+                        ],
                     },
                     &chain_key,
                     tb,
@@ -186,8 +191,8 @@ pub fn packet_sending_precomputed_bench(c: &mut Criterion) {
             let precomputed = PartialHoprPacket::new(
                 &pseudonym,
                 PacketRouting::ForwardPath {
-                    forward_path: &path[0..=hop],
-                    return_paths: &[],
+                    forward_path: TransportPath::new(path[0..=hop]).unwrap(),
+                    return_paths: vec![],
                 },
                 &chain_key,
                 tb,
@@ -235,8 +240,8 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
         &msg,
         &pseudonym,
         PacketRouting::ForwardPath {
-            forward_path: &path,
-            return_paths: &[],
+            forward_path: TransportPath::new(path).unwrap(),
+            return_paths: vec![],
         },
         &chain_key,
         tb,
@@ -245,10 +250,10 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     )
     .unwrap()
     {
-        (HoprPacket::Outgoing { packet, ticket, .. }, _) => {
+        (HoprPacket::Outgoing(out), _) => {
             let mut ret = Vec::with_capacity(HoprPacket::SIZE);
-            ret.extend_from_slice(packet.as_ref());
-            ret.extend_from_slice(&ticket.clone().into_encoded());
+            ret.extend_from_slice(out.packet.as_ref());
+            ret.extend_from_slice(&out.ticket.clone().into_encoded());
             ret.into_boxed_slice()
         }
         _ => panic!("should not happen"),
@@ -296,8 +301,8 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
         &msg,
         &pseudonym,
         PacketRouting::ForwardPath {
-            forward_path: &path,
-            return_paths: &[],
+            forward_path: TransportPath::new(path).unwrap(),
+            return_paths: vec![],
         },
         &chain_key,
         tb,
@@ -306,10 +311,10 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     )
     .unwrap()
     {
-        (HoprPacket::Outgoing { packet, ticket, .. }, _) => {
+        (HoprPacket::Outgoing(out), _) => {
             let mut ret = Vec::with_capacity(HoprPacket::SIZE);
-            ret.extend_from_slice(packet.as_ref());
-            ret.extend_from_slice(&ticket.clone().into_encoded());
+            ret.extend_from_slice(out.packet.as_ref());
+            ret.extend_from_slice(&out.ticket.clone().into_encoded());
             ret.into_boxed_slice()
         }
         _ => panic!("should not happen"),
@@ -318,10 +323,10 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     // Relayer
     let packet = match HoprPacket::from_incoming(&packet, &relayer, sender.public().clone(), &mapper, |_| None).unwrap()
     {
-        HoprPacket::Forwarded { packet, ticket, .. } => {
+        HoprPacket::Forwarded(fwd) => {
             let mut ret = Vec::with_capacity(HoprPacket::SIZE);
-            ret.extend_from_slice(packet.as_ref());
-            ret.extend_from_slice(&ticket.clone().into_encoded());
+            ret.extend_from_slice(fwd.outgoing.packet.as_ref());
+            ret.extend_from_slice(&fwd.outgoing.ticket.clone().into_encoded());
             ret.into_boxed_slice()
         }
         _ => panic!("should not happen"),

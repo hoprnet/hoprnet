@@ -13,7 +13,7 @@ pub enum IncomingPacket {
         previous_hop: PeerId,
         plain_text: Box<[u8]>,
         ack_key: HalfKey,
-        is_probe: bool,
+        no_ack: bool,
     },
     /// Packet must be forwarded
     Forwarded {
@@ -35,13 +35,13 @@ impl TryFrom<TransportPacketWithChainData> for IncomingPacket {
                 previous_hop,
                 plain_text,
                 ack_key,
-                is_probe,
+                no_ack,
             } => Ok(IncomingPacket::Final {
                 packet_tag,
                 previous_hop: previous_hop.into(),
                 plain_text,
                 ack_key,
-                is_probe,
+                no_ack,
             }),
             TransportPacketWithChainData::Forwarded {
                 packet_tag,
@@ -98,7 +98,7 @@ pub enum TransportPacket {
         previous_hop: PeerId,
         plain_text: Box<[u8]>,
         ack_key: HalfKey,
-        is_probe: bool,
+        no_ack: bool,
     },
     /// Packet must be forwarded
     Forwarded {
@@ -124,13 +124,13 @@ impl From<IncomingPacket> for TransportPacket {
                 previous_hop,
                 plain_text,
                 ack_key,
-                is_probe,
+                no_ack,
             } => TransportPacket::Final {
                 packet_tag,
                 previous_hop,
                 plain_text,
                 ack_key,
-                is_probe,
+                no_ack,
             },
             IncomingPacket::Forwarded {
                 packet_tag,

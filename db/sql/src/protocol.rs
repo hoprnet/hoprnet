@@ -279,7 +279,11 @@ impl HoprDbProtocolOperations for HoprDb {
     }
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn to_probe(&self, data: Box<[u8]>, destination: &OffchainPublicKey) -> Result<TransportPacketWithChainData> {
+    async fn to_send_no_ack(
+        &self,
+        data: Box<[u8]>,
+        destination: &OffchainPublicKey,
+    ) -> Result<TransportPacketWithChainData> {
         let next_peer = self.resolve_chain_key(destination).await?.ok_or_else(|| {
             DbSqlError::LogicalError(format!(
                 "failed to find chain key for packet key {} on previous hop",
@@ -303,7 +307,7 @@ impl HoprDbProtocolOperations for HoprDb {
             HoprPacket::into_outgoing(
                 &data,
                 &pseudonym,
-                PacketRouting::Probe::<ValidatedPath>(destination),
+                PacketRouting::NoAck::<ValidatedPath>(destination),
                 &myself.chain_key,
                 next_ticket,
                 &myself.caches.key_id_mapper,
@@ -443,7 +447,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 previous_hop: incoming.previous_hop,
                 plain_text: incoming.plain_text,
                 ack_key: incoming.ack_key,
-                is_probe: incoming.is_probe,
+                no_ack: incoming.no_ack,
             }),
             HoprPacket::Forwarded(fwd) => {
                 match self

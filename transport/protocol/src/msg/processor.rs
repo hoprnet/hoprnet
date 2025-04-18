@@ -138,11 +138,11 @@ where
                 previous_hop,
                 plain_text,
                 ack_key,
-                is_probe,
+                no_ack,
                 ..
             } => {
                 // If this is not a probe packet, send an acknowledgement back to the previous hop
-                if !is_probe {
+                if !no_ack {
                     let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
                     RecvOperation::Receive {
                         data: app_data,
@@ -152,7 +152,7 @@ where
                         },
                     }
                 } else {
-                    // TODO: implement no-acknowledgement (probe) packet handling
+                    // TODO: implement no-acknowledgement packet handling
                     unimplemented!()
                 }
             }

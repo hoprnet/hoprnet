@@ -24,7 +24,9 @@ pub trait HoprDbProtocolOperations {
 
     /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
     async fn get_network_ticket_price(&self) -> crate::errors::Result<Balance>;
-    async fn to_probe(
+
+    /// Process the data into an outgoing packet that is not going to be acknowledged.
+    async fn to_send_no_ack(
         &self,
         data: Box<[u8]>,
         destination: &OffchainPublicKey,
@@ -79,7 +81,7 @@ pub enum TransportPacketWithChainData {
         previous_hop: OffchainPublicKey,
         plain_text: Box<[u8]>,
         ack_key: HalfKey,
-        is_probe: bool,
+        no_ack: bool,
     },
     /// Packet must be forwarded
     Forwarded {
