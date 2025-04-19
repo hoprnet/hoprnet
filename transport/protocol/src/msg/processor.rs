@@ -13,10 +13,11 @@ use hopr_crypto_packet::errors::{
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
+use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 
 use super::packet::OutgoingPacket;
-use crate::{bloom, RoutingValues};
+use crate::bloom;
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -27,7 +28,7 @@ lazy_static::lazy_static! {
 pub trait PacketWrapping {
     type Input;
 
-    async fn send(&self, data: ApplicationData, routing: RoutingValues) -> Result<(PeerId, Box<[u8]>)>;
+    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<(PeerId, Box<[u8]>)>;
 }
 
 pub struct SendPkt {
@@ -71,14 +72,12 @@ where
     type Input = ApplicationData;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn send(&self, data: ApplicationData, routing: RoutingValues) -> Result<(PeerId, Box<[u8]>)> {
+    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<(PeerId, Box<[u8]>)> {
         let packet = self
             .db
             .to_send(
                 data.to_bytes(),
-                routing.pseudonym,
-                routing.forward_path,
-                routing.return_paths,
+                routing,
                 self.determine_actual_outgoing_win_prob().await,
                 self.determine_actual_outgoing_ticket_price().await?,
             )
@@ -284,7 +283,7 @@ impl PacketSendAwaiter {
     }
 }
 
-pub type SendMsgInput = (ApplicationData, RoutingValues, PacketSendFinalizer);
+pub type SendMsgInput = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer);
 
 #[derive(Debug, Clone)]
 pub struct MsgSender<T>
@@ -304,7 +303,11 @@ where
 
     /// Pushes a new packet into processing.
     #[tracing::instrument(level = "trace", skip(self, data))]
-    pub async fn send_packet(&self, data: ApplicationData, routing: RoutingValues) -> Result<PacketSendAwaiter> {
+    pub async fn send_packet(
+        &self,
+        data: ApplicationData,
+        routing: ResolvedTransportRouting,
+    ) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 
         self.tx
@@ -380,7 +383,7 @@ mod tests {
             ChainKeypair::random().public().to_address(),
         );
 
-        let routing = RoutingValues {
+        let routing = ResolvedTransportRouting::Forward {
             pseudonym: None,
             forward_path: expected_path.clone(),
             return_paths: vec![],

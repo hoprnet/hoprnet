@@ -17,6 +17,9 @@ pub enum ProtocolError {
     #[error("timeout on protocol operation")]
     Timeout,
 
+    #[error("no surb found for the given pseudonym")]
+    NoSurb,
+
     #[error("invalidate acknowledgement signature")]
     InvalidSignature,
 

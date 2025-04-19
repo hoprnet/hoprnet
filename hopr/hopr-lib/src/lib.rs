@@ -66,8 +66,8 @@ use hopr_path::channel_graph::{ChannelGraph, ChannelGraphConfig, NodeScoreUpdate
 use hopr_platform::file::native::{join, remove_dir_all};
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 use hopr_transport::{
-    execute_on_tick, ChainKeypair, Hash, HoprPseudonym, HoprTransport, HoprTransportConfig, HoprTransportProcess,
-    IncomingSession, OffchainKeypair, PeerDiscovery, PeerStatus,
+    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession,
+    OffchainKeypair, PeerDiscovery, PeerStatus,
 };
 pub use {
     hopr_chain_actions::errors::ChainActionsError,
@@ -121,6 +121,7 @@ lazy_static::lazy_static! {
 }
 
 pub use async_trait::async_trait;
+use hopr_network_types::prelude::DestinationRouting;
 
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.
@@ -1107,24 +1108,12 @@ impl Hopr {
     pub async fn send_message(
         &self,
         msg: Box<[u8]>,
-        destination: Address,
-        forward_options: RoutingOptions,
-        return_options: Option<RoutingOptions>,
+        routing: DestinationRouting,
         application_tag: Tag,
-        pseudonym: Option<HoprPseudonym>,
     ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        self.transport_api
-            .send_message(
-                msg,
-                destination,
-                forward_options,
-                return_options,
-                application_tag,
-                pseudonym,
-            )
-            .await?;
+        self.transport_api.send_message(msg, routing, application_tag).await?;
 
         Ok(())
     }

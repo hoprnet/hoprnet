@@ -14,11 +14,14 @@ use hopr_db_api::protocol::{
 };
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::prelude::*;
+use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_parallelize::cpu::spawn_fifo_blocking;
 use hopr_path::errors::PathError;
 use hopr_path::{Path, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::prelude::*;
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::ops::{Mul, Sub};
+use std::sync::{Arc, Mutex};
 use tracing::{instrument, trace, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -282,15 +285,16 @@ impl HoprDbProtocolOperations for HoprDb {
     async fn to_send_no_ack(
         &self,
         data: Box<[u8]>,
-        destination: &OffchainPublicKey,
+        destination: OffchainPublicKey,
     ) -> Result<TransportPacketWithChainData> {
-        let next_peer = self.resolve_chain_key(destination).await?.ok_or_else(|| {
+        let next_peer = self.resolve_chain_key(&destination).await?.ok_or_else(|| {
             DbSqlError::LogicalError(format!(
                 "failed to find chain key for packet key {} on previous hop",
                 destination.to_peerid_str()
             ))
         })?;
 
+        // No-ack packets are always sent as zero-hops with a random pseudonym
         let pseudonym = HoprPseudonym::random();
         let next_ticket = TicketBuilder::zero_hop().direction(&self.me_onchain, &next_peer);
 
@@ -302,7 +306,6 @@ impl HoprDbProtocolOperations for HoprDb {
 
         // Construct the outgoing packet
         let myself = self.clone();
-        let destination = *destination;
         let (packet, _) = spawn_fifo_blocking(move || {
             HoprPacket::into_outgoing(
                 &data,
@@ -332,27 +335,66 @@ impl HoprDbProtocolOperations for HoprDb {
         }
     }
 
-    #[tracing::instrument(level = "trace", skip(self, data, forward_path, return_paths))]
+    #[tracing::instrument(level = "trace", skip(self, data, routing))]
     async fn to_send(
         &self,
         data: Box<[u8]>,
-        pseudonym: Option<HoprPseudonym>,
-        forward_path: ValidatedPath,
-        return_paths: Vec<ValidatedPath>,
+        routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData> {
-        let next_peer = self.resolve_chain_key(&forward_path[0]).await?.ok_or_else(|| {
+        // Get necessary packet routing values
+        let (next_peer, num_hops, pseudonym, routing) = match routing {
+            ResolvedTransportRouting::Forward {
+                pseudonym,
+                forward_path,
+                return_paths,
+            } => (
+                forward_path[0],
+                forward_path.num_hops(),
+                pseudonym,
+                PacketRouting::ForwardPath {
+                    forward_path,
+                    return_paths,
+                },
+            ),
+            ResolvedTransportRouting::Return(pseudonym) => {
+                // Try to retrieve the SURB from the pseudonym
+                let surb = self
+                    .caches
+                    .surbs_per_pseudonym
+                    .get(&pseudonym)
+                    .await
+                    .ok_or(DbSqlError::LogicalError("unknown pseudonym".into()))?
+                    .lock()
+                    .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
+                    .dequeue()
+                    .ok_or(DbSqlError::LogicalError("no surb available for pseudonym".into()))?;
+
+                let next = self
+                    .caches
+                    .key_id_mapper
+                    .map_id_to_public(&surb.first_relayer)
+                    .ok_or(DbSqlError::MissingAccount)?;
+
+                (
+                    next,
+                    surb.additional_data_receiver.chain_length() as usize,
+                    pseudonym,
+                    PacketRouting::Surb(surb),
+                )
+            }
+        };
+
+        let next_peer = self.resolve_chain_key(&next_peer).await?.ok_or_else(|| {
             DbSqlError::LogicalError(format!(
                 "failed to find chain key for packet key {} on previous hop",
-                forward_path[0].to_peerid_str()
+                next_peer.to_peerid_str()
             ))
         })?;
 
-        let pseudonym = pseudonym.unwrap_or_else(HoprPseudonym::random);
-
         // Decide whether to create a multi-hop or a zero-hop ticket
-        let next_ticket = if forward_path.num_hops() > 1 {
+        let next_ticket = if num_hops > 1 {
             let channel = self
                 .get_channel_by_parties(None, &self.me_onchain, &next_peer, true)
                 .await?
@@ -362,7 +404,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 channel,
                 self.me_onchain,
                 next_peer,
-                forward_path.num_hops() as u8,
+                num_hops as u8,
                 outgoing_ticket_win_prob,
                 outgoing_ticket_price,
             )
@@ -383,10 +425,7 @@ impl HoprDbProtocolOperations for HoprDb {
             HoprPacket::into_outgoing(
                 &data,
                 &pseudonym,
-                PacketRouting::ForwardPath {
-                    forward_path,
-                    return_paths,
-                },
+                routing,
                 &myself.chain_key,
                 next_ticket,
                 &myself.caches.key_id_mapper,
@@ -397,6 +436,7 @@ impl HoprDbProtocolOperations for HoprDb {
         .await?;
 
         // Store the reply openers under the given pseudonym
+        // This is a no-op for reply packets
         openers
             .into_iter()
             .for_each(|p| self.caches.pseudonym_openers.insert(pseudonym, p));
@@ -442,13 +482,34 @@ impl HoprDbProtocolOperations for HoprDb {
         .await?;
 
         match packet {
-            HoprPacket::Final(incoming) => Ok(TransportPacketWithChainData::Final {
-                packet_tag: incoming.packet_tag,
-                previous_hop: incoming.previous_hop,
-                plain_text: incoming.plain_text,
-                ack_key: incoming.ack_key,
-                no_ack: incoming.no_ack,
-            }),
+            HoprPacket::Final(incoming) => {
+                // Store all incoming SURBs if any
+                if !incoming.surbs.is_empty() {
+                    let surbs = self
+                        .caches
+                        .surbs_per_pseudonym
+                        .get_with_by_ref(&incoming.sender, async {
+                            Arc::new(Mutex::new(AllocRingBuffer::new(10_000)))
+                        })
+                        .await;
+
+                    let num_surbs = incoming.surbs.len();
+                    surbs
+                        .lock()
+                        .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
+                        .extend(incoming.surbs);
+
+                    tracing::trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
+                }
+
+                Ok(TransportPacketWithChainData::Final {
+                    packet_tag: incoming.packet_tag,
+                    previous_hop: incoming.previous_hop,
+                    plain_text: incoming.plain_text,
+                    ack_key: incoming.ack_key,
+                    no_ack: incoming.no_ack,
+                })
+            }
             HoprPacket::Forwarded(fwd) => {
                 match self
                     .validate_and_replace_ticket(*fwd, &self.chain_key, outgoing_ticket_win_prob, outgoing_ticket_price)

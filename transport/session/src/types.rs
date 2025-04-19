@@ -2,7 +2,7 @@ use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_internal_types::protocol::ApplicationData;
-use hopr_network_types::prelude::{RoutingOptions, SealedHost};
+use hopr_network_types::prelude::{DestinationRouting, RoutingOptions, SealedHost};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::prelude::Address;
 use hopr_primitive_types::traits::BytesRepresentable;
@@ -403,13 +403,15 @@ impl futures::AsyncWrite for InnerSession {
                 .map(move |payload| ApplicationData::new_from_owned(tag, payload.into_boxed_slice()))?;
 
             let sender = self.tx.clone();
-            let peer_id = *self.id.peer();
-            let options = self.options.clone();
-
             // TODO: add RP support to the Session protocol
-            self.tx_buffer.push(Box::pin(async move {
-                sender.send_message(payload, peer_id, options, None, None).await
-            }));
+            let routing = DestinationRouting::Forward {
+                destination: *self.id.peer(),
+                pseudonym: None,
+                forward_options: self.options.clone(),
+                return_options: None,
+            };
+            self.tx_buffer
+                .push(Box::pin(async move { sender.send_message(payload, routing).await }));
 
             self.tx_bytes += end - start;
         }

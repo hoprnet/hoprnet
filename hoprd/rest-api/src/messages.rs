@@ -10,15 +10,15 @@ use std::{sync::Arc, time::Duration};
 use tracing::error;
 use validator::Validate;
 
-use hopr_lib::{
-    errors::{HoprLibError, HoprStatusError},
-    AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
-};
-
 use crate::{
     types::{HoprIdentifier, PeerOrAddress},
     ApiError, ApiErrorStatus, InternalState, BASE_PATH,
 };
+use hopr_lib::{
+    errors::{HoprLibError, HoprStatusError},
+    AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
+};
+use hopr_network_types::prelude::DestinationRouting;
 
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -137,7 +137,7 @@ pub(super) async fn send_message(
             .into_response()
     })?;
 
-    let peer_id = match HoprIdentifier::new_with(args.destination, hopr.peer_resolver()).await {
+    let peer_addr = match HoprIdentifier::new_with(args.destination, hopr.peer_resolver()).await {
         Ok(destination) => destination.address,
         Err(e) => return Err(e.into_response()),
     };
@@ -202,10 +202,13 @@ pub(super) async fn send_message(
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
     // NOTE: The return path is not introduced to, because the send_message API will be deprecated
-    match hopr
-        .send_message(args.body.into_boxed_slice(), peer_id, options, None, args.tag, None)
-        .await
-    {
+    let routing = DestinationRouting::Forward {
+        destination: peer_addr,
+        pseudonym: None,
+        forward_options: options,
+        return_options: None,
+    };
+    match hopr.send_message(args.body.into_boxed_slice(), routing, args.tag).await {
         Ok(_) => Ok((
             StatusCode::ACCEPTED,
             Json(SendMessageResponse {

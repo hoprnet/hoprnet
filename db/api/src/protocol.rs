@@ -1,10 +1,9 @@
 use async_trait::async_trait;
-use std::{fmt::Debug, result::Result};
-
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_path::ValidatedPath;
+use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::Balance;
+use std::{fmt::Debug, result::Result};
 
 use crate::prelude::DbError;
 
@@ -29,16 +28,14 @@ pub trait HoprDbProtocolOperations {
     async fn to_send_no_ack(
         &self,
         data: Box<[u8]>,
-        destination: &OffchainPublicKey,
+        destination: OffchainPublicKey,
     ) -> Result<TransportPacketWithChainData, DbError>;
 
     /// Process the data into an outgoing packet
     async fn to_send(
         &self,
         data: Box<[u8]>,
-        pseudonym: Option<SimplePseudonym>,
-        path: ValidatedPath,
-        return_paths: Vec<ValidatedPath>,
+        routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData, DbError>;

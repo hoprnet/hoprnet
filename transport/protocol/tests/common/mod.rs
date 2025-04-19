@@ -24,7 +24,7 @@ use hopr_primitive_types::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
     msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-    RoutingValues, DEFAULT_PRICE_PER_PACKET,
+    ResolvedTransportRouting, DEFAULT_PRICE_PER_PACKET,
 };
 use tracing::debug;
 
@@ -150,7 +150,7 @@ pub type WireChannels = (
 );
 
 pub type LogicalChannels = (
-    futures::channel::mpsc::UnboundedSender<(ApplicationData, RoutingValues, PacketSendFinalizer)>,
+    futures::channel::mpsc::UnboundedSender<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>,
     futures::channel::mpsc::UnboundedReceiver<ApplicationData>,
 );
 
@@ -198,7 +198,7 @@ pub async fn peer_setup_for(
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
 
         let (api_send_tx, api_send_rx) =
-            futures::channel::mpsc::unbounded::<(ApplicationData, RoutingValues, PacketSendFinalizer)>();
+            futures::channel::mpsc::unbounded::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>();
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
 
         let opk: &OffchainKeypair = &PEERS[i];
@@ -390,7 +390,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
     let mut sent_packet_count = 0;
     for i in 0..packet_count {
         let sender = MsgSender::new(apis[0].0.clone());
-        let routing = RoutingValues {
+        let routing = ResolvedTransportRouting {
             pseudonym: None,
             forward_path: packet_path.clone(),
             return_paths: vec![],

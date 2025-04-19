@@ -73,10 +73,9 @@ use std::collections::HashMap;
 use tracing::error;
 
 use hopr_async_runtime::prelude::spawn;
-use hopr_crypto_packet::HoprPseudonym;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
-use hopr_path::ValidatedPath;
+use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_transport_identity::PeerId;
 
 pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
@@ -140,13 +139,6 @@ pub enum PeerDiscovery {
     Announce(PeerId, Vec<Multiaddr>),
 }
 
-#[derive(Debug, Clone)]
-pub struct RoutingValues {
-    pub pseudonym: Option<HoprPseudonym>,
-    pub forward_path: ValidatedPath,
-    pub return_paths: Vec<ValidatedPath>,
-}
-
 /// Run all processes responsible for handling the msg and acknowledgment protocols.
 ///
 /// The pipeline does not handle the mixing itself, that needs to be injected as a separate process
@@ -166,7 +158,10 @@ pub async fn run_msg_ack_protocol<Db>(
     ),
     api: (
         impl futures::Sink<ApplicationData> + Send + Sync + 'static,
-        impl futures::Stream<Item = (ApplicationData, RoutingValues, PacketSendFinalizer)> + Send + Sync + 'static,
+        impl futures::Stream<Item = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
+            + Send
+            + Sync
+            + 'static,
     ),
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::prelude::JoinHandle<()>>
 where

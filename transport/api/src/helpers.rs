@@ -8,13 +8,14 @@ use tracing::trace;
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_packet::HoprPseudonym;
+use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::protocol::ApplicationData;
-use hopr_network_types::prelude::RoutingOptions;
+use hopr_network_types::prelude::{ResolvedTransportRouting, RoutingOptions};
+use hopr_network_types::types::DestinationRouting;
 use hopr_path::{selectors::PathSelector, ChainPath, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::primitives::Address;
 use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
-use hopr_transport_protocol::RoutingValues;
 use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
     traits::SendMsg,
@@ -59,6 +60,7 @@ pub(crate) struct PathPlanner<T, S> {
     db: T,
     channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
     selector: S,
+    me: Address,
 }
 
 impl<T, S> PathPlanner<T, S>
@@ -66,11 +68,17 @@ where
     T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
-    pub(crate) fn new(db: T, selector: S, channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>) -> Self {
+    pub(crate) fn new(
+        me: Address,
+        db: T,
+        selector: S,
+        channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
+    ) -> Self {
         Self {
             db,
             channel_graph,
             selector,
+            me,
         }
     }
 
@@ -124,13 +132,52 @@ where
 
         Ok(path)
     }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub(crate) async fn resolve_routing(
+        &self,
+        size_hint: usize,
+        routing: DestinationRouting,
+    ) -> crate::errors::Result<ResolvedTransportRouting> {
+        match routing {
+            DestinationRouting::Forward {
+                destination,
+                pseudonym,
+                forward_options,
+                return_options,
+            } => {
+                let forward_path = self.resolve_path(self.me, destination, forward_options).await?;
+
+                let return_paths = if let Some(return_options) = return_options {
+                    let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint);
+                    trace!(%destination, %num_possible_surbs, data_len = size_hint, "resolving packet return paths");
+
+                    (0..num_possible_surbs)
+                        .map(|_| self.resolve_path(destination, self.me, return_options.clone()))
+                        .collect::<FuturesUnordered<_>>()
+                        .try_collect::<Vec<ValidatedPath>>()
+                        .await?
+                } else {
+                    vec![]
+                };
+
+                trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
+
+                Ok(ResolvedTransportRouting::Forward {
+                    pseudonym: pseudonym.unwrap_or_else(HoprPseudonym::random),
+                    forward_path,
+                    return_paths,
+                })
+            }
+            DestinationRouting::Return(pseudonym) => Ok(ResolvedTransportRouting::Return(pseudonym)),
+        }
+    }
 }
 
 #[derive(Clone)]
 pub(crate) struct MessageSender<T, S> {
     pub process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     pub resolver: PathPlanner<T, S>,
-    me: Address,
 }
 
 impl<T, S> MessageSender<T, S>
@@ -141,12 +188,10 @@ where
     pub fn new(
         process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
         resolver: PathPlanner<T, S>,
-        me: Address,
     ) -> Self {
         Self {
             process_packet_send,
             resolver,
-            me,
         }
     }
 }
@@ -161,36 +206,16 @@ where
     async fn send_message(
         &self,
         data: ApplicationData,
-        destination: Address,
-        forward_options: RoutingOptions,
-        return_options: Option<RoutingOptions>,
-        pseudonym: Option<HoprPseudonym>,
+        routing: DestinationRouting,
     ) -> std::result::Result<(), TransportSessionError> {
-        let return_paths = if let Some(return_options) = return_options {
-            let num_possible_surbs = HoprPacket::max_surbs_with_message(data.len());
-            trace!(%destination, %num_possible_surbs, len = data.len(), "resolving packet return paths");
-
-            (0..num_possible_surbs)
-                .map(|_| self.resolver.resolve_path(destination, self.me, return_options.clone()))
-                .collect::<FuturesUnordered<_>>()
-                .try_collect::<Vec<ValidatedPath>>()
-                .await
-                .map_err(|_| TransportSessionError::Path)?
-        } else {
-            vec![]
-        };
-
-        let routing = RoutingValues {
-            pseudonym,
-            forward_path: self
-                .resolver
-                .resolve_path(self.me, destination, forward_options)
-                .await
-                .map_err(|_| TransportSessionError::Path)?,
-            return_paths,
-        };
-
-        trace!(%destination, num_surbs = routing.return_paths.len(), len = data.len(), "resolved packet");
+        let routing = self
+            .resolver
+            .resolve_routing(data.len(), routing)
+            .await
+            .map_err(|err| {
+                tracing::error!(%err, "failed to resolve routing");
+                TransportSessionError::Path
+            })?;
 
         self.process_packet_send
             .get()
@@ -202,7 +227,7 @@ where
             .await
             .map_err(|_e| TransportSessionError::Timeout)?;
 
-        trace!("Packet sent to the outgoing queue");
+        trace!("packet sent to the outgoing queue");
 
         Ok(())
     }

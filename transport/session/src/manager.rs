@@ -109,10 +109,13 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                     .unwrap()
                     .send_message(
                         data,
-                        *session_id.peer(),
-                        session_data.routing_opts,
-                        None, // TODO: add RP support to the Session protocol
-                        None,
+                        DestinationRouting::Forward {
+                            // TODO: add RP support to the Session protocol
+                            destination: *session_id.peer(),
+                            pseudonym: None,
+                            forward_options: session_data.routing_opts,
+                            return_options: None,
+                        },
                     )
                     .await
                 {
@@ -398,10 +401,13 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         msg_sender
             .send_message(
                 start_session_msg.try_into()?,
-                cfg.peer,
-                cfg.path_options.clone(),
-                None, // TODO: add RP support to the Session protocol
-                None,
+                DestinationRouting::Forward {
+                    // TODO: add RP support to the Session protocol
+                    destination: cfg.peer,
+                    pseudonym: None,
+                    forward_options: cfg.path_options.clone(),
+                    return_options: None,
+                },
             )
             .await?;
 
@@ -585,7 +591,15 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                     // TODO: add RP support to the Session protocol
                     msg_sender
-                        .send_message(data.try_into()?, peer, route, None, None)
+                        .send_message(
+                            data.try_into()?,
+                            DestinationRouting::Forward {
+                                destination: peer,
+                                pseudonym: None,
+                                forward_options: route,
+                                return_options: None,
+                            },
+                        )
                         .await
                         .map_err(|e| {
                             SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
@@ -613,7 +627,15 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                     // TODO: add RP support to the Session protocol
                     msg_sender
-                        .send_message(data.try_into()?, peer, route, None, None)
+                        .send_message(
+                            data.try_into()?,
+                            DestinationRouting::Forward {
+                                destination: peer,
+                                pseudonym: None,
+                                forward_options: route,
+                                return_options: None,
+                            },
+                        )
                         .await
                         .map_err(|e| {
                             SessionManagerError::Other(format!(
@@ -702,10 +724,13 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     .ok_or(SessionManagerError::NotStarted)?
                     .send_message(
                         StartProtocol::CloseSession(session_id.with_address(self.me)).try_into()?,
-                        *session_id.peer(),
-                        session_data.routing_opts,
-                        None, // TODO: add RP support to the Session protocol
-                        None,
+                        DestinationRouting::Forward {
+                            // TODO: add RP support to the Session protocol
+                            destination: *session_id.peer(),
+                            pseudonym: None,
+                            forward_options: session_data.routing_opts,
+                            return_options: None,
+                        },
                     )
                     .await?;
             }

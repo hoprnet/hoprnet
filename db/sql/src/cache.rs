@@ -1,16 +1,16 @@
+use crate::errors::DbSqlError;
 use dashmap::{DashMap, Entry};
-use hopr_crypto_packet::{HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, ReplyOpener};
+use hopr_crypto_packet::{HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::info::{IndexerData, SafeInfo};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::{Address, Balance, KeyIdent, U256};
 use moka::future::Cache;
 use moka::Expiry;
+use ringbuffer::AllocRingBuffer;
 use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-
-use crate::errors::DbSqlError;
 
 /// Enumerates all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for long term.
@@ -70,6 +70,7 @@ pub struct HoprDbCaches {
     pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
     pub(crate) key_id_mapper: CacheKeyMapper,
     pub(crate) pseudonym_openers: moka::sync::Cache<HoprPseudonym, ReplyOpener>,
+    pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, Arc<Mutex<AllocRingBuffer<HoprSurb>>>>,
 }
 
 impl Default for HoprDbCaches {
@@ -101,8 +102,13 @@ impl Default for HoprDbCaches {
             .build();
 
         let pseudonym_openers = moka::sync::Cache::builder()
-            .max_capacity(100_000)
             .time_to_live(Duration::from_secs(60))
+            .max_capacity(100_000)
+            .build();
+
+        let surbs_per_pseudonym = Cache::builder()
+            .time_to_idle(Duration::from_secs(60))
+            .max_capacity(100_000)
             .build();
 
         Self {
@@ -114,6 +120,7 @@ impl Default for HoprDbCaches {
             offchain_to_chain,
             src_dst_to_channel,
             pseudonym_openers,
+            surbs_per_pseudonym,
             key_id_mapper: CacheKeyMapper::with_capacity(10_000),
         }
     }
