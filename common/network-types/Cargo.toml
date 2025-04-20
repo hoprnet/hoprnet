@@ -10,7 +10,14 @@ license = "GPL-3.0-only"
 
 [features]
 default = []
-serde = ["dep:serde", "dep:serde_bytes", "libp2p-identity/serde"]
+serde = [
+  "dep:serde",
+  "dep:serde_bytes",
+  "libp2p-identity/serde",
+  "hopr-crypto-packet/serde",
+  "hopr-crypto-types/serde",
+  "hopr-path/serde",
+]
 runtime-async-std = [
   "dep:async-std-resolver",
   "hopr-async-runtime/runtime-async-std",

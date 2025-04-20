@@ -556,11 +556,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use futures::{AsyncReadExt, AsyncWriteExt};
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-
     use super::*;
     use crate::traits::MockSendMsg;
+    use futures::{AsyncReadExt, AsyncWriteExt};
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use hopr_network_types::prelude::RoutingOptions;
 
     #[test]
     fn wrapping_and_unwrapping_with_chain_key_should_be_an_identity() -> anyhow::Result<()> {
@@ -629,7 +629,7 @@ mod tests {
         let session = InnerSession::new(
             id,
             (&ChainKeypair::random()).into(),
-            RoutingOptions::Hops(1_u32.try_into()?),
+            DestinationRouting::forward_only(id.peer, RoutingOptions::Hops(1_u32.try_into()?)),
             Arc::new(mock),
             rx,
         );
@@ -648,7 +648,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             (&ChainKeypair::random()).into(),
-            RoutingOptions::Hops(1_u32.try_into()?),
+            DestinationRouting::forward_only(id.peer, RoutingOptions::Hops(1_u32.try_into()?)),
             Arc::new(mock),
             rx,
         );
@@ -680,7 +680,7 @@ mod tests {
         let mut session = InnerSession::new(
             id,
             (&ChainKeypair::random()).into(),
-            RoutingOptions::Hops(1_u32.try_into()?),
+            DestinationRouting::forward_only(id.peer, RoutingOptions::Hops(1_u32.try_into()?)),
             Arc::new(mock),
             rx,
         );
@@ -718,22 +718,19 @@ mod tests {
 
         mock.expect_send_message()
             .times(1)
-            .withf(move |data, _peer, options, _, _| {
+            .withf(move |data, routing,| {
                 let (_peer_id, data) = unwrap_chain_address(&data.plain_text).expect("Unwrapping should work");
                 assert_eq!(data, b"Hello, world!".to_vec().into_boxed_slice());
-                assert_eq!(
-                    options,
-                    &RoutingOptions::Hops(1_u32.try_into().expect("must be convertible"))
-                );
+                assert!(matches!(routing, DestinationRouting::Forward {forward_options,..} if forward_options == &RoutingOptions::Hops(1_u32.try_into().expect("must be convertible"))));
                 // TODO: also test RP options here
                 true
             })
-            .returning(|_, _, _, _, _| Ok(()));
+            .returning(|_, _| Ok(()));
 
         let mut session = InnerSession::new(
             id,
             (&ChainKeypair::random()).into(),
-            RoutingOptions::Hops(1_u32.try_into()?),
+            DestinationRouting::forward_only(id.peer, RoutingOptions::Hops(1_u32.try_into()?)),
             Arc::new(mock),
             rx,
         );
@@ -759,12 +756,12 @@ mod tests {
             .to_vec()
             .into_boxed_slice();
 
-        mock.expect_send_message().times(3).returning(|_, _, _, _, _| Ok(()));
+        mock.expect_send_message().times(3).returning(|_, _| Ok(()));
 
         let mut session = InnerSession::new(
             id,
             (&ChainKeypair::random()).into(),
-            RoutingOptions::Hops(1_u32.try_into()?),
+            DestinationRouting::forward_only(id.peer, RoutingOptions::Hops(1_u32.try_into()?)),
             Arc::new(mock),
             rx,
         );

@@ -344,6 +344,18 @@ pub enum DestinationRouting {
     Return(HoprPseudonym),
 }
 
+impl DestinationRouting {
+    /// Shortcut for routing that does not create any SURBs for a return path.
+    pub fn forward_only(destination: Address, forward_options: RoutingOptions) -> Self {
+        Self::Forward {
+            destination,
+            pseudonym: None,
+            forward_options,
+            return_options: None,
+        }
+    }
+}
+
 /// Contains the resolved routing information for the packet.
 ///
 /// This contains the actual forward and return paths for forward packets,

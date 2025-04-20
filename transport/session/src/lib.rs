@@ -72,6 +72,7 @@ pub struct SessionClientConfig {
     /// The fixed path options for the session.
     pub path_options: RoutingOptions,
 
+    // TODO: add RP support
     /// Contains target protocol and optionally encrypted target of the session.
     pub target: SessionTarget,
 

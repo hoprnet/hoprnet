@@ -750,7 +750,7 @@ mod tests {
     use async_trait::async_trait;
     use futures::AsyncWriteExt;
     use hopr_crypto_types::keypairs::ChainKeypair;
-    use hopr_crypto_types::prelude::{Keypair, SimplePseudonym};
+    use hopr_crypto_types::prelude::Keypair;
     use hopr_primitive_types::bounded::BoundedSize;
 
     mockall::mock! {
@@ -763,10 +763,7 @@ mod tests {
             async fn send_message(
                 &self,
                 data: ApplicationData,
-                destination: Address,
-                fwd_options: RoutingOptions,
-                ret_options: Option<RoutingOptions>,
-                pseudonym: Option<SimplePseudonym>
+                routing: DestinationRouting,
             ) -> std::result::Result<(), TransportSessionError>;
         }
     }
@@ -812,8 +809,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == bob_peer)
-            .returning(move |data, _, _, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -831,8 +828,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == alice_peer)
-            .returning(move |data, _, _, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -850,8 +847,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == bob_peer)
-            .returning(move |data, _, _, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -862,8 +859,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == alice_peer)
-            .returning(move |data, _, _, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -936,8 +933,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == bob_peer)
-            .returning(move |data, _, _, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -955,8 +952,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == alice_peer)
-            .returning(move |data, _, _, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -974,8 +971,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == bob_peer)
-            .returning(move |data, _, _, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -986,8 +983,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == alice_peer)
-            .returning(move |data, _, _, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1072,8 +1069,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == bob_peer)
-            .returning(move |data, _, _, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1084,8 +1081,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == alice_peer)
-            .returning(move |data, _, _, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1138,8 +1135,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _, _, _| *peer == bob_peer)
-            .returning(|_, _, _, _, _| Ok(()));
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(|_, _| Ok(()));
 
         let mut jhs = Vec::new();
 
