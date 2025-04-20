@@ -607,12 +607,18 @@ pub(crate) mod tests {
                 forward_path: &pubkeys,
                 additional_data_relayer: &por_strings,
                 pseudonym: &pseudonym,
+                no_ack: false,
             },
             &mapper,
         )?;
 
-        let encoded_1 = bincode::serialize(&packet_1)?;
-        let packet_2: PartialPacket<S, TestHeader<S>> = bincode::deserialize(&encoded_1)?;
+        const BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+            .with_little_endian()
+            .with_variable_int_encoding();
+
+        let encoded_1 = bincode::serde::encode_to_vec(&packet_1, BINCODE_CONFIGURATION)?;
+        let packet_2: PartialPacket<S, TestHeader<S>> =
+            bincode::serde::decode_from_slice(&encoded_1, BINCODE_CONFIGURATION)?.0;
 
         assert_eq!(packet_1, packet_2);
         Ok(())

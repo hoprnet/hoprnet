@@ -76,7 +76,7 @@ use crate::helpers::PathPlanner;
 use hopr_path::selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting};
 
 #[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_session::types::transfer_session;
+pub use hopr_transport_session::transfer_session;
 
 pub use crate::{
     config::HoprTransportConfig,
@@ -101,11 +101,11 @@ pub use {
     hopr_transport_identity::{Multiaddr, PeerId},
     hopr_transport_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
     hopr_transport_protocol::{execute_on_tick, PeerDiscovery},
-    hopr_transport_session::types::{ServiceId, SessionTarget},
     hopr_transport_session::{
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
         SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
     },
+    hopr_transport_session::{ServiceId, SessionTarget},
 };
 
 #[cfg(any(

@@ -354,6 +354,8 @@ mod tests {
     use anyhow::Context;
     use async_std::future::timeout;
     use futures::StreamExt;
+    use hopr_crypto_packet::HoprPseudonym;
+    use hopr_crypto_random::Randomizable;
     use hopr_path::ValidatedPath;
     use std::time::Duration;
 
@@ -384,7 +386,7 @@ mod tests {
         );
 
         let routing = ResolvedTransportRouting::Forward {
-            pseudonym: None,
+            pseudonym: HoprPseudonym::random(),
             forward_path: expected_path.clone(),
             return_paths: vec![],
         };
@@ -399,7 +401,7 @@ mod tests {
             .context("value should be present")?;
 
         assert_eq!(data, expected_data);
-        assert_eq!(path.forward_path, expected_path);
+        assert!(matches!(path, ResolvedTransportRouting::Forward { forward_path,.. } if forward_path == expected_path));
 
         async_std::task::spawn(async move {
             async_std::task::sleep(Duration::from_millis(3)).await;

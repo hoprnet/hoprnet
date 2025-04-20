@@ -314,7 +314,7 @@ impl tokio::io::AsyncWrite for Session {
 type FuturesBuffer = futures::stream::FuturesUnordered<
     Pin<Box<dyn std::future::Future<Output = Result<(), TransportSessionError>> + Send>>,
 >;
-pub struct InnerSession {
+struct InnerSession {
     id: SessionId,
     me: Address,
     routing: DestinationRouting,
@@ -347,10 +347,6 @@ impl InnerSession {
             rx_buffer_range: (0, 0),
             closed: false,
         }
-    }
-
-    pub fn id(&self) -> &SessionId {
-        &self.id
     }
 }
 
@@ -634,7 +630,7 @@ mod tests {
             rx,
         );
 
-        assert_eq!(session.id(), &id);
+        assert_eq!(session.id, id);
 
         Ok(())
     }

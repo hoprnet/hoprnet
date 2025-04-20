@@ -75,7 +75,7 @@ pub use {
         Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
     },
     hopr_internal_types::prelude::*,
-    hopr_network_types::prelude::{IpProtocol, RoutingOptions},
+    hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions},
     hopr_path::channel_graph::GraphExportConfig,
     hopr_primitive_types::prelude::*,
     hopr_strategy::Strategy,
@@ -121,7 +121,6 @@ lazy_static::lazy_static! {
 }
 
 pub use async_trait::async_trait;
-use hopr_network_types::prelude::DestinationRouting;
 
 /// Interface representing the HOPR server behavior for each incoming session instance
 /// supplied as an argument.

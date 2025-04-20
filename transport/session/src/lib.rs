@@ -4,18 +4,24 @@
 //! advanced interactions and functionality.
 
 pub mod errors;
-pub mod initiation;
+mod initiation;
 mod manager;
 pub mod traits;
-pub mod types;
+mod types;
 
-pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
-
-use crate::types::SessionTarget;
-use hopr_network_types::prelude::state::SessionFeature;
 pub use hopr_network_types::types::*;
+pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
+pub use types::{
+    unwrap_chain_address, wrap_with_chain_address, IncomingSession, ServiceId, Session, SessionId, SessionTarget,
+    SESSION_USABLE_MTU_SIZE,
+};
+
+#[cfg(feature = "runtime-tokio")]
+pub use types::transfer_session;
+
+use hopr_network_types::prelude::state::SessionFeature;
 use hopr_primitive_types::prelude::Address;
-pub use types::{IncomingSession, Session, SessionId, SESSION_USABLE_MTU_SIZE};
+
 #[cfg(feature = "serde")]
 use {
     serde::{Deserialize, Serialize},

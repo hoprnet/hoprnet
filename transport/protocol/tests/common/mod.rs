@@ -5,10 +5,11 @@ use async_std::prelude::FutureExt;
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use hex_literal::hex;
-use hopr_crypto_random::{random_bytes, random_integer};
+use hopr_crypto_random::{random_bytes, random_integer, Randomizable};
 use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 
+use hopr_crypto_packet::HoprPseudonym;
 use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{Hash, OffchainPublicKey},
@@ -18,13 +19,14 @@ use hopr_db_sql::{
     accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
 };
 use hopr_internal_types::prelude::*;
+use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_path::errors::PathError;
 use hopr_path::{channel_graph::ChannelGraph, ChainPath, Path, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
     msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
-    ResolvedTransportRouting, DEFAULT_PRICE_PER_PACKET,
+    DEFAULT_PRICE_PER_PACKET,
 };
 use tracing::debug;
 
@@ -390,8 +392,8 @@ pub async fn send_relay_receive_channel_of_n_peers(
     let mut sent_packet_count = 0;
     for i in 0..packet_count {
         let sender = MsgSender::new(apis[0].0.clone());
-        let routing = ResolvedTransportRouting {
-            pseudonym: None,
+        let routing = ResolvedTransportRouting::Forward {
+            pseudonym: HoprPseudonym::random(),
             forward_path: packet_path.clone(),
             return_paths: vec![],
         };

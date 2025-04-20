@@ -9,10 +9,9 @@ use tokio::net::UdpSocket;
 
 use hopr_lib::SendMsg;
 use hopr_network_types::prelude::protocol::SessionMessage;
-use hopr_primitive_types::prelude::Address;
-use hopr_transport::{HoprPseudonym, Session, SessionId, TransportSessionError};
-use hopr_transport_session::types::{transfer_session, unwrap_chain_address};
+use hopr_transport::{Session, SessionId, TransportSessionError};
 use hopr_transport_session::Capability;
+use hopr_transport_session::{transfer_session, unwrap_chain_address};
 
 struct BufferingMsgSender {
     buffer: futures::channel::mpsc::UnboundedSender<Box<[u8]>>,
@@ -20,14 +19,7 @@ struct BufferingMsgSender {
 
 #[async_trait::async_trait]
 impl SendMsg for BufferingMsgSender {
-    async fn send_message(
-        &self,
-        data: ApplicationData,
-        _destination: Address,
-        _fw_options: RoutingOptions,
-        _rp_options: Option<RoutingOptions>,
-        _pseudonym: Option<HoprPseudonym>,
-    ) -> Result<(), TransportSessionError> {
+    async fn send_message(&self, data: ApplicationData, _: DestinationRouting) -> Result<(), TransportSessionError> {
         let (_, data) = unwrap_chain_address(&data.plain_text)?;
 
         let len = data.len();
@@ -47,7 +39,7 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
     let mut session = Session::new(
         id,
         (&ChainKeypair::random()).into(),
-        RoutingOptions::Hops(0_u32.try_into()?),
+        DestinationRouting::forward_only(*id.peer(), RoutingOptions::Hops(0_u32.try_into()?)),
         HashSet::new(),
         Arc::new(BufferingMsgSender { buffer: buffer_tx }),
         rx,
@@ -105,7 +97,7 @@ async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
     let mut session = Session::new(
         id,
         (&ChainKeypair::random()).into(),
-        RoutingOptions::Hops(0_u32.try_into()?),
+        DestinationRouting::forward_only(*id.peer(), RoutingOptions::Hops(0_u32.try_into()?)),
         HashSet::from_iter([Capability::Segmentation]),
         Arc::new(BufferingMsgSender { buffer: buffer_tx }),
         rx,
@@ -143,7 +135,7 @@ async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
                 .await?
                 .expect("must have data");
             if let Some(msg) =
-                SessionMessage::<{ hopr_transport_session::types::SESSION_USABLE_MTU_SIZE }>::try_from(read.as_ref())
+                SessionMessage::<{ hopr_transport_session::SESSION_USABLE_MTU_SIZE }>::try_from(read.as_ref())
                     .expect("must decode message")
                     .try_as_segment()
             {

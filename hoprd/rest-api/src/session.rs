@@ -70,7 +70,7 @@ impl std::fmt::Display for SessionTargetSpec {
     }
 }
 
-impl std::str::FromStr for SessionTargetSpec {
+impl FromStr for SessionTargetSpec {
     type Err = HoprLibError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -576,8 +576,8 @@ pub(crate) async fn create_client(
                                     debug!(socket = ?sock_addr, "incoming TCP connection");
                                     let session = match hopr.connect_to(data).await {
                                         Ok(s) => s,
-                                        Err(e) => {
-                                            error!(error = %e, "failed to establish session");
+                                        Err(error) => {
+                                            error!(%error, "failed to establish session");
                                             return;
                                         }
                                     };
@@ -923,8 +923,8 @@ mod tests {
     use super::*;
     use anyhow::Context;
     use futures::channel::mpsc::UnboundedSender;
-    use hopr_crypto_types::types::SimplePseudonym;
     use hopr_lib::{ApplicationData, SendMsg};
+    use hopr_network_types::prelude::DestinationRouting;
     use hopr_transport_session::errors::TransportSessionError;
     use std::collections::HashSet;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -945,12 +945,9 @@ mod tests {
         async fn send_message(
             &self,
             data: ApplicationData,
-            _destination: Address,
-            _fw_options: hopr_lib::RoutingOptions,
-            _rp_options: Option<hopr_lib::RoutingOptions>,
-            _pseudonym: Option<SimplePseudonym>,
+            _: DestinationRouting,
         ) -> std::result::Result<(), TransportSessionError> {
-            let (_peer, data) = hopr_transport_session::types::unwrap_chain_address(&data.plain_text)?;
+            let (_peer, data) = hopr_transport_session::unwrap_chain_address(&data.plain_text)?;
 
             self.tx
                 .clone()
@@ -970,7 +967,10 @@ mod tests {
         let session = hopr_lib::HoprSession::new(
             hopr_lib::HoprSessionId::new(4567, peer),
             peer,
-            hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
+            hopr_lib::DestinationRouting::forward_only(
+                peer,
+                hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
+            ),
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
             rx,
@@ -1013,7 +1013,10 @@ mod tests {
         let session = hopr_lib::HoprSession::new(
             hopr_lib::HoprSessionId::new(4567, peer),
             peer,
-            hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
+            hopr_lib::DestinationRouting::forward_only(
+                peer,
+                hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
+            ),
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
             rx,
