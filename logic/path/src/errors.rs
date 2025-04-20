@@ -10,6 +10,9 @@ pub enum PathError {
     #[error("path contains an invalid peer id: {0}")]
     InvalidPeer(String),
 
+    #[error("path contains a unknown peer that cannot be resolved: {0}")]
+    UnknownPeer(String),
+
     #[error("missing channel between {0} and {1}")]
     MissingChannel(String, String),
 

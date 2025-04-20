@@ -602,12 +602,12 @@ impl PathAddressResolver for HoprDb {
     ) -> std::result::Result<Option<OffchainPublicKey>, PathError> {
         self.resolve_packet_key(address)
             .await
-            .map_err(|_| PathError::InvalidPeer(address.to_string()))
+            .map_err(|_| PathError::UnknownPeer(address.to_string()))
     }
 
     async fn resolve_chain_address(&self, key: &OffchainPublicKey) -> std::result::Result<Option<Address>, PathError> {
         self.resolve_chain_key(key)
             .await
-            .map_err(|_| PathError::InvalidPeer(key.to_string()))
+            .map_err(|_| PathError::UnknownPeer(key.to_string()))
     }
 }

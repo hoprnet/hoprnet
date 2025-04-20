@@ -1,6 +1,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hopr_crypto_packet::prelude::{generate_proof_of_relay, pre_verify};
 use hopr_crypto_packet::HoprSphinxSuite;
+use hopr_crypto_random::Randomizable;
 use hopr_crypto_sphinx::prelude::{SharedSecret, SphinxSuite};
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_crypto_types::prelude::OffchainKeypair;

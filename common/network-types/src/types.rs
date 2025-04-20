@@ -9,6 +9,7 @@ use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::str::FromStr;
+use hopr_crypto_random::Randomizable;
 
 /// Lists some of the IP protocols.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumString)]
@@ -319,7 +320,7 @@ impl RoutingOptions {
 
 /// Routing information containing forward or return routing options.
 ///
-/// Information in this object represents a minimum required basis
+/// Information in this object represents the minimum required basis
 /// to generate forward paths and return paths.
 ///
 /// See also [`RoutingOptions`].
@@ -358,7 +359,10 @@ impl DestinationRouting {
 
 /// Contains the resolved routing information for the packet.
 ///
-/// This contains the actual forward and return paths for forward packets,
+/// Instance of this object is typically constructed via some resolution of a
+/// [`DestinationRouting`] instance.
+///
+/// It contains the actual forward and return paths for forward packets,
 /// or an actual SURB for return (reply) packets.
 #[derive(Debug, Clone, strum::EnumIs)]
 pub enum ResolvedTransportRouting {
@@ -373,6 +377,17 @@ pub enum ResolvedTransportRouting {
     },
     /// Pseudonym of a SURB to retrieve.
     Return(HoprPseudonym),
+}
+
+impl ResolvedTransportRouting {
+    /// Shortcut for routing that does not create any SURBs for a return path.
+    pub fn forward_only(forward_path: ValidatedPath) -> Self {
+        Self::Forward {
+            pseudonym: HoprPseudonym::random(),
+            forward_path,
+            return_paths: vec![],
+        }
+    }
 }
 
 #[cfg(test)]
