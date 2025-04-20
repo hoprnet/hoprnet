@@ -323,7 +323,7 @@ impl RoutingOptions {
 /// to generate forward paths and return paths.
 ///
 /// See also [`RoutingOptions`].
-#[derive(Debug, Clone, PartialEq, Eq, strum::EnumTryAs, strum::EnumIs)]
+#[derive(Debug, Clone, PartialEq, Eq, strum::EnumIs)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum DestinationRouting {
     /// Forward routing using the destination address and path,
@@ -348,7 +348,7 @@ pub enum DestinationRouting {
 ///
 /// This contains the actual forward and return paths for forward packets,
 /// or an actual SURB for return (reply) packets.
-#[derive(Debug, Clone, strum::EnumTryAs, strum::EnumIs)]
+#[derive(Debug, Clone, strum::EnumIs)]
 pub enum ResolvedTransportRouting {
     /// Concrete routing information for a forward packet.
     Forward {

@@ -2,7 +2,7 @@ use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_internal_types::protocol::ApplicationData;
-use hopr_network_types::prelude::{DestinationRouting, RoutingOptions, SealedHost};
+use hopr_network_types::prelude::{DestinationRouting, SealedHost};
 use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use hopr_primitive_types::prelude::Address;
 use hopr_primitive_types::traits::BytesRepresentable;
@@ -149,7 +149,7 @@ pub struct IncomingSession {
 pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
-    routing_options: RoutingOptions,
+    routing: DestinationRouting,
     capabilities: HashSet<Capability>,
     shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
 }
@@ -158,18 +158,20 @@ impl Session {
     pub fn new(
         id: SessionId,
         me: Address,
-        routing_options: RoutingOptions,
+        routing: DestinationRouting,
         capabilities: HashSet<Capability>,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
         shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
     ) -> Self {
-        let inner_session = InnerSession::new(id, me, routing_options.clone(), tx, rx);
+        let inner_session = InnerSession::new(id, me, routing.clone(), tx, rx);
 
         // If we request any capability, we need to use Session protocol
         if !capabilities.is_empty() {
-            // This is a very coarse assumption, that it takes max 2 seconds for each hop one way.
-            let rto_base = Duration::from_secs(2) * (routing_options.count_hops() + 1) as u32;
+            // This is a very coarse assumption, that 3-hop takes at most 3 seconds.
+            // We can no longer base this timeout on the number of hops because
+            // it is not known for SURB-based routing.
+            let rto_base = Duration::from_secs(3);
 
             let expiration_coefficient = if capabilities.contains(&Capability::Retransmission)
                 || capabilities.contains(&Capability::RetransmissionAckOnly)
@@ -185,7 +187,7 @@ impl Session {
                 acknowledged_frames_buffer: 100_000, // Can hold frames for > 40 sec at 2000 frames/sec
                 frame_expiration_age: rto_base * expiration_coefficient,
                 rto_base_receiver: rto_base, // Ask for segment resend, if not yet complete after this period
-                rto_base_sender: rto_base * 2, // Resend frame if not acknowledged after this period
+                rto_base_sender: rto_base * 2, // Resend frame if is not acknowledged after this period
                 ..Default::default()
             };
             debug!(
@@ -197,7 +199,7 @@ impl Session {
             Self {
                 id,
                 inner: Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(id, inner_session, cfg)),
-                routing_options,
+                routing,
                 capabilities,
                 shutdown_notifier,
             }
@@ -206,7 +208,7 @@ impl Session {
             Self {
                 id,
                 inner: Box::pin(inner_session),
-                routing_options,
+                routing,
                 capabilities,
                 shutdown_notifier,
             }
@@ -219,8 +221,8 @@ impl Session {
     }
 
     /// Routing options used to deliver data.
-    pub fn routing_options(&self) -> &RoutingOptions {
-        &self.routing_options
+    pub fn routing(&self) -> &DestinationRouting {
+        &self.routing
     }
 
     /// Capabilities of this Session.
@@ -233,7 +235,7 @@ impl std::fmt::Debug for Session {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Session")
             .field("id", &self.id)
-            .field("routing_options", &self.routing_options)
+            .field("routing", &self.routing)
             .finish_non_exhaustive()
     }
 }
@@ -315,7 +317,7 @@ type FuturesBuffer = futures::stream::FuturesUnordered<
 pub struct InnerSession {
     id: SessionId,
     me: Address,
-    options: RoutingOptions,
+    routing: DestinationRouting,
     rx: UnboundedReceiver<Box<[u8]>>,
     tx: Arc<dyn SendMsg + Send + Sync>,
     tx_bytes: usize,
@@ -329,14 +331,14 @@ impl InnerSession {
     pub fn new(
         id: SessionId,
         me: Address,
-        options: RoutingOptions,
+        routing: DestinationRouting,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
     ) -> Self {
         Self {
             id,
             me,
-            options,
+            routing,
             rx,
             tx,
             tx_bytes: 0,
@@ -403,13 +405,7 @@ impl futures::AsyncWrite for InnerSession {
                 .map(move |payload| ApplicationData::new_from_owned(tag, payload.into_boxed_slice()))?;
 
             let sender = self.tx.clone();
-            // TODO: add RP support to the Session protocol
-            let routing = DestinationRouting::Forward {
-                destination: *self.id.peer(),
-                pseudonym: None,
-                forward_options: self.options.clone(),
-                return_options: None,
-            };
+            let routing = self.routing.clone();
             self.tx_buffer
                 .push(Box::pin(async move { sender.send_message(payload, routing).await }));
 

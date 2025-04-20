@@ -396,19 +396,18 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             back_routing: Some((cfg.path_options.clone().invert(), self.me)),
         });
 
+        // TODO: add RP support to the Session protocol
+        let routing = DestinationRouting::Forward {
+            destination: cfg.peer,
+            pseudonym: None,
+            forward_options: cfg.path_options.clone(),
+            return_options: None,
+        };
+
         // Send the Session initiation message
         trace!(challenge, "sending new session request");
         msg_sender
-            .send_message(
-                start_session_msg.try_into()?,
-                DestinationRouting::Forward {
-                    // TODO: add RP support to the Session protocol
-                    destination: cfg.peer,
-                    pseudonym: None,
-                    forward_options: cfg.path_options.clone(),
-                    return_options: None,
-                },
-            )
+            .send_message(start_session_msg.try_into()?, routing.clone())
             .await?;
 
         // Await session establishment response from the Exit node or timeout
@@ -450,7 +449,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 Ok(Session::new(
                     session_id,
                     self.me,
-                    cfg.path_options,
+                    routing,
                     cfg.capabilities.into_iter().collect(),
                     Arc::new(msg_sender.clone()),
                     rx,
@@ -535,6 +534,14 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     .cloned()
                     .ok_or(SessionManagerError::NotStarted)?;
 
+                // TODO: add RP support to the Session protocol
+                let routing = DestinationRouting::Forward {
+                    destination: peer,
+                    pseudonym: None,
+                    forward_options: route.clone(),
+                    return_options: None,
+                };
+
                 // Construct the session
                 let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
                 if let Some(session_id) = insert_into_next_slot(
@@ -562,7 +569,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     let session = Session::new(
                         session_id,
                         self.me,
-                        route.clone(),
+                        routing.clone(),
                         session_req.capabilities,
                         Arc::new(msg_sender.clone()),
                         rx_session_data,
@@ -589,21 +596,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         session_id: session_id.with_address(self.me),
                     });
 
-                    // TODO: add RP support to the Session protocol
-                    msg_sender
-                        .send_message(
-                            data.try_into()?,
-                            DestinationRouting::Forward {
-                                destination: peer,
-                                pseudonym: None,
-                                forward_options: route,
-                                return_options: None,
-                            },
-                        )
-                        .await
-                        .map_err(|e| {
-                            SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
-                        })?;
+                    msg_sender.send_message(data.try_into()?, routing).await.map_err(|e| {
+                        SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
+                    })?;
 
                     info!(%session_id, "new session established");
 
@@ -625,17 +620,8 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         reason,
                     });
 
-                    // TODO: add RP support to the Session protocol
                     msg_sender
-                        .send_message(
-                            data.try_into()?,
-                            DestinationRouting::Forward {
-                                destination: peer,
-                                pseudonym: None,
-                                forward_options: route,
-                                return_options: None,
-                            },
-                        )
+                        .send_message(data.try_into()?, routing.clone())
                         .await
                         .map_err(|e| {
                             SessionManagerError::Other(format!(
