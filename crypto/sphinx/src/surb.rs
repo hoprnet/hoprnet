@@ -130,12 +130,12 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
                 header: value[H::KEY_ID_SIZE.get() + alpha..H::KEY_ID_SIZE.get() + alpha + RoutingInfo::<H>::SIZE]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB.header".into()))?,
-                sender_key: value[H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE
-                    ..H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE + SecretKey16::LENGTH]
+                sender_key: value[H::KEY_ID_SIZE.get() + alpha + RoutingInfo::<H>::SIZE
+                    ..H::KEY_ID_SIZE.get() + alpha + RoutingInfo::<H>::SIZE + SecretKey16::LENGTH]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB.sender_key".into()))?,
                 additional_data_receiver: value
-                    [H::KEY_ID_SIZE.get() + alpha + H::HEADER_LEN + H::TAG_SIZE + SecretKey16::LENGTH..]
+                    [H::KEY_ID_SIZE.get() + alpha + RoutingInfo::<H>::SIZE + SecretKey16::LENGTH..]
                     .try_into()
                     .map_err(|_| GeneralError::ParseError("SURB.additional_data_receiver".into()))?,
             })

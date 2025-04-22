@@ -595,8 +595,7 @@ mod tests {
     }
 
     #[parameterized(hops = { 0,1,2,3 })]
-    fn test_packet_forward_message_no_surb() -> anyhow::Result<()> {
-        let hops = 0;
+    fn test_packet_forward_message_no_surb(hops: usize) -> anyhow::Result<()> {
         let msg = b"some testing forward message";
         let pseudonym = SimplePseudonym::random();
         let (mut packet, opener) = create_packet(hops, pseudonym, vec![], msg)?;
