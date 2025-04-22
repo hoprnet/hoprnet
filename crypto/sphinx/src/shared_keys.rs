@@ -3,7 +3,7 @@ use hopr_crypto_types::prelude::*;
 use std::marker::PhantomData;
 use std::ops::Mul;
 
-use crate::derivation::{create_hkdf_instance, generate_key_iv};
+use crate::derivation::{create_kdf_instance, generate_key_iv};
 
 /// Represents a shared secret with a remote peer.
 pub type SharedSecret = SecretValue<typenum::U32>;
@@ -50,8 +50,7 @@ pub trait GroupElement<E: Scalar>: Clone + for<'a> Mul<&'a E, Output = Self> {
 
     /// Extract a keying material from a group element using a KDF
     fn extract_key(&self, context: &str, salt: &[u8]) -> SharedSecret {
-        let mut output =
-            create_hkdf_instance(&self.to_alpha(), context, Some(salt)).expect("invalid sphinx key length");
+        let mut output = create_kdf_instance(&self.to_alpha(), context, Some(salt)).expect("invalid sphinx key length");
         let mut out = SharedSecret::default();
         output.fill(out.as_mut());
         out

@@ -3070,6 +3070,7 @@ checksum = "e8c8444bc9d71b935156cc0ccab7f622180808af7867b1daae6547d773591703"
 dependencies = [
  "serde",
  "typenum",
+ "zeroize",
 ]
 
 [[package]]
@@ -4563,6 +4564,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tracing",
  "typenum",
+ "zeroize",
 ]
 
 [[package]]

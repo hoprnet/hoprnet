@@ -234,9 +234,9 @@ pub enum HoprPacket {
 impl Display for HoprPacket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self {
-            Self::Final { .. } => write!(f, "Final"),
-            Self::Forwarded { .. } => write!(f, "Forwarded"),
-            Self::Outgoing { .. } => write!(f, "Outgoing"),
+            Self::Final(_) => write!(f, "Final"),
+            Self::Forwarded(_) => write!(f, "Forwarded"),
+            Self::Outgoing(_) => write!(f, "Outgoing"),
         }
     }
 }
@@ -317,7 +317,7 @@ impl HoprPacket {
     /// Calculates how many SURBs can be fitted into a packet that
     /// also carries a message of the given length.
     pub const fn max_surbs_with_message(msg_len: usize) -> usize {
-        (HoprPacket::PAYLOAD_SIZE - msg_len) / HoprSurb::SIZE
+        HoprPacket::PAYLOAD_SIZE.saturating_sub(msg_len) / HoprSurb::SIZE
     }
 
     /// Deserializes the packet and performs the forward-transformation, so the

@@ -3,7 +3,7 @@ use hopr_crypto_types::prelude::*;
 // Module-specific constants
 const HASH_KEY_PACKET_TAG: &str = "HASH_KEY_PACKET_TAG";
 
-pub(crate) fn create_hkdf_instance<S: AsRef<[u8]>>(
+pub(crate) fn create_kdf_instance<S: AsRef<[u8]>>(
     secret: &S,
     context: &str,
     salt: Option<&[u8]>,
@@ -32,7 +32,7 @@ pub(crate) fn create_hkdf_instance<S: AsRef<[u8]>>(
 pub fn derive_packet_tag(secret: &SecretKey) -> hopr_crypto_types::errors::Result<PacketTag> {
     let mut packet_tag: PacketTag = [0u8; PACKET_TAG_LENGTH];
 
-    let mut output = create_hkdf_instance(secret, HASH_KEY_PACKET_TAG, None)?;
+    let mut output = create_kdf_instance(secret, HASH_KEY_PACKET_TAG, None)?;
     output.fill(&mut packet_tag);
     Ok(packet_tag)
 }
@@ -55,7 +55,7 @@ pub(crate) fn generate_key<T: crypto_traits::KeyInit, S: AsRef<[u8]>>(
 ) -> hopr_crypto_types::errors::Result<T> {
     let mut out = crypto_traits::Key::<T>::default();
 
-    let mut output = create_hkdf_instance(secret, context, with_salt)?;
+    let mut output = create_kdf_instance(secret, context, with_salt)?;
     output.fill(&mut out);
 
     Ok(T::new(&out))
@@ -70,7 +70,7 @@ pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
     context: &str,
     with_salt: Option<&[u8]>,
 ) -> hopr_crypto_types::errors::Result<T> {
-    let mut output = create_hkdf_instance(secret, context, with_salt)?;
+    let mut output = create_kdf_instance(secret, context, with_salt)?;
 
     let mut key = crypto_traits::Key::<T>::default();
     let mut iv = crypto_traits::Iv::<T>::default();

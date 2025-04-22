@@ -192,7 +192,7 @@ where
     let surb = SURB {
         sender_key: sender_key.clone(),
         header,
-        first_relayer: path[0],
+        first_relayer: *path.first().ok_or(CryptoError::InvalidInputValue("path is empty"))?,
         additional_data_receiver,
         alpha: shared_keys.alpha,
     };
