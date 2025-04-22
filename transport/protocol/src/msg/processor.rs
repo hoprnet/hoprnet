@@ -354,8 +354,8 @@ mod tests {
     use anyhow::Context;
     use async_std::future::timeout;
     use futures::StreamExt;
-    use hopr_crypto_packet::HoprPseudonym;
     use hopr_crypto_random::Randomizable;
+    use hopr_internal_types::prelude::HoprPseudonym;
     use hopr_path::ValidatedPath;
     use std::time::Duration;
 

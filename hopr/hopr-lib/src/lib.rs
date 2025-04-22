@@ -7,7 +7,7 @@
 //! a complete and fully featured HOPR node stripped from top level functionality
 //! such as the REST API, key management...
 //!
-//! The intended way to use hopr_lib is for a specific tool to be built on top of it,
+//! The intended way to use hopr_lib is for a specific tool to be built on top of it;
 //! should the default `hoprd` implementation not be acceptable.
 //!
 //! For most of the practical use cases, the `hoprd` application should be a preferable
@@ -83,7 +83,7 @@ pub use {
         config::{looks_like_domain, HostConfig, HostType},
         constants::RESERVED_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, NetworkingError, ProtocolError},
-        ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
+        HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
         OffchainKeypair as HoprOffchainKeypair, PeerId, SendMsg, ServiceId, Session as HoprSession, SessionCapability,
         SessionClientConfig, SessionId as HoprSessionId, SessionTarget, TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },

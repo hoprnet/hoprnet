@@ -40,9 +40,6 @@ pub mod prelude {
 
 pub use hopr_crypto_sphinx::prelude::{KeyIdMapper, ReplyOpener};
 
-/// Pseudonyms used for the return path.
-pub type HoprPseudonym = hopr_crypto_types::prelude::SimplePseudonym;
-
 /// Currently used public key cipher suite for Sphinx.
 pub type HoprSphinxSuite = X25519Suite;
 

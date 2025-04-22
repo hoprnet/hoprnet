@@ -203,6 +203,7 @@ impl HoprDb {
             .try_for_each(|(a, b)| match model_to_account_entry(a, b) {
                 Ok(account) => caches.key_id_mapper.update_key_id_binding(&account),
                 Err(error) => {
+                    // Undecodeable accounts are skipped and will be unreachable
                     tracing::error!(%error, "undecodeable account");
                     Ok(())
                 }

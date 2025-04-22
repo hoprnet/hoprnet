@@ -1,10 +1,9 @@
 use bimap::BiHashMap;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hopr_crypto_packet::prelude::*;
-use hopr_crypto_packet::HoprPseudonym;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey};
-use hopr_internal_types::prelude::TicketBuilder;
+use hopr_internal_types::prelude::*;
 use hopr_path::TransportPath;
 use hopr_primitive_types::prelude::{Address, BytesEncodable, KeyIdent};
 

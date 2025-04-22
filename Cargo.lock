@@ -4567,7 +4567,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4618,7 +4618,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.12.3"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4771,6 +4771,7 @@ dependencies = [
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
+ "hopr-internal-types",
  "hopr-metrics",
  "hopr-path",
  "hopr-platform",

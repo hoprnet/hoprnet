@@ -1,11 +1,5 @@
-use crate::channels::HoprDbChannelOperations;
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::info::HoprDbInfoOperations;
-use crate::prelude::HoprDbTicketOperations;
 use async_trait::async_trait;
 use hopr_crypto_packet::prelude::*;
-use hopr_crypto_packet::HoprPseudonym;
 use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
@@ -19,10 +13,14 @@ use hopr_parallelize::cpu::spawn_fifo_blocking;
 use hopr_path::errors::PathError;
 use hopr_path::{Path, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::prelude::*;
-use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::ops::{Mul, Sub};
-use std::sync::{Arc, Mutex};
 use tracing::{instrument, trace, warn};
+
+use crate::channels::HoprDbChannelOperations;
+use crate::db::HoprDb;
+use crate::errors::DbSqlError;
+use crate::info::HoprDbInfoOperations;
+use crate::prelude::HoprDbTicketOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -366,10 +364,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     .get(&pseudonym)
                     .await
                     .ok_or(DbSqlError::LogicalError("unknown pseudonym".into()))?
-                    .lock()
-                    .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
-                    .dequeue()
-                    .ok_or(DbSqlError::LogicalError("no surb available for pseudonym".into()))?;
+                    .pop_one()?;
 
                 let next = self
                     .caches
@@ -485,19 +480,15 @@ impl HoprDbProtocolOperations for HoprDb {
             HoprPacket::Final(incoming) => {
                 // Store all incoming SURBs if any
                 if !incoming.surbs.is_empty() {
-                    let surbs = self
-                        .caches
-                        .surbs_per_pseudonym
-                        .get_with_by_ref(&incoming.sender, async {
-                            Arc::new(Mutex::new(AllocRingBuffer::new(10_000)))
-                        })
-                        .await;
-
                     let num_surbs = incoming.surbs.len();
-                    surbs
-                        .lock()
-                        .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
-                        .extend(incoming.surbs);
+
+                    self.caches
+                        .surbs_per_pseudonym
+                        .entry_by_ref(&incoming.sender)
+                        .or_default() // Default SurbRingBuffer
+                        .await
+                        .value()
+                        .push(incoming.surbs)?;
 
                     tracing::trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
                 }

@@ -91,12 +91,11 @@ use crate::{
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_network_types::prelude::{DestinationRouting, ResolvedTransportRouting};
 pub use {
-    hopr_crypto_packet::HoprPseudonym,
     hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{HalfKeyChallenge, Hash, OffchainPublicKey},
     },
-    hopr_internal_types::protocol::ApplicationData,
+    hopr_internal_types::prelude::HoprPseudonym,
     hopr_network_types::prelude::RoutingOptions,
     hopr_transport_identity::{Multiaddr, PeerId},
     hopr_transport_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},

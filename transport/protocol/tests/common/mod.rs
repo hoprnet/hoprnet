@@ -9,7 +9,6 @@ use hopr_crypto_random::{random_bytes, random_integer, Randomizable};
 use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 
-use hopr_crypto_packet::HoprPseudonym;
 use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{Hash, OffchainPublicKey},
