@@ -84,25 +84,12 @@ async fn start_node_chain_logic(
     // DB
     let db = HoprDb::new_in_memory(chain_key.clone()).await?;
     let self_db = db.clone();
-    let ock = offchain_key.public().clone();
-    let ckp = chain_key.public().to_address().clone();
     db.begin_transaction()
         .await?
         .perform(|tx| {
             Box::pin(async move {
                 self_db
                     .set_domain_separator(Some(tx), DomainSeparator::Channel, Hash::default())
-                    .await?;
-                self_db
-                    .insert_account(
-                        Some(tx),
-                        AccountEntry {
-                            public_key: ock,
-                            chain_addr: ckp,
-                            entry_type: AccountType::NotAnnounced,
-                            published_at: 1,
-                        },
-                    )
                     .await
             })
         })
