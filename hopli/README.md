@@ -242,3 +242,43 @@ hopli safe-module safe-module move \
     --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
 ```
+
+## Examples
+
+### Create, read identity and make it eligible for rotsee network
+
+In this guide, you will create an identity, retrieve its peerID and node address, and make the identity eligible for the Rotsee network.
+
+1. Clone the `hoprnet` repository to your machine and navigate to the `hoprnet` folder.
+2. Execute the following command to allow the terminal to use the default scripts in the **hoprnet** folder: `direnv allow`
+3. Build the package: `cargo build --release`.
+4. Modify the following variables to suit your setup `IDENTITY_PASSWORD`, `PRIVATE_KEY` & `MANAGER_PRIVATE_KEY`:
+
+```
+export PATH="./target/release:${PATH}"
+export RUST_BACKTRACE=full
+export HOPRD_NETWORK=rotsee
+export IDENTITY_PASSWORD=<your-secure-password-here> # Replace with your own secure password
+export PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000000 # Replace with Deployer Private Key
+export MANAGER_PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000000 # Replace with Manager Private Key
+```
+
+After making the necessary adjustments, copy the entire block of code and execute it in your terminal.
+
+5. Execute the following command to create an identity file in the `new_identities` folder:
+
+```
+hopli identity create --identity-directory "./new_identities" --identity-prefix nodes_ --number 1
+```
+
+6. Create a safe, module instances and link the recently created identity by executing the following command:
+
+```
+hopli safe-module create --network ${HOPRD_NETWORK} --contracts-root "./ethereum/contracts"  --provider-url https://gnosis.rpc-provider.prod.hoprnet.link --identity-directory "./new_identities" --allowance 10.5 --hopr-amount 1 --native-amount 0.1
+```
+
+7. Read the identity file to retrieve the PeerID and native address by executing the following command (OPTIONAL):
+
+```
+hopli identity read --identity-directory "./new_identities" --identity-prefix nodes_
+```

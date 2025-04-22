@@ -6,7 +6,7 @@
 //! The major type implemented in this module is the [JsonRpcProviderClient]
 //! which implements the [ethers::providers::JsonRpcClient] trait. That makes it possible to use it with `ethers`.
 //!
-//! The [JsonRpcProviderClient] is abstract over the [HttpPostRequestor] trait, which makes it possible
+//! The [JsonRpcProviderClient] is abstract over the [HttpRequestor] trait, which makes it possible
 //! to make the underlying HTTP client implementation easily replaceable. This is needed to make it possible
 //! for `ethers` to work with different async runtimes, since the HTTP client is typically not agnostic to
 //! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
@@ -15,6 +15,7 @@
 use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, JsonRpcError};
 use futures::StreamExt;
+use http_types::Method;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
@@ -30,7 +31,7 @@ use hopr_async_runtime::prelude::sleep;
 use crate::client::RetryAction::{NoRetry, RetryAfter};
 use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
 use crate::helper::{Request, Response};
-use crate::{HttpPostRequestor, RetryAction, RetryPolicy};
+use crate::{HttpRequestor, RetryAction, RetryPolicy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
@@ -255,7 +256,7 @@ impl RetryPolicy<JsonRpcProviderClientError> for SimpleJsonRpcRetryPolicy {
 /// operate with any `HttpPostRequestor`.
 /// Also contains possible retry actions to be taken on various failures, therefore it
 /// implements also `ethers::providers::RetryClient` functionality.
-pub struct JsonRpcProviderClient<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> {
+pub struct JsonRpcProviderClient<Req: HttpRequestor, R: RetryPolicy<JsonRpcProviderClientError>> {
     id: AtomicU64,
     requests_enqueued: AtomicU32,
     url: String,
@@ -263,7 +264,7 @@ pub struct JsonRpcProviderClient<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcP
     retry_policy: R,
 }
 
-impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpcProviderClient<Req, R> {
+impl<Req: HttpRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpcProviderClient<Req, R> {
     /// Creates the client given the `HttpPostRequestor`
     pub fn new(base_url: &str, requestor: Req, retry_policy: R) -> Self {
         Self {
@@ -347,7 +348,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> JsonRpc
     }
 }
 
-impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> Debug for JsonRpcProviderClient<Req, R> {
+impl<Req: HttpRequestor, R: RetryPolicy<JsonRpcProviderClientError>> Debug for JsonRpcProviderClient<Req, R> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("JsonRpcProviderClient")
             .field("id", &self.id)
@@ -357,7 +358,7 @@ impl<Req: HttpPostRequestor, R: RetryPolicy<JsonRpcProviderClientError>> Debug f
     }
 }
 
-impl<Req: HttpPostRequestor + Clone, R: RetryPolicy<JsonRpcProviderClientError> + Clone> Clone
+impl<Req: HttpRequestor + Clone, R: RetryPolicy<JsonRpcProviderClientError> + Clone> Clone
     for JsonRpcProviderClient<Req, R>
 {
     fn clone(&self) -> Self {
@@ -375,7 +376,7 @@ impl<Req: HttpPostRequestor + Clone, R: RetryPolicy<JsonRpcProviderClientError> 
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<Req, R> JsonRpcClient for JsonRpcProviderClient<Req, R>
 where
-    Req: HttpPostRequestor,
+    Req: HttpRequestor,
     R: RetryPolicy<JsonRpcProviderClientError> + Send + Sync,
 {
     type Error = JsonRpcProviderClientError;
@@ -474,7 +475,7 @@ pub mod surf_client {
     use tracing::info;
 
     use crate::errors::HttpRequestError;
-    use crate::{HttpPostRequestor, HttpPostRequestorConfig};
+    use crate::{HttpPostRequestorConfig, HttpRequestor};
 
     /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.
     /// `surf` works also for Browsers in WASM environments.
@@ -503,17 +504,25 @@ pub mod surf_client {
     }
 
     #[async_trait]
-    impl HttpPostRequestor for SurfRequestor {
-        async fn http_post<T: Serialize + Send + Sync>(
+    impl HttpRequestor for SurfRequestor {
+        async fn http_query<T>(
             &self,
+            method: http_types::Method,
             url: &str,
-            data: T,
-        ) -> Result<Box<[u8]>, HttpRequestError> {
-            let request = self
-                .client
-                .post(url)
-                .body_json(&data)
-                .map_err(|e| HttpRequestError::UnknownError(e.to_string()))?;
+            data: Option<T>,
+        ) -> Result<Box<[u8]>, HttpRequestError>
+        where
+            T: Serialize + Send + Sync,
+        {
+            let request = match method {
+                http_types::Method::Post => self
+                    .client
+                    .post(url)
+                    .body_json(&data.ok_or(HttpRequestError::UnknownError("missing data".to_string()))?)
+                    .map_err(|e| HttpRequestError::UnknownError(e.to_string()))?,
+                http_types::Method::Get => self.client.get(url),
+                _ => return Err(HttpRequestError::UnknownError("unsupported method".to_string())),
+            };
 
             async move {
                 match request.await {
@@ -542,7 +551,7 @@ pub mod reqwest_client {
     use tracing::info;
 
     use crate::errors::HttpRequestError;
-    use crate::{HttpPostRequestor, HttpPostRequestorConfig};
+    use crate::{HttpPostRequestorConfig, HttpRequestor};
 
     /// HTTP client that uses a Tokio runtime-based HTTP client library, such as `reqwest`.
     #[derive(Clone, Debug, Default)]
@@ -554,7 +563,6 @@ pub mod reqwest_client {
     impl ReqwestRequestor {
         pub fn new(cfg: HttpPostRequestorConfig) -> Self {
             info!(?cfg, "creating reqwest client");
-
             Self {
                 client: reqwest::Client::builder()
                     .timeout(cfg.http_request_timeout)
@@ -581,13 +589,27 @@ pub mod reqwest_client {
     }
 
     #[async_trait]
-    impl HttpPostRequestor for ReqwestRequestor {
-        async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
+    impl HttpRequestor for ReqwestRequestor {
+        async fn http_query<T>(
+            &self,
+            method: http_types::Method,
+            url: &str,
+            data: Option<T>,
+        ) -> Result<Box<[u8]>, HttpRequestError>
         where
             T: Serialize + Send + Sync,
         {
             let url = reqwest::Url::parse(url)
                 .map_err(|e| HttpRequestError::UnknownError(format!("url parse error: {e}")))?;
+
+            let builder = match method {
+                http_types::Method::Get => self.client.get(url.clone()),
+                http_types::Method::Post => self.client.post(url.clone()).body(
+                    serde_json::to_string(&data.ok_or(HttpRequestError::UnknownError("missing data".to_string()))?)
+                        .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?,
+                ),
+                _ => return Err(HttpRequestError::UnknownError("unsupported method".to_string())),
+            };
 
             if self
                 .limiter
@@ -595,14 +617,8 @@ pub mod reqwest_client {
                 .map(|limiter| limiter.check_key(&url.host_str().unwrap_or(".").to_string()).is_ok())
                 .unwrap_or(true)
             {
-                let resp = self
-                    .client
-                    .post(url)
+                let resp = builder
                     .header("content-type", "application/json")
-                    .body(
-                        serde_json::to_string(&data)
-                            .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?,
-                    )
                     .send()
                     .await
                     .map_err(|e| {
@@ -639,7 +655,7 @@ pub struct RequestorResponseSnapshot {
 
 /// Replays an RPC response to a request if it is found in the snapshot YAML file.
 /// If no such request has been seen before,
-/// it captures the new request/response pair obtained from the inner [`HttpPostRequestor`]
+/// it captures the new request/response pair obtained from the inner [`HttpRequestor`]
 /// and stores it into the snapshot file.
 ///
 /// This is useful for snapshot testing only and should **NOT** be used in production.
@@ -655,7 +671,7 @@ pub struct SnapshotRequestor<T> {
 }
 
 impl<T> SnapshotRequestor<T> {
-    /// Creates a new instance by wrapping an existing [`HttpPostRequestor`] and capturing
+    /// Creates a new instance by wrapping an existing [`HttpRequestor`] and capturing
     /// the request/response pairs.
     ///
     /// The constructor does not load any [snapshot entries](SnapshotRequestor) from
@@ -764,7 +780,7 @@ impl<T> SnapshotRequestor<T> {
     }
 }
 
-impl<R: HttpPostRequestor> SnapshotRequestor<R> {
+impl<R: HttpRequestor> SnapshotRequestor<R> {
     async fn http_post_with_snapshot<In>(&self, url: &str, data: In) -> Result<Box<[u8]>, HttpRequestError>
     where
         In: Serialize + Send + Sync,
@@ -818,22 +834,44 @@ impl<T> Drop for SnapshotRequestor<T> {
 }
 
 #[async_trait::async_trait]
-impl<R: HttpPostRequestor> HttpPostRequestor for SnapshotRequestor<R> {
+impl<R: HttpRequestor> HttpRequestor for SnapshotRequestor<R> {
+    async fn http_query<T>(&self, _: Method, _: &str, _: Option<T>) -> Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync,
+    {
+        todo!()
+    }
+
     async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
     where
         T: Serialize + Send + Sync,
     {
         self.http_post_with_snapshot(url, data).await
     }
+
+    async fn http_get(&self, _url: &str) -> Result<Box<[u8]>, HttpRequestError> {
+        todo!()
+    }
 }
 
 #[async_trait]
-impl<R: HttpPostRequestor> HttpPostRequestor for &SnapshotRequestor<R> {
+impl<R: HttpRequestor> HttpRequestor for &SnapshotRequestor<R> {
+    async fn http_query<T>(&self, _: Method, _: &str, _: Option<T>) -> Result<Box<[u8]>, HttpRequestError>
+    where
+        T: Serialize + Send + Sync,
+    {
+        todo!()
+    }
+
     async fn http_post<T>(&self, url: &str, data: T) -> Result<Box<[u8]>, HttpRequestError>
     where
         T: Serialize + Send + Sync,
     {
         self.http_post_with_snapshot(url, data).await
+    }
+
+    async fn http_get(&self, _url: &str) -> Result<Box<[u8]>, HttpRequestError> {
+        todo!()
     }
 }
 
@@ -844,7 +882,7 @@ type AnvilRpcClient<R> = ethers::middleware::SignerMiddleware<
 
 /// Used for testing. Creates Ethers RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn create_rpc_client_to_anvil<R: HttpPostRequestor>(
+pub fn create_rpc_client_to_anvil<R: HttpRequestor>(
     backend: R,
     anvil: &ethers::utils::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
@@ -872,6 +910,7 @@ mod tests {
     use hopr_chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
+    use http_types::Method;
     use serde::Serialize;
     use serde_json::json;
     use std::fmt::Debug;
@@ -885,9 +924,9 @@ mod tests {
         create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
     };
     use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
-    use crate::{HttpPostRequestor, ZeroRetryPolicy};
+    use crate::{HttpRequestor, ZeroRetryPolicy};
 
-    async fn deploy_contracts<R: HttpPostRequestor + Debug>(req: R) -> anyhow::Result<ContractAddresses> {
+    async fn deploy_contracts<R: HttpRequestor + Debug>(req: R) -> anyhow::Result<ContractAddresses> {
         let anvil = create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
@@ -1254,11 +1293,12 @@ mod tests {
 
     // Requires manual implementation, because mockall does not work well with generic methods
     // in non-generic traits.
+    #[derive(Debug)]
     struct NullHttpPostRequestor;
 
     #[async_trait]
-    impl HttpPostRequestor for NullHttpPostRequestor {
-        async fn http_post<T>(&self, _: &str, _: T) -> Result<Box<[u8]>, HttpRequestError>
+    impl HttpRequestor for NullHttpPostRequestor {
+        async fn http_query<T>(&self, _: Method, _: &str, _: Option<T>) -> Result<Box<[u8]>, HttpRequestError>
         where
             T: Serialize + Send + Sync,
         {
@@ -1268,7 +1308,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn test_client_from_file() -> anyhow::Result<()> {
-        let block_time = Duration::from_secs(1);
+        let block_time = Duration::from_millis(1100);
         let snapshot_file = NamedTempFile::new()?;
 
         let anvil = create_anvil(Some(block_time));

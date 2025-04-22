@@ -4,7 +4,7 @@ hopr:
     address: !IPv4 127.0.0.1 # NOTE: adapt this to reflect your public IP
     port: 9091 # NOTE: adapt this to reflect your public PORT - the value set in HOPRD_P2P_PORT
   db:
-    data: /app/hoprd/
+    data: /app/hoprd/data
   strategy:
     on_fail_continue: true
     allow_recursive: true
@@ -15,12 +15,12 @@ hopr:
         aggregate_on_channel_close: true
       - !AutoRedeeming
         redeem_only_aggregated: true
-        minimum_redeem_ticket_value: "2500000000000000000 HOPR"
+        minimum_redeem_ticket_value: "2000000000000000000 HOPR"
       - !ClosureFinalizer
         max_closure_overdue: 300
   chain:
     network: dufour
-    provider: # NOTE: fill in value
+    provider: # NOTE: Fill in value. Using a local RPC provider, make sure to always include the http:// prefix, followed by the IP address or localhost.
     announce: true
     keep_logs: true
     fast_sync: true
@@ -29,7 +29,7 @@ hopr:
     module_address: # NOTE: fill in value
     safe_transaction_service_provider: https://safe-transaction.prod.hoprnet.link/
 identity:
-  file: "/app/hopr.id"
+  file: "/app/hoprd/conf/hopr.id"
 api:
   enable: true
   host:

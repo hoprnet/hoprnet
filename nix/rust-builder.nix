@@ -68,8 +68,7 @@ in
     let
       crate = pkgs.callPackage package (args //
         {
-          inherit foundryBin
-            solcDefault craneLib isCross;
+          inherit foundryBin solcDefault craneLib isCross;
         });
     in
     # Override the derivation to add cross-compilation environment variables.

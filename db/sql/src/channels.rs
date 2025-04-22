@@ -1,14 +1,15 @@
 use async_trait::async_trait;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryStreamExt};
+use sea_orm::ActiveValue::Set;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
+
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::channel;
 use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
 use hopr_db_entity::prelude::Channel;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 
 use crate::cache::ChannelParties;
 use crate::db::HoprDb;
@@ -19,6 +20,7 @@ use crate::{HoprDbGeneralModelOperations, OptTx};
 pub struct ChannelEditor {
     orig: ChannelEntry,
     model: channel::ActiveModel,
+    delete: bool,
 }
 
 impl ChannelEditor {
@@ -51,6 +53,12 @@ impl ChannelEditor {
         self.model.epoch = Set(epoch.into().to_be_bytes().to_vec());
         self
     }
+
+    /// If set, the channel will be deleted, no other edits will be done.
+    pub fn delete(mut self) -> Self {
+        self.delete = true;
+        self
+    }
 }
 
 /// Defines DB API for accessing information about HOPR payment channels.
@@ -67,6 +75,7 @@ pub trait HoprDbChannelOperations {
     async fn begin_channel_update<'a>(&'a self, tx: OptTx<'a>, id: &Hash) -> Result<Option<ChannelEditor>>;
 
     /// Commits changes of the channel to the database.
+    /// Returns the updated channel, or on deletion, the deleted channel entry.
     async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry>;
 
     /// Retrieves the channel by source and destination.
@@ -92,7 +101,7 @@ pub trait HoprDbChannelOperations {
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Incoming, my_node)`
     async fn get_incoming_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
-    /// Fetches all channels that are `Incoming` to this node.
+    /// Fetches all channels that are `Outgoing` from this node.
     /// Shorthand for `get_channels_via(tx, ChannelDirection::Outgoing, my_node)`
     async fn get_outgoing_channels<'a>(&'a self, tx: OptTx<'a>) -> Result<Vec<ChannelEntry>>;
 
@@ -145,6 +154,7 @@ impl HoprDbChannelOperations for HoprDb {
                             Some(ChannelEditor {
                                 orig: model.clone().try_into()?,
                                 model: model.into_active_model(),
+                                delete: false,
                             })
                         } else {
                             None
@@ -156,18 +166,36 @@ impl HoprDbChannelOperations for HoprDb {
     }
 
     async fn finish_channel_update<'a>(&'a self, tx: OptTx<'a>, editor: ChannelEditor) -> Result<ChannelEntry> {
+        let epoch = editor.model.epoch.clone();
         let parties = ChannelParties(editor.orig.source, editor.orig.destination);
         let ret = self
             .nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    let model = editor.model.update(tx.as_ref()).await?;
-                    Ok::<_, DbSqlError>(model.try_into()?)
+                    if !editor.delete {
+                        let model = editor.model.update(tx.as_ref()).await?;
+                        Ok::<_, DbSqlError>(model.try_into()?)
+                    } else {
+                        editor.model.delete(tx.as_ref()).await?;
+                        Ok::<_, DbSqlError>(editor.orig)
+                    }
                 })
             })
             .await?;
         self.caches.src_dst_to_channel.invalidate(&parties).await;
+
+        // Finally invalidate any unrealized values from the cache.
+        // This might be a no-op if the channel was not in the cache
+        // like for channels that are not ours.
+        let channel_id = editor.orig.get_id();
+        if let Some(channel_epoch) = epoch.try_as_ref() {
+            self.caches
+                .unrealized_value
+                .invalidate(&(channel_id, channel_epoch.as_slice().into()))
+                .await;
+        }
+
         Ok(ret)
     }
 
@@ -305,6 +333,17 @@ impl HoprDbChannelOperations for HoprDb {
             .await?;
 
         self.caches.src_dst_to_channel.invalidate(&parties).await;
+
+        // Finally invalidate any unrealized values from the cache.
+        // This might be a no-op if the channel was not in the cache
+        // like for channels that are not ours.
+        let channel_id = channel_entry.get_id();
+        let channel_epoch = channel_entry.channel_epoch;
+        self.caches
+            .unrealized_value
+            .invalidate(&(channel_id, channel_epoch))
+            .await;
+
         Ok(())
     }
 }

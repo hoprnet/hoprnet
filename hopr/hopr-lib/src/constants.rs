@@ -15,3 +15,7 @@ pub const MIN_NATIVE_BALANCE: &str = "1000000000000000"; // 0.001
 pub const SUGGESTED_NATIVE_BALANCE: &str = "10000000000000000"; // 0.01
 
 pub const ONBOARDING_INFORMATION_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Default minimum quality of stored peer entries to re-sync from the persistent storage on
+/// node's startup.
+pub const DEFAULT_MIN_QUALITY_TO_SYNC: f64 = 0.9;

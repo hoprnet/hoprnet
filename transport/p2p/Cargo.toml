@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.5.4"
+version = "0.6.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -22,6 +22,7 @@ runtime-async-std = [
 runtime-tokio = ["libp2p/tokio", "hopr-transport-protocol/runtime-tokio"]
 
 [dependencies]
+async-trait = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }
@@ -35,6 +36,7 @@ libp2p = { workspace = true, features = [
   "dns",
   "yamux",
 ] }
+libp2p-stream = { workspace = true }
 moka = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
@@ -51,7 +53,10 @@ hopr-transport-protocol = { workspace = true }
 anyhow = { workspace = true }
 async-std = { workspace = true }
 async-trait = { workspace = true }
-test-log = { workspace = true }
+lazy_static = { workspace = true }
+tracing-test = { workspace = true }
 tokio = { workspace = true }
+hopr-crypto-packet = { workspace = true }
+hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-platform = { workspace = true }

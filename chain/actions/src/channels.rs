@@ -14,13 +14,14 @@
 //! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent)
 //! by the Indexer.
 use async_trait::async_trait;
+use std::time::Duration;
+use tracing::{debug, error, info};
+
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::time::Duration;
-use tracing::{debug, error, info};
 
 use crate::action_queue::PendingAction;
 use crate::errors::ChainActionsError::{
@@ -44,7 +45,8 @@ pub trait ChannelActions {
     /// Funds the given channel with the given `amount`
     async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<PendingAction>;
 
-    /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that channel.
+    /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that channel,
+    /// in case the `direction` is [`ChannelDirection::Incoming`].
     async fn close_channel(
         &self,
         counterparty: Address,
@@ -89,7 +91,7 @@ where
                     }
 
                     if db_clone.get_indexer_data(Some(tx)).await?.nr_enabled
-                        && !db_clone.is_allowed_in_network_registry(Some(tx), destination).await?
+                        && !db_clone.is_allowed_in_network_registry(Some(tx), &destination).await?
                     {
                         return Err(PeerAccessDenied);
                     }
@@ -200,7 +202,7 @@ where
                         }
                     }
                     ChannelStatus::Open => {
-                        if redeem_before_close {
+                        if redeem_before_close && direction == ChannelDirection::Incoming {
                             // TODO: trigger aggregation
                             // Do not await the redemption, just submit it to the queue
                             let redeemed = self.redeem_tickets_in_channel(&channel, false).await?.len();

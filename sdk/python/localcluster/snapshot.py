@@ -54,7 +54,7 @@ class Snapshot:
     def reuse(self):
         logging.info("Re-using snapshot")
 
-        # remove all files and folder in self.dir which are not snashot
+        # remove all files and folder in self.dir which are not snapshot
 
         for entry in self.parent_dir.glob("*"):
             if entry.is_dir():

@@ -1,14 +1,15 @@
-use crate::errors::DbSqlError;
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::{Address, Balance};
 use moka::future::Cache;
 use moka::Expiry;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Duration;
 
+use hopr_crypto_types::prelude::*;
 use hopr_db_api::info::{IndexerData, SafeInfo};
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::prelude::{Address, Balance, U256};
+
+use crate::errors::DbSqlError;
 
 /// Enumerates all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for long term.
@@ -60,7 +61,9 @@ pub struct HoprDbCaches {
     pub(crate) single_values: Cache<CachedValueDiscriminants, CachedValue>,
     pub(crate) unacked_tickets: Cache<HalfKeyChallenge, PendingAcknowledgement>,
     pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
-    pub(crate) unrealized_value: Cache<Hash, Balance>,
+    // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
+    // include tickets from other epochs
+    pub(crate) unrealized_value: Cache<(Hash, U256), Balance>,
     pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
     pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
     pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,

@@ -1,6 +1,6 @@
 ---
-api_token:
-  default: e2e-API-token^^
+defaults:
+  api_token: e2e-API-token^^
 
 networks:
   anvil-localhost:

@@ -23,20 +23,22 @@ class Anvil:
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
 
     def run(self, state=AnvilState.DUMP):
-        logging.info(f"Starting and waiting for local anvil server to be up ({state.name.lower()} state enabled)")
+        logging.info("Starting and waiting for local anvil server to be up" + f"({state.name.lower()} state enabled)")
 
-        run(
-            f"""
-            ./run-local-anvil.sh
-            {'-s' if state is AnvilState.LOAD else ''}
+        command = f"""
+            bash scripts/run-local-anvil.sh
+            {'-s ' if state is AnvilState.LOAD else ''}
             -l {self.log_file}
             -c {self.cfg_file}
             -p {PORT_BASE}
             {'-ls' if state is AnvilState.LOAD else '-ds'} {self.state_file}
-            """.split(),
+            """
+
+        run(
+            command.split(),
             check=True,
             capture_output=True,
-            cwd=PWD.joinpath("scripts"),
+            cwd=PWD,
         )
 
     def mirror_contracts(self, src_file: Path, dest_file: Path, src_network: str, dest_network: str):
@@ -64,4 +66,4 @@ class Anvil:
     @classmethod
     def kill(cls):
         logging.info("Stop all local anvil servers running")
-        run(f"make -s kill-anvil port={PORT_BASE}".split(), cwd=PWD, check=True)
+        run(f"make -s kill-anvil port={PORT_BASE}".split(), cwd=PWD, check=False)

@@ -3,12 +3,12 @@ hopr:
   # run heartbeats more frequently
   heartbeat:
     max_parallel_probes: 10
-    interval: 10
-    threshold: 10
-    variance: 1
+    interval: 3
+    threshold: 2
+    variance: 0
   network_options:
     # ignore for shorter than heartbeat cycle
-    ignore_timeframe: 5
+    ignore_timeframe: 1
   strategy:
     on_fail_continue: true
     execution_interval: 1

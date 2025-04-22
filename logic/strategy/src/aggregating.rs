@@ -23,25 +23,22 @@
 //!
 //!
 //! For details on default parameters see [AggregatingStrategyConfig].
+use async_lock::RwLock;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use std::collections::HashMap;
+use std::fmt::{Debug, Display, Formatter};
+use std::sync::Arc;
+use tracing::{debug, error, info, warn};
+use validator::Validate;
+
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_sql::api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_db_sql::channels::HoprDbChannelOperations;
 use hopr_internal_types::prelude::*;
 use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
-
-use async_lock::RwLock;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::{
-    fmt::{Display, Formatter},
-    sync::Arc,
-};
-use tracing::{debug, error, info, warn};
-use validator::Validate;
 
 use crate::{strategy::SingularStrategy, Strategy};
 
@@ -56,6 +53,23 @@ lazy_static::lazy_static! {
 
 use hopr_platform::time::native::current_time;
 
+const MAX_AGGREGATABLE_TICKET_COUNT: u32 = hopr_db_sql::tickets::MAX_TICKETS_TO_AGGREGATE_BATCH as u32;
+
+#[inline]
+fn default_aggregation_threshold() -> Option<u32> {
+    Some(250)
+}
+
+#[inline]
+fn just_true() -> bool {
+    true
+}
+
+#[inline]
+fn default_unrealized_balance_ratio() -> Option<f32> {
+    Some(0.9)
+}
+
 /// Configuration object for the `AggregatingStrategy`
 #[serde_as]
 #[derive(Debug, Clone, Copy, PartialEq, smart_default::SmartDefault, Validate, Serialize, Deserialize)]
@@ -65,9 +79,10 @@ pub struct AggregatingStrategyConfig {
     ///
     /// This condition is independent of `unrealized_balance_ratio`.
     ///
-    /// Default is 100.
-    #[validate(range(min = 2))]
-    #[default(Some(100))]
+    /// Default is 250.
+    #[validate(range(min = 2, max = MAX_AGGREGATABLE_TICKET_COUNT))]
+    #[serde(default = "default_aggregation_threshold")]
+    #[default(default_aggregation_threshold())]
     pub aggregation_threshold: Option<u32>,
 
     /// Percentage of unrealized balance in unaggregated tickets in a channel
@@ -78,7 +93,7 @@ pub struct AggregatingStrategyConfig {
     ///
     /// Default is 0.9
     #[validate(range(min = 0_f32, max = 1.0_f32))]
-    #[default(Some(0.9))]
+    #[default(default_unrealized_balance_ratio())]
     pub unrealized_balance_ratio: Option<f32>,
 
     /// If set, the strategy will automatically aggregate tickets in channel that has transitioned
@@ -88,7 +103,7 @@ pub struct AggregatingStrategyConfig {
     /// If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
     ///
     /// Default is true.
-    #[default = true]
+    #[default(just_true())]
     pub aggregate_on_channel_close: bool,
 }
 
@@ -280,6 +295,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::aggregating::{default_aggregation_threshold, MAX_AGGREGATABLE_TICKET_COUNT};
     use crate::strategy::SingularStrategy;
     use anyhow::Context;
     use async_std::prelude::FutureExt as AsyncStdFutureExt;
@@ -304,6 +320,13 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use tracing::{debug, error};
+
+    #[test]
+    fn default_ticket_aggregation_count_is_lower_than_maximum_allowed_ticket_count() -> anyhow::Result<()> {
+        assert!(default_aggregation_threshold().unwrap() < MAX_AGGREGATABLE_TICKET_COUNT);
+
+        Ok(())
+    }
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = vec![

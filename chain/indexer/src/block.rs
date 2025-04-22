@@ -414,7 +414,7 @@ where
                     Ok(_) => match db.update_logs_checksums().await {
                         Ok(last_log_checksum) => {
                             let checksum = if fetch_checksum_from_db {
-                                let last_log = block.logs.into_iter().last().unwrap();
+                                let last_log = block.logs.into_iter().next_back().unwrap();
                                 let log = db.get_log(block_id, last_log.tx_index, last_log.log_index).await.ok()?;
 
                                 log.checksum

@@ -58,7 +58,7 @@ async fn generate_the_first_ack_ticket(
     Ok(())
 }
 
-type TestRpc = RpcOperations<JsonRpcProviderClient<Requestor, SimpleJsonRpcRetryPolicy>>;
+type TestRpc = RpcOperations<JsonRpcProviderClient<Requestor, SimpleJsonRpcRetryPolicy>, Requestor>;
 
 struct ChainNode {
     chain_key: ChainKeypair,
@@ -106,19 +106,19 @@ async fn start_node_chain_logic(
 
     let json_rpc_client = JsonRpcProviderClient::new(
         &chain_env.anvil.endpoint(),
-        requestor_in,
+        requestor_in.clone(),
         SimpleJsonRpcRetryPolicy::default(),
     );
 
-    let rpc_ops_in = RpcOperations::new(json_rpc_client, chain_key, rpc_cfg)?;
+    let rpc_ops_in = RpcOperations::new(json_rpc_client, requestor_in, chain_key, rpc_cfg.clone())?;
 
     let json_rpc_client = JsonRpcProviderClient::new(
         &chain_env.anvil.endpoint(),
-        requestor_out,
+        requestor_out.clone(),
         SimpleJsonRpcRetryPolicy::default(),
     );
 
-    let rpc_ops_out = RpcOperations::new(json_rpc_client, chain_key, rpc_cfg)?;
+    let rpc_ops_out = RpcOperations::new(json_rpc_client, requestor_out.clone(), chain_key, rpc_cfg)?;
 
     // Transaction executor
     let eth_client = RpcEthereumClient::new(rpc_ops_out, RpcEthereumClientConfig::default());
@@ -251,6 +251,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         expected_block_time: block_time,
         tx_polling_interval: Duration::from_millis(100),
         max_block_range_fetch_size: 100,
+        gas_oracle_url: None,
         ..RpcOperationsConfig::default()
     };
 
@@ -273,7 +274,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         requestor_alice_tx,
         &chain_env,
         safe_cfgs[0],
-        rpc_cfg,
+        rpc_cfg.clone(),
         actions_cfg,
         indexer_cfg,
     )

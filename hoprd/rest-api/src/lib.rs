@@ -90,8 +90,10 @@ pub(crate) struct InternalState {
         account::balances,
         account::withdraw,
         alias::aliases,
+        alias::aliases_addresses,
         alias::set_alias,
         alias::get_alias,
+        alias::get_alias_address,
         alias::delete_alias,
         alias::clear_aliases,
         channels::close_channel,
@@ -115,7 +117,6 @@ pub(crate) struct InternalState {
         node::configuration,
         node::entry_nodes,
         node::info,
-        node::metrics,
         node::channel_graph,
         node::peers,
         node::version,
@@ -262,13 +263,42 @@ async fn build_api(
                 .route("/eligiblez", get(checks::eligiblez))
                 .with_state(state.into()),
         )
+        .merge(
+            Router::new()
+                .route("/metrics", get(node::metrics))
+                .layer(middleware::from_fn_with_state(
+                    inner_state.clone(),
+                    preconditions::authenticate,
+                ))
+                .layer(middleware::from_fn_with_state(
+                    inner_state.clone(),
+                    preconditions::cap_websockets,
+                ))
+                .layer(
+                    ServiceBuilder::new()
+                        .layer(TraceLayer::new_for_http())
+                        .layer(
+                            CorsLayer::new()
+                                .allow_methods([Method::GET])
+                                .allow_origin(Any)
+                                .allow_headers(Any)
+                                .max_age(std::time::Duration::from_secs(86400)),
+                        )
+                        .layer(middleware::from_fn(prometheus::record))
+                        .layer(CompressionLayer::new())
+                        .layer(ValidateRequestHeaderLayer::accept("text/plain"))
+                        .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
+                ),
+        )
         .nest(
             BASE_PATH,
             Router::new()
                 .route("/aliases", get(alias::aliases))
+                .route("/aliases_addresses", get(alias::aliases_addresses))
                 .route("/aliases", post(alias::set_alias))
                 .route("/aliases", delete(alias::clear_aliases))
                 .route("/aliases/{alias}", get(alias::get_alias))
+                .route("/aliases_addresses/{alias}", get(alias::get_alias_address))
                 .route("/aliases/{alias}", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
@@ -306,7 +336,6 @@ async fn build_api(
                 .route("/node/info", get(node::info))
                 .route("/node/peers", get(node::peers))
                 .route("/node/entryNodes", get(node::entry_nodes))
-                .route("/node/metrics", get(node::metrics))
                 .route("/node/graph", get(node::channel_graph))
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/websocket", get(session::websocket))
@@ -319,24 +348,24 @@ async fn build_api(
                     preconditions::authenticate,
                 ))
                 .layer(middleware::from_fn_with_state(
-                    inner_state,
+                    inner_state.clone(),
                     preconditions::cap_websockets,
-                )),
-        )
-        .layer(
-            ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http())
+                ))
                 .layer(
-                    CorsLayer::new()
-                        .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
-                        .allow_origin(Any)
-                        .allow_headers(Any)
-                        .max_age(std::time::Duration::from_secs(86400)),
-                )
-                .layer(middleware::from_fn(prometheus::record))
-                .layer(CompressionLayer::new())
-                .layer(ValidateRequestHeaderLayer::accept("application/json"))
-                .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
+                    ServiceBuilder::new()
+                        .layer(TraceLayer::new_for_http())
+                        .layer(
+                            CorsLayer::new()
+                                .allow_methods([Method::GET, Method::POST, Method::OPTIONS, Method::DELETE])
+                                .allow_origin(Any)
+                                .allow_headers(Any)
+                                .max_age(std::time::Duration::from_secs(86400)),
+                        )
+                        .layer(middleware::from_fn(prometheus::record))
+                        .layer(CompressionLayer::new())
+                        .layer(ValidateRequestHeaderLayer::accept("application/json"))
+                        .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
+                ),
         )
 }
 

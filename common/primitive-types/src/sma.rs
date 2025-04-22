@@ -30,6 +30,9 @@ pub trait SMA<T> {
 
     /// Indicates whether there are no samples.
     fn is_empty(&self) -> bool;
+
+    /// Clears all the samples.
+    fn clear(&mut self);
 }
 
 /// Basic implementation of Simple Moving Average (SMA).
@@ -75,6 +78,10 @@ where
 
     fn is_empty(&self) -> bool {
         self.window.is_empty()
+    }
+
+    fn clear(&mut self) {
+        self.window.clear()
     }
 }
 
@@ -164,6 +171,11 @@ where
 
     fn is_empty(&self) -> bool {
         self.window.is_empty()
+    }
+
+    fn clear(&mut self) {
+        self.sum -= self.sum;
+        self.window.clear();
     }
 }
 
