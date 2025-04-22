@@ -25,6 +25,7 @@ pub type SecretKey16 = SecretValue<typenum::U16>;
 
 /// Convenience container for IV and key of a given primitive `T`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(zeroize::ZeroizeOnDrop)]
 pub struct IvKey<T>(Box<[u8]>, PhantomData<T>);
 
 impl<T: KeyIvInit> KeySizeUser for IvKey<T> {
