@@ -1,10 +1,9 @@
 use bimap::BiHashMap;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use hopr_crypto_packet::prelude::*;
-use hopr_crypto_packet::HoprPseudonym;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey};
-use hopr_internal_types::prelude::TicketBuilder;
+use hopr_internal_types::prelude::*;
 use hopr_path::TransportPath;
 use hopr_primitive_types::prelude::{Address, BytesEncodable, KeyIdent};
 
@@ -40,12 +39,13 @@ pub fn packet_sending_bench(c: &mut Criterion) {
             b.iter(|| {
                 // The number of hops for ticket creation does not matter for benchmark purposes
                 let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
+                let tp = TransportPath::new(path.iter().take(hop + 1).copied()).unwrap();
 
                 HoprPacket::into_outgoing(
                     &msg,
                     &pseudonym,
                     PacketRouting::ForwardPath {
-                        forward_path: TransportPath::new(path[0..=hop]).unwrap(),
+                        forward_path: tp,
                         return_paths: vec![],
                     },
                     &chain_key,
@@ -89,11 +89,12 @@ pub fn packet_precompute_1rp_bench(c: &mut Criterion) {
             b.iter(|| {
                 // The number of hops for ticket creation does not matter for benchmark purposes
                 let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
+                let tp = TransportPath::new(path.iter().take(hop + 1).copied()).unwrap();
 
                 PartialHoprPacket::new(
                     &pseudonym,
                     PacketRouting::ForwardPath {
-                        forward_path: TransportPath::new(path[0..=hop]).unwrap(),
+                        forward_path: tp,
                         return_paths: vec![],
                     },
                     &chain_key,
@@ -137,15 +138,13 @@ pub fn packet_precompute_2rp_bench(c: &mut Criterion) {
             b.iter(|| {
                 // The number of hops for ticket creation does not matter for benchmark purposes
                 let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
+                let tp = TransportPath::new(path.iter().take(hop + 1).copied()).unwrap();
 
                 PartialHoprPacket::new(
                     &pseudonym,
                     PacketRouting::ForwardPath {
-                        forward_path: TransportPath::new(path[0..=hop]).unwrap(),
-                        return_paths: vec![
-                            TransportPath::new(path[0..=hop]).unwrap(),
-                            TransportPath::new(path[0..=hop]).unwrap(),
-                        ],
+                        forward_path: tp.clone(),
+                        return_paths: vec![tp.clone(), tp],
                     },
                     &chain_key,
                     tb,
@@ -188,10 +187,11 @@ pub fn packet_sending_precomputed_bench(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
             // The number of hops for ticket creation does not matter for benchmark purposes
             let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
+            let tp = TransportPath::new(path.iter().take(hop + 1).copied()).unwrap();
             let precomputed = PartialHoprPacket::new(
                 &pseudonym,
                 PacketRouting::ForwardPath {
-                    forward_path: TransportPath::new(path[0..=hop]).unwrap(),
+                    forward_path: tp,
                     return_paths: vec![],
                 },
                 &chain_key,

@@ -47,4 +47,3 @@ serde = [
   "curve25519-dalek/serde",
   "hopr-crypto-types/serde",
 ]
-benchmarks = []

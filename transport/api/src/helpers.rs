@@ -7,10 +7,9 @@ use tracing::trace;
 
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_crypto_packet::HoprPseudonym;
 use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_db_sql::HoprDbAllOperations;
-use hopr_internal_types::protocol::ApplicationData;
+use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, RoutingOptions};
 use hopr_network_types::types::DestinationRouting;
 use hopr_path::{selectors::PathSelector, ChainPath, PathAddressResolver, ValidatedPath};

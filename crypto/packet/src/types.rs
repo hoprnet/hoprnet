@@ -28,7 +28,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
         if num_surbs > 0 {
             let surb_end = num_surbs * SURB::<S, H>::SIZE;
             if surb_end >= data.len() {
-                return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs".into()).into());
+                return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
             }
 
             let mut data = data.into_vec();
@@ -52,12 +52,12 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> PacketMessage<S, H, P>
     /// Allocates a new instance from the given parts.
     pub fn from_parts(surbs: Vec<SURB<S, H>>, payload: &[u8]) -> Result<Self, SphinxError> {
         if surbs.len() > 255 {
-            return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs".into()).into());
+            return Err(GeneralError::ParseError("HoprPacketMessage.num_surbs not valid".into()).into());
         }
 
         // The total size of the packet message must not exceed the maximum packet size.
         if Self::HEADER_LEN + surbs.len() * SURB::<S, H>::SIZE + payload.len() > P {
-            return Err(GeneralError::ParseError("HoprPacketMessage.size".into()).into());
+            return Err(GeneralError::ParseError("HoprPacketMessage.size not valid".into()).into());
         }
 
         let mut ret = Vec::with_capacity(PaddedPayload::<P>::SIZE);

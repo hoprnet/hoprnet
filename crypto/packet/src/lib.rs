@@ -36,15 +36,9 @@ pub mod prelude {
         HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
     };
     pub use crate::validation::validate_unacknowledged_ticket;
-
-    #[cfg(feature = "benchmarks")]
-    pub use crate::por::{generate_proof_of_relay, pre_verify};
 }
 
 pub use hopr_crypto_sphinx::prelude::{KeyIdMapper, ReplyOpener};
-
-/// Pseudonyms used for the return path.
-pub type HoprPseudonym = hopr_crypto_types::prelude::SimplePseudonym;
 
 /// Currently used public key cipher suite for Sphinx.
 pub type HoprSphinxSuite = X25519Suite;

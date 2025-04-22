@@ -1,8 +1,8 @@
 use crate::errors::NetworkTypeError;
 use hickory_resolver::name_server::ConnectionProvider;
 use hickory_resolver::AsyncResolver;
-use hopr_crypto_packet::HoprPseudonym;
 use hopr_crypto_random::Randomizable;
+use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_path::ValidatedPath;
 use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
 use hopr_primitive_types::prelude::Address;
@@ -333,6 +333,8 @@ pub enum DestinationRouting {
         /// The destination address.
         destination: Address,
         /// Our pseudonym shown to the destination.
+        ///
+        /// If not given, will be resolved as random.
         pseudonym: Option<HoprPseudonym>,
         /// The path to the destination.
         forward_options: RoutingOptions,

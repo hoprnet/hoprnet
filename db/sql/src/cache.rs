@@ -1,18 +1,18 @@
 use crate::errors::DbSqlError;
 use dashmap::{DashMap, Entry};
-use hopr_crypto_packet::{HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener};
+use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::info::{IndexerData, SafeInfo};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::{Address, Balance, KeyIdent, U256};
 use moka::future::Cache;
 use moka::Expiry;
-use ringbuffer::AllocRingBuffer;
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-/// Enumerates all singular data that can be cached and
+/// Lists all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for the long term.
 #[derive(Debug, Clone, PartialEq, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(Hash))]
@@ -56,6 +56,34 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
+#[derive(Debug, Clone)]
+pub(crate) struct SurbRingBuffer(Arc<Mutex<AllocRingBuffer<HoprSurb>>>);
+
+impl Default for SurbRingBuffer {
+    fn default() -> Self {
+        // TODO: make the RB capacity configurable in the future ?
+        // With the current packet size, this is roughly for 7 MB of data budget in SURBs
+        Self(Arc::new(Mutex::new(AllocRingBuffer::new(10_000))))
+    }
+}
+
+impl SurbRingBuffer {
+    pub fn push<I: IntoIterator<Item = HoprSurb>>(&self, surbs: I) -> Result<(), DbSqlError> {
+        self.0
+            .lock()
+            .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
+            .extend(surbs);
+        Ok(())
+    }
+    pub fn pop_one(&self) -> Result<HoprSurb, DbSqlError> {
+        self.0
+            .lock()
+            .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
+            .dequeue()
+            .ok_or(DbSqlError::NoSurbAvailable)
+    }
+}
+
 /// Contains all caches used by the [crate::db::HoprDb].
 #[derive(Debug)]
 pub struct HoprDbCaches {
@@ -71,7 +99,7 @@ pub struct HoprDbCaches {
     // KeyIdMapper must be synchronous because it is used from a sync context.
     pub(crate) key_id_mapper: CacheKeyMapper,
     pub(crate) pseudonym_openers: moka::sync::Cache<HoprPseudonym, ReplyOpener>,
-    pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, Arc<Mutex<AllocRingBuffer<HoprSurb>>>>,
+    pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer>,
 }
 
 impl Default for HoprDbCaches {

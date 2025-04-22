@@ -5,10 +5,9 @@ use common::{create_dbs, create_minimal_topology, random_packets_of_count, resol
 use criterion::{async_executor::AsyncExecutor, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::StreamExt;
 use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_crypto_packet::HoprPseudonym;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::keypairs::Keypair;
-use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
+use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::{Balance, BalanceType};
 use hopr_transport_protocol::msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
