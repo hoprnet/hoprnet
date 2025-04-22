@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = ["contract", "node-bindings"] }
 libp2p-identity = { workspace = true }
 tracing = { workspace = true }
 multiaddr = { workspace = true }
