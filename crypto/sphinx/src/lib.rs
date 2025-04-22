@@ -41,9 +41,6 @@ pub mod prelude {
     pub use crate::routing::SphinxHeaderSpec;
     pub use crate::shared_keys::{SharedKeys, SharedSecret, SphinxSuite};
     pub use crate::surb::*;
-
-    #[cfg(feature = "benchmarks")]
-    pub use crate::routing::{forward_header, RoutingInfo};
 }
 
 #[cfg(test)]

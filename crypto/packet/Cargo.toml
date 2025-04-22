@@ -19,7 +19,6 @@ serde = [
   "hopr-crypto-sphinx/serde",
   "hopr-path/serde",
 ]
-benchmarks = []
 
 [dependencies]
 hex = { workspace = true }

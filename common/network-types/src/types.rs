@@ -333,6 +333,8 @@ pub enum DestinationRouting {
         /// The destination address.
         destination: Address,
         /// Our pseudonym shown to the destination.
+        ///
+        /// If not given, will be resolved as random.
         pseudonym: Option<HoprPseudonym>,
         /// The path to the destination.
         forward_options: RoutingOptions,
