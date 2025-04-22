@@ -2,6 +2,7 @@ use crate::errors::NetworkTypeError;
 use hickory_resolver::name_server::ConnectionProvider;
 use hickory_resolver::AsyncResolver;
 use hopr_crypto_packet::HoprPseudonym;
+use hopr_crypto_random::Randomizable;
 use hopr_path::ValidatedPath;
 use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
 use hopr_primitive_types::prelude::Address;
@@ -9,7 +10,6 @@ use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::str::FromStr;
-use hopr_crypto_random::Randomizable;
 
 /// Lists some of the IP protocols.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumString)]

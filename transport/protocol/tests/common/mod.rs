@@ -106,6 +106,7 @@ pub async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()
                             multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444")?,
                             updated_block: 1,
                         },
+                        published_at: 1,
                     },
                 )
                 .await

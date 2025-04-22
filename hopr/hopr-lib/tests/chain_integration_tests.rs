@@ -94,7 +94,15 @@ async fn start_node_chain_logic(
                     .set_domain_separator(Some(tx), DomainSeparator::Channel, Hash::default())
                     .await?;
                 self_db
-                    .insert_account(Some(tx), AccountEntry::new(ock, ckp, AccountType::NotAnnounced))
+                    .insert_account(
+                        Some(tx),
+                        AccountEntry {
+                            public_key: ock,
+                            chain_addr: ckp,
+                            entry_type: AccountType::NotAnnounced,
+                            published_at: 1,
+                        },
+                    )
                     .await
             })
         })

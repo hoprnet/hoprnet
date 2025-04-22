@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// Enumerates all singular data that can be cached and
-/// cannot be represented by a key. These values can be cached for long term.
+/// cannot be represented by a key. These values can be cached for the long term.
 #[derive(Debug, Clone, PartialEq, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(Hash))]
 pub enum CachedValue {
@@ -68,6 +68,7 @@ pub struct HoprDbCaches {
     pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
     pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
     pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
+    // KeyIdMapper must be synchronous because it is used from a sync context.
     pub(crate) key_id_mapper: CacheKeyMapper,
     pub(crate) pseudonym_openers: moka::sync::Cache<HoprPseudonym, ReplyOpener>,
     pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, Arc<Mutex<AllocRingBuffer<HoprSurb>>>>,
@@ -87,12 +88,12 @@ impl Default for HoprDbCaches {
         let unrealized_value = Cache::builder().expire_after(ExpiryNever).max_capacity(10_000).build();
 
         let chain_to_offchain = Cache::builder()
-            .time_to_live(Duration::from_secs(600))
+            .time_to_idle(Duration::from_secs(600))
             .max_capacity(100_000)
             .build();
 
         let offchain_to_chain = Cache::builder()
-            .time_to_live(Duration::from_secs(600))
+            .time_to_idle(Duration::from_secs(600))
             .max_capacity(100_000)
             .build();
 
@@ -150,53 +151,41 @@ impl CacheKeyMapper {
         Self(DashMap::with_capacity(capacity), DashMap::with_capacity(capacity))
     }
 
-    /// Creates key id mapping for a public key of an [`AccountType::Announced`] account.
+    /// Creates key id mapping for a public key of an [account](AccountEntry).
     ///
-    /// Does nothing the account is [`AccountType::NotAnnounced`].
-    pub fn insert_account(&self, account: &AccountEntry) -> Result<(), DbSqlError> {
-        if let AccountType::Announced { updated_block, .. } = account.entry_type {
-            let id_hash = Hash::create(&[
-                account.public_key.as_ref(),
-                account.chain_addr.as_ref(),
-                &updated_block.to_be_bytes(),
-            ]);
-
-            let id: KeyIdent = u32::from_be_bytes(
-                id_hash.as_ref()[0..std::mem::size_of::<u32>()]
-                    .try_into()
-                    .map_err(|_| DbSqlError::LogicalError("cannot build key id".into()))?,
-            )
-            .into();
-
-            match self.0.entry(id) {
-                Entry::Vacant(v) => {
-                    v.insert(account.public_key);
-                    self.1.insert(account.public_key, id);
+    /// Does nothing if the binding already exists. Returns error if an existing binding
+    /// is not consistent.
+    pub fn update_key_id_binding(&self, account: &AccountEntry) -> Result<(), DbSqlError> {
+        let id = account.key_id();
+        match self.0.entry(id) {
+            Entry::Vacant(v) => {
+                v.insert(account.public_key);
+                self.1.insert(account.public_key, id);
+                tracing::debug!(%id, %account.public_key, "inserted key-id binding");
+                Ok(())
+            }
+            Entry::Occupied(v) => {
+                // Check if the existing binding is consistent with the new one.
+                if v.get() != &account.public_key {
+                    Err(DbSqlError::LogicalError(format!(
+                        "attempt to insert key {} with key-id {id} already exists for the key {}",
+                        account.public_key,
+                        v.get()
+                    )))
+                } else {
                     Ok(())
                 }
-                Entry::Occupied(v) => Err(DbSqlError::LogicalError(format!(
-                    "attempt to insert key {} with key-id {id} already exists for the key {}",
-                    account.public_key,
-                    v.get()
-                ))),
             }
-        } else {
-            // Insertion of unannounced accounts is simply skipped
-            tracing::debug!(
-                "skipping account insertion for an unannounced account with public key {}",
-                account.public_key
-            );
-            Ok(())
         }
     }
 }
 
 impl hopr_crypto_packet::KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec> for CacheKeyMapper {
-    fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<KeyIdent<4>> {
+    fn map_key_to_id(&self, key: &OffchainPublicKey) -> Option<KeyIdent> {
         self.1.get(key).map(|k| *k.value())
     }
 
-    fn map_id_to_public(&self, id: &KeyIdent<4>) -> Option<OffchainPublicKey> {
+    fn map_id_to_public(&self, id: &KeyIdent) -> Option<OffchainPublicKey> {
         self.0.get(id).map(|k| *k.value())
     }
 }

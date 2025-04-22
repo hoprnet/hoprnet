@@ -183,14 +183,15 @@ mod tests {
 
         db.insert_account(
             None,
-            AccountEntry::new(
-                *ALICE_OFFCHAIN.public(),
-                *ALICE,
-                AccountType::Announced {
+            AccountEntry {
+                public_key: *ALICE_OFFCHAIN.public(),
+                chain_addr: *ALICE,
+                entry_type: AccountType::Announced {
                     multiaddr: announce_multiaddr.clone(),
                     updated_block: 0,
                 },
-            ),
+                published_at: 1,
+            },
         )
         .await?;
 

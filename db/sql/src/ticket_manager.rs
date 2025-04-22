@@ -344,6 +344,7 @@ mod tests {
                     public_key: *peer_offchain.public(),
                     chain_addr: peer_onchain.public().to_address(),
                     entry_type: AccountType::NotAnnounced,
+                    published_at: 0,
                 },
             )
             .await?

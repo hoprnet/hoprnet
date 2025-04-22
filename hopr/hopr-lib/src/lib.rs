@@ -665,28 +665,14 @@ impl Hopr {
         let network_min_win_prob = self.hopr_chain_api.get_minimum_winning_probability().await?;
         let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
         if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
-            && configured_win_prob.is_some_and(|c|
-                !f64_approx_eq(c, network_min_win_prob, LOWEST_POSSIBLE_WINNING_PROB) &&
-                c < network_min_win_prob
-        )
+            && configured_win_prob.is_some_and(|c| {
+                !f64_approx_eq(c, network_min_win_prob, LOWEST_POSSIBLE_WINNING_PROB) && c < network_min_win_prob
+            })
         {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
                 "configured outgoing ticket winning probability is lower than the network minimum winning probability: {configured_win_prob:?} < {network_min_win_prob}"
             ))));
         }
-
-        info!("Linking chain and packet keys");
-        self.db
-            .insert_account(
-                None,
-                AccountEntry {
-                    public_key: *self.me.public(),
-                    chain_addr: self.hopr_chain_api.me_onchain(),
-                    // Will be set once we announce ourselves and Indexer processes the announcement
-                    entry_type: AccountType::NotAnnounced,
-                },
-            )
-            .await?;
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
@@ -765,8 +751,8 @@ impl Hopr {
             ))));
         }
 
-        // Possibly register node-safe pair to NodeSafeRegistry. Following that the
-        // connector is set to use safe tx variants.
+        // Possibly register a node-safe pair to NodeSafeRegistry.
+        // Following that, the connector is set to use safe tx variants.
         if can_register_with_safe(
             self.me_onchain(),
             self.cfg.safe_module.safe_address,
@@ -817,7 +803,7 @@ impl Hopr {
             {
                 Ok(_) => info!(?multiaddresses_to_announce, "Announcing node on chain",),
                 Err(ChainActionsError::AlreadyAnnounced) => {
-                    info!(multiaddresses_announced = ?multiaddresses_to_announce, "Node already announced on chain", )
+                    info!(multiaddresses_announced = ?multiaddresses_to_announce, "Node already announced on chain")
                 }
                 // If the announcement fails, we keep going to prevent the node from retrying
                 // after restart.
@@ -827,6 +813,9 @@ impl Hopr {
         }
 
         {
+            // Sync key ids from indexed Accounts
+
+            // Sync the Channel graph
             let channel_graph = self.channel_graph.clone();
             let mut cg = channel_graph.write().await;
 
@@ -1254,7 +1243,7 @@ impl Hopr {
 
     /// List of all accounts announced on the chain
     pub async fn accounts_announced_on_chain(&self) -> errors::Result<Vec<AccountEntry>> {
-        Ok(self.db.get_accounts(None, false).await?)
+        Ok(self.hopr_chain_api.accounts_announced_on_chain().await?)
     }
 
     /// Get the channel entry from Hash.

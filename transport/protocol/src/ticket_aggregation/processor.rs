@@ -490,11 +490,12 @@ mod tests {
                         db_clone
                             .insert_account(
                                 Some(tx),
-                                AccountEntry::new(
-                                    *offchain.public(),
-                                    chain.public().to_address(),
-                                    AccountType::NotAnnounced,
-                                ),
+                                AccountEntry {
+                                    public_key: *offchain.public(),
+                                    chain_addr: chain.public().to_address(),
+                                    entry_type: AccountType::NotAnnounced,
+                                    published_at: 1,
+                                },
                             )
                             .await?
                     }
