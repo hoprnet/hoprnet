@@ -5267,6 +5267,7 @@ dependencies = [
 name = "hopr-chain-actions"
 version = "0.7.3"
 dependencies = [
+ "alloy",
  "anyhow",
  "async-channel 2.3.1",
  "async-lock 3.4.0",

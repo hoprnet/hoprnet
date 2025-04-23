@@ -10,23 +10,27 @@
 //! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the
 //!   SAFE transaction. This is currently the main mode of HOPR node operation.
 //!
-use ethers::types::NameOrAddress;
-use ethers::{
-    abi::AbiEncode,
-    types::{H160, H256, U256},
-};
+
+// TODO: Replace those with alloy-rs
+// use ethers::types::NameOrAddress;
+// use ethers::{
+//     abi::AbiEncode,
+//     types::{H160, H256, U256},
+// };
 
 use hopr_bindings::{
-    hopr_announcements::{AnnounceCall, AnnounceSafeCall, BindKeysAnnounceCall, BindKeysAnnounceSafeCall},
-    hopr_channels::{
+    hoprannouncements::HoprAnnouncements::{
+        AnnounceCall, AnnounceSafeCall, BindKeysAnnounceCall, BindKeysAnnounceSafeCall,
+    },
+    hoprchannels::HoprChannels::{
         CloseIncomingChannelCall, CloseIncomingChannelSafeCall, CompactSignature, FinalizeOutgoingChannelClosureCall,
         FinalizeOutgoingChannelClosureSafeCall, FundChannelCall, FundChannelSafeCall,
         InitiateOutgoingChannelClosureCall, InitiateOutgoingChannelClosureSafeCall, RedeemTicketCall,
         RedeemTicketSafeCall, RedeemableTicket as OnChainRedeemableTicket, TicketData, Vrfparameters,
     },
-    hopr_node_management_module::ExecTransactionFromModuleCall,
-    hopr_node_safe_registry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
-    hopr_token::{ApproveCall, TransferCall},
+    hoprnodemanagementmodule::HoprNodeManagementModule::ExecTransactionFromModuleCall,
+    hoprnodesaferegistry::HoprNodeSafeRegistry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
+    hoprtoken::HoprToken::{ApproveCall, TransferCall},
 };
 use hopr_chain_types::ContractAddresses;
 use hopr_chain_types::{create_eip1559_transaction, TypedTransaction};
@@ -574,18 +578,18 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 
         Ok(OnChainRedeemableTicket {
             data: TicketData {
-                channel_id: off_chain.verified_ticket().channel_id.into(),
+                channelId: off_chain.verified_ticket().channel_id.into(),
                 amount: off_chain.verified_ticket().amount.amount().as_u128(),
-                ticket_index: off_chain.verified_ticket().index,
-                index_offset: off_chain.verified_ticket().index_offset,
+                ticketIndex: off_chain.verified_ticket().index,
+                indexOffset: off_chain.verified_ticket().index_offset,
                 epoch: off_chain.verified_ticket().channel_epoch,
-                win_prob: u64::from_be_bytes(encoded_win_prob),
+                winProb: u64::from_be_bytes(encoded_win_prob),
             },
             signature: CompactSignature {
                 r: H256::from_slice(&serialized_signature[0..32]).into(),
                 vs: H256::from_slice(&serialized_signature[32..64]).into(),
             },
-            por_secret: U256::from_big_endian(off_chain.response.as_ref()),
+            porSecret: U256::from_big_endian(off_chain.response.as_ref()),
         })
     } else {
         Err(InvalidArguments("Acknowledged ticket must be signed".into()))
@@ -597,7 +601,8 @@ mod tests {
     use super::{BasicPayloadGenerator, PayloadGenerator};
 
     use anyhow::Context;
-    use ethers::providers::Middleware;
+    // TODO: Replace those with alloy-rs
+    // use ethers::providers::Middleware;
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use std::str::FromStr;

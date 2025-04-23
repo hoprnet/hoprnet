@@ -30,6 +30,7 @@ prometheus = [
 ]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = ["contract", "node-bindings"] }
 async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
