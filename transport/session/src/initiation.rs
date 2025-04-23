@@ -94,6 +94,8 @@ pub enum StartProtocol<T> {
     SessionError(StartErrorType),
     /// Counterparty has closed the session.
     CloseSession(T),
+    /// A ping message to keep the session alive.
+    KeepAlive(T),
 }
 
 const SESSION_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
@@ -113,6 +115,7 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
             }
             StartProtocol::SessionError(err) => bincode::serde::encode_to_vec(err, SESSION_BINCODE_CONFIGURATION),
             StartProtocol::CloseSession(id) => bincode::serde::encode_to_vec(&id, SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::KeepAlive(id) => bincode::serde::encode_to_vec(&id, SESSION_BINCODE_CONFIGURATION),
         }?;
 
         Ok((disc as u16, inner.into_boxed_slice()))
@@ -138,6 +141,9 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
             StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(
                 bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
             )),
+            StartProtocolDiscriminants::KeepAlive => Ok(StartProtocol::KeepAlive(
+                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+            ))
         }
     }
 }

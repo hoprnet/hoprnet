@@ -1,5 +1,5 @@
 use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
-use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt};
+use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt, TryStreamExt};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_internal_types::protocol::ApplicationData;
 use hopr_network_types::prelude::{DestinationRouting, SealedHost};
@@ -18,7 +18,9 @@ use std::{
     sync::Arc,
     task::Poll,
 };
+use std::sync::atomic::AtomicUsize;
 use tracing::{debug, error};
+use crate::initiation::StartProtocol;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -145,6 +147,46 @@ pub struct IncomingSession {
     pub target: SessionTarget,
 }
 
+pub struct KeepAliveControl {
+    sending_rate_per_sec: Arc<AtomicUsize>,
+    jh: hopr_async_runtime::prelude::JoinHandle<()>,
+}
+
+impl KeepAliveControl {
+    pub fn new<T>(session_id: SessionId, msg_sender: T, routing: DestinationRouting, initial_rate: usize,) -> Self
+    where
+        T: SendMsg + Send + Sync + Clone + 'static
+    {
+        let tx_cpy = msg_sender.clone();
+        let routing_cpy = routing.clone();
+        let sending_rate_per_sec = Arc::new(AtomicUsize::new(initial_rate));
+        Self {
+            sending_rate_per_sec,
+            jh: hopr_async_runtime::prelude::spawn(async move {
+                // TODO: add delay and rate-limiting with decay
+                if let Err(error) = futures::stream::repeat_with(|| Ok(StartProtocol::KeepAlive(session_id)))
+                    .try_for_each(|msg| {
+                        let routing_cpy = routing_cpy.clone();
+                        let keepalive_sender = tx_cpy.clone();
+                        async move {
+                            keepalive_sender.send_message(msg.try_into()?, routing_cpy.clone()).await
+                        }
+                    }).await {
+                    tracing::error!(%error, %session_id, "keepalive message task failed");
+                }
+            })
+        }
+    }
+
+    pub fn set_minimum_rate(&self, min_rate: usize) {
+        self.sending_rate_per_sec.fetch_max(min_rate, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    pub fn abort(self) {
+        self.jh.abort();
+    }
+}
+
 // TODO: missing docs
 pub struct Session {
     id: SessionId,
@@ -152,6 +194,7 @@ pub struct Session {
     routing: DestinationRouting,
     capabilities: HashSet<Capability>,
     shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
+    keepalive: Option<KeepAliveControl>,
 }
 
 impl Session {
@@ -163,6 +206,7 @@ impl Session {
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
         shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
+        keepalive: Option<KeepAliveControl>,
     ) -> Self {
         let inner_session = InnerSession::new(id, me, routing.clone(), tx, rx);
 
@@ -202,6 +246,7 @@ impl Session {
                 routing,
                 capabilities,
                 shutdown_notifier,
+                keepalive,
             }
         } else {
             // Otherwise, no additional sub protocol is necessary
@@ -211,6 +256,7 @@ impl Session {
                 routing,
                 capabilities,
                 shutdown_notifier,
+                keepalive,
             }
         }
     }
@@ -262,6 +308,10 @@ impl futures::AsyncWrite for Session {
     }
 
     fn poll_close(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
+        if let Some(jh) = self.keepalive.take() {
+            jh.abort();
+        }
+
         let inner = &mut self.inner;
         pin_mut!(inner);
         match inner.poll_close(cx) {

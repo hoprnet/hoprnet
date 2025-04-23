@@ -1,10 +1,3 @@
-use crate::errors::{SessionManagerError, TransportSessionError};
-use crate::initiation::{
-    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
-};
-use crate::traits::SendMsg;
-use crate::types::unwrap_chain_address;
-use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
@@ -15,6 +8,14 @@ use std::ops::Range;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
+
+use crate::errors::{SessionManagerError, TransportSessionError};
+use crate::initiation::{
+    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
+};
+use crate::traits::SendMsg;
+use crate::types::{unwrap_chain_address, KeepAliveControl};
+use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -246,6 +247,7 @@ fn initiation_timeout_max(base: Duration, hops: usize) -> Duration {
     2 * base * (hops as u32)
 }
 
+
 /// The Minimum Session tag due to Start-protocol messages.
 pub const MIN_SESSION_TAG_RANGE_RESERVATION: Tag = 16;
 
@@ -446,6 +448,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     METRIC_ACTIVE_SESSIONS.increment(1.0);
                 }
 
+                // TODO: configurable initial rate
+                let keep_alives = KeepAliveControl::new(session_id, msg_sender.clone(), routing.clone(), 1000);
+
                 Ok(Session::new(
                     session_id,
                     self.me,
@@ -454,6 +459,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     Arc::new(msg_sender.clone()),
                     rx,
                     self.session_notifiers.get().map(|(_, c)| c.clone()),
+                    keep_alives.into()
                 ))
             }
             Either::Left((Ok(None), _)) => Err(SessionManagerError::Other(
@@ -574,6 +580,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         Arc::new(msg_sender.clone()),
                         rx_session_data,
                         close_session_notifier.into(),
+                        None,
                     );
 
                     // Extract useful information about the session from the Start protocol message
@@ -693,6 +700,13 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         "session could not be closed on other party's request"
                     ),
                     _ => {}
+                }
+            }
+            StartProtocol::KeepAlive(session_id) => {
+                if self.sessions.get(&session_id).await.is_some() {
+                    trace!(?session_id, "received keep-alive request");
+                } else {
+                    error!(?session_id, "received keep-alive request for unknown session");
                 }
             }
         }
