@@ -14,13 +14,14 @@ crate-type = ["rlib"]
 [dependencies]
 alloy = { workspace = true, default-features = false, features = ["contract", "node-bindings"] }
 libp2p-identity = { workspace = true }
+lazy_static = { workspace = true }
 tracing = { workspace = true }
 multiaddr = { workspace = true }
 ethers = { workspace = true }
 hex-literal = { workspace = true }
 serde = { workspace = true }
 strum = { workspace = true }
-lazy_static = { workspace = true }
+thiserror = { workspace = true }
 
 hopr-bindings = { workspace = true }
 hopr-crypto-types = { workspace = true }

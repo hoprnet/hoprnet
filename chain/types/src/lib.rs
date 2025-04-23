@@ -1,8 +1,9 @@
 //! This crate contains various on-chain related modules and types.
 
 use alloy::{contract::Result as ContractResult, network::TransactionBuilder, primitives};
+use constants::{ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER};
 use serde::{Deserialize, Serialize};
-use utils::ERC_1820_REGISTRY_DEPLOY_CODE;
+use utils::{address_from_alloy_primitive, address_to_alloy_primitive};
 
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{self, HoprAnnouncementsInstance},
@@ -26,6 +27,8 @@ use hopr_primitive_types::primitives::Address;
 
 pub mod actions;
 pub mod chain_events;
+pub mod constants;
+pub mod errors;
 // Various (mostly testing related) utility functions
 pub mod utils;
 
@@ -68,8 +71,8 @@ where
 {
     pub fn address(&self) -> Address {
         match self {
-            NetworkRegistryProxy::Dummy(c) => Address::from(c.address().0 .0),
-            NetworkRegistryProxy::Safe(c) => Address::from(c.address().0 .0),
+            NetworkRegistryProxy::Dummy(c) => address_from_alloy_primitive(*c.address()),
+            NetworkRegistryProxy::Safe(c) => address_from_alloy_primitive(*c.address()),
         }
     }
 }
@@ -101,51 +104,48 @@ where
 {
     pub fn new(contract_addresses: &ContractAddresses, provider: P, use_dummy_nr: bool) -> Self {
         Self {
-            token: HoprTokenInstance::new(
-                primitives::Address::from_slice(contract_addresses.token.as_ref()),
-                provider.clone(),
-            ),
+            token: HoprTokenInstance::new(address_to_alloy_primitive(contract_addresses.token), provider.clone()),
             channels: HoprChannelsInstance::new(
-                primitives::Address::from_slice(contract_addresses.channels.as_ref()),
+                address_to_alloy_primitive(contract_addresses.channels),
                 provider.clone(),
             ),
             announcements: HoprAnnouncementsInstance::new(
-                primitives::Address::from_slice(contract_addresses.announcements.as_ref()),
+                address_to_alloy_primitive(contract_addresses.announcements),
                 provider.clone(),
             ),
             network_registry: HoprNetworkRegistryInstance::new(
-                primitives::Address::from_slice(contract_addresses.network_registry.as_ref()),
+                address_to_alloy_primitive(contract_addresses.network_registry),
                 provider.clone(),
             ),
             network_registry_proxy: if use_dummy_nr {
                 NetworkRegistryProxy::Dummy(HoprDummyProxyForNetworkRegistryInstance::new(
-                    primitives::Address::from_slice(contract_addresses.network_registry_proxy.as_ref()),
+                    address_to_alloy_primitive(contract_addresses.network_registry_proxy),
                     provider.clone(),
                 ))
             } else {
                 NetworkRegistryProxy::Safe(HoprSafeProxyForNetworkRegistryInstance::new(
-                    primitives::Address::from_slice(contract_addresses.network_registry_proxy.as_ref()),
+                    address_to_alloy_primitive(contract_addresses.network_registry_proxy),
                     provider.clone(),
                 ))
             },
             safe_registry: HoprNodeSafeRegistryInstance::new(
-                primitives::Address::from_slice(contract_addresses.safe_registry.as_ref()),
+                address_to_alloy_primitive(contract_addresses.safe_registry),
                 provider.clone(),
             ),
             price_oracle: HoprTicketPriceOracleInstance::new(
-                primitives::Address::from_slice(contract_addresses.price_oracle.as_ref()),
+                address_to_alloy_primitive(contract_addresses.price_oracle),
                 provider.clone(),
             ),
             win_prob_oracle: HoprWinningProbabilityOracleInstance::new(
-                primitives::Address::from_slice(contract_addresses.win_prob_oracle.as_ref()),
+                address_to_alloy_primitive(contract_addresses.win_prob_oracle),
                 provider.clone(),
             ),
             stake_factory: HoprNodeStakeFactoryInstance::new(
-                primitives::Address::from_slice(contract_addresses.stake_factory.as_ref()),
+                address_to_alloy_primitive(contract_addresses.stake_factory),
                 provider.clone(),
             ),
             module_implementation: HoprNodeManagementModuleInstance::new(
-                primitives::Address::from_slice(contract_addresses.module_implementation.as_ref()),
+                address_to_alloy_primitive(contract_addresses.module_implementation),
                 provider.clone(),
             ),
         }
@@ -156,8 +156,8 @@ where
         {
             // Fund 1820 deployer and deploy ERC1820Registry
             let tx = N::TransactionRequest::default()
-                .with_to(crate::utils::ERC_1820_DEPLOYER)
-                .with_value(crate::utils::ETH_VALUE_FOR_ERC1820_DEPLOYER);
+                .with_to(ERC_1820_DEPLOYER)
+                .with_value(ETH_VALUE_FOR_ERC1820_DEPLOYER);
 
             // Sequentially executing the following transactions:
             // 1. Fund the deployer wallet
@@ -171,7 +171,7 @@ where
         }
 
         // Get deployer address
-        let self_address = primitives::Address::from_slice(deployer.public().to_address().as_ref());
+        let self_address = address_to_alloy_primitive(deployer.public().to_address());
 
         let stake_factory = HoprNodeStakeFactory::deploy(provider.clone()).await?;
         let module_implementation = HoprNodeManagementModule::deploy(provider.clone()).await?;
@@ -236,31 +236,16 @@ where
 {
     fn from(instances: &ContractInstances<T, P, N>) -> Self {
         Self {
-            token: Address::from(instances.token.address().into_array()),
-            channels: Address::from(instances.channels.address().into_array()),
-            announcements: Address::from(instances.announcements.address().into_array()),
-            network_registry: Address::from(instances.network_registry.address().into_array()),
+            token: address_from_alloy_primitive(*instances.token.address()),
+            channels: address_from_alloy_primitive(*instances.channels.address()),
+            announcements: address_from_alloy_primitive(*instances.announcements.address()),
+            network_registry: address_from_alloy_primitive(*instances.network_registry.address()),
             network_registry_proxy: instances.network_registry_proxy.address(),
-            safe_registry: Address::from(instances.safe_registry.address().into_array()),
-            price_oracle: Address::from(instances.price_oracle.address().into_array()),
-            win_prob_oracle: Address::from(instances.win_prob_oracle.address().into_array()),
-            stake_factory: Address::from(instances.stake_factory.address().into_array()),
-            module_implementation: Address::from(instances.module_implementation.address().into_array()),
+            safe_registry: address_from_alloy_primitive(*instances.safe_registry.address()),
+            price_oracle: address_from_alloy_primitive(*instances.price_oracle.address()),
+            win_prob_oracle: address_from_alloy_primitive(*instances.win_prob_oracle.address()),
+            stake_factory: address_from_alloy_primitive(*instances.stake_factory.address()),
+            module_implementation: address_from_alloy_primitive(*instances.module_implementation.address()),
         }
     }
-}
-
-/// Creates local Anvil instance.
-///
-/// Used for testing. When block time is given, new blocks are mined periodically.
-/// Otherwise, a new block is mined per transaction.
-pub fn create_anvil(block_time: Option<std::time::Duration>) -> alloy::node_bindings::AnvilInstance {
-    // The anvil binary must be in the PATH.
-    let mut anvil = alloy::node_bindings::Anvil::new();
-
-    if let Some(bt) = block_time {
-        anvil = anvil.block_time(bt.as_secs());
-    }
-
-    anvil.spawn()
 }
