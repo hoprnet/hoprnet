@@ -1,4 +1,3 @@
-use alloy::hex;
 use bloomfilter::Bloom;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -255,7 +254,7 @@ impl Display for ApplicationData {
             f,
             "({}): {}",
             self.application_tag.unwrap_or(DEFAULT_APPLICATION_TAG),
-            hex::encode(&self.plain_text)
+            alloy::hex::encode(&self.plain_text)
         )
     }
 }

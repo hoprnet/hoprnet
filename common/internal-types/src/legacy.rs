@@ -187,7 +187,6 @@ impl From<AcknowledgedTicket> for crate::tickets::TransferableWinningTicket {
 mod tests {
     use crate::legacy::{Ticket, VrfParameters};
     use crate::tickets::{TicketBuilder, TransferableWinningTicket};
-    use alloy::hex;
     use hex_literal::hex;
     use hopr_crypto_types::prelude::{ChainKeypair, Challenge, CurvePoint, HalfKey, Hash, Keypair};
     use hopr_primitive_types::prelude::{BalanceType, EthereumChallenge};
