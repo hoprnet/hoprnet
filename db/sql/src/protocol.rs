@@ -3,9 +3,7 @@ use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
-use hopr_db_api::protocol::{
-    AckResult, HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement,
-};
+use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement};
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
@@ -239,7 +237,7 @@ impl HoprDb {
 #[async_trait]
 impl HoprDbProtocolOperations for HoprDb {
     #[instrument(level = "trace", skip(self, ack))]
-    async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<AckResult> {
+    async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<()> {
         let result = self.validate_acknowledgement(&ack).await?;
         match &result {
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => {
@@ -248,6 +246,9 @@ impl HoprDbProtocolOperations for HoprDb {
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 {
+                    METRIC_RECEIVED_ACKS.increment(&["true"]);
+                    METRIC_TICKETS_COUNT.increment(&["winning"]);
+
                     let verified_ticket = ack_ticket.ticket.verified_ticket();
                     let channel = verified_ticket.channel_id.to_string();
                     crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
@@ -268,14 +269,19 @@ impl HoprDbProtocolOperations for HoprDb {
             ResolvedAcknowledgement::RelayingLoss(_channel) => {
                 #[cfg(all(feature = "prometheus", not(test)))]
                 {
+                    METRIC_RECEIVED_ACKS.increment(&["true"]);
+                    METRIC_TICKETS_COUNT.increment(&["losing"]);
                     crate::tickets::METRIC_HOPR_TICKETS_INCOMING_STATISTICS
                         .increment(&[&_channel.to_string(), "losing_count"], 1.0f64);
                 }
             }
-            _ => {}
+            ResolvedAcknowledgement::Sending(_) => {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_RECEIVED_ACKS.increment(&["true"]);
+            }
         };
 
-        Ok(result.into())
+        Ok(())
     }
 
     async fn get_network_winning_probability(&self) -> Result<f64> {
@@ -521,22 +527,8 @@ impl HoprDbProtocolOperations for HoprDb {
 
                         DbSqlError::DecodingError
                     })?;
-                    let _ack_result = self.handle_acknowledgement(ack).await?;
 
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    match &_ack_result {
-                        AckResult::Sender(_) => {
-                            METRIC_RECEIVED_ACKS.increment(&["true"]);
-                        }
-                        AckResult::RelayerWinning(_) => {
-                            METRIC_RECEIVED_ACKS.increment(&["true"]);
-                            METRIC_TICKETS_COUNT.increment(&["winning"]);
-                        }
-                        AckResult::RelayerLosing => {
-                            METRIC_RECEIVED_ACKS.increment(&["true"]);
-                            METRIC_TICKETS_COUNT.increment(&["losing"]);
-                        }
-                    };
+                    self.handle_acknowledgement(ack).await?;
 
                     Ok(None)
                 } else {
