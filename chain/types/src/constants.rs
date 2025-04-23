@@ -1,8 +1,8 @@
 use alloy::{
-    hex,
     primitives::{address, Address, U256},
     uint,
 };
+use hex_literal::hex;
 
 /// Deployed code of the Safe Diamond Proxy Singleton
 pub const SAFE_DIAMOND_PROXY_SINGLETON_DEPLOY_CODE: [u8; 169] = hex!("f8a78085174876e800830186a08080b853604580600e600039806000f350fe7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe03601600081602082378035828234f58015156039578182fd5b8082525050506014600cf382f4f5a00dc4d1d21b308094a30f5f93da35e4d72e99115378f135f2295bea47301a3165a0636b822daad40aa8c52dd5132f378c0c0e6d83b4898228c7e21c84e631a0b891");
