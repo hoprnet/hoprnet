@@ -5401,7 +5401,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-types"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "alloy",
  "ethers",
@@ -5599,7 +5599,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.6.2"
+version = "0.7.2"
 dependencies = [
  "alloy",
  "anyhow",
