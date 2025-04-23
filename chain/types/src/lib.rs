@@ -1,6 +1,8 @@
 //! This crate contains various on-chain related modules and types.
 
-use alloy::{contract::Result as ContractResult, network::TransactionBuilder, primitives};
+use alloy::{
+    contract::Result as ContractResult, network::TransactionBuilder, primitives, rpc::types::TransactionRequest,
+};
 use constants::{ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER};
 use serde::{Deserialize, Serialize};
 use utils::{address_from_alloy_primitive, address_to_alloy_primitive};
@@ -58,16 +60,14 @@ pub struct ContractAddresses {
 }
 
 #[derive(Debug, Clone)]
-pub enum NetworkRegistryProxy<T, P, N> {
-    Dummy(HoprDummyProxyForNetworkRegistryInstance<T, P, N>),
-    Safe(HoprSafeProxyForNetworkRegistryInstance<T, P, N>),
+pub enum NetworkRegistryProxy<P> {
+    Dummy(HoprDummyProxyForNetworkRegistryInstance<(), P>),
+    Safe(HoprSafeProxyForNetworkRegistryInstance<(), P>),
 }
 
-impl<T, P, N> NetworkRegistryProxy<T, P, N>
+impl<P> NetworkRegistryProxy<P>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N>,
-    N: alloy::providers::Network,
+    P: alloy::providers::Provider + Clone,
 {
     pub fn address(&self) -> Address {
         match self {
@@ -79,28 +79,22 @@ where
 
 /// Holds instances to contracts.
 #[derive(Debug)]
-pub struct ContractInstances<T, P, N> {
-    pub token: HoprTokenInstance<T, P, N>,
-    pub channels: HoprChannelsInstance<T, P, N>,
-    pub announcements: HoprAnnouncementsInstance<T, P, N>,
-    pub network_registry: HoprNetworkRegistryInstance<T, P, N>,
-    pub network_registry_proxy: NetworkRegistryProxy<T, P, N>,
-    pub safe_registry: HoprNodeSafeRegistryInstance<T, P, N>,
-    pub price_oracle: HoprTicketPriceOracleInstance<T, P, N>,
-    pub win_prob_oracle: HoprWinningProbabilityOracleInstance<T, P, N>,
-    pub stake_factory: HoprNodeStakeFactoryInstance<T, P, N>,
-    pub module_implementation: HoprNodeManagementModuleInstance<T, P, N>,
+pub struct ContractInstances<P> {
+    pub token: HoprTokenInstance<(), P>,
+    pub channels: HoprChannelsInstance<(), P>,
+    pub announcements: HoprAnnouncementsInstance<(), P>,
+    pub network_registry: HoprNetworkRegistryInstance<(), P>,
+    pub network_registry_proxy: NetworkRegistryProxy<P>,
+    pub safe_registry: HoprNodeSafeRegistryInstance<(), P>,
+    pub price_oracle: HoprTicketPriceOracleInstance<(), P>,
+    pub win_prob_oracle: HoprWinningProbabilityOracleInstance<(), P>,
+    pub stake_factory: HoprNodeStakeFactoryInstance<(), P>,
+    pub module_implementation: HoprNodeManagementModuleInstance<(), P>,
 }
 
-/// FIXME: This implementation would still require Provider to be Clone.
-impl<T, P, N> ContractInstances<T, P, N>
+impl<P> ContractInstances<P>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N> + Clone,
-    N: alloy::providers::Network,
-    // where
-    //     T: alloy::contract::private::Transport,
-    //     P: alloy::contract::private::Provider<T, alloy::network::Ethereum> + Clone,
+    P: alloy::providers::Provider + Clone,
 {
     pub fn new(contract_addresses: &ContractAddresses, provider: P, use_dummy_nr: bool) -> Self {
         Self {
@@ -155,7 +149,7 @@ where
     pub async fn deploy_for_testing(provider: P, deployer: &ChainKeypair) -> ContractResult<Self> {
         {
             // Fund 1820 deployer and deploy ERC1820Registry
-            let tx = N::TransactionRequest::default()
+            let tx = TransactionRequest::default()
                 .with_to(ERC_1820_DEPLOYER)
                 .with_value(ETH_VALUE_FOR_ERC1820_DEPLOYER);
 
@@ -228,13 +222,11 @@ where
     }
 }
 
-impl<T, P, N> From<&ContractInstances<T, P, N>> for ContractAddresses
+impl<P> From<&ContractInstances<P>> for ContractAddresses
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N>,
-    N: alloy::providers::Network,
+    P: alloy::providers::Provider + Clone,
 {
-    fn from(instances: &ContractInstances<T, P, N>) -> Self {
+    fn from(instances: &ContractInstances<P>) -> Self {
         Self {
             token: address_from_alloy_primitive(*instances.token.address()),
             channels: address_from_alloy_primitive(*instances.channels.address()),

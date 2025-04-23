@@ -1,12 +1,12 @@
 //! Chain utilities used for testing.
 //!
 //! This used in unit and integration tests.
-use crate::{constants, errors::Result as ChainTypesResult, ContractAddresses, ContractInstances};
+use crate::{constants, errors::Result as ChainTypesResult, ContractInstances};
 use alloy::{
     contract::{Error as ContractError, Result as ContractResult},
     network::{ReceiptResponse, TransactionBuilder},
     primitives::{self, address, aliases, keccak256, Bytes, U256},
-    rpc::types::{TransactionReceipt, TransactionRequest},
+    rpc::types::TransactionRequest,
     signers::{local::PrivateKeySigner, Signer},
     sol,
     sol_types::{SolCall, SolValue},
@@ -76,6 +76,20 @@ pub fn create_anvil(block_time: Option<std::time::Duration>) -> alloy::node_bind
 //     }
 
 //     anvil.spawn()
+// }
+
+// pub async fn test_type() -> ContractResult<()> {
+//     let provider = alloy::providers::ProviderBuilder::default()
+//         .with_gas_estimation()
+//         .on_anvil_with_wallet();
+//     let instance = HoprTokenInstance::new(address!("0x8819c5bab7d63c61d72f65b19b05a6772f55391b"), provider.clone());
+//     // let lib_addr: Address = Comparators::deploy_builder(&provider).deploy().await?;
+//     // let anvil = ethers::utils::Anvil::new()
+//     //     .mnemonic("gentle wisdom move brush express similar canal dune emotion series because parrot")
+//     //     .spawn();
+//     // let provider = anvil.provider();
+//     let accounts = provider.get_accounts().await?;
+//     Ok(())
 // }
 
 /// Mints specified amount of HOPR tokens to the contract deployer wallet.
@@ -442,14 +456,15 @@ where
 ///
 /// Returns (module address, safe address)
 pub async fn deploy_one_safe_one_module_and_setup_for_testing<T, P, N>(
-    instances: &ContractInstances<T, P, N>,
+    instances: &ContractInstances<P>,
     provider: P,
     deployer: &ChainKeypair,
 ) -> ContractResult<(Address, Address)>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::providers::Provider + alloy::contract::private::Provider<T, N>,
-    N: alloy::providers::Network,
+    P: alloy::providers::Provider + Clone,
+    // T: alloy::contract::private::Transport + Clone,
+    // P: alloy::providers::Provider + alloy::contract::private::Provider<T, N>,
+    // N: alloy::providers::Network,
     // N: alloy::network::Ethereum,
 {
     // Get deployer address
@@ -462,8 +477,7 @@ where
 
     // only deploy contracts when needed
     if code.is_empty() {
-        // // FIXME: debug log
-        // debug!("deploying safe code");
+        debug!("deploying safe code");
         // Deploy Safe diamond deployment proxy singleton
         let safe_diamond_proxy_address = {
             // Fund Safe singleton deployer 0.01 anvil-eth and deploy Safe singleton
@@ -489,8 +503,7 @@ where
             // )?;
             // tx.contract_address.unwrap()
         };
-        // // FIXME: debug log
-        // debug!(%safe_diamond_proxy_address, "Safe diamond proxy singleton");
+        debug!(%safe_diamond_proxy_address, "Safe diamond proxy singleton");
 
         // Deploy minimum Safe suite
         {
@@ -535,21 +548,17 @@ where
         //  Some(BlockNumber::Pending.into()))
         .await
         .unwrap();
-    // // FIXME: debug log
-    // debug!(%curr_nonce, "curr_nonce");
+    debug!(%curr_nonce, "curr_nonce");
 
     // FIXME: Check if this is the correct way to get the nonce
     let nonce = keccak256((address_to_alloy_primitive(self_address), U256::from(curr_nonce)).abi_encode_packed());
     // let nonce = keccak256(sol_types::abi::abi_encode_packed(&[Token::Address(self_address), Token::Uint(curr_nonce)]).unwrap());
     let default_target = format!("{:?}010103020202020202020202", instances.channels.address());
 
-    let contract_addrs = ContractAddresses::from(instances);
-
-    // // FIXME: debug log
-    // debug!(%self_address, "self_address");
-    // debug!("nonce {:?}", U256::from_be_bytes(nonce.0).to_string());
-    // debug!("default_target in bytes {:?}", default_target.encode_hex());
-    // debug!("default_target in u256 {:?}", U256::from_str(&default_target).unwrap());
+    debug!(%self_address, "self_address");
+    debug!("nonce {:?}", U256::from_be_bytes(nonce.0).to_string());
+    debug!("default_target in bytes {:?}", default_target.bytes());
+    debug!("default_target in u256 {:?}", U256::from_str(&default_target).unwrap());
 
     // let typed_tx = instances
     //     .stake_factory
@@ -562,20 +571,20 @@ where
     // .tx;
     let typed_tx = HoprNodeStakeFactory::cloneCall {
         moduleSingletonAddress: *instances.module_implementation.address(),
-        admins: vec![*address_to_alloy_primitive(self_address).into()],
+        admins: vec![address_to_alloy_primitive(self_address)],
         nonce: nonce.into(),
         defaultTarget: U256::from_str(&default_target).unwrap().into(),
     }
     .abi_encode();
-    // // FIXME: debug log
-    // debug!("typed_tx {:?}", typed_tx);
+
+    debug!("typed_tx {:?}", typed_tx);
 
     // deploy one safe and one module
     let instance_deployment_tx_receipt = instances
         .stake_factory
         .clone(
             *instances.module_implementation.address(),
-            vec![*address_to_alloy_primitive(self_address).into()],
+            vec![address_to_alloy_primitive(self_address)],
             nonce.into(),
             U256::from_str(&default_target).unwrap().into(),
         )
@@ -586,7 +595,7 @@ where
 
     // decode logs
     let maybe_module_tx_log =
-        instance_deployment_tx_receipt.decoded_log::<HoprNodeStakeFactory::NewHoprNodeStakeModule>()?;
+        instance_deployment_tx_receipt.decoded_log::<HoprNodeStakeFactory::NewHoprNodeStakeModule>();
     let deployed_module_address: primitives::Address = if let Some(module_tx_log) = maybe_module_tx_log {
         let HoprNodeStakeFactory::NewHoprNodeStakeModule { instance, .. } = module_tx_log.data;
         instance
@@ -594,8 +603,7 @@ where
         return Err(ContractError::ContractNotDeployed);
     };
 
-    let maybe_safe_tx_log =
-        instance_deployment_tx_receipt.decoded_log::<HoprNodeStakeFactory::NewHoprNodeStakeSafe>()?;
+    let maybe_safe_tx_log = instance_deployment_tx_receipt.decoded_log::<HoprNodeStakeFactory::NewHoprNodeStakeSafe>();
     let deployed_safe_address: primitives::Address = if let Some(safe_tx_log) = maybe_safe_tx_log {
         let HoprNodeStakeFactory::NewHoprNodeStakeSafe { instance } = safe_tx_log.data;
         instance
@@ -659,9 +667,8 @@ where
     //     .unwrap()
     //     .into();
 
-    // // FIXME: debug log
-    // debug!("instance_deployment_tx module instance {:?}", deployed_module_address);
-    // debug!("instance_deployment_tx safe instance {:?}", deployed_safe_address);
+    debug!("instance_deployment_tx module instance {:?}", deployed_module_address);
+    debug!("instance_deployment_tx safe instance {:?}", deployed_safe_address);
 
     Ok((
         address_from_alloy_primitive(deployed_module_address),
