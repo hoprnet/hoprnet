@@ -140,16 +140,10 @@ pub async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()
     Ok(())
 }
 
-pub type WireChannels = (
-    (
-        futures::channel::mpsc::UnboundedSender<(PeerId, Acknowledgement)>,
-        futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
-    ),
-    (
-        futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
-        hopr_transport_mixer::channel::Receiver<(PeerId, Box<[u8]>)>,
-    ),
-);
+pub type WireChannels = ((
+    futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
+    hopr_transport_mixer::channel::Receiver<(PeerId, Box<[u8]>)>,
+),);
 
 pub type LogicalChannels = (
     futures::channel::mpsc::UnboundedSender<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>,
@@ -192,9 +186,6 @@ pub async fn peer_setup_for(
         let (received_ack_tickets_tx, received_ack_tickets_rx) =
             futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
 
-        let (wire_ack_send_tx, wire_ack_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-        let (wire_ack_recv_tx, wire_ack_recv_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-
         let (wire_msg_send_tx, wire_msg_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
         let (mixer_channel_tx, mixer_channel_rx) =
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
@@ -218,16 +209,12 @@ pub async fn peer_setup_for(
             packet_cfg,
             db,
             None,
-            (wire_ack_recv_tx, wire_ack_send_rx),
             (mixer_channel_tx, wire_msg_send_rx),
             (api_recv_tx, api_send_rx),
         )
         .await;
 
-        wire_channels.push((
-            (wire_ack_send_tx, wire_ack_recv_rx),
-            (wire_msg_send_tx, mixer_channel_rx),
-        ));
+        wire_channels.push(((wire_msg_send_tx, mixer_channel_rx),));
 
         logical_channels.push((api_send_tx, api_recv_rx));
         ticket_channels.push(received_ack_tickets_rx)

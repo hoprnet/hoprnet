@@ -526,12 +526,6 @@ where
         let _mixing_process_before_sending_out =
             hopr_async_runtime::prelude::spawn(mixing_channel_rx.map(Ok).forward(wire_msg_tx));
 
-        let ack_proto_control =
-            transport_layer.build_protocol_control(hopr_transport_protocol::ack::CURRENT_HOPR_ACK_PROTOCOL);
-        let ack_codec = hopr_transport_protocol::ack::AckCodec::new();
-        let (wire_ack_tx, wire_ack_rx) =
-            hopr_transport_protocol::stream::process_stream_protocol(ack_codec, ack_proto_control).await?;
-
         processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
 
         // initiate the msg-ack protocol stack over the wire transport
@@ -547,7 +541,6 @@ where
             packet_cfg,
             self.db.clone(),
             Some(tbf_path),
-            (wire_ack_tx, wire_ack_rx),
             (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, external_msg_rx),
         )

@@ -1,6 +1,6 @@
 use futures::{future::Either, SinkExt};
 use futures::{pin_mut, Sink};
-use tracing::{error, trace};
+use tracing::error;
 
 use hopr_async_runtime::prelude::sleep;
 use hopr_crypto_packet::errors::PacketError;
@@ -19,7 +19,6 @@ use hopr_transport_identity::PeerId;
 
 use super::packet::OutgoingPacket;
 use crate::bloom;
-use crate::errors::ProtocolError;
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -40,7 +39,7 @@ pub struct SendPkt {
 
 pub struct SendAck {
     pub peer: PeerId,
-    pub ack: Acknowledgement,
+    pub ack: Box<[u8]>,
 }
 
 pub enum RecvOperation {
@@ -52,7 +51,7 @@ pub enum RecvOperation {
 pub trait PacketUnwrapping {
     type Packet;
 
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Self::Packet>;
+    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Option<Self::Packet>>;
 }
 
 /// Implements protocol acknowledgement logic for msg packets
@@ -102,7 +101,7 @@ where
     type Packet = RecvOperation;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<RecvOperation> {
+    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Option<RecvOperation>> {
         let previous_hop = OffchainPublicKey::try_from(peer)
             .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
 
@@ -126,59 +125,80 @@ where
                 _ => PacketError::PacketConstructionError(e.to_string()),
             })?;
 
-        if let TransportPacketWithChainData::Final { packet_tag, .. }
-        | TransportPacketWithChainData::Forwarded { packet_tag, .. } = &packet
-        {
-            if self.is_tag_replay(packet_tag).await {
-                return Err(TagReplay);
-            }
-        };
-
-        Ok(match packet {
-            TransportPacketWithChainData::Final {
-                previous_hop,
-                plain_text,
-                ack_key,
-                no_ack,
-                ..
-            } => {
-                // If this is not a probe packet, send an acknowledgement back to the previous hop
-                if !no_ack {
-                    let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
-                    RecvOperation::Receive {
-                        data: app_data,
-                        ack: SendAck {
-                            peer: previous_hop.into(),
-                            ack: Acknowledgement::new(ack_key, &self.cfg.packet_keypair),
-                        },
+        // Indicating
+        match packet {
+            Some(packet) => {
+                if let TransportPacketWithChainData::Final { packet_tag, .. }
+                | TransportPacketWithChainData::Forwarded { packet_tag, .. } = &packet
+                {
+                    if self.is_tag_replay(packet_tag).await {
+                        return Err(TagReplay);
                     }
-                } else {
-                    // TODO: implement no-acknowledgement packet handling (#7073)
-                    unimplemented!()
-                }
+                };
+
+                Ok(match packet {
+                    TransportPacketWithChainData::Final {
+                        previous_hop,
+                        plain_text,
+                        ack_key,
+                        ..
+                    } => {
+                        // If this is not a probe packet, send an acknowledgement back to the previous hop
+                        if let Some(ack_key) = ack_key {
+                            let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
+
+                            let ack = Acknowledgement::new(ack_key, &self.cfg.packet_keypair);
+                            let ack_packet = self
+                                .db
+                                .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
+                                .await
+                                .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
+
+                            Some(RecvOperation::Receive {
+                                data: app_data,
+                                ack: SendAck {
+                                    peer: ack_packet.next_hop.into(),
+                                    ack: ack_packet.data,
+                                },
+                            })
+                        } else {
+                            // TODO: implement no-acknowledgement packet handling (#7073)
+                            unimplemented!()
+                        }
+                    }
+                    TransportPacketWithChainData::Forwarded {
+                        previous_hop,
+                        next_hop,
+                        data,
+                        ack,
+                        ..
+                    } => {
+                        let ack_packet = self
+                            .db
+                            .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
+                            .await
+                            .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
+
+                        Some(RecvOperation::Forward {
+                            msg: SendPkt {
+                                peer: next_hop.into(),
+                                data,
+                            },
+                            ack: SendAck {
+                                peer: ack_packet.next_hop.into(),
+                                ack: ack_packet.data,
+                            },
+                        })
+                    }
+                    TransportPacketWithChainData::Outgoing { .. } => {
+                        return Err(PacketError::LogicError(
+                            "Attempting to process an outgoing packet in the incoming pipeline".into(),
+                        ))
+                    }
+                })
             }
-            TransportPacketWithChainData::Forwarded {
-                previous_hop,
-                next_hop,
-                data,
-                ack,
-                ..
-            } => RecvOperation::Forward {
-                msg: SendPkt {
-                    peer: next_hop.into(),
-                    data,
-                },
-                ack: SendAck {
-                    peer: previous_hop.into(),
-                    ack,
-                },
-            },
-            TransportPacketWithChainData::Outgoing { .. } => {
-                return Err(PacketError::LogicError(
-                    "Attempting to process an outgoing packet in the incoming pipeline".into(),
-                ))
-            }
-        })
+            None => Ok(None),
+        }
     }
 }
 
@@ -346,42 +366,6 @@ impl PacketInteractionConfig {
             outgoing_ticket_win_prob,
             outgoing_ticket_price,
         }
-    }
-}
-
-/// Implements protocol acknowledgement logic for acknowledgements
-#[derive(Clone)]
-pub struct AcknowledgementProcessor<Db: HoprDbProtocolOperations> {
-    db: Db,
-}
-
-impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
-    pub fn new(db: Db) -> Self {
-        Self { db }
-    }
-
-    /// Processes the outgoing acknowledgement.
-    #[inline]
-    #[tracing::instrument(level = "debug", skip(self, ack))]
-    pub async fn send(&self, peer: &PeerId, ack: Acknowledgement) -> Acknowledgement {
-        ack
-    }
-
-    /// Processes the incoming acknowledgement.
-    #[tracing::instrument(level = "debug", skip(self, ack))]
-    pub async fn recv(&self, peer: &PeerId, ack: Acknowledgement) -> crate::errors::Result<AckResult> {
-        let remote_pk = OffchainPublicKey::try_from(peer)?;
-
-        let ack = ack.validate(&remote_pk).map_err(|_e| {
-            tracing::error!("Failed to verify signature on received acknowledgement");
-            ProtocolError::InvalidSignature
-        })?;
-
-        self.db.handle_acknowledgement(ack).await.map_err(|e| {
-            trace!(error = %e, "Failed to process a received acknowledgement");
-            let error: ProtocolError = e.into();
-            error
-        })
     }
 }
 

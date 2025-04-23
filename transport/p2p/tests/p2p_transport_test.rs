@@ -12,7 +12,6 @@ use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
-use hopr_internal_types::protocol::Acknowledgement;
 use hopr_platform::time::native::current_time;
 use hopr_transport_network::{network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_transport_p2p::HoprSwarm;
@@ -37,10 +36,6 @@ pub(crate) struct Interface {
     // ---
     pub send_msg: Sender<(PeerId, Box<[u8]>)>,
     pub recv_msg: Receiver<(PeerId, Box<[u8]>)>,
-    #[allow(dead_code)]
-    pub send_ack: Sender<(PeerId, Acknowledgement)>,
-    #[allow(dead_code)]
-    pub recv_ack: Receiver<(PeerId, Acknowledgement)>,
 }
 pub(crate) enum Announcement {
     QUIC,
@@ -79,11 +74,6 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     let (wire_msg_tx, wire_msg_rx) =
         hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
 
-    let ack_proto_control = swarm.build_protocol_control(hopr_transport_protocol::ack::CURRENT_HOPR_ACK_PROTOCOL);
-    let ack_codec = hopr_transport_protocol::ack::AckCodec::new();
-    let (wire_ack_tx, wire_ack_rx) =
-        hopr_transport_protocol::stream::process_stream_protocol(ack_codec, ack_proto_control).await?;
-
     let api = Interface {
         me: peer_id,
         address: multiaddress,
@@ -92,8 +82,6 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
         send_heartbeat: heartbeat_requests_tx,
         send_msg: wire_msg_tx,
         recv_msg: wire_msg_rx,
-        send_ack: wire_ack_tx,
-        recv_ack: wire_ack_rx,
     };
 
     Ok((api, swarm))

@@ -47,11 +47,6 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                     let dbs = dbs.clone();
 
                     async move {
-                        let (wire_ack_send_tx, _wire_ack_send_rx) =
-                            futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-                        let (_wire_ack_recv_tx, wire_ack_recv_rx) =
-                            futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-
                         let (wire_msg_send_tx, wire_msg_send_rx) =
                             futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
 
@@ -76,7 +71,6 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             cfg,
                             dbs[TESTED_PEER_ID].clone(),
                             None,
-                            (wire_ack_send_tx, wire_ack_recv_rx),
                             (wire_msg_send_tx, wire_msg_recv_rx),
                             (api_recv_tx, api_send_rx),
                         )

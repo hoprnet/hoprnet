@@ -29,7 +29,7 @@ pub trait HoprDbProtocolOperations {
         &self,
         data: Box<[u8]>,
         destination: OffchainPublicKey,
-    ) -> Result<TransportPacketWithChainData>;
+    ) -> Result<OutgoingTransportPacket>;
 
     /// Process the data into an outgoing packet
     async fn to_send(
@@ -49,7 +49,7 @@ pub trait HoprDbProtocolOperations {
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
-    ) -> Result<TransportPacketWithChainData>;
+    ) -> Result<Option<TransportPacketWithChainData>>;
 }
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
@@ -69,6 +69,11 @@ impl Debug for AckResult {
     }
 }
 
+pub enum ReceivedFinal {
+    Msg(Box<[u8]>),
+    Ack(Box<[u8]>),
+}
+
 // TODO: create 4 separate objects and use them Boxed in the enum variants
 #[allow(clippy::large_enum_variant)]
 pub enum TransportPacketWithChainData {
@@ -77,8 +82,7 @@ pub enum TransportPacketWithChainData {
         packet_tag: PacketTag,
         previous_hop: OffchainPublicKey,
         plain_text: Box<[u8]>,
-        ack_key: HalfKey,
-        no_ack: bool,
+        ack_key: Option<HalfKey>,
     },
     /// Packet must be forwarded
     Forwarded {
@@ -94,6 +98,12 @@ pub enum TransportPacketWithChainData {
         ack_challenge: HalfKeyChallenge,
         data: Box<[u8]>,
     },
+}
+
+pub struct OutgoingTransportPacket {
+    pub next_hop: OffchainPublicKey,
+    pub ack_challenge: HalfKeyChallenge,
+    pub data: Box<[u8]>,
 }
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
