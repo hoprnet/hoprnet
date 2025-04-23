@@ -23,17 +23,6 @@ use std::str::FromStr;
 use tracing::debug;
 use SafeContract::SafeContractInstance;
 
-/// convert hopr_primitive_types::primitives::Address to alloy::primitives::Address
-pub fn address_to_alloy_primitive(a: hopr_primitive_types::primitives::Address) -> alloy::primitives::Address {
-    // alloy::primitives::Address::from(a.into_array())
-    alloy::primitives::Address::from_slice(a.as_ref())
-}
-
-/// convert alloy::primitives::Address to hopr_primitive_types::primitives::Address
-pub fn address_from_alloy_primitive(b: alloy::primitives::Address) -> hopr_primitive_types::primitives::Address {
-    hopr_primitive_types::primitives::Address::from(b.0 .0)
-}
-
 // define basic safe abi
 sol!(
     #![sol(abi)]
@@ -56,7 +45,6 @@ lazy_static::lazy_static! {
 /// Otherwise, a new block is mined per transaction.
 ///
 /// Uses a fixed mnemonic to make generated accounts deterministic.
-
 pub fn create_anvil(block_time: Option<std::time::Duration>) -> alloy::node_bindings::AnvilInstance {
     let mut anvil = alloy::node_bindings::Anvil::new()
         .mnemonic("gentle wisdom move brush express similar canal dune emotion series because parrot");
@@ -68,30 +56,6 @@ pub fn create_anvil(block_time: Option<std::time::Duration>) -> alloy::node_bind
     anvil.spawn()
 }
 
-// pub fn create_anvil(block_time: Option<std::time::Duration>) -> ethers::utils::AnvilInstance {
-//     let mut anvil = ethers::utils::Anvil::new()
-//         .mnemonic("gentle wisdom move brush express similar canal dune emotion series because parrot");
-//     if let Some(bt) = block_time {
-//         anvil = anvil.block_time(bt.as_secs());
-//     }
-
-//     anvil.spawn()
-// }
-
-// pub async fn test_type() -> ContractResult<()> {
-//     let provider = alloy::providers::ProviderBuilder::default()
-//         .with_gas_estimation()
-//         .on_anvil_with_wallet();
-//     let instance = HoprTokenInstance::new(address!("0x8819c5bab7d63c61d72f65b19b05a6772f55391b"), provider.clone());
-//     // let lib_addr: Address = Comparators::deploy_builder(&provider).deploy().await?;
-//     // let anvil = ethers::utils::Anvil::new()
-//     //     .mnemonic("gentle wisdom move brush express similar canal dune emotion series because parrot")
-//     //     .spawn();
-//     // let provider = anvil.provider();
-//     let accounts = provider.get_accounts().await?;
-//     Ok(())
-// }
-
 /// Mints specified amount of HOPR tokens to the contract deployer wallet.
 /// Assumes that the `hopr_token` contract is associated with a RPC client that also deployed the contract.
 /// Returns the block number at which the minting transaction was confirmed.
@@ -101,15 +65,11 @@ where
     P: alloy::contract::private::Provider<T, N>,
     N: alloy::providers::Network,
 {
-    // pub async fn mint_tokens<M: Middleware + 'static>(hopr_token: HoprTokenInstance<M>, amount: U256) -> u64 {
     let deployer = hopr_token
         .provider()
         .get_accounts()
         .await
         .expect("client must have a signer")[0];
-    // let accounts = provider.get_accounts().await.unwrap();
-    //     let sender = accounts[0];
-    // let deployer = hopr_token.client().default_sender().expect("client must have a signer");
 
     hopr_token
         .grantRole(*MINTER_ROLE_VALUE, deployer)
@@ -117,11 +77,6 @@ where
         .await?
         .watch()
         .await?;
-    // .send()
-    // .await
-    // .unwrap()
-    // .await
-    // .unwrap();
 
     let tx_receipt = hopr_token
         .mint(deployer, amount, Bytes::new(), Bytes::new())
@@ -131,11 +86,6 @@ where
         .await?;
 
     Ok(tx_receipt.block_number())
-    // .unwrap()
-    // .unwrap()
-    // .block_number
-    // .unwrap()
-    // .as_u64()
 }
 
 /// Creates a transaction that transfers the given `amount` of native tokens to the
@@ -144,9 +94,7 @@ pub fn create_native_transfer<N>(to: Address, amount: U256) -> N::TransactionReq
 where
     N: alloy::providers::Network,
 {
-    let tx = N::TransactionRequest::default()
-        .with_to(address_to_alloy_primitive(to))
-        .with_value(amount);
+    let tx = N::TransactionRequest::default().with_to(to.into()).with_value(amount);
 
     tx
 }
@@ -165,7 +113,7 @@ where
     N: alloy::providers::Network,
 {
     let native_transfer_tx = N::TransactionRequest::default()
-        .with_to(address_to_alloy_primitive(node))
+        .with_to(node.into())
         .with_value(native_token);
 
     // let native_transfer_tx = Eip1559TransactionRequest::new()
@@ -177,7 +125,7 @@ where
     provider.send_transaction(native_transfer_tx).await?.watch().await?;
 
     hopr_token_contract
-        .transfer(address_to_alloy_primitive(node), hopr_token)
+        .transfer(node.into(), hopr_token)
         .send()
         .await?
         .watch()
@@ -206,7 +154,7 @@ where
         .await?;
 
     hopr_channels
-        .fundChannel(address_to_alloy_primitive(counterparty), aliases::U96::from(amount))
+        .fundChannel(counterparty.into(), aliases::U96::from(amount))
         .send()
         .await?
         .watch()
@@ -223,26 +171,24 @@ pub async fn fund_channel_from_different_client<T, P, N>(
     hopr_channels_address: Address,
     amount: U256,
     new_client: P,
-    // new_client: Arc<M>,
 ) -> ContractResult<()>
 where
     T: alloy::contract::private::Transport + Clone,
     P: alloy::contract::private::Provider<T, N> + Clone,
     N: alloy::providers::Network,
 {
-    let hopr_token_with_new_client =
-        HoprTokenInstance::new(address_to_alloy_primitive(hopr_token_address), new_client.clone());
-    let hopr_channels_with_new_client =
-        HoprChannelsInstance::new(address_to_alloy_primitive(hopr_channels_address), new_client.clone());
+    let hopr_token_with_new_client: HoprTokenInstance<_, P, N> =
+        HoprTokenInstance::new(hopr_token_address.into(), new_client.clone());
+    let hopr_channels_with_new_client = HoprChannelsInstance::new(hopr_channels_address.into(), new_client.clone());
     hopr_token_with_new_client
-        .approve(address_to_alloy_primitive(hopr_channels_address), amount)
+        .approve(hopr_channels_address.into(), amount)
         .send()
         .await?
         .watch()
         .await?;
 
     hopr_channels_with_new_client
-        .fundChannel(address_to_alloy_primitive(counterparty), aliases::U96::from(amount))
+        .fundChannel(counterparty.into(), aliases::U96::from(amount))
         .send()
         .await?
         .watch()
@@ -263,12 +209,11 @@ where
     P: alloy::contract::private::Provider<T, N>,
     N: alloy::providers::Network,
 {
-    // ) -> Result<TypedTransaction, ContractError<M>> {
     let nonce = safe_contract.nonce().call().await?;
 
     let data_hash = safe_contract
         .getTransactionHash(
-            address_to_alloy_primitive(target),
+            target.into(),
             U256::ZERO,
             inner_tx_data.clone(),
             0,
@@ -284,9 +229,8 @@ where
 
     let signed_data_hash = wallet.sign_hash(&data_hash._0).await?;
 
-    // safe_tx.set_data(
     let safe_tx_data = SafeContract::execTransactionCall {
-        to: address_to_alloy_primitive(target),
+        to: target.into(),
         value: U256::ZERO,
         data: inner_tx_data,
         operation: 0,
@@ -296,7 +240,6 @@ where
         gasToken: primitives::Address::default(),
         refundReceiver: wallet.address(),
         signatures: Bytes::from(signed_data_hash.as_bytes()),
-        // signatures: Bytes::from(signed_data_hash),
     }
     .abi_encode();
 
@@ -304,26 +247,6 @@ where
     let safe_tx = N::TransactionRequest::default()
         .with_to(*safe_contract.address())
         .with_input(safe_tx_data);
-
-    // // SafeContractCalls::execTransaction(()).
-    // ExecTransactionCall {
-    //     to: target.into(),
-    //     value: U256::ZERO,
-    //     data: inner_tx_data,
-    //     operation: 0,
-    //     safe_tx_gas: U256::ZERO,
-    //     base_gas: U256::ZERO,
-    //     gas_price: U256::ZERO,
-    //     gas_token: Address::default().into(),
-    //     refund_receiver: wallet.address(),
-    //     signatures: encode_packed(&[Token::Bytes(signed_data_hash.to_vec())])
-    //         .unwrap()
-    //         .into(),
-    // }
-    // .encode()
-    // .into();
-    // );
-    // safe_tx.set_to(NameOrAddress::Address(safe_contract.address()));
 
     Ok(safe_tx)
 }
@@ -353,22 +276,14 @@ where
         nodeDefaultTarget: U256::from_str(&node_target_permission).unwrap(),
     }
     .abi_encode();
-    // let inner_tx_data: ethers::types::Bytes = IncludeNodeCall {
-    //     node_default_target: U256::from_str(&node_target_permission).unwrap(),
-    // };
 
-    let safe_contract = SafeContract::new(address_to_alloy_primitive(safe_address), provider.clone());
+    let safe_contract = SafeContract::new(safe_address.into(), provider.clone());
     let wallet = PrivateKeySigner::from_slice(deployer.secret().as_ref()).expect("failed to construct wallet");
     let safe_tx = get_safe_tx(safe_contract, module_address, inner_tx_data.into(), wallet)
         .await
         .unwrap();
 
-    provider
-        .send_transaction(safe_tx)
-        .await?
-        .watch()
-        // .map_err(|e| ContractError::MiddlewareError { e })?
-        .await?;
+    provider.send_transaction(safe_tx).await?.watch().await?;
 
     Ok(())
 }
@@ -398,13 +313,8 @@ where
         defaultTarget: U256::from_str(&announcement_target_permission).unwrap(),
     }
     .abi_encode();
-    // let inner_tx_data: ethers::types::Bytes = ScopeTargetTokenCall {
-    //     default_target: U256::from_str(&announcement_target_permission).unwrap(),
-    // }
-    // .encode()
-    // .into();
 
-    let safe_contract = SafeContract::new(address_to_alloy_primitive(safe_address), provider.clone());
+    let safe_contract = SafeContract::new(safe_address.into(), provider.clone());
     let wallet = PrivateKeySigner::from_slice(deployer.secret().as_ref()).expect("failed to construct wallet");
     let safe_tx = get_safe_tx(safe_contract, module_address, inner_tx_data.into(), wallet)
         .await
@@ -430,12 +340,12 @@ where
 {
     // Inner tx payload: include node to the module
     let inner_tx_data = HoprToken::approveCall {
-        spender: address_to_alloy_primitive(channel_address),
+        spender: channel_address.into(),
         value: U256::MAX,
     }
     .abi_encode();
 
-    let safe_contract = SafeContract::new(address_to_alloy_primitive(safe_address), provider.clone());
+    let safe_contract = SafeContract::new(safe_address.into(), provider.clone());
     let wallet = PrivateKeySigner::from_slice(deployer.secret().as_ref()).expect("failed to construct wallet");
     let safe_tx = get_safe_tx(safe_contract, token_address, inner_tx_data.into(), wallet)
         .await
@@ -462,10 +372,6 @@ pub async fn deploy_one_safe_one_module_and_setup_for_testing<T, P, N>(
 ) -> ContractResult<(Address, Address)>
 where
     P: alloy::providers::Provider + Clone,
-    // T: alloy::contract::private::Transport + Clone,
-    // P: alloy::providers::Provider + alloy::contract::private::Provider<T, N>,
-    // N: alloy::providers::Network,
-    // N: alloy::network::Ethereum,
 {
     // Get deployer address
     let self_address: Address = deployer.public().to_address().into();
@@ -492,16 +398,7 @@ where
                 .await?
                 .get_receipt()
                 .await?;
-            // let tx = provider
-            //     .send_raw_transaction(Bytes::from_static(&*SAFE_DIAMOND_PROXY_SINGLETON_DEPLOY_CODE))
-            //     .await
-            //     .map_err(|e| ContractError::MiddlewareError { e })?
-            //     .await?
-            //     .unwrap();
             tx_receipt.contract_address().unwrap()
-            // .ok_or_else(|| ContractError::ContractNotDeployed)?;
-            // )?;
-            // tx.contract_address.unwrap()
         };
         debug!(%safe_diamond_proxy_address, "Safe diamond proxy singleton");
 
@@ -543,7 +440,7 @@ where
 
     // create a salt from the nonce
     let curr_nonce = provider
-        .get_transaction_count(address_to_alloy_primitive(self_address))
+        .get_transaction_count(self_address.into())
         .pending()
         //  Some(BlockNumber::Pending.into()))
         .await
@@ -551,8 +448,8 @@ where
     debug!(%curr_nonce, "curr_nonce");
 
     // FIXME: Check if this is the correct way to get the nonce
-    let nonce = keccak256((address_to_alloy_primitive(self_address), U256::from(curr_nonce)).abi_encode_packed());
-    // let nonce = keccak256(sol_types::abi::abi_encode_packed(&[Token::Address(self_address), Token::Uint(curr_nonce)]).unwrap());
+    let nonce =
+        keccak256((Into::<primitives::Address>::into(self_address), U256::from(curr_nonce)).abi_encode_packed());
     let default_target = format!("{:?}010103020202020202020202", instances.channels.address());
 
     debug!(%self_address, "self_address");
@@ -560,18 +457,9 @@ where
     debug!("default_target in bytes {:?}", default_target.bytes());
     debug!("default_target in u256 {:?}", U256::from_str(&default_target).unwrap());
 
-    // let typed_tx = instances
-    //     .stake_factory
-    //     .clone(
-    //         *instances.module_implementation.address(),
-    //         vec![*address_to_alloy_primitive(self_address).into()],
-    //         nonce.into(),
-    //         U256::from_str(&default_target).unwrap().into(),
-    //     );
-    // .tx;
     let typed_tx = HoprNodeStakeFactory::cloneCall {
         moduleSingletonAddress: *instances.module_implementation.address(),
-        admins: vec![address_to_alloy_primitive(self_address)],
+        admins: vec![self_address.into()],
         nonce: nonce.into(),
         defaultTarget: U256::from_str(&default_target).unwrap().into(),
     }
@@ -584,7 +472,7 @@ where
         .stake_factory
         .clone(
             *instances.module_implementation.address(),
-            vec![address_to_alloy_primitive(self_address)],
+            vec![self_address.into()],
             nonce.into(),
             U256::from_str(&default_target).unwrap().into(),
         )
@@ -610,68 +498,9 @@ where
     } else {
         return Err(ContractError::ContractNotDeployed);
     };
-    // let module_log = instance_deployment_tx_logs
-    //     .iter()
-    //     .find(|log| {
-    //         log.topics[0].eq(&"0x813d391dc490d6c1dae7d3fdd555f337533d1da2c908c6efd36d4cf557a63206"
-    //             .parse::<H256>()
-    //             .unwrap())
-    //     })
-    //     .ok_or(ContractError::ContractNotDeployed)?; // "NewHoprNodeStakeModule(address,address)"
-
-    // let safe_log = instance_deployment_tx_logs
-    //     .iter()
-    //     .find(|log| {
-    //         log.topics[0].eq(&"0x8231d169f416b666ae7fa43faa24a18899738075a53f32c97617d173b189e386"
-    //             .parse::<H256>()
-    //             .unwrap())
-    //     })
-    //     .ok_or(ContractError::ContractNotDeployed)?; // "NewHoprNodeStakeSafe(address)"
-
-    // // get address of deployed instances
-    // let deployed_module_address: Address = instances
-    //     .stake_factory
-    //     .decode_event::<NewHoprNodeStakeModuleFilter>(
-    //         "NewHoprNodeStakeModule",
-    //         module_log.topics.clone(),
-    //         module_log.data.clone(),
-    //     )
-    //     .unwrap()
-    //     .instance
-    //     .into();
-
-    // note that using the following snippet would cause error
-    // "DetokenizationError(InvalidOutputType("Expected Tuple, got Address(0x8819c5bab7d63c61d72f65b19b05a6772f55391b)"))"
-    // ```
-    // let decoded_safe_log: NewHoprNodeStakeSafeFilter = instances
-    // .stake_factory
-    // .decode_event("NewHoprNodeStakeSafe", safe_log.topics.clone(), safe_log.data.clone())
-    // .unwrap();
-    // ```
-    // let deployed_safe_address: Address = instances
-    //     .stake_factory
-    //     .abi()
-    //     .event("NewHoprNodeStakeSafe")
-    //     .unwrap()
-    //     .parse_log(RawLog {
-    //         topics: safe_log.topics.clone(),
-    //         data: safe_log.data.clone().to_vec(),
-    //     })?
-    //     .params
-    //     .into_iter()
-    //     .map(|param| param.value)
-    //     .collect::<Vec<_>>()
-    //     .pop()
-    //     .unwrap()
-    //     .into_address()
-    //     .unwrap()
-    //     .into();
 
     debug!("instance_deployment_tx module instance {:?}", deployed_module_address);
     debug!("instance_deployment_tx safe instance {:?}", deployed_safe_address);
 
-    Ok((
-        address_from_alloy_primitive(deployed_module_address),
-        address_from_alloy_primitive(deployed_safe_address),
-    ))
+    Ok((deployed_module_address.into(), deployed_safe_address.into()))
 }

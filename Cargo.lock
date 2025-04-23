@@ -185,6 +185,7 @@ dependencies = [
  "alloy-contract",
  "alloy-core",
  "alloy-eips",
+ "alloy-genesis",
  "alloy-network",
  "alloy-node-bindings",
  "alloy-provider",
@@ -5404,7 +5405,6 @@ name = "hopr-chain-types"
 version = "0.9.0"
 dependencies = [
  "alloy",
- "ethers",
  "hex",
  "hex-literal",
  "hopr-bindings",
@@ -5778,8 +5778,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "chrono",
  "float-cmp",

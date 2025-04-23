@@ -5,7 +5,6 @@ use alloy::{
 };
 use constants::{ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER};
 use serde::{Deserialize, Serialize};
-use utils::{address_from_alloy_primitive, address_to_alloy_primitive};
 
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{self, HoprAnnouncementsInstance},
@@ -71,8 +70,8 @@ where
 {
     pub fn address(&self) -> Address {
         match self {
-            NetworkRegistryProxy::Dummy(c) => address_from_alloy_primitive(*c.address()),
-            NetworkRegistryProxy::Safe(c) => address_from_alloy_primitive(*c.address()),
+            NetworkRegistryProxy::Dummy(c) => Into::<Address>::into(*c.address()),
+            NetworkRegistryProxy::Safe(c) => Into::<Address>::into(*c.address()),
         }
     }
 }
@@ -98,48 +97,33 @@ where
 {
     pub fn new(contract_addresses: &ContractAddresses, provider: P, use_dummy_nr: bool) -> Self {
         Self {
-            token: HoprTokenInstance::new(address_to_alloy_primitive(contract_addresses.token), provider.clone()),
-            channels: HoprChannelsInstance::new(
-                address_to_alloy_primitive(contract_addresses.channels),
-                provider.clone(),
-            ),
-            announcements: HoprAnnouncementsInstance::new(
-                address_to_alloy_primitive(contract_addresses.announcements),
-                provider.clone(),
-            ),
+            token: HoprTokenInstance::new(contract_addresses.token.into(), provider.clone()),
+            channels: HoprChannelsInstance::new(contract_addresses.channels.into(), provider.clone()),
+            announcements: HoprAnnouncementsInstance::new(contract_addresses.announcements.into(), provider.clone()),
             network_registry: HoprNetworkRegistryInstance::new(
-                address_to_alloy_primitive(contract_addresses.network_registry),
+                contract_addresses.network_registry.into(),
                 provider.clone(),
             ),
             network_registry_proxy: if use_dummy_nr {
                 NetworkRegistryProxy::Dummy(HoprDummyProxyForNetworkRegistryInstance::new(
-                    address_to_alloy_primitive(contract_addresses.network_registry_proxy),
+                    contract_addresses.network_registry_proxy.into(),
                     provider.clone(),
                 ))
             } else {
                 NetworkRegistryProxy::Safe(HoprSafeProxyForNetworkRegistryInstance::new(
-                    address_to_alloy_primitive(contract_addresses.network_registry_proxy),
+                    contract_addresses.network_registry_proxy.into(),
                     provider.clone(),
                 ))
             },
-            safe_registry: HoprNodeSafeRegistryInstance::new(
-                address_to_alloy_primitive(contract_addresses.safe_registry),
-                provider.clone(),
-            ),
-            price_oracle: HoprTicketPriceOracleInstance::new(
-                address_to_alloy_primitive(contract_addresses.price_oracle),
-                provider.clone(),
-            ),
+            safe_registry: HoprNodeSafeRegistryInstance::new(contract_addresses.safe_registry.into(), provider.clone()),
+            price_oracle: HoprTicketPriceOracleInstance::new(contract_addresses.price_oracle.into(), provider.clone()),
             win_prob_oracle: HoprWinningProbabilityOracleInstance::new(
-                address_to_alloy_primitive(contract_addresses.win_prob_oracle),
+                contract_addresses.win_prob_oracle.into(),
                 provider.clone(),
             ),
-            stake_factory: HoprNodeStakeFactoryInstance::new(
-                address_to_alloy_primitive(contract_addresses.stake_factory),
-                provider.clone(),
-            ),
+            stake_factory: HoprNodeStakeFactoryInstance::new(contract_addresses.stake_factory.into(), provider.clone()),
             module_implementation: HoprNodeManagementModuleInstance::new(
-                address_to_alloy_primitive(contract_addresses.module_implementation),
+                contract_addresses.module_implementation.into(),
                 provider.clone(),
             ),
         }
@@ -165,7 +149,7 @@ where
         }
 
         // Get deployer address
-        let self_address = address_to_alloy_primitive(deployer.public().to_address());
+        let self_address = deployer.public().to_address().into();
 
         let stake_factory = HoprNodeStakeFactory::deploy(provider.clone()).await?;
         let module_implementation = HoprNodeManagementModule::deploy(provider.clone()).await?;
@@ -228,16 +212,16 @@ where
 {
     fn from(instances: &ContractInstances<P>) -> Self {
         Self {
-            token: address_from_alloy_primitive(*instances.token.address()),
-            channels: address_from_alloy_primitive(*instances.channels.address()),
-            announcements: address_from_alloy_primitive(*instances.announcements.address()),
-            network_registry: address_from_alloy_primitive(*instances.network_registry.address()),
+            token: Into::<Address>::into(*instances.token.address()),
+            channels: Into::<Address>::into(*instances.channels.address()),
+            announcements: Into::<Address>::into(*instances.announcements.address()),
+            network_registry: Into::<Address>::into(*instances.network_registry.address()),
             network_registry_proxy: instances.network_registry_proxy.address(),
-            safe_registry: address_from_alloy_primitive(*instances.safe_registry.address()),
-            price_oracle: address_from_alloy_primitive(*instances.price_oracle.address()),
-            win_prob_oracle: address_from_alloy_primitive(*instances.win_prob_oracle.address()),
-            stake_factory: address_from_alloy_primitive(*instances.stake_factory.address()),
-            module_implementation: address_from_alloy_primitive(*instances.module_implementation.address()),
+            safe_registry: Into::<Address>::into(*instances.safe_registry.address()),
+            price_oracle: Into::<Address>::into(*instances.price_oracle.address()),
+            win_prob_oracle: Into::<Address>::into(*instances.win_prob_oracle.address()),
+            stake_factory: Into::<Address>::into(*instances.stake_factory.address()),
+            module_implementation: Into::<Address>::into(*instances.module_implementation.address()),
         }
     }
 }
