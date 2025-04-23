@@ -33,8 +33,9 @@ from sdk.python.localcluster.node import Node
 from .conftest import barebone_nodes, random_distinct_pairs_from
 from .utils import PARAMETERIZED_SAMPLE_SIZE, create_channel, shuffled
 
-HOPR_SESSION_MAX_PAYLOAD_SIZE = 462
+HOPR_SESSION_MAX_PAYLOAD_SIZE = 762
 STANDARD_MTU_SIZE = 1500
+DOWNLOAD_FILE_SIZE = 800
 
 
 class SocketType(Enum):
@@ -349,10 +350,6 @@ class TestSessionWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
     async def test_session_communication_with_a_udp_echo_server(self, src: str, dest: str, swarm7: dict[str, Node]):
-        """
-        HOPR UDP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
-        """
-
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
         expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
 
@@ -401,10 +398,6 @@ class TestSessionWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
     async def test_session_communication_with_udp_loopback_service(self, src: str, dest: str, swarm7: dict[str, Node]):
-        """
-        HOPR UDP socket buffers are set to 462 bytes to mimic the underlying MTU of the HOPR protocol.
-        """
-
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
         expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
 
@@ -434,9 +427,12 @@ class TestSessionWithSwarm:
                 # UDP has no flow-control, so we must insert an artificial gap
                 await asyncio.sleep(0.01)
 
+            logging.debug(f"total sent: {total_sent}")
             while total_sent > 0:
                 chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
                 total_sent = total_sent - len(chunk)
+                logging.debug(f"received: {len(chunk)}, remaining: {total_sent}")
+
                 # Adapt for situations when data arrive completely unordered (also within the buffer)
                 actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
 
@@ -525,12 +521,11 @@ class TestSessionWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
     async def test_session_communication_with_an_https_server(self, src: str, dest: str, swarm7: dict[str, Node]):
-        file_len = 500
         src_peer = swarm7[src]
         dest_peer = swarm7[dest]
 
         # Generate random text content to be served
-        expected = "".join(random.choices(string.ascii_letters + string.digits, k=file_len))
+        expected = "".join(random.choices(string.ascii_letters + string.digits, k=DOWNLOAD_FILE_SIZE))
 
         with run_https_server(expected) as dst_sock_port:
             session = await src_peer.api.session_client(
@@ -559,8 +554,6 @@ class TestSessionWithSwarm:
         # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     )
     async def test_session_communication_over_n_hop_with_an_https_server(self, route, swarm7: dict[str, Node]):
-        file_len = 500
-
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
         path = [swarm7[node].peer_id for node in route[1:-1]]
@@ -569,7 +562,7 @@ class TestSessionWithSwarm:
             channels_to = [
                 channels.enter_async_context(
                     create_channel(
-                        swarm7[route[i]], swarm7[route[i + 1]], funding=100 * file_len * TICKET_PRICE_PER_HOP
+                        swarm7[route[i]], swarm7[route[i + 1]], funding=100 * DOWNLOAD_FILE_SIZE * TICKET_PRICE_PER_HOP
                     )
                 )
                 for i in range(len(route) - 1)
@@ -577,7 +570,7 @@ class TestSessionWithSwarm:
             channels_back = [
                 channels.enter_async_context(
                     create_channel(
-                        swarm7[route[i]], swarm7[route[i - 1]], funding=100 * file_len * TICKET_PRICE_PER_HOP
+                        swarm7[route[i]], swarm7[route[i - 1]], funding=100 * DOWNLOAD_FILE_SIZE * TICKET_PRICE_PER_HOP
                     )
                 )
                 for i in reversed(range(1, len(route)))
@@ -586,7 +579,7 @@ class TestSessionWithSwarm:
             await asyncio.gather(*(channels_to + channels_back))
 
             # Generate random text content to be served
-            expected = "".join(random.choices(string.ascii_letters + string.digits, k=file_len))
+            expected = "".join(random.choices(string.ascii_letters + string.digits, k=DOWNLOAD_FILE_SIZE))
 
             with run_https_server(expected) as dst_sock_port:
                 session = await src_peer.api.session_client(
