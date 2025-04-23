@@ -1,20 +1,20 @@
-use futures::channel::mpsc::UnboundedSender;
-use futures::future::Either;
-use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
-use hopr_internal_types::prelude::{ApplicationData, Tag};
-use hopr_network_types::prelude::*;
-use std::ops::Range;
-use std::sync::{Arc, OnceLock};
-use std::time::Duration;
-use tracing::{debug, error, info, trace, warn};
-
 use crate::errors::{SessionManagerError, TransportSessionError};
 use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
 };
 use crate::traits::SendMsg;
-use crate::types::unwrap_offchain_key;
+use crate::types::unwrap_chain_address;
 use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
+use futures::channel::mpsc::UnboundedSender;
+use futures::future::Either;
+use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
+use hopr_internal_types::prelude::{ApplicationData, Tag};
+use hopr_network_types::prelude::*;
+use hopr_primitive_types::prelude::Address;
+use std::ops::Range;
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
+use tracing::{debug, error, info, trace, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -73,7 +73,7 @@ pub struct SessionManagerConfig {
 
 fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
     msg_sender: Arc<OnceLock<S>>,
-    me: PeerId,
+    me: Address,
     session_id: SessionId,
     session_data: CachedSession,
     cause: moka::notification::RemovalCause,
@@ -89,7 +89,7 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                 reason = ?r,
                 "session termination due to eviction from the cache"
             );
-            let data = match ApplicationData::try_from(StartProtocol::CloseSession(session_id.with_peer(me))) {
+            let data = match ApplicationData::try_from(StartProtocol::CloseSession(session_id.with_address(me))) {
                 Ok(data) => data,
                 Err(e) => {
                     error!(
@@ -107,7 +107,16 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                 if let Err(err) = msg_sender
                     .get()
                     .unwrap()
-                    .send_message(data, *session_id.peer(), session_data.routing_opts)
+                    .send_message(
+                        data,
+                        DestinationRouting::Forward {
+                            // TODO: add RP support to the Session protocol
+                            destination: *session_id.peer(),
+                            pseudonym: None,
+                            forward_options: session_data.routing_opts,
+                            return_options: None,
+                        },
+                    )
                     .await
                 {
                     error!(
@@ -215,7 +224,7 @@ pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<(UnboundedSender<IncomingSession>, UnboundedSender<SessionId>)>>,
     sessions: moka::future::Cache<SessionId, CachedSession>,
-    me: PeerId,
+    me: Address,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
 }
@@ -242,7 +251,7 @@ pub const MIN_SESSION_TAG_RANGE_RESERVATION: Tag = 16;
 
 impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
-    pub fn new(me: PeerId, mut cfg: SessionManagerConfig) -> Self {
+    pub fn new(me: Address, mut cfg: SessionManagerConfig) -> Self {
         // Accommodate the lower bound if too low.
         if cfg.session_tag_range.start < MIN_SESSION_TAG_RANGE_RESERVATION {
             let diff = MIN_SESSION_TAG_RANGE_RESERVATION - cfg.session_tag_range.start;
@@ -277,7 +286,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     }
 
     /// Starts the instance with the given [transport](SendMsg) implementation
-    /// and a channel that is used to notify when new incoming session is opened to us.
+    /// and a channel that is used to notify when a new incoming session is opened to us.
     ///
     /// This method must be called prior to any calls to [`SessionManager::new_session`] or
     /// [`SessionManager::dispatch_message`].
@@ -383,13 +392,22 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             target: cfg.target,
             capabilities: cfg.capabilities.iter().copied().collect(),
             // Back-routing currently uses the same (inverted) route as session initiation
+            // TODO: remove this once RP support is enabled
             back_routing: Some((cfg.path_options.clone().invert(), self.me)),
         });
+
+        // TODO: add RP support to the Session protocol
+        let routing = DestinationRouting::Forward {
+            destination: cfg.peer,
+            pseudonym: None,
+            forward_options: cfg.path_options.clone(),
+            return_options: None,
+        };
 
         // Send the Session initiation message
         trace!(challenge, "sending new session request");
         msg_sender
-            .send_message(start_session_msg.try_into()?, cfg.peer, cfg.path_options.clone())
+            .send_message(start_session_msg.try_into()?, routing.clone())
             .await?;
 
         // Await session establishment response from the Exit node or timeout
@@ -431,7 +449,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 Ok(Session::new(
                     session_id,
                     self.me,
-                    cfg.path_options,
+                    routing,
                     cfg.capabilities.into_iter().collect(),
                     Arc::new(msg_sender.clone()),
                     rx,
@@ -463,38 +481,36 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         }
     }
 
-    /// Main method to be called whenever data are received.
+    /// The main method to be called whenever data are received.
     ///
     /// It tries to recognize the message and correctly dispatches either
     /// the Session protocol or Start protocol messages.
     ///
     /// If the data are not recognized, they are returned as [`DispatchResult::Unrelated`].
     pub async fn dispatch_message(&self, data: ApplicationData) -> crate::errors::Result<DispatchResult> {
-        if let Some(app_tag) = &data.application_tag {
-            if (0..self.cfg.session_tag_range.start).contains(app_tag) {
-                trace!(tag = app_tag, "dispatching Start protocol message");
-                return self
-                    .handle_start_protocol_message(data)
-                    .await
-                    .map(|_| DispatchResult::Processed);
-            } else if self.cfg.session_tag_range.contains(app_tag) {
-                let (peer, data) = unwrap_offchain_key(data.plain_text.clone())?;
+        if (0..self.cfg.session_tag_range.start).contains(&data.application_tag) {
+            trace!(tag = data.application_tag, "dispatching Start protocol message");
+            return self
+                .handle_start_protocol_message(data)
+                .await
+                .map(|_| DispatchResult::Processed);
+        } else if self.cfg.session_tag_range.contains(&data.application_tag) {
+            let (peer, session_payload) = unwrap_chain_address(&data.plain_text)?;
 
-                let session_id = SessionId::new(*app_tag, peer);
+            let session_id = SessionId::new(data.application_tag, peer);
 
-                return if let Some(session_data) = self.sessions.get(&session_id).await {
-                    trace!(?session_id, "received data for a registered session");
+            return if let Some(session_data) = self.sessions.get(&session_id).await {
+                trace!(?session_id, "received data for a registered session");
 
-                    Ok(session_data
-                        .session_tx
-                        .unbounded_send(data)
-                        .map(|_| DispatchResult::Processed)
-                        .map_err(|e| SessionManagerError::Other(e.to_string()))?)
-                } else {
-                    error!(%session_id, "received data from an unestablished session");
-                    Err(TransportSessionError::UnknownData)
-                };
-            }
+                Ok(session_data
+                    .session_tx
+                    .unbounded_send(session_payload)
+                    .map(|_| DispatchResult::Processed)
+                    .map_err(|e| SessionManagerError::Other(e.to_string()))?)
+            } else {
+                error!(%session_id, "received data from an unestablished session");
+                Err(TransportSessionError::UnknownData)
+            };
         }
 
         Ok(DispatchResult::Unrelated(data))
@@ -517,6 +533,14 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     .get()
                     .cloned()
                     .ok_or(SessionManagerError::NotStarted)?;
+
+                // TODO: add RP support to the Session protocol
+                let routing = DestinationRouting::Forward {
+                    destination: peer,
+                    pseudonym: None,
+                    forward_options: route.clone(),
+                    return_options: None,
+                };
 
                 // Construct the session
                 let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
@@ -545,7 +569,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     let session = Session::new(
                         session_id,
                         self.me,
-                        route.clone(),
+                        routing.clone(),
                         session_req.capabilities,
                         Arc::new(msg_sender.clone()),
                         rx_session_data,
@@ -569,15 +593,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     // Set our peer ID in the session ID sent back to them.
                     let data = StartProtocol::SessionEstablished(StartEstablished {
                         orig_challenge: session_req.challenge,
-                        session_id: session_id.with_peer(self.me),
+                        session_id: session_id.with_address(self.me),
                     });
 
-                    msg_sender
-                        .send_message(data.try_into()?, peer, route)
-                        .await
-                        .map_err(|e| {
-                            SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
-                        })?;
+                    msg_sender.send_message(data.try_into()?, routing).await.map_err(|e| {
+                        SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
+                    })?;
 
                     info!(%session_id, "new session established");
 
@@ -600,7 +621,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     });
 
                     msg_sender
-                        .send_message(data.try_into()?, peer, route)
+                        .send_message(data.try_into()?, routing.clone())
                         .await
                         .map_err(|e| {
                             SessionManagerError::Other(format!(
@@ -688,9 +709,14 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     .get()
                     .ok_or(SessionManagerError::NotStarted)?
                     .send_message(
-                        StartProtocol::CloseSession(session_id.with_peer(self.me)).try_into()?,
-                        *session_id.peer(),
-                        session_data.routing_opts,
+                        StartProtocol::CloseSession(session_id.with_address(self.me)).try_into()?,
+                        DestinationRouting::Forward {
+                            // TODO: add RP support to the Session protocol
+                            destination: *session_id.peer(),
+                            pseudonym: None,
+                            forward_options: session_data.routing_opts,
+                            return_options: None,
+                        },
                     )
                     .await?;
             }
@@ -723,6 +749,8 @@ mod tests {
     use async_std::prelude::FutureExt;
     use async_trait::async_trait;
     use futures::AsyncWriteExt;
+    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::prelude::Keypair;
     use hopr_primitive_types::bounded::BoundedSize;
 
     mockall::mock! {
@@ -735,8 +763,7 @@ mod tests {
             async fn send_message(
                 &self,
                 data: ApplicationData,
-                destination: PeerId,
-                options: RoutingOptions,
+                routing: DestinationRouting,
             ) -> std::result::Result<(), TransportSessionError>;
         }
     }
@@ -766,8 +793,8 @@ mod tests {
     #[test_log::test(async_std::test)]
     async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> anyhow::Result<()>
     {
-        let alice_peer = PeerId::random();
-        let bob_peer = PeerId::random();
+        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let alice_mgr = SessionManager::new(alice_peer, Default::default());
         let bob_mgr = SessionManager::new(bob_peer, Default::default());
@@ -782,8 +809,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == bob_peer)
-            .returning(move |data, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -801,8 +828,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == alice_peer)
-            .returning(move |data, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -820,8 +847,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == bob_peer)
-            .returning(move |data, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -832,8 +859,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == alice_peer)
-            .returning(move |data, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -885,8 +912,8 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn session_manager_should_close_idle_session_automatically() -> anyhow::Result<()> {
-        let alice_peer = PeerId::random();
-        let bob_peer = PeerId::random();
+        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
             idle_timeout: Duration::from_millis(200),
@@ -906,8 +933,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == bob_peer)
-            .returning(move |data, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -925,8 +952,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == alice_peer)
-            .returning(move |data, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -944,8 +971,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == bob_peer)
-            .returning(move |data, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -956,8 +983,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == alice_peer)
-            .returning(move |data, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1008,8 +1035,8 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn session_manager_should_not_allow_establish_session_when_tag_range_is_used_up() -> anyhow::Result<()> {
-        let alice_peer = PeerId::random();
-        let bob_peer = PeerId::random();
+        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
             session_tag_range: 16..17, // Slot for exactly one session
@@ -1042,8 +1069,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == bob_peer)
-            .returning(move |data, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1054,8 +1081,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == alice_peer)
-            .returning(move |data, _, _| {
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .returning(move |data, _| {
                 async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1088,8 +1115,8 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn session_manager_should_timeout_new_session_attempt_when_no_response() -> anyhow::Result<()> {
-        let alice_peer = PeerId::random();
-        let bob_peer = PeerId::random();
+        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
             initiation_timeout_base: Duration::from_millis(100),
@@ -1108,8 +1135,8 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer, _| *peer == bob_peer)
-            .returning(|_, _, _| Ok(()));
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
+            .returning(|_, _| Ok(()));
 
         let mut jhs = Vec::new();
 

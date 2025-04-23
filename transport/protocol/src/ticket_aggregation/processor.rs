@@ -62,11 +62,7 @@ pub enum TicketAggregationToProcess<T, U> {
 pub enum TicketAggregationProcessed<T, U> {
     Receive(PeerId, AcknowledgedTicket, U),
     Reply(PeerId, std::result::Result<Ticket, String>, T),
-    Send(
-        PeerId,
-        Vec<hopr_internal_types::legacy::AcknowledgedTicket>,
-        TicketAggregationFinalizer,
-    ),
+    Send(PeerId, Vec<TransferableWinningTicket>, TicketAggregationFinalizer),
 }
 
 #[async_trait::async_trait]
@@ -342,19 +338,13 @@ where
                     }
                     TicketAggregationToProcess::ToSend(channel, prerequsites, finalizer) => {
                         match db.prepare_aggregation_in_channel(&channel, prerequsites).await {
-                            Ok(Some((source, tickets, dst))) if !tickets.is_empty() => {
+                            Ok(Some((source, tickets, _))) if !tickets.is_empty() => {
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
                                     METRIC_AGGREGATED_TICKETS.increment_by(tickets.len() as u64);
                                     METRIC_AGGREGATION_COUNT.increment();
                                 }
 
-                                // TODO: remove this transformation in 3.0 once proper aggregation protocol format is introduced
-                                let addr = chain_key.public().to_address();
-                                let tickets = tickets
-                                    .into_iter()
-                                    .map(|t| hopr_internal_types::legacy::AcknowledgedTicket::new(t, &addr, &dst))
-                                    .collect::<Vec<_>>();
                                 Some(TicketAggregationProcessed::Send(source.into(), tickets, finalizer))
                             }
                             Err(e) => {
@@ -500,11 +490,12 @@ mod tests {
                         db_clone
                             .insert_account(
                                 Some(tx),
-                                AccountEntry::new(
-                                    *offchain.public(),
-                                    chain.public().to_address(),
-                                    AccountType::NotAnnounced,
-                                ),
+                                AccountEntry {
+                                    public_key: *offchain.public(),
+                                    chain_addr: chain.public().to_address(),
+                                    entry_type: AccountType::NotAnnounced,
+                                    published_at: 1,
+                                },
                             )
                             .await?
                     }

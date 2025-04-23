@@ -13,9 +13,6 @@ pub enum PacketError {
     #[error("failed to construct packet: {0}")]
     PacketConstructionError(String),
 
-    #[error("packet is in invalid state")]
-    InvalidPacketState,
-
     #[error("packet tag already present, possible replay")]
     TagReplay,
 
@@ -54,6 +51,9 @@ pub enum PacketError {
 
     #[error(transparent)]
     CoreTypesError(#[from] CoreTypesError),
+
+    #[error(transparent)]
+    SphinxError(#[from] hopr_crypto_sphinx::errors::SphinxError),
 
     #[error(transparent)]
     Other(#[from] GeneralError),
