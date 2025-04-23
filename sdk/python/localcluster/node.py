@@ -222,7 +222,7 @@ class Node:
             peers_info = await asyncio.wait_for(self.api.peers(), timeout=1)
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 
-            # filter out peers that are not not well connection yet
+            # filter out peers that are not well-connected yet
             connected_peers = [p.peer_id for p in peers_info if p.quality >= 0.25]
             connected_peers.sort()
             logging.debug(f"Peers connected on {self.id}: {connected_peers}")
@@ -234,6 +234,8 @@ class Node:
 
             if not ready:
                 await asyncio.sleep(0.5)
+            else:
+                logging.info(f"All peers connected on {self.id}")
 
         return ready
 

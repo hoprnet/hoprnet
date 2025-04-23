@@ -10,15 +10,15 @@ use std::{sync::Arc, time::Duration};
 use tracing::error;
 use validator::Validate;
 
-use hopr_lib::{
-    errors::{HoprLibError, HoprStatusError},
-    AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
-};
-
 use crate::{
     types::{HoprIdentifier, PeerOrAddress},
     ApiError, ApiErrorStatus, InternalState, BASE_PATH,
 };
+use hopr_lib::{
+    errors::{HoprLibError, HoprStatusError},
+    AsUnixTimestamp, RoutingOptions, RESERVED_TAG_UPPER_LIMIT,
+};
+use hopr_network_types::prelude::DestinationRouting;
 
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -137,8 +137,8 @@ pub(super) async fn send_message(
             .into_response()
     })?;
 
-    let peer_id = match HoprIdentifier::new_with(args.destination, hopr.peer_resolver()).await {
-        Ok(destination) => destination.peer_id,
+    let peer_addr = match HoprIdentifier::new_with(args.destination, hopr.peer_resolver()).await {
+        Ok(destination) => destination.address,
         Err(e) => return Err(e.into_response()),
     };
 
@@ -167,7 +167,7 @@ pub(super) async fn send_message(
                     .into_response()
             })?
             .into_iter()
-            .map(|v| v.peer_id)
+            .map(|v| v.address)
             .collect::<Vec<_>>();
 
         RoutingOptions::IntermediatePath(
@@ -201,10 +201,14 @@ pub(super) async fn send_message(
 
     let timestamp = std::time::SystemTime::now().as_unix_timestamp();
 
-    match hopr
-        .send_message(args.body.into_boxed_slice(), peer_id, options, Some(args.tag))
-        .await
-    {
+    // NOTE: The return path is not introduced to, because the send_message API will be deprecated
+    let routing = DestinationRouting::Forward {
+        destination: peer_addr,
+        pseudonym: None,
+        forward_options: options,
+        return_options: None,
+    };
+    match hopr.send_message(args.body.into_boxed_slice(), routing, args.tag).await {
         Ok(_) => Ok((
             StatusCode::ACCEPTED,
             Json(SendMessageResponse {
@@ -300,17 +304,13 @@ pub(crate) struct MessagePopResponse {
 }
 
 fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Result<MessagePopResponse, String> {
-    if let Some(tag) = data.application_tag {
-        match std::str::from_utf8(&data.plain_text) {
-            Ok(data_str) => Ok(MessagePopResponse {
-                tag,
-                body: data_str.into(),
-                received_at,
-            }),
-            Err(error) => Err(format!("Failed to deserialize data into string: {error}")),
-        }
-    } else {
-        Err("No application tag was present despite picking from a tagged inbox".into())
+    match std::str::from_utf8(&data.plain_text) {
+        Ok(data_str) => Ok(MessagePopResponse {
+            tag: data.application_tag,
+            body: data_str.into(),
+            received_at,
+        }),
+        Err(error) => Err(format!("Failed to deserialize data into string: {error}")),
     }
 }
 

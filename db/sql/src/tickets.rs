@@ -1292,17 +1292,17 @@ mod tests {
     use anyhow::{anyhow, Context};
     use futures::{pin_mut, StreamExt};
     use hex_literal::hex;
-    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
-    use std::ops::Add;
-    use std::sync::atomic::Ordering;
-    use std::time::{Duration, SystemTime};
-
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
     use hopr_db_api::prelude::{DbError, TicketMarker};
     use hopr_db_api::{info::DomainSeparator, tickets::ChannelTicketStatistics};
     use hopr_db_entity::ticket;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
+    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
+    use std::ops::Add;
+    use std::sync::atomic::Ordering;
+    use std::time::{Duration, SystemTime};
 
     use crate::accounts::HoprDbAccountOperations;
     use crate::channels::HoprDbChannelOperations;
@@ -1335,6 +1335,7 @@ mod tests {
                     public_key: *peer_offchain.public(),
                     chain_addr: peer_onchain.public().to_address(),
                     entry_type: AccountType::NotAnnounced,
+                    published_at: 0,
                 },
             )
             .await?
@@ -3311,7 +3312,7 @@ mod tests {
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        // Set winning probability to zero and sign the ticket again
+        // Set the winning probability to zero and sign the ticket again
         let resp = Response::from_half_keys(&HalfKey::random(), &HalfKey::random())?;
         tickets[1] = TicketBuilder::from(tickets[1].ticket.clone())
             .win_prob(0.0)

@@ -34,7 +34,7 @@ use libp2p::{swarm::NetworkBehaviour, StreamProtocol};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-use hopr_internal_types::legacy;
+use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;
 use hopr_transport_network::messaging::ControlMessage;
 use hopr_transport_network::network::NetworkTriggeredEvent;
@@ -102,10 +102,8 @@ pub struct HoprNetworkBehavior {
     heartbeat_generator: behavior::heartbeat::Behaviour,
     ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour,
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
-    pub ticket_aggregation: libp2p::request_response::cbor::Behaviour<
-        Vec<legacy::AcknowledgedTicket>,
-        std::result::Result<legacy::Ticket, String>,
-    >,
+    pub ticket_aggregation:
+        libp2p::request_response::cbor::Behaviour<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     // WARNING: the order of struct members is important, `discovery` must be the last member,
     // because the request_response components remove the peer from its peer store after a failed
     // dial operation and the discovery mechanism is responsible for populating all peer stores.
@@ -150,8 +148,8 @@ impl HoprNetworkBehavior {
                 libp2p::request_response::Config::default().with_request_timeout(hb_timeout),
             ),
             ticket_aggregation: libp2p::request_response::cbor::Behaviour::<
-                Vec<legacy::AcknowledgedTicket>,
-                std::result::Result<legacy::Ticket, String>,
+                Vec<TransferableWinningTicket>,
+                std::result::Result<Ticket, String>,
             >::new(
                 [(
                     StreamProtocol::new(HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0),
@@ -174,7 +172,7 @@ pub enum HoprNetworkBehaviorEvent {
     TicketAggregationBehavior(behavior::ticket_aggregation::Event),
     Heartbeat(libp2p::request_response::Event<Ping, Pong>),
     TicketAggregation(
-        libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket, String>>,
+        libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ),
     KeepAlive(void::Void),
 }
@@ -216,14 +214,11 @@ impl From<libp2p::request_response::Event<Ping, Pong>> for HoprNetworkBehaviorEv
     }
 }
 
-impl From<libp2p::request_response::Event<Vec<legacy::AcknowledgedTicket>, std::result::Result<legacy::Ticket, String>>>
+impl From<libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>>
     for HoprNetworkBehaviorEvent
 {
     fn from(
-        event: libp2p::request_response::Event<
-            Vec<legacy::AcknowledgedTicket>,
-            std::result::Result<legacy::Ticket, String>,
-        >,
+        event: libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ) -> Self {
         Self::TicketAggregation(event)
     }

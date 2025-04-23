@@ -99,13 +99,29 @@ mod tests {
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
-        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
-            .await?;
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_1,
+                chain_addr: chain_1,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
 
         let chain_2 = ChainKeypair::random().public().to_address();
         let packet_2 = *OffchainKeypair::random().public();
-        db.insert_account(None, AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced))
-            .await?;
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_2,
+                chain_addr: chain_2,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
 
         let actual_ck = db.resolve_chain_key(&packet_1).await?;
         assert_eq!(actual_ck, Some(chain_1), "chain keys must match");
@@ -152,13 +168,29 @@ mod tests {
 
         let chain_1 = ChainKeypair::random().public().to_address();
         let packet_1 = *OffchainKeypair::random().public();
-        db.insert_account(None, AccountEntry::new(packet_1, chain_1, AccountType::NotAnnounced))
-            .await?;
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_1,
+                chain_addr: chain_1,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
 
         let chain_2 = ChainKeypair::random().public().to_address();
         let packet_2 = *OffchainKeypair::random().public();
-        db.insert_account(None, AccountEntry::new(packet_2, chain_2, AccountType::NotAnnounced))
-            .await?;
+        db.insert_account(
+            None,
+            AccountEntry {
+                public_key: packet_2,
+                chain_addr: chain_2,
+                entry_type: AccountType::NotAnnounced,
+                published_at: 1,
+            },
+        )
+        .await?;
 
         let actual_pk = db.resolve_packet_key(&chain_2).await?;
 

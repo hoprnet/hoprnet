@@ -6,8 +6,6 @@ use petgraph::prelude::StableDiGraph;
 use petgraph::stable_graph::NodeIndex;
 use petgraph::visit::{EdgeFiltered, EdgeRef, NodeFiltered};
 use petgraph::Direction;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
@@ -38,7 +36,8 @@ lazy_static::lazy_static! {
 
 /// Structure that adds additional data to a `ChannelEntry`, which
 /// can be used to compute edge weights and traverse the `ChannelGraph`.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChannelEdge {
     /// Underlying channel
     pub channel: ChannelEntry,
@@ -62,7 +61,8 @@ impl std::fmt::Display for ChannelEdge {
 /// Represents a node in the Channel Graph.
 /// This is typically represented by an on-chain address and ping quality, which
 /// represents some kind of node's liveness as perceived by us.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Node {
     /// Node's on-chain address.
     pub address: Address,
@@ -117,7 +117,8 @@ impl std::fmt::Display for Node {
 }
 
 /// Configuration for the [`ChannelGraph`].
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, smart_default::SmartDefault)]
+#[derive(Clone, Copy, Debug, PartialEq, smart_default::SmartDefault)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChannelGraphConfig {
     /// Length of the Simple Moving Average window for node latencies.
     #[default(20)]
@@ -136,7 +137,8 @@ pub struct ChannelGraphConfig {
 }
 
 /// Describes an update of the [`Node`]'s score.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum NodeScoreUpdate {
     /// Node is reachable with the given latency.
     Reachable(Duration),
@@ -172,11 +174,13 @@ impl<T> From<Result<Duration, T>> for NodeScoreUpdate {
 ///
 /// When a node reaches zero [quality](Node) and there are no edges (channels) containing this node,
 /// it is removed from the graph entirely.
-#[serde_as]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+
+#[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_with::serde_as)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug)]
 pub struct ChannelGraph {
     me: Address,
-    #[serde_as(as = "Vec<(_, _)>")]
+    #[cfg_attr(feature = "serde", serde_as(as = "Vec<(_, _)>"))]
     indices: HashMap<Address, u32>,
     graph: StableDiGraph<Node, ChannelEdge>,
     cfg: ChannelGraphConfig,
@@ -529,42 +533,14 @@ pub struct GraphExportConfig {
 mod tests {
     use super::*;
 
-    use crate::channel_graph::ChannelGraph;
     use anyhow::{anyhow, Context};
-    use hopr_internal_types::channels::{ChannelChange, ChannelEntry, ChannelStatus};
+    use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
     use hopr_primitive_types::prelude::*;
-    use lazy_static::lazy_static;
     use std::ops::Add;
-    use std::str::FromStr;
     use std::time::{Duration, SystemTime};
 
-    lazy_static! {
-        static ref ADDRESSES: [Address; 6] = [
-            Address::from_str("0xafe8c178cf70d966be0a798e666ce2782c7b2288")
-                .expect("lazy static address should be valid"),
-            Address::from_str("0x1223d5786d9e6799b3297da1ad55605b91e2c882")
-                .expect("lazy static address should be valid"),
-            Address::from_str("0x0e3e60ddced1e33c9647a71f4fc2cf4ed33e4a9d")
-                .expect("lazy static address should be valid"),
-            Address::from_str("0x27644105095c8c10f804109b4d1199a9ac40ed46")
-                .expect("lazy static address should be valid"),
-            Address::from_str("0x4701a288c38fa8a0f4b79127747257af4a03a623")
-                .expect("lazy static address should be valid"),
-            Address::from_str("0xfddd2f462ec709cf181bbe44a7e952487bd4591d")
-                .expect("lazy static address should be valid"),
-        ];
-    }
-
-    fn dummy_channel(src: Address, dst: Address, status: ChannelStatus) -> ChannelEntry {
-        ChannelEntry::new(
-            src,
-            dst,
-            Balance::new_from_str("1", BalanceType::HOPR),
-            1u32.into(),
-            status,
-            1u32.into(),
-        )
-    }
+    use crate::channel_graph::ChannelGraph;
+    use crate::tests::{dummy_channel, ADDRESSES};
 
     #[test]
     fn channel_graph_self_addr() {

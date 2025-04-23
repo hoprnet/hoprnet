@@ -190,7 +190,7 @@ mod tests {
     use hopr_chain_actions::redeem::TicketRedeemActions;
     use hopr_chain_types::actions::Action;
     use hopr_chain_types::chain_events::ChainEventType;
-    use hopr_crypto_random::random_bytes;
+    use hopr_crypto_random::{random_bytes, Randomizable};
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::api::tickets::TicketSelector;
     use hopr_db_sql::channels::HoprDbChannelOperations;

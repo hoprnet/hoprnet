@@ -434,11 +434,12 @@ mod tests {
                         db_clone
                             .insert_account(
                                 Some(tx),
-                                AccountEntry::new(
-                                    *PEERS[i].public(),
-                                    PEERS_CHAIN[i].public().to_address(),
-                                    AccountType::NotAnnounced,
-                                ),
+                                AccountEntry {
+                                    public_key: *PEERS[i].public(),
+                                    chain_addr: PEERS_CHAIN[i].public().to_address(),
+                                    entry_type: AccountType::NotAnnounced,
+                                    published_at: 1,
+                                },
                             )
                             .await?;
                     }

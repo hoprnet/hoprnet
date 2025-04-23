@@ -7,7 +7,7 @@
 //! a complete and fully featured HOPR node stripped from top level functionality
 //! such as the REST API, key management...
 //!
-//! The intended way to use hopr_lib is for a specific tool to be built on top of it,
+//! The intended way to use hopr_lib is for a specific tool to be built on top of it;
 //! should the default `hoprd` implementation not be acceptable.
 //!
 //! For most of the practical use cases, the `hoprd` application should be a preferable
@@ -75,7 +75,7 @@ pub use {
         Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
     },
     hopr_internal_types::prelude::*,
-    hopr_network_types::prelude::{IpProtocol, RoutingOptions},
+    hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions},
     hopr_path::channel_graph::GraphExportConfig,
     hopr_primitive_types::prelude::*,
     hopr_strategy::Strategy,
@@ -83,7 +83,7 @@ pub use {
         config::{looks_like_domain, HostConfig, HostType},
         constants::RESERVED_TAG_UPPER_LIMIT,
         errors::{HoprTransportError, NetworkingError, ProtocolError},
-        ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
+        HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
         OffchainKeypair as HoprOffchainKeypair, PeerId, SendMsg, ServiceId, Session as HoprSession, SessionCapability,
         SessionClientConfig, SessionId as HoprSessionId, SessionTarget, TicketStatistics, SESSION_USABLE_MTU_SIZE,
     },
@@ -665,25 +665,14 @@ impl Hopr {
         let network_min_win_prob = self.hopr_chain_api.get_minimum_winning_probability().await?;
         let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
         if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
-            && configured_win_prob.is_some_and(|c| c < network_min_win_prob)
+            && configured_win_prob.is_some_and(|c| {
+                !f64_approx_eq(c, network_min_win_prob, LOWEST_POSSIBLE_WINNING_PROB) && c < network_min_win_prob
+            })
         {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
                 "configured outgoing ticket winning probability is lower than the network minimum winning probability: {configured_win_prob:?} < {network_min_win_prob}"
             ))));
         }
-
-        info!("Linking chain and packet keys");
-        self.db
-            .insert_account(
-                None,
-                AccountEntry {
-                    public_key: *self.me.public(),
-                    chain_addr: self.hopr_chain_api.me_onchain(),
-                    // Will be set once we announce ourselves and Indexer processes the announcement
-                    entry_type: AccountType::NotAnnounced,
-                },
-            )
-            .await?;
 
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
@@ -762,8 +751,8 @@ impl Hopr {
             ))));
         }
 
-        // Possibly register node-safe pair to NodeSafeRegistry. Following that the
-        // connector is set to use safe tx variants.
+        // Possibly register a node-safe pair to NodeSafeRegistry.
+        // Following that, the connector is set to use safe tx variants.
         if can_register_with_safe(
             self.me_onchain(),
             self.cfg.safe_module.safe_address,
@@ -814,7 +803,7 @@ impl Hopr {
             {
                 Ok(_) => info!(?multiaddresses_to_announce, "Announcing node on chain",),
                 Err(ChainActionsError::AlreadyAnnounced) => {
-                    info!(multiaddresses_announced = ?multiaddresses_to_announce, "Node already announced on chain", )
+                    info!(multiaddresses_announced = ?multiaddresses_to_announce, "Node already announced on chain")
                 }
                 // If the announcement fails, we keep going to prevent the node from retrying
                 // after restart.
@@ -824,6 +813,9 @@ impl Hopr {
         }
 
         {
+            // Sync key ids from indexed Accounts
+
+            // Sync the Channel graph
             let channel_graph = self.channel_graph.clone();
             let mut cg = channel_graph.write().await;
 
@@ -1107,15 +1099,12 @@ impl Hopr {
     pub async fn send_message(
         &self,
         msg: Box<[u8]>,
-        destination: PeerId,
-        options: RoutingOptions,
-        application_tag: Option<u16>,
+        routing: DestinationRouting,
+        application_tag: Tag,
     ) -> errors::Result<()> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
-        self.transport_api
-            .send_message(msg, destination, options, application_tag)
-            .await?;
+        self.transport_api.send_message(msg, routing, application_tag).await?;
 
         Ok(())
     }
@@ -1254,7 +1243,7 @@ impl Hopr {
 
     /// List of all accounts announced on the chain
     pub async fn accounts_announced_on_chain(&self) -> errors::Result<Vec<AccountEntry>> {
-        Ok(self.db.get_accounts(None, false).await?)
+        Ok(self.hopr_chain_api.accounts_announced_on_chain().await?)
     }
 
     /// Get the channel entry from Hash.

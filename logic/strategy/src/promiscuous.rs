@@ -749,11 +749,12 @@ mod tests {
                     for (chain_key, peer_id) in PEERS.iter() {
                         db.insert_account(
                             Some(tx),
-                            AccountEntry::new(
-                                OffchainPublicKey::try_from(*peer_id).expect("should be valid PeerId"),
-                                *chain_key,
-                                AccountType::NotAnnounced,
-                            ),
+                            AccountEntry {
+                                public_key: OffchainPublicKey::try_from(*peer_id).expect("should be valid PeerId"),
+                                chain_addr: *chain_key,
+                                entry_type: AccountType::NotAnnounced,
+                                published_at: 1,
+                            },
                         )
                         .await?;
                     }

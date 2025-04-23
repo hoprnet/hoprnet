@@ -1,8 +1,7 @@
-use hopr_db_api::errors::DbError;
 use hopr_primitive_types::errors::GeneralError;
 use thiserror::Error;
 
-/// Enumerates all errors in this crate.
+/// Lists all errors in this crate.
 #[derive(Error, Debug)]
 pub enum PathError {
     #[error("path is not valid")]
@@ -10,6 +9,9 @@ pub enum PathError {
 
     #[error("path contains an invalid peer id: {0}")]
     InvalidPeer(String),
+
+    #[error("path contains a unknown peer that cannot be resolved: {0}")]
+    UnknownPeer(String),
 
     #[error("missing channel between {0} and {1}")]
     MissingChannel(String, String),
@@ -22,11 +24,6 @@ pub enum PathError {
 
     #[error("cannot find {0} hop path {1} -> {2} in the channel graph")]
     PathNotFound(usize, String, String),
-
-    // #[error(transparent)]
-    // DatabaseError(#[from] DbSqlError),
-    #[error(transparent)]
-    DbError(#[from] DbError),
 
     #[error(transparent)]
     OtherError(#[from] GeneralError),

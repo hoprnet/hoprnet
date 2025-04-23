@@ -4,18 +4,24 @@
 //! advanced interactions and functionality.
 
 pub mod errors;
-pub mod initiation;
+mod initiation;
 mod manager;
 pub mod traits;
-pub mod types;
+mod types;
 
-pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
-
-use crate::types::SessionTarget;
-use hopr_network_types::prelude::state::SessionFeature;
 pub use hopr_network_types::types::*;
-use libp2p_identity::PeerId;
-pub use types::{IncomingSession, Session, SessionId, SESSION_USABLE_MTU_SIZE};
+pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
+pub use types::{
+    unwrap_chain_address, wrap_with_chain_address, IncomingSession, ServiceId, Session, SessionId, SessionTarget,
+    SESSION_USABLE_MTU_SIZE,
+};
+
+#[cfg(feature = "runtime-tokio")]
+pub use types::transfer_session;
+
+use hopr_network_types::prelude::state::SessionFeature;
+use hopr_primitive_types::prelude::Address;
+
 #[cfg(feature = "serde")]
 use {
     serde::{Deserialize, Serialize},
@@ -67,11 +73,12 @@ impl IntoIterator for Capability {
 pub struct SessionClientConfig {
     /// The peer to which the session should be established.
     #[cfg_attr(feature = "serde", serde(with = "As::<DisplayFromStr>"))]
-    pub peer: PeerId,
+    pub peer: Address,
 
     /// The fixed path options for the session.
     pub path_options: RoutingOptions,
 
+    // TODO: add RP support
     /// Contains target protocol and optionally encrypted target of the session.
     pub target: SessionTarget,
 

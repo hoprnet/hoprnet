@@ -100,29 +100,29 @@ impl Display for HostConfig {
     }
 }
 
-#[cfg(all(not(test), not(feature = "transport-quic")))]
 fn default_multiaddr_transport(port: u16) -> String {
-    format!("tcp/{port}")
-}
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "transport-quic")] {
+            // In case we run on a Dappnode-like device, presumably behind NAT, we fall back to TCP
+            // to circumvent issues with QUIC in such environments. To make this work reliably,
+            // we would need proper NAT traversal support.
+            let on_dappnode = std::env::var("DAPPNODE")
+                .map(|v| v.to_lowercase() == "true")
+                .unwrap_or(false);
 
-#[cfg(any(test, feature = "transport-quic"))]
-fn default_multiaddr_transport(port: u16) -> String {
-    // In case we run on a Dappnode-like devices, presumably behind NAT, we fall back to TCP
-    // to circumvent issues with QUIC in such environments. To make this work reliably we'd need
-    // proper NAT traversal support.
-    let on_dappnode = std::env::var("DAPPNODE")
-        .map(|v| v.to_lowercase() == "true")
-        .unwrap_or(false);
+            // Using HOPRD_NAT a user can overwrite the default behaviour even on a Dappnode-like device
+            let uses_nat = std::env::var("HOPRD_NAT")
+                .map(|v| v.to_lowercase() == "true")
+                .unwrap_or(on_dappnode);
 
-    // Using HOPRD_NAT a user can overwrite the default behaviour even on a Dappnode-like device
-    let uses_nat = std::env::var("HOPRD_NAT")
-        .map(|v| v.to_lowercase() == "true")
-        .unwrap_or(on_dappnode);
-
-    if uses_nat {
-        format!("tcp/{port}")
-    } else {
-        format!("udp/{port}/quic-v1")
+            if uses_nat {
+                format!("tcp/{port}")
+            } else {
+                format!("udp/{port}/quic-v1")
+            }
+        } else {
+            format!("tcp/{port}")
+        }
     }
 }
 
@@ -309,9 +309,16 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "transport-quic")]
     #[test]
     fn test_multiaddress_on_non_dappnode_default() {
         assert_eq!(default_multiaddr_transport(1234), "udp/1234/quic-v1");
+    }
+
+    #[cfg(not(feature = "transport-quic"))]
+    #[test]
+    fn test_multiaddress_on_non_dappnode_default() {
+        assert_eq!(default_multiaddr_transport(1234), "tcp/1234");
     }
 
     #[test]
@@ -321,6 +328,7 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "transport-quic")]
     #[test]
     fn test_multiaddress_on_non_dappnode_not_uses_nat() {
         temp_env::with_var("HOPRD_NAT", Some("false"), || {
@@ -328,10 +336,27 @@ mod tests {
         });
     }
 
+    #[cfg(not(feature = "transport-quic"))]
+    #[test]
+    fn test_multiaddress_on_non_dappnode_not_uses_nat() {
+        temp_env::with_var("HOPRD_NAT", Some("false"), || {
+            assert_eq!(default_multiaddr_transport(1234), "tcp/1234");
+        });
+    }
+
+    #[cfg(feature = "transport-quic")]
     #[test]
     fn test_multiaddress_on_dappnode_not_uses_nat() {
         temp_env::with_vars([("DAPPNODE", Some("true")), ("HOPRD_NAT", Some("false"))], || {
             assert_eq!(default_multiaddr_transport(1234), "udp/1234/quic-v1");
+        });
+    }
+
+    #[cfg(not(feature = "transport-quic"))]
+    #[test]
+    fn test_multiaddress_on_dappnode_not_uses_nat() {
+        temp_env::with_vars([("DAPPNODE", Some("true")), ("HOPRD_NAT", Some("false"))], || {
+            assert_eq!(default_multiaddr_transport(1234), "tcp/1234");
         });
     }
 }

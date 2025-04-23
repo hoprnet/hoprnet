@@ -8,7 +8,7 @@ use hopr_primitive_types::primitives::Address;
 
 use crate::channel_graph::ChannelEdge;
 use crate::errors::Result;
-use crate::path::ChannelPath;
+use crate::ChannelPath;
 
 /// Computes weights of edges corresponding to [`ChannelEdge`].
 pub trait EdgeWeighting<W>
