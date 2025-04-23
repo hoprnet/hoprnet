@@ -43,6 +43,9 @@
 //!   - in the absence of response, the requester will time out
 //!
 
+/// Coder and decoder for the transport binary protocol layer
+mod codec;
+
 /// Configuration of the protocol components.
 pub mod config;
 /// Errors produced by the crate.
@@ -53,8 +56,8 @@ pub mod bloom;
 // protocols
 /// `heartbeat` p2p protocol
 pub mod heartbeat;
-/// `msg` p2p protocol
-pub mod mix;
+/// processor for the protocol
+pub mod processor;
 
 /// Stream processing utilities
 pub mod stream;
@@ -74,8 +77,13 @@ use hopr_internal_types::protocol::ApplicationData;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_transport_identity::PeerId;
 
-pub use mix::processor::DEFAULT_PRICE_PER_PACKET;
-use mix::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+pub use processor::DEFAULT_PRICE_PER_PACKET;
+use processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+
+const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
+
+pub type HoprBinaryCodec = crate::codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
+pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
@@ -137,7 +145,7 @@ pub enum PeerDiscovery {
 /// overlayed on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
-    packet_cfg: mix::processor::PacketInteractionConfig,
+    packet_cfg: processor::PacketInteractionConfig,
     db: Db,
     bloom_filter_persistent_path: Option<String>,
     wire_msg: (
@@ -191,7 +199,7 @@ where
         bloom::WrappedTagBloomFilter::new("no_tbf".into())
     };
 
-    let msg_processor_read = mix::processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
+    let msg_processor_read = processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
 
     let msg_to_send_tx = wire_msg.0.clone();
@@ -244,7 +252,7 @@ where
                     async move {
                         match v {
                             Ok(Some(v)) => match v {
-                                mix::processor::RecvOperation::Receive { data, ack } => {
+                                processor::RecvOperation::Receive { data, ack } => {
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     {
                                         METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
@@ -255,7 +263,7 @@ where
                                     });
                                     Some(data)
                                 }
-                                mix::processor::RecvOperation::Forward { msg, ack } => {
+                                processor::RecvOperation::Forward { msg, ack } => {
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     {
                                         METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);

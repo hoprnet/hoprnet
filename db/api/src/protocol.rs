@@ -25,11 +25,7 @@ pub trait HoprDbProtocolOperations {
     async fn get_network_ticket_price(&self) -> Result<Balance>;
 
     /// Process the data into an outgoing packet that is not going to be acknowledged.
-    async fn to_send_no_ack(
-        &self,
-        data: Box<[u8]>,
-        destination: OffchainPublicKey,
-    ) -> Result<OutgoingTransportPacket>;
+    async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingPacket>;
 
     /// Process the data into an outgoing packet
     async fn to_send(
@@ -38,7 +34,7 @@ pub trait HoprDbProtocolOperations {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
-    ) -> Result<TransportPacketWithChainData>;
+    ) -> Result<OutgoingPacket>;
 
     /// Process the incoming packet into data
     #[allow(clippy::wrong_self_convention)]
@@ -49,7 +45,32 @@ pub trait HoprDbProtocolOperations {
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
-    ) -> Result<Option<TransportPacketWithChainData>>;
+    ) -> Result<Option<IncomingPacket>>;
+}
+
+pub enum IncomingPacket {
+    /// Packet is intended for us
+    Final {
+        packet_tag: PacketTag,
+        previous_hop: OffchainPublicKey,
+        plain_text: Box<[u8]>,
+        ack_key: Option<HalfKey>,
+    },
+    /// Packet must be forwarded
+    Forwarded {
+        packet_tag: PacketTag,
+        previous_hop: OffchainPublicKey,
+        next_hop: OffchainPublicKey,
+        data: Box<[u8]>,
+        ack: Acknowledgement,
+    },
+}
+
+/// Packet that is being sent out by us
+pub struct OutgoingPacket {
+    pub next_hop: OffchainPublicKey,
+    pub ack_challenge: HalfKeyChallenge,
+    pub data: Box<[u8]>,
 }
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
@@ -67,43 +88,6 @@ impl Debug for AckResult {
             Self::RelayerLosing => write!(f, "RelayerLosing"),
         }
     }
-}
-
-pub enum ReceivedFinal {
-    Msg(Box<[u8]>),
-    Ack(Box<[u8]>),
-}
-
-// TODO: create 4 separate objects and use them Boxed in the enum variants
-#[allow(clippy::large_enum_variant)]
-pub enum TransportPacketWithChainData {
-    /// Packet is intended for us
-    Final {
-        packet_tag: PacketTag,
-        previous_hop: OffchainPublicKey,
-        plain_text: Box<[u8]>,
-        ack_key: Option<HalfKey>,
-    },
-    /// Packet must be forwarded
-    Forwarded {
-        packet_tag: PacketTag,
-        previous_hop: OffchainPublicKey,
-        next_hop: OffchainPublicKey,
-        data: Box<[u8]>,
-        ack: Acknowledgement,
-    },
-    /// Packet that is being sent out by us
-    Outgoing {
-        next_hop: OffchainPublicKey,
-        ack_challenge: HalfKeyChallenge,
-        data: Box<[u8]>,
-    },
-}
-
-pub struct OutgoingTransportPacket {
-    pub next_hop: OffchainPublicKey,
-    pub ack_challenge: HalfKeyChallenge,
-    pub data: Box<[u8]>,
 }
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects

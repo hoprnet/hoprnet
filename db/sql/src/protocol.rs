@@ -4,7 +4,7 @@ use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
 use hopr_db_api::protocol::{
-    AckResult, HoprDbProtocolOperations, OutgoingTransportPacket, ResolvedAcknowledgement, TransportPacketWithChainData,
+    AckResult, HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement,
 };
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::prelude::*;
@@ -293,7 +293,7 @@ impl HoprDbProtocolOperations for HoprDb {
     }
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingTransportPacket> {
+    async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingPacket> {
         let next_peer = self.resolve_chain_key(&destination).await?.ok_or_else(|| {
             DbSqlError::LogicalError(format!(
                 "failed to find chain key for packet key {} on previous hop",
@@ -332,7 +332,7 @@ impl HoprDbProtocolOperations for HoprDb {
             transport_payload.extend_from_slice(out.packet.as_ref());
             transport_payload.extend_from_slice(&out.ticket.into_encoded());
 
-            Ok(OutgoingTransportPacket {
+            Ok(OutgoingPacket {
                 next_hop: out.next_hop,
                 ack_challenge: out.ack_challenge,
                 data: transport_payload.into_boxed_slice(),
@@ -349,7 +349,7 @@ impl HoprDbProtocolOperations for HoprDb {
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
-    ) -> Result<TransportPacketWithChainData> {
+    ) -> Result<OutgoingPacket> {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
             ResolvedTransportRouting::Forward {
@@ -455,7 +455,7 @@ impl HoprDbProtocolOperations for HoprDb {
             transport_payload.extend_from_slice(out.packet.as_ref());
             transport_payload.extend_from_slice(&out.ticket.into_encoded());
 
-            Ok(TransportPacketWithChainData::Outgoing {
+            Ok(OutgoingPacket {
                 next_hop: out.next_hop,
                 ack_challenge: out.ack_challenge,
                 data: transport_payload.into_boxed_slice(),
@@ -473,7 +473,7 @@ impl HoprDbProtocolOperations for HoprDb {
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
-    ) -> Result<Option<TransportPacketWithChainData>> {
+    ) -> Result<Option<IncomingPacket>> {
         let offchain_keypair = pkt_keypair.clone();
         let myself = self.clone();
 
@@ -540,7 +540,7 @@ impl HoprDbProtocolOperations for HoprDb {
 
                     Ok(None)
                 } else {
-                    Ok(Some(TransportPacketWithChainData::Final {
+                    Ok(Some(IncomingPacket::Final {
                         packet_tag: incoming.packet_tag,
                         previous_hop: incoming.previous_hop,
                         plain_text: incoming.plain_text,
@@ -558,7 +558,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         payload.extend_from_slice(fwd.outgoing.packet.as_ref());
                         payload.extend_from_slice(&fwd.outgoing.ticket.into_encoded());
 
-                        Ok(Some(TransportPacketWithChainData::Forwarded {
+                        Ok(Some(IncomingPacket::Forwarded {
                             packet_tag: fwd.packet_tag,
                             previous_hop: fwd.previous_hop,
                             next_hop: fwd.outgoing.next_hop,

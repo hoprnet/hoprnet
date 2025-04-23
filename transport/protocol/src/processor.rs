@@ -10,14 +10,12 @@ use hopr_crypto_packet::errors::{
 };
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
-pub use hopr_db_api::protocol::AckResult;
-use hopr_db_api::protocol::TransportPacketWithChainData;
+use hopr_db_api::protocol::IncomingPacket;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_identity::PeerId;
 
-use super::packet::OutgoingPacket;
 use crate::bloom;
 
 lazy_static::lazy_static! {
@@ -85,11 +83,7 @@ where
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
 
-        let packet: OutgoingPacket = packet
-            .try_into()
-            .map_err(|e: crate::errors::ProtocolError| PacketError::LogicError(e.to_string()))?;
-
-        Ok((packet.next_hop, packet.data))
+        Ok((packet.next_hop.into(), packet.data))
     }
 }
 
@@ -128,8 +122,8 @@ where
         // Indicating
         match packet {
             Some(packet) => {
-                if let TransportPacketWithChainData::Final { packet_tag, .. }
-                | TransportPacketWithChainData::Forwarded { packet_tag, .. } = &packet
+                #[allow(irrefutable_let_patterns)]
+                if let IncomingPacket::Final { packet_tag, .. } | IncomingPacket::Forwarded { packet_tag, .. } = &packet
                 {
                     if self.is_tag_replay(packet_tag).await {
                         return Err(TagReplay);
@@ -137,7 +131,7 @@ where
                 };
 
                 Ok(match packet {
-                    TransportPacketWithChainData::Final {
+                    IncomingPacket::Final {
                         previous_hop,
                         plain_text,
                         ack_key,
@@ -166,7 +160,7 @@ where
                             unimplemented!()
                         }
                     }
-                    TransportPacketWithChainData::Forwarded {
+                    IncomingPacket::Forwarded {
                         previous_hop,
                         next_hop,
                         data,
@@ -189,11 +183,6 @@ where
                                 ack: ack_packet.data,
                             },
                         })
-                    }
-                    TransportPacketWithChainData::Outgoing { .. } => {
-                        return Err(PacketError::LogicError(
-                            "Attempting to process an outgoing packet in the incoming pipeline".into(),
-                        ))
                     }
                 })
             }
