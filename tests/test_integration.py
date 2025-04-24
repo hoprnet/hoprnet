@@ -1,8 +1,8 @@
 import asyncio
+import logging
 import random
 import re
 import string
-import logging
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
@@ -103,11 +103,7 @@ class TestIntegrationWithSwarm:
         assert await swarm7[peer].api.aliases_get_alias("Alice") is None
         assert await swarm7[peer].api.aliases_set_alias("Alice", alice.address) is True
         assert (await swarm7[peer].api.aliases_get_alias("Alice")).peer_id == alice.peer_id
-        assert (await swarm7[peer].api.aliases_get_alias("Alice", True)).address == alice.address.lower()
-
         assert (await swarm7[peer].api.aliases_get_aliases())["Alice"] == alice.peer_id
-        assert (await swarm7[peer].api.aliases_get_aliases(True))["Alice"] == alice.address.lower()
-
         assert await swarm7[peer].api.aliases_remove_alias("Alice")
         assert await swarm7[peer].api.aliases_get_alias("Alice") is None
 
@@ -139,8 +135,7 @@ class TestIntegrationWithSwarm:
         response = await swarm7[src].api.ping(swarm7[dest].peer_id)
 
         assert response is not None
-        # any non-negative value is acceptable
-        assert int(response.latency) >= 0, f"round trip must be non-negative, actual: '{int(response.latency)}'"
+        assert int(response.latency) > 0, f"Non-0 round trip time expected, actual: '{int(response.latency)}'"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
@@ -184,7 +179,7 @@ class TestIntegrationWithSwarm:
     async def test_hoprd_should_fail_sending_a_message_that_is_too_large(
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
-        maximum_payload_size = 500
+        maximum_payload_size = 800
         random_tag = gen_random_tag()
 
         packet = "0 hop message too large: " + "".join(
@@ -332,7 +327,6 @@ class TestIntegrationWithSwarm:
 
             await asyncio.sleep(10)  # wait for aggregation to finish
             assert await swarm7[dest].api.tickets_redeem()
-
             await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 30.0)
 
     @pytest.mark.asyncio
@@ -501,7 +495,6 @@ class TestIntegrationWithSwarm:
 
         async def peek_the_messages():
             packets = await dest_peer.api.messages_peek_all(random_tag, ts_for_query)
-
             done = len(packets) == (message_count - split_index)
 
             if not done:

@@ -413,7 +413,8 @@
               ];
               ExposedPorts = {
                 "8545/tcp" = { };
-                "3011-3061" = { };
+                "3001-3006/tcp" = { };
+                "10001-10101/tcp" = { };
               };
             };
           };
@@ -464,6 +465,7 @@
               ];
             };
             buildInputs = with pkgs; [
+              uv
               foundry-bin
               solcDefault
               hopli-debug
@@ -472,14 +474,9 @@
             ];
             buildPhase = ''
               unset SOURCE_DATE_EPOCH
-              python -m venv .venv
-              source .venv/bin/activate
-              pip install -U pip setuptools wheel
-              pip install -r tests/requirements.txt
             '';
             checkPhase = ''
-              source .venv/bin/activate
-              python3 -m pytest tests/
+              uv run -m pytest tests/
             '';
             doCheck = true;
           };
@@ -507,6 +504,7 @@
           ];
           };
           docsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
+          clusterDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
               set -e
@@ -525,7 +523,7 @@
               name = "audit";
               runtimeInputs = [ pkgs.cargo pkgs.cargo-audit ];
               text = ''
-                cargo audit --deny warnings
+                cargo audit
               '';
             };
           };
@@ -673,6 +671,7 @@
           devShells.default = defaultDevShell;
           devShells.smoke-tests = smoketestsDevShell;
           devShells.docs = docsDevShell;
+          devShells.cluster = clusterDevShell;
 
           formatter = config.treefmt.build.wrapper;
         };

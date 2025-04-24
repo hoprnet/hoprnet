@@ -17,11 +17,11 @@ from .constants import (
 )
 from .node import Node
 
-GLOBAL_TIMEOUT = 60
+GLOBAL_TIMEOUT = 90
 
 
 class Cluster:
-    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path, use_nat):
+    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path, use_nat: bool, exposed: bool):
         self.anvil_config = anvil_config
         self.protocol_config = protocol_config
         self.use_nat = use_nat
@@ -30,7 +30,9 @@ class Cluster:
 
         for network_name, params in config["networks"].items():
             for alias, node in params["nodes"].items():
-                self.nodes[str(index)] = Node.fromConfig(index, alias, node, config["api_token"], network_name, use_nat)
+                self.nodes[str(index)] = Node.fromConfig(
+                    index, alias, node, config["defaults"], network_name, use_nat, exposed
+                )
                 index += 1
 
     def clean_up(self):
@@ -78,7 +80,7 @@ class Cluster:
             logging.critical("Not all nodes are ready, interrupting setup")
             raise RuntimeError
 
-        logging.info(f"Retrieve nodes addresses and peer ids")
+        logging.info("Retrieve nodes addresses and peer ids")
         for node in self.nodes.values():
             if addresses := await node.api.addresses():
                 node.peer_id = addresses.hopr

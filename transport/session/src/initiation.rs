@@ -3,9 +3,9 @@
 use crate::errors::TransportSessionError;
 use crate::types::SessionTarget;
 use crate::Capability;
-use hopr_crypto_types::prelude::PeerId;
 use hopr_internal_types::prelude::ApplicationData;
 use hopr_network_types::prelude::RoutingOptions;
+use hopr_primitive_types::prelude::Address;
 use std::collections::HashSet;
 
 /// Challenge that identifies a Start initiation protocol message.
@@ -46,7 +46,7 @@ pub struct StartInitiation {
     /// session initiator.
     ///
     /// **NOTE:** This will not be used when the Return Path is introduced.
-    pub back_routing: Option<(RoutingOptions, PeerId)>,
+    pub back_routing: Option<(RoutingOptions, Address)>,
 }
 
 /// Message of the Start protocol that confirms the establishment of a session.
@@ -96,6 +96,10 @@ pub enum StartProtocol<T> {
     CloseSession(T),
 }
 
+const SESSION_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+    .with_little_endian()
+    .with_variable_int_encoding();
+
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
     /// Serialize the message into a message tag and message data.
@@ -103,10 +107,12 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
     pub fn encode(self) -> crate::errors::Result<(u16, Box<[u8]>)> {
         let disc = StartProtocolDiscriminants::from(&self) as u8 + 1;
         let inner = match self {
-            StartProtocol::StartSession(init) => bincode::serialize(&init),
-            StartProtocol::SessionEstablished(est) => bincode::serialize(&est),
-            StartProtocol::SessionError(err) => bincode::serialize(&err),
-            StartProtocol::CloseSession(id) => bincode::serialize(&id),
+            StartProtocol::StartSession(init) => bincode::serde::encode_to_vec(&init, SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::SessionEstablished(est) => {
+                bincode::serde::encode_to_vec(&est, SESSION_BINCODE_CONFIGURATION)
+            }
+            StartProtocol::SessionError(err) => bincode::serde::encode_to_vec(err, SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::CloseSession(id) => bincode::serde::encode_to_vec(&id, SESSION_BINCODE_CONFIGURATION),
         }?;
 
         Ok((disc as u16, inner.into_boxed_slice()))
@@ -120,12 +126,18 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
         }
 
         match StartProtocolDiscriminants::from_repr(tag as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
-            StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(bincode::deserialize(data)?)),
-            StartProtocolDiscriminants::SessionEstablished => {
-                Ok(StartProtocol::SessionEstablished(bincode::deserialize(data)?))
-            }
-            StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(bincode::deserialize(data)?)),
-            StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(bincode::deserialize(data)?)),
+            StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(
+                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+            )),
+            StartProtocolDiscriminants::SessionEstablished => Ok(StartProtocol::SessionEstablished(
+                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+            )),
+            StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(
+                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+            )),
+            StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(
+                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+            )),
         }
     }
 }
@@ -134,9 +146,9 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<StartProtoc
     type Error = TransportSessionError;
 
     fn try_from(value: StartProtocol<T>) -> Result<Self, Self::Error> {
-        let (tag, plain_text) = value.encode()?;
+        let (application_tag, plain_text) = value.encode()?;
         Ok(ApplicationData {
-            application_tag: Some(tag),
+            application_tag,
             plain_text,
         })
     }
@@ -146,19 +158,19 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<Application
     type Error = TransportSessionError;
 
     fn try_from(value: ApplicationData) -> Result<Self, Self::Error> {
-        Self::decode(
-            value.application_tag.ok_or(TransportSessionError::Tag)?,
-            &value.plain_text,
-        )
+        Self::decode(value.application_tag, &value.plain_text)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SessionId;
-    use hopr_internal_types::prelude::PAYLOAD_SIZE;
+    use hopr_crypto_packet::prelude::HoprPacket;
+    use hopr_crypto_types::keypairs::ChainKeypair;
+    use hopr_crypto_types::prelude::Keypair;
     use hopr_network_types::prelude::SealedHost;
+
+    use crate::SessionId;
 
     #[cfg(feature = "serde")]
     #[test]
@@ -168,8 +180,8 @@ mod tests {
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:1234".parse()?)),
             capabilities: Default::default(),
             back_routing: Some((
-                RoutingOptions::IntermediatePath(vec![PeerId::random()].try_into()?),
-                PeerId::random(),
+                RoutingOptions::IntermediatePath(vec![(&ChainKeypair::random()).into()].try_into()?),
+                (&ChainKeypair::random()).into(),
             )),
         });
 
@@ -241,25 +253,32 @@ mod tests {
             capabilities: HashSet::from_iter([Capability::Retransmission, Capability::Segmentation]),
             back_routing: Some((
                 RoutingOptions::IntermediatePath(
-                    vec![PeerId::random(), PeerId::random(), PeerId::random()].try_into()?,
+                    vec![
+                        (&ChainKeypair::random()).into(),
+                        (&ChainKeypair::random()).into(),
+                        (&ChainKeypair::random()).into(),
+                    ]
+                    .try_into()?,
                 ),
-                PeerId::random(),
+                (&ChainKeypair::random()).into(),
             )),
         });
 
         assert!(
-            msg.encode()?.1.len() <= PAYLOAD_SIZE,
-            "StartSession must fit within {PAYLOAD_SIZE}"
+            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
+            "StartSession must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
         );
 
         let msg = StartProtocol::SessionEstablished(StartEstablished {
             orig_challenge: StartChallenge::MAX,
-            session_id: SessionId::new(u16::MAX, PeerId::random()),
+            session_id: SessionId::new(u16::MAX, (&ChainKeypair::random()).into()),
         });
 
         assert!(
-            msg.encode()?.1.len() <= PAYLOAD_SIZE,
-            "SessionEstablished must fit within {PAYLOAD_SIZE}"
+            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
+            "SessionEstablished must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
         );
 
         let msg = StartProtocol::<i32>::SessionError(StartErrorType {
@@ -268,14 +287,16 @@ mod tests {
         });
 
         assert!(
-            msg.encode()?.1.len() <= PAYLOAD_SIZE,
-            "SessionError must fit within {PAYLOAD_SIZE}"
+            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
+            "SessionError must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::CloseSession(SessionId::new(u16::MAX, PeerId::random()));
+        let msg = StartProtocol::CloseSession(SessionId::new(u16::MAX, (&ChainKeypair::random()).into()));
         assert!(
-            msg.encode()?.1.len() <= PAYLOAD_SIZE,
-            "CloseSession must fit within {PAYLOAD_SIZE}"
+            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
+            "CloseSession must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
         );
 
         Ok(())
