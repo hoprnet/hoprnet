@@ -79,4 +79,4 @@ jobs:
           export THRESHOLD_MEASURE=throughput
           export THRESHOLD_UPPER_BOUNDARY=0.95
           export THRESHOLD_LOWER_BOUNDARY=0.05
-          nix develop -c bencher run --err --adapter rust_criterion "cargo bench -F testing"
+          nix develop -c bencher run --err --adapter rust_criterion "cargo bench"
