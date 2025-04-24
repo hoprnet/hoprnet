@@ -84,7 +84,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
                         let path = resolve_mock_path(
                             PEERS_CHAIN[TESTED_PEER_ID].public().to_address(),
-                            PEERS[1..PEER_COUNT].iter().map(|p| p.public().into()).collect(),
+                            PEERS[1..PEER_COUNT].iter().map(|p| (*p.public()).into()).collect(),
                             PEERS_CHAIN[1..PEER_COUNT]
                                 .iter()
                                 .map(|key| key.public().to_address())
