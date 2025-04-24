@@ -53,7 +53,7 @@ pub enum IncomingPacket {
         packet_tag: PacketTag,
         previous_hop: OffchainPublicKey,
         plain_text: Box<[u8]>,
-        ack_key: Option<HalfKey>,
+        ack_key: HalfKey,
     },
     /// Packet must be forwarded
     Forwarded {

@@ -137,28 +137,22 @@ where
                         ack_key,
                         ..
                     } => {
-                        // If this is not a probe packet, send an acknowledgement back to the previous hop
-                        if let Some(ack_key) = ack_key {
-                            let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
+                        let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
 
-                            let ack = Acknowledgement::new(ack_key, &self.cfg.packet_keypair);
-                            let ack_packet = self
-                                .db
-                                .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
-                                .await
-                                .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
+                        let ack = Acknowledgement::new(ack_key, &self.cfg.packet_keypair);
+                        let ack_packet = self
+                            .db
+                            .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
+                            .await
+                            .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
 
-                            Some(RecvOperation::Receive {
-                                data: app_data,
-                                ack: SendAck {
-                                    peer: ack_packet.next_hop.into(),
-                                    ack: ack_packet.data,
-                                },
-                            })
-                        } else {
-                            // TODO: implement no-acknowledgement packet handling (#7073)
-                            unimplemented!()
-                        }
+                        Some(RecvOperation::Receive {
+                            data: app_data,
+                            ack: SendAck {
+                                peer: ack_packet.next_hop.into(),
+                                ack: ack_packet.data,
+                            },
+                        })
                     }
                     IncomingPacket::Forwarded {
                         previous_hop,

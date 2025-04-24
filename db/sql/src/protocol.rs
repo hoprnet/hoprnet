@@ -536,7 +536,7 @@ impl HoprDbProtocolOperations for HoprDb {
                         packet_tag: incoming.packet_tag,
                         previous_hop: incoming.previous_hop,
                         plain_text: incoming.plain_text,
-                        ack_key: incoming.ack_key,
+                        ack_key: incoming.ack_key.expect("should have contained an ack key"),
                     }))
                 }
             }
