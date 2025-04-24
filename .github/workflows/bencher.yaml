@@ -69,22 +69,14 @@ jobs:
 
       - name: Execute benchmarks
         run: |
-          nix develop -c cargo bench -F testing
-
-      - name: Publish benchmark results
-        run: |
-          find target/criterion -type f -name benchmark.json | while read file; do
-            echo "Pushing benchmark: $file"
-            bencher run --file "$file" --err
-          done
-        env:
-          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
-          BENCHER_BRANCH: ${{ steps.vars.outputs.GITHUB_REF_NAME }}
-          BENCHER_PROJECT: hoprnet
-          BENCHER_TESTBED: self-hosted-bigger
-          GITHUB_ACTIONS: ${{ secrets.GITHUB_TOKEN }}
-          BENCHER_ADAPTER: rust_criterion
-          THRESHOLD_TEST: t_test
-          THRESHOLD_MEASURE: latency
-          THRESHOLD_UPPER_BOUNDARY: 0.95
-          THRESHOLD_LOWER_BOUNDARY: 0.05  
+          export BENCHER_API_TOKEN=${{ secrets.BENCHER_API_TOKEN }}
+          export BENCHER_BRANCH=${{ steps.vars.outputs.GITHUB_REF_NAME }}
+          export BENCHER_PROJECT=hoprnet
+          export BENCHER_TESTBED=self-hosted-bigger
+          export GITHUB_ACTIONS=${{ secrets.GITHUB_TOKEN }}
+          export BENCHER_ADAPTER=rust_criterion
+          export THRESHOLD_TEST=t_test
+          export THRESHOLD_MEASURE=throughput
+          export THRESHOLD_UPPER_BOUNDARY=0.95
+          export THRESHOLD_LOWER_BOUNDARY=0.05
+          nix develop -c bencher run --err --adapter rust_criterion "cargo bench -F testing"
