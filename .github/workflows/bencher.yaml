@@ -8,15 +8,15 @@ env:
   RUST_BACKTRACE: "1"
 
 on:
-  workflow_call: # This workflow is called from merge workflow
+  workflow_call: # This workflow is called from other workflow
     inputs:
       branch:
         required: true
         type: string
+      type:
+        required: true
+        type: string
   workflow_dispatch: # This workflow is triggered manually
-  schedule:
-    - cron: "3 0 * * *" # Every day at 03:00 UTC
-
 
 concurrency:
   group: ${{ github.ref }}-bencher
@@ -26,7 +26,7 @@ jobs:
   bencher:
     name: Bencher
     runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
@@ -37,11 +37,18 @@ jobs:
       - name: Set environment variables
         id: vars
         run: |
-          # Get the branch name (from inputs or GitHub context)
-          BRANCH_NAME="${{ inputs.branch || github.ref_name }}"
+          # Safely get branch name without template injection
+          if [ -n "$INPUT_BRANCH" ]; then
+            BRANCH_NAME="$INPUT_BRANCH"
+          else
+            BRANCH_NAME="$GITHUB_REF_NAME"
+          fi
           echo "BRANCH_NAME=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
           FORMATTED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
           echo "FORMATTED_BRANCH=$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
+        env:
+          INPUT_BRANCH: ${{ inputs.branch }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
 
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
@@ -63,21 +70,26 @@ jobs:
 
       - name: Set Bencher Testbed
         env:
-          # For workflow_call (parent workflow triggered by push)
-          IS_MERGE: ${{ github.event_name == 'workflow_call' }}
-          # For workflow_dispatch (manual run)
+          IS_MERGE: ${{ github.event_name == 'workflow_call' && inputs.type == 'merge' }}
+          IS_SCHEDULED: ${{ github.event_name == 'workflow_call' && inputs.type == 'scheduled' }}
           IS_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
-          # For schedule (nightly run)
-          IS_SCHEDULED: ${{ github.event_name == 'schedule' }}
+          FORMATTED_BRANCH: ${{ steps.vars.outputs.FORMATTED_BRANCH }}
         run: |
-          if [ "$IS_MERGE" = "true" ]; then
-            echo "BENCHER_TESTBED=baseline-${{ steps.vars.outputs.FORMATTED_BRANCH }}-pr" >> $GITHUB_ENV
-          elif [ "$IS_SCHEDULED" = "true" ]; then
-            echo "BENCHER_TESTBED=baseline-${{ steps.vars.outputs.FORMATTED_BRANCH }}-nightly" >> $GITHUB_ENV
-          elif [ "$IS_MANUAL" = "true" ]; then
-            echo "BENCHER_TESTBED=branch-${{ steps.vars.outputs.FORMATTED_BRANCH }}" >> $GITHUB_ENV
+          # Check if branch is allowed (master or release-*)
+          if [[ "$FORMATTED_BRANCH" == "master" || "$FORMATTED_BRANCH" =~ ^release- ]]; then
+            if [ "$IS_MERGE" = "true" ]; then
+              echo "BENCHER_TESTBED=baseline-$FORMATTED_BRANCH" >> $GITHUB_ENV
+            elif [ "$IS_SCHEDULED" = "true" ]; then
+              echo "BENCHER_TESTBED=nightly-$FORMATTED_BRANCH" >> $GITHUB_ENV
+            elif [ "$IS_MANUAL" = "true" ]; then
+              echo "BENCHER_TESTBED=branch-$FORMATTED_BRANCH" >> $GITHUB_ENV
+            else
+              echo Skipping execution of benchmarks not triggered by merge, manual
+              exit 1
+            fi
           else
-            echo "BENCHER_TESTBED=unknown" >> $GITHUB_ENV
+            echo Skipping execution of benchmarks for branch $FORMATTED_BRANCH
+            exit 0
           fi
 
       - name: Setup Bencher
@@ -85,13 +97,17 @@ jobs:
 
       - name: Execute benchmarks
         run: |
-          export BENCHER_API_TOKEN=${{ secrets.BENCHER_API_TOKEN }}
-          export BENCHER_BRANCH=${{ steps.vars.outputs.BRANCH_NAME }}
+          export BENCHER_API_TOKEN=${BENCHER_API_TOKEN}
+          export BENCHER_BRANCH=${BRANCH_NAME}
           export BENCHER_PROJECT=hoprnet
-          export GITHUB_ACTIONS=${{ secrets.GITHUB_TOKEN }}
+          export GITHUB_ACTIONS=${GITHUB_ACTIONS}
           export BENCHER_ADAPTER=rust_criterion
           export THRESHOLD_TEST=t_test
           export THRESHOLD_MEASURE=throughput
           export THRESHOLD_UPPER_BOUNDARY=0.95
           export THRESHOLD_LOWER_BOUNDARY=0.05
-          nix develop -c bencher run --err --adapter rust_criterion "cargo bench"
+          nix develop -c bencher run --hash $(git rev-parse HEAD) --err "cargo bench"
+        env:
+          BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
+          GITHUB_ACTIONS: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ steps.vars.outputs.BRANCH_NAME }}
