@@ -1,5 +1,4 @@
-{ 
-mkCargoDerivation
+{ mkCargoDerivation
 }:
 
 { cargoArtifacts
@@ -15,7 +14,7 @@ mkCargoDerivation (args // {
   inherit cargoArtifacts;
   pnameSuffix = "-bench";
 
-  buildPhaseCargoCommand = "cargo bench --locked -F testing";
+  buildPhaseCargoCommand = "cargo bench --locked";
 
   nativeBuildInputs = (args.nativeBuildInputs or [ ]);
 })

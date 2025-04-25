@@ -146,7 +146,7 @@
             CARGO_PROFILE = "dev";
           });
           hoprd-bench = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runBench = true; });
-            
+
           hopliBuildArgs = {
             inherit src depsSrc rev;
             cargoToml = ./hopli/Cargo.toml;
