@@ -4,18 +4,19 @@ use common::{create_dbs, create_minimal_topology, random_packets_of_count, resol
 
 use criterion::{async_executor::AsyncExecutor, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::StreamExt;
-use hopr_primitive_types::prelude::{Balance, BalanceType};
-use libp2p::PeerId;
-
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::keypairs::Keypair;
-use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
-use hopr_path::path::TransportPath;
+use hopr_internal_types::prelude::*;
+use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_primitive_types::prelude::{Balance, BalanceType};
 use hopr_transport_protocol::msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
+use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 20;
 
 pub fn protocol_throughput_sender(c: &mut Criterion) {
-    const PAYLOAD_SIZE: usize = 490;
+    const PAYLOAD_SIZE: usize = HoprPacket::PAYLOAD_SIZE;
     const PEER_COUNT: usize = 3;
     const TESTED_PEER_ID: usize = 0;
 
@@ -57,9 +58,11 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let (_wire_msg_recv_tx, wire_msg_recv_rx) =
                             futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
 
-                        let (api_send_tx, api_send_rx) =
-                            futures::channel::mpsc::unbounded::<(ApplicationData, TransportPath, PacketSendFinalizer)>(
-                            );
+                        let (api_send_tx, api_send_rx) = futures::channel::mpsc::unbounded::<(
+                            ApplicationData,
+                            ResolvedTransportRouting,
+                            PacketSendFinalizer,
+                        )>();
                         let (api_recv_tx, _api_recv_rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
 
                         let cfg = PacketInteractionConfig {
@@ -91,12 +94,17 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         .expect("path must be constructible");
 
                         let sender = MsgSender::new(api_send_tx);
+                        let routing = ResolvedTransportRouting::Forward {
+                            pseudonym: HoprPseudonym::random(),
+                            forward_path: path,
+                            return_paths: vec![],
+                        };
 
                         let count = packets.len();
                         futures::stream::iter(packets)
                             .map(|packet| {
                                 let sender = sender.clone();
-                                let path = path.clone();
+                                let path = routing.clone();
 
                                 async move { sender.send_packet(packet, path.clone()).await }
                             })

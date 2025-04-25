@@ -12,15 +12,11 @@ use crate::errors::{ProtocolError, Result};
 #[derive(Clone)]
 pub struct AcknowledgementProcessor<Db: HoprDbProtocolOperations> {
     db: Db,
-    chain_key: ChainKeypair,
 }
 
 impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
-    pub fn new(db: Db, chain_key: &ChainKeypair) -> Self {
-        Self {
-            db,
-            chain_key: chain_key.clone(),
-        }
+    pub fn new(db: Db) -> Self {
+        Self { db }
     }
 
     /// Processes the outgoing acknowledgement.
@@ -32,17 +28,15 @@ impl<Db: HoprDbProtocolOperations> AcknowledgementProcessor<Db> {
 
     /// Processes the incoming acknowledgement.
     #[tracing::instrument(level = "debug", skip(self, ack))]
-    pub async fn recv(&self, peer: &PeerId, mut ack: Acknowledgement) -> Result<AckResult> {
+    pub async fn recv(&self, peer: &PeerId, ack: Acknowledgement) -> Result<AckResult> {
         let remote_pk = OffchainPublicKey::try_from(peer)?;
-        if !ack.validate(&remote_pk) {
-            tracing::error!("Failed to verify signature on received acknowledgement");
-            return Err(ProtocolError::InvalidSignature);
-        };
-
-        self.db.handle_acknowledgement(ack, &self.chain_key).await.map_err(|e| {
-            trace!(error = %e, "Failed to process a received acknowledgement");
-            let error: ProtocolError = e.into();
-            error
-        })
+        self.db
+            .handle_acknowledgement(ack.validate(&remote_pk)?)
+            .await
+            .map_err(|e| {
+                trace!(error = %e, "Failed to process a received acknowledgement");
+                let error: ProtocolError = e.into();
+                error
+            })
     }
 }

@@ -179,7 +179,7 @@ class TestIntegrationWithSwarm:
     async def test_hoprd_should_fail_sending_a_message_that_is_too_large(
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
-        maximum_payload_size = 500
+        maximum_payload_size = 800
         random_tag = gen_random_tag()
 
         packet = "0 hop message too large: " + "".join(

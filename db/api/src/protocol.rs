@@ -1,10 +1,11 @@
 use async_trait::async_trait;
+use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::*;
+use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_primitive_types::prelude::Balance;
 use std::{fmt::Debug, result::Result};
 
 use crate::prelude::DbError;
-use hopr_crypto_types::prelude::*;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::Balance;
 
 /// Trait defining all DB functionality needed by packet/acknowledgement processing pipeline.
 #[async_trait]
@@ -15,8 +16,7 @@ pub trait HoprDbProtocolOperations {
     /// 1. There is an unacknowledged ticket and we are awaiting a half key.
     /// 2. We were the creator of the packet, hence we do not wait for any half key
     /// 3. The acknowledgement is unexpected and stems from a protocol bug or an attacker
-    async fn handle_acknowledgement(&self, ack: Acknowledgement, me: &ChainKeypair)
-        -> crate::errors::Result<AckResult>;
+    async fn handle_acknowledgement(&self, ack: Acknowledgement) -> crate::errors::Result<AckResult>;
 
     /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
     async fn get_network_winning_probability(&self) -> crate::errors::Result<f64>;
@@ -24,12 +24,18 @@ pub trait HoprDbProtocolOperations {
     /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
     async fn get_network_ticket_price(&self) -> crate::errors::Result<Balance>;
 
+    /// Process the data into an outgoing packet that is not going to be acknowledged.
+    async fn to_send_no_ack(
+        &self,
+        data: Box<[u8]>,
+        destination: OffchainPublicKey,
+    ) -> Result<TransportPacketWithChainData, DbError>;
+
     /// Process the data into an outgoing packet
     async fn to_send(
         &self,
         data: Box<[u8]>,
-        me: ChainKeypair,
-        path: Vec<OffchainPublicKey>,
+        routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: f64,
         outgoing_ticket_price: Balance,
     ) -> Result<TransportPacketWithChainData, DbError>;
@@ -39,7 +45,6 @@ pub trait HoprDbProtocolOperations {
     async fn from_recv(
         &self,
         data: Box<[u8]>,
-        me: ChainKeypair,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: f64,
@@ -49,7 +54,7 @@ pub trait HoprDbProtocolOperations {
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum AckResult {
-    Sender(HalfKeyChallenge),
+    Sender(Acknowledgement),
     RelayerWinning(AcknowledgedTicket),
     RelayerLosing,
 }
@@ -64,13 +69,16 @@ impl Debug for AckResult {
     }
 }
 
+// TODO: create 4 separate objects and use them Boxed in the enum variants
+#[allow(clippy::large_enum_variant)]
 pub enum TransportPacketWithChainData {
     /// Packet is intended for us
     Final {
         packet_tag: PacketTag,
         previous_hop: OffchainPublicKey,
         plain_text: Box<[u8]>,
-        ack: Acknowledgement,
+        ack_key: HalfKey,
+        no_ack: bool,
     },
     /// Packet must be forwarded
     Forwarded {
@@ -90,7 +98,7 @@ pub enum TransportPacketWithChainData {
 
 #[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum ResolvedAcknowledgement {
-    Sending(HalfKeyChallenge),
+    Sending(Acknowledgement),
     RelayingWin(AcknowledgedTicket),
     RelayingLoss(Hash),
 }
@@ -98,7 +106,7 @@ pub enum ResolvedAcknowledgement {
 impl From<ResolvedAcknowledgement> for AckResult {
     fn from(value: ResolvedAcknowledgement) -> Self {
         match value {
-            ResolvedAcknowledgement::Sending(ack_challenge) => AckResult::Sender(ack_challenge),
+            ResolvedAcknowledgement::Sending(ack) => AckResult::Sender(ack),
             ResolvedAcknowledgement::RelayingWin(ack_ticket) => AckResult::RelayerWinning(ack_ticket),
             ResolvedAcknowledgement::RelayingLoss(_) => AckResult::RelayerLosing,
         }
