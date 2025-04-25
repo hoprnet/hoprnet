@@ -9,7 +9,7 @@ env:
 
 on:
   schedule:
-    - cron: "2 0 * * *" # Every day at 03:00 UTC
+    - cron: "2 0 * * *" # Every day at 02:00 UTC
 
 concurrency:
   group: ${{ github.ref }}-bencher-nightly
