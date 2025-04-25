@@ -26,8 +26,8 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(*bytes as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(format!(
-                "random data with size {}",
-                bytesize::ByteSize::b(*bytes as u64)
+                "random_data_size_{}",
+                bytesize::ByteSize::b(*bytes as u64).to_string().replace(" ", "_")
             )),
             bytes,
             |b, bytes| {
@@ -84,7 +84,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
                         let path = resolve_mock_path(
                             PEERS_CHAIN[TESTED_PEER_ID].public().to_address(),
-                            PEERS[1..PEER_COUNT].iter().map(|p| p.public().into()).collect(),
+                            PEERS[1..PEER_COUNT].iter().map(|p| p.public().clone().into()).collect(),
                             PEERS_CHAIN[1..PEER_COUNT]
                                 .iter()
                                 .map(|key| key.public().to_address())
