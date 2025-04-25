@@ -73,24 +73,23 @@ jobs:
         env:
           IS_MERGE: ${{ github.event_name == 'workflow_call' && inputs.type == 'merge' }}
           IS_SCHEDULED: ${{ github.event_name == 'workflow_call' && inputs.type == 'scheduled' }}
-          IS_MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
           FORMATTED_BRANCH: ${{ steps.vars.outputs.FORMATTED_BRANCH }}
         run: |
           # Check if branch is allowed (master or release-*)
           if [[ "$FORMATTED_BRANCH" == "master" || "$FORMATTED_BRANCH" =~ ^release- ]]; then
             if [ "$IS_MERGE" = "true" ]; then
+              echo Testbed is set to baseline-$FORMATTED_BRANCH
               echo "BENCHER_TESTBED=baseline-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
             elif [ "$IS_SCHEDULED" = "true" ]; then
+              echo Testbed is set to nightly-$FORMATTED_BRANCH
               echo "BENCHER_TESTBED=nightly-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
-            elif [ "$IS_MANUAL" = "true" ]; then
-              echo "BENCHER_TESTBED=branch-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
             else
-              echo Skipping execution of benchmarks not triggered by merge, manual
-              exit 1
+              echo Testbed is set to manual-$FORMATTED_BRANCH
+              echo "BENCHER_TESTBED=manual-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
             fi
           else
-            echo Skipping execution of benchmarks for branch $FORMATTED_BRANCH
-            exit 0
+            echo Testbed is set to branch-$FORMATTED_BRANCH
+            echo "BENCHER_TESTBED=branch-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
           fi
 
       - name: Setup Bencher
@@ -115,16 +114,16 @@ jobs:
           COMMIT_HASH: ${{ github.sha }}
           BENCHER_TESTBED: ${{ steps.testbed.outputs.BENCHER_TESTBED }}
 
-      - name: Notify drop in performance
-        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-        if: failure()
-        with:
-          api-key: ${{ secrets.ZULIP_API_KEY }}
-          email: ${{ secrets.ZULIP_EMAIL }}
-          organization-url: "https://hopr.zulipchat.com"
-          type: "stream"
-          to: "HOPRd"
-          topic: "Core"
-          content: |
-            The benchmark results for branch `${{ steps.vars.outputs.BRANCH_NAME }}` at commit (${{ github.sha }}) have dropped by more than 5%.
-            Please check [Bencher](https://bencher.dev/console/projects/hoprnet) for more details.
+      # - name: Notify drop in performance
+      #   uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+      #   if: failure()
+      #   with:
+      #     api-key: ${{ secrets.ZULIP_API_KEY }}
+      #     email: ${{ secrets.ZULIP_EMAIL }}
+      #     organization-url: "https://hopr.zulipchat.com"
+      #     type: "stream"
+      #     to: "HOPRd"
+      #     topic: "Core"
+      #     content: |
+      #       The benchmark results for branch `${{ steps.vars.outputs.BRANCH_NAME }}` at commit (${{ github.sha }}) have dropped by more than 5%.
+      #       Please check [Bencher](https://bencher.dev/console/projects/hoprnet) for more details.
