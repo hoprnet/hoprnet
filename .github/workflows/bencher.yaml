@@ -19,8 +19,8 @@ on:
   workflow_dispatch: # This workflow is triggered manually
 
 concurrency:
-  group: ${{ github.ref }}-bencher
-  cancel-in-progress: true
+  group: bencher
+  cancel-in-progress: false
 
 jobs:
   bencher:
@@ -46,6 +46,7 @@ jobs:
           echo "BRANCH_NAME=${BRANCH_NAME}" >> "$GITHUB_OUTPUT"
           FORMATTED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
           echo "FORMATTED_BRANCH=$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
+          echo "COMMIT_HASH=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
         env:
           INPUT_BRANCH: ${{ inputs.branch }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
@@ -69,6 +70,7 @@ jobs:
           USER: runner
 
       - name: Set Bencher Testbed
+        id: testbed
         env:
           IS_MERGE: ${{ github.event_name == 'workflow_call' && inputs.type == 'merge' }}
           IS_SCHEDULED: ${{ github.event_name == 'workflow_call' && inputs.type == 'scheduled' }}
@@ -78,11 +80,11 @@ jobs:
           # Check if branch is allowed (master or release-*)
           if [[ "$FORMATTED_BRANCH" == "master" || "$FORMATTED_BRANCH" =~ ^release- ]]; then
             if [ "$IS_MERGE" = "true" ]; then
-              echo "BENCHER_TESTBED=baseline-$FORMATTED_BRANCH" >> $GITHUB_ENV
+              echo "BENCHER_TESTBED=baseline-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
             elif [ "$IS_SCHEDULED" = "true" ]; then
-              echo "BENCHER_TESTBED=nightly-$FORMATTED_BRANCH" >> $GITHUB_ENV
+              echo "BENCHER_TESTBED=nightly-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
             elif [ "$IS_MANUAL" = "true" ]; then
-              echo "BENCHER_TESTBED=branch-$FORMATTED_BRANCH" >> $GITHUB_ENV
+              echo "BENCHER_TESTBED=branch-$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
             else
               echo Skipping execution of benchmarks not triggered by merge, manual
               exit 1
@@ -99,15 +101,31 @@ jobs:
         run: |
           export BENCHER_API_TOKEN=${BENCHER_API_TOKEN}
           export BENCHER_BRANCH=${BRANCH_NAME}
+          export BENCHER_TESTBED=${BENCHER_TESTBED}
           export BENCHER_PROJECT=hoprnet
           export GITHUB_ACTIONS=${GITHUB_ACTIONS}
           export BENCHER_ADAPTER=rust_criterion
           export THRESHOLD_TEST=t_test
           export THRESHOLD_MEASURE=throughput
-          export THRESHOLD_UPPER_BOUNDARY=0.95
           export THRESHOLD_LOWER_BOUNDARY=0.05
-          nix develop -c bencher run --hash $(git rev-parse HEAD) --err "cargo bench"
+          nix develop -c bencher run --hash ${COMMIT_HASH} --err "cargo bench --package hopr-crypto-packet packet_forwarding"
         env:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           GITHUB_ACTIONS: ${{ secrets.GITHUB_TOKEN }}
           BRANCH_NAME: ${{ steps.vars.outputs.BRANCH_NAME }}
+          COMMIT_HASH: ${{ steps.vars.outputs.COMMIT_HASH }}
+          BENCHER_TESTBED: ${{ steps.testbed.outputs.BENCHER_TESTBED }}
+
+      - name: Notify drop in performance
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        if: failure()
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "HOPRd"
+          topic: "Core"
+          content: |
+            The benchmark results for branch `${{ steps.vars.outputs.BRANCH_NAME }}` at commit (${{ steps.vars.outputs.COMMIT_HASH }}) have dropped by more than 5%.
+            Please check [Bencher](https://bencher.dev/console/projects/hoprnet) for more details.

@@ -7,7 +7,7 @@ use hopr_internal_types::prelude::*;
 use hopr_path::TransportPath;
 use hopr_primitive_types::prelude::{Address, BytesEncodable, KeyIdent};
 
-const SAMPLE_SIZE: usize = 100_000;
+const SAMPLE_SIZE: usize = 1_000;
 
 pub fn packet_sending_bench(c: &mut Criterion) {
     assert!(
