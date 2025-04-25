@@ -46,7 +46,9 @@ jobs:
           echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_OUTPUT
           FORMATTED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
           echo "FORMATTED_BRANCH=$FORMATTED_BRANCH" >> $GITHUB_OUTPUT
-          echo "GIT_COMMIT_HASH=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          set -x
+          COMMIT_HASH=$(git rev-parse HEAD)
+          echo "COMMIT_HASH=${COMMIT_HASH}" >> $GITHUB_OUTPUT
         env:
           INPUT_BRANCH: ${{ inputs.branch }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
@@ -101,10 +103,7 @@ jobs:
         run: |
           export BENCHER_API_TOKEN=${BENCHER_API_TOKEN}
           export BENCHER_BRANCH=${BRANCH_NAME}
-          echo "GIT_COMMIT_HASH=${GIT_COMMIT_HASH}"
-          echo "GIT_COMMIT_HASH_VAR=${{ steps.vars.outputs.GIT_COMMIT_HASH }}"
-          echo "COMMIT_HASH=$(git rev-parse HEAD)"
-          export COMMIT_HASH=${GIT_COMMIT_HASH}
+          export COMMIT_HASH=${COMMIT_HASH}
           export BENCHER_TESTBED=${BENCHER_TESTBED}
           export BENCHER_PROJECT=hoprnet
           export GITHUB_ACTIONS=${GITHUB_TOKEN}
@@ -117,7 +116,7 @@ jobs:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH_NAME: ${{ steps.vars.outputs.BRANCH_NAME }}
-          GIT_COMMIT_HASH: ${{ steps.vars.outputs.GIT_COMMIT_HASH }}
+          COMMIT_HASH: ${{ steps.vars.outputs.COMMIT_HASH }}
           BENCHER_TESTBED: ${{ steps.testbed.outputs.BENCHER_TESTBED }}
 
       - name: Notify drop in performance
@@ -131,5 +130,5 @@ jobs:
           to: "HOPRd"
           topic: "Core"
           content: |
-            The benchmark results for branch `${{ steps.vars.outputs.BRANCH_NAME }}` at commit (${{ steps.vars.outputs.GIT_COMMIT_HASH }}) have dropped by more than 5%.
+            The benchmark results for branch `${{ steps.vars.outputs.BRANCH_NAME }}` at commit (${{ steps.vars.outputs.COMMIT_HASH }}) have dropped by more than 5%.
             Please check [Bencher](https://bencher.dev/console/projects/hoprnet) for more details.
