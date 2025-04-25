@@ -71,8 +71,8 @@ jobs:
       - name: Set Bencher Testbed
         id: testbed
         env:
-          IS_MERGE: ${{ github.event_name == 'workflow_call' && inputs.type == 'merge' }}
-          IS_SCHEDULED: ${{ github.event_name == 'workflow_call' && inputs.type == 'scheduled' }}
+          IS_MERGE: ${{ inputs.type == 'merge' }}
+          IS_SCHEDULED: ${{ inputs.type == 'scheduled' }}
           FORMATTED_BRANCH: ${{ steps.vars.outputs.FORMATTED_BRANCH }}
         run: |
           # Check if branch is allowed (master or release-*)
