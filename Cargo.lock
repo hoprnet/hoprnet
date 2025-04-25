@@ -186,6 +186,7 @@ dependencies = [
  "alloy-core",
  "alloy-eips",
  "alloy-genesis",
+ "alloy-json-rpc",
  "alloy-network",
  "alloy-node-bindings",
  "alloy-provider",
@@ -5360,8 +5361,9 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-rpc"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "async-std",
  "async-stream",
@@ -5396,6 +5398,7 @@ dependencies = [
  "test-log",
  "thiserror 2.0.12",
  "tokio",
+ "tower 0.5.2",
  "tracing",
  "url",
  "validator",

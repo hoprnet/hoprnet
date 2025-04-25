@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-rpc"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Abstraction over Ethereum RPC provider client"
@@ -27,6 +27,7 @@ runtime-tokio = [
 ]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = ["essentials", "json-rpc", "node-bindings"] }
 async-trait = { workspace = true }
 async-std = { workspace = true, optional = true, features = [
   "attributes",
@@ -61,6 +62,7 @@ hopr-bindings = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-chain-types = { workspace = true }
 tracing = { workspace = true }
+tower = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-primitive-types = { workspace = true }
 hopr-internal-types = { workspace = true }
