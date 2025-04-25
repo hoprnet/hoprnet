@@ -106,7 +106,8 @@ jobs:
           export THRESHOLD_TEST=t_test
           export THRESHOLD_MEASURE=throughput
           export THRESHOLD_LOWER_BOUNDARY=0.05
-          nix develop -c bencher run --hash ${COMMIT_HASH} --err "cargo bench --package hopr-crypto-packet packet_forwarding"
+          # nix develop -c bencher run --hash ${COMMIT_HASH} --err "cargo bench --package hopr-crypto-packet packet_forwarding"
+          nix develop -c bencher run --hash ${COMMIT_HASH} --err "cargo bench"
         env:
           BENCHER_API_TOKEN: ${{ secrets.BENCHER_API_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -114,16 +115,16 @@ jobs:
           COMMIT_HASH: ${{ github.sha }}
           BENCHER_TESTBED: ${{ steps.testbed.outputs.BENCHER_TESTBED }}
 
-      # - name: Notify drop in performance
-      #   uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-      #   if: failure()
-      #   with:
-      #     api-key: ${{ secrets.ZULIP_API_KEY }}
-      #     email: ${{ secrets.ZULIP_EMAIL }}
-      #     organization-url: "https://hopr.zulipchat.com"
-      #     type: "stream"
-      #     to: "HOPRd"
-      #     topic: "Core"
-      #     content: |
-      #       The benchmark results for branch `${{ steps.vars.outputs.BRANCH_NAME }}` at commit (${{ github.sha }}) have dropped by more than 5%.
-      #       Please check [Bencher](https://bencher.dev/console/projects/hoprnet) for more details.
+      - name: Notify drop in performance
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        if: failure()
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "HOPRd"
+          topic: "Core"
+          content: |
+            The benchmark results for branch `${{ steps.vars.outputs.BRANCH_NAME }}` at commit (${{ github.sha }}) have dropped by more than 5%.
+            Please check [Bencher](https://bencher.dev/console/projects/hoprnet) for more details.
