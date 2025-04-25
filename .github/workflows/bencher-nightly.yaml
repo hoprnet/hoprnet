@@ -10,14 +10,6 @@ env:
 on:
   schedule:
     - cron: "2 0 * * *" # Every day at 02:00 UTC
-  workflow_dispatch:
-    inputs:
-      branch:
-        required: true
-        type: string
-      type:
-        required: true
-        type: string
 
 concurrency:
   group: ${{ github.ref }}-bencher-nightly
@@ -29,8 +21,8 @@ jobs:
     uses: ./.github/workflows/bencher.yaml
     secrets: inherit
     with:
-      branch: ${{ inputs.branch }}
-      type: ${{ inputs.type }}
+      branch: master
+      type: scheduled
   bencher-nightly-release-singapore:
     name: Benchmarks
     uses: ./.github/workflows/bencher.yaml

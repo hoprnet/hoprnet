@@ -13,7 +13,7 @@ on:
   pull_request:
     types:
       - closed
-      # - synchronize
+      - synchronize
 
 concurrency:
   group: merge
@@ -23,268 +23,268 @@ permissions:
   contents: write
 
 jobs:
-  cleanup_actions:
-    name: Cleanup Actions
-    runs-on: self-hosted-hoprnet-small
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+  # cleanup_actions:
+  #   name: Cleanup Actions
+  #   runs-on: self-hosted-hoprnet-small
+  #   steps:
+  #     - name: Harden Runner
+  #       uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+  #       with:
+  #         disable-sudo: true
+  #         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+  #       with:
+  #         persist-credentials: false
 
-      - name: Cleanup
-        run: |
-          gh extension install actions/gh-actions-cache
+  #     - name: Cleanup
+  #       run: |
+  #         gh extension install actions/gh-actions-cache
 
-          REPO=${{ github.repository }}
-          BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
+  #         REPO=${{ github.repository }}
+  #         BRANCH="refs/pull/${{ github.event.pull_request.number }}/merge"
 
-          echo "Fetching list of cache key"
-          cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
+  #         echo "Fetching list of cache key"
+  #         cacheKeysForPR=$(gh actions-cache list -R $REPO -B $BRANCH | cut -f 1 )
 
-          ## Setting this to not fail the workflow while deleting cache keys.
-          set +e
-          echo "Deleting caches..."
-          for cacheKey in $cacheKeysForPR
-          do
-            gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
-          done
-          echo "Done"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         ## Setting this to not fail the workflow while deleting cache keys.
+  #         set +e
+  #         echo "Deleting caches..."
+  #         for cacheKey in $cacheKeysForPR
+  #         do
+  #           gh actions-cache delete $cacheKey -R $REPO -B $BRANCH --confirm
+  #         done
+  #         echo "Done"
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: "Undeploy PR deployment"
-        if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
-        # Remove the deploy_nodes label to indicate that the PR deployment has been cleaned up
-        run: |
-          gh pr edit ${{ github.event.pull_request.number }} --remove-label "deploy_nodes"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: "Undeploy PR deployment"
+  #       if: contains(github.event.pull_request.labels.*.name, 'deploy_nodes')
+  #       # Remove the deploy_nodes label to indicate that the PR deployment has been cleaned up
+  #       run: |
+  #         gh pr edit ${{ github.event.pull_request.number }} --remove-label "deploy_nodes"
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build_docker:
-    strategy:
-      matrix:
-        package:
-          - hopli
-          - hoprd
-    name: Build ${{ matrix.package }}
-    # only run build and tag if the PR is merged, not if its closed
-    if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/build-docker.yaml
-    with:
-      branch: ${{ github.event.pull_request.base.ref }}
-      package: ${{ matrix.package }}
-      production: true
-    secrets: inherit
+  # build_docker:
+  #   strategy:
+  #     matrix:
+  #       package:
+  #         - hopli
+  #         - hoprd
+  #   name: Build ${{ matrix.package }}
+  #   # only run build and tag if the PR is merged, not if its closed
+  #   if: github.event.pull_request.merged == true
+  #   uses: ./.github/workflows/build-docker.yaml
+  #   with:
+  #     branch: ${{ github.event.pull_request.base.ref }}
+  #     package: ${{ matrix.package }}
+  #     production: true
+  #   secrets: inherit
 
-  cache_deps:
-    name: Cache deps
-    if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/cache-deps.yaml
-    with:
-      branch: ${{ github.event.pull_request.base.ref }}
-    secrets: inherit
+  # cache_deps:
+  #   name: Cache deps
+  #   if: github.event.pull_request.merged == true
+  #   uses: ./.github/workflows/cache-deps.yaml
+  #   with:
+  #     branch: ${{ github.event.pull_request.base.ref }}
+  #   secrets: inherit
 
-  load_test:
-    name: Load tests
-    if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
-    needs:
-      - build_docker
-    uses: ./.github/workflows/load-tests.yaml
-    with:
-      test_id: pr-${{ github.event.pull_request.number }}
-      cluster_nodes: core-rotsee
-      topology: receiver
-      workload: constant
-      duration: ${{ vars.K6_TEST_DURATION }}
-      echo_service_replicas: ${{ vars.K6_ECHO_SERVERS_REPLICAS }}
-      payload_size: ${{ vars.K6_PAYLOAD_SIZE }}
-      download_throughput: ${{ vars.K6_DOWNLOAD_THROUGHPUT }}
-      upload_throughput: ${{ vars.K6_UPLOAD_THROUGHPUT }}
+  # load_test:
+  #   name: Load tests
+  #   if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
+  #   needs:
+  #     - build_docker
+  #   uses: ./.github/workflows/load-tests.yaml
+  #   with:
+  #     test_id: pr-${{ github.event.pull_request.number }}
+  #     cluster_nodes: core-rotsee
+  #     topology: receiver
+  #     workload: constant
+  #     duration: ${{ vars.K6_TEST_DURATION }}
+  #     echo_service_replicas: ${{ vars.K6_ECHO_SERVERS_REPLICAS }}
+  #     payload_size: ${{ vars.K6_PAYLOAD_SIZE }}
+  #     download_throughput: ${{ vars.K6_DOWNLOAD_THROUGHPUT }}
+  #     upload_throughput: ${{ vars.K6_UPLOAD_THROUGHPUT }}
 
-    secrets: inherit
+  #   secrets: inherit
 
-  create_release:
-    name: Create Release
-    runs-on: ubuntu-latest-4-cores # Cannot use a self-hosted runner because of the docker daemon not running
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs:
-      - build_docker
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+  # create_release:
+  #   name: Create Release
+  #   runs-on: ubuntu-latest-4-cores # Cannot use a self-hosted runner because of the docker daemon not running
+  #   if: contains(github.event.pull_request.labels.*.name, 'release')
+  #   needs:
+  #     - build_docker
+  #   steps:
+  #     - name: Harden Runner
+  #       uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+  #       with:
+  #         disable-sudo: true
+  #         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+  #       with:
+  #         persist-credentials: false
 
-      - name: Setup GCP
-        id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@72b6f30b6d0e2fa7298034156f503f2a2bd0f9c6 # master
-        with:
-          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-          login-artifact-registry: 'true'
-          install-sdk: 'true'
+  #     - name: Setup GCP
+  #       id: gcp
+  #       uses: hoprnet/hopr-workflows/actions/setup-gcp@72b6f30b6d0e2fa7298034156f503f2a2bd0f9c6 # master
+  #       with:
+  #         google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+  #         login-artifact-registry: 'true'
+  #         install-sdk: 'true'
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+  #     - name: Log in to Docker Hub
+  #       uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+  #       with:
+  #         username: ${{ secrets.DOCKER_HUB_USERNAME }}
+  #         password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Setup workspace
-        id: setup
-        run: |
-          current_version=$(./scripts/get-current-version.sh semver)
-          echo "current_version=${current_version}" >> $GITHUB_OUTPUT
-          if [[ $current_version == *"-rc."* ]]; then
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "prerelease=false" >> $GITHUB_OUTPUT
-          fi
-          ./scripts/download-workflow-binaries.sh "bot/close-${current_version}"
-        env:
-          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+  #     - name: Setup workspace
+  #       id: setup
+  #       run: |
+  #         current_version=$(./scripts/get-current-version.sh semver)
+  #         echo "current_version=${current_version}" >> $GITHUB_OUTPUT
+  #         if [[ $current_version == *"-rc."* ]]; then
+  #           echo "prerelease=true" >> $GITHUB_OUTPUT
+  #         else
+  #           echo "prerelease=false" >> $GITHUB_OUTPUT
+  #         fi
+  #         ./scripts/download-workflow-binaries.sh "bot/close-${current_version}"
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
-      - name: Tag repository
-        id: tag
-        run: |
-          # Tag semver
-          git tag v${{ steps.setup.outputs.current_version }}
-          git push origin v${{ steps.setup.outputs.current_version }}
+  #     - name: Tag repository
+  #       id: tag
+  #       run: |
+  #         # Tag semver
+  #         git tag v${{ steps.setup.outputs.current_version }}
+  #         git push origin v${{ steps.setup.outputs.current_version }}
 
-          declare base_branch=${{ github.event.pull_request.base.ref }}
-          # Tag release name
-          if [[ "${base_branch}" == "master" ]]; then
-            release_name=${{ vars.BRANCH_MASTER_RELEASE_NAME }}
-          elif [[ "${base_branch}" =~ ^"release" ]]; then
-            release_name=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}
-          fi
-          git tag --force ${release_name}
-          git push --force origin ${release_name}
-          echo "release_name=${release_name}" >> $GITHUB_OUTPUT
+  #         declare base_branch=${{ github.event.pull_request.base.ref }}
+  #         # Tag release name
+  #         if [[ "${base_branch}" == "master" ]]; then
+  #           release_name=${{ vars.BRANCH_MASTER_RELEASE_NAME }}
+  #         elif [[ "${base_branch}" =~ ^"release" ]]; then
+  #           release_name=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}
+  #         fi
+  #         git tag --force ${release_name}
+  #         git push --force origin ${release_name}
+  #         echo "release_name=${release_name}" >> $GITHUB_OUTPUT
 
-      - name: Generate Changelog
-        id: changelog
-        run: |
-          milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.setup.outputs.current_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
-          ./scripts/generate-changelog.sh ${milestone_number} | tee docs/changelog/changelog.md
-          echo "milestone_number=${milestone_number}" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
+  #     - name: Generate Changelog
+  #       id: changelog
+  #       run: |
+  #         milestone_number=$(gh api repos/${{ github.repository }}/milestones | jq -r --arg version "${{ steps.setup.outputs.current_version }}"  ' to_entries[] | select(.value.title | test($version)).value.number')
+  #         ./scripts/generate-changelog.sh ${milestone_number} | tee docs/changelog/changelog.md
+  #         echo "milestone_number=${milestone_number}" >> $GITHUB_OUTPUT
+  #       env:
+  #         GH_TOKEN: ${{ github.token }}
 
-      - name: Tag docker images with release name
-        run: |
-          images=(hopli hoprd)
-          for image in ${images[@]};
-          do
-            echo "Tagging ${image}:${{ steps.tag.outputs.release_name }}"
-            gcloud artifacts docker tags add \
-              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
-              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.tag.outputs.release_name }}
-            docker pull ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }}
-            docker tag \
-              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
-              ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
-            docker tag \
-              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
-              ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
-            echo "Pushing images into Docker Hub"
-            docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
-            docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
-          done
+  #     - name: Tag docker images with release name
+  #       run: |
+  #         images=(hopli hoprd)
+  #         for image in ${images[@]};
+  #         do
+  #           echo "Tagging ${image}:${{ steps.tag.outputs.release_name }}"
+  #           gcloud artifacts docker tags add \
+  #             ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
+  #             ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.tag.outputs.release_name }}
+  #           docker pull ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }}
+  #           docker tag \
+  #             ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
+  #             ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
+  #           docker tag \
+  #             ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
+  #             ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
+  #           echo "Pushing images into Docker Hub"
+  #           docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
+  #           docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
+  #         done
 
-      - name: Create Release
-        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
-        with:
-          body_path: docs/changelog/changelog.md
-          prerelease: ${{ steps.setup.outputs.prerelease }}
-          name: HOPR - v${{ steps.setup.outputs.current_version }}
-          tag_name: v${{ steps.setup.outputs.current_version }}
+  #     - name: Create Release
+  #       uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
+  #       with:
+  #         body_path: docs/changelog/changelog.md
+  #         prerelease: ${{ steps.setup.outputs.prerelease }}
+  #         name: HOPR - v${{ steps.setup.outputs.current_version }}
+  #         tag_name: v${{ steps.setup.outputs.current_version }}
 
-      - name: Upload release assets
-        run: |
-          for binary in ./binaries/*; do
-            echo "Uploading $binary to release v${{ steps.setup.outputs.current_version }}"
-            gh release upload v${{ steps.setup.outputs.current_version }} "$binary" --clobber
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #     - name: Upload release assets
+  #       run: |
+  #         for binary in ./binaries/*; do
+  #           echo "Uploading $binary to release v${{ steps.setup.outputs.current_version }}"
+  #           gh release upload v${{ steps.setup.outputs.current_version }} "$binary" --clobber
+  #         done
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Close Milestone
-        run: |
-          gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
-        env:
-          GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
+  #     - name: Close Milestone
+  #       run: |
+  #         gh api --method PATCH -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /repos/${{ github.repository }}/milestones/${{ steps.changelog.outputs.milestone_number }} -f state='closed'
+  #       env:
+  #         GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
-      - name: Notify release
-        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-        with:
-          api-key: ${{ secrets.ZULIP_API_KEY }}
-          email: ${{ secrets.ZULIP_EMAIL }}
-          organization-url: "https://hopr.zulipchat.com"
-          type: "stream"
-          to: "HOPRd"
-          topic: "Releases"
-          content: |
-            I'm thrilled to inform the new hoprd version v${{ steps.setup.outputs.current_version }} has been released.
-            [Release Notes](https://github.com/hoprnet/hoprnet/releases/tag/v${{ steps.setup.outputs.current_version }})
-            [Docker Hub](https://hub.docker.com/repository/docker/hoprnet/hoprd/tags)
+  #     - name: Notify release
+  #       uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+  #       with:
+  #         api-key: ${{ secrets.ZULIP_API_KEY }}
+  #         email: ${{ secrets.ZULIP_EMAIL }}
+  #         organization-url: "https://hopr.zulipchat.com"
+  #         type: "stream"
+  #         to: "HOPRd"
+  #         topic: "Releases"
+  #         content: |
+  #           I'm thrilled to inform the new hoprd version v${{ steps.setup.outputs.current_version }} has been released.
+  #           [Release Notes](https://github.com/hoprnet/hoprnet/releases/tag/v${{ steps.setup.outputs.current_version }})
+  #           [Docker Hub](https://hub.docker.com/repository/docker/hoprnet/hoprd/tags)
 
-  new_release:
-    name: Open new release
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs:
-      - create_release
-    uses: ./.github/workflows/open-release.yaml
-    with:
-      release_type: ${{ vars.NEXT_RELEASE_TYPE }}
-      base_branch: ${{ github.event.pull_request.base.ref }}
-    secrets: inherit
+  # new_release:
+  #   name: Open new release
+  #   if: contains(github.event.pull_request.labels.*.name, 'release')
+  #   needs:
+  #     - create_release
+  #   uses: ./.github/workflows/open-release.yaml
+  #   with:
+  #     release_type: ${{ vars.NEXT_RELEASE_TYPE }}
+  #     base_branch: ${{ github.event.pull_request.base.ref }}
+  #   secrets: inherit
 
-  build_dappnode:
-    name: Build dappNode
-    if: contains(github.event.pull_request.labels.*.name, 'release')
-    needs:
-      - create_release
-    uses: ./.github/workflows/generate-dappnode-pr.yaml
-    with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
-    secrets: inherit
+  # build_dappnode:
+  #   name: Build dappNode
+  #   if: contains(github.event.pull_request.labels.*.name, 'release')
+  #   needs:
+  #     - create_release
+  #   uses: ./.github/workflows/generate-dappnode-pr.yaml
+  #   with:
+  #     base_branch: ${{ github.event.pull_request.base.ref }}
+  #   secrets: inherit
 
-  build_pluto:
-    strategy:
-      matrix:
-        package:
-          - hopr-pluto
-    name: Build ${{ matrix.package }}
-    # only run build and tag if the PR is merged, not if its closed
-    if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/build-docker.yaml
-    with:
-      branch: ${{ github.event.pull_request.base.ref }}
-      package: ${{ matrix.package }}
-      production: true
-    secrets: inherit
+  # build_pluto:
+  #   strategy:
+  #     matrix:
+  #       package:
+  #         - hopr-pluto
+  #   name: Build ${{ matrix.package }}
+  #   # only run build and tag if the PR is merged, not if its closed
+  #   if: github.event.pull_request.merged == true
+  #   uses: ./.github/workflows/build-docker.yaml
+  #   with:
+  #     branch: ${{ github.event.pull_request.base.ref }}
+  #     package: ${{ matrix.package }}
+  #     production: true
+  #   secrets: inherit
 
-  docs:
-    name: Docs
-    needs:
-      - build_docker
-    uses: ./.github/workflows/build-docs.yaml
-    secrets: inherit
-    with:
-      publish: true
+  # docs:
+  #   name: Docs
+  #   needs:
+  #     - build_docker
+  #   uses: ./.github/workflows/build-docs.yaml
+  #   secrets: inherit
+  #   with:
+  #     publish: true
 
   bencher:
     name: Benchmarks
@@ -294,45 +294,45 @@ jobs:
       branch: ${{ github.event.pull_request.base.ref }}
       type: merge
 
-  notify:
-    name: Notify Changes
-    runs-on: self-hosted-hoprnet-small
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
-        with:
-          disable-sudo: true
-          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+  # notify:
+  #   name: Notify Changes
+  #   runs-on: self-hosted-hoprnet-small
+  #   steps:
+  #     - name: Harden Runner
+  #       uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+  #       with:
+  #         disable-sudo: true
+  #         egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
+  #     - name: Checkout hoprnet repository
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+  #       with:
+  #         persist-credentials: false
 
-      - name: Check for changes in specific folder
-        id: folder_changes
-        run: |
-          # Fetch the base branch
-          git fetch origin ${{ github.event.pull_request.base.ref }}
+  #     - name: Check for changes in specific folder
+  #       id: folder_changes
+  #       run: |
+  #         # Fetch the base branch
+  #         git fetch origin ${{ github.event.pull_request.base.ref }}
 
-          # Check if any file in the folder 'deploy' has changed
-          if git diff --name-only origin/${{ github.event.pull_request.base.ref }} ${{ github.sha }} | grep -q '^deploy/'; then
-            echo "folder_changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "folder_changed=false" >> $GITHUB_OUTPUT
-          fi
+  #         # Check if any file in the folder 'deploy' has changed
+  #         if git diff --name-only origin/${{ github.event.pull_request.base.ref }} ${{ github.sha }} | grep -q '^deploy/'; then
+  #           echo "folder_changed=true" >> $GITHUB_OUTPUT
+  #         else
+  #           echo "folder_changed=false" >> $GITHUB_OUTPUT
+  #         fi
 
-      # Conditional step to notify if the folder has changed
-      - name: Notify deployment changes
-        if: steps.folder_changes.outputs.folder_changed == 'true'
-        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-        with:
-          api-key: ${{ secrets.ZULIP_API_KEY }}
-          email: ${{ secrets.ZULIP_EMAIL }}
-          organization-url: "https://hopr.zulipchat.com"
-          type: "stream"
-          to: "GnosisVPN"
-          topic: "gnosisvpn-js"
-          content: |
-            The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
-            Review the changes manually and update the `uhttp-docker` repository accordingly.
+  #     # Conditional step to notify if the folder has changed
+  #     - name: Notify deployment changes
+  #       if: steps.folder_changes.outputs.folder_changed == 'true'
+  #       uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+  #       with:
+  #         api-key: ${{ secrets.ZULIP_API_KEY }}
+  #         email: ${{ secrets.ZULIP_EMAIL }}
+  #         organization-url: "https://hopr.zulipchat.com"
+  #         type: "stream"
+  #         to: "GnosisVPN"
+  #         topic: "gnosisvpn-js"
+  #         content: |
+  #           The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
+  #           Review the changes manually and update the `uhttp-docker` repository accordingly.
