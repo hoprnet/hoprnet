@@ -63,6 +63,7 @@ pub mod processor;
 pub mod stream;
 
 pub mod timer;
+use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_transport_identity::Multiaddr;
 pub use timer::execute_on_tick;
 
@@ -72,8 +73,8 @@ use std::collections::HashMap;
 use tracing::error;
 
 use hopr_async_runtime::prelude::spawn;
-use hopr_db_api::protocol::HoprDbProtocolOperations;
-use hopr_internal_types::protocol::ApplicationData;
+use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
+use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_transport_identity::PeerId;
 
@@ -199,7 +200,7 @@ where
         bloom::WrappedTagBloomFilter::new("no_tbf".into())
     };
 
-    let msg_processor_read = processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
+    let msg_processor_read = processor::PacketProcessor::new(db.clone(), packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
 
     let msg_to_send_tx = wire_msg.0.clone();
@@ -214,6 +215,7 @@ where
                     async move {
                         match PacketWrapping::send(&msg_processor, data, routing).await {
                             Ok(v) => {
+                                let v: (PeerId, Box<[u8]>) = (v.next_hop.into(), v.data);
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
                                     METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &v.0.to_string()]);
@@ -236,6 +238,9 @@ where
         }),
     );
 
+    let msg_to_send_tx = wire_msg.0.clone();
+    let db2 = db.clone();
+    let me_for_recv = me.clone();
     processes.insert(
         ProtocolProcesses::MsgIn,
         spawn(async move {
@@ -243,76 +248,143 @@ where
                 .1
                 .then_concurrent(move |(peer, data)| {
                     let msg_processor = msg_processor_read.clone();
-
-                    async move { msg_processor.recv(&peer, data).await.map_err(|e| (peer, e)) }
-                })
-                .filter_map(move |v| {
-                    let mut msg_to_send_tx = wire_msg.0.clone();
+                    let db = db2.clone();
+                    let mut msg_to_send_tx = msg_to_send_tx.clone();
+                    let me = me.clone();
 
                     async move {
-                        match v {
-                            Ok(Some(v)) => match v {
-                                processor::RecvOperation::Receive { data, ack } => {
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    {
-                                        METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
-                                        METRIC_PACKET_COUNT.increment(&["received"]);
-                                    }
-                                    msg_to_send_tx.send((ack.peer, ack.ack)).await.unwrap_or_else(|_e| {
-                                        error!("Failed to send ack to the transport layer");
-                                    });
-                                    Some(data)
-                                }
-                                processor::RecvOperation::Forward { msg, ack } => {
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    {
-                                        METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
-                                        METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &msg.peer.to_string()]);
-                                        METRIC_PACKET_COUNT.increment(&["forwarded"]);
-                                    }
-
-                                    msg_to_send_tx.send((msg.peer, msg.data)).await.unwrap_or_else(|_e| {
-                                        error!("Failed to forward a message to the transport layer");
-                                    });
-                                    msg_to_send_tx.send((ack.peer, ack.ack)).await.unwrap_or_else(|_e| {
-                                        error!("Failed to send ack to the transport layer");
-                                    });
-                                    None
-                                }
-                            },
-                            Ok(None) => {
-                                tracing::trace!("Received an acknowledgement");
-                                None
+                        let res = msg_processor.recv(&peer, data).await.map_err(move |e| (peer, e));
+                        if let Err((peer, e)) = &res {
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            if let hopr_crypto_packet::errors::PacketError::TicketValidation(_) = e {
+                                METRIC_REJECTED_TICKETS_COUNT.increment();
                             }
-                            Err((peer, e)) => {
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                match e {
-                                    hopr_crypto_packet::errors::PacketError::TagReplay => {
-                                        METRIC_REPLAYED_PACKET_COUNT.increment();
-                                    }
-                                    hopr_crypto_packet::errors::PacketError::TicketValidation(_) => {
-                                        METRIC_REJECTED_TICKETS_COUNT.increment();
-                                    }
-                                    _ => {}
+
+                            error!(peer = %peer, error = %e, "Failed to process the received message");
+
+                            // TODO: is this really needed?
+                            // send random signed acknowledgement to give feedback to the sender
+                            let ack = Acknowledgement::random(&me);
+                            let peer: OffchainPublicKey = peer.try_into().unwrap(); // TODO: should not unwrap !!!
+                            match db
+                                .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), peer) // TODO: Optimize this copy
+                                .await {
+                                    Ok(ack_packet) => {
+                                        msg_to_send_tx
+                                            .send((
+                                                ack_packet.next_hop.into(),
+                                                ack_packet.data,
+                                            ))
+                                            .await
+                                            .unwrap_or_else(|_e| {
+                                                error!("Failed to forward an acknowledgement for a failed packet recv to the transport layer");
+                                            });
+                                    },
+                                    Err(e) => tracing::error!(error = %e, "Failed to create random ack packet for a failed receive"),
                                 }
+                        }
 
-                                error!(peer = %peer, error = %e, "Failed to process the received message");
-                                // send random signed acknowledgement to give feedback to the sender
+                        res.ok().flatten()
+                    }
+                })
+                .filter_map(move |maybe_packet| {
+                    let tbf = tbf.clone();
 
-                                // TODO: do this on a different level?
-                                // internal_ack_send
-                                //     .send((
-                                //         peer,
-                                //         Acknowledgement::random(&me),
-                                //     ))
-                                //     .await
-                                //     .unwrap_or_else(|e| {
-                                //         error!(error = %e, "Failed to forward an acknowledgement for a failed packet recv to the transport layer");
-                                //     });
+                    async move {
+                    if let Some(packet) = maybe_packet {
+                        match packet {
+                            IncomingPacket::Final { packet_tag, .. }
+                            | IncomingPacket::Forwarded { packet_tag, .. } => {
+                                if tbf.is_tag_replay(&packet_tag).await {
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_REPLAYED_PACKET_COUNT.increment();
 
-                                None
+                                    None
+                                } else {
+                                    Some(packet)
+                                }
                             }
                         }
+                    } else {
+                        None
+                    }
+                }
+                })
+                .then_concurrent(move |packet| {
+                    let mut msg_to_send_tx = wire_msg.0.clone();
+                    let db = db.clone();
+                    let me = me_for_recv.clone();
+
+                    async move {
+
+                    match packet {
+                        IncomingPacket::Final {
+                            previous_hop,
+                            plain_text,
+                            ack_key,
+                            ..
+                        } => {
+                                let ack = Acknowledgement::new(ack_key, &me);
+                                if let Ok(ack_packet) = db
+                                    .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
+                                    .await
+                                    .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a received message")) {
+
+                                    msg_to_send_tx
+                                        .send((
+                                            ack_packet.next_hop.into(),
+                                            ack_packet.data,
+                                        ))
+                                        .await
+                                        .unwrap_or_else(|_e| {
+                                            error!("Failed to send an acknowledgement for a received packet to the transport layer");
+                                        });
+                                    }
+
+                                    Some(plain_text)
+                                }
+                                IncomingPacket::Forwarded {
+                                    previous_hop,
+                                    next_hop,
+                                    data,
+                                    ack,
+                                    ..
+                                } => {
+                                    msg_to_send_tx
+                                        .send((
+                                            next_hop.into(),
+                                            data,
+                                        ))
+                                        .await
+                                        .unwrap_or_else(|_e| {
+                                            error!("Failed to forward a packet to the transport layer");
+                                        });
+
+                                    if let Ok(ack_packet) = db
+                                        .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
+                                        .await
+                                        .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a relayed message")) {
+
+                                        msg_to_send_tx
+                                            .send((
+                                                ack_packet.next_hop.into(),
+                                                ack_packet.data,
+                                            ))
+                                            .await
+                                            .unwrap_or_else(|_e| {
+                                                error!("Failed to send an acknowledgement for a relayed packet to the transport layer");
+                                            });
+                                        }
+
+                    None
+                    }
+                    }
+                }})
+                .filter_map(|maybe_data| async move {
+                    if let Some(data) = maybe_data {
+                        ApplicationData::from_bytes(data.as_ref()).inspect_err(|error| tracing::error!(error = %error, "Failed to decode application data")).ok()
+                    } else {
+                        None
                     }
                 })
                 .map(Ok)

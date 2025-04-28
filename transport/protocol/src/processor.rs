@@ -4,19 +4,14 @@ use tracing::error;
 
 use hopr_async_runtime::prelude::sleep;
 use hopr_crypto_packet::errors::PacketError;
-use hopr_crypto_packet::errors::{
-    PacketError::{TagReplay, TransportError},
-    Result,
-};
+use hopr_crypto_packet::errors::{PacketError::TransportError, Result};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
-use hopr_db_api::protocol::IncomingPacket;
+use hopr_db_api::protocol::{IncomingPacket, OutgoingPacket};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_identity::PeerId;
-
-use crate::bloom;
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -27,7 +22,7 @@ lazy_static::lazy_static! {
 pub trait PacketWrapping {
     type Input;
 
-    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<(PeerId, Box<[u8]>)>;
+    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<OutgoingPacket>;
 }
 
 pub struct SendPkt {
@@ -59,7 +54,6 @@ where
     Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     db: Db,
-    tbf: bloom::WrappedTagBloomFilter,
     cfg: PacketInteractionConfig,
 }
 
@@ -71,7 +65,7 @@ where
     type Input = ApplicationData;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<(PeerId, Box<[u8]>)> {
+    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<OutgoingPacket> {
         let packet = self
             .db
             .to_send(
@@ -83,7 +77,7 @@ where
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
 
-        Ok((packet.next_hop.into(), packet.data))
+        Ok(packet)
     }
 }
 
@@ -92,15 +86,14 @@ impl<Db> PacketUnwrapping for PacketProcessor<Db>
 where
     Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
-    type Packet = RecvOperation;
+    type Packet = IncomingPacket;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Option<RecvOperation>> {
+    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Option<Self::Packet>> {
         let previous_hop = OffchainPublicKey::try_from(peer)
             .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
 
-        let packet = self
-            .db
+        self.db
             .from_recv(
                 data,
                 &self.cfg.packet_keypair,
@@ -117,71 +110,7 @@ where
                     })
                 }
                 _ => PacketError::PacketConstructionError(e.to_string()),
-            })?;
-
-        // Indicating
-        match packet {
-            Some(packet) => {
-                #[allow(irrefutable_let_patterns)]
-                if let IncomingPacket::Final { packet_tag, .. } | IncomingPacket::Forwarded { packet_tag, .. } = &packet
-                {
-                    if self.is_tag_replay(packet_tag).await {
-                        return Err(TagReplay);
-                    }
-                };
-
-                Ok(match packet {
-                    IncomingPacket::Final {
-                        previous_hop,
-                        plain_text,
-                        ack_key,
-                        ..
-                    } => {
-                        let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
-
-                        let ack = Acknowledgement::new(ack_key, &self.cfg.packet_keypair);
-                        let ack_packet = self
-                            .db
-                            .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
-                            .await
-                            .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
-
-                        Some(RecvOperation::Receive {
-                            data: app_data,
-                            ack: SendAck {
-                                peer: ack_packet.next_hop.into(),
-                                ack: ack_packet.data,
-                            },
-                        })
-                    }
-                    IncomingPacket::Forwarded {
-                        previous_hop,
-                        next_hop,
-                        data,
-                        ack,
-                        ..
-                    } => {
-                        let ack_packet = self
-                            .db
-                            .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
-                            .await
-                            .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
-
-                        Some(RecvOperation::Forward {
-                            msg: SendPkt {
-                                peer: next_hop.into(),
-                                data,
-                            },
-                            ack: SendAck {
-                                peer: ack_packet.next_hop.into(),
-                                ack: ack_packet.data,
-                            },
-                        })
-                    }
-                })
-            }
-            None => Ok(None),
-        }
+            })
     }
 }
 
@@ -190,18 +119,8 @@ where
     Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Db, tbf: bloom::WrappedTagBloomFilter, cfg: PacketInteractionConfig) -> Self {
-        Self { db, tbf, cfg }
-    }
-
-    #[tracing::instrument(level = "trace", name = "check_tag_replay", skip(self, tag))]
-    /// Check whether the packet is replayed using a packet tag.
-    ///
-    /// There is a 0.1% chance that the positive result is not a replay because a Bloom filter is used.
-    pub async fn is_tag_replay(&self, tag: &PacketTag) -> bool {
-        self.tbf
-            .with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
-            .await
+    pub fn new(db: Db, cfg: PacketInteractionConfig) -> Self {
+        Self { db, cfg }
     }
 
     // NOTE: as opposed to the winning probability, the ticket price does not have
@@ -336,22 +255,6 @@ pub struct PacketInteractionConfig {
     pub outgoing_ticket_price: Option<Balance>,
 }
 
-impl PacketInteractionConfig {
-    pub fn new(
-        packet_keypair: &OffchainKeypair,
-        chain_keypair: &ChainKeypair,
-        outgoing_ticket_win_prob: Option<f64>,
-        outgoing_ticket_price: Option<Balance>,
-    ) -> Self {
-        Self {
-            packet_keypair: packet_keypair.clone(),
-            chain_keypair: chain_keypair.clone(),
-            outgoing_ticket_win_prob,
-            outgoing_ticket_price,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -363,11 +266,6 @@ mod tests {
     use hopr_internal_types::prelude::HoprPseudonym;
     use hopr_path::ValidatedPath;
     use std::time::Duration;
-
-    // #[test]
-    // fn multiple_acknowledgements_fit_into_a_message_sized_payload() {
-    //     assert_eq!(std::mem::size_of::<Acknowledgement>(), 1);
-    // }
 
     #[async_std::test]
     pub async fn packet_send_finalizer_is_triggered() {
