@@ -47,6 +47,7 @@ pub trait HoprDbProtocolOperations {
     ) -> Result<Option<IncomingPacket>>;
 }
 
+#[allow(clippy::large_enum_variant)] // TODO: Uses too large objects
 pub enum IncomingPacket {
     /// Packet is intended for us
     Final {

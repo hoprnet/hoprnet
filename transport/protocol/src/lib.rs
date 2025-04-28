@@ -239,7 +239,7 @@ where
     );
 
     let msg_to_send_tx = wire_msg.0.clone();
-    let db2 = db.clone();
+    let db_for_recv = db.clone();
     let me_for_recv = me.clone();
     processes.insert(
         ProtocolProcesses::MsgIn,
@@ -248,7 +248,7 @@ where
                 .1
                 .then_concurrent(move |(peer, data)| {
                     let msg_processor = msg_processor_read.clone();
-                    let db = db2.clone();
+                    let db = db_for_recv.clone();
                     let mut msg_to_send_tx = msg_to_send_tx.clone();
                     let me = me.clone();
 
@@ -328,17 +328,17 @@ where
                                 if let Ok(ack_packet) = db
                                     .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
                                     .await
-                                    .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a received message")) {
-
-                                    msg_to_send_tx
-                                        .send((
-                                            ack_packet.next_hop.into(),
-                                            ack_packet.data,
-                                        ))
-                                        .await
-                                        .unwrap_or_else(|_e| {
-                                            error!("Failed to send an acknowledgement for a received packet to the transport layer");
-                                        });
+                                    .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a received message"))
+                                    {
+                                        msg_to_send_tx
+                                            .send((
+                                                ack_packet.next_hop.into(),
+                                                ack_packet.data,
+                                            ))
+                                            .await
+                                            .unwrap_or_else(|_e| {
+                                                error!("Failed to send an acknowledgement for a received packet to the transport layer");
+                                            });
                                     }
 
                                     Some(plain_text)
@@ -363,8 +363,8 @@ where
                                     if let Ok(ack_packet) = db
                                         .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
                                         .await
-                                        .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a relayed message")) {
-
+                                        .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a relayed message"))
+                                    {
                                         msg_to_send_tx
                                             .send((
                                                 ack_packet.next_hop.into(),
@@ -374,10 +374,9 @@ where
                                             .unwrap_or_else(|_e| {
                                                 error!("Failed to send an acknowledgement for a relayed packet to the transport layer");
                                             });
-                                        }
-
-                    None
-                    }
+                                    }
+                            None
+                        }
                     }
                 }})
                 .filter_map(|maybe_data| async move {

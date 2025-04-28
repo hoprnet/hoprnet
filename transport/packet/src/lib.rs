@@ -96,12 +96,12 @@ impl Payload {
 }
 
 pub struct Header {
-    peer: PeerId,
+    pub peer: PeerId,
 }
 
 pub struct Packet {
-    header: Header,
-    payload: Payload,
+    pub header: Header,
+    pub payload: Payload,
 }
 
 #[cfg(test)]
