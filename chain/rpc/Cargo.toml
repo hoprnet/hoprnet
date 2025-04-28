@@ -24,6 +24,8 @@ runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "dep:reqwest",
   "dep:governor",
+  "dep:surf",
+  "dep:surf-governor",
 ]
 
 [dependencies]

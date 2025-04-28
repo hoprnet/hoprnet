@@ -171,7 +171,16 @@ mod tests {
     };
     use hopr_chain_types::utils::create_anvil;
 
+    #[tokio::test]
+    async fn test_surf_transport_tokio() {
+        let _ = test_surf_transport().await;
+    }
+
     #[async_std::test]
+    async fn test_surf_transport_std() {
+        let _ = test_surf_transport().await;
+    }
+
     async fn test_surf_transport() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
