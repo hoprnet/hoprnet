@@ -31,7 +31,7 @@ use crate::errors::RpcError::{ProviderError, TransactionDropped};
 use crate::errors::{HttpRequestError, Result};
 use crate::RetryAction::NoRetry;
 
-// pub mod client;
+pub mod client;
 pub mod errors;
 // mod helper;
 // pub mod indexer;

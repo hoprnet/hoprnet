@@ -192,7 +192,7 @@ mod tests {
 
         let provider = ProviderBuilder::new().on_client(rpc_client);
 
-        let num = provider.get_block_number().await.unwrap();
+        let num = provider.get_block_number().await?;
 
         assert_eq!(num, 0);
 
