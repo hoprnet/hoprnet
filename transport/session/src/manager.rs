@@ -247,7 +247,6 @@ fn initiation_timeout_max(base: Duration, hops: usize) -> Duration {
     2 * base * (hops as u32)
 }
 
-
 /// The Minimum Session tag due to Start-protocol messages.
 pub const MIN_SESSION_TAG_RANGE_RESERVATION: Tag = 16;
 
@@ -459,7 +458,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     Arc::new(msg_sender.clone()),
                     rx,
                     self.session_notifiers.get().map(|(_, c)| c.clone()),
-                    keep_alives.into()
+                    keep_alives.into(),
                 ))
             }
             Either::Left((Ok(None), _)) => Err(SessionManagerError::Other(

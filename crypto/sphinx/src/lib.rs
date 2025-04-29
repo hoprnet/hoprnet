@@ -1,26 +1,26 @@
-//! This Rust crate contains implementation of the Sphinx packet format for the HOPR protocol.
+//! This Rust crate contains an implementation of the Sphinx packet format for the HOPR protocol.
 //!
 //! ## SPHINX shared keys derivation
 //! The architecture of the SPHINX shared key derivation is done generically, so it can work with any
-//! elliptic curve group for which CDH problem is hard. The generic Sphinx implementation only
+//! elliptic curve group for which the CDH problem is hard. The generic Sphinx implementation only
 //! requires one to implement the `SphinxSuite` trait.
 //!
-//! The trait requires to have the following building blocks:
+//! The trait requires having the following building blocks:
 //! - elliptic curve group ([GroupElement](shared_keys::GroupElement)) and corresponding the scalar type ([Scalar](shared_keys::Scalar))
 //! - type representing public and private keypair and their conversion to [Scalar](shared_keys::Scalar)
 //!   and [GroupElement](shared_keys::GroupElement) (by the means of the corresponding `From` trait implementation)
 //!
-//! Currently, there are the following [SphinxSuite](crate::shared_keys::SphinxSuite) implementations :
+//! Currently, there are the following [SphinxSuite](crate::shared_keys::SphinxSuite) implementations:
 //! - `Secp256k1Suite`: deprecated, used in previous HOPR versions
 //! - `Ed25519Suite`: simple implementation using Ed25519, used for testing
-//! - [X25519Suite](crate::ec_groups::X25519Suite) currently used, implemented using Curve25519 Montgomery curve for faster computation
+//! - [X25519Suite](crate::ec_groups::X25519Suite) currently used, implemented using the Curve25519 Montgomery curve for faster computation
 //!
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
-//! In particular, as soon as there's way to represent `Ed448` PeerIDs, it would be easy to create e.g. an `X448Suite`.
+//! In particular, as soon as there is a way to represent `Ed448` PeerIDs, it would be easy to create e.g., an `X448Suite`.
 
 /// Contains simple key derivation functions for different purposes
 mod derivation;
-/// Implementations of `SphinxSuite` trait for different elliptic curve groups
+/// Implementations of the ` SphinxSuite ` trait for different elliptic curve groups
 mod ec_groups;
 /// Contains various errors returned from this crate.
 pub mod errors;
@@ -93,6 +93,7 @@ pub(crate) mod tests {
         type KeyId = K;
         type Pseudonym = SimplePseudonym;
         type RelayerData = WrappedBytes<RELAYER_DATA>;
+        type PacketReceiverData = SimplePseudonym;
         type SurbReceiverData = WrappedBytes<53>;
         type PRG = ChaCha20;
         type UH = Poly1305;

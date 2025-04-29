@@ -149,16 +149,19 @@ impl<'a, S: SphinxSuite, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for SURB<S, H> {
 /// of received responses.
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ReplyOpener {
+pub struct ReplyOpener<A> {
+    /// Packet receiver data for the SURB receiver.
+    pub receiver_data: A,
     /// Encryption key the other party should use to encrypt the data for us.
     pub sender_key: SecretKey16,
     /// Shared secrets for nodes along the return path.
     pub shared_secrets: Vec<SharedSecret>,
 }
 
-impl std::fmt::Debug for ReplyOpener {
+impl<A: std::fmt::Debug> std::fmt::Debug for ReplyOpener<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ReplyOpener")
+            .field("receiver_data", &self.receiver_data)
             .field("sender_key", &"<redacted>")
             .field("shared_secrets", &format!("{} <redacted>", self.shared_secrets.len()))
             .finish()
@@ -172,9 +175,9 @@ pub fn create_surb<S: SphinxSuite, H: SphinxHeaderSpec>(
     shared_keys: SharedKeys<S::E, S::G>,
     path: &[H::KeyId],
     additional_data_relayer: &[H::RelayerData],
-    pseudonym: &H::Pseudonym,
+    receiver_data: H::PacketReceiverData,
     additional_data_receiver: H::SurbReceiverData,
-) -> hopr_crypto_types::errors::Result<(SURB<S, H>, ReplyOpener)>
+) -> hopr_crypto_types::errors::Result<(SURB<S, H>, ReplyOpener<H::PacketReceiverData>)>
 where
     H::KeyId: Copy,
 {
@@ -182,7 +185,7 @@ where
         path,
         &shared_keys.secrets,
         additional_data_relayer,
-        pseudonym,
+        &receiver_data,
         true,
         false,
     )?;
@@ -198,6 +201,7 @@ where
     };
 
     let reply_opener = ReplyOpener {
+        receiver_data,
         sender_key: sender_key.clone(),
         shared_secrets: shared_keys.secrets,
     };
@@ -215,7 +219,9 @@ mod tests {
     #[allow(type_alias_bounds)]
     pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66>;
 
-    fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener)>
+    fn generate_surbs<S: SphinxSuite>(
+        keypairs: Vec<S::P>,
+    ) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener<SimplePseudonym>)>
     where
         <<S as SphinxSuite>::P as Keypair>::Public: Copy,
     {
@@ -226,7 +232,7 @@ mod tests {
             shares,
             &pub_keys,
             &[Default::default(); 4],
-            &SimplePseudonym::random(),
+            SimplePseudonym::random(),
             Default::default(),
         )?)
     }

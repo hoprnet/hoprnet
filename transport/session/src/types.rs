@@ -1,3 +1,4 @@
+use crate::initiation::StartProtocol;
 use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 use futures::{channel::mpsc::UnboundedReceiver, pin_mut, StreamExt, TryStreamExt};
 use hopr_crypto_packet::prelude::HoprPacket;
@@ -9,6 +10,7 @@ use hopr_primitive_types::traits::BytesRepresentable;
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
+use std::sync::atomic::AtomicUsize;
 use std::task::Context;
 use std::time::Duration;
 use std::{
@@ -18,9 +20,7 @@ use std::{
     sync::Arc,
     task::Poll,
 };
-use std::sync::atomic::AtomicUsize;
 use tracing::{debug, error};
-use crate::initiation::StartProtocol;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -153,9 +153,9 @@ pub struct KeepAliveControl {
 }
 
 impl KeepAliveControl {
-    pub fn new<T>(session_id: SessionId, msg_sender: T, routing: DestinationRouting, initial_rate: usize,) -> Self
+    pub fn new<T>(session_id: SessionId, msg_sender: T, routing: DestinationRouting, initial_rate: usize) -> Self
     where
-        T: SendMsg + Send + Sync + Clone + 'static
+        T: SendMsg + Send + Sync + Clone + 'static,
     {
         let tx_cpy = msg_sender.clone();
         let routing_cpy = routing.clone();
@@ -169,21 +169,26 @@ impl KeepAliveControl {
                         let routing_cpy = routing_cpy.clone();
                         let keepalive_sender = tx_cpy.clone();
                         async move {
-                            keepalive_sender.send_message(msg.try_into()?, routing_cpy.clone()).await
+                            keepalive_sender
+                                .send_message(msg.try_into()?, routing_cpy.clone())
+                                .await
                         }
-                    }).await {
+                    })
+                    .await
+                {
                     tracing::error!(%error, %session_id, "keepalive message task failed");
                 }
-            })
+            }),
         }
     }
 
     pub fn set_minimum_rate(&self, min_rate: usize) {
-        self.sending_rate_per_sec.fetch_max(min_rate, std::sync::atomic::Ordering::SeqCst);
+        self.sending_rate_per_sec
+            .fetch_max(min_rate, std::sync::atomic::Ordering::SeqCst);
     }
 
     pub fn abort(self) {
-        self.jh.abort();
+        //self.jh.abort();
     }
 }
 

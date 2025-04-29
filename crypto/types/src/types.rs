@@ -1249,7 +1249,7 @@ impl Display for SimplePseudonym {
 }
 
 impl BytesRepresentable for SimplePseudonym {
-    const SIZE: usize = 16;
+    const SIZE: usize = 10;
 }
 
 impl AsRef<[u8]> for SimplePseudonym {

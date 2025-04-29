@@ -143,7 +143,7 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
             )),
             StartProtocolDiscriminants::KeepAlive => Ok(StartProtocol::KeepAlive(
                 bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
-            ))
+            )),
         }
     }
 }
