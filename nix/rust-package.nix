@@ -96,12 +96,12 @@ let
 
   sharedArgs =
     if runCoverage then sharedArgsBase // {
-      cargoTestExtraArgs = "--workspace --tests --all-features";
+      cargoTestExtraArgs = "--workspace -F runtime-async-std -F runtime-tokio";
       doCheck = true;
       nativeBuildInputs = sharedArgsBase.nativeBuildInputs ++ [ cargoLlvmCov ]; # add llvm-cov
       postBuild = ''
         # Generate coverage report
-        cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+        cargo llvm-cov --workspace --lcov --output-path lcov.info --features "runtime-async-std runtime-tokio"
       '';
     }
     else if runTests then sharedArgsBase // {

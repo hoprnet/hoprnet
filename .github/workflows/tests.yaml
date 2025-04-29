@@ -58,6 +58,16 @@ jobs:
         run: |
           nix build .#hopr-test
 
+      - name: Debug coverage output
+        run: ls -R ./target/llvm-cov-target
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./target/llvm-cov-target/lcov.info
+          fail_ci_if_error: true
+
   tests-unit-nightly:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
