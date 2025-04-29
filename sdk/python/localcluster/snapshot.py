@@ -20,7 +20,7 @@ class Snapshot:
         self.parent_dir = parent_dir
         self.cluster = cluster
 
-    def create(self, anvil_file: Path):
+    def create(self):
         logging.info("Taking snapshot")
 
         # delete old snapshot
@@ -28,10 +28,6 @@ class Snapshot:
 
         # create new snapshot
         self.sdir.mkdir(parents=True, exist_ok=True)
-
-        # copy configuration files
-        for f in self.parent_dir.glob("*.cfg.yaml"):
-            shutil.copy(f, self.sdir)
 
         # copy anvil files
         shutil.copytree(ANVIL_FOLDER, self.sdir.joinpath(ANVIL_FOLDER_NAME))
@@ -47,6 +43,9 @@ class Snapshot:
 
             for file in EXPECTED_FILES_FOR_SNAPSHOT:
                 shutil.copy(source_dir.joinpath(file), db_target_dir)
+
+            for file in source_dir.glob("*.cfg.yaml"):
+                shutil.copy(file, target_dir)
 
             shutil.copy(source_dir.joinpath("./hoprd.id"), target_dir)
             shutil.copy(source_dir.joinpath("./.env"), target_dir)
@@ -69,19 +68,18 @@ class Snapshot:
 
     @property
     def usable(self):
-        expected_files = [
-            self.sdir.joinpath(ANVIL_FOLDER_NAME),
-            self.sdir.joinpath("barebone-lower-win-prob.cfg.yaml"),
-            self.sdir.joinpath("barebone.cfg.yaml"),
-            self.sdir.joinpath("default.cfg.yaml"),
-        ]
+        expected_files = [self.sdir.joinpath(ANVIL_FOLDER_NAME)]
         for i in range(self.cluster.size):
             node_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
             expected_files.extend([node_dir.joinpath(file) for file in EXPECTED_FILES_FOR_SNAPSHOT])
 
+            if not any(node_dir.glob("*.cfg.yaml")):
+                logging.warning(f"Cannot find *.cfg.yaml in {node_dir}")
+                return False
+
         for f in expected_files:
             if not f.exists():
-                logging.info(f"Cannot find {f} in snapshot")
+                logging.warning(f"Cannot find {f} in snapshot")
                 return False
 
         return True

@@ -27,5 +27,6 @@ hopr:
     heartbeat:
       timeout: 5
     outgoing_ticket_winning_prob: 1.0
+    autonat_port: <AUTONAT_PORT>
 session_ip_forwarding:
   use_target_allow_list: false

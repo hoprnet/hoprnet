@@ -21,4 +21,7 @@ pub struct ProtocolConfig {
     /// `ticket_aggregation` protocol config
     #[serde(default)]
     pub ticket_aggregation: crate::ticket_aggregation::config::TicketAggregationProtocolConfig,
+    #[default(9291)]
+    /// Port used for Autonat
+    pub autonat_port: u16,
 }

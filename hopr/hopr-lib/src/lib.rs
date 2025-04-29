@@ -717,6 +717,8 @@ impl Hopr {
             processes.insert(nid, proc);
         }
 
+        // HERE THE ONCHAIN DATA IS RETRIEVED
+
         {
             // Show onboarding information
             let my_ethereum_address = self.me_onchain();
@@ -926,6 +928,8 @@ impl Hopr {
                 })),
             );
         }
+
+        // get the announced addresses
 
         for (id, proc) in self
             .transport_api

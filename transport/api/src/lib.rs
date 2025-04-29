@@ -57,6 +57,7 @@ use hopr_transport_p2p::{
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
     HoprSwarm,
 };
+
 use hopr_transport_protocol::{
     errors::ProtocolError,
     msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
@@ -501,16 +502,18 @@ where
             (tx, rx)
         };
 
-        let transport_layer = HoprSwarm::new(
+        let mut transport_layer = HoprSwarm::new(
             (&self.me).into(),
             network_events_rx,
             discovery_updates,
             ping_rx,
             ticket_agg_proc,
-            self.my_multiaddresses.clone(),
+            self.my_multiaddresses.clone(), // has to be empty if autonat is on
             self.cfg.protocol,
         )
         .await;
+
+        transport_layer.dial_nat_server(Multiaddr::empty()); // TODO (jean): use correct multiaddr here
 
         let msg_proto_control =
             transport_layer.build_protocol_control(hopr_transport_protocol::msg::CURRENT_HOPR_MSG_PROTOCOL);

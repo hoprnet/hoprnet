@@ -164,11 +164,6 @@ class Cluster:
             )
         logging.info(f"Copied '*.id' files to {MAIN_DIR}")
 
-        # Copy new config files
-        for f in PWD.joinpath("sdk").glob("*.cfg.yaml"):
-            shutil.copy(f, MAIN_DIR.joinpath(f.name))
-        logging.info(f"Copied '*.cfg.yaml' files to {MAIN_DIR}")
-
     def load_addresses(self):
         for node in self.nodes.values():
             node.load_addresses()

@@ -71,7 +71,7 @@ async def bringup(
         # delay to ensure anvil is stopped and state file closed
         await asyncio.sleep(1)
 
-        snapshot.create(ANVIL_FOLDER.joinpath("anvil.state.json"))
+        snapshot.create()
 
     snapshot.reuse()
 

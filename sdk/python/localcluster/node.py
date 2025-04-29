@@ -53,9 +53,9 @@ class Node:
         self.network: str = network
         self.identity_path: str = identity_path
         self.use_nat: bool = use_nat
+        self.cfg_file: str = cfg_file
 
         # optional
-        self.cfg_file: str = cfg_file
         self.api_addr: str = api_addr
         if api_addr is None:
             self.api_addr = host_addr
@@ -69,7 +69,6 @@ class Node:
         self.peer_id: str = None
         self.address: str = None
         self.dir: Path = None
-        self.cfg_file_path: Path = None
         self.api_port: int = 0
         self.p2p_port: int = 0
         self.anvil_port: int = 0
@@ -83,7 +82,7 @@ class Node:
     def prepare(self):
         self.anvil_port = PORT_BASE
         self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")
-        self.cfg_file_path = MAIN_DIR.joinpath(self.cfg_file)
+        self.dir.mkdir(parents=True, exist_ok=True)
         self.api_port = PORT_BASE + self.id
         self.p2p_port = PORT_BASE + 100 + self.id
 
@@ -145,7 +144,6 @@ class Node:
 
         # store the addresses in a file which can be loaded later
         if self.safe_address is not None and self.module_address is not None:
-            self.dir.mkdir(parents=True, exist_ok=True)
             with open(self.dir.joinpath(".env"), "w") as env_file:
                 env_file.write(f"HOPRD_SAFE_ADDRESS={self.safe_address}\n")
                 env_file.write(f"HOPRD_MODULE_ADDRESS={self.module_address}\n")
@@ -183,6 +181,15 @@ class Node:
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
 
+        # Copy config file to the node directory
+        with open(PWD.joinpath("sdk", self.cfg_file), "r") as f:
+            config = f.read()
+        config = config.replace("<AUTONAT_PORT>", str(self.p2p_port + 100))
+        with open(self.dir.joinpath(self.cfg_file.name), "w") as f:
+            f.write(config)
+
+        logging.info(f"Copied '{self.cfg_file}' files to {self.dir}")
+
         cmd = [
             "hoprd",
             "--announce",
@@ -201,8 +208,7 @@ class Node:
             f"--provider=http://127.0.0.1:{self.anvil_port}",
             api_token_param,
         ]
-        if self.cfg_file_path is not None:
-            cmd += [f"--configurationFilePath={self.cfg_file_path}"]
+        cmd += [f"--configurationFilePath={self.dir.joinpath(self.cfg_file)}"]
 
         with open(self.dir.joinpath("hoprd.log"), "w") as log_file:
             self.proc = Popen(
@@ -252,7 +258,7 @@ class Node:
             config["host"],
             network,
             config["identity_path"],
-            config["config_file"],
+            Path(config["config_file"]),
             alias,
             api_addr="0.0.0.0" if exposed else None,
             use_nat=use_nat,

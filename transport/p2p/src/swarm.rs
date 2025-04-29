@@ -153,54 +153,49 @@ impl HoprSwarm {
         .await
         .expect("swarm must be constructible");
 
-        // for multiaddress in my_multiaddresses.iter() {
-        //     match resolve_dns_if_any(multiaddress) {
-        //         Ok(ma) => {
-        //             if let Err(e) = swarm.listen_on(ma.clone()) {
-        //                 warn!(%multiaddress, listen_on=%ma, error = %e, "Failed to listen_on, will try to use an unspecified address");
+        for multiaddress in my_multiaddresses.iter() {
+            match resolve_dns_if_any(multiaddress) {
+                Ok(ma) => {
+                    if let Err(e) = swarm.listen_on(ma.clone()) {
+                        warn!(%multiaddress, listen_on=%ma, error = %e, "Failed to listen_on, will try to use an unspecified address");
 
-        //                 match replace_transport_with_unspecified(&ma) {
-        //                     Ok(ma) => {
-        //                         if let Err(e) = swarm.listen_on(ma.clone()) {
-        //                             warn!(multiaddress = %ma, error = %e, "Failed to listen_on using the unspecified multiaddress",);
-        //                         } else {
-        //                             info!(
-        //                                 listen_on = ?ma,
-        //                                 multiaddress = ?multiaddress,
-        //                                 "Listening for p2p connections"
-        //                             );
-        //                             swarm.add_external_address(multiaddress.clone());
-        //                         }
-        //                     }
-        //                     Err(e) => {
-        //                         error!(multiaddress = %ma, error = %e, "Failed to transform the multiaddress")
-        //                     }
-        //                 }
-        //             } else {
-        //                 info!(
-        //                     listen_on = ?ma,
-        //                     multiaddress = ?multiaddress,
-        //                     "Listening for p2p connections"
-        //                 );
-        //                 swarm.add_external_address(multiaddress.clone());
-        //             }
-        //         }
-        //         Err(e) => error!(%multiaddress, error = %e, "Failed to transform the multiaddress"),
-        //     }
-        // }
+                        match replace_transport_with_unspecified(&ma) {
+                            Ok(ma) => {
+                                if let Err(e) = swarm.listen_on(ma.clone()) {
+                                    warn!(multiaddress = %ma, error = %e, "Failed to listen_on using the unspecified multiaddress",);
+                                } else {
+                                    info!(
+                                        listen_on = ?ma,
+                                        multiaddress = ?multiaddress,
+                                        "Listening for p2p connections"
+                                    );
+                                    swarm.add_external_address(multiaddress.clone());
+                                }
+                            }
+                            Err(e) => {
+                                error!(multiaddress = %ma, error = %e, "Failed to transform the multiaddress")
+                            }
+                        }
+                    } else {
+                        info!(
+                            listen_on = ?ma,
+                            multiaddress = ?multiaddress,
+                            "Listening for p2p connections"
+                        );
+                        swarm.add_external_address(multiaddress.clone());
+                    }
+                }
+                Err(e) => error!(%multiaddress, error = %e, "Failed to transform the multiaddress"),
+            }
+        }
+
         swarm
             .listen_on(
                 Multiaddr::empty()
                     .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
-                    .with(Protocol::Tcp(9191)), // TODO: replace with a configurable port
+                    .with(Protocol::Tcp(protocol_cfg.autonat_port)),
             )
             .expect("Failed to listen on unspecified address");
-
-        let server_address = Multiaddr::empty(); // TODO (jean) replace with an announced node multiaddress
-
-        swarm
-            .dial(DialOpts::unknown_peer_id().address(server_address).build())
-            .expect("Failed to dial the server");
 
         // TODO: perform this check
         // NOTE: This would be a valid check but is not immediate
@@ -222,6 +217,12 @@ impl HoprSwarm {
             swarm: self,
             ticket_aggregation_writer,
         }
+    }
+
+    pub fn dial_nat_server(&mut self, address: Multiaddr) {
+        self.swarm
+            .dial(DialOpts::unknown_peer_id().address(address).build())
+            .expect("Failed to dial the server");
     }
 }
 
@@ -527,7 +528,7 @@ impl HoprSwarmWithProcessors {
                         listener_id,
                         address,
                     } => {
-                        debug!(%listener_id, %address, transport="libp2p", "new listen address")
+                        debug!(%listener_id, %address, transport="libp2p", "new listen address");
                     }
                     SwarmEvent::ExpiredListenAddr {
                         listener_id,
@@ -555,7 +556,7 @@ impl HoprSwarmWithProcessors {
                         debug!(peer = ?peer_id, %connection_id, transport="libp2p", "dialing")
                     }
                     SwarmEvent::ExternalAddrConfirmed { address } => {
-                        info!(%address, "External address confirmed");
+                        info!(%address, "Detected external address");
                     }
                     SwarmEvent::NewExternalAddrCandidate {
                         ..  // address: Multiaddr
