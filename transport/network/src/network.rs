@@ -221,7 +221,8 @@ where
     /// // Simulate a successful ping
     /// let event = network.update(&peer_id, Ok(Duration::from_millis(50)), Some("1.0.0".to_string())).await.unwrap();
     /// assert!(matches!(event, Some(NetworkTriggeredEvent::UpdateQuality(_, _))));
-    /// ```    pub async fn update(
+    /// ```    
+    pub async fn update(
         &self,
         peer: &PeerId,
         ping_result: std::result::Result<Duration, ()>,
@@ -336,12 +337,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::time::{SystemTime, Duration};
-    /// # async fn example(network: &Network<impl HoprDbPeersOperations>) {
-    /// let threshold = SystemTime::now();
-    /// let peers = network.find_peers_to_ping(threshold).await.unwrap();
-    /// // `peers` contains the IDs of peers eligible for pinging.
-    /// # }
+    /// use std::time::{SystemTime, Duration};
+    /// async fn example(network: &Network<impl HoprDbPeersOperations>) {
+    ///   let threshold = SystemTime::now();
+    ///   let peers = network.find_peers_to_ping(threshold).await.unwrap();
+    ///   // `peers` contains the IDs of peers eligible for pinging.
+    /// }
     /// ```
     pub async fn find_peers_to_ping(&self, threshold: SystemTime) -> crate::errors::Result<Vec<PeerId>> {
         let stream = self
@@ -649,18 +650,6 @@ mod tests {
     }
 
     #[async_std::test]
-    /// Tests that the peer backoff value does not exceed the configured maximum after repeated failed heartbeat updates.
-    ///
-    /// This test adds a peer, performs several successful heartbeat updates, then repeatedly fails heartbeat updates until the peer's backoff reaches the configured maximum. It verifies that further failed updates do not increase the backoff beyond this maximum.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use crate::test_network_should_not_overflow_max_backoff;
-    /// # tokio_test::block_on(async {
-    /// test_network_should_not_overflow_max_backoff().await.unwrap();
-    /// # });
-    /// ```
     async fn test_network_should_not_overflow_max_backoff() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
