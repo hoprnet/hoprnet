@@ -1,3 +1,7 @@
+//! Extended layers of RPC clients:
+//! - Replace the legacy retry backoff layer with the default [`RetryBackoffService`]
+//! - Add Metrics Layer
+//!
 //! Extended `JsonRpcClient` abstraction.
 //!
 //! This module contains custom implementation of `ethers::providers::JsonRpcClient`
@@ -14,7 +18,7 @@
 
 use alloy::{
     rpc::json_rpc::{RequestPacket, ResponsePacket, ResponsePayload},
-    transports::{BoxFuture, TransportError, TransportFut},
+    transports::{layers::RetryPolicy, BoxFuture, TransportError, TransportFut},
 };
 // use async_trait::async_trait;
 // use ethers::providers::{JsonRpcClient, JsonRpcError};
@@ -68,6 +72,30 @@ lazy_static::lazy_static! {
         &["call"]
     )
     .unwrap();
+}
+
+#[derive(Debug, Clone)]
+pub struct DefaultRetryPolicy;
+impl RetryPolicy for DefaultRetryPolicy {
+    fn should_retry(&self, _err: &alloy::transports::TransportError) -> bool {
+        true
+    }
+
+    fn backoff_hint(&self, _error: &alloy::transports::TransportError) -> Option<std::time::Duration> {
+        None
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ZeroRetryPolicy;
+impl RetryPolicy for ZeroRetryPolicy {
+    fn should_retry(&self, _err: &alloy::transports::TransportError) -> bool {
+        false
+    }
+
+    fn backoff_hint(&self, _error: &alloy::transports::TransportError) -> Option<std::time::Duration> {
+        None
+    }
 }
 
 // /// Defines a retry policy suitable for `JsonRpcProviderClient`.
@@ -1017,9 +1045,11 @@ where
 mod tests {
     use alloy::providers::Provider;
     use alloy::providers::ProviderBuilder;
+    use alloy::rpc::client;
     use alloy::rpc::client::ClientBuilder;
     use alloy::signers::local::PrivateKeySigner;
     use alloy::transports::layers::RetryBackoffLayer;
+    use anyhow::Ok;
     use async_trait::async_trait;
     use ethers::providers::JsonRpcClient;
     use hopr_async_runtime::prelude::sleep;
@@ -1079,8 +1109,6 @@ mod tests {
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
         let signer_chain_key = ChainKeypair::from_secret(signer.to_bytes().as_ref())?;
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
-
         let rpc_client = ClientBuilder::default().http(anvil.endpoint_url());
 
         let provider = ProviderBuilder::new().wallet(signer).on_client(rpc_client);
@@ -1107,7 +1135,7 @@ mod tests {
 
         let anvil = create_anvil(Some(block_time));
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
-        let signer_chain_key = ChainKeypair::from_secret(signer.to_bytes().as_ref())?;
+        // let signer_chain_key = ChainKeypair::from_secret(signer.to_bytes().as_ref())?;
 
         let transport_client = SurfTransport::new(anvil.endpoint_url());
 
@@ -1136,7 +1164,6 @@ mod tests {
 
         let anvil = create_anvil(Some(block_time));
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
-        // let signer_chain_key = ChainKeypair::from_secret(signer.to_bytes().as_ref())?;
 
         let transport_client = SurfTransport::new(anvil.endpoint_url());
 
@@ -1172,86 +1199,106 @@ mod tests {
         Ok(())
     }
 
-    // #[async_std::test]
-    // async fn test_client_should_fail_on_malformed_request() {
-    //     let anvil = create_anvil(None);
-    //     let client = JsonRpcProviderClient::new(
-    //         &anvil.endpoint(),
-    //         SurfRequestor::default(),
-    //         SimpleJsonRpcRetryPolicy::default(),
-    //     );
+    #[tokio::test]
+    async fn test_client_should_fail_on_malformed_request() -> anyhow::Result<()> {
+        let anvil = create_anvil(None);
+        let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
-    //     let err = client
-    //         .request::<_, ethers::types::U64>("eth_blockNumber_bla", ())
-    //         .await
-    //         .expect_err("expected error");
+        let transport_client = SurfTransport::new(anvil.endpoint_url());
 
-    //     assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(..)));
-    // }
+        let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
 
-    // #[async_std::test]
-    // async fn test_client_should_fail_on_malformed_response() {
-    //     let mut server = mockito::Server::new_async().await;
+        let provider = ProviderBuilder::new().wallet(signer).on_client(rpc_client);
 
-    //     let m = server
-    //         .mock("POST", "/")
-    //         .with_status(200)
-    //         .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
-    //         .with_body("}malformed{")
-    //         .expect(1)
-    //         .create();
+        let err = provider
+            .raw_request::<(), alloy::primitives::U64>("eth_blockNumber_bla".into(), ())
+            .await
+            .expect_err("expected error");
 
-    //     let client = JsonRpcProviderClient::new(
-    //         &server.url(),
-    //         SurfRequestor::default(),
-    //         SimpleJsonRpcRetryPolicy::default(),
-    //     );
+        assert!(matches!(err, alloy::transports::RpcError::ErrorResp(..)));
 
-    //     let err = client
-    //         .request::<_, ethers::types::U64>("eth_blockNumber", ())
-    //         .await
-    //         .expect_err("expected error");
+        Ok(())
+    }
 
-    //     m.assert();
-    //     assert!(matches!(err, JsonRpcProviderClientError::SerdeJson { .. }));
-    // }
+    #[tokio::test]
+    async fn test_client_should_fail_on_malformed_response() {
+        let mut server = mockito::Server::new_async().await;
 
-    // #[async_std::test]
-    // async fn test_client_should_retry_on_http_error() {
-    //     let mut server = mockito::Server::new_async().await;
+        let m = server
+            .mock("POST", "/")
+            .with_status(200)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
+            .with_body("}malformed{")
+            .expect(1)
+            .create();
 
-    //     let m = server
-    //         .mock("POST", "/")
-    //         .with_status(http_types::StatusCode::TooManyRequests as usize)
-    //         .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
-    //         .with_body("{}")
-    //         .expect(3)
-    //         .create();
+        let transport_client = SurfTransport::new(url::Url::parse(&server.url()).unwrap());
 
-    //     let client = JsonRpcProviderClient::new(
-    //         &server.url(),
-    //         SurfRequestor::default(),
-    //         SimpleJsonRpcRetryPolicy {
-    //             max_retries: Some(2),
-    //             retryable_http_errors: vec![http_types::StatusCode::TooManyRequests],
-    //             initial_backoff: Duration::from_millis(100),
-    //             ..SimpleJsonRpcRetryPolicy::default()
-    //         },
-    //     );
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new(2, 100, 100))
+            .transport(transport_client.clone(), transport_client.guess_local());
 
-    //     let err = client
-    //         .request::<_, ethers::types::U64>("eth_blockNumber", ())
-    //         .await
-    //         .expect_err("expected error");
+        let provider = ProviderBuilder::new().on_client(rpc_client);
 
-    //     m.assert();
-    //     assert!(matches!(err, JsonRpcProviderClientError::BackendError(_)));
-    //     assert_eq!(
-    //         0,
-    //         client.requests_enqueued.load(Ordering::SeqCst),
-    //         "retry queue should be zero when policy says no more retries"
-    //     );
-    // }
+        let err = provider
+            .raw_request::<(), alloy::primitives::U64>("eth_blockNumber".into(), ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(
+            err,
+            alloy::transports::RpcError::DeserError { err: _, text: _ }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_client_should_retry_on_http_error() {
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server
+            .mock("POST", "/")
+            .with_status(http_types::StatusCode::TooManyRequests as usize)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
+            .with_body("{}")
+            .expect(3)
+            .create();
+
+        let transport_client = SurfTransport::new(url::Url::parse(&server.url()).unwrap());
+
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new(2, 100, 100))
+            .transport(transport_client.clone(), transport_client.guess_local());
+
+        // TODO: FIXME: implement a CustomRetryBackoff policy/service and test its `requests_enqueued`
+        // let client = JsonRpcProviderClient::new(
+        //     &server.url(),
+        //     SurfRequestor::default(),
+        //     SimpleJsonRpcRetryPolicy {
+        //         max_retries: Some(2),
+        //         retryable_http_errors: vec![http_types::StatusCode::TooManyRequests],
+        //         initial_backoff: Duration::from_millis(100),
+        //         ..SimpleJsonRpcRetryPolicy::default()
+        //     },
+        // );
+
+        let provider = ProviderBuilder::new().on_client(rpc_client);
+
+        let err = provider
+            .raw_request::<(), alloy::primitives::U64>("eth_blockNumber".into(), ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(err, alloy::transports::RpcError::Transport(..)));
+
+        // TODO: Create a customize RetryBackoffService that exposes `requests_enqueued``
+        // assert_eq!(
+        //     0,
+        //     client.requests_enqueued.load(Ordering::SeqCst),
+        //     "retry queue should be zero when policy says no more retries"
+        // );
+    }
 
     // #[async_std::test]
     // async fn test_client_should_not_retry_with_zero_retry_policy() {

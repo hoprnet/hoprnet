@@ -1,3 +1,4 @@
+use alloy::transports::RpcError as AlloyRpcError;
 /// Errors produced by this crate and other error-related types.
 use ethers::prelude::nonce_manager::NonceManagerError;
 use ethers::prelude::signer::SignerMiddlewareError;
@@ -84,7 +85,7 @@ pub enum HttpRequestError {
 
 /// Errors for `JsonRpcProviderClient`
 #[derive(Error, Debug)]
-pub enum JsonRpcProviderClientError {
+pub enum JsonRpcProviderClientError<E> {
     #[error("Deserialization Error: {err}. Response: {text}")]
     /// Serde JSON Error
     SerdeJson {
@@ -95,36 +96,36 @@ pub enum JsonRpcProviderClientError {
     },
 
     #[error(transparent)]
-    JsonRpcError(#[from] JsonRpcError),
+    AlloyRpcError(#[from] AlloyRpcError<E>),
 
     #[error(transparent)]
     BackendError(#[from] HttpRequestError),
 }
 
-impl From<JsonRpcProviderClientError> for ProviderError {
-    fn from(src: JsonRpcProviderClientError) -> Self {
-        match src {
-            // Because we cannot use `ProviderError::HTTPError`, due to `request::Error` having private constructor
-            // we must resolve connectivity error within our `RetryPolicy<JsonRpcProviderClientError>`
-            JsonRpcProviderClientError::BackendError(err) => ProviderError::CustomError(err.to_string()),
-            _ => ProviderError::JsonRpcClientError(Box::new(src)),
-        }
-    }
-}
+// impl From<JsonRpcProviderClientError> for ProviderError {
+//     fn from(src: JsonRpcProviderClientError) -> Self {
+//         match src {
+//             // Because we cannot use `ProviderError::HTTPError`, due to `request::Error` having private constructor
+//             // we must resolve connectivity error within our `RetryPolicy<JsonRpcProviderClientError>`
+//             JsonRpcProviderClientError::BackendError(err) => ProviderError::CustomError(err.to_string()),
+//             _ => ProviderError::JsonRpcClientError(Box::new(src)),
+//         }
+//     }
+// }
 
-impl ethers::providers::RpcError for JsonRpcProviderClientError {
-    fn as_error_response(&self) -> Option<&JsonRpcError> {
-        if let JsonRpcProviderClientError::JsonRpcError(err) = self {
-            Some(err)
-        } else {
-            None
-        }
-    }
+// impl ethers::providers::RpcError for JsonRpcProviderClientError {
+//     fn as_error_response(&self) -> Option<&JsonRpcError> {
+//         if let JsonRpcProviderClientError::JsonRpcError(err) = self {
+//             Some(err)
+//         } else {
+//             None
+//         }
+//     }
 
-    fn as_serde_error(&self) -> Option<&serde_json::Error> {
-        match self {
-            JsonRpcProviderClientError::SerdeJson { err, .. } => Some(err),
-            _ => None,
-        }
-    }
-}
+//     fn as_serde_error(&self) -> Option<&serde_json::Error> {
+//         match self {
+//             JsonRpcProviderClientError::SerdeJson { err, .. } => Some(err),
+//             _ => None,
+//         }
+//     }
+// }
