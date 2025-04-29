@@ -215,9 +215,7 @@ mod tests {
     #[allow(type_alias_bounds)]
     pub type HeaderSpec<S: SphinxSuite> = TestSpec<<S::P as Keypair>::Public, 4, 66>;
 
-    fn generate_surbs<S: SphinxSuite>(
-        keypairs: Vec<S::P>,
-    ) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener)>
+    fn generate_surbs<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<(SURB<S, HeaderSpec<S>>, ReplyOpener)>
     where
         <<S as SphinxSuite>::P as Keypair>::Public: Copy,
     {

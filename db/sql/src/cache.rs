@@ -1,5 +1,6 @@
 use crate::errors::DbSqlError;
 use dashmap::{DashMap, Entry};
+use hopr_crypto_packet::prelude::{HoprSenderId, HoprSurbId};
 use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::info::{IndexerData, SafeInfo};
@@ -56,8 +57,8 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
-#[derive(Debug, Clone)]
-pub(crate) struct SurbRingBuffer(Arc<Mutex<AllocRingBuffer<HoprSurb>>>);
+#[derive(Clone, Debug)]
+pub(crate) struct SurbRingBuffer(Arc<Mutex<AllocRingBuffer<(HoprSurbId, HoprSurb)>>>);
 
 impl Default for SurbRingBuffer {
     fn default() -> Self {
@@ -68,19 +69,31 @@ impl Default for SurbRingBuffer {
 }
 
 impl SurbRingBuffer {
-    pub fn push<I: IntoIterator<Item = HoprSurb>>(&self, surbs: I) -> Result<(), DbSqlError> {
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, HoprSurb)>>(&self, surbs: I) -> Result<(), DbSqlError> {
         self.0
             .lock()
             .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
             .extend(surbs);
         Ok(())
     }
-    pub fn pop_one(&self) -> Result<HoprSurb, DbSqlError> {
+    pub fn pop_one(&self) -> Result<(HoprSurbId, HoprSurb), DbSqlError> {
         self.0
             .lock()
             .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
             .dequeue()
-            .ok_or(DbSqlError::NoSurbAvailable)
+            .ok_or(DbSqlError::NoSurbAvailable("no more surbs".into()))
+    }
+
+    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<(HoprSurbId, HoprSurb), DbSqlError> {
+        let mut rb = self
+            .0
+            .lock()
+            .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?;
+        if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
+            rb.dequeue().ok_or(DbSqlError::NoSurbAvailable("no more surbs".into()))
+        } else {
+            Err(DbSqlError::NoSurbAvailable("surb does not match the given id".into()))
+        }
     }
 }
 
@@ -98,7 +111,7 @@ pub struct HoprDbCaches {
     pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
     // KeyIdMapper must be synchronous because it is used from a sync context.
     pub(crate) key_id_mapper: CacheKeyMapper,
-    pub(crate) pseudonym_openers: moka::sync::Cache<HoprPseudonym, ReplyOpener>,
+    pub(crate) pseudonym_openers: moka::sync::Cache<HoprSenderId, ReplyOpener>,
     pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer>,
 }
 

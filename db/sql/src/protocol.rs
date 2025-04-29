@@ -8,7 +8,7 @@ use hopr_db_api::protocol::{
 };
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_parallelize::cpu::spawn_fifo_blocking;
 use hopr_path::errors::PathError;
 use hopr_path::{Path, PathAddressResolver, ValidatedPath};
@@ -279,6 +279,25 @@ impl HoprDbProtocolOperations for HoprDb {
         })?)
     }
 
+    async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)> {
+        let pseudonym = matcher.pseudonym();
+        let surbs_for_pseudonym = self
+            .caches
+            .surbs_per_pseudonym
+            .get(&pseudonym)
+            .await
+            .ok_or(DbSqlError::NoSurbAvailable("pseudonym not found".into()))?;
+
+        match matcher {
+            SurbMatcher::Pseudonym(_) => Ok(surbs_for_pseudonym
+                .pop_one()
+                .map(|(id, surb)| (HoprSenderId::from_pseudonym_and_id(&pseudonym, id), surb))?),
+            SurbMatcher::Exact(id) => Ok(surbs_for_pseudonym
+                .pop_one_if_has_id(&id.surb_id())
+                .map(|(id, surb)| (HoprSenderId::from_pseudonym_and_id(&pseudonym, id), surb))?),
+        }
+    }
+
     #[tracing::instrument(level = "trace", skip(self, data))]
     async fn to_send_no_ack(
         &self,
@@ -356,16 +375,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     return_paths,
                 },
             ),
-            ResolvedTransportRouting::Return(pseudonym) => {
-                // Try to retrieve the SURB from the pseudonym
-                let surb = self
-                    .caches
-                    .surbs_per_pseudonym
-                    .get(&pseudonym)
-                    .await
-                    .ok_or(DbSqlError::LogicalError("unknown pseudonym".into()))?
-                    .pop_one()?;
-
+            ResolvedTransportRouting::Return(sender_id, surb) => {
                 let next = self
                     .caches
                     .key_id_mapper
@@ -374,9 +384,9 @@ impl HoprDbProtocolOperations for HoprDb {
 
                 (
                     next,
-                    surb.additional_data_receiver.chain_length() as usize,
-                    pseudonym,
-                    PacketRouting::Surb(surb),
+                    surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
+                    sender_id.pseudonym(),
+                    PacketRouting::Surb(sender_id.surb_id(), surb),
                 )
             }
         };
@@ -430,11 +440,13 @@ impl HoprDbProtocolOperations for HoprDb {
         })
         .await?;
 
-        // Store the reply openers under the given pseudonym
+        // Store the reply openers under the given SenderId
         // This is a no-op for reply packets
-        openers
-            .into_iter()
-            .for_each(|p| self.caches.pseudonym_openers.insert(pseudonym, p));
+        openers.into_iter().for_each(|(surb_id, opener)| {
+            self.caches
+                .pseudonym_openers
+                .insert(HoprSenderId::from_pseudonym_and_id(&pseudonym, surb_id), opener)
+        });
 
         if let Some(out) = packet.try_as_outgoing() {
             self.caches

@@ -10,11 +10,20 @@ pub const SURB_ID_SIZE: usize = 8;
 
 pub type HoprSurbId = [u8; SURB_ID_SIZE];
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// Identifier of the packet sender.
+///
+/// This consists of two parts:
+/// - [`HoprSenderId::pseudonym`] of the sender
+/// - [`HoprSenderId::surb_id`] is an identifier a single SURB that routes the packet back to the sender.
+///
+/// The `surb_id` always identifies a single SURB. The instance can be turned into a pseudorandom
+/// sequence using [`HoprSenderId::into_sequence`] to create identifiers for more SURBs
+/// with the same pseudonym.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct HoprPacketReceiverData(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
+pub struct HoprSenderId(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
-impl HoprPacketReceiverData {
+impl HoprSenderId {
     pub fn new(pseudonym: &HoprPseudonym) -> Self {
         let mut ret: [u8; Self::SIZE] = hopr_crypto_random::random_bytes();
         ret[..HoprPseudonym::SIZE].copy_from_slice(pseudonym.as_ref());
@@ -32,7 +41,7 @@ impl HoprPacketReceiverData {
         HoprPseudonym::try_from(&self.0[..HoprPseudonym::SIZE]).expect("must have valid pseudonym")
     }
 
-    pub(crate) fn surb_id(&self) -> HoprSurbId {
+    pub fn surb_id(&self) -> HoprSurbId {
         self.0[HoprPseudonym::SIZE..HoprPseudonym::SIZE + SURB_ID_SIZE]
             .try_into()
             .expect("must have valid nonce")
@@ -50,13 +59,13 @@ impl HoprPacketReceiverData {
     }
 }
 
-impl AsRef<[u8]> for HoprPacketReceiverData {
+impl AsRef<[u8]> for HoprSenderId {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl<'a> TryFrom<&'a [u8]> for HoprPacketReceiverData {
+impl<'a> TryFrom<&'a [u8]> for HoprSenderId {
     type Error = GeneralError;
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
@@ -67,8 +76,14 @@ impl<'a> TryFrom<&'a [u8]> for HoprPacketReceiverData {
     }
 }
 
-impl BytesRepresentable for HoprPacketReceiverData {
+impl BytesRepresentable for HoprSenderId {
     const SIZE: usize = HoprPseudonym::SIZE + SURB_ID_SIZE;
+}
+
+impl hopr_crypto_random::Randomizable for HoprSenderId {
+    fn random() -> Self {
+        Self::new(&HoprPseudonym::random())
+    }
 }
 
 /// Additional encoding of a packet message that can be preceded by a number of [`SURBs`](SURB).
@@ -189,7 +204,7 @@ mod tests {
                 .map(|v| v.ok_or(anyhow!("missing id")))
                 .collect::<Result<Vec<_>, _>>()?;
         let pseudonym = SimplePseudonym::random();
-        let recv_data = HoprPacketReceiverData::new(&pseudonym);
+        let recv_data = HoprSenderId::new(&pseudonym);
 
         Ok((0..count)
             .into_iter()

@@ -35,10 +35,10 @@ pub mod prelude {
     pub use crate::packet::{
         HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
     };
+    pub use crate::types::{HoprSenderId, HoprSurbId};
     pub use crate::validation::validate_unacknowledged_ticket;
 }
 
-use crate::types::HoprPacketReceiverData;
 pub use hopr_crypto_sphinx::prelude::{KeyIdMapper, ReplyOpener};
 
 /// Currently used public key cipher suite for Sphinx.
@@ -54,7 +54,7 @@ impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
     type KeyId = KeyIdent<4>;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
-    type PacketReceiverData = HoprPacketReceiverData;
+    type PacketReceiverData = types::HoprSenderId;
     type SurbReceiverData = por::SurbReceiverInfo;
     type PRG = hopr_crypto_types::primitives::ChaCha20;
     type UH = hopr_crypto_types::primitives::Poly1305;

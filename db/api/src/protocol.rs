@@ -1,11 +1,12 @@
+use crate::prelude::DbError;
 use async_trait::async_trait;
+use hopr_crypto_packet::prelude::HoprSenderId;
+use hopr_crypto_packet::HoprSurb;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_primitive_types::prelude::Balance;
 use std::{fmt::Debug, result::Result};
-
-use crate::prelude::DbError;
 
 /// Trait defining all DB functionality needed by packet/acknowledgement processing pipeline.
 #[async_trait]
@@ -23,6 +24,8 @@ pub trait HoprDbProtocolOperations {
 
     /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
     async fn get_network_ticket_price(&self) -> crate::errors::Result<Balance>;
+
+    async fn find_surb(&self, matcher: SurbMatcher) -> crate::errors::Result<(HoprSenderId, HoprSurb)>;
 
     /// Process the data into an outgoing packet that is not going to be acknowledged.
     async fn to_send_no_ack(

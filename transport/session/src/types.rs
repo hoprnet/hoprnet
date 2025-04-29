@@ -149,7 +149,7 @@ pub struct IncomingSession {
 
 pub struct KeepAliveControl {
     sending_rate_per_sec: Arc<AtomicUsize>,
-    jh: hopr_async_runtime::prelude::JoinHandle<()>,
+    _jh: hopr_async_runtime::prelude::JoinHandle<()>,
 }
 
 impl KeepAliveControl {
@@ -162,7 +162,7 @@ impl KeepAliveControl {
         let sending_rate_per_sec = Arc::new(AtomicUsize::new(initial_rate));
         Self {
             sending_rate_per_sec,
-            jh: hopr_async_runtime::prelude::spawn(async move {
+            _jh: hopr_async_runtime::prelude::spawn(async move {
                 // TODO: add delay and rate-limiting with decay
                 if let Err(error) = futures::stream::repeat_with(|| Ok(StartProtocol::KeepAlive(session_id)))
                     .try_for_each(|msg| {
@@ -188,7 +188,8 @@ impl KeepAliveControl {
     }
 
     pub fn abort(self) {
-        //self.jh.abort();
+        // TODO: cancel the JH
+        //hopr_async_runtime::prelude::cancel_join_handle(self.jh);
     }
 }
 

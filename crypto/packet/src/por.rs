@@ -93,7 +93,7 @@ impl BytesRepresentable for ProofOfRelayValues {
 /// Wraps the [`ProofOfRelayValues`] with some additional information about the sender of the packet,
 /// that is supposed to be passed along with the SURB.
 // TODO: currently 32 bytes are reserved for future use by Shamir's secret sharing scheme.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SurbReceiverInfo(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 

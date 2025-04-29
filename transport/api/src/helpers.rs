@@ -168,7 +168,10 @@ where
                     return_paths,
                 })
             }
-            DestinationRouting::Return(pseudonym) => Ok(ResolvedTransportRouting::Return(pseudonym)),
+            DestinationRouting::Return(matcher) => {
+                let (sender_id, surb) = self.db.find_surb(matcher).await?;
+                Ok(ResolvedTransportRouting::Return(sender_id, surb))
+            }
         }
     }
 }
