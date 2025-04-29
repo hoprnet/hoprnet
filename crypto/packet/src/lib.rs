@@ -53,7 +53,7 @@ impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
     type KeyId = KeyIdent<4>;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
-    type SurbReceiverData = por::ProofOfRelayValues;
+    type SurbReceiverData = por::SurbReceiverInfo;
     type PRG = hopr_crypto_types::primitives::ChaCha20;
     type UH = hopr_crypto_types::primitives::Poly1305;
 }
@@ -83,5 +83,24 @@ mod tests {
         );
 
         assert!(hopr_packet_len < 1492, "HOPR packet must fit within a layer 4 packet");
+    }
+
+    #[test]
+    fn packet_length() {
+        let packet_len = HoprPacket::SIZE;
+        assert_eq!(packet_len, 1236);
+    }
+
+    #[test]
+    fn header_length() {
+        let header_len = HoprSphinxHeaderSpec::HEADER_LEN;
+        assert_eq!(header_len, 239);
+    }
+
+    #[test]
+    fn surb_length() {
+        let surb_len = HoprSurb::SIZE;
+        assert_eq!(surb_len, 393);
+        assert!(HoprPacket::PAYLOAD_SIZE > surb_len * 2);
     }
 }

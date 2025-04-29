@@ -25,7 +25,7 @@ pub fn derive_ack_key_share(secret: &SecretKey) -> HalfKey {
 /// Type that contains the challenge for the first ticket sent to the first relayer.
 ///
 /// This is the first entry of the entire PoR challenge chain generated for the packet.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ProofOfRelayValues(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
@@ -88,6 +88,48 @@ impl<'a> TryFrom<&'a [u8]> for ProofOfRelayValues {
 
 impl BytesRepresentable for ProofOfRelayValues {
     const SIZE: usize = 1 + HalfKeyChallenge::SIZE + EthereumChallenge::SIZE;
+}
+
+/// Wraps the [`ProofOfRelayValues`] with some additional information about the sender of the packet,
+/// that is supposed to be passed along with the SURB.
+// TODO: currently 32 bytes are reserved for future use by Shamir's secret sharing scheme.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SurbReceiverInfo(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
+
+impl SurbReceiverInfo {
+    pub fn new(pov: ProofOfRelayValues, _share: [u8; 32]) -> Self {
+        let mut ret = [0u8; Self::SIZE];
+        ret[0..ProofOfRelayValues::SIZE].copy_from_slice(&pov.0);
+        // Share is currently not used but will be used in the future
+        // ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + 32].copy_from_slice(&share);
+        Self(ret)
+    }
+    pub fn proof_of_relay_values(&self) -> ProofOfRelayValues {
+        ProofOfRelayValues::try_from(&self.0[0..ProofOfRelayValues::SIZE])
+            .expect("proof of relay values must be valid")
+    }
+}
+
+impl AsRef<[u8]> for SurbReceiverInfo {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for SurbReceiverInfo {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> std::result::Result<Self, Self::Error> {
+        value
+            .try_into()
+            .map(Self)
+            .map_err(|_| GeneralError::ParseError("SurbReceiverInfo".into()))
+    }
+}
+
+impl BytesRepresentable for SurbReceiverInfo {
+    const SIZE: usize = ProofOfRelayValues::SIZE + 32;
 }
 
 /// Contains the Proof of Relay challenge for the next downstream node as well as the hint that is used to

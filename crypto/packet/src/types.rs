@@ -97,7 +97,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
 
     use crate::packet::HoprPacket;
-    use crate::por::generate_proof_of_relay;
+    use crate::por::{generate_proof_of_relay, SurbReceiverInfo};
     use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite};
 
     lazy_static::lazy_static! {
@@ -136,7 +136,7 @@ mod tests {
                     &path_ids,
                     &por_strings,
                     &pseudonym,
-                    por_values,
+                    SurbReceiverInfo::new(por_values, [0u8; 32]),
                 )
                 .map(|(s, _)| s)
             })

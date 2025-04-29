@@ -7,7 +7,7 @@ use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
 
 use crate::errors::PacketError::{PacketConstructionError, PacketDecodingError};
-use crate::por::{derive_ack_key_share, generate_proof_of_relay, pre_verify};
+use crate::por::{derive_ack_key_share, generate_proof_of_relay, pre_verify, SurbReceiverInfo};
 use crate::types::HoprPacketMessage;
 use crate::{errors::Result, HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT};
 
@@ -93,7 +93,7 @@ impl PartialHoprPacket {
             PacketRouting::Surb(surb) => {
                 // Update the ticket with the challenge
                 let ticket = ticket
-                    .challenge(surb.additional_data_receiver.ticket_challenge())
+                    .challenge(surb.additional_data_receiver.proof_of_relay_values().ticket_challenge())
                     .build_signed(chain_keypair, domain_separator)?
                     .leak();
 
@@ -105,7 +105,7 @@ impl PartialHoprPacket {
                             surb.first_relayer.to_hex()
                         ))
                     })?,
-                    ack_challenge: surb.additional_data_receiver.acknowledgement_challenge(),
+                    ack_challenge: surb.additional_data_receiver.proof_of_relay_values().acknowledgement_challenge(),
                     partial_packet: PartialPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec>::new(
                         MetaPacketRouting::Surb(surb, pseudonym),
                         mapper,
@@ -274,7 +274,7 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P
             .collect::<Result<Vec<_>>>()?,
         &por_strings,
         pseudonym,
-        por_values,
+        SurbReceiverInfo::new(por_values, [0u8; 32]),
     )?)
 }
 
@@ -534,7 +534,7 @@ mod tests {
 
         let ticket = mock_ticket(
             &PEERS[sender_node - 1].0.public().0,
-            surb.additional_data_receiver.chain_length() as usize,
+            surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
             &PEERS[sender_node].0,
         )?;
 
@@ -669,7 +669,7 @@ mod tests {
         assert_eq!(1, received_surbs.len(), "invalid number of surbs");
         assert_eq!(
             return_hops as u8 + 1,
-            received_surbs[0].additional_data_receiver.chain_length(),
+            received_surbs[0].additional_data_receiver.proof_of_relay_values().chain_length(),
             "surb has invalid por chain length"
         );
 
@@ -720,7 +720,7 @@ mod tests {
         assert_eq!(1, received_surbs.len(), "invalid number of surbs");
         assert_eq!(
             return_hops as u8 + 1,
-            received_surbs[0].additional_data_receiver.chain_length(),
+            received_surbs[0].additional_data_receiver.proof_of_relay_values().chain_length(),
             "surb has invalid por chain length"
         );
 
@@ -810,7 +810,7 @@ mod tests {
         for recv_surb in &received_surbs {
             assert_eq!(
                 return_hops as u8 + 1,
-                recv_surb.additional_data_receiver.chain_length(),
+                recv_surb.additional_data_receiver.proof_of_relay_values().chain_length(),
                 "surb has invalid por chain length"
             );
         }
