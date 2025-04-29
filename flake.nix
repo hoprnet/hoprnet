@@ -134,6 +134,7 @@
 
           hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             runTests = true;
+            runCoverage = true;
           });
 
           hopr-test-nightly = rust-builder-local-nightly.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
