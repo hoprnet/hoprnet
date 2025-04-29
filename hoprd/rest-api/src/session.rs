@@ -210,9 +210,11 @@ impl SessionWebsocketClientQueryRequest {
 
         Ok(SessionClientConfig {
             peer: ident.address,
-            path_options,
+            forward_path_options: path_options.clone(),
+            return_path_options: path_options.clone(), // TODO: allow using separate return options
             target: self.target.into_target(self.protocol)?,
             capabilities: self.capabilities.into_iter().map(SessionCapability::into).collect(),
+            pseudonym: None,
         })
     }
 }
@@ -407,7 +409,8 @@ impl SessionClientRequest {
 
         Ok(SessionClientConfig {
             peer: ident.address,
-            path_options,
+            forward_path_options: path_options.clone(),
+            return_path_options: path_options.clone(), // TODO: allow using separate return options
             target: self.target.into_target(target_protocol)?,
             capabilities: self
                 .capabilities
@@ -428,6 +431,7 @@ impl SessionClientRequest {
                     }
                     _ => vec![], // no default capabilities for UDP, etc.
                 }),
+            pseudonym: None,
         })
     }
 }

@@ -292,6 +292,10 @@ impl HoprDbProtocolOperations for HoprDb {
             SurbMatcher::Pseudonym(_) => Ok(surbs_for_pseudonym
                 .pop_one()
                 .map(|(id, surb)| (HoprSenderId::from_pseudonym_and_id(&pseudonym, id), surb))?),
+            // The following code intentionally only checks the first SURB in the ring buffer
+            // and does not search the entire RB.
+            // This is because the exact match use-case is suited only for situations
+            // when there is a single SURB.
             SurbMatcher::Exact(id) => Ok(surbs_for_pseudonym
                 .pop_one_if_has_id(&id.surb_id())
                 .map(|(id, surb)| (HoprSenderId::from_pseudonym_and_id(&pseudonym, id), surb))?),
@@ -508,6 +512,7 @@ impl HoprDbProtocolOperations for HoprDb {
                 Ok(TransportPacketWithChainData::Final {
                     packet_tag: incoming.packet_tag,
                     previous_hop: incoming.previous_hop,
+                    sender: incoming.sender,
                     plain_text: incoming.plain_text,
                     ack_key: incoming.ack_key,
                     no_ack: incoming.no_ack,

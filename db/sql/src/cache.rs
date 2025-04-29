@@ -84,6 +84,7 @@ impl SurbRingBuffer {
             .ok_or(DbSqlError::NoSurbAvailable("no more surbs".into()))
     }
 
+    /// Check if the next SURB has the given ID and pop it.
     pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<(HoprSurbId, HoprSurb), DbSqlError> {
         let mut rb = self
             .0

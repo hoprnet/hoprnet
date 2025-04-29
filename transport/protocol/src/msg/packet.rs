@@ -2,6 +2,7 @@ use hopr_db_api::protocol::TransportPacketWithChainData;
 use hopr_transport_identity::PeerId;
 
 use hopr_crypto_types::prelude::*;
+use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::protocol::Acknowledgement;
 
 use crate::errors::ProtocolError;
@@ -12,6 +13,7 @@ pub enum IncomingPacket {
         packet_tag: PacketTag,
         previous_hop: PeerId,
         plain_text: Box<[u8]>,
+        sender: HoprPseudonym,
         ack_key: HalfKey,
         no_ack: bool,
     },
@@ -33,6 +35,7 @@ impl TryFrom<TransportPacketWithChainData> for IncomingPacket {
             TransportPacketWithChainData::Final {
                 packet_tag,
                 previous_hop,
+                sender,
                 plain_text,
                 ack_key,
                 no_ack,
@@ -40,6 +43,7 @@ impl TryFrom<TransportPacketWithChainData> for IncomingPacket {
                 packet_tag,
                 previous_hop: previous_hop.into(),
                 plain_text,
+                sender,
                 ack_key,
                 no_ack,
             }),
@@ -97,6 +101,7 @@ pub enum TransportPacket {
         packet_tag: PacketTag,
         previous_hop: PeerId,
         plain_text: Box<[u8]>,
+        sender: HoprPseudonym,
         ack_key: HalfKey,
         no_ack: bool,
     },
@@ -123,12 +128,14 @@ impl From<IncomingPacket> for TransportPacket {
                 packet_tag,
                 previous_hop,
                 plain_text,
+                sender,
                 ack_key,
                 no_ack,
             } => TransportPacket::Final {
                 packet_tag,
                 previous_hop,
                 plain_text,
+                sender,
                 ack_key,
                 no_ack,
             },

@@ -74,6 +74,7 @@ use tracing::error;
 
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::protocol::HoprDbProtocolOperations;
+use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_transport_identity::PeerId;
@@ -157,7 +158,7 @@ pub async fn run_msg_ack_protocol<Db>(
         impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
     ),
     api: (
-        impl futures::Sink<ApplicationData> + Send + Sync + 'static,
+        impl futures::Sink<(HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
         impl futures::Stream<Item = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
             + Send
             + Sync
@@ -314,7 +315,7 @@ where
                     async move {
                         match v {
                             Ok(v) => match v {
-                                msg::processor::RecvOperation::Receive { data, ack } => {
+                                msg::processor::RecvOperation::Receive { pseudonym, data, ack } => {
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     {
                                         METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
@@ -323,7 +324,7 @@ where
                                     internal_ack_send.send((ack.peer, ack.ack)).await.unwrap_or_else(|e| {
                                         error!(error = %e, "Failed to forward an acknowledgement to the transport layer");
                                     });
-                                    Some(data)
+                                    Some((pseudonym, data))
                                 }
                                 msg::processor::RecvOperation::Forward { msg, ack } => {
                                     #[cfg(all(feature = "prometheus", not(test)))]

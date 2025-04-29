@@ -79,6 +79,7 @@ pub enum TransportPacketWithChainData {
     Final {
         packet_tag: PacketTag,
         previous_hop: OffchainPublicKey,
+        sender: HoprPseudonym,
         plain_text: Box<[u8]>,
         ack_key: HalfKey,
         no_ack: bool,

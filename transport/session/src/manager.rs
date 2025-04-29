@@ -1,9 +1,8 @@
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::Either;
 use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
-use hopr_internal_types::prelude::{ApplicationData, Tag};
+use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
 use hopr_network_types::prelude::*;
-use hopr_primitive_types::prelude::Address;
 use std::ops::Range;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -14,7 +13,7 @@ use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
 };
 use crate::traits::SendMsg;
-use crate::types::{unwrap_chain_address, KeepAliveControl};
+use crate::types::KeepAliveControl;
 use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -59,7 +58,7 @@ pub struct SessionManagerConfig {
     /// The base timeout for initiation of Session initiation.
     ///
     /// The actual timeout is adjusted according to the number of hops for that Session:
-    /// `t = 2 * initiation_time_out_base * (num_hops + 1)`
+    /// `t = initiation_time_out_base * (num_forward_hops + num_return_hops + 2)`
     ///
     /// Default is 5 seconds.
     #[default(Duration::from_secs(5))]
@@ -74,7 +73,6 @@ pub struct SessionManagerConfig {
 
 fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
     msg_sender: Arc<OnceLock<S>>,
-    me: Address,
     session_id: SessionId,
     session_data: CachedSession,
     cause: moka::notification::RemovalCause,
@@ -90,14 +88,10 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                 reason = ?r,
                 "session termination due to eviction from the cache"
             );
-            let data = match ApplicationData::try_from(StartProtocol::CloseSession(session_id.with_address(me))) {
+            let data = match ApplicationData::try_from(StartProtocol::CloseSession(session_id)) {
                 Ok(data) => data,
-                Err(e) => {
-                    error!(
-                        ?session_id,
-                        error = %e,
-                        "failed to serialize CloseSession"
-                    );
+                Err(error) => {
+                    error!(%session_id, %error, "failed to serialize CloseSession");
                     return futures::future::ready(()).boxed();
                 }
             };
@@ -105,24 +99,15 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
             let msg_sender = msg_sender.clone();
             async move {
                 // Unwrap cannot panic, since the value's existence is checked on L72
-                if let Err(err) = msg_sender
+                if let Err(error) = msg_sender
                     .get()
                     .unwrap()
-                    .send_message(
-                        data,
-                        DestinationRouting::Forward {
-                            // TODO: add RP support to the Session protocol
-                            destination: *session_id.peer(),
-                            pseudonym: None,
-                            forward_options: session_data.routing_opts,
-                            return_options: None,
-                        },
-                    )
+                    .send_message(data, session_data.routing_opts)
                     .await
                 {
                     error!(
-                        ?session_id,
-                        error = %err,
+                        %session_id,
+                        %error,
                         "could not send notification of session closure after cache eviction"
                     );
                 }
@@ -173,7 +158,7 @@ where
             return Some(next);
         }
 
-        // Otherwise, generate a next key
+        // Otherwise, generate the next key
         next = gen(Some(next));
 
         // If generated keys made it to full loop, return failure
@@ -197,7 +182,7 @@ struct CachedSession {
     // Sender needs to be put in Arc, so that no clones are made by `moka`.
     // This makes sure that the entire channel closes once the one and only sender is closed.
     session_tx: Arc<UnboundedSender<Box<[u8]>>>,
-    routing_opts: RoutingOptions,
+    routing_opts: DestinationRouting,
 }
 
 /// Indicates the result of processing a message.
@@ -225,7 +210,6 @@ pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<(UnboundedSender<IncomingSession>, UnboundedSender<SessionId>)>>,
     sessions: moka::future::Cache<SessionId, CachedSession>,
-    me: Address,
     msg_sender: Arc<OnceLock<S>>,
     cfg: SessionManagerConfig,
 }
@@ -236,15 +220,14 @@ impl<S> Clone for SessionManager<S> {
             session_initiations: self.session_initiations.clone(),
             session_notifiers: self.session_notifiers.clone(),
             sessions: self.sessions.clone(),
-            me: self.me,
             cfg: self.cfg.clone(),
             msg_sender: self.msg_sender.clone(),
         }
     }
 }
 
-fn initiation_timeout_max(base: Duration, hops: usize) -> Duration {
-    2 * base * (hops as u32)
+fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
+    base * (hops as u32)
 }
 
 /// The Minimum Session tag due to Start-protocol messages.
@@ -252,7 +235,7 @@ pub const MIN_SESSION_TAG_RANGE_RESERVATION: Tag = 16;
 
 impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
-    pub fn new(me: Address, mut cfg: SessionManagerConfig) -> Self {
+    pub fn new(mut cfg: SessionManagerConfig) -> Self {
         // Accommodate the lower bound if too low.
         if cfg.session_tag_range.start < MIN_SESSION_TAG_RANGE_RESERVATION {
             let diff = MIN_SESSION_TAG_RANGE_RESERVATION - cfg.session_tag_range.start;
@@ -267,21 +250,22 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::future::Cache::builder()
                 .max_capacity(cfg.session_tag_range.clone().count() as u64)
-                .time_to_live(initiation_timeout_max(
-                    cfg.initiation_timeout_base,
-                    RoutingOptions::MAX_INTERMEDIATE_HOPS,
-                ))
+                .time_to_live(
+                    2 * initiation_timeout_max_one_way(
+                        cfg.initiation_timeout_base,
+                        RoutingOptions::MAX_INTERMEDIATE_HOPS,
+                    ),
+                )
                 .build(),
             sessions: moka::future::Cache::builder()
                 .max_capacity(u16::MAX as u64)
                 .time_to_idle(cfg.idle_timeout)
                 .async_eviction_listener(move |k, v, c| {
                     let msg_sender = msg_sender.clone();
-                    close_session_after_eviction(msg_sender, me, *k, v, c)
+                    close_session_after_eviction(msg_sender, *k, v, c)
                 })
                 .build(),
             session_notifiers: Arc::new(OnceLock::new()),
-            me,
             cfg,
         }
     }
@@ -336,7 +320,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         let myself = self.clone();
         let jh_session_expiration = hopr_async_runtime::prelude::spawn(async move {
             let jitter = hopr_crypto_random::random_float_in_range(1.0..1.5);
-            let timeout = initiation_timeout_max(
+            let timeout = 2 * initiation_timeout_max_one_way(
                 myself.cfg.initiation_timeout_base,
                 RoutingOptions::MAX_INTERMEDIATE_HOPS,
             )
@@ -392,23 +376,19 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             challenge,
             target: cfg.target,
             capabilities: cfg.capabilities.iter().copied().collect(),
-            // Back-routing currently uses the same (inverted) route as session initiation
-            // TODO: remove this once RP support is enabled
-            back_routing: Some((cfg.path_options.clone().invert(), self.me)),
         });
 
-        // TODO: add RP support to the Session protocol
-        let routing = DestinationRouting::Forward {
+        let forward_routing = DestinationRouting::Forward {
             destination: cfg.peer,
-            pseudonym: None,
-            forward_options: cfg.path_options.clone(),
-            return_options: None,
+            pseudonym: cfg.pseudonym,
+            forward_options: cfg.forward_path_options.clone(),
+            return_options: cfg.return_path_options.clone().into(),
         };
 
         // Send the Session initiation message
         trace!(challenge, "sending new session request");
         msg_sender
-            .send_message(start_session_msg.try_into()?, routing.clone())
+            .send_message(start_session_msg.try_into()?, forward_routing.clone())
             .await?;
 
         // Await session establishment response from the Exit node or timeout
@@ -416,9 +396,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         let initiation_done = TryStreamExt::try_next(&mut rx_initiation_done);
 
         // The timeout is given by the number of hops requested
-        let timeout = hopr_async_runtime::prelude::sleep(initiation_timeout_max(
+        let timeout = hopr_async_runtime::prelude::sleep(initiation_timeout_max_one_way(
             self.cfg.initiation_timeout_base,
-            cfg.path_options.count_hops() + 1,
+            cfg.forward_path_options.count_hops() + cfg.return_path_options.count_hops() + 2,
         ));
         pin_mut!(timeout);
 
@@ -436,7 +416,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         session_id,
                         CachedSession {
                             session_tx: Arc::new(tx),
-                            routing_opts: cfg.path_options.clone(),
+                            routing_opts: forward_routing.clone(),
                         },
                     )
                     .await;
@@ -448,17 +428,16 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 }
 
                 // TODO: configurable initial rate
-                let keep_alives = KeepAliveControl::new(session_id, msg_sender.clone(), routing.clone(), 1000);
+                let _keep_alives = KeepAliveControl::new(session_id, msg_sender.clone(), forward_routing.clone(), 1000);
 
                 Ok(Session::new(
                     session_id,
-                    self.me,
-                    routing,
+                    forward_routing,
                     cfg.capabilities.into_iter().collect(),
                     Arc::new(msg_sender.clone()),
                     rx,
                     self.session_notifiers.get().map(|(_, c)| c.clone()),
-                    keep_alives.into(),
+                    None, // TODO
                 ))
             }
             Either::Left((Ok(None), _)) => Err(SessionManagerError::Other(
@@ -466,7 +445,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             )
             .into()),
             Either::Left((Err(e), _)) => {
-                // The other side didn't allow us to establish a session
+                // The other side did not allow us to establish a session
                 error!(
                     challenge = e.challenge,
                     error = ?e,
@@ -492,24 +471,26 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     /// the Session protocol or Start protocol messages.
     ///
     /// If the data are not recognized, they are returned as [`DispatchResult::Unrelated`].
-    pub async fn dispatch_message(&self, data: ApplicationData) -> crate::errors::Result<DispatchResult> {
+    pub async fn dispatch_message(
+        &self,
+        pseudonym: HoprPseudonym,
+        data: ApplicationData,
+    ) -> crate::errors::Result<DispatchResult> {
         if (0..self.cfg.session_tag_range.start).contains(&data.application_tag) {
             trace!(tag = data.application_tag, "dispatching Start protocol message");
             return self
-                .handle_start_protocol_message(data)
+                .handle_start_protocol_message(pseudonym, data)
                 .await
                 .map(|_| DispatchResult::Processed);
         } else if self.cfg.session_tag_range.contains(&data.application_tag) {
-            let (peer, session_payload) = unwrap_chain_address(&data.plain_text)?;
-
-            let session_id = SessionId::new(data.application_tag, peer);
+            let session_id = SessionId::new(data.application_tag, pseudonym);
 
             return if let Some(session_data) = self.sessions.get(&session_id).await {
                 trace!(?session_id, "received data for a registered session");
 
                 Ok(session_data
                     .session_tx
-                    .unbounded_send(session_payload)
+                    .unbounded_send(data.plain_text)
                     .map(|_| DispatchResult::Processed)
                     .map_err(|e| SessionManagerError::Other(e.to_string()))?)
             } else {
@@ -521,15 +502,16 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         Ok(DispatchResult::Unrelated(data))
     }
 
-    async fn handle_start_protocol_message(&self, data: ApplicationData) -> crate::errors::Result<()> {
+    async fn handle_start_protocol_message(
+        &self,
+        pseudonym: HoprPseudonym,
+        data: ApplicationData,
+    ) -> crate::errors::Result<()> {
         match StartProtocol::<SessionId>::try_from(data)? {
             StartProtocol::StartSession(session_req) => {
                 trace!(challenge = session_req.challenge, "received session initiation request");
 
-                // Back-routing information is mandatory until the Return Path is introduced
-                let (route, peer) = session_req.back_routing.ok_or(SessionManagerError::NoBackRoutingInfo)?;
-
-                debug!(%peer, "got new session request, searching for a free session slot");
+                debug!(%pseudonym, "got new session request, searching for a free session slot");
 
                 let msg_sender = self.msg_sender.get().ok_or(SessionManagerError::NotStarted)?;
 
@@ -539,13 +521,8 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     .cloned()
                     .ok_or(SessionManagerError::NotStarted)?;
 
-                // TODO: add RP support to the Session protocol
-                let routing = DestinationRouting::Forward {
-                    destination: peer,
-                    pseudonym: None,
-                    forward_options: route.clone(),
-                    return_options: None,
-                };
+                // Reply routing uses SURBs only with the pseudonym of this Session's ID
+                let reply_routing = DestinationRouting::Return(SurbMatcher::Pseudonym(pseudonym));
 
                 // Construct the session
                 let (tx_session_data, rx_session_data) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
@@ -560,11 +537,11 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                                 Some(self.cfg.session_tag_range.end as u64),
                             ) as u16,
                         };
-                        SessionId::new(next_tag, peer)
+                        SessionId::new(next_tag, pseudonym)
                     },
                     CachedSession {
                         session_tx: Arc::new(tx_session_data),
-                        routing_opts: route.clone(),
+                        routing_opts: reply_routing.clone(),
                     },
                 )
                 .await
@@ -573,13 +550,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                     let session = Session::new(
                         session_id,
-                        self.me,
-                        routing.clone(),
+                        reply_routing.clone(),
                         session_req.capabilities,
                         Arc::new(msg_sender.clone()),
                         rx_session_data,
                         close_session_notifier.into(),
-                        None,
+                        None, // Keep-alives are not sent by the server
                     );
 
                     // Extract useful information about the session from the Start protocol message
@@ -599,12 +575,15 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     // Set our peer ID in the session ID sent back to them.
                     let data = StartProtocol::SessionEstablished(StartEstablished {
                         orig_challenge: session_req.challenge,
-                        session_id: session_id.with_address(self.me),
+                        session_id,
                     });
 
-                    msg_sender.send_message(data.try_into()?, routing).await.map_err(|e| {
-                        SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
-                    })?;
+                    msg_sender
+                        .send_message(data.try_into()?, reply_routing)
+                        .await
+                        .map_err(|e| {
+                            SessionManagerError::Other(format!("failed to send session establishment message: {e}"))
+                        })?;
 
                     info!(%session_id, "new session established");
 
@@ -615,7 +594,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     }
                 } else {
                     error!(
-                        %peer,
+                        %pseudonym,
                         "failed to reserve a new session slot"
                     );
 
@@ -627,7 +606,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     });
 
                     msg_sender
-                        .send_message(data.try_into()?, routing.clone())
+                        .send_message(data.try_into()?, reply_routing.clone())
                         .await
                         .map_err(|e| {
                             SessionManagerError::Other(format!(
@@ -635,7 +614,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                             ))
                         })?;
 
-                    trace!(%peer, "session establishment failure message sent");
+                    trace!(%pseudonym, "session establishment failure message sent");
 
                     #[cfg(all(feature = "prometheus", not(test)))]
                     METRIC_SENT_SESSION_ERRS.increment(&[&reason.to_string()])
@@ -722,14 +701,8 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     .get()
                     .ok_or(SessionManagerError::NotStarted)?
                     .send_message(
-                        StartProtocol::CloseSession(session_id.with_address(self.me)).try_into()?,
-                        DestinationRouting::Forward {
-                            // TODO: add RP support to the Session protocol
-                            destination: *session_id.peer(),
-                            pseudonym: None,
-                            forward_options: session_data.routing_opts,
-                            return_options: None,
-                        },
+                        StartProtocol::CloseSession(session_id).try_into()?,
+                        session_data.routing_opts,
                     )
                     .await?;
             }
@@ -762,9 +735,11 @@ mod tests {
     use async_std::prelude::FutureExt;
     use async_trait::async_trait;
     use futures::AsyncWriteExt;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
     use hopr_primitive_types::bounded::BoundedSize;
+    use hopr_primitive_types::prelude::Address;
 
     mockall::mock! {
         MsgSender {}
@@ -806,11 +781,11 @@ mod tests {
     #[test_log::test(async_std::test)]
     async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> anyhow::Result<()>
     {
-        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
-        let alice_mgr = SessionManager::new(alice_peer, Default::default());
-        let bob_mgr = SessionManager::new(bob_peer, Default::default());
+        let alice_mgr = SessionManager::new(Default::default());
+        let bob_mgr = SessionManager::new(Default::default());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -824,7 +799,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
                 Ok(())
             });
 
@@ -841,9 +816,9 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym))
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
                 Ok(())
             });
 
@@ -862,7 +837,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
                 Ok(())
             });
 
@@ -872,9 +847,9 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym))
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
                 Ok(())
             });
 
@@ -894,9 +869,11 @@ mod tests {
         let (alice_session, bob_session) = futures::future::join(
             alice_mgr.new_session(SessionClientConfig {
                 peer: bob_peer,
-                path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                forward_path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                return_path_options: RoutingOptions::Hops(BoundedSize::MIN),
                 target: SessionTarget::TcpStream(target.clone()),
                 capabilities: vec![Capability::Segmentation],
+                pseudonym: alice_pseudonym.into(),
             }),
             new_session_rx_bob.next(),
         )
@@ -925,7 +902,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn session_manager_should_close_idle_session_automatically() -> anyhow::Result<()> {
-        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
@@ -933,8 +910,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(alice_peer, cfg);
-        let bob_mgr = SessionManager::new(bob_peer, Default::default());
+        let alice_mgr = SessionManager::new(cfg);
+        let bob_mgr = SessionManager::new(Default::default());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -948,7 +925,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
                 Ok(())
             });
 
@@ -965,9 +942,9 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym))
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
                 Ok(())
             });
 
@@ -986,7 +963,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
                 Ok(())
             });
 
@@ -996,9 +973,9 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym))
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
                 Ok(())
             });
 
@@ -1018,9 +995,11 @@ mod tests {
         let (alice_session, bob_session) = futures::future::join(
             alice_mgr.new_session(SessionClientConfig {
                 peer: bob_peer,
-                path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                forward_path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                return_path_options: RoutingOptions::Hops(BoundedSize::MIN),
                 target: SessionTarget::TcpStream(target.clone()),
                 capabilities: vec![Capability::Segmentation],
+                pseudonym: alice_pseudonym.into(),
             }),
             new_session_rx_bob.next(),
         )
@@ -1048,7 +1027,7 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn session_manager_should_not_allow_establish_session_when_tag_range_is_used_up() -> anyhow::Result<()> {
-        let alice_peer: Address = (&ChainKeypair::random()).into();
+        let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
@@ -1056,18 +1035,19 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(alice_peer, Default::default());
-        let bob_mgr = SessionManager::new(bob_peer, cfg);
+        let alice_mgr = SessionManager::new(Default::default());
+        let bob_mgr = SessionManager::new(cfg);
 
         // Occupy the only free slot with tag 16
+        let another_pseudonym = HoprPseudonym::random();
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         bob_mgr
             .sessions
             .insert(
-                SessionId::new(16, alice_peer),
+                SessionId::new(16, another_pseudonym),
                 CachedSession {
                     session_tx: Arc::new(dummy_tx),
-                    routing_opts: RoutingOptions::Hops(BoundedSize::MIN),
+                    routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(another_pseudonym)),
                 },
             )
             .await;
@@ -1084,7 +1064,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
                 Ok(())
             });
 
@@ -1094,9 +1074,9 @@ mod tests {
             .expect_send_message()
             .once()
             .in_sequence(&mut sequence)
-            .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
+            .withf(move |_, peer| matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym))
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
                 Ok(())
             });
 
@@ -1113,9 +1093,11 @@ mod tests {
         let result = alice_mgr
             .new_session(SessionClientConfig {
                 peer: bob_peer,
-                path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                forward_path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                return_path_options: RoutingOptions::Hops(BoundedSize::MIN),
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: vec![],
+                pseudonym: alice_pseudonym.into(),
             })
             .await;
 
@@ -1128,7 +1110,6 @@ mod tests {
 
     #[test_log::test(async_std::test)]
     async fn session_manager_should_timeout_new_session_attempt_when_no_response() -> anyhow::Result<()> {
-        let alice_peer: Address = (&ChainKeypair::random()).into();
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
@@ -1136,8 +1117,8 @@ mod tests {
             ..Default::default()
         };
 
-        let alice_mgr = SessionManager::new(alice_peer, cfg);
-        let bob_mgr = SessionManager::new(bob_peer, Default::default());
+        let alice_mgr = SessionManager::new(cfg);
+        let bob_mgr = SessionManager::new(Default::default());
 
         let mut sequence = mockall::Sequence::new();
         let mut alice_transport = MockMsgSender::new();
@@ -1164,9 +1145,11 @@ mod tests {
         let result = alice_mgr
             .new_session(SessionClientConfig {
                 peer: bob_peer,
-                path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                forward_path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                return_path_options: RoutingOptions::Hops(BoundedSize::MIN),
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: vec![],
+                pseudonym: None,
             })
             .await;
 

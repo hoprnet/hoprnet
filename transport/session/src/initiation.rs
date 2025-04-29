@@ -1,12 +1,11 @@
 //! This module defines the Start sub-protocol used for HOPR Session initiation and management.
 
+use hopr_internal_types::prelude::ApplicationData;
+use std::collections::HashSet;
+
 use crate::errors::TransportSessionError;
 use crate::types::SessionTarget;
 use crate::Capability;
-use hopr_internal_types::prelude::ApplicationData;
-use hopr_network_types::prelude::RoutingOptions;
-use hopr_primitive_types::prelude::Address;
-use std::collections::HashSet;
 
 /// Challenge that identifies a Start initiation protocol message.
 pub type StartChallenge = u64;
@@ -42,11 +41,6 @@ pub struct StartInitiation {
     pub target: SessionTarget,
     /// Capabilities of the session.
     pub capabilities: HashSet<Capability>,
-    /// Optional information on back routing from the other party back towards the
-    /// session initiator.
-    ///
-    /// **NOTE:** This will not be used when the Return Path is introduced.
-    pub back_routing: Option<(RoutingOptions, Address)>,
 }
 
 /// Message of the Start protocol that confirms the establishment of a session.
@@ -172,8 +166,8 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<Application
 mod tests {
     use super::*;
     use hopr_crypto_packet::prelude::HoprPacket;
-    use hopr_crypto_types::keypairs::ChainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
+    use hopr_crypto_random::Randomizable;
+    use hopr_internal_types::prelude::HoprPseudonym;
     use hopr_network_types::prelude::SealedHost;
 
     use crate::SessionId;
@@ -185,10 +179,6 @@ mod tests {
             challenge: 0,
             target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:1234".parse()?)),
             capabilities: Default::default(),
-            back_routing: Some((
-                RoutingOptions::IntermediatePath(vec![(&ChainKeypair::random()).into()].try_into()?),
-                (&ChainKeypair::random()).into(),
-            )),
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
@@ -257,17 +247,6 @@ mod tests {
                 "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530".parse()?,
             )),
             capabilities: HashSet::from_iter([Capability::Retransmission, Capability::Segmentation]),
-            back_routing: Some((
-                RoutingOptions::IntermediatePath(
-                    vec![
-                        (&ChainKeypair::random()).into(),
-                        (&ChainKeypair::random()).into(),
-                        (&ChainKeypair::random()).into(),
-                    ]
-                    .try_into()?,
-                ),
-                (&ChainKeypair::random()).into(),
-            )),
         });
 
         assert!(
@@ -278,7 +257,7 @@ mod tests {
 
         let msg = StartProtocol::SessionEstablished(StartEstablished {
             orig_challenge: StartChallenge::MAX,
-            session_id: SessionId::new(u16::MAX, (&ChainKeypair::random()).into()),
+            session_id: SessionId::new(u16::MAX, HoprPseudonym::random()),
         });
 
         assert!(
@@ -298,7 +277,7 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::CloseSession(SessionId::new(u16::MAX, (&ChainKeypair::random()).into()));
+        let msg = StartProtocol::CloseSession(SessionId::new(u16::MAX, HoprPseudonym::random()));
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "CloseSession must fit within {}",

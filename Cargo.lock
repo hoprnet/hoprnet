@@ -5082,7 +5082,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5090,6 +5090,7 @@ dependencies = [
  "async-std",
  "async-trait",
  "bincode",
+ "cfg_eval",
  "futures",
  "hopr-async-runtime",
  "hopr-crypto-packet",

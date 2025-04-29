@@ -248,14 +248,11 @@ where
             db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
-            smgr: SessionManager::new(
-                me_chain_addr,
-                SessionManagerConfig {
-                    session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
-                    initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
-                    idle_timeout: cfg.session.idle_timeout,
-                },
-            ),
+            smgr: SessionManager::new(SessionManagerConfig {
+                session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
+                initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+                idle_timeout: cfg.session.idle_timeout,
+            }),
             cfg,
         }
     }
@@ -544,7 +541,7 @@ where
             self.cfg.protocol.outgoing_ticket_price,
         );
 
-        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<ApplicationData>();
+        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -575,10 +572,10 @@ where
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             spawn(async move {
-                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, |data| {
+                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {
-                        match smgr.dispatch_message(data).await {
+                        match smgr.dispatch_message(pseudonym, data).await {
                             Ok(DispatchResult::Processed) => {
                                 trace!("message dispatch completed");
                                 None

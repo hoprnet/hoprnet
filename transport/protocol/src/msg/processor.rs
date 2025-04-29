@@ -42,8 +42,15 @@ pub struct SendAck {
 }
 
 pub enum RecvOperation {
-    Receive { data: ApplicationData, ack: SendAck },
-    Forward { msg: SendPkt, ack: SendAck },
+    Receive {
+        pseudonym: HoprPseudonym,
+        data: ApplicationData,
+        ack: SendAck,
+    },
+    Forward {
+        msg: SendPkt,
+        ack: SendAck,
+    },
 }
 
 #[async_trait::async_trait]
@@ -138,12 +145,14 @@ where
                 plain_text,
                 ack_key,
                 no_ack,
+                sender,
                 ..
             } => {
                 // If this is not a probe packet, send an acknowledgement back to the previous hop
                 if !no_ack {
                     let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
                     RecvOperation::Receive {
+                        pseudonym: sender,
                         data: app_data,
                         ack: SendAck {
                             peer: previous_hop.into(),

@@ -11,10 +11,7 @@ mod types;
 
 pub use hopr_network_types::types::*;
 pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
-pub use types::{
-    unwrap_chain_address, wrap_with_chain_address, IncomingSession, ServiceId, Session, SessionId, SessionTarget,
-    SESSION_USABLE_MTU_SIZE,
-};
+pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, SESSION_USABLE_MTU_SIZE};
 
 #[cfg(feature = "runtime-tokio")]
 pub use types::transfer_session;
@@ -22,16 +19,12 @@ pub use types::transfer_session;
 use hopr_network_types::prelude::state::SessionFeature;
 use hopr_primitive_types::prelude::Address;
 
-#[cfg(feature = "serde")]
-use {
-    serde::{Deserialize, Serialize},
-    serde_with::{As, DisplayFromStr},
-};
+use hopr_internal_types::prelude::HoprPseudonym;
 
 /// Capabilities of a session.
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::EnumIter, strum::Display, strum::EnumString)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Capability {
     /// Frame segmentation
     Segmentation,
@@ -69,19 +62,20 @@ impl IntoIterator for Capability {
 /// Relevant primarily for the client, since the server is only
 /// a reactive component in regard to the session concept.
 #[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_with::serde_as)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SessionClientConfig {
     /// The peer to which the session should be established.
-    #[cfg_attr(feature = "serde", serde(with = "As::<DisplayFromStr>"))]
+    #[cfg_attr(feature = "serde", serde_as(as = "serde_with::DisplayFromStr"))]
     pub peer: Address,
-
-    /// The fixed path options for the session.
-    pub path_options: RoutingOptions,
-
-    // TODO: add RP support
+    /// The forward path options for the session.
+    pub forward_path_options: RoutingOptions,
+    /// The return path options for the session.
+    pub return_path_options: RoutingOptions,
     /// Contains target protocol and optionally encrypted target of the session.
     pub target: SessionTarget,
-
     /// Capabilities offered by the session.
     pub capabilities: Vec<Capability>,
+    /// Optional pseudonym used for the session. Mostly useful for testing only.
+    pub pseudonym: Option<HoprPseudonym>,
 }
