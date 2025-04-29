@@ -74,6 +74,14 @@ lazy_static::lazy_static! {
     .unwrap();
 }
 
+/// Defines a default retry policy suitable for `RpcClient`.
+/// This is a reimplementation of the legacy "retry policy suitable for `JsonRpcProviderClient`"
+///
+/// This retry policy distinguishes between 4 types of RPC request failures:
+/// - JSON RPC error (based on error code)
+/// - HTTP error (based on HTTP status)
+/// - Transport error (e.g. connection timeout)
+/// - Serde error (some of these are treated as JSON RPC error above, if an error code can be obtained).
 #[derive(Debug, Clone)]
 pub struct DefaultRetryPolicy;
 impl RetryPolicy for DefaultRetryPolicy {
@@ -87,7 +95,7 @@ impl RetryPolicy for DefaultRetryPolicy {
 }
 
 #[derive(Debug, Clone)]
-struct ZeroRetryPolicy;
+pub struct ZeroRetryPolicy;
 impl RetryPolicy for ZeroRetryPolicy {
     fn should_retry(&self, _err: &alloy::transports::TransportError) -> bool {
         false
@@ -1066,6 +1074,7 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use crate::client::MetricsLayer;
+    use crate::client::ZeroRetryPolicy;
     // use crate::client::reqwest_client::ReqwestRequestor;
     // use crate::client::surf_client::SurfRequestor;
     // use crate::client::{
@@ -1073,7 +1082,7 @@ mod tests {
     // };
     use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
     use crate::transport::SurfTransport;
-    use crate::{HttpRequestor, ZeroRetryPolicy};
+    use crate::HttpRequestor;
 
     #[tokio::test]
     async fn test_client_should_deploy_contracts_via_surf() -> anyhow::Result<()> {
@@ -1292,7 +1301,7 @@ mod tests {
         m.assert();
         assert!(matches!(err, alloy::transports::RpcError::Transport(..)));
 
-        // TODO: Create a customize RetryBackoffService that exposes `requests_enqueued``
+        // TODO: Create a customize RetryBackoffService that exposes `requests_enqueued`
         // assert_eq!(
         //     0,
         //     client.requests_enqueued.load(Ordering::SeqCst),
@@ -1300,33 +1309,40 @@ mod tests {
         // );
     }
 
-    // #[async_std::test]
-    // async fn test_client_should_not_retry_with_zero_retry_policy() {
-    //     let mut server = mockito::Server::new_async().await;
+    #[async_std::test]
+    async fn test_client_should_not_retry_with_zero_retry_policy() {
+        let mut server = mockito::Server::new_async().await;
 
-    //     let m = server
-    //         .mock("POST", "/")
-    //         .with_status(404)
-    //         .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
-    //         .with_body("{}")
-    //         .expect(1)
-    //         .create();
+        let m = server
+            .mock("POST", "/")
+            .with_status(404)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
+            .with_body("{}")
+            .expect(1)
+            .create();
 
-    //     let client = JsonRpcProviderClient::new(&server.url(), SurfRequestor::default(), ZeroRetryPolicy::default());
+        let transport_client = SurfTransport::new(url::Url::parse(&server.url()).unwrap());
 
-    //     let err = client
-    //         .request::<_, ethers::types::U64>("eth_blockNumber", ())
-    //         .await
-    //         .expect_err("expected error");
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new_with_policy(2, 100, 100, ZeroRetryPolicy))
+            .transport(transport_client.clone(), transport_client.guess_local());
 
-    //     m.assert();
-    //     assert!(matches!(err, JsonRpcProviderClientError::BackendError(_)));
-    //     assert_eq!(
-    //         0,
-    //         client.requests_enqueued.load(Ordering::SeqCst),
-    //         "retry queue should be zero when policy says no more retries"
-    //     );
-    // }
+        let provider = ProviderBuilder::new().on_client(rpc_client);
+
+        let err = provider
+            .raw_request::<(), alloy::primitives::U64>("eth_blockNumber".into(), ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(err, alloy::transports::RpcError::Transport(..)));
+        // TODO: Create a customize RetryBackoffService that exposes `requests_enqueued`
+        // assert_eq!(
+        //     0,
+        //     client.requests_enqueued.load(Ordering::SeqCst),
+        //     "retry queue should be zero when policy says no more retries"
+        // );
+    }
 
     // #[async_std::test]
     // async fn test_client_should_retry_on_json_rpc_error() {

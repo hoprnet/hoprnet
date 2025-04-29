@@ -226,17 +226,17 @@ pub trait RetryPolicy<E> {
     }
 }
 
-/// Performs no retries.
-#[derive(Clone, Debug)]
-pub struct ZeroRetryPolicy<E>(PhantomData<E>);
+// /// Performs no retries.
+// #[derive(Clone, Debug)]
+// pub struct ZeroRetryPolicy<E>(PhantomData<E>);
 
-impl<E> Default for ZeroRetryPolicy<E> {
-    fn default() -> Self {
-        Self(PhantomData)
-    }
-}
+// impl<E> Default for ZeroRetryPolicy<E> {
+//     fn default() -> Self {
+//         Self(PhantomData)
+//     }
+// }
 
-impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
+// impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
 
 /// Abstraction for an HTTP client that performs HTTP POST with serializable request data.
 #[async_trait]
