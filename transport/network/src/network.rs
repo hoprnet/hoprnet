@@ -204,8 +204,24 @@ where
         Ok(())
     }
 
-    /// Update the peer record with the observation
-    pub async fn update(
+    /// Updates a peer's record with the result of a heartbeat ping.
+    ///
+    /// Adjusts the peer's quality, backoff, and ignore status based on the ping outcome. If the peer's quality drops below configured thresholds, may trigger a connection close or quality update event. Returns an error if called on the local peer.
+    ///
+    /// # Returns
+    /// - `Ok(Some(NetworkTriggeredEvent))` if the peer's status changed and an event should be triggered.
+    /// - `Ok(None)` if the peer is unknown.
+    /// - `Err(NetworkingError)` if the operation is disallowed or a database error occurs.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let peer_id = random_peer_id();
+    /// let network = setup_test_network().await;
+    /// // Simulate a successful ping
+    /// let event = network.update(&peer_id, Ok(Duration::from_millis(50)), Some("1.0.0".to_string())).await.unwrap();
+    /// assert!(matches!(event, Some(NetworkTriggeredEvent::UpdateQuality(_, _))));
+    /// ```    pub async fn update(
         &self,
         peer: &PeerId,
         ping_result: std::result::Result<Duration, ()>,
@@ -307,6 +323,26 @@ where
         Ok(stream.filter_map(filter).collect().await)
     }
 
+    /// Returns a list of peer IDs eligible for pinging based on last seen time, ignore status, and backoff delay.
+    ///
+    /// Peers are filtered to exclude self, those currently within their ignore timeframe, and those whose backoff-adjusted delay has not yet elapsed. The resulting peers are sorted by last seen time in ascending order.
+    ///
+    /// # Parameters
+    /// - `threshold`: The cutoff `SystemTime`; only peers whose next ping is due before this time are considered.
+    ///
+    /// # Returns
+    /// A vector of peer IDs that should be pinged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::time::{SystemTime, Duration};
+    /// # async fn example(network: &Network<impl HoprDbPeersOperations>) {
+    /// let threshold = SystemTime::now();
+    /// let peers = network.find_peers_to_ping(threshold).await.unwrap();
+    /// // `peers` contains the IDs of peers eligible for pinging.
+    /// # }
+    /// ```
     pub async fn find_peers_to_ping(&self, threshold: SystemTime) -> crate::errors::Result<Vec<PeerId>> {
         let stream = self
             .db
@@ -613,6 +649,18 @@ mod tests {
     }
 
     #[async_std::test]
+    /// Tests that the peer backoff value does not exceed the configured maximum after repeated failed heartbeat updates.
+    ///
+    /// This test adds a peer, performs several successful heartbeat updates, then repeatedly fails heartbeat updates until the peer's backoff reaches the configured maximum. It verifies that further failed updates do not increase the backoff beyond this maximum.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use crate::test_network_should_not_overflow_max_backoff;
+    /// # tokio_test::block_on(async {
+    /// test_network_should_not_overflow_max_backoff().await.unwrap();
+    /// # });
+    /// ```
     async fn test_network_should_not_overflow_max_backoff() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
