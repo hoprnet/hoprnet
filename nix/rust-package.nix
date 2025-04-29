@@ -98,7 +98,7 @@ let
     if runCoverage then sharedArgsBase // {
       cargoTestExtraArgs = "--workspace --tests --all-features";
       doCheck = true;
-      nativeBuildInputs = sharedArgsBase.nativeBuildInputs ++ [ cargoLlvmCov ];
+      nativeBuildInputs = sharedArgsBase.nativeBuildInputs ++ [ cargoLlvmCov ]; # add llvm-cov
       postBuild = ''
         # Generate coverage report
         cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
