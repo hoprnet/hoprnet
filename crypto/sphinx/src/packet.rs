@@ -408,7 +408,7 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> MetaPacket<S, H, P> {
     ) -> Result<ForwardedMetaPacket<S, H, P>, SphinxError>
     where
         K: KeyIdMapper<S, H>,
-        F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener<H::PacketReceiverData>>,
+        F: FnMut(&H::PacketReceiverData) -> Option<ReplyOpener>,
     {
         let (alpha, secret) = SharedKeys::<S::E, S::G>::forward_transform(
             Alpha::<<S::G as GroupElement<S::E>>::AlphaLen>::from_slice(self.alpha()),

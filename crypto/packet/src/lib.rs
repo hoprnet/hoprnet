@@ -63,9 +63,6 @@ impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
 /// Single Use Reply Block representation for HOPR protocol.
 pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
-/// Reply opener for a SURB.
-pub type HoprReplyOpener = ReplyOpener<HoprPacketReceiverData>;
-
 /// Size of the maximum packet payload.
 ///
 /// Adjust this value to change the maximum packet size.

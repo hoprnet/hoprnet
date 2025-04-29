@@ -10,7 +10,7 @@ use crate::errors::PacketError::{PacketConstructionError, PacketDecodingError};
 use crate::por::{derive_ack_key_share, generate_proof_of_relay, pre_verify, SurbReceiverInfo};
 use crate::types::{HoprPacketMessage, HoprPacketReceiverData, HoprSurbId};
 use crate::{
-    errors::Result, HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
+    errors::Result, HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
 };
 
 /// Represents an outgoing packet that has been only partially instantiated.
@@ -25,8 +25,8 @@ use crate::{
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PartialHoprPacket {
     partial_packet: PartialPacket<HoprSphinxSuite, HoprSphinxHeaderSpec>,
-    surbs: Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>,
-    openers: Vec<HoprReplyOpener>,
+    surbs: Vec<HoprSurb>,
+    openers: Vec<(HoprSurbId, ReplyOpener)>,
     ticket: Ticket,
     next_hop: OffchainPublicKey,
     ack_challenge: HalfKeyChallenge,
@@ -155,7 +155,7 @@ impl PartialHoprPacket {
 
     /// Turns this partial HOPR packet into a full [`Outgoing`](HoprPacket::Outgoing) [`HoprPacket`] by
     /// attaching the given payload.
-    pub fn into_hopr_packet(self, msg: &[u8]) -> Result<(HoprPacket, Vec<HoprReplyOpener>)> {
+    pub fn into_hopr_packet(self, msg: &[u8]) -> Result<(HoprPacket, Vec<(HoprSurbId, ReplyOpener)>)> {
         let msg = HoprPacketMessage::from_parts(self.surbs, msg)?;
         Ok((
             HoprPacket::Outgoing(
@@ -265,7 +265,7 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P
     return_path: &P,
     recv_data: HoprPacketReceiverData,
     mapper: &M,
-) -> Result<(HoprSurb, ReplyOpener<HoprPacketReceiverData>)> {
+) -> Result<(HoprSurb, (HoprSurbId, ReplyOpener))> {
     let shared_keys = HoprSphinxSuite::new_shared_keys(return_path)?;
     let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
 
@@ -282,7 +282,7 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P
         &por_strings,
         recv_data,
         SurbReceiverInfo::new(por_values, [0u8; 32]),
-    )?)
+    ).map(|(s, r)| (s, (recv_data.surb_id(), r)))?)
 }
 
 impl HoprPacket {
@@ -316,7 +316,7 @@ impl HoprPacket {
         ticket: TicketBuilder,
         mapper: &M,
         domain_separator: &Hash,
-    ) -> Result<(Self, Vec<HoprReplyOpener>)> {
+    ) -> Result<(Self, Vec<(HoprSurbId, ReplyOpener)>)> {
         PartialHoprPacket::new(pseudonym, routing, chain_keypair, ticket, mapper, domain_separator)?
             .into_hopr_packet(msg)
     }
@@ -325,6 +325,12 @@ impl HoprPacket {
     /// also carries a message of the given length.
     pub const fn max_surbs_with_message(msg_len: usize) -> usize {
         HoprPacket::PAYLOAD_SIZE.saturating_sub(msg_len) / HoprSurb::SIZE
+    }
+
+    /// Calculates the maximum length of the message that can be carried by a packet
+    /// with the given number of SURBs.
+    pub const fn max_message_with_surbs(num_surbs: usize) -> usize {
+        HoprPacket::PAYLOAD_SIZE.saturating_sub(num_surbs * HoprSurb::SIZE)
     }
 
     /// Deserializes the packet and performs the forward-transformation, so the
@@ -338,7 +344,7 @@ impl HoprPacket {
     ) -> Result<Self>
     where
         M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>,
-        F: FnMut(&HoprPacketReceiverData) -> Option<HoprReplyOpener>,
+        F: FnMut(&HoprPacketReceiverData) -> Option<ReplyOpener>,
     {
         if data.len() == Self::SIZE {
             let (pre_packet, pre_ticket) =
@@ -506,7 +512,7 @@ mod tests {
         pseudonym: HoprPseudonym,
         return_hops: Vec<usize>,
         msg: &[u8],
-    ) -> anyhow::Result<(HoprPacket, Vec<HoprReplyOpener>)> {
+    ) -> anyhow::Result<(HoprPacket, Vec<(HoprSurbId, ReplyOpener)>)> {
         assert!((0..=3).contains(&forward_hops), "forward hops must be between 1 and 3");
         assert!(
             return_hops.iter().all(|h| (0..=3).contains(h)),
@@ -570,7 +576,7 @@ mod tests {
         openers: F,
     ) -> anyhow::Result<HoprPacket>
     where
-        F: FnMut(&HoprPacketReceiverData) -> Option<HoprReplyOpener>,
+        F: FnMut(&HoprPacketReceiverData) -> Option<ReplyOpener>,
     {
         assert!((0..=4).contains(&node_pos), "node position must be between 1 and 3");
 
@@ -744,7 +750,7 @@ mod tests {
             "surb has invalid por chain length"
         );
 
-        // Reply packet
+        // The reply packet
         let re_msg = b"some testing reply message";
         let mut re_packet = create_packet_from_surb(
             forward_hops + 1,
@@ -756,7 +762,9 @@ mod tests {
 
         let mut openers_fn = |p: &HoprPacketReceiverData| {
             assert_eq!(p.pseudonym(), pseudonym);
-            openers.pop()
+            let opener = openers.pop();
+            assert!(opener.as_ref().is_none_or(|(id,_)| id == &p.surb_id()));
+            opener.map(|(_, opener)| opener)
         };
 
         match &re_packet {
@@ -847,10 +855,12 @@ mod tests {
 
         let mut openers_fn = |p: &HoprPacketReceiverData| {
             assert_eq!(p.pseudonym(), pseudonym);
-            Some(openers.remove(0))
+            let (id, opener) = openers.remove(0);
+            assert_eq!(id, p.surb_id());
+            Some(opener)
         };
 
-        // Reply packet
+        // The reply packet
         for (i, recv_surb) in received_surbs.into_iter().enumerate() {
             let re_msg = format!("some testing reply message {i}");
             let mut re_packet = create_packet_from_surb(
