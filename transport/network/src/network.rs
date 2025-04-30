@@ -3,7 +3,7 @@ use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use std::collections::hash_set::HashSet;
 use std::time::{Duration, SystemTime};
-use tracing::{debug, trace};
+use tracing::debug;
 
 pub use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
 use hopr_platform::time::native::current_time;
@@ -362,7 +362,6 @@ where
                         .map_or(false, |v| v > threshold);
 
                     if should_be_ignored {
-                        trace!(peer = %v.id.1, ?ignore_start, ?threshold, ?self.cfg.ignore_timeframe, "Peer should be ignored during ping");
                         return None;
                     }
                 }
@@ -373,7 +372,6 @@ where
                 if (v.last_seen + delay) < threshold {
                     Some(v)
                 } else {
-                    trace!(peer = %v.id.1, ?v.last_seen, ?delay, ?threshold, "Ping threshold not reached");
                     None
                 }
             })
