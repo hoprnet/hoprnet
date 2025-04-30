@@ -90,18 +90,7 @@ pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    // acknowledgement
-    static ref METRIC_RECEIVED_ACKS: MultiCounter = MultiCounter::new(
-        "hopr_received_ack_count",
-        "Number of received acknowledgements",
-        &["valid"]
-    )
-    .unwrap();
-    static ref METRIC_SENT_ACKS: SimpleCounter =
-        SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
-    static ref METRIC_TICKETS_COUNT: MultiCounter =
-        MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
+lazy_static::lazy_static! {    
     // packet
     static ref METRIC_PACKET_COUNT: MultiCounter = MultiCounter::new(
         "hopr_packets_count",
@@ -171,9 +160,9 @@ where
     #[cfg(all(feature = "prometheus", not(test)))]
     {
         // Initialize the lazy statics here
-        lazy_static::initialize(&METRIC_RECEIVED_ACKS);
-        lazy_static::initialize(&METRIC_SENT_ACKS);
-        lazy_static::initialize(&METRIC_TICKETS_COUNT);
+        // lazy_static::initialize(&METRIC_RECEIVED_ACKS);
+        // lazy_static::initialize(&METRIC_SENT_ACKS);
+        // lazy_static::initialize(&METRIC_TICKETS_COUNT);
         lazy_static::initialize(&METRIC_PACKET_COUNT);
         lazy_static::initialize(&METRIC_PACKET_COUNT_PER_PEER);
         lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);

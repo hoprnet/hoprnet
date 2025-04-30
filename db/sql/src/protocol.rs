@@ -21,7 +21,7 @@ use crate::info::HoprDbInfoOperations;
 use crate::prelude::HoprDbTicketOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::MultiCounter;
+use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -38,6 +38,9 @@ lazy_static::lazy_static! {
         &["valid"]
     )
     .unwrap();
+
+    static ref METRIC_SENT_ACKS: SimpleCounter =
+        SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
 
     static ref METRIC_TICKETS_COUNT: MultiCounter =
         MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
@@ -338,6 +341,9 @@ impl HoprDbProtocolOperations for HoprDb {
             transport_payload.extend_from_slice(out.packet.as_ref());
             transport_payload.extend_from_slice(&out.ticket.into_encoded());
 
+            #[cfg(all(feature = "prometheus", not(test)))]
+            METRIC_SENT_ACKS.increment();
+
             Ok(OutgoingPacket {
                 next_hop: out.next_hop,
                 ack_challenge: out.ack_challenge,
@@ -510,15 +516,7 @@ impl HoprDbProtocolOperations for HoprDb {
 
                 // The contained payload represents an Acknowledgement
                 if incoming.ack_key.is_none() {
-                    // // This is a no-ack packet
-                    // Ok(TransportPacketWithChainData::Final {
-                    //     packet_tag: incoming.packet_tag,
-                    //     previous_hop: incoming.previous_hop,
-                    //     plain_text: incoming.plain_text,
-                    //     ack_key: None,
-                    // })
-
-                    // TODO: Optimize for more than 1 ACK in the payload?
+                    // TODO: Optimize for more than 1 ACK in the payload
                     let ack: Acknowledgement = incoming.plain_text.as_ref().try_into().map_err(|error| {
                         tracing::error!(%error, "failed to decode the acknowledgement");
 
@@ -528,6 +526,9 @@ impl HoprDbProtocolOperations for HoprDb {
                         DbSqlError::DecodingError
                     })?;
 
+                    let ack = ack
+                        .validate(&incoming.previous_hop)
+                        .map_err(|e| crate::errors::DbSqlError::AcknowledgementValidationError(e.to_string()))?;
                     self.handle_acknowledgement(ack).await?;
 
                     Ok(None)

@@ -227,43 +227,50 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
         for j in 0..pending_packet_count {
             debug!("Component: {i} on packet {j}");
 
-            if i != components.len() - 1 {
-                debug!("Resending message to the next");
-                let (peer, data) = components[i]
+            let count = if i == 0 || i == components.len() - 1 { 1 } else { 2 };
+
+            for _i in 0..count {
+                let (dest, payload) = components[i]
                     .1
                     .next()
                     .await
                     .expect("MSG relayer should forward a msg to the next");
 
-                assert_eq!(peer, PEERS[i + 1].public().into());
+                let destination = if i == 0 {
+                    assert_eq!(
+                        dest,
+                        PEERS[i + 1].public().into(),
+                        "first peer should send only data to the next one"
+                    );
+                    i + 1
+                } else if i == components.len() - 1 {
+                    assert_eq!(
+                        dest,
+                        PEERS[i - 1].public().into(),
+                        "last peer should send only ack to the previous one"
+                    );
+                    i - 1
+                } else if dest == PEERS[i + 1].public().into() {
+                    debug!(%dest, "sending data to next");
+                    i + 1
+                } else if dest == PEERS[i - 1].public().into() {
+                    debug!(%dest, "sending ack to previous");
+                    i - 1
+                } else {
+                    panic!("Unexpected destination");
+                };
 
-                debug!(from = i, to = i + 1, "relaying packet");
-                components[i + 1]
+                components[destination]
                     .0
-                    .send((PEERS[i].public().into(), data))
+                    .send((PEERS[i].public().into(), payload))
                     .await
-                    .expect("Send to relayer should succeed");
-            }
-
-            if i != 0 {
-                debug!("Peeking into the ack queue");
-                let (peer, ack) = components[i]
-                    .1
-                    .next()
-                    .await
-                    .expect("MSG relayer should ack the forwarded packet back");
-
-                assert_eq!(peer, PEERS[i - 1].public().into());
-
-                debug!(from = i, to = i - 1, "sending ack back");
-                components[i - 1]
-                    .0
-                    .send((PEERS[i].public().into(), ack))
-                    .await
-                    .expect("ACK send to originator should succeed");
+                    .expect("Sending of payload to the peer failed");
             }
         }
     }
+
+    // TODO: let it live for a while
+    futures::future::pending::<()>().await;
 }
 
 struct TestResolver(Vec<(OffchainPublicKey, Address)>);
