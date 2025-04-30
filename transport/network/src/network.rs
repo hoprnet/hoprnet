@@ -641,7 +641,7 @@ mod tests {
             peers
                 .update(&peer, Ok(std::time::Duration::from_millis(latency)), None)
                 .await?;
-         }
+        }
 
         // iterate until max backoff is reached
         loop {
