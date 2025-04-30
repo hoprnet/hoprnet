@@ -7,6 +7,7 @@ use hopr_network_types::session::state::{SessionConfig, SessionSocket};
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
+use std::sync::atomic::AtomicU64;
 use std::task::Context;
 use std::time::Duration;
 use std::{
@@ -159,8 +160,9 @@ impl Session {
         rx: UnboundedReceiver<Box<[u8]>>,
         shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
         keepalive_abort: Option<futures::stream::AbortHandle>,
+        rx_packet_counter: Arc<AtomicU64>,
     ) -> Self {
-        let inner_session = InnerSession::new(id, routing.clone(), tx, rx);
+        let inner_session = InnerSession::new(id, routing.clone(), tx, rx, rx_packet_counter);
 
         // If we request any capability, we need to use Session protocol
         if !capabilities.is_empty() {
@@ -325,6 +327,7 @@ struct InnerSession {
     tx_buffer: FuturesBuffer,
     rx_buffer: [u8; HoprPacket::PAYLOAD_SIZE],
     rx_buffer_range: (usize, usize),
+    rx_packet_counter: Arc<AtomicU64>,
     closed: bool,
 }
 
@@ -333,7 +336,8 @@ impl InnerSession {
         id: SessionId,
         routing: DestinationRouting,
         tx: Arc<dyn SendMsg + Send + Sync>,
-        rx: UnboundedReceiver<Box<[u8]>>,
+        rx: UnboundedReceiver<Box<[u8]>>, // TODO: change this so it uses Box<dyn Stream<...>>
+        rx_packet_counter: Arc<AtomicU64>,
     ) -> Self {
         Self {
             id,
@@ -344,6 +348,7 @@ impl InnerSession {
             tx_buffer: futures::stream::FuturesUnordered::new(),
             rx_buffer: [0; HoprPacket::PAYLOAD_SIZE],
             rx_buffer_range: (0, 0),
+            rx_packet_counter,
             closed: false,
         }
     }
@@ -393,9 +398,9 @@ impl futures::AsyncWrite for InnerSession {
             let end = ((i + 1) * SESSION_USABLE_MTU_SIZE).min(buf.len());
 
             let payload = ApplicationData::new(tag, &buf[start..end]);
-
             let sender = self.tx.clone();
             let routing = self.routing.clone();
+
             self.tx_buffer
                 .push(Box::pin(async move { sender.send_message(payload, routing).await }));
 
@@ -407,8 +412,8 @@ impl futures::AsyncWrite for InnerSession {
                 Poll::Ready(Some(Ok(_))) => {
                     continue;
                 }
-                Poll::Ready(Some(Err(e))) => {
-                    error!(error = %e, "failed to send the message chunk inside a session");
+                Poll::Ready(Some(Err(error))) => {
+                    error!(%error, "failed to send the message chunk inside a session");
                     break Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
                 }
                 Poll::Ready(None) => {
@@ -428,8 +433,8 @@ impl futures::AsyncWrite for InnerSession {
         }
 
         while let Poll::Ready(Some(result)) = self.tx_buffer.poll_next_unpin(cx) {
-            if let Err(e) = result {
-                error!(error = %e, "failed to send message chunk inside session during flush");
+            if let Err(error) = result {
+                error!(%error, "failed to send message chunk inside session during flush");
                 return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
             }
         }
@@ -472,11 +477,13 @@ impl futures::AsyncRead for InnerSession {
                 }
 
                 buf[..copy_len].copy_from_slice(&data[..copy_len]);
+                self.rx_packet_counter
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                 Poll::Ready(Ok(copy_len))
             }
             Poll::Ready(None) => {
-                self.rx.close();
+                self.rx.close(); // TODO: see if this close is needed here
                 Poll::Ready(Ok(0)) // due to convention, Ok(0) indicates EOF
             }
             //Poll::Ready(None) => Poll::Ready(Err(Error::from(ErrorKind::NotConnected))),
@@ -543,6 +550,7 @@ mod tests {
             DestinationRouting::forward_only(addr, RoutingOptions::Hops(1_u32.try_into()?)),
             Arc::new(mock),
             rx,
+            Arc::new(AtomicU64::new(0)),
         );
 
         assert_eq!(session.id, id);
@@ -562,6 +570,7 @@ mod tests {
             DestinationRouting::forward_only(addr, RoutingOptions::Hops(1_u32.try_into()?)),
             Arc::new(mock),
             rx,
+            Arc::new(AtomicU64::new(0)),
         );
 
         let random_data = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>()
@@ -594,6 +603,7 @@ mod tests {
             DestinationRouting::forward_only(addr, RoutingOptions::Hops(1_u32.try_into()?)),
             Arc::new(mock),
             rx,
+            Arc::new(AtomicU64::new(0)),
         );
 
         let random_data = hopr_crypto_random::random_bytes::<{ HoprPacket::PAYLOAD_SIZE }>()
@@ -642,6 +652,7 @@ mod tests {
             DestinationRouting::forward_only(addr, RoutingOptions::Hops(1_u32.try_into()?)),
             Arc::new(mock),
             rx,
+            Arc::new(AtomicU64::new(0)),
         );
 
         let bytes_written = session.write(&data).await?;
@@ -672,6 +683,7 @@ mod tests {
             DestinationRouting::Return(SurbMatcher::Pseudonym(id.pseudonym)),
             Arc::new(mock),
             rx,
+            Arc::new(AtomicU64::new(0)),
         );
 
         let bytes_written = session.write(&data).await?;
@@ -702,6 +714,7 @@ mod tests {
             DestinationRouting::forward_only(addr, RoutingOptions::Hops(1_u32.try_into()?)),
             Arc::new(mock),
             rx,
+            Arc::new(AtomicU64::new(0)),
         );
 
         let bytes_written = session.write(&data).await?;

@@ -1,4 +1,4 @@
-use crate::balancer::{keep_alive_stream, KeepAliveController};
+use crate::balancer::{keep_alive_stream, CountingSendMsg, KeepAliveController, SurbBalancer, SurbBalancerConfig};
 use crate::errors::{SessionManagerError, TransportSessionError};
 use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
@@ -12,6 +12,7 @@ use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
 use hopr_network_types::prelude::*;
 use std::ops::Range;
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
@@ -355,7 +356,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     fn spawn_keep_alive_stream(
         &self,
         session_id: SessionId,
-        sender: Arc<S>,
+        sender: Arc<CountingSendMsg<S>>,
         routing: DestinationRouting,
     ) -> KeepAliveController {
         let (ka_stream, ka_controller) = keep_alive_stream(
@@ -469,26 +470,53 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     METRIC_ACTIVE_SESSIONS.increment(1.0);
                 }
 
-                let sender = Arc::new(msg_sender.clone());
-
-                let mut ka_abort: Option<futures::stream::AbortHandle> = None;
-
                 if cfg.automatic_surb_management {
-                    let (_ka_controller, ka_abort_h) = self
+                    let surb_production_counter = Arc::new(AtomicU64::new(0));
+                    let surb_consumption_counter = Arc::new(AtomicU64::new(0));
+
+                    // Sender responsible for keep-alive and Session data is counting produced SURBS
+                    let sender = Arc::new(CountingSendMsg::new(
+                        msg_sender.clone(),
+                        surb_production_counter.clone(),
+                    ));
+
+                    // Spawn the SURB-bearing keep alive stream
+                    let (ka_controller, ka_abort) = self
                         .spawn_keep_alive_stream(session_id, sender.clone(), forward_routing.clone())
                         .split();
-                    ka_abort = Some(ka_abort_h);
-                }
 
-                Ok(Session::new(
-                    session_id,
-                    forward_routing,
-                    cfg.capabilities.into_iter().collect(),
-                    sender,
-                    rx,
-                    self.session_notifiers.get().map(|(_, c)| c.clone()),
-                    ka_abort,
-                ))
+                    let session = Session::new(
+                        session_id,
+                        forward_routing,
+                        cfg.capabilities.into_iter().collect(),
+                        sender,
+                        rx,
+                        self.session_notifiers.get().map(|(_, c)| c.clone()),
+                        Some(ka_abort),
+                        surb_consumption_counter.clone(), // Received packets = SURB consumption estimate
+                    );
+
+                    // TODO: complete the SURB balancing
+                    let _balancer = SurbBalancer::new(
+                        surb_production_counter,
+                        surb_consumption_counter,
+                        ka_controller,
+                        SurbBalancerConfig::default(),
+                    );
+
+                    Ok(session)
+                } else {
+                    Ok(Session::new(
+                        session_id,
+                        forward_routing,
+                        cfg.capabilities.into_iter().collect(),
+                        Arc::new(msg_sender.clone()),
+                        rx,
+                        self.session_notifiers.get().map(|(_, c)| c.clone()),
+                        None,
+                        Arc::new(AtomicU64::new(0)),
+                    ))
+                }
             }
             Either::Left((Ok(None), _)) => Err(SessionManagerError::Other(
                 "internal error: sender has been closed without completing the session establishment".into(),
@@ -608,6 +636,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         rx_session_data,
                         close_session_notifier.into(),
                         None, // Keep-alives are not sent by the server
+                        Arc::new(AtomicU64::new(0)),
                     );
 
                     // Extract useful information about the session from the Start protocol message
