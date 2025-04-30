@@ -637,15 +637,11 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
-        peers
-            .update(&peer, Ok(std::time::Duration::from_millis(123_u64)), None)
-            .await?;
-        peers
-            .update(&peer, Ok(std::time::Duration::from_millis(200_u64)), None)
-            .await?;
-        peers
-            .update(&peer, Ok(std::time::Duration::from_millis(200_u64)), None)
-            .await?;
+        for latency in [123_u64, 200_u64, 200_u64] {
+            peers
+                .update(&peer, Ok(std::time::Duration::from_millis(latency)), None)
+                .await?;
+         }
 
         // iterate until max backoff is reached
         loop {
