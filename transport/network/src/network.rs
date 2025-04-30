@@ -213,15 +213,6 @@ where
     /// - `Ok(None)` if the peer is unknown.
     /// - `Err(NetworkingError)` if the operation is disallowed or a database error occurs.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// let peer_id = random_peer_id();
-    /// let network = setup_test_network().await;
-    /// // Simulate a successful ping
-    /// let event = network.update(&peer_id, Ok(Duration::from_millis(50)), Some("1.0.0".to_string())).await.unwrap();
-    /// assert!(matches!(event, Some(NetworkTriggeredEvent::UpdateQuality(_, _))));
-    /// ```    
     pub async fn update(
         &self,
         peer: &PeerId,
@@ -334,16 +325,6 @@ where
     /// # Returns
     /// A vector of peer IDs that should be pinged.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::time::{SystemTime, Duration};
-    /// async fn example(network: &Network<impl HoprDbPeersOperations>) {
-    ///   let threshold = SystemTime::now();
-    ///   let peers = network.find_peers_to_ping(threshold).await.unwrap();
-    ///   // `peers` contains the IDs of peers eligible for pinging.
-    /// }
-    /// ```
     pub async fn find_peers_to_ping(&self, threshold: SystemTime) -> crate::errors::Result<Vec<PeerId>> {
         let stream = self
             .db
