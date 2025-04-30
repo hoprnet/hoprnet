@@ -2,7 +2,4 @@
 name = "sdk-localcluster"
 version = "1.0.0"
 requires-python = ">=3.12,<3.13"
-dependencies = [
-    "click>=8.1.8",
-    "pyyaml>=6.0.2",
-]
+dependencies = ["click>=8.1.8", "pyyaml>=6.0.2"]
