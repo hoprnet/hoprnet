@@ -167,7 +167,7 @@ mod tests {
     use super::*;
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_crypto_random::Randomizable;
-    use hopr_internal_types::prelude::HoprPseudonym;
+    use hopr_internal_types::prelude::{HoprPseudonym, Tag};
     use hopr_network_types::prelude::SealedHost;
 
     use crate::SessionId;
@@ -182,7 +182,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(1, tag);
+        assert_eq!(StartProtocolDiscriminants::StartSession as Tag + 1, tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -199,7 +199,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(2, tag);
+        assert_eq!(StartProtocolDiscriminants::SessionEstablished as Tag + 1, tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -216,7 +216,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(3, tag);
+        assert_eq!(StartProtocolDiscriminants::SessionError as Tag + 1, tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -230,7 +230,21 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::CloseSession(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(4, tag);
+        assert_eq!(StartProtocolDiscriminants::CloseSession as Tag + 1, tag);
+
+        let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
+
+        assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn start_protocol_keep_alive_message_should_encode_and_decode() -> anyhow::Result<()> {
+        let msg_1 = StartProtocol::<i32>::KeepAlive(10);
+
+        let (tag, msg) = msg_1.clone().encode()?;
+        assert_eq!(StartProtocolDiscriminants::KeepAlive as Tag + 1, tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -241,7 +255,7 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn start_protocol_messages_must_fit_within_hopr_packet() -> anyhow::Result<()> {
-        let msg = StartProtocol::<i32>::StartSession(StartInitiation {
+        let msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
             challenge: StartChallenge::MAX,
             target: SessionTarget::TcpStream(SealedHost::Plain(
                 "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530".parse()?,
@@ -282,6 +296,25 @@ mod tests {
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "CloseSession must fit within {}",
             HoprPacket::PAYLOAD_SIZE
+        );
+
+        let msg = StartProtocol::KeepAlive(SessionId::new(u16::MAX, HoprPseudonym::random()));
+        assert!(
+            msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
+            "KeepAlive must fit within {}",
+            HoprPacket::PAYLOAD_SIZE
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_message_keep_alive_message_should_allow_for_at_least_two_surbs() -> anyhow::Result<()> {
+        let msg = StartProtocol::KeepAlive(SessionId::new(u16::MAX, HoprPseudonym::random()));
+        let len = msg.encode()?.1.len();
+        assert!(
+            HoprPacket::max_surbs_with_message(len) >= 2,
+            "KeepAlive message size ({len}) must allow for at least two surbs in packet"
         );
 
         Ok(())

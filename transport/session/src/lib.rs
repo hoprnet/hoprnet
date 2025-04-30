@@ -9,7 +9,6 @@ mod manager;
 pub mod traits;
 mod types;
 
-
 pub use hopr_network_types::types::*;
 pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
 pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, SESSION_USABLE_MTU_SIZE};
@@ -79,4 +78,6 @@ pub struct SessionClientConfig {
     pub capabilities: Vec<Capability>,
     /// Optional pseudonym used for the session. Mostly useful for testing only.
     pub pseudonym: Option<HoprPseudonym>,
+    /// Enable automatic SURB management for the Session.
+    pub automatic_surb_management: bool,
 }

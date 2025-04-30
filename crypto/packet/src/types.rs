@@ -179,7 +179,7 @@ mod tests {
 
     use crate::packet::HoprPacket;
     use crate::por::{generate_proof_of_relay, SurbReceiverInfo};
-    use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite};
+    use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb};
 
     lazy_static::lazy_static! {
         static ref PEERS: [(ChainKeypair, OffchainKeypair); 4] = [
@@ -284,9 +284,9 @@ mod tests {
 
     #[test]
     fn hopr_packet_size_msg_and_surb_size_limit() -> anyhow::Result<()> {
-        let test_msg = b"message that is too long to fit with 2 surbs";
+        let test_msg = [0u8; HoprPacket::PAYLOAD_SIZE - 2 * HoprSurb::SIZE + 1];
         let surbs = generate_surbs(2)?;
-        let res = HoprPacketMessage::from_parts(surbs, test_msg);
+        let res = HoprPacketMessage::from_parts(surbs, &test_msg);
         assert!(res.is_err());
         Ok(())
     }

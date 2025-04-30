@@ -326,6 +326,9 @@ impl HoprPacket {
         HoprPacket::PAYLOAD_SIZE.saturating_sub(msg_len) / HoprSurb::SIZE
     }
 
+    /// The maximum number of SURBs that fit into a packet that contains no message.
+    pub const MAX_SURBS_IN_PACKET: usize = HoprPacket::PAYLOAD_SIZE / HoprSurb::SIZE;
+
     /// Calculates the maximum length of the message that can be carried by a packet
     /// with the given number of SURBs.
     pub const fn max_message_with_surbs(num_surbs: usize) -> usize {

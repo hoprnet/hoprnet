@@ -1,19 +1,20 @@
-use futures::channel::mpsc::UnboundedSender;
-use futures::future::Either;
-use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
-use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
-use hopr_network_types::prelude::*;
-use std::ops::Range;
-use std::sync::{Arc, OnceLock};
-use std::time::Duration;
-use tracing::{debug, error, info, trace, warn};
-
+use crate::balancer::{keep_alive_stream, KeepAliveController};
 use crate::errors::{SessionManagerError, TransportSessionError};
 use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
 };
 use crate::traits::SendMsg;
 use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
+use futures::channel::mpsc::UnboundedSender;
+use futures::future::Either;
+use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
+use hopr_network_types::prelude::*;
+use std::ops::Range;
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
+use tracing::{debug, error, info, trace, warn};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -68,6 +69,13 @@ pub struct SessionManagerConfig {
     /// Default is 180 seconds.
     #[default(Duration::from_secs(180))]
     pub idle_timeout: Duration,
+
+    /// The initial amount Session initiator's SURB upload per second to the Session's counterparty.
+    ///
+    /// Default is 100.
+    /// This is currently 50 HOPR packets per second (one empty packet can carry 2 SURBs).
+    #[default(100)]
+    pub initial_surb_upload_rate: usize,
 }
 
 fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
@@ -197,7 +205,7 @@ pub enum DispatchResult {
 ///
 /// Once the manager is [started](SessionManager::start), the [`SessionManager::dispatch_message`]
 /// should be called for each [`ApplicationData`] received by the node.
-/// This way, the `SessionManager` takes care of proper processing of the Start sub-protocol
+/// This way, the `SessionManager` takes care of proper Start sub-protocol message processing
 /// and correct dispatch of Session-related packets to individual existing Sessions.
 ///
 /// Secondly, the manager can initiate new outgoing sessions via [`SessionManager::new_session`].
@@ -344,6 +352,41 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         self.session_notifiers.get().is_some()
     }
 
+    fn spawn_keep_alive_stream(
+        &self,
+        session_id: SessionId,
+        sender: Arc<S>,
+        routing: DestinationRouting,
+    ) -> KeepAliveController {
+        let (ka_stream, ka_controller) = keep_alive_stream(
+            session_id,
+            self.cfg.initial_surb_upload_rate,
+            HoprPacket::MAX_SURBS_IN_PACKET as u32 * Duration::from_secs(1),
+        );
+        let sender_clone = sender.clone();
+        let fwd_routing_clone = routing.clone();
+
+        // This task will automatically terminate once the returned controller aborts the stream
+        let _ = hopr_async_runtime::prelude::spawn(
+            ka_stream
+                .map(ApplicationData::try_from)
+                .try_for_each_concurrent(None, move |msg| {
+                    let sender_clone = sender_clone.clone();
+                    let fwd_routing_clone = fwd_routing_clone.clone();
+                    async move { sender_clone.send_message(msg, fwd_routing_clone).await }
+                })
+                .then(move |res| {
+                    match res {
+                        Ok(_) => debug!(%session_id, "keep-alive stream done"),
+                        Err(error) => error!(%session_id, %error, "keep-alive stream failed"),
+                    }
+                    futures::future::ready(())
+                }),
+        );
+
+        ka_controller
+    }
+
     /// Initiates a new outgoing Session with the given configuration.
     ///
     /// If the Session's counterparty does not respond within
@@ -426,17 +469,25 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     METRIC_ACTIVE_SESSIONS.increment(1.0);
                 }
 
-                // TODO: configurable initial rate
-                //let _keep_alives = KeepAliveControl::new(session_id, msg_sender.clone(), forward_routing.clone(), 1000);
+                let sender = Arc::new(msg_sender.clone());
+
+                let mut ka_abort: Option<futures::stream::AbortHandle> = None;
+
+                if cfg.automatic_surb_management {
+                    let (_ka_controller, ka_abort_h) = self
+                        .spawn_keep_alive_stream(session_id, sender.clone(), forward_routing.clone())
+                        .split();
+                    ka_abort = Some(ka_abort_h);
+                }
 
                 Ok(Session::new(
                     session_id,
                     forward_routing,
                     cfg.capabilities.into_iter().collect(),
-                    Arc::new(msg_sender.clone()),
+                    sender,
                     rx,
                     self.session_notifiers.get().map(|(_, c)| c.clone()),
-                    None, // TODO
+                    ka_abort,
                 ))
             }
             Either::Left((Ok(None), _)) => Err(SessionManagerError::Other(
@@ -875,6 +926,7 @@ mod tests {
                 target: SessionTarget::TcpStream(target.clone()),
                 capabilities: vec![Capability::Segmentation],
                 pseudonym: alice_pseudonym.into(),
+                automatic_surb_management: false,
             }),
             new_session_rx_bob.next(),
         )
@@ -1001,6 +1053,7 @@ mod tests {
                 target: SessionTarget::TcpStream(target.clone()),
                 capabilities: vec![Capability::Segmentation],
                 pseudonym: alice_pseudonym.into(),
+                automatic_surb_management: false,
             }),
             new_session_rx_bob.next(),
         )
@@ -1098,6 +1151,7 @@ mod tests {
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: vec![],
                 pseudonym: alice_pseudonym.into(),
+                automatic_surb_management: false,
             })
             .await;
 
@@ -1150,6 +1204,7 @@ mod tests {
                 target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 capabilities: vec![],
                 pseudonym: None,
+                automatic_surb_management: false,
             })
             .await;
 

@@ -1,7 +1,7 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
@@ -9,45 +9,71 @@ use futures::Stream;
 use futures_timer::Delay;
 use pin_project::pin_project;
 
-/// Controller for [`RateLimitedStream`] to allow to remotely control the stream's rate.
+/// Controller for [`RateLimitedStream`] to allow dynamic controlling of the stream's rate.
 #[derive(Debug)]
-pub struct RateController(Arc<AtomicUsize>);
+pub struct RateController(Arc<AtomicUsize>, Arc<AtomicUsize>);
 
 impl RateController {
     /// Update the rate limit (elements per second)
-    pub fn set_rate(&self, elements_per_second: usize) {
+    pub fn set_rate_per_sec(&self, elements_per_second: usize) {
         self.0.store(elements_per_second, Ordering::Relaxed);
     }
 
-    /// Get the current rate limit
-    pub fn get_rate(&self) -> usize {
-        self.0.load(Ordering::Relaxed)
+    /// Update the rate limit (elements per unit).
+    pub fn set_rate_per_unit(&self, elements_per_unit: usize, unit: Duration) {
+        self.0.store(elements_per_unit, Ordering::Relaxed);
+        self.1.store(unit.as_millis() as usize, Ordering::Relaxed);
+    }
+
+    /// Get the current rate limit per second.
+    pub fn get_rate_per_sec(&self) -> f64 {
+        self.0.load(Ordering::Relaxed) as f64
+            / Duration::from_millis(self.1.load(Ordering::Relaxed) as u64).as_secs_f64()
+    }
+
+    /// Get the current rate limit per time unit.
+    pub fn get_rate_per_unit(&self) -> (usize, Duration) {
+        (
+            self.0.load(Ordering::Relaxed),
+            Duration::from_millis(self.1.load(Ordering::Relaxed) as u64),
+        )
     }
 }
 
-/// A stream adapter that yields elements at a controlled rate.
+/// A stream adapter that yields elements at a controlled rate, with dynamic rate adjustment.
 ///
 /// See [`RateLimitExt::rate_limit`].
 #[pin_project]
 pub struct RateLimitedStream<S> {
     #[pin]
     inner: S,
-    elements_per_second: Arc<AtomicUsize>,
+    elements_per_unit: Arc<AtomicUsize>,
+    unit_in_ms: Arc<AtomicUsize>,
     last_yield: Option<Instant>,
     #[pin]
     delay: Option<Delay>,
 }
 
 impl<S> RateLimitedStream<S> {
+    /// Creates a stream with some initial rate limit of elements per a time unit.
+    pub fn new_with_rate_per_unit(stream: S, initial_rate_per_unit: usize, unit: Duration) -> (Self, RateController) {
+        let rate = Arc::new(AtomicUsize::new(initial_rate_per_unit));
+        let unit = Arc::new(AtomicUsize::new(unit.as_millis() as usize));
+        (
+            Self {
+                inner: stream,
+                elements_per_unit: rate.clone(),
+                unit_in_ms: unit.clone(),
+                last_yield: None,
+                delay: None,
+            },
+            RateController(rate, unit),
+        )
+    }
+
     /// Creates a stream with some initial rate limit of elements per second.
-    pub fn new(stream: S, initial_rate: usize) -> (Self, RateController) {
-        let rate = Arc::new(AtomicUsize::new(initial_rate));
-        (Self {
-            inner: stream,
-            elements_per_second: rate.clone(),
-            last_yield: None,
-            delay: None,
-        }, RateController(rate))
+    pub fn new(stream: S, initial_rate_per_second: usize) -> (Self, RateController) {
+        Self::new_with_rate_per_unit(stream, initial_rate_per_second, Duration::from_secs(1))
     }
 }
 
@@ -59,7 +85,7 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
-        
+
         // Check if we're waiting for a delay to complete
         if let Some(delay) = this.delay.as_mut().as_pin_mut() {
             match delay.poll(cx) {
@@ -78,20 +104,23 @@ where
         match this.inner.as_mut().poll_next(cx) {
             Poll::Ready(Some(item)) => {
                 let now = Instant::now();
-                
+
                 // Update last yield time
                 *this.last_yield = Some(now);
-                
+
                 // Calculate the next allowable time based on the rate
-                let rate = this.elements_per_second.load(Ordering::Relaxed);
-                if rate > 0 {
+                let units = this.elements_per_unit.load(Ordering::Relaxed);
+                if units > 0 {
+                    let rate_per_sec = units as f64
+                        / Duration::from_millis(this.unit_in_ms.load(Ordering::Relaxed) as u64).as_secs_f64();
+
                     // Convert to duration (seconds per element)
-                    let delay_duration = Duration::from_secs_f64(1.0 / rate as f64);
-                    
+                    let delay_duration = Duration::from_secs_f64(1.0 / rate_per_sec);
+
                     // Create a delay for the calculated duration
                     *this.delay = Some(Delay::new(delay_duration));
                 }
-                
+
                 Poll::Ready(Some(item))
             }
             other => other,
@@ -106,6 +135,18 @@ pub trait RateLimitExt: Stream + Sized {
     /// the returned [`RateController`].
     ///
     /// If `elements_per_second` is 0, no rate limiting is applied.
+    fn rate_limit_per_unit(
+        self,
+        elements_per_second: usize,
+        unit: Duration,
+    ) -> (RateLimitedStream<Self>, RateController) {
+        RateLimitedStream::new_with_rate_per_unit(self, elements_per_second, unit)
+    }
+
+    /// Convenience extension method to create a rate-limited stream with the given
+    /// number of elements per second.
+    ///
+    /// See [`RateLimitExt::rate_limit_per_unit`] for details.
     fn rate_limit(self, elements_per_second: usize) -> (RateLimitedStream<Self>, RateController) {
         RateLimitedStream::new(self, elements_per_second)
     }
@@ -127,7 +168,7 @@ mod tests {
         // Set a rate of 10 elements per second (100ms per element)
         let (rate_limited, controller) = stream.rate_limit(10);
 
-        assert_eq!(controller.get_rate(), 10);
+        assert_eq!(controller.get_rate_per_sec(), 10.0);
 
         let start = Instant::now();
 
@@ -142,12 +183,18 @@ mod tests {
         // Verify the rate limiting worked
         // With 5 elements at 10 per second; we expect ~400ms (4 delays of 100ms)
         // We use 300ms as a lower bound to account for processing time
-        assert!(elapsed >= Duration::from_millis(300),
-                "Stream completed too quickly: {:?}", elapsed);
+        assert!(
+            elapsed >= Duration::from_millis(300),
+            "Stream completed too quickly: {:?}",
+            elapsed
+        );
 
         // We use 600ms as an upper bound to allow for some overhead
-        assert!(elapsed <= Duration::from_millis(600),
-                "Stream completed too slowly: {:?}", elapsed);
+        assert!(
+            elapsed <= Duration::from_millis(600),
+            "Stream completed too slowly: {:?}",
+            elapsed
+        );
     }
 
     #[async_std::test]
@@ -156,7 +203,7 @@ mod tests {
         let stream = stream::iter::<Vec<i32>>(vec![]);
 
         // Apply rate limiting
-        let (mut rate_limited,_) = stream.rate_limit(10);
+        let (mut rate_limited, _) = stream.rate_limit(10);
 
         // Verify we get None right away
         assert_eq!(rate_limited.next().await, None);
@@ -181,8 +228,11 @@ mod tests {
         assert_eq!(items, vec![1, 2, 3]);
 
         // Verify there was no rate limiting (should be very fast)
-        assert!(elapsed < Duration::from_millis(50),
-                "Stream with zero rate took too long: {:?}", elapsed);
+        assert!(
+            elapsed < Duration::from_millis(50),
+            "Stream with zero rate took too long: {:?}",
+            elapsed
+        );
     }
 
     #[async_std::test]
@@ -206,7 +256,7 @@ mod tests {
         let first_half_elapsed = start.elapsed();
 
         // Change rate to 2 elements per second (500ms per element)
-        controller.set_rate(2);
+        controller.set_rate_per_sec(2);
 
         // Consume last 3 elements
         for i in 4..=6 {
@@ -219,16 +269,28 @@ mod tests {
         let second_half_elapsed = total_elapsed - first_half_elapsed;
 
         // First 3 elements at 5 per second should take ~400ms (2 delays)
-        assert!(first_half_elapsed >= Duration::from_millis(300),
-                "First half too fast: {:?}", first_half_elapsed);
-        assert!(first_half_elapsed <= Duration::from_millis(700),
-                "First half too slow: {:?}", first_half_elapsed);
+        assert!(
+            first_half_elapsed >= Duration::from_millis(300),
+            "First half too fast: {:?}",
+            first_half_elapsed
+        );
+        assert!(
+            first_half_elapsed <= Duration::from_millis(700),
+            "First half too slow: {:?}",
+            first_half_elapsed
+        );
 
         // Last 3 elements at 2 per second should take ~1000ms (2 delays)
-        assert!(second_half_elapsed >= Duration::from_millis(800),
-                "Second half too fast: {:?}", second_half_elapsed);
-        assert!(second_half_elapsed <= Duration::from_millis(1500),
-                "Second half too slow: {:?}", second_half_elapsed);
+        assert!(
+            second_half_elapsed >= Duration::from_millis(800),
+            "Second half too fast: {:?}",
+            second_half_elapsed
+        );
+        assert!(
+            second_half_elapsed <= Duration::from_millis(1500),
+            "Second half too slow: {:?}",
+            second_half_elapsed
+        );
     }
 
     #[async_std::test]
@@ -253,8 +315,11 @@ mod tests {
 
         // Even at a high rate, processing 100 elements should take some time
         // but less than 200ms (theoretical time would be ~99ms)
-        assert!(elapsed < Duration::from_millis(200),
-                "Very high rate stream took too long: {:?}", elapsed);
+        assert!(
+            elapsed < Duration::from_millis(200),
+            "Very high rate stream took too long: {:?}",
+            elapsed
+        );
     }
 
     #[async_std::test]
@@ -291,7 +356,7 @@ mod tests {
             Delay::new(Duration::from_millis(100)).await;
 
             // Change the rate to 20 per second
-            controller.set_rate(20);
+            controller.set_rate_per_sec(20);
 
             // Return the new rate
             20

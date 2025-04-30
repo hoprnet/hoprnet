@@ -68,7 +68,7 @@ pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 /// Adjust this value to change the maximum packet size.
 ///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
-pub(crate) const PAYLOAD_SIZE_INT: usize = 800;
+pub(crate) const PAYLOAD_SIZE_INT: usize = 900;
 
 #[cfg(test)]
 mod tests {
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn packet_length() {
         let packet_len = HoprPacket::SIZE;
-        assert_eq!(packet_len, 1238);
+        assert_eq!(packet_len, 438 + PAYLOAD_SIZE_INT);
     }
 
     #[test]
