@@ -21,6 +21,7 @@ mod m20241112_000018_logs_add_index;
 mod m20250107_000019_logs_meta_table;
 mod m20250219_000020_logs_add_index;
 mod m20250219_000021_channels_add_index;
+mod m20250430_000022_peers_reset;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -65,6 +66,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250107_000019_logs_meta_table::Migration),
             Box::new(m20250219_000020_logs_add_index::Migration),
             Box::new(m20250219_000021_channels_add_index::Migration),
+            Box::new(m20250430_000022_peers_reset::Migration),
         ]
     }
 }
@@ -105,6 +107,7 @@ impl MigratorTrait for MigratorPeers {
             Box::new(m20240926_000016_peers_create_peer_store_with_new_sea_orm::Migration(
                 BackendType::SQLite,
             )),
+            Box::new(m20250430_000022_peers_reset::Migration),
         ]
     }
 }
