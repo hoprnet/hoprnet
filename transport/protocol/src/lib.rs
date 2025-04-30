@@ -90,7 +90,7 @@ pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {    
+lazy_static::lazy_static! {
     // packet
     static ref METRIC_PACKET_COUNT: MultiCounter = MultiCounter::new(
         "hopr_packets_count",
