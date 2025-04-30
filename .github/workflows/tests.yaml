@@ -58,9 +58,6 @@ jobs:
         run: |
           nix build .#hopr-test
 
-      - name: Debug coverage output
-        run: ls -R ./target/llvm-cov-target
-
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:

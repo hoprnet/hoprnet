@@ -21,7 +21,7 @@
 , runClippy ? false
 , runTests ? false
 , runBench ? false
-, runCoverage ? false
+, runTestsWithCoverage ? false
 , solcDefault
 , src
 , stdenv
@@ -95,7 +95,7 @@ let
   };
 
   sharedArgs =
-    if runCoverage then sharedArgsBase // {
+    if runTestsWithCoverage then sharedArgsBase // {
       cargoTestExtraArgs = "--workspace -F runtime-async-std -F runtime-tokio";
       doCheck = true;
       nativeBuildInputs = sharedArgsBase.nativeBuildInputs ++ [ cargoLlvmCov ]; # add llvm-cov
@@ -139,7 +139,7 @@ let
     mkCargoDerivation = craneLib.mkCargoDerivation;
   };
   builder =
-    if runCoverage then craneLib.cargoTest # Use cargoTest for coverage
+    if runTestsWithCoverage then craneLib.cargoTest # Use cargoTest for coverage
     else if runTests then craneLib.cargoTest
     else if runClippy then craneLib.cargoClippy
     else if buildDocs then craneLib.cargoDoc

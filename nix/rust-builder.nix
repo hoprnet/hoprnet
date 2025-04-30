@@ -48,9 +48,7 @@ let
 
   rustToolchain =
     if useRustNightly
-    then pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
-          extensions = [ "llvm-tools-preview" ];
-        })
+    then pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)
     else
       (pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile
         ../rust-toolchain.toml).override { 
