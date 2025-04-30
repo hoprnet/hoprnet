@@ -13,7 +13,6 @@ use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
 };
 use crate::traits::SendMsg;
-use crate::types::KeepAliveControl;
 use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -428,7 +427,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 }
 
                 // TODO: configurable initial rate
-                let _keep_alives = KeepAliveControl::new(session_id, msg_sender.clone(), forward_routing.clone(), 1000);
+                //let _keep_alives = KeepAliveControl::new(session_id, msg_sender.clone(), forward_routing.clone(), 1000);
 
                 Ok(Session::new(
                     session_id,
@@ -529,6 +528,8 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 if let Some(session_id) = insert_into_next_slot(
                     &self.sessions,
                     |sid| {
+                        // NOTE: It is allowed to insert sessions using the same tag
+                        // but different pseudonyms because the SessionId is different.
                         let next_tag = match sid {
                             Some(session_id) => ((session_id.tag() + 1) % self.cfg.session_tag_range.end)
                                 .max(self.cfg.session_tag_range.start),
@@ -1039,15 +1040,14 @@ mod tests {
         let bob_mgr = SessionManager::new(cfg);
 
         // Occupy the only free slot with tag 16
-        let another_pseudonym = HoprPseudonym::random();
         let (dummy_tx, _) = futures::channel::mpsc::unbounded();
         bob_mgr
             .sessions
             .insert(
-                SessionId::new(16, another_pseudonym),
+                SessionId::new(16, alice_pseudonym),
                 CachedSession {
                     session_tx: Arc::new(dummy_tx),
-                    routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(another_pseudonym)),
+                    routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
                 },
             )
             .await;
