@@ -2,12 +2,13 @@
 //!
 //! The session proxies the user interactions with the transport in order to hide the
 //! advanced interactions and functionality.
-
+pub(crate) mod balancer;
 pub mod errors;
 mod initiation;
 mod manager;
 pub mod traits;
 mod types;
+
 
 pub use hopr_network_types::types::*;
 pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};

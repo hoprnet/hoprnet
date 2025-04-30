@@ -5092,6 +5092,7 @@ dependencies = [
  "bincode",
  "cfg_eval",
  "futures",
+ "futures-timer",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
@@ -5103,6 +5104,8 @@ dependencies = [
  "lazy_static",
  "mockall",
  "moka",
+ "pid",
+ "pin-project",
  "serde",
  "serde_with",
  "smart-default",
@@ -7453,6 +7456,15 @@ checksum = "e9567389417feee6ce15dd6527a8a1ecac205ef62c2932bcf3d9f6fc5b78b414"
 dependencies = [
  "futures",
  "rustc_version 0.4.1",
+]
+
+[[package]]
+name = "pid"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c931ef9756cd5e3fa3d395bfe09df4dfa6f0612c6ca8f6b12927d17ca34e36"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]

@@ -157,8 +157,8 @@ impl KeepAliveControl {
         Self {
             sending_rate_per_sec,
             _jh: hopr_async_runtime::prelude::spawn(async move {
-                // TODO: add delay and rate-limiting with decay
-                if let Err(error) = futures::stream::repeat_with(|| Ok(StartProtocol::KeepAlive(session_id)))
+                if let Err(error) =
+                    futures::stream::repeat_with(|| Ok(StartProtocol::KeepAlive(session_id)))
                     .try_for_each(|msg| {
                         let routing_cpy = routing_cpy.clone();
                         let keepalive_sender = tx_cpy.clone();
