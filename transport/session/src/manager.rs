@@ -501,6 +501,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         surb_production_counter,
                         surb_consumption_counter,
                         ka_controller,
+                        session_id,
                         SurbBalancerConfig::default(),
                     );
 
