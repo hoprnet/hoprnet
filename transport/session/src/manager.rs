@@ -7,6 +7,7 @@ use crate::traits::SendMsg;
 use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::Either;
+use futures::stream::AbortHandle;
 use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
@@ -77,6 +78,14 @@ pub struct SessionManagerConfig {
     /// This is currently 50 HOPR packets per second (one empty packet can carry 2 SURBs).
     #[default(100)]
     pub initial_surb_upload_rate: usize,
+
+    /// SURB balancer update period.
+    ///
+    /// The SURB balancer will make control decisions this often.
+    ///
+    /// Default is 2 seconds.
+    #[default(Duration::from_secs(2))]
+    pub balancer_update_interval: Duration,
 }
 
 fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
@@ -470,6 +479,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     METRIC_ACTIVE_SESSIONS.increment(1.0);
                 }
 
+                let notifier = self.session_notifiers.get().map(|(_, c)| c.clone());
                 if cfg.automatic_surb_management {
                     let surb_production_counter = Arc::new(AtomicU64::new(0));
                     let surb_consumption_counter = Arc::new(AtomicU64::new(0));
@@ -485,24 +495,43 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         .spawn_keep_alive_stream(session_id, sender.clone(), forward_routing.clone())
                         .split();
 
+                    let (balancer_abort, balancer_ar) = AbortHandle::new_pair();
                     let session = Session::new(
                         session_id,
                         forward_routing,
                         cfg.capabilities.into_iter().collect(),
                         sender,
                         rx,
-                        self.session_notifiers.get().map(|(_, c)| c.clone()),
-                        Some(ka_abort),
+                        Some(Box::new(move |session_id: SessionId| {
+                            if let Some(notifier) = notifier {
+                                if let Err(error) = notifier.unbounded_send(session_id) {
+                                    tracing::error!(%session_id, %error, "failed to notify session closure");
+                                }
+                            }
+                            // Terminate also the SURB-bearing keep-alive sending and the Balancer
+                            ka_abort.abort();
+                            balancer_abort.abort();
+                        })),
                         surb_consumption_counter.clone(), // Received packets = SURB consumption estimate
                     );
 
-                    // TODO: complete the SURB balancing
-                    let _balancer = SurbBalancer::new(
+                    // Spawn the SURB balancer
+                    let mut balancer = SurbBalancer::new(
                         surb_production_counter,
                         surb_consumption_counter,
                         ka_controller,
                         session_id,
                         SurbBalancerConfig::default(),
+                    );
+                    hopr_async_runtime::prelude::spawn(
+                        futures::stream::Abortable::new(
+                            futures_time::stream::interval(self.cfg.balancer_update_interval.into()),
+                            balancer_ar,
+                        )
+                        .for_each(move |_| {
+                            balancer.update();
+                            futures::future::ready(())
+                        }),
                     );
 
                     Ok(session)
@@ -513,8 +542,13 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         cfg.capabilities.into_iter().collect(),
                         Arc::new(msg_sender.clone()),
                         rx,
-                        self.session_notifiers.get().map(|(_, c)| c.clone()),
-                        None,
+                        Some(Box::new(move |session_id: SessionId| {
+                            if let Some(notifier) = notifier {
+                                if let Err(error) = notifier.unbounded_send(session_id) {
+                                    tracing::error!(%session_id, %error, "failed to notify session closure");
+                                }
+                            }
+                        })),
                         Arc::new(AtomicU64::new(0)),
                     ))
                 }
@@ -635,8 +669,11 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         session_req.capabilities,
                         Arc::new(msg_sender.clone()),
                         rx_session_data,
-                        close_session_notifier.into(),
-                        None, // Keep-alives are not sent by the server
+                        Some(Box::new(move |session_id: SessionId| {
+                            if let Err(error) = close_session_notifier.unbounded_send(session_id) {
+                                error!(%session_id, %error, "failed to notify session closure");
+                            }
+                        })),
                         Arc::new(AtomicU64::new(0)),
                     );
 

@@ -147,8 +147,7 @@ pub struct Session {
     inner: Pin<Box<dyn AsyncReadWrite>>,
     routing: DestinationRouting,
     capabilities: HashSet<Capability>,
-    shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
-    keepalive_abort: Option<futures::stream::AbortHandle>,
+    on_close: Option<Box<dyn FnOnce(SessionId) + Send + Sync>>,
 }
 
 impl Session {
@@ -158,8 +157,7 @@ impl Session {
         capabilities: HashSet<Capability>,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: UnboundedReceiver<Box<[u8]>>,
-        shutdown_notifier: Option<futures::channel::mpsc::UnboundedSender<SessionId>>,
-        keepalive_abort: Option<futures::stream::AbortHandle>,
+        on_close: Option<Box<dyn FnOnce(SessionId) + Send + Sync>>,
         rx_packet_counter: Arc<AtomicU64>,
     ) -> Self {
         let inner_session = InnerSession::new(id, routing.clone(), tx, rx, rx_packet_counter);
@@ -199,8 +197,7 @@ impl Session {
                 inner: Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(id, inner_session, cfg)),
                 routing,
                 capabilities,
-                shutdown_notifier,
-                keepalive_abort,
+                on_close,
             }
         } else {
             // Otherwise, no additional sub protocol is necessary
@@ -209,8 +206,7 @@ impl Session {
                 inner: Box::pin(inner_session),
                 routing,
                 capabilities,
-                shutdown_notifier,
-                keepalive_abort,
+                on_close,
             }
         }
     }
@@ -262,22 +258,13 @@ impl futures::AsyncWrite for Session {
     }
 
     fn poll_close(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<std::io::Result<()>> {
-        if let Some(controller) = self.keepalive_abort.take() {
-            controller.abort();
-        }
-
         let inner = &mut self.inner;
         pin_mut!(inner);
         match inner.poll_close(cx) {
             Poll::Ready(res) => {
                 // Notify about closure if desired
-                if let Some(notifier) = self.shutdown_notifier.take() {
-                    if let Err(err) = notifier.unbounded_send(self.id) {
-                        error!(
-                            session_id = tracing::field::display(self.id),
-                            "failed to notify session closure: {err}"
-                        );
-                    }
+                if let Some(notifier) = self.on_close.take() {
+                    notifier(self.id);
                 }
                 Poll::Ready(res)
             }
