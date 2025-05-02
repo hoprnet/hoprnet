@@ -1,30 +1,21 @@
+//! Due to the migration of the RPC client to the `alloy` crate, this module contains implementation
+//! and parameters of client layers. The underlying HTTP transport layer is defined in `transport.rs`.
+//!
 //! Extended layers of RPC clients:
-//! - Replace the legacy retry backoff layer with the default [`RetryBackoffService`]
+//! - Replace the legacy retry backoff layer with the default [`RetryBackoffService`].
+//! However the backoff calculation still needs to be improved, as the number of retries
+//! is not passed to the `backoff_hint` method.
 //! - Add Metrics Layer
+//! - Add Snapshot Layer
+//! - Use tokio runtime for most of the tests
 //!
-//! Extended `JsonRpcClient` abstraction.
-//!
-//! This module contains custom implementation of `ethers::providers::JsonRpcClient`
-//! which allows usage of non-`reqwest` based HTTP clients.
-//!
-//! The major type implemented in this module is the [JsonRpcProviderClient]
-//! which implements the [ethers::providers::JsonRpcClient] trait. That makes it possible to use it with `ethers`.
-//!
-//! The [JsonRpcProviderClient] is abstract over the [HttpRequestor] trait, which makes it possible
-//! to make the underlying HTTP client implementation easily replaceable. This is needed to make it possible
-//! for `ethers` to work with different async runtimes, since the HTTP client is typically not agnostic to
-//! async runtimes (the default HTTP client in `ethers` is using `reqwest`, which is `tokio` specific).
-//! Secondly, this abstraction also allows implementing WASM-compatible HTTP client if needed at some point.
-
+//! This module contains defalut gas estimation constants for EIP-1559 for Gnosis chain,
+/// as GnosisScan middleware is migrated to GasFiller
 use alloy::{
     rpc::json_rpc::{ErrorPayload, RequestPacket, ResponsePacket, ResponsePayload},
     transports::{layers::RetryPolicy, HttpError, TransportError, TransportErrorKind, TransportFut},
 };
-// use async_trait::async_trait;
-// use ethers::providers::{JsonRpcClient, JsonRpcError};
 use futures::StreamExt;
-// use http_types::Method;
-// use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
@@ -40,13 +31,11 @@ use tower::{Layer, Service};
 use tracing::{error, trace};
 use validator::Validate;
 
-// use hopr_async_runtime::prelude::sleep;
-
-// use crate::client::RetryAction::{NoRetry, RetryAfter};
-// use crate::errors::{HttpRequestError, JsonRpcProviderClientError};
-// use crate::helper::{Request, Response};
-// use crate::{RetryAction, RetryPolicy};
-// use crate::{HttpRequestor};
+//// Gas estimation constants for EIP-1559 for Gnosis chain.
+/// These values are used to estimate the gas price for transactions.
+/// As GnosisScan middleware is migrated to GasFiller
+pub const EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS: u64 = 3_000_000_000;
+pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS: u64 = 100_000_000;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
@@ -737,7 +726,6 @@ mod tests {
         for _ in 0..3 {
             sleep(block_time).await;
 
-            // let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await?;
             let num = provider.get_block_number().await?;
 
             assert!(num > last_number, "next block number must be greater");
@@ -771,7 +759,6 @@ mod tests {
         for _ in 0..3 {
             sleep(block_time).await;
 
-            // let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await?;
             let num = provider.get_block_number().await?;
 
             assert!(num > last_number, "next block number must be greater");
@@ -1172,7 +1159,6 @@ mod tests {
             for _ in 0..3 {
                 sleep(block_time).await;
 
-                // let number: ethers::types::U64 = client.request("eth_blockNumber", ()).await?;
                 let num = provider.get_block_number().await?;
 
                 assert!(num > last_number, "next block number must be greater");

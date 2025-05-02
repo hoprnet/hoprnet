@@ -35,7 +35,6 @@ pub mod client;
 pub mod errors;
 mod helper;
 // pub mod indexer;
-// pub mod middleware;
 // pub mod rpc;
 pub mod transport;
 
