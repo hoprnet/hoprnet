@@ -13,6 +13,7 @@ use pin_project::pin_project;
 #[derive(Debug)]
 pub struct RateController(Arc<AtomicUsize>, Arc<AtomicUsize>);
 
+#[allow(unused)]
 impl RateController {
     /// Update the rate limit (elements per second)
     pub fn set_rate_per_sec(&self, elements_per_second: usize) {
@@ -57,6 +58,8 @@ pub struct RateLimitedStream<S> {
 impl<S> RateLimitedStream<S> {
     /// Creates a stream with some initial rate limit of elements per a time unit.
     pub fn new_with_rate_per_unit(stream: S, initial_rate_per_unit: usize, unit: Duration) -> (Self, RateController) {
+        assert!(unit > Duration::ZERO, "unit must be greater than zero");
+
         let rate = Arc::new(AtomicUsize::new(initial_rate_per_unit));
         let unit = Arc::new(AtomicUsize::new(unit.as_millis() as usize));
         (
@@ -69,11 +72,6 @@ impl<S> RateLimitedStream<S> {
             },
             RateController(rate, unit),
         )
-    }
-
-    /// Creates a stream with some initial rate limit of elements per second.
-    pub fn new(stream: S, initial_rate_per_second: usize) -> (Self, RateController) {
-        Self::new_with_rate_per_unit(stream, initial_rate_per_second, Duration::from_secs(1))
     }
 }
 
@@ -142,14 +140,6 @@ pub trait RateLimitExt: Stream + Sized {
     ) -> (RateLimitedStream<Self>, RateController) {
         RateLimitedStream::new_with_rate_per_unit(self, elements_per_second, unit)
     }
-
-    /// Convenience extension method to create a rate-limited stream with the given
-    /// number of elements per second.
-    ///
-    /// See [`RateLimitExt::rate_limit_per_unit`] for details.
-    fn rate_limit(self, elements_per_second: usize) -> (RateLimitedStream<Self>, RateController) {
-        RateLimitedStream::new(self, elements_per_second)
-    }
 }
 
 impl<S: Stream + Sized> RateLimitExt for S {}
@@ -166,7 +156,7 @@ mod tests {
         let stream = stream::iter(1..=5);
 
         // Set a rate of 10 elements per second (100ms per element)
-        let (rate_limited, controller) = stream.rate_limit(10);
+        let (rate_limited, controller) = stream.rate_limit_per_unit(10, Duration::from_secs(1));
 
         assert_eq!(controller.get_rate_per_sec(), 10.0);
 
@@ -203,7 +193,7 @@ mod tests {
         let stream = stream::iter::<Vec<i32>>(vec![]);
 
         // Apply rate limiting
-        let (mut rate_limited, _) = stream.rate_limit(10);
+        let (mut rate_limited, _) = stream.rate_limit_per_unit(10, Duration::from_secs(1));
 
         // Verify we get None right away
         assert_eq!(rate_limited.next().await, None);
@@ -215,7 +205,7 @@ mod tests {
         let stream = stream::iter(1..=3);
 
         // Set a rate of 0 elements per second (no delay)
-        let (rate_limited, _) = stream.rate_limit(0);
+        let (rate_limited, _) = stream.rate_limit_per_unit(0, Duration::from_secs(1));
 
         let start = Instant::now();
 
@@ -241,7 +231,7 @@ mod tests {
         let stream = stream::iter(1..=6);
 
         // Start with 5 elements per second (200ms per element)
-        let (mut rate_limited, controller) = stream.rate_limit(5);
+        let (mut rate_limited, controller) = stream.rate_limit_per_unit(5, Duration::from_secs(1));
 
         // Get a timer
         let start = Instant::now();
@@ -299,7 +289,7 @@ mod tests {
         let stream = stream::iter(1..=100);
 
         // Set a very high rate (1000 per second)
-        let (rate_limited, _) = stream.rate_limit(1000);
+        let (rate_limited, _) = stream.rate_limit_per_unit(1000, Duration::from_secs(1));
 
         let start = Instant::now();
 
@@ -330,7 +320,7 @@ mod tests {
         let stream = stream::iter(1..=10);
 
         // Start with 2 elements per second
-        let (mut rate_limited, controller) = stream.rate_limit(2);
+        let (mut rate_limited, controller) = stream.rate_limit_per_unit(2, Duration::from_secs(1));
 
         // Set up a task to process the stream
         let stream_task = async {

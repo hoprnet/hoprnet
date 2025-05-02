@@ -1,6 +1,7 @@
 mod controller;
 mod rate_limiting;
 
+use futures::stream::AbortHandle;
 use hopr_crypto_packet::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::*;
@@ -31,39 +32,18 @@ pub trait SurbFlowController {
     fn adjust_surb_flow(&self, surbs_per_sec: usize);
 }
 
-impl SurbFlowController for RateController {
-    fn adjust_surb_flow(&self, surbs_per_sec: usize) {
-        self.set_rate_per_sec(surbs_per_sec)
-    }
-}
-
 /// Allows dynamically controlling the rate at which the keep-alive messages are yielded from
-/// an associated infinite stream, and to abort the stream.
+/// an associated infinite stream.
 ///
-/// See [`keep_alive_stream`].
-pub struct KeepAliveController(RateController, futures::stream::AbortHandle);
+/// This is done by wrapping the [`RateController`] to implement [`SurbFlowController`] for HOPR Keep-Alive messages
+/// that bear SURBs.
+pub(crate) struct KeepAliveController(RateController);
 
-impl KeepAliveController {
-    /// Aborts the stream, so it will no longer yield any messages.
-    pub fn abort(&self) {
-        self.1.abort();
-    }
-
-    /// Sets the desired rate (per time unit) of keep-alive messages.
-    ///
-    /// No rate-limiting will apply if 0 is given.
-    pub fn set_rate(&self, rate: usize, unit: std::time::Duration) {
-        self.0.set_rate_per_unit(rate, unit);
-    }
-
-    /// Gets the current rate (per unit) of keep-alive messages.
-    pub fn rate(&self) -> (usize, std::time::Duration) {
-        self.0.get_rate_per_unit()
-    }
-
-    /// Consumes self and returns the rate controller and abort handle separately.
-    pub fn split(self) -> (RateController, futures::stream::AbortHandle) {
-        (self.0, self.1)
+impl SurbFlowController for KeepAliveController {
+    fn adjust_surb_flow(&self, surbs_per_sec: usize) {
+        // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
+        // so the correction by this factor is applied.
+        self.0.set_rate_per_sec(surbs_per_sec / HoprPacket::MAX_SURBS_IN_PACKET);
     }
 }
 
@@ -74,12 +54,16 @@ pub fn keep_alive_stream<S: Clone>(
     session_id: S,
     initial_msg_per_unit: usize,
     unit: std::time::Duration,
-) -> (impl futures::Stream<Item = StartProtocol<S>>, KeepAliveController) {
+) -> (
+    impl futures::Stream<Item = StartProtocol<S>>,
+    KeepAliveController,
+    AbortHandle,
+) {
     let elem = StartProtocol::KeepAlive(session_id);
     let (stream, abort_handle) = futures::stream::abortable(futures::stream::repeat(elem));
     let (stream, controller) = stream.rate_limit_per_unit(initial_msg_per_unit, unit);
 
-    (stream, KeepAliveController(controller, abort_handle))
+    (stream, KeepAliveController(controller), abort_handle)
 }
 
 pub(crate) struct CountingSendMsg<T>(T, std::sync::Arc<std::sync::atomic::AtomicU64>);

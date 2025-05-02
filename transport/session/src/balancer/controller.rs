@@ -39,13 +39,17 @@ pub struct SurbBalancerConfig {
     ///
     /// The [`SurbBalancer`] will try to maintain approximately this number of SURBs
     /// at the counterparty at all times, by regulating the [flow of non-organic SURBs](SurbFlowController).
-    #[default(10_000)]
+    #[default(5_000)]
     pub target_surb_buffer_size: u64,
     /// Initial outflow of non-organic SURBs.
-    #[default(2)]
+    ///
+    /// The default is 100 (which is 50 packets/second currently)
+    #[default(100)]
     pub initial_surbs_per_sec: u64,
     /// Maximum outflow of non-organic surbs.
-    #[default(2000)]
+    ///
+    /// The default is 2500 (which is 1250 packets/second currently)
+    #[default(2500)]
     pub max_surbs_per_sec: u64,
 }
 
@@ -98,6 +102,7 @@ where
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self), fields(session_id = %self.session_id))]
     pub fn update(&mut self) {
         let dt = self.last_update.elapsed();
         self.last_update = std::time::Instant::now();
@@ -115,12 +120,14 @@ where
         // Estimated change in counteparty's SURB buffer
         let target_buffer_change = surbs_delivered_delta as i64 - surbs_used_delta as i64;
         self.current_target_buffer = self.current_target_buffer.saturating_add_signed(target_buffer_change);
+        if self.current_target_buffer == 0 {
+            tracing::warn!("target SURB buffer size is 0")
+        }
 
         // Error from the desired target SURB buffer size at counterparty
         let error = self.cfg.target_surb_buffer_size as i64 - self.current_target_buffer as i64;
 
-        tracing::debug!(
-            session = %self.session_id,
+        tracing::trace!(
             ?dt,
             delta = target_buffer_change,
             current = self.current_target_buffer,
@@ -131,15 +138,16 @@ where
         );
 
         let output = self.pid.next_control_output(self.current_target_buffer as f64);
-        let corrected_output =  output.output.clamp(0.0, self.cfg.max_surbs_per_sec as f64);
-        tracing::debug!(control_output = corrected_output, "next control output");
-        self.controller.adjust_surb_flow(corrected_output as usize); // TODO: divide by num surbs per packet
+        let corrected_output = output.output.clamp(0.0, self.cfg.max_surbs_per_sec as f64);
+        self.controller.adjust_surb_flow(corrected_output as usize);
+
+        tracing::trace!(control_output = corrected_output, "next control output");
 
         #[cfg(feature = "prometheus")]
         {
             let sid = self.session_id.to_string();
             METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], error as f64);
-            METRIC_CONTROL_OUTPUT.set(&[&sid], output.output);
+            METRIC_CONTROL_OUTPUT.set(&[&sid], corrected_output);
             METRIC_SURBS_CONSUMED.increment_by(&[&sid], surbs_used_delta);
             METRIC_SURBS_PRODUCED.increment_by(&[&sid], surbs_delivered_delta);
         }

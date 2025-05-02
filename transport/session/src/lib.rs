@@ -19,6 +19,7 @@ pub use types::transfer_session;
 use hopr_network_types::prelude::state::SessionFeature;
 use hopr_primitive_types::prelude::Address;
 
+use crate::balancer::SurbBalancerConfig;
 use hopr_internal_types::prelude::HoprPseudonym;
 
 /// Capabilities of a session.
@@ -79,5 +80,5 @@ pub struct SessionClientConfig {
     /// Optional pseudonym used for the session. Mostly useful for testing only.
     pub pseudonym: Option<HoprPseudonym>,
     /// Enable automatic SURB management for the Session.
-    pub automatic_surb_management: bool,
+    pub surb_management: Option<SurbBalancerConfig>,
 }
