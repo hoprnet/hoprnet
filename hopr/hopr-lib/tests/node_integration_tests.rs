@@ -1,16 +1,17 @@
 mod common;
 
-use crate::common::{deploy_test_environment, onboard_node};
+use std::time::Duration;
+
 use hopr_chain_rpc::client::surf_client::SurfRequestor;
 use hopr_chain_rpc::client::SnapshotRequestor;
 use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
-use std::time::Duration;
+
+use crate::common::{deploy_test_environment, onboard_node};
 
 const SNAPSHOT_BASE: &str = "tests/snapshots/node_snapshot_base";
 
 #[ignore] // Ignore for now, until the actual test is implemented
 #[cfg_attr(feature = "runtime-async-std", async_std::test)]
-#[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::test)]
 async fn hopr_node_integration_test() {
     let block_time = Duration::from_secs(1);
     let finality = 2;

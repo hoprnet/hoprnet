@@ -258,6 +258,10 @@ panic = "abort"
 strip = true
 opt-level = 2
 
+# perform minimal optimizations to prevent stack overflows in large tests
+[profile.test]
+opt-level = 1
+
 # this profile focuses on best runtime performance and smallest binary size
 [profile.release]
 codegen-units = 1

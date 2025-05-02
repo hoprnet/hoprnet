@@ -1,5 +1,8 @@
 use async_std::task::sleep;
 use ethers::utils::AnvilInstance;
+use std::time::Duration;
+use tracing::info;
+
 use hopr_chain_rpc::client::surf_client::SurfRequestor;
 use hopr_chain_rpc::client::{
     create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
@@ -10,8 +13,6 @@ use hopr_chain_types::utils::{
 use hopr_chain_types::{ContractAddresses, ContractInstances};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::time::Duration;
-use tracing::info;
 
 pub type AnvilRpcClient<R> = ethers::middleware::SignerMiddleware<
     ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
