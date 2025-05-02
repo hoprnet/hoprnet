@@ -516,7 +516,6 @@ impl HoprDbProtocolOperations for HoprDb {
 
                 // The contained payload represents an Acknowledgement
                 if incoming.ack_key.is_none() {
-                    // TODO: Optimize for more than 1 ACK in the payload
                     let ack: Acknowledgement = incoming.plain_text.as_ref().try_into().map_err(|error| {
                         tracing::error!(%error, "failed to decode the acknowledgement");
 

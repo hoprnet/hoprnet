@@ -251,12 +251,19 @@ where
 
                             error!(peer = %peer, error = %e, "Failed to process the received message");
 
-                            // TODO: is this really needed?
+                            let peer: OffchainPublicKey = match peer.try_into() {
+                                Ok(p) => p,
+                                Err(error) => {
+                                    tracing::warn!(%peer, %error, "Dropping packet – cannot convert peer id");
+                                    return None;
+                                }
+                            };
+
                             // send random signed acknowledgement to give feedback to the sender
                             let ack = Acknowledgement::random(&me);
-                            let peer: OffchainPublicKey = peer.try_into().unwrap(); // TODO: should not unwrap !!!
+
                             match db
-                                .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), peer) // TODO: Optimize this copy
+                                .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), peer)
                                 .await {
                                     Ok(ack_packet) => {
                                         msg_to_send_tx
@@ -269,7 +276,7 @@ where
                                                 error!("Failed to forward an acknowledgement for a failed packet recv to the transport layer");
                                             });
                                     },
-                                    Err(e) => tracing::error!(error = %e, "Failed to create random ack packet for a failed receive"),
+                                    Err(error) => tracing::error!(%error, "Failed to create random ack packet for a failed receive"),
                                 }
                         }
 
@@ -315,7 +322,7 @@ where
                         } => {
                                 let ack = Acknowledgement::new(ack_key, &me);
                                 if let Ok(ack_packet) = db
-                                    .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
+                                    .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
                                     .await
                                     .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a received message"))
                                     {
@@ -350,7 +357,7 @@ where
                                         });
 
                                     if let Ok(ack_packet) = db
-                                        .to_send_no_ack(Box::from_iter(ack.as_ref().iter().copied()), previous_hop) // TODO: Optimize this copy
+                                        .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
                                         .await
                                         .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a relayed message"))
                                     {
