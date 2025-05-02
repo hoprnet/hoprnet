@@ -13,7 +13,7 @@ use hopr_crypto_packet::errors::{
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
 use hopr_internal_types::prelude::*;
-use hopr_path::path::{Path, TransportPath};
+use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 
 use super::packet::OutgoingPacket;
@@ -28,7 +28,7 @@ lazy_static::lazy_static! {
 pub trait PacketWrapping {
     type Input;
 
-    async fn send(&self, data: ApplicationData, path: TransportPath) -> Result<(PeerId, Box<[u8]>)>;
+    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<(PeerId, Box<[u8]>)>;
 }
 
 pub struct SendPkt {
@@ -72,16 +72,12 @@ where
     type Input = ApplicationData;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn send(&self, data: ApplicationData, path: TransportPath) -> Result<(PeerId, Box<[u8]>)> {
-        let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
-            path.hops().iter().map(OffchainPublicKey::try_from).collect();
-
+    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<(PeerId, Box<[u8]>)> {
         let packet = self
             .db
             .to_send(
                 data.to_bytes(),
-                self.cfg.chain_keypair.clone(),
-                path?,
+                routing,
                 self.determine_actual_outgoing_win_prob().await,
                 self.determine_actual_outgoing_ticket_price().await?,
             )
@@ -112,7 +108,6 @@ where
             .db
             .from_recv(
                 data,
-                self.cfg.chain_keypair.clone(),
                 &self.cfg.packet_keypair,
                 previous_hop,
                 self.determine_actual_outgoing_win_prob().await,
@@ -141,16 +136,23 @@ where
             TransportPacketWithChainData::Final {
                 previous_hop,
                 plain_text,
-                ack,
+                ack_key,
+                no_ack,
                 ..
             } => {
-                let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
-                RecvOperation::Receive {
-                    data: app_data,
-                    ack: SendAck {
-                        peer: previous_hop.into(),
-                        ack,
-                    },
+                // If this is not a probe packet, send an acknowledgement back to the previous hop
+                if !no_ack {
+                    let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
+                    RecvOperation::Receive {
+                        data: app_data,
+                        ack: SendAck {
+                            peer: previous_hop.into(),
+                            ack: Acknowledgement::new(ack_key, &self.cfg.packet_keypair),
+                        },
+                    }
+                } else {
+                    // TODO: implement no-acknowledgement packet handling (#7073)
+                    unimplemented!()
                 }
             }
             TransportPacketWithChainData::Forwarded {
@@ -281,7 +283,7 @@ impl PacketSendAwaiter {
     }
 }
 
-pub type SendMsgInput = (ApplicationData, TransportPath, PacketSendFinalizer);
+pub type SendMsgInput = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer);
 
 #[derive(Debug, Clone)]
 pub struct MsgSender<T>
@@ -301,12 +303,16 @@ where
 
     /// Pushes a new packet into processing.
     #[tracing::instrument(level = "trace", skip(self, data))]
-    pub async fn send_packet(&self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
+    pub async fn send_packet(
+        &self,
+        data: ApplicationData,
+        routing: ResolvedTransportRouting,
+    ) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 
         self.tx
             .clone()
-            .send((data, path, tx.into()))
+            .send((data, routing, tx.into()))
             .await
             .map_err(|_| TransportError("Failed to send a message".into()))
             .map(move |_| {
@@ -343,11 +349,14 @@ impl PacketInteractionConfig {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use anyhow::Context;
     use async_std::future::timeout;
     use futures::StreamExt;
-
-    use super::*;
+    use hopr_crypto_random::Randomizable;
+    use hopr_internal_types::prelude::HoprPseudonym;
+    use hopr_path::ValidatedPath;
     use std::time::Duration;
 
     #[async_std::test]
@@ -371,9 +380,18 @@ mod tests {
         let sender = MsgSender::new(tx);
 
         let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03])?;
-        let expected_path = TransportPath::direct(PeerId::random());
+        let expected_path = ValidatedPath::direct(
+            *OffchainKeypair::random().public(),
+            ChainKeypair::random().public().to_address(),
+        );
 
-        let result = sender.send_packet(expected_data.clone(), expected_path.clone()).await;
+        let routing = ResolvedTransportRouting::Forward {
+            pseudonym: HoprPseudonym::random(),
+            forward_path: expected_path.clone(),
+            return_paths: vec![],
+        };
+
+        let result = sender.send_packet(expected_data.clone(), routing.clone()).await;
         assert!(result.is_ok());
 
         let received = rx.next();
@@ -383,7 +401,7 @@ mod tests {
             .context("value should be present")?;
 
         assert_eq!(data, expected_data);
-        assert_eq!(path, expected_path);
+        assert!(matches!(path, ResolvedTransportRouting::Forward { forward_path,.. } if forward_path == expected_path));
 
         async_std::task::spawn(async move {
             async_std::task::sleep(Duration::from_millis(3)).await;

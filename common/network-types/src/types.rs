@@ -1,12 +1,15 @@
+use crate::errors::NetworkTypeError;
 use hickory_resolver::name_server::ConnectionProvider;
 use hickory_resolver::AsyncResolver;
+use hopr_crypto_random::Randomizable;
+use hopr_internal_types::prelude::HoprPseudonym;
+use hopr_path::ValidatedPath;
 use hopr_primitive_types::bounded::{BoundedSize, BoundedVec};
+use hopr_primitive_types::prelude::Address;
 use libp2p_identity::PeerId;
 use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::str::FromStr;
-
-use crate::errors::NetworkTypeError;
 
 /// Lists some of the IP protocols.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display, strum::EnumString)]
@@ -286,7 +289,7 @@ impl std::fmt::Display for SealedHost {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RoutingOptions {
     /// A fixed intermediate path consisting of at most [`RoutingOptions::MAX_INTERMEDIATE_HOPS`] hops.
-    IntermediatePath(BoundedVec<PeerId, { RoutingOptions::MAX_INTERMEDIATE_HOPS }>),
+    IntermediatePath(BoundedVec<Address, { RoutingOptions::MAX_INTERMEDIATE_HOPS }>),
     /// Random intermediate path with at least the given number of hops,
     /// but at most [`RoutingOptions::MAX_INTERMEDIATE_HOPS`].
     Hops(BoundedSize<{ RoutingOptions::MAX_INTERMEDIATE_HOPS }>),
@@ -311,6 +314,80 @@ impl RoutingOptions {
         match &self {
             RoutingOptions::IntermediatePath(v) => v.as_ref().len(),
             RoutingOptions::Hops(h) => (*h).into(),
+        }
+    }
+}
+
+/// Routing information containing forward or return routing options.
+///
+/// Information in this object represents the minimum required basis
+/// to generate forward paths and return paths.
+///
+/// See also [`RoutingOptions`].
+#[derive(Debug, Clone, PartialEq, Eq, strum::EnumIs)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum DestinationRouting {
+    /// Forward routing using the destination address and path,
+    /// with a possible return path.
+    Forward {
+        /// The destination address.
+        destination: Address,
+        /// Our pseudonym shown to the destination.
+        ///
+        /// If not given, will be resolved as random.
+        pseudonym: Option<HoprPseudonym>,
+        /// The path to the destination.
+        forward_options: RoutingOptions,
+        /// Optional return path.
+        return_options: Option<RoutingOptions>,
+    },
+    /// Return routing using a SURB with the given pseudonym.
+    ///
+    /// Will fail if no SURB for this pseudonym is found.
+    Return(HoprPseudonym),
+}
+
+impl DestinationRouting {
+    /// Shortcut for routing that does not create any SURBs for a return path.
+    pub fn forward_only(destination: Address, forward_options: RoutingOptions) -> Self {
+        Self::Forward {
+            destination,
+            pseudonym: None,
+            forward_options,
+            return_options: None,
+        }
+    }
+}
+
+/// Contains the resolved routing information for the packet.
+///
+/// Instance of this object is typically constructed via some resolution of a
+/// [`DestinationRouting`] instance.
+///
+/// It contains the actual forward and return paths for forward packets,
+/// or an actual SURB for return (reply) packets.
+#[derive(Debug, Clone, strum::EnumIs)]
+pub enum ResolvedTransportRouting {
+    /// Concrete routing information for a forward packet.
+    Forward {
+        /// Pseudonym of the sender.
+        pseudonym: HoprPseudonym,
+        /// Forward path.
+        forward_path: ValidatedPath,
+        /// Optional list of return paths.
+        return_paths: Vec<ValidatedPath>,
+    },
+    /// Pseudonym of a SURB to retrieve.
+    Return(HoprPseudonym),
+}
+
+impl ResolvedTransportRouting {
+    /// Shortcut for routing that does not create any SURBs for a return path.
+    pub fn forward_only(forward_path: ValidatedPath) -> Self {
+        Self::Forward {
+            pseudonym: HoprPseudonym::random(),
+            forward_path,
+            return_paths: vec![],
         }
     }
 }

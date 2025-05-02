@@ -12,11 +12,16 @@ pub struct WrappedTagBloomFilter {
 }
 
 impl WrappedTagBloomFilter {
+    const TAGBLOOM_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+        .with_little_endian()
+        .with_variable_int_encoding();
+
     pub fn new(path: String) -> Self {
         let tbf = read_file(&path)
             .and_then(|data| {
                 debug!(path = &path, "Found and loading a tag Bloom filter");
-                TagBloomFilter::from_bytes(&data)
+                bincode::serde::decode_from_slice(&data, Self::TAGBLOOM_BINCODE_CONFIGURATION)
+                    .map(|(f, _)| f)
                     .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
             })
             .unwrap_or_else(|_| {
@@ -38,8 +43,11 @@ impl WrappedTagBloomFilter {
     pub async fn save(&self) {
         let bloom = self.tbf.read().await.clone(); // Clone to immediately release the lock
 
-        if let Err(e) = write(&self.path, bloom.to_bytes()) {
-            error!(erorr = %e, "Tag Bloom filter save failed")
+        if let Err(e) = bincode::serde::encode_to_vec(&bloom, Self::TAGBLOOM_BINCODE_CONFIGURATION)
+            .map_err(|e| hopr_platform::error::PlatformError::GeneralError(e.to_string()))
+            .and_then(|d| write(&self.path, &d))
+        {
+            error!(error = %e, "Tag Bloom filter save failed")
         } else {
             info!("Tag Bloom filter saved successfully")
         };
