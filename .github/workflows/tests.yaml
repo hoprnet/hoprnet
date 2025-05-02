@@ -156,11 +156,11 @@ jobs:
       needs_nix_setup: true
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         # limit to run only a single smoke test at a time while we cannot
         # choose different ports on our runners, this only minimizes the risk,
         # does not prevent collisions with other workflow runs
-        max-parallel: 1
         suite:
           - websocket
           - hopli
