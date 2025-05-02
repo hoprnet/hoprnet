@@ -33,7 +33,7 @@ use crate::RetryAction::NoRetry;
 
 pub mod client;
 pub mod errors;
-// mod helper;
+mod helper;
 // pub mod indexer;
 // pub mod middleware;
 // pub mod rpc;
