@@ -31,9 +31,6 @@ let
   buildPlatform = stdenv.buildPlatform;
   hostPlatform = stdenv.hostPlatform;
 
-  # Add cargo-llvm-cov as a dependency
-  cargoLlvmCov = pkgs.cargo-llvm-cov;
-
   # The target interpreter is used to patch the interpreter in the binary
   targetInterpreter =
     if hostPlatform.isLinux && hostPlatform.isx86_64 then "/lib64/ld-linux-x86-64.so.2"
