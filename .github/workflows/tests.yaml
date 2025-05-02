@@ -158,12 +158,12 @@ jobs:
       fail-fast: false
       matrix:
         suite:
+          - websocket
           - hopli
           - integration
           - redeeming
           - rest_api
           - session
-          - websocket
           - win_prob
     if: github.event.pull_request.draft == false
     # limit to run only a single smoke test at a time while we cannot
