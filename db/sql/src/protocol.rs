@@ -32,17 +32,17 @@ lazy_static::lazy_static! {
             vec![0.0, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.15, 0.25, 0.3, 0.5],
         ).unwrap();
 
-    static ref METRIC_RECEIVED_ACKS: MultiCounter = MultiCounter::new(
+    pub(crate) static ref METRIC_RECEIVED_ACKS: MultiCounter = MultiCounter::new(
         "hopr_received_ack_count",
         "Number of received acknowledgements",
         &["valid"]
     )
     .unwrap();
 
-    static ref METRIC_SENT_ACKS: SimpleCounter =
+    pub(crate) static ref METRIC_SENT_ACKS: SimpleCounter =
         SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
 
-    static ref METRIC_TICKETS_COUNT: MultiCounter =
+    pub(crate) static ref METRIC_TICKETS_COUNT: MultiCounter =
         MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
 }
 
