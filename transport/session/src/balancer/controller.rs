@@ -8,13 +8,13 @@ lazy_static::lazy_static! {
     static ref METRIC_TARGET_ERROR_ESTIMATE: hopr_metrics::metrics::MultiGauge =
         hopr_metrics::metrics::MultiGauge::new(
             "hopr_surb_balancer_target_error_estimate",
-            "Estimations of the target error of the SURB balancer",
+            "Target error estimation by the SURB balancer",
             &["session_id"]
     ).unwrap();
     static ref METRIC_CONTROL_OUTPUT: hopr_metrics::metrics::MultiGauge =
         hopr_metrics::metrics::MultiGauge::new(
             "hopr_surb_balancer_control_output",
-            "Outputs of the SURB balancer PID controller",
+            "hopr_surb_balancer_control_output",
             &["session_id"]
     ).unwrap();
     static ref METRIC_SURBS_CONSUMED: hopr_metrics::metrics::MultiCounter =
