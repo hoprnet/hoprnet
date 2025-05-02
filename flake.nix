@@ -148,6 +148,7 @@
           hoprd-candidate = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "candidate";
           });
+          hoprd-bench = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runBench = true; });
 
           hopliBuildArgs = {
             inherit src depsSrc rev;
@@ -665,6 +666,7 @@
             # Follow https://github.com/nixos/nixpkgs/pull/256590
             inherit hoprd-aarch64-darwin hoprd-x86_64-darwin;
             inherit hopli-aarch64-darwin hopli-x86_64-darwin;
+            inherit hoprd-bench;
             default = hoprd;
           };
 

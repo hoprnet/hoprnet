@@ -292,6 +292,7 @@ jobs:
     secrets: inherit
     with:
       branch: ${{ github.event.pull_request.base.ref }}
+      type: merge
 
   notify:
     name: Notify Changes

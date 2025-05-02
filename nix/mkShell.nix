@@ -22,6 +22,7 @@ let
     curl
     findutils
     gnumake
+    gnuplot
     jq
     lsof
     mold

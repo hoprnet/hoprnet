@@ -22,6 +22,7 @@
 , rev
 , runClippy ? false
 , runTests ? false
+, runBench ? false
 , solcDefault
 , src
 , stdenv
@@ -133,10 +134,15 @@ let
     if buildDocs then sharedArgs // docsArgs
     else sharedArgs // defaultArgs;
 
+  mkBench = import ./cargo-bench.nix {
+    mkCargoDerivation = craneLib.mkCargoDerivation;
+  };
+
   builder =
     if runTests then craneLib.cargoTest
     else if runClippy then craneLib.cargoClippy
     else if buildDocs then craneLib.cargoDoc
+    else if runBench then mkBench
     else craneLib.buildPackage;
 in
 builder (args // {

@@ -11,7 +11,6 @@ use futures::{
 use lazy_static::lazy_static;
 use libp2p::{Multiaddr, PeerId};
 
-use hopr_crypto_packet::chain::ChainPacketComponents;
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_internal_types::protocol::Acknowledgement;
 use hopr_platform::time::native::current_time;
@@ -123,7 +122,7 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     Ok((api, swarm))
 }
 
-const TRANSPORT_PAYLOAD_SIZE: usize = ChainPacketComponents::SIZE;
+const TRANSPORT_PAYLOAD_SIZE: usize = HoprPacket::SIZE;
 
 lazy_static! {
     pub static ref RANDOM_GIBBERISH: Box<[u8]> =
@@ -165,6 +164,7 @@ use async_std::{
     future::timeout,
     task::{block_on, sleep, spawn, JoinHandle},
 };
+use hopr_crypto_packet::prelude::HoprPacket;
 
 #[ignore]
 #[cfg_attr(feature = "runtime-async-std", async_std::test)]
