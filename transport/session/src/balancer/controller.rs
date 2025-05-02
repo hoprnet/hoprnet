@@ -56,6 +56,14 @@ pub struct SurbBalancerConfig {
 /// Runs a continuous process that attempts to [evaluate](SurbFlowEstimator) and
 /// [regulate](SurbFlowController) the flow of non-organic SURBs to the Session counterparty,
 /// to keep the number of SURBs at the counterparty at a certain level.
+///
+/// Internally, the Balancer uses a PID (Proportional Integral Derivative) controller to
+/// control the rate of SURBs sent to the counterparty
+/// each time the [`update`](SurbBalancer::update) method is called:
+///
+/// 1. The size of the SURB buffer at the counterparty is estimated using [`SurbFlowEstimator`].
+/// 2. Error against a set-point given in [`SurbBalancerConfig`] is evaluated in the PID controller.
+/// 3. The PID controller applies a new SURB flow rate value using the [`SurbFlowController`].
 pub struct SurbBalancer<I, O, F, S> {
     session_id: S,
     pid: Pid<f64>,
