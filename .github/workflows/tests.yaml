@@ -62,7 +62,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./target/llvm-cov-target/lcov.info
+          files: ./result
           fail_ci_if_error: true
 
   tests-unit-nightly:
