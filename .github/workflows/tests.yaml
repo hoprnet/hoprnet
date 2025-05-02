@@ -17,7 +17,7 @@ on:
       - ready_for_review
 
 concurrency:
-  group: ${{ github.ref }}-test
+  group: ${{ github.workflow}}-${{ github.ref }}-test
   cancel-in-progress: true
 
 jobs:
@@ -157,19 +157,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # limit to run only a single smoke test at a time while we cannot
+        # choose different ports on our runners, this only minimizes the risk,
+        # does not prevent collisions with other workflow runs
+        max-parallel: 1
         suite:
           - websocket
           - hopli
-          - integration
-          - redeeming
           - rest_api
           - session
+          - integration
+          - redeeming
           - win_prob
     if: github.event.pull_request.draft == false
-    # limit to run only a single smoke test at a time while we cannot
-    # choose different ports on our runners
-    concurrency:
-      group: smoke-test
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
