@@ -80,9 +80,9 @@ where
         cfg: SurbBalancerConfig,
     ) -> Self {
         let mut pid = Pid::new(cfg.target_surb_buffer_size as f64, cfg.max_surbs_per_sec as f64);
-        pid.p(0.5, 1.0);
-        pid.i(0.1, 1.0);
-        pid.d(0.2, 1.0);
+        pid.p(0.6, cfg.max_surbs_per_sec as f64);
+        pid.i(0.7, cfg.max_surbs_per_sec as f64);
+        pid.d(0.2, cfg.max_surbs_per_sec as f64);
 
         Self {
             outflow_estimator,
@@ -131,8 +131,9 @@ where
         );
 
         let output = self.pid.next_control_output(self.current_target_buffer as f64);
-        tracing::debug!(control_output = output.output, "next control output");
-        self.controller.adjust_surb_flow(output.output as usize);
+        let corrected_output =  output.output.clamp(0.0, self.cfg.max_surbs_per_sec as f64);
+        tracing::debug!(control_output = corrected_output, "next control output");
+        self.controller.adjust_surb_flow(corrected_output as usize); // TODO: divide by num surbs per packet
 
         #[cfg(feature = "prometheus")]
         {

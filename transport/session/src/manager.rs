@@ -74,7 +74,7 @@ pub struct SessionManagerConfig {
 
     /// The initial amount Session initiator's SURB upload per second to the Session's counterparty.
     ///
-    /// Default is 100.
+    /// Default is 100 SURBs per second.
     /// This is currently 50 HOPR packets per second (one empty packet can carry 2 SURBs).
     #[default(100)]
     pub initial_surb_upload_rate: usize,
