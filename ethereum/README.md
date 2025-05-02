@@ -1,6 +1,6 @@
 # HOPR Ethereum Package
 
-This directory contains the Ethereum smart contracts and their bindings for the [HOPR protocol](https://github.com/hoprnet/hoprnet). 
+This directory contains the Ethereum smart contracts and their bindings for the [HOPR protocol](https://github.com/hoprnet/hoprnet).
 These contracts power HOPR's privacy-preserving incentive framework.
 
 Main contracts are
@@ -62,6 +62,7 @@ Main contracts are
 ## Installation
 
 Please use the [Nix environment](../README.md#develop) or install the following packages
+
 1. `rustup`
 2. `foundryup`
 3. `brew install lcov` (to install lcov for viewing coverage report)
@@ -69,9 +70,11 @@ Please use the [Nix environment](../README.md#develop) or install the following 
 If not using Nix, make sure to create a `foundry.toml` file based on `foundry.in.toml` and populate the solc version under "[profile.default]"
 
 Create a file for environment variables:
+
 ```
 cp ./contracts/.env.example ./contracts/.env
 ```
+
 and populate the necessary variables.
 
 ## Test
@@ -82,7 +85,7 @@ and populate the necessary variables.
 cd contracts && make sc-test
 ```
 
-###  Coverage
+### Coverage
 
 ```
 cd contracts && make sc-coverage
@@ -154,7 +157,8 @@ forge verify-check --chain-id <number> <GUID>
 ## Deployment
 
 ### Deploy legacy contracts
-The following diagram illustrates the deployment order and dependencies among contracts in the `static/` folder. 
+
+The following diagram illustrates the deployment order and dependencies among contracts in the `static/` folder.
 Contracts at the bottom depend on those above them:
 
 ```
@@ -199,19 +203,22 @@ Note that in local deployment, the deployment for `HoprDistributor` and `HoprWra
 
 ### Deployed contracts
 
-The `./contracts/contracts-address.json` file defines contract deployments across multiple networks, including local, staging, and production environments. 
-For each network, it specifies deployed contract addresses, the environment type, and the starting block number for indexers. 
+The `./contracts/contracts-address.json` file defines contract deployments across multiple networks, including local, staging, and production environments.
+For each network, it specifies deployed contract addresses, the environment type, and the starting block number for indexers.
 It serves as a centralized reference for frontend, indexer, and integration scripts to locate on-chain components.
 
 This file is automatically populated with the latest deployment addresses.
 
 ## Note
+
 1. Compared to the versions used in actual deployments (see list below), some contracts in this repository have updated solc versions. This is due to the limitation of Foundry's lack of multi-version Solidity compiler support.
+
 - Solc v0.4: Used for the PermittableToken, which is the base implementation of the deployed xHOPR token. The source code has been extracted from the deployed contract, with the only modification being the loosening of the pragma solidity directive to support compilation.
 - Solc v0.6: Used for the deployed HoprToken.
 - Solc v0.8: Used for all newer contracts.
 
 2. Most of the libraries are locked to specific commit or version
+
 - Audited Safe contracts at commit [eb93dbb0f62e2dc1b308ac4c110038062df0a8c9](https://github.com/safe-global/safe-contracts/blob/main/docs/audit_1_4_0.md)
 - Audited Zodiac Modifier Roles v1 contracts at commit [454be9d3c26f90221ca717518df002d1eca1845f](https://github.com/gnosis/zodiac-modifier-roles-v1/tree/main) After importing the contracts, adjust the pragma for two contracts; and manually imported their imports from Gnosis Safe, e.g. Enum.sol
 - Audited Zodiac Base contract at commit [8a77e7b224af8004bd9f2ff4e2919642e93ffd85](https://github.com/gnosis/zodiac/tree/8a77e7b224af8004bd9f2ff4e2919642e93ffd85)

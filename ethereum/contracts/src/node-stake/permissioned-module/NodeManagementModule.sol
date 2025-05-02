@@ -31,7 +31,7 @@ import { EnumerableTargetSet, TargetSet, TargetUtils, Target } from "../../utils
  * @notice This module is a permissioned module for HOPR nodes.
  * HOPR nodes can use the HOPR tokens held in the Safe for actions related to
  * their operations.
- * Owner of Safes can decide if this node management module is desired to be used 
+ * Owner of Safes can decide if this node management module is desired to be used
  * for the Safe.
  * @dev Drawing inspiration from the `zodiac-modifier-roles-v1` `Roles.sol` contract,
  * this module removes target attribute and is dedicated for managing HOPR nodes
