@@ -73,7 +73,6 @@ impl<T> HttpWrapper<T> {
 // }
 
 /// An [`Http`] transport using [`surf`].
-// pub struct SurfTransport(Http<SurfClient>);
 pub type SurfTransport = HttpWrapper<SurfClient>;
 
 impl SurfTransport {
