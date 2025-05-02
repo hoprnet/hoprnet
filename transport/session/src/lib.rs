@@ -58,6 +58,7 @@ impl IntoIterator for Capability {
     }
 }
 
+// TODO: make this defaultable by moving `peer` and `target` out of the object
 /// Configuration for the session.
 ///
 /// Relevant primarily for the client, since the server is only

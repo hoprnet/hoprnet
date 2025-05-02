@@ -43,7 +43,7 @@ impl RateController {
 
 /// A stream adapter that yields elements at a controlled rate, with dynamic rate adjustment.
 ///
-/// See [`RateLimitExt::rate_limit`].
+/// See [`RateLimitExt::rate_limit_per_unit`].
 #[pin_project]
 pub struct RateLimitedStream<S> {
     #[pin]
