@@ -127,6 +127,23 @@ pub struct RpcOperationsConfig {
 // pub(crate) type HoprMiddleware<P, R> =
 //     NonceManagerMiddleware<GasOracleMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>, GnosisScan<R>>>;
 
+// pub(crate) type HoprProvider<R> = FillProvider<
+//     JoinFill<
+//         JoinFill<
+//             JoinFill<
+//                 JoinFill<
+//                     JoinFill<JoinFill<Identity, WalletFiller<EthereumWallet>>, ChainIdFiller>,
+//                     NonceFiller<CachedNonceManager>,
+//                 >,
+//                 GasOracleFiller<R>,
+//             >,
+//             GasFiller,
+//         >,
+//         BlobGasFiller,
+//     >,
+//     RootProvider,
+// >;
+
 pub(crate) type HoprProvider<R> = FillProvider<
     JoinFill<
         JoinFill<
@@ -135,9 +152,9 @@ pub(crate) type HoprProvider<R> = FillProvider<
                     JoinFill<JoinFill<Identity, WalletFiller<EthereumWallet>>, ChainIdFiller>,
                     NonceFiller<CachedNonceManager>,
                 >,
-                GasOracleFiller<R>,
+                GasFiller,
             >,
-            GasFiller,
+            GasOracleFiller<R>,
         >,
         BlobGasFiller,
     >,
@@ -210,8 +227,8 @@ impl<
             .wallet(wallet)
             .filler(ChainIdFiller::default())
             .filler(NonceFiller::new(CachedNonceManager::default()))
-            .filler(GasOracleFiller::new(requestor.clone(), None))
             .filler(GasFiller)
+            .filler(GasOracleFiller::new(requestor.clone(), cfg.gas_oracle_url.clone()))
             .filler(BlobGasFiller)
             .on_client(rpc_client);
 
@@ -469,11 +486,21 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
 #[cfg(test)]
 mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
+    use crate::transport::SurfTransport;
     use crate::{HoprRpcOperations, PendingTransaction};
+    use alloy::network::Ethereum;
+    use alloy::primitives::U256;
+    use alloy::providers::Provider;
+    use alloy::providers::ProviderBuilder;
+    use alloy::rpc::client::ClientBuilder;
+    use alloy::rpc::types::TransactionRequest;
+    use alloy::signers::local::PrivateKeySigner;
+    use alloy::transports::layers::RetryBackoffLayer;
     // use ethers::contract::ContractError;
     // use ethers::providers::Middleware;
     // use ethers::types::{Bytes, Eip1559TransactionRequest};
     use hex_literal::hex;
+    use hopr_chain_types::utils::create_native_transfer;
     use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
     use primitive_types::H160;
     use std::sync::Arc;
@@ -496,13 +523,13 @@ mod tests {
     pub const ETH_VALUE_FOR_MULTICALL3_DEPLOYER: u128 = 100_000_000_000_000_000;
     // 0.1 (anvil) ETH
 
-    // pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
-    //     let tx_hash = pending.tx_hash();
-    //     sleep(timeout).await;
-    //     pending
-    //         .await
-    //         .unwrap_or_else(|_| panic!("timeout awaiting tx hash {tx_hash} after {} seconds", timeout.as_secs()));
-    // }
+    pub async fn wait_until_tx(pending: PendingTransaction, timeout: Duration) {
+        let tx_hash = *pending.tx_hash();
+        sleep(timeout).await;
+        pending
+            .await
+            .unwrap_or_else(|_| panic!("timeout awaiting tx hash {tx_hash} after {} seconds", timeout.as_secs()));
+    }
 
     // /// Deploy a MULTICALL contract into Anvil local chain for testing
     // pub async fn deploy_multicall3_to_anvil<M: Middleware>(provider: Arc<M>) -> Result<(), ContractError<M>> {
@@ -525,102 +552,135 @@ mod tests {
     //     Ok(())
     // }
 
-    // #[async_std::test]
-    // async fn test_should_estimate_tx() -> anyhow::Result<()> {
-    //     let _ = env_logger::builder().is_test(true).try_init();
+    #[tokio::test]
+    async fn test_should_estimate_tx() -> anyhow::Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
 
-    //     let expected_block_time = Duration::from_secs(1);
-    //     let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
-    //     let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+        // let signer: PrivateKeySigner = chain_key_0.secret().clone().into();
 
-    //     let mut server = mockito::Server::new();
-    //     let gas_oracle_mock = server.mock("GET", "/gas_oracle")
-    //         .with_header("content-type", "application/json")
-    //         .with_status(200)
-    //         .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"38791478","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999985432689946"}}"#)
-    //         .create();
+        let mut server = mockito::Server::new_async().await;
 
-    //     let cfg = RpcOperationsConfig {
-    //         chain_id: anvil.chain_id(),
-    //         tx_polling_interval: Duration::from_millis(10),
-    //         expected_block_time,
-    //         finality: 2,
-    //         gas_oracle_url: Some((server.url() + "/gas_oracle").parse()?),
-    //         ..RpcOperationsConfig::default()
-    //     };
+        // let gas_oracle_mock = server
+        //     .mock("GET", "/gasapi.ashx?apikey=key&method=gasoracle")
+        //     .with_status(http_types::StatusCode::Accepted as usize)
+        //     .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"39864926","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999968207972734"}}"#)
+        //     .expect(1)
+        //     .create();
 
-    //     let client = JsonRpcProviderClient::new(
-    //         &anvil.endpoint(),
-    //         SurfRequestor::default(),
-    //         SimpleJsonRpcRetryPolicy::default(),
-    //     );
+        // let mut server = mockito::Server::new();
+        let gas_oracle_mock = server.mock("GET", "/gas_oracle")
+            .with_header("content-type", "application/json")
+            .with_status(200)
+            .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"38791478","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999985432689946"}}"#)
+            .create();
 
-    //     // Wait until contracts deployments are final
-    //     sleep((1 + cfg.finality) * expected_block_time).await;
+        let cfg = RpcOperationsConfig {
+            chain_id: anvil.chain_id(),
+            tx_polling_interval: Duration::from_millis(10),
+            expected_block_time,
+            finality: 2,
+            gas_oracle_url: Some((server.url() + "/gas_oracle").parse()?),
+            ..RpcOperationsConfig::default()
+        };
 
-    //     let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let transport_client = SurfTransport::new(anvil.endpoint_url());
 
-    //     // call eth_gas_estimate
-    //     let (_, estimated_max_priority_fee) = rpc.provider.estimate_eip1559_fees(None).await?;
-    //     assert!(
-    //         estimated_max_priority_fee.ge(&U256::from(100_000_000)),
-    //         "estimated_max_priority_fee must be equal or greater than 0, 0.1 gwei"
-    //     );
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new(2, 100, 100))
+            .transport(transport_client.clone(), transport_client.guess_local());
 
-    //     let estimated_gas_price = rpc.provider.get_gas_price().await?;
-    //     assert!(
-    //         estimated_gas_price.ge(&U256::from(100_000_000)),
-    //         "estimated_max_fee must be greater than 0.1 gwei"
-    //     );
+        // let provider = ProviderBuilder::new()
+        //     .disable_recommended_fillers()
+        //     .wallet(signer)
+        //     .filler(ChainIdFiller::default())
+        //     .filler(NonceFiller::new(CachedNonceManager::default()))
+        //     .filler(GasOracleFiller::new(
+        //         transport_client.client().clone(),
+        //         Some(gas_oracle_req_uri),
+        //     ))
+        //     .filler(GasFiller)
+        //     .filler(BlobGasFiller)
+        //     .on_client(rpc_client);
 
-    //     gas_oracle_mock.assert();
+        // let client = JsonRpcProviderClient::new(
+        //     &anvil.endpoint(),
+        //     SurfRequestor::default(),
+        //     SimpleJsonRpcRetryPolicy::default(),
+        // );
 
-    //     Ok(())
-    // }
+        // Wait until contracts deployments are final
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
-    // #[async_std::test]
-    // async fn test_should_send_tx() -> anyhow::Result<()> {
-    //     let _ = env_logger::builder().is_test(true).try_init();
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-    //     let expected_block_time = Duration::from_secs(1);
-    //     let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
-    //     let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+        // call eth_gas_estimate
+        let fees = rpc.provider.estimate_eip1559_fees().await?;
 
-    //     let cfg = RpcOperationsConfig {
-    //         chain_id: anvil.chain_id(),
-    //         tx_polling_interval: Duration::from_millis(10),
-    //         expected_block_time,
-    //         finality: 2,
-    //         gas_oracle_url: None,
-    //         ..RpcOperationsConfig::default()
-    //     };
+        assert!(
+            fees.max_priority_fee_per_gas.ge(&100_000_000_u128),
+            "estimated_max_priority_fee must be equal or greater than 0, 0.1 gwei"
+        );
 
-    //     let client = JsonRpcProviderClient::new(
-    //         &anvil.endpoint(),
-    //         SurfRequestor::default(),
-    //         SimpleJsonRpcRetryPolicy::default(),
-    //     );
+        let estimated_gas_price = rpc.provider.get_gas_price().await?;
+        assert!(
+            estimated_gas_price.ge(&100_000_000_u128),
+            "estimated_max_fee must be greater than 0.1 gwei"
+        );
 
-    //     // Wait until contracts deployments are final
-    //     sleep((1 + cfg.finality) * expected_block_time).await;
+        gas_oracle_mock.assert();
 
-    //     let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        Ok(())
+    }
 
-    //     let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
-    //     assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
+    #[tokio::test]
+    async fn test_should_send_tx() -> anyhow::Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
 
-    //     // Send 1 ETH to some random address
-    //     let tx_hash = rpc
-    //         .send_transaction(hopr_chain_types::utils::create_native_transfer(
-    //             *RANDY,
-    //             1000000_u32.into(),
-    //         ))
-    //         .await?;
+        let expected_block_time = Duration::from_secs(1);
+        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
-    //     wait_until_tx(tx_hash, Duration::from_secs(8)).await;
+        let cfg = RpcOperationsConfig {
+            chain_id: anvil.chain_id(),
+            tx_polling_interval: Duration::from_millis(10),
+            expected_block_time,
+            finality: 2,
+            gas_oracle_url: None,
+            ..RpcOperationsConfig::default()
+        };
 
-    //     Ok(())
-    // }
+        let transport_client = SurfTransport::new(anvil.endpoint_url());
+
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new(2, 100, 100))
+            .transport(transport_client.clone(), transport_client.guess_local());
+
+        // let client = JsonRpcProviderClient::new(
+        //     &anvil.endpoint(),
+        //     SurfRequestor::default(),
+        //     SimpleJsonRpcRetryPolicy::default(),
+        // );
+
+        // Wait until contracts deployments are final
+        sleep((1 + cfg.finality) * expected_block_time).await;
+
+        // let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
+
+        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
+
+        // Send 1 ETH to some random address
+        let tx = create_native_transfer::<Ethereum>(*RANDY, U256::from(1000000_u32));
+        let tx_hash = rpc.send_transaction(tx).await?;
+
+        wait_until_tx(tx_hash, Duration::from_secs(8)).await;
+
+        Ok(())
+    }
 
     // #[async_std::test]
     // async fn test_should_send_consecutive_txs() -> anyhow::Result<()> {

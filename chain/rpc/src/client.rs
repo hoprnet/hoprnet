@@ -284,7 +284,7 @@ pub enum GasCategory {
 #[derive(Clone, Debug)]
 pub struct GasOracleFiller<C> {
     client: C,
-    url: String,
+    url: Url,
     gas_category: GasCategory,
 }
 
@@ -327,10 +327,10 @@ where
     C: HttpRequestor + Clone,
 {
     /// Same as [`Self::new`] but with a custom [`Client`].
-    pub fn new(client: C, url: Option<String>) -> Self {
+    pub fn new(client: C, url: Option<Url>) -> Self {
         Self {
             client,
-            url: url.unwrap_or_else(|| DEFAULT_GAS_ORACLE_URL.into()),
+            url: url.unwrap_or_else(|| Url::parse(DEFAULT_GAS_ORACLE_URL).unwrap()),
             gas_category: GasCategory::Standard,
         }
     }
@@ -345,7 +345,7 @@ where
     pub async fn query(&self) -> Result<GasOracleResponse, TransportError> {
         let raw_value = self
             .client
-            .http_get(&self.url)
+            .http_get(&self.url.as_str())
             .await
             .map_err(|e| TransportErrorKind::custom(e))?;
 
@@ -1424,9 +1424,6 @@ mod tests {
         let anvil = create_anvil(None);
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
-        let gas_oracle_server_url = server.url();
-        let gas_oracle_req_uri = format!("{}/gasapi.ashx?apikey=key&method=gasoracle", gas_oracle_server_url);
-
         let transport_client = SurfTransport::new(anvil.endpoint_url());
         // let underlying_transport_client = transport_client.client().clone();
 
@@ -1440,7 +1437,7 @@ mod tests {
             .filler(NonceFiller::new(CachedNonceManager::default()))
             .filler(GasOracleFiller::new(
                 transport_client.client().clone(),
-                Some(gas_oracle_req_uri),
+                Some((server.url() + "/gasapi.ashx?apikey=key&method=gasoracle").parse()?),
             ))
             .filler(GasFiller)
             .on_client(rpc_client);
@@ -1474,9 +1471,6 @@ mod tests {
         let anvil = create_anvil(None);
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
-        let gas_oracle_server_url = server.url();
-        let gas_oracle_req_uri = format!("{}/gasapi.ashx?apikey=key&method=gasoracle", gas_oracle_server_url);
-
         let transport_client = SurfTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
@@ -1490,7 +1484,7 @@ mod tests {
             .filler(NonceFiller::new(CachedNonceManager::default()))
             .filler(GasOracleFiller::new(
                 transport_client.client().clone(),
-                Some(gas_oracle_req_uri),
+                Some((server.url() + "/gasapi.ashx?apikey=key&method=gasoracle").parse()?),
             ))
             .filler(GasFiller)
             .filler(BlobGasFiller)
