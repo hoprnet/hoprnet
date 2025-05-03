@@ -243,7 +243,7 @@ mod tests {
 
         let mut server = mockito::Server::new_async().await;
 
-        let m = server
+        let _m = server
             .mock("GET", "/gasapi.ashx?apikey=key&method=gasoracle")
             .with_status(http_types::StatusCode::Accepted as usize)
             .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"39864926","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999968207972734"}}"#)
