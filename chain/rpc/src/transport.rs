@@ -7,12 +7,22 @@ use alloy::{
         TransportFut, TransportResult,
     },
 };
+use async_trait::async_trait;
 
 use std::task;
 pub use surf::Client as SurfClient;
 use tower::Service;
 use tracing::{debug, debug_span, info, trace, Instrument};
 use url::Url;
+
+use crate::errors::HttpRequestError;
+
+/// Abstraction for an HTTP client that performs HTTP GET with serializable request data.
+#[async_trait]
+pub trait HttpRequestor: std::fmt::Debug + Send + Sync {
+    /// Performs HTTP GET query to the given URL and gets the JSON response.
+    async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError>;
+}
 
 /// Local wrapper for `Http`
 #[derive(Clone, Debug)]
@@ -141,7 +151,7 @@ impl TransportConnect for SurfTransport {
         )))
     }
 }
-
+/// HTTP Post requestor
 impl Service<RequestPacket> for HttpWrapper<SurfClient> {
     type Response = ResponsePacket;
     type Error = TransportError;
@@ -161,9 +171,38 @@ impl Service<RequestPacket> for HttpWrapper<SurfClient> {
     }
 }
 
+#[async_trait]
+impl HttpRequestor for SurfClient {
+    #[inline]
+    async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError> {
+        let mut res = self
+            .get(url)
+            .await
+            .map_err(|e| HttpRequestError::TransportError(e.to_string()))?;
+
+        let status = res.status();
+
+        debug!(%status, "received response from server");
+
+        let body = res
+            .body_bytes()
+            .await
+            .map_err(|e| HttpRequestError::UnknownError(e.to_string().into()))?;
+
+        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
+        trace!(body = %String::from_utf8_lossy(&body), "response body");
+
+        if !status.is_success() {
+            return Err(HttpRequestError::HttpError(status));
+        }
+
+        Ok(body.into_boxed_slice())
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::transport::SurfTransport;
+    use crate::transport::{HttpRequestor, SurfTransport};
     use alloy::{
         providers::{Provider, ProviderBuilder},
         rpc::client::ClientBuilder,
@@ -194,6 +233,35 @@ mod tests {
         let num = provider.get_block_number().await?;
 
         assert_eq!(num, 0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_surf_transport_get() -> anyhow::Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server
+            .mock("GET", "/gasapi.ashx?apikey=key&method=gasoracle")
+            .with_status(http_types::StatusCode::Accepted as usize)
+            .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"39864926","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999968207972734"}}"#)
+            .expect(1)
+            .create();
+
+        let anvil = create_anvil(None);
+
+        let surf_transport_client = SurfTransport::new(anvil.endpoint_url());
+
+        let url = server.url();
+        let req_uri = format!("{}/gasapi.ashx?apikey=key&method=gasoracle", url);
+        let resp = surf_transport_client.client().http_get(&req_uri).await?;
+
+        assert_eq!(
+            resp.iter().as_slice(),
+            r#"{"status":"1","message":"OK","result":{"LastBlock":"39864926","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999968207972734"}}"#.as_bytes()
+        );
 
         Ok(())
     }

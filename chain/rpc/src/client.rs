@@ -10,15 +10,23 @@
 //! - Use tokio runtime for most of the tests
 //!
 //! This module contains defalut gas estimation constants for EIP-1559 for Gnosis chain,
-/// as GnosisScan middleware is migrated to GasFiller
+/// as GasOracleMiddleware middleware is migrated to GasFiller
 use alloy::{
+    eips::eip1559::Eip1559Estimation,
+    network::{Network, TransactionBuilder},
+    primitives::{utils::parse_units, U256},
+    providers::{
+        fillers::{FillerControlFlow, TxFiller},
+        Provider, SendableTx,
+    },
     rpc::json_rpc::{ErrorPayload, RequestPacket, ResponsePacket, ResponsePayload},
-    transports::{layers::RetryPolicy, HttpError, TransportError, TransportErrorKind, TransportFut},
+    transports::{layers::RetryPolicy, HttpError, TransportError, TransportErrorKind, TransportFut, TransportResult},
 };
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 use std::{
-    fmt::Debug,
+    fmt::{format, Debug},
     io::{BufWriter, Write},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -29,16 +37,20 @@ use std::{
 };
 use tower::{Layer, Service};
 use tracing::{error, trace};
+use url::Url;
 use validator::Validate;
 
 //// Gas estimation constants for EIP-1559 for Gnosis chain.
 /// These values are used to estimate the gas price for transactions.
-/// As GnosisScan middleware is migrated to GasFiller
-pub const EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS: u64 = 3_000_000_000;
-pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS: u64 = 100_000_000;
+/// As GasOracleMiddleware is migrated to GasFiller, they are replaced with
+/// default values.
+pub const EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS: u128 = 3_000_000_000;
+pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS: u128 = 100_000_000;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
+
+use crate::transport::HttpRequestor;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -252,6 +264,254 @@ impl RetryPolicy for ZeroRetryPolicy {
 
     fn backoff_hint(&self, _error: &alloy::transports::TransportError) -> Option<std::time::Duration> {
         None
+    }
+}
+
+/// Generic [`GasOracle`] gas price categories.
+#[derive(Clone, Copy, Default, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum GasCategory {
+    SafeLow,
+    #[default]
+    Standard,
+    Fast,
+    Fastest,
+}
+
+/// Use the underlying gas tracker API of GnosisScan to populate the gas price.
+/// It returns gas price in gwei.
+/// It implements the `GasOracle` trait.
+/// If no Oracle URL is given, it returns no values.
+#[derive(Clone, Debug)]
+pub struct GasOracleFiller<C> {
+    client: C,
+    url: String,
+    gas_category: GasCategory,
+}
+
+/// Default gas oracle URL for Gnosis chain.
+pub const DEFAULT_GAS_ORACLE_URL: &str = "https://ggnosis.blockscan.com/gasapi.ashx?apikey=key&method=gasoracle";
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct GasOracleResponse {
+    pub status: String,
+    pub message: String,
+    pub result: GasOracleResponseResult,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "PascalCase")]
+pub struct GasOracleResponseResult {
+    pub last_block: String,
+    pub safe_gas_price: String,
+    pub propose_gas_price: String,
+    pub fast_gas_price: String,
+}
+
+impl GasOracleResponse {
+    #[inline]
+    pub fn gas_from_category(&self, gas_category: GasCategory) -> String {
+        self.result.gas_from_category(gas_category)
+    }
+}
+
+impl GasOracleResponseResult {
+    fn gas_from_category(&self, gas_category: GasCategory) -> String {
+        match gas_category {
+            GasCategory::SafeLow => self.safe_gas_price.clone(),
+            GasCategory::Standard => self.propose_gas_price.clone(),
+            GasCategory::Fast => self.fast_gas_price.clone(),
+            GasCategory::Fastest => self.fast_gas_price.clone(),
+        }
+    }
+}
+
+// #[async_trait]
+// impl<C: Service<String> + std::fmt::Debug> GasOracle for GnosisScan<C> {
+//     async fn fetch(&self) -> Result<U256, GasOracleError> {
+//         let res: Response = self.query().await?;
+//         let gas_price_in_gwei = res.gas_from_category(self.gas_category);
+//         let gas_price = parse_units(gas_price_in_gwei, "gwei")?.into();
+//         Ok(gas_price)
+//     }
+
+//     // returns hardcoded (max_fee_per_gas, max_priority_fee_per_gas)
+//     // Due to foundry is unable to estimate EIP-1559 fees for L2s https://github.com/foundry-rs/foundry/issues/5709,
+//     // a hardcoded value of (3 gwei, 0.1 gwei) for Gnosischain is returned.
+//     async fn estimate_eip1559_fees(&self) -> Result<(U256, U256), GasOracleError> {
+//         Ok((
+//             U256::from(EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS),
+//             U256::from(EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS),
+//         ))
+//     }
+// }
+
+impl<C> GasOracleFiller<C>
+where
+    // C: Service<String, Response = Box<RawValue>, Error = TransportError>,
+    C: HttpRequestor,
+{
+    /// Same as [`Self::new`] but with a custom [`Client`].
+    pub fn new(client: C, url: Option<String>) -> Self {
+        Self {
+            client,
+            url: url.unwrap_or_else(|| DEFAULT_GAS_ORACLE_URL.into()),
+            gas_category: GasCategory::Standard,
+        }
+    }
+
+    /// Sets the gas price category to be used when fetching the gas price.
+    pub fn category(mut self, gas_category: GasCategory) -> Self {
+        self.gas_category = gas_category;
+        self
+    }
+
+    /// Perform a request to the gas price API and deserialize the response.
+    pub async fn query(&self) -> Result<GasOracleResponse, TransportError> {
+        let raw_value = self
+            .client
+            .http_get(&self.url)
+            .await
+            .map_err(|e| TransportErrorKind::custom(e))?;
+
+        // let url = self.url.as_ref();
+        // // .ok_or_else(|| TransportErrorKind::Custom("Cannot parse gas oracle url".into()))?;
+
+        // let raw_value: Box<[u8]> = self
+        //     .client
+        //     .http_get(url)
+        //     .await
+        //     .map_err(|_| TransportErrorKind::Custom("failed to query gas price API".into()))?;
+
+        let parsed: GasOracleResponse = serde_json::from_slice(raw_value.as_ref()).map_err(|e| {
+            error!(%e, "failed to deserialize gas price API response");
+            TransportErrorKind::Custom("failed to deserialize gas price API response".into())
+        })?;
+
+        Ok(parsed)
+    }
+
+    async fn prepare_legacy<P, N>(
+        &self,
+        _provider: &P,
+        _tx: &N::TransactionRequest,
+    ) -> TransportResult<GasOracleFillable>
+    where
+        P: Provider<N>,
+        N: Network,
+    {
+        let res = self.query().await?;
+        let gas_price_in_gwei = res.gas_from_category(self.gas_category);
+        let gas_price = parse_units(&gas_price_in_gwei, "gwei")
+            .map_err(|e| TransportErrorKind::custom_str(&format!("Failed to parse gwei from gas oracle: {e}")))?;
+        let gas_price_in_128: u128 = gas_price
+            .get_absolute()
+            .try_into()
+            .map_err(|_| TransportErrorKind::custom_str("Conversion overflow"))?;
+
+        Ok(GasOracleFillable::Legacy {
+            gas_price: gas_price_in_128,
+        })
+    }
+
+    async fn prepare_1559<P, N>(&self, _provider: &P, _tx: &N::TransactionRequest) -> TransportResult<GasOracleFillable>
+    where
+        P: Provider<N>,
+        N: Network,
+    {
+        Ok(GasOracleFillable::Eip1559 {
+            estimate: self.estimate_eip1559_fees(),
+        })
+    }
+
+    // async fn fetch(&self) -> Result<U256, GasOracleError> {
+    //     let res: Response = self.query().await?;
+    //     let gas_price_in_gwei = res.gas_from_category(self.gas_category);
+    //     let gas_price = parse_units(gas_price_in_gwei, "gwei")?.into();
+    //     Ok(gas_price)
+    // }
+
+    // returns hardcoded (max_fee_per_gas, max_priority_fee_per_gas)
+    // Due to foundry is unable to estimate EIP-1559 fees for L2s https://github.com/foundry-rs/foundry/issues/5709,
+    // a hardcoded value of (3 gwei, 0.1 gwei) for Gnosischain is returned.
+    fn estimate_eip1559_fees(&self) -> Eip1559Estimation {
+        Eip1559Estimation {
+            max_fee_per_gas: EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS,
+            max_priority_fee_per_gas: EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS,
+        }
+    }
+}
+
+/// An enum over the different types of gas fillable.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GasOracleFillable {
+    // Legacy {
+    //     gas_limit: u64,
+    //     gas_price: u128,
+    // },
+    // Eip1559 {
+    //     gas_limit: u64,
+    //     estimate: Eip1559Estimation,
+    // },
+    Legacy { gas_price: u128 },
+    Eip1559 { estimate: Eip1559Estimation },
+}
+
+impl<N, C> TxFiller<N> for GasOracleFiller<C>
+where
+    N: Network,
+    // C: Service<String, Response = Box<RawValue>, Error = TransportError> + Debug,
+    // C: Send + Sync + Clone,
+    C: HttpRequestor + Clone,
+{
+    type Fillable = GasOracleFillable;
+
+    fn status(&self, tx: &<N as Network>::TransactionRequest) -> FillerControlFlow {
+        // legacy and eip2930 tx
+        if tx.gas_price().is_some() && tx.gas_limit().is_some() {
+            return FillerControlFlow::Finished;
+        }
+
+        // eip1559
+        if tx.max_fee_per_gas().is_some() && tx.max_priority_fee_per_gas().is_some() && tx.gas_limit().is_some() {
+            return FillerControlFlow::Finished;
+        }
+
+        FillerControlFlow::Ready
+    }
+
+    fn fill_sync(&self, _tx: &mut SendableTx<N>) {}
+
+    async fn prepare<P>(&self, provider: &P, tx: &<N as Network>::TransactionRequest) -> TransportResult<Self::Fillable>
+    where
+        P: Provider<N>,
+    {
+        if tx.gas_price().is_some() {
+            self.prepare_legacy(provider, tx).await
+        } else {
+            match self.prepare_1559(provider, tx).await {
+                // fallback to legacy
+                Ok(estimate) => Ok(estimate),
+                Err(e) => Err(e),
+            }
+        }
+    }
+
+    async fn fill(&self, fillable: Self::Fillable, mut tx: SendableTx<N>) -> TransportResult<SendableTx<N>> {
+        if let Some(builder) = tx.as_mut_builder() {
+            match fillable {
+                GasOracleFillable::Legacy { gas_price } => {
+                    // builder.set_gas_limit(gas_limit);
+                    builder.set_gas_price(gas_price);
+                }
+                GasOracleFillable::Eip1559 { estimate } => {
+                    // builder.set_gas_limit(gas_limit);
+                    builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
+                    builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
+                }
+            }
+        };
+        Ok(tx)
     }
 }
 
@@ -516,17 +776,12 @@ impl<S> Layer<S> for SnapshotRequestorLayer {
     fn layer(&self, inner: S) -> Self::Service {
         SnapshotRequestorService {
             inner,
-            snapshot_requestor: self.snapshot_requestor.clone(), // next_id: self.next_id.clone(),
-                                                                 // entries: self.entries.clone(),
-                                                                 // file: self.file.clone(),
-                                                                 // aggressive_save: self.aggressive_save.clone(),
-                                                                 // fail_on_miss: self.fail_on_miss.clone(),
-                                                                 // ignore_snapshot: self.ignore_snapshot.clone(),
+            snapshot_requestor: self.snapshot_requestor.clone(),
         }
     }
 }
 
-/// Implement the [`tower::Service`] trait for the [`MetricsService`].
+/// Implement the [`tower::Service`] trait for the [`SnapshotRequestorService`].
 impl<S> Service<RequestPacket> for SnapshotRequestorService<S>
 where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError> + Send + 'static + Clone,
@@ -631,11 +886,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloy::providers::Provider;
-    use alloy::providers::ProviderBuilder;
-    use alloy::rpc::client::ClientBuilder;
-    use alloy::signers::local::PrivateKeySigner;
-    use alloy::transports::layers::RetryBackoffLayer;
+    use alloy::{
+        network::TransactionBuilder,
+        primitives::{address, U256},
+        providers::{
+            fillers::{CachedNonceManager, GasFiller, NonceFiller},
+            Provider, ProviderBuilder,
+        },
+        rpc::{client::ClientBuilder, types::TransactionRequest},
+        signers::local::PrivateKeySigner,
+        transports::layers::RetryBackoffLayer,
+    };
     use anyhow::Ok;
     use hopr_async_runtime::prelude::sleep;
     use hopr_chain_types::utils::create_anvil;
@@ -646,11 +907,9 @@ mod tests {
     use std::time::Duration;
     use tempfile::NamedTempFile;
 
-    use crate::client::DefaultRetryPolicy;
-    use crate::client::MetricsLayer;
-    use crate::client::SnapshotRequestor;
-    use crate::client::SnapshotRequestorLayer;
-    use crate::client::ZeroRetryPolicy;
+    use crate::client::{
+        DefaultRetryPolicy, GasOracleFiller, MetricsLayer, SnapshotRequestor, SnapshotRequestorLayer, ZeroRetryPolicy,
+    };
     use crate::transport::SurfTransport;
 
     #[tokio::test]
@@ -1196,6 +1455,105 @@ mod tests {
             }
         }
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_client_should_call_on_gas_oracle_for_eip1559_tx() -> anyhow::Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server
+            .mock("GET", "/gasapi.ashx?apikey=key&method=gasoracle")
+            .with_status(http_types::StatusCode::Accepted as usize)
+            .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"39864926","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999968207972734"}}"#)
+            .expect(0)
+            .create();
+
+        let anvil = create_anvil(None);
+        let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
+
+        let gas_oracle_server_url = server.url();
+        let gas_oracle_req_uri = format!("{}/gasapi.ashx?apikey=key&method=gasoracle", gas_oracle_server_url);
+
+        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        // let underlying_transport_client = transport_client.client().clone();
+
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new(2, 100, 100))
+            .transport(transport_client.clone(), transport_client.guess_local());
+
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .wallet(signer)
+            .filler(NonceFiller::new(CachedNonceManager::default()))
+            .filler(GasOracleFiller::new(
+                transport_client.client().clone(),
+                Some(gas_oracle_req_uri),
+            ))
+            .filler(GasFiller)
+            .on_client(rpc_client);
+
+        let tx = TransactionRequest::default()
+            .with_chain_id(provider.get_chain_id().await?)
+            .to(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))
+            .value(U256::from(100))
+            .transaction_type(2);
+
+        let receipt = provider.send_transaction(tx.into()).await?.get_receipt().await?;
+
+        m.assert();
+        assert_eq!(receipt.gas_used, 21000);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_client_should_call_on_gas_oracle_for_legacy_tx() -> anyhow::Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server
+            .mock("GET", "/gasapi.ashx?apikey=key&method=gasoracle")
+            .with_status(http_types::StatusCode::Accepted as usize)
+            .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"39864926","SafeGasPrice":"1.1","ProposeGasPrice":"3.5","FastGasPrice":"1.6","UsdPrice":"0.999968207972734"}}"#)
+            .expect(1)
+            .create();
+
+        let anvil = create_anvil(None);
+        let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
+
+        let gas_oracle_server_url = server.url();
+        let gas_oracle_req_uri = format!("{}/gasapi.ashx?apikey=key&method=gasoracle", gas_oracle_server_url);
+
+        let transport_client = SurfTransport::new(anvil.endpoint_url());
+
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new(2, 100, 100))
+            .transport(transport_client.clone(), transport_client.guess_local());
+
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .wallet(signer)
+            .filler(NonceFiller::new(CachedNonceManager::default()))
+            .filler(GasOracleFiller::new(
+                transport_client.client().clone(),
+                Some(gas_oracle_req_uri),
+            ))
+            .filler(GasFiller)
+            .on_client(rpc_client);
+
+        // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
+        let tx = TransactionRequest::default()
+            .with_to(address!("d8dA6BF26964aF9D7eEd9e03E53415D37aA96045"))
+            .with_value(U256::from(100))
+            .with_gas_price(1000000000);
+
+        let receipt = provider.send_transaction(tx.into()).await?.get_receipt().await?;
+
+        m.assert();
+        assert_eq!(receipt.gas_used, 21000);
         Ok(())
     }
 }
