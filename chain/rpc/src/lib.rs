@@ -13,7 +13,6 @@ extern crate core;
 use alloy::providers::PendingTransaction;
 use alloy::rpc::types::{Filter, TransactionRequest};
 use async_trait::async_trait;
-// pub use ethers::types::transaction::eip2718::TypedTransaction;
 use futures::{FutureExt, Stream};
 use http_types::convert::Deserialize;
 use primitive_types::H256;
@@ -80,30 +79,15 @@ impl From<alloy::rpc::types::Log> for Log {
         }
     }
 }
-// impl From<ethers::types::Log> for Log {
-//     fn from(value: ethers::prelude::Log) -> Self {
-//         Self {
-//             address: value.address.into(),
-//             topics: value.topics.into_iter().map(Hash::from).collect(),
-//             data: Box::from(value.data.as_ref()),
-//             tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
-//             block_number: value.block_number.expect("block id must be present").as_u64(),
-//             block_hash: value.block_hash.expect("block hash must be present").into(),
-//             log_index: value.log_index.expect("log index must be present"),
-//             tx_hash: value.transaction_hash.expect("tx hash must be present").into(),
-//             removed: value.removed.expect("removed flag must be present"),
+
+// impl From<Log> for ethers::abi::RawLog {
+//     fn from(value: Log) -> Self {
+//         ethers::abi::RawLog {
+//             topics: value.topics.into_iter().map(H256::from).collect(),
+//             data: value.data.into(),
 //         }
 //     }
 // }
-
-impl From<Log> for ethers::abi::RawLog {
-    fn from(value: Log) -> Self {
-        ethers::abi::RawLog {
-            topics: value.topics.into_iter().map(H256::from).collect(),
-            data: value.data.into(),
-        }
-    }
-}
 
 impl From<SerializableLog> for Log {
     fn from(value: SerializableLog) -> Self {
@@ -230,19 +214,6 @@ impl From<LogFilter> for alloy::rpc::types::Filter {
             )
     }
 }
-// impl From<LogFilter> for ethers::types::Filter {
-//     fn from(value: LogFilter) -> Self {
-//         ethers::types::Filter::new()
-//             .address(
-//                 value
-//                     .address
-//                     .into_iter()
-//                     .map(ethers::types::Address::from)
-//                     .collect::<Vec<_>>(),
-//             )
-//             .topic0(value.topics)
-//     }
-// }
 
 /// Indicates what retry action should be taken, as result of a `RetryPolicy` implementation.
 pub enum RetryAction {

@@ -36,7 +36,6 @@ async-std = { workspace = true, optional = true, features = [
   "unstable",
 ] }
 async-stream = { workspace = true }
-ethers = { workspace = true }
 futures = { workspace = true }
 futures-timer = { workspace = true }
 governor = { workspace = true, optional = true }

@@ -5369,7 +5369,6 @@ dependencies = [
  "async-stream",
  "async-trait",
  "env_logger",
- "ethers",
  "futures",
  "futures-timer",
  "governor 0.10.0",

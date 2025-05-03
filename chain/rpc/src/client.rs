@@ -870,7 +870,7 @@ pub type AnvilRpcClient = FillProvider<
     >,
     RootProvider,
 >;
-/// Used for testing. Creates Ethers RPC client to the local Anvil instance.
+/// Used for testing. Creates RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil(
     anvil: &alloy::node_bindings::AnvilInstance,
@@ -981,7 +981,6 @@ mod tests {
 
         let anvil = create_anvil(Some(block_time));
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
-        // let signer_chain_key = ChainKeypair::from_secret(signer.to_bytes().as_ref())?;
 
         let transport_client = SurfTransport::new(anvil.endpoint_url());
 
