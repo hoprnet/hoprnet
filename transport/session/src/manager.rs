@@ -768,7 +768,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_insert_into_next_slot() -> anyhow::Result<()> {
         let cache = moka::future::Cache::new(10);
 
@@ -790,7 +790,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> anyhow::Result<()>
     {
         let alice_peer: Address = (&ChainKeypair::random()).into();
@@ -910,7 +910,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_close_idle_session_automatically() -> anyhow::Result<()> {
         let alice_peer: Address = (&ChainKeypair::random()).into();
         let bob_peer: Address = (&ChainKeypair::random()).into();
@@ -1033,7 +1033,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_not_allow_establish_session_when_tag_range_is_used_up() -> anyhow::Result<()> {
         let alice_peer: Address = (&ChainKeypair::random()).into();
         let bob_peer: Address = (&ChainKeypair::random()).into();
@@ -1113,7 +1113,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_timeout_new_session_attempt_when_no_response() -> anyhow::Result<()> {
         let alice_peer: Address = (&ChainKeypair::random()).into();
         let bob_peer: Address = (&ChainKeypair::random()).into();

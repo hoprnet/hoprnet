@@ -154,7 +154,7 @@ sea-query = { version = "0.32.3", default-features = false }
 sea-query-binder = { version = "0.7.0", default-features = false, features = [
   "with-chrono",
   "sqlx-sqlite",
-  "runtime-async-std-rustls",
+  "runtime-tokio-rustls",
 ] }
 semver = "1.0.26"
 serde = { version = "1.0.219", features = ["derive"] }

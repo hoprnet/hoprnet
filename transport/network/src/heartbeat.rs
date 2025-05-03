@@ -270,7 +270,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_heartbeat_should_loop_multiple_times() {
         let config = simple_heartbeat_config();
 
@@ -295,7 +295,7 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_heartbeat_should_interrupt_long_running_heartbeats() {
         let config = HeartbeatConfig {
             interval: std::time::Duration::from_millis(5u64),

@@ -195,7 +195,7 @@ mod tests {
     use hopr_internal_types::prelude::*;
     use std::time::Duration;
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_basic_flow() -> anyhow::Result<()> {
         let cfg = MessageInboxConfiguration {
             capacity: 4,

@@ -803,7 +803,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_promiscuous_strategy_tick_decisions() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 

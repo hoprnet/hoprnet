@@ -115,25 +115,25 @@ impl SelfClosingJoinHandle {
     }
 }
 
-#[cfg(feature = "runtime-async-std")]
+// TODO: Replace this with tokio
 impl Drop for SelfClosingJoinHandle {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            block_on(handle.cancel());
+            handle.abort();
         }
     }
 }
 
-#[cfg(feature = "runtime-async-std")]
-use async_std::{
-    future::timeout,
-    task::{block_on, sleep, spawn, JoinHandle},
+use tokio::{
+    task::{spawn, JoinHandle},
+    time::{sleep, timeout},
 };
+
 use hopr_crypto_packet::prelude::HoprPacket;
 
 #[ignore]
-#[cfg_attr(feature = "runtime-async-std", async_std::test)]
-// #[cfg_attr(feature = "runtime-async-std", tracing_test::traced_test)]
+#[tokio::test]
+// #[tracing_test::traced_test]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
     let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;

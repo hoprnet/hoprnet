@@ -12,7 +12,6 @@ crate-type = ["rlib"]
 default = ["compat-ping"]
 compat-ping = []
 prometheus = ["dep:hopr-metrics"]
-runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
@@ -42,7 +41,7 @@ hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
+tokio = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }

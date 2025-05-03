@@ -21,7 +21,7 @@ prometheus = [
 ]
 explicit-path = []
 # placeholder feature so we can enable it globally during tests
-runtime-async-std = []
+runtime-tokio = []
 
 [dependencies]
 async-lock = { workspace = true }

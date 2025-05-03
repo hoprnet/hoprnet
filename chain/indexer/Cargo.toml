@@ -13,10 +13,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = [
-  "hopr-db-sql/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-]
 runtime-tokio = [
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
@@ -52,10 +48,11 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 hex-literal = { workspace = true }
 mockall = { workspace = true }
 primitive-types = { workspace = true }
-hopr-crypto-random = { workspace = true }
 test-log = { workspace = true }
+tokio = { workspace = true }
+
+hopr-crypto-random = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }

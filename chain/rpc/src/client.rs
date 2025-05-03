@@ -467,80 +467,6 @@ where
     }
 }
 
-#[cfg(any(test, feature = "runtime-async-std"))]
-pub mod surf_client {
-    use async_std::prelude::FutureExt;
-    use async_trait::async_trait;
-    use serde::Serialize;
-    use tracing::info;
-
-    use crate::errors::HttpRequestError;
-    use crate::{HttpPostRequestorConfig, HttpRequestor};
-
-    /// HTTP client that uses a non-Tokio runtime based HTTP client library, such as `surf`.
-    /// `surf` works also for Browsers in WASM environments.
-    #[derive(Clone, Debug, Default)]
-    pub struct SurfRequestor {
-        client: surf::Client,
-        cfg: HttpPostRequestorConfig,
-    }
-
-    impl SurfRequestor {
-        pub fn new(cfg: HttpPostRequestorConfig) -> Self {
-            info!(?cfg, "creating surf client");
-
-            let mut client = surf::client().with(surf::middleware::Redirect::new(cfg.max_redirects));
-
-            // Rate limit of 0 also means unlimited as if None was given
-            if let Some(max) = cfg.max_requests_per_sec.and_then(|r| (r > 0).then_some(r)) {
-                client = client.with(
-                    surf_governor::GovernorMiddleware::per_second(max)
-                        .expect("cannot setup http rate limiter middleware"),
-                );
-            }
-
-            Self { client, cfg }
-        }
-    }
-
-    #[async_trait]
-    impl HttpRequestor for SurfRequestor {
-        async fn http_query<T>(
-            &self,
-            method: http_types::Method,
-            url: &str,
-            data: Option<T>,
-        ) -> Result<Box<[u8]>, HttpRequestError>
-        where
-            T: Serialize + Send + Sync,
-        {
-            let request = match method {
-                http_types::Method::Post => self
-                    .client
-                    .post(url)
-                    .body_json(&data.ok_or(HttpRequestError::UnknownError("missing data".to_string()))?)
-                    .map_err(|e| HttpRequestError::UnknownError(e.to_string()))?,
-                http_types::Method::Get => self.client.get(url),
-                _ => return Err(HttpRequestError::UnknownError("unsupported method".to_string())),
-            };
-
-            async move {
-                match request.await {
-                    Ok(mut response) if response.status().is_success() => match response.body_bytes().await {
-                        Ok(data) => Ok(data.into_boxed_slice()),
-                        Err(e) => Err(HttpRequestError::TransportError(e.to_string())),
-                    },
-                    Ok(response) => Err(HttpRequestError::HttpError(response.status())),
-                    Err(e) => Err(HttpRequestError::TransportError(e.to_string())),
-                }
-            }
-            .timeout(self.cfg.http_request_timeout)
-            .await
-            .map_err(|_| HttpRequestError::Timeout)?
-        }
-    }
-}
-
 #[cfg(any(test, feature = "runtime-tokio"))]
 pub mod reqwest_client {
     use async_trait::async_trait;
@@ -939,7 +865,7 @@ mod tests {
         Ok(ContractAddresses::from(&contracts))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_client_should_deploy_contracts_via_surf() -> anyhow::Result<()> {
         let contract_addrs = deploy_contracts(SurfRequestor::default()).await?;
 
@@ -967,7 +893,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_client_should_get_block_number() -> anyhow::Result<()> {
         let block_time = Duration::from_millis(1100);
 
@@ -998,7 +924,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_client_should_fail_on_malformed_request() {
         let anvil = create_anvil(None);
         let client = JsonRpcProviderClient::new(
@@ -1015,7 +941,7 @@ mod tests {
         assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(..)));
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_client_should_fail_on_malformed_response() {
         let mut server = mockito::Server::new_async().await;
 
@@ -1042,7 +968,7 @@ mod tests {
         assert!(matches!(err, JsonRpcProviderClientError::SerdeJson { .. }));
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_client_should_retry_on_http_error() {
         let mut server = mockito::Server::new_async().await;
 
@@ -1079,7 +1005,7 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_client_should_not_retry_with_zero_retry_policy() {
         let mut server = mockito::Server::new_async().await;
 
@@ -1107,7 +1033,7 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_client_should_retry_on_json_rpc_error() {
         let mut server = mockito::Server::new_async().await;
 
@@ -1153,7 +1079,7 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_client_should_not_retry_on_nonretryable_json_rpc_error() {
         let mut server = mockito::Server::new_async().await;
 
@@ -1199,7 +1125,7 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_client_should_retry_on_nonretryable_json_rpc_error_if_min_retries_is_given() {
         let mut server = mockito::Server::new_async().await;
 
@@ -1246,7 +1172,7 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_client_should_retry_on_malformed_json_rpc_error() {
         let mut server = mockito::Server::new_async().await;
 
@@ -1306,7 +1232,7 @@ mod tests {
         }
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_client_from_file() -> anyhow::Result<()> {
         let block_time = Duration::from_millis(1100);
         let snapshot_file = NamedTempFile::new()?;

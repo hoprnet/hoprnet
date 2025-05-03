@@ -512,7 +512,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_estimate_tx() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -565,7 +565,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_send_tx() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -609,7 +609,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_send_consecutive_txs() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -666,7 +666,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_balance_native() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -710,7 +710,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_balance_token() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -754,7 +754,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_check_node_safe_module_status() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -847,7 +847,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_eligibility_status() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 

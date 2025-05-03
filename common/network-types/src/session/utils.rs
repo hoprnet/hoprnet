@@ -240,7 +240,7 @@ mod tests {
         (read, written)
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn faulty_network_mixing() {
         const MIX_FACTOR: usize = 2;
         const COUNT: usize = 20;
@@ -264,7 +264,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn faulty_network_packet_drop() {
         const DROP: f64 = 0.3333;
         const COUNT: usize = 20;
@@ -284,7 +284,7 @@ mod tests {
         assert!(read.len() >= max_drop, "dropped more than {max_drop}: {}", read.len());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn faulty_network_reliable() {
         const COUNT: usize = 20;
 

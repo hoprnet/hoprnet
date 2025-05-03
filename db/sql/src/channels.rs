@@ -361,7 +361,7 @@ mod tests {
     use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry};
     use hopr_primitive_types::prelude::{Address, BalanceType};
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -385,7 +385,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_insert_get_by_parties() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -412,7 +412,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_channel_get_for_destination_that_does_not_exist_returns_none() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -427,7 +427,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_channel_get_for_destination_that_exists_should_be_returned() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -454,7 +454,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_incoming_outgoing_channels() -> anyhow::Result<()> {
         let ckp = ChainKeypair::random();
         let addr_1 = ckp.public().to_address();

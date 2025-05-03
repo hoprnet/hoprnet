@@ -18,10 +18,6 @@ serde = [
   "hopr-crypto-types/serde",
   "hopr-path/serde",
 ]
-runtime-async-std = [
-  "dep:async-std-resolver",
-  "hopr-async-runtime/runtime-async-std",
-]
 runtime-tokio = [
   "dep:tokio",
   "dep:tokio-util",
@@ -33,7 +29,6 @@ prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 [dependencies]
 aquamarine = { workspace = true }
 arrayvec = { workspace = true }
-async-std-resolver = { workspace = true, optional = true }
 bitvec = { workspace = true }
 crossbeam-queue = { workspace = true }
 crossbeam-skiplist = { workspace = true }
@@ -71,7 +66,6 @@ hopr-path = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-stream = { workspace = true }
 ctor = { workspace = true }
 criterion = { workspace = true }

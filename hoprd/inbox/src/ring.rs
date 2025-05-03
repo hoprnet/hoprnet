@@ -217,7 +217,7 @@ mod tests {
         )
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_push_pop_tag() {
         let mut rb = make_backend(4);
 
@@ -267,7 +267,7 @@ mod tests {
         assert_eq!(2, rb.count(None).await);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_pop_all() {
         let mut rb = make_backend(2);
 
@@ -290,7 +290,7 @@ mod tests {
         assert_eq!(0, rb.count_untagged());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_pop_all_specific() {
         let mut rb = make_backend(2);
 
@@ -318,7 +318,7 @@ mod tests {
         assert_eq!(3, rb.count(None).await);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_pop_oldest() {
         let mut rb = make_backend(2);
 
@@ -350,7 +350,7 @@ mod tests {
         assert_eq!(0, rb.count(None).await);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_peek_oldest() {
         let mut rb = make_backend(2);
 
@@ -369,7 +369,7 @@ mod tests {
         assert_eq!(5, rb.count(None).await);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_peek_oldest_specific() {
         let mut rb = make_backend(2);
 
@@ -396,7 +396,7 @@ mod tests {
         assert_eq!(2, rb.count(Some(2)).await);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_peek_all() {
         let mut rb = make_backend(4);
 
@@ -425,7 +425,7 @@ mod tests {
         rb.pop_all(None).await;
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_peek_all_specific() {
         let mut rb = make_backend(4);
 
@@ -453,7 +453,7 @@ mod tests {
         rb.pop_all(None).await;
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_peek_all_with_timestamp() {
         let mut rb = make_backend(8);
 
@@ -503,7 +503,7 @@ mod tests {
         rb.pop_all(None).await;
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_purge() {
         let mut rb = make_backend(8);
 
@@ -533,7 +533,7 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_duplicates() {
         let mut rb = make_backend(4);
 

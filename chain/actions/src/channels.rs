@@ -257,7 +257,7 @@ mod tests {
         static ref BOB: Address = BOB_KP.public().to_address();
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_open_channel() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -325,7 +325,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_open_channel_again() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
@@ -376,7 +376,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_open_channel_to_self() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
@@ -423,7 +423,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_open_should_not_allow_invalid_balance() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
@@ -482,7 +482,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_open_if_not_enough_allowance() -> anyhow::Result<()> {
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
@@ -529,7 +529,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_open_if_not_enough_token_balance() -> anyhow::Result<()> {
         let stake = Balance::new(10_000_u32, BalanceType::HOPR);
 
@@ -576,7 +576,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_fund_channel() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -644,7 +644,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_fund_nonexistent_channel() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
@@ -691,7 +691,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_fund_should_not_allow_invalid_balance() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
@@ -751,7 +751,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_fund_if_not_enough_allowance() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
@@ -798,7 +798,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_fund_if_not_enough_balance() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
@@ -845,7 +845,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_close_channel_outgoing() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -960,7 +960,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_close_channel_incoming() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -1033,7 +1033,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_close_when_closure_time_did_not_elapse() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
 
@@ -1090,7 +1090,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_close_nonexistent_channel() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         let db_clone = db.clone();
@@ -1134,7 +1134,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_close_closed_channel() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());

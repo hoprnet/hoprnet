@@ -13,12 +13,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = [
-  "hopr-async-runtime/runtime-async-std",
-  "hopr-db-sql/runtime-async-std",
-  "hopr-transport-protocol/runtime-async-std",
-  "hopr-transport-ticket-aggregation/runtime-async-std",
-]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
@@ -65,8 +59,8 @@ hopr-transport-ticket-aggregation = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+tokio = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-chain-types = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }

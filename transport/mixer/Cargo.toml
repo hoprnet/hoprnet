@@ -29,9 +29,9 @@ hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true, features = ["attributes"] }
+tokio = { workspace = true }
 bytesize = { workspace = true }
-criterion = { workspace = true, features = ["async_futures", "async_std"] }
+criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }

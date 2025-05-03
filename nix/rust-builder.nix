@@ -56,7 +56,7 @@ let
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
   # mold is only supported on Linux, so falling back to lld on Darwin
-  linker = if buildPlatform.isDarwin then "lld" else "mold";
+  linker = if buildPlatform.isDarwin then "ld" else "mold";
 
   buildEnv = {
     CARGO_BUILD_TARGET = cargoTarget;

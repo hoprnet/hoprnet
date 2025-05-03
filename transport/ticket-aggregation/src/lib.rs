@@ -523,7 +523,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_aggregation() -> anyhow::Result<()> {
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await?;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await?;
@@ -649,7 +649,7 @@ mod tests {
         Ok(awaiter.consume_and_wait(Duration::from_millis(2000)).await?)
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_aggregation_skip_lower_indices() -> anyhow::Result<()> {
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await?;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await?;

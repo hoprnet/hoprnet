@@ -42,23 +42,9 @@ where
 {
     let me_peerid: PeerId = me.public().into();
 
-    #[cfg(feature = "runtime-async-std")]
-    let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
-        .with_async_std()
-        .with_tcp(
-            libp2p::tcp::Config::default().nodelay(true),
-            libp2p::noise::Config::new,
-            // use default yamux configuration to enable auto-tuning
-            // see https://github.com/libp2p/rust-libp2p/pull/4970
-            libp2p::yamux::Config::default,
-        )
-        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_quic()
-        .with_dns();
-
     // Both features could be enabled during testing, therefore we only use tokio when its
     // exclusively enabled.
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+    #[cfg(feature = "runtime-tokio")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
         .with_tcp(

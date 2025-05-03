@@ -1210,7 +1210,7 @@ mod tests {
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
-    #[parameterized_macro(async_std::test)]
+    #[parameterized_macro(tokio::test)]
     async fn reliable_send_recv_with_no_acks(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             enabled_features: HashSet::new(),
@@ -1232,7 +1232,7 @@ mod tests {
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
-    #[parameterized_macro(async_std::test)]
+    #[parameterized_macro(tokio::test)]
     async fn reliable_send_recv_with_with_acks(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig { ..Default::default() };
 
@@ -1251,7 +1251,7 @@ mod tests {
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
-    #[parameterized_macro(async_std::test)]
+    #[parameterized_macro(tokio::test)]
     async fn unreliable_send_recv(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_receiver: Duration::from_millis(10),
@@ -1281,7 +1281,7 @@ mod tests {
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
-    #[parameterized_macro(async_std::test)]
+    #[parameterized_macro(tokio::test)]
     async fn unreliable_send_recv_with_mixing(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_receiver: Duration::from_millis(10),
@@ -1312,7 +1312,7 @@ mod tests {
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
-    #[parameterized_macro(async_std::test)]
+    #[parameterized_macro(tokio::test)]
     async fn almost_reliable_send_recv_with_mixing(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(500),
@@ -1343,7 +1343,7 @@ mod tests {
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
-    #[parameterized_macro(async_std::test)]
+    #[parameterized_macro(tokio::test)]
     async fn reliable_send_recv_with_mixing(num_frames: usize, frame_size: usize) {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(500),
@@ -1372,7 +1372,7 @@ mod tests {
         .await;
     }
 
-    #[test(async_std::test)]
+    #[test(tokio::test)]
     async fn small_frames_should_be_sent_as_single_transport_msgs_with_buffering_disabled() {
         const NUM_FRAMES: usize = 10;
         const FRAME_SIZE: usize = 64;
@@ -1416,7 +1416,7 @@ mod tests {
         );
     }
 
-    #[test(async_std::test)]
+    #[test(tokio::test)]
     async fn small_frames_should_be_sent_batched_in_transport_msgs_with_buffering_enabled() {
         const NUM_FRAMES: usize = 10;
         const FRAME_SIZE: usize = 64;
@@ -1460,7 +1460,7 @@ mod tests {
         );
     }
 
-    #[test(async_std::test)]
+    #[test(tokio::test)]
     async fn receiving_on_disconnected_network_should_timeout() {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
@@ -1492,7 +1492,7 @@ mod tests {
         }
     }
 
-    #[test(async_std::test)]
+    #[test(tokio::test)]
     async fn single_frame_resend_should_be_resent_on_unreliable_network() {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),

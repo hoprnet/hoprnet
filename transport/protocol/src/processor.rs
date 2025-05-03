@@ -266,7 +266,7 @@ mod tests {
     use hopr_path::ValidatedPath;
     use std::time::Duration;
 
-    #[async_std::test]
+    #[tokio::test]
     pub async fn packet_send_finalizer_is_triggered() {
         let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 
@@ -280,7 +280,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     pub async fn message_sender_operation_reacts_on_finalizer_closure() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<SendMsgInput>();
 

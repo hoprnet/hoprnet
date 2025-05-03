@@ -394,7 +394,7 @@ mod tests {
         assert_eq!(Health::Green as i32, 4);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_not_be_able_to_add_self_reference() -> anyhow::Result<()> {
         let me = PeerId::random();
 
@@ -415,7 +415,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_contain_a_registered_peer() -> anyhow::Result<()> {
         let expected: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -437,7 +437,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_remove_a_peer_on_unregistration() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -461,7 +461,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_ignore_heartbeat_updates_for_peers_that_were_not_registered() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -485,7 +485,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_be_able_to_register_a_succeeded_heartbeat_result() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -509,7 +509,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_update_should_merge_metadata() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -544,7 +544,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time(
     ) -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
@@ -574,7 +574,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_be_able_to_register_a_failed_heartbeat_result() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -605,7 +605,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_peer_should_be_listed_for_the_ping_if_last_recorded_later_than_reference(
     ) -> anyhow::Result<()> {
         let first: PeerId = OffchainKeypair::random().public().into();
@@ -648,7 +648,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_have_red_health_without_any_registered_peers() -> anyhow::Result<()> {
         let me: PeerId = OffchainKeypair::random().public().into();
 
@@ -659,7 +659,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_be_unhealthy_without_any_heartbeat_updates() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -674,7 +674,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_be_unhealthy_without_any_peers_once_the_health_was_known() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -690,7 +690,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_low_quality() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -716,7 +716,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_close_connection_to_peer_once_it_reaches_the_lowest_possible_quality(
     ) -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
@@ -745,7 +745,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public(
     ) -> anyhow::Result<()> {
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -774,7 +774,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_another_high_quality_non_public(
     ) -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();

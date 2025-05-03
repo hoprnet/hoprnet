@@ -653,7 +653,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_none_if_none_is_found(
     ) -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
@@ -696,7 +696,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_it_when_found() -> anyhow::Result<()>
     {
         let mut handlers = MockChainLogHandler::new();
@@ -762,7 +762,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_indexer_should_pass_blocks_that_are_finalized() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
@@ -813,7 +813,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_fast_sync_full_with_resume() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -961,7 +961,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_should_yield_back_once_the_past_events_are_indexed() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
@@ -1031,7 +1031,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_should_not_reprocess_last_processed_block() -> anyhow::Result<()> {
         let last_processed_block = 100_u64;
 

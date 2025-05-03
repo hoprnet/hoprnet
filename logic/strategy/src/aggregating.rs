@@ -514,7 +514,7 @@ mod tests {
         ))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_strategy_aggregation_on_tick() -> anyhow::Result<()> {
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
@@ -561,7 +561,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_strategy_aggregation_on_tick_when_unrealized_balance_exceeded() -> anyhow::Result<()> {
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
@@ -608,7 +608,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_strategy_aggregation_on_tick_should_not_agg_when_unrealized_balance_exceeded_via_aggregated_tickets(
     ) -> anyhow::Result<()> {
         // db_0: Alice (channel source)
@@ -659,7 +659,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_strategy_aggregation_on_channel_close() -> anyhow::Result<()> {
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
@@ -714,7 +714,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_strategy_aggregation_on_tick_should_not_agg_on_channel_close_if_only_single_ticket(
     ) -> anyhow::Result<()> {
         // db_0: Alice (channel source)

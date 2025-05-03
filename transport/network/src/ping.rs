@@ -272,7 +272,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge(
     ) -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
@@ -290,7 +290,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge(
     ) -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
@@ -307,7 +307,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn ping_query_replier_should_return_the_unidirectional_latency() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
 
@@ -334,7 +334,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn ping_empty_vector_of_peers_should_not_do_any_api_calls() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
@@ -361,7 +361,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ping_peers_with_happy_path_should_trigger_the_desired_external_api_calls() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
@@ -396,7 +396,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ping_should_invoke_a_failed_ping_reply_for_an_incorrect_reply() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
@@ -430,7 +430,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ping_peer_returns_error_on_the_pong() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
@@ -471,7 +471,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
@@ -514,7 +514,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ping_peers_should_ping_parallel_only_a_limited_number_of_peers() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 

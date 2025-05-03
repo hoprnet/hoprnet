@@ -180,7 +180,7 @@ mod tests {
         static ref RANDY: Address = hex!("60f8492b6fbaf86ac2b064c90283d8978a491a01").into();
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_expectation_should_resolve() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let sample_event = SignificantChainEvent {
@@ -217,7 +217,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_expectation_should_error_when_unregistered() -> anyhow::Result<()> {
         let sample_event = SignificantChainEvent {
             tx_hash: Hash::from(random_bytes::<{ Hash::SIZE }>()),
@@ -252,7 +252,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_expectation_should_resolve_and_filter() -> anyhow::Result<()> {
         let tx_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let sample_events = vec![
@@ -300,7 +300,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_expectation_should_resolve_multiple_expectations() -> anyhow::Result<()> {
         let sample_events = vec![
             SignificantChainEvent {

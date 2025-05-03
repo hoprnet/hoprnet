@@ -264,7 +264,7 @@ mod tests {
         ))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_split_range() -> anyhow::Result<()> {
         let ranges = split_range(LogFilter::default(), 0, 10, 2).collect::<Vec<_>>().await;
 
@@ -298,7 +298,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_get_block_number() -> anyhow::Result<()> {
         let expected_block_time = Duration::from_secs(1);
         let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
@@ -333,7 +333,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -469,7 +469,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel(
     ) -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();

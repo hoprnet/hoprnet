@@ -612,7 +612,7 @@ mod tests {
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_announce() -> anyhow::Result<()> {
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56")?;
 
@@ -649,7 +649,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn redeem_ticket() -> anyhow::Result<()> {
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
@@ -709,7 +709,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn withdraw_token() -> anyhow::Result<()> {
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;

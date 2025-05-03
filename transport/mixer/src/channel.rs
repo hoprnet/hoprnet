@@ -310,7 +310,7 @@ mod tests {
         crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS + crate::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS,
     );
 
-    #[async_std::test]
+    #[tokio::test]
     async fn mixer_channel_should_pass_an_element() -> anyhow::Result<()> {
         let (tx, mut rx) = channel(MixerConfig::default());
         tx.send(1)?;
@@ -319,7 +319,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn mixer_channel_should_introduce_random_delay() -> anyhow::Result<()> {
         let start = std::time::SystemTime::now();
 
@@ -335,7 +335,7 @@ mod tests {
         ))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     // #[tracing_test::traced_test]
     async fn mixer_channel_should_batch_on_sending_emulating_concurrency() -> anyhow::Result<()> {
         const ITERATIONS: usize = 10;
@@ -360,7 +360,7 @@ mod tests {
         ))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     // #[tracing_test::traced_test]
     async fn mixer_channel_should_work_concurrently_and_properly_closed_channels() -> anyhow::Result<()> {
         const ITERATIONS: usize = 1000;
@@ -389,7 +389,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     // #[tracing_test::traced_test]
     async fn mixer_channel_should_produce_mixed_output_from_the_supplied_input_using_sync_send() -> anyhow::Result<()> {
         const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
@@ -412,7 +412,7 @@ mod tests {
         Ok(assert_ne!(input, mixed_output))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     // #[tracing_test::traced_test]
     async fn mixer_channel_should_produce_mixed_output_from_the_supplied_input_using_async_send() -> anyhow::Result<()>
     {
@@ -436,7 +436,7 @@ mod tests {
         Ok(assert_ne!(input, mixed_output))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     // #[tracing_test::traced_test]
     async fn mixer_channel_should_produce_mixed_output_from_the_supplied_input_using_async_feed() -> anyhow::Result<()>
     {
@@ -461,7 +461,7 @@ mod tests {
         Ok(assert_ne!(input, mixed_output))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     // #[tracing_test::traced_test]
     async fn mixer_channel_should_not_mix_the_order_if_the_min_delay_and_delay_range_is_0() -> anyhow::Result<()> {
         const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size

@@ -746,7 +746,7 @@ pub(crate) mod tests {
         assert_eq!(segment, recovered);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_must_process_ordered_frames() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -766,7 +766,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_must_process_single_frame() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(10));
 
@@ -826,7 +826,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn pushing_segment_of_an_evicted_frame_into_reassembler_should_fail() -> anyhow::Result<()> {
         let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_millis(5));
 
@@ -845,7 +845,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_single_frame() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -866,7 +866,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_shuffled_randomized_frames() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -885,7 +885,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_shuffled_randomized_frames_in_parallel() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -907,7 +907,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_should_evict_expired_incomplete_frames() -> anyhow::Result<()> {
         let frames = vec![
             Frame {
@@ -960,7 +960,7 @@ pub(crate) mod tests {
         jh.await
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_should_evict_frame_that_never_arrived() -> anyhow::Result<()> {
         let frames = vec![
             Frame {
@@ -1012,7 +1012,7 @@ pub(crate) mod tests {
         jh.await
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_randomized_delayed_frames_in_parallel() -> anyhow::Result<()> {
         let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
 
@@ -1083,7 +1083,7 @@ pub(crate) mod tests {
         (segments, expected_frames, excluded_segments)
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_yields_correct_frames_when_also_corrupted_frames_are_present() -> anyhow::Result<()> {
         // Corrupt 30% of the frames, by removing a random segment from them
         let (segments, expected_frames, excluded) = corrupt_frames(FRAME_COUNT / 4, 0.3);
@@ -1142,7 +1142,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_yields_no_frames_when_all_corrupted() -> anyhow::Result<()> {
         // Corrupt each frame
         let (segments, expected_frames, _) = corrupt_frames(1000, 1.0);
@@ -1202,7 +1202,7 @@ pub(crate) mod tests {
         )
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_yields_and_evicts_frames_on_unreliable_network() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(25));
         let fragmented = Arc::new(fragmented);
