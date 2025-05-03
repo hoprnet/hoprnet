@@ -1,4 +1,5 @@
-use ethers::core::abi::Error as AbiError;
+// use ethers::core::abi::Error as AbiError;
+use alloy::dyn_abi::Error as AbiError;
 use thiserror::Error;
 
 use hopr_primitive_types::{errors::GeneralError, primitives::Address};
