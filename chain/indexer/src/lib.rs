@@ -10,11 +10,11 @@
 //! local storage, and further reactively triggering higher level components of the business
 //! logic.
 
-pub mod block;
-pub mod config;
+// pub mod block;
+// pub mod config;
 pub mod constants;
-pub mod errors;
-pub mod handlers;
-pub mod traits;
+// pub mod errors;
+// pub mod handlers;
+// pub mod traits;
 
-pub use config::IndexerConfig;
+// pub use config::IndexerConfig;

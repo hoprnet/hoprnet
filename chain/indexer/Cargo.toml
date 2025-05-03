@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-indexer"
-version = "0.6.2"
+version = "0.7.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -28,6 +28,7 @@ prometheus = [
 ]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = ["essentials", "json-rpc", "node-bindings"] }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
 ethers = { workspace = true, default-features = false, features = ["abigen"] }
