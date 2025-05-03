@@ -4,7 +4,7 @@ use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
 };
 use crate::traits::SendMsg;
-use crate::{IncomingSession, Session, SessionClientConfig, SessionId};
+use crate::{IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget};
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::Either;
 use futures::stream::AbortHandle;
@@ -16,6 +16,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
+use hopr_primitive_types::prelude::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -389,14 +390,14 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         (ka_controller, abort_handle)
     }
 
-    /// Initiates a new outgoing Session with the given configuration.
+    /// Initiates a new outgoing Session to `destination` with the given configuration.
     ///
     /// If the Session's counterparty does not respond within
     /// the [configured](SessionManagerConfig) period,
     /// this method returns [`TransportSessionError::Timeout`].
     ///
     /// It will also fail if the instance has not been [started](SessionManager::start).
-    pub async fn new_session(&self, cfg: SessionClientConfig) -> crate::errors::Result<Session> {
+    pub async fn new_session(&self, destination: Address, target: SessionTarget, cfg: SessionClientConfig) -> crate::errors::Result<Session> {
         let msg_sender = self.msg_sender.get().ok_or(SessionManagerError::NotStarted)?;
 
         let (tx_initiation_done, rx_initiation_done) = futures::channel::mpsc::unbounded();
@@ -418,12 +419,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         trace!(challenge, ?cfg, "initiating session with config");
         let start_session_msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
             challenge,
-            target: cfg.target,
+            target,
             capabilities: cfg.capabilities.iter().copied().collect(),
         });
 
         let forward_routing = DestinationRouting::Forward {
-            destination: cfg.peer,
+            destination,
             pseudonym: cfg.pseudonym,
             forward_options: cfg.forward_path_options.clone(),
             return_options: cfg.return_path_options.clone().into(),
@@ -852,7 +853,6 @@ mod tests {
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
-    use hopr_primitive_types::bounded::BoundedSize;
     use hopr_primitive_types::prelude::Address;
 
     mockall::mock! {
@@ -981,14 +981,10 @@ mod tests {
 
         pin_mut!(new_session_rx_bob);
         let (alice_session, bob_session) = futures::future::join(
-            alice_mgr.new_session(SessionClientConfig {
-                peer: bob_peer,
-                forward_path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                return_path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                target: SessionTarget::TcpStream(target.clone()),
-                capabilities: vec![Capability::Segmentation],
+            alice_mgr.new_session(bob_peer, SessionTarget::TcpStream(target.clone()),SessionClientConfig {
                 pseudonym: alice_pseudonym.into(),
                 surb_management: None,
+                ..Default::default()
             }),
             new_session_rx_bob.next(),
         )
@@ -1108,14 +1104,10 @@ mod tests {
 
         pin_mut!(new_session_rx_bob);
         let (alice_session, bob_session) = futures::future::join(
-            alice_mgr.new_session(SessionClientConfig {
-                peer: bob_peer,
-                forward_path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                return_path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                target: SessionTarget::TcpStream(target.clone()),
-                capabilities: vec![Capability::Segmentation],
+            alice_mgr.new_session(bob_peer, SessionTarget::TcpStream(target.clone()), SessionClientConfig {
                 pseudonym: alice_pseudonym.into(),
                 surb_management: None,
+                ..Default::default()
             }),
             new_session_rx_bob.next(),
         )
@@ -1206,14 +1198,11 @@ mod tests {
         jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
 
         let result = alice_mgr
-            .new_session(SessionClientConfig {
-                peer: bob_peer,
-                forward_path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                return_path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            .new_session(bob_peer, SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)), SessionClientConfig {
                 capabilities: vec![],
                 pseudonym: alice_pseudonym.into(),
                 surb_management: None,
+                ..Default::default()
             })
             .await;
 
@@ -1259,14 +1248,11 @@ mod tests {
         jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
 
         let result = alice_mgr
-            .new_session(SessionClientConfig {
-                peer: bob_peer,
-                forward_path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                return_path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+            .new_session(bob_peer, SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)), SessionClientConfig {
                 capabilities: vec![],
                 pseudonym: None,
                 surb_management: None,
+                ..Default::default()
             })
             .await;
 
