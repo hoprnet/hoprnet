@@ -24,38 +24,36 @@ pub enum RpcError {
 
     #[error(transparent)]
     PendingTransactionError(#[from] PendingTransactionError), // #[error("error on backend interface: {0}")]
-                                                              // InterfaceError(String),
+    // InterfaceError(String),
 
-                                                              // #[error("error in smart contract '{0}' while executing '{1}': {2}")]
-                                                              // ContractError(String, String, String),
+    // #[error("error in smart contract '{0}' while executing '{1}': {2}")]
+    // ContractError(String, String, String),
 
-                                                              // #[error("middleware error: {0}")]
-                                                              // MiddlewareError(String),
+    // #[error("middleware error: {0}")]
+    // MiddlewareError(String),
 
-                                                              // #[error("block with such id does not (yet) exist")]
-                                                              // NoSuchBlock,
+    // #[error("block with such id does not (yet) exist")]
+    // NoSuchBlock,
+    #[error("filter does not contain any criteria")]
+    FilterIsEmpty,
+    // #[error("transaction {0} has not been included on-chain")]
+    // TransactionDropped(String),
 
-                                                              // #[error("filter does not contain any criteria")]
-                                                              // FilterIsEmpty,
+    // #[error("transaction submission to the RPC provider timed out")]
+    // Timeout,
 
-                                                              // #[error("transaction {0} has not been included on-chain")]
-                                                              // TransactionDropped(String),
+    // #[error("non-specific RPC error occurred: {0}")]
+    // GeneralError(String),
 
-                                                              // #[error("transaction submission to the RPC provider timed out")]
-                                                              // Timeout,
+    // #[error(transparent)]
+    // KeypairError(#[from] ethers::signers::WalletError),
 
-                                                              // #[error("non-specific RPC error occurred: {0}")]
-                                                              // GeneralError(String),
+    // #[error(transparent)]
+    // ProviderError(#[from] ProviderError),
 
-                                                              // #[error(transparent)]
-                                                              // KeypairError(#[from] ethers::signers::WalletError),
-
-                                                              // #[error(transparent)]
-                                                              // ProviderError(#[from] ProviderError),
-
-                                                              // /// Error occurred during data conversion
-                                                              // #[error("conversion error: {0}")]
-                                                              // ConversionError(String),
+    // /// Error occurred during data conversion
+    // #[error("conversion error: {0}")]
+    // ConversionError(String),
 }
 
 pub type Result<T> = std::result::Result<T, RpcError>;

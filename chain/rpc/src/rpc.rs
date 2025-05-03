@@ -184,11 +184,7 @@ pub struct RpcOperations<R: HttpRequestor + 'static + Clone> {
 //     }
 // }
 
-impl<
-        // T: TransportConnect + Clone + Service<RequestPacket, Response = ResponsePacket>,
-        R: HttpRequestor + 'static + Clone,
-    > RpcOperations<R>
-{
+impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
     pub fn new(
         rpc_client: RpcClient,
         requestor: R,

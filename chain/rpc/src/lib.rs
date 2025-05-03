@@ -11,7 +11,7 @@
 extern crate core;
 
 use alloy::providers::PendingTransaction;
-use alloy::rpc::types::TransactionRequest;
+use alloy::rpc::types::{Filter, TransactionRequest};
 use async_trait::async_trait;
 // pub use ethers::types::transaction::eip2718::TypedTransaction;
 use futures::{FutureExt, Stream};
@@ -36,7 +36,7 @@ use crate::RetryAction::NoRetry;
 pub mod client;
 pub mod errors;
 mod helper;
-// pub mod indexer;
+pub mod indexer;
 pub mod rpc;
 pub mod transport;
 
@@ -65,21 +65,36 @@ pub struct Log {
     pub removed: bool,
 }
 
-impl From<ethers::types::Log> for Log {
-    fn from(value: ethers::prelude::Log) -> Self {
+impl From<alloy::rpc::types::Log> for Log {
+    fn from(value: alloy::rpc::types::Log) -> Self {
         Self {
-            address: value.address.into(),
-            topics: value.topics.into_iter().map(Hash::from).collect(),
-            data: Box::from(value.data.as_ref()),
-            tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
-            block_number: value.block_number.expect("block id must be present").as_u64(),
-            block_hash: value.block_hash.expect("block hash must be present").into(),
-            log_index: value.log_index.expect("log index must be present"),
-            tx_hash: value.transaction_hash.expect("tx hash must be present").into(),
-            removed: value.removed.expect("removed flag must be present"),
+            address: value.inner.address.into(),
+            topics: value.inner.topics().into_iter().map(|t| Hash::from(t.0)).collect(),
+            data: Box::from(value.inner.data.data.as_ref()),
+            tx_index: value.transaction_index.expect("tx index must be present"),
+            block_number: value.block_number.expect("block id must be present"),
+            block_hash: value.block_hash.expect("block hash must be present").0.into(),
+            log_index: value.log_index.expect("log index must be present").into(),
+            tx_hash: value.transaction_hash.expect("tx hash must be present").0.into(),
+            removed: value.removed,
         }
     }
 }
+// impl From<ethers::types::Log> for Log {
+//     fn from(value: ethers::prelude::Log) -> Self {
+//         Self {
+//             address: value.address.into(),
+//             topics: value.topics.into_iter().map(Hash::from).collect(),
+//             data: Box::from(value.data.as_ref()),
+//             tx_index: value.transaction_index.expect("tx index must be present").as_u64(),
+//             block_number: value.block_number.expect("block id must be present").as_u64(),
+//             block_hash: value.block_hash.expect("block hash must be present").into(),
+//             log_index: value.log_index.expect("log index must be present"),
+//             tx_hash: value.transaction_hash.expect("tx hash must be present").into(),
+//             removed: value.removed.expect("removed flag must be present"),
+//         }
+//     }
+// }
 
 impl From<Log> for ethers::abi::RawLog {
     fn from(value: Log) -> Self {
@@ -196,19 +211,38 @@ impl Display for LogFilter {
     }
 }
 
-impl From<LogFilter> for ethers::types::Filter {
+impl From<LogFilter> for alloy::rpc::types::Filter {
     fn from(value: LogFilter) -> Self {
-        ethers::types::Filter::new()
+        alloy::rpc::types::Filter::new()
             .address(
                 value
                     .address
                     .into_iter()
-                    .map(ethers::types::Address::from)
+                    .map(alloy::primitives::Address::from)
                     .collect::<Vec<_>>(),
             )
-            .topic0(value.topics)
+            .event_signature(
+                value
+                    .topics
+                    .into_iter()
+                    .map(|h| alloy::primitives::B256::from_slice(h.as_ref()))
+                    .collect::<Vec<_>>(),
+            )
     }
 }
+// impl From<LogFilter> for ethers::types::Filter {
+//     fn from(value: LogFilter) -> Self {
+//         ethers::types::Filter::new()
+//             .address(
+//                 value
+//                     .address
+//                     .into_iter()
+//                     .map(ethers::types::Address::from)
+//                     .collect::<Vec<_>>(),
+//             )
+//             .topic0(value.topics)
+//     }
+// }
 
 /// Indicates what retry action should be taken, as result of a `RetryPolicy` implementation.
 pub enum RetryAction {
