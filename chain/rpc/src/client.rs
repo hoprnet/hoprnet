@@ -13,11 +13,14 @@
 /// as GasOracleMiddleware middleware is migrated to GasFiller
 use alloy::{
     eips::eip1559::Eip1559Estimation,
-    network::{Network, TransactionBuilder},
+    network::{EthereumWallet, Network, TransactionBuilder},
     primitives::{utils::parse_units, U256},
     providers::{
-        fillers::{FillerControlFlow, TxFiller},
-        Provider, SendableTx,
+        fillers::{
+            BlobGasFiller, ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller, TxFiller,
+            WalletFiller,
+        },
+        Identity, Provider, RootProvider, SendableTx,
     },
     rpc::json_rpc::{ErrorPayload, RequestPacket, ResponsePacket, ResponsePayload},
     transports::{layers::RetryPolicy, HttpError, TransportError, TransportErrorKind, TransportFut, TransportResult},
@@ -25,6 +28,7 @@ use alloy::{
 use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
+use std::future::IntoFuture;
 use std::{
     fmt::{format, Debug},
     io::{BufWriter, Write},
@@ -357,16 +361,25 @@ where
         Ok(parsed)
     }
 
-    async fn prepare_legacy<P, N>(
-        &self,
-        _provider: &P,
-        _tx: &N::TransactionRequest,
-    ) -> TransportResult<GasOracleFillable>
+    async fn prepare_legacy<P, N>(&self, provider: &P, tx: &N::TransactionRequest) -> TransportResult<GasOracleFillable>
     where
         P: Provider<N>,
         N: Network,
     {
-        let res = self.query().await?;
+        let gas_limit_fut = tx.gas_limit().map_or_else(
+            || provider.estimate_gas(tx.clone()).into_future().right_future(),
+            |gas_limit| async move { Ok(gas_limit) }.left_future(),
+        );
+
+        let res_fut = self.query();
+
+        // Run both futures concurrently
+        let (gas_limit, res) = futures::try_join!(gas_limit_fut, res_fut)?;
+
+        // // Await the future to get the gas limit
+        // let gas_limit = gas_limit_fut.await?;
+
+        // let res = self.query().await?;
         let gas_price_in_gwei = res.gas_from_category(self.gas_category);
         let gas_price = parse_units(&gas_price_in_gwei, "gwei")
             .map_err(|e| TransportErrorKind::custom_str(&format!("Failed to parse gwei from gas oracle: {e}")))?;
@@ -376,16 +389,26 @@ where
             .map_err(|_| TransportErrorKind::custom_str("Conversion overflow"))?;
 
         Ok(GasOracleFillable::Legacy {
+            gas_limit,
             gas_price: gas_price_in_128,
         })
     }
 
-    async fn prepare_1559<P, N>(&self, _provider: &P, _tx: &N::TransactionRequest) -> TransportResult<GasOracleFillable>
+    async fn prepare_1559<P, N>(&self, provider: &P, tx: &N::TransactionRequest) -> TransportResult<GasOracleFillable>
     where
         P: Provider<N>,
         N: Network,
     {
+        let gas_limit_fut = tx.gas_limit().map_or_else(
+            || provider.estimate_gas(tx.clone()).into_future().right_future(),
+            |gas_limit| async move { Ok(gas_limit) }.left_future(),
+        );
+
+        // Await the future to get the gas limit
+        let gas_limit = gas_limit_fut.await?;
+
         Ok(GasOracleFillable::Eip1559 {
+            gas_limit,
             estimate: self.estimate_eip1559_fees(),
         })
     }
@@ -405,8 +428,14 @@ where
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GasOracleFillable {
-    Legacy { gas_price: u128 },
-    Eip1559 { estimate: Eip1559Estimation },
+    Legacy {
+        gas_limit: u64,
+        gas_price: u128,
+    },
+    Eip1559 {
+        gas_limit: u64,
+        estimate: Eip1559Estimation,
+    },
 }
 
 impl<N, C> TxFiller<N> for GasOracleFiller<C>
@@ -450,12 +479,12 @@ where
     async fn fill(&self, fillable: Self::Fillable, mut tx: SendableTx<N>) -> TransportResult<SendableTx<N>> {
         if let Some(builder) = tx.as_mut_builder() {
             match fillable {
-                GasOracleFillable::Legacy { gas_price } => {
-                    // builder.set_gas_limit(gas_limit);
+                GasOracleFillable::Legacy { gas_limit, gas_price } => {
+                    builder.set_gas_limit(gas_limit);
                     builder.set_gas_price(gas_price);
                 }
-                GasOracleFillable::Eip1559 { estimate } => {
-                    // builder.set_gas_limit(gas_limit);
+                GasOracleFillable::Eip1559 { gas_limit, estimate } => {
+                    builder.set_gas_limit(gas_limit);
                     builder.set_max_fee_per_gas(estimate.max_fee_per_gas);
                     builder.set_max_priority_fee_per_gas(estimate.max_priority_fee_per_gas);
                 }
@@ -832,6 +861,36 @@ where
             res
         })
     }
+}
+
+pub type AnvilRpcClient = FillProvider<
+    JoinFill<
+        JoinFill<Identity, JoinFill<GasFiller, JoinFill<BlobGasFiller, JoinFill<NonceFiller, ChainIdFiller>>>>,
+        WalletFiller<EthereumWallet>,
+    >,
+    RootProvider,
+>;
+/// Used for testing. Creates Ethers RPC client to the local Anvil instance.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn create_rpc_client_to_anvil(
+    anvil: &alloy::node_bindings::AnvilInstance,
+    signer: &hopr_crypto_types::keypairs::ChainKeypair,
+) -> Arc<AnvilRpcClient> {
+    use crate::transport::SurfTransport;
+    use alloy::providers::ProviderBuilder;
+    use alloy::rpc::client::ClientBuilder;
+    use alloy::signers::local::PrivateKeySigner;
+    use hopr_crypto_types::keypairs::Keypair;
+
+    let wallet = PrivateKeySigner::from_slice(signer.secret().as_ref()).expect("failed to construct wallet");
+
+    let transport_client = SurfTransport::new(anvil.endpoint_url());
+
+    let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
+
+    let provider = ProviderBuilder::new().wallet(wallet).on_client(rpc_client);
+
+    Arc::new(provider)
 }
 
 #[cfg(test)]
@@ -1233,7 +1292,7 @@ mod tests {
     async fn test_client_should_retry_on_nonretryable_json_rpc_error_if_min_retries_is_given() {
         let mut server = mockito::Server::new_async().await;
 
-        let m = server
+        let _m = server
             .mock("POST", "/")
             .with_status(200)
             .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
