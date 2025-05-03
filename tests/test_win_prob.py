@@ -61,6 +61,7 @@ class TestWinProbWithSwarm:
             set_minimum_winning_probability_in_network(private_key, win_prob.value)
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")
     @pytest.mark.parametrize(
         "route",
         [

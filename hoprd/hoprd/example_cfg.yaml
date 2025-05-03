@@ -228,10 +228,6 @@ hopr:
     heartbeat:
       # Timeout in seconds
       timeout: 6
-    # Message sub-protocol configuration
-    ticket_aggregation:
-      # Timeout in seconds
-      timeout: 15
   # Blockchain specific configuration
   chain:
     # Indicates whether node should announce itself on-chain

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.9.2"
+version = "0.10.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition = "2021"
@@ -19,6 +19,7 @@ runtime-async-std = [
   "hopr-transport-p2p/runtime-async-std",
   "hopr-transport-protocol/runtime-async-std",
   "hopr-transport-session/runtime-async-std",
+  "hopr-transport-ticket-aggregation/runtime-async-std",
   "hopr-network-types/runtime-async-std",
 ]
 runtime-tokio = [
@@ -28,6 +29,7 @@ runtime-tokio = [
   "hopr-transport-p2p/runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
   "hopr-transport-session/runtime-tokio",
+  "hopr-transport-ticket-aggregation/runtime-tokio",
   "hopr-network-types/runtime-tokio",
 ]
 prometheus = [
@@ -40,6 +42,7 @@ prometheus = [
   "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
+  "hopr-transport-ticket-aggregation/prometheus",
 ]
 mixer-stream = []
 mixer-channel = []
@@ -80,6 +83,7 @@ hopr-transport-network = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
+hopr-transport-ticket-aggregation = { workspace = true }
 
 [dev-dependencies]
 temp-env = { workspace = true }
@@ -88,3 +92,6 @@ hopr-transport-network = { workspace = true, features = ["runtime-async-std"] }
 hopr-transport-mixer = { workspace = true }
 hopr-transport-protocol = { workspace = true, features = ["runtime-async-std"] }
 hopr-transport-p2p = { workspace = true, features = ["runtime-async-std"] }
+hopr-transport-ticket-aggregation = { workspace = true, features = [
+  "runtime-async-std",
+] }

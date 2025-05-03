@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_lock::RwLock;
+use hopr_crypto_types::types::PacketTag;
 use hopr_internal_types::protocol::TagBloomFilter;
 use hopr_platform::file::native::{read_file, write};
 use tracing::{debug, error, info};
@@ -33,6 +34,15 @@ impl WrappedTagBloomFilter {
             path,
             tbf: Arc::new(RwLock::new(tbf)),
         }
+    }
+
+    /// Check whether the packet is replayed using a packet tag.
+    ///
+    /// There is a 0.1% chance that the positive result is not a replay because a Bloom filter is used.
+    #[tracing::instrument(level = "trace", skip(self, tag))]
+    pub async fn is_tag_replay(&self, tag: &PacketTag) -> bool {
+        self.with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
+            .await
     }
 
     pub async fn with_write_lock<T>(&self, f: impl FnOnce(&mut TagBloomFilter) -> T) -> T {
