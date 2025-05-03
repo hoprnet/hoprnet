@@ -2,41 +2,68 @@
 //!
 //! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
 //! [RpcOperations] type, which is the main API exposed by this crate.
-use async_trait::async_trait;
-use ethers::contract::{abigen, Multicall, MULTICALL_ADDRESS};
-use ethers::middleware::{
-    gas_oracle::GasOracleMiddleware, MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware,
+use alloy::{
+    eips::{BlockId, BlockNumberOrTag},
+    network::{Ethereum, EthereumWallet, TransactionResponse},
+    providers::{
+        fillers::{
+            BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
+            WalletFiller,
+        },
+        CallItemBuilder, Identity, MulticallBuilder, MulticallItem, PendingTransaction, Provider, ProviderBuilder,
+        RootProvider,
+    },
+    rpc::types::Block,
+    rpc::{
+        client::{ClientBuilder, RpcClient},
+        json_rpc::{RequestPacket, ResponsePacket},
+        types::TransactionRequest,
+    },
+    signers::local::PrivateKeySigner,
+    sol,
+    transports::{layers::RetryBackoffLayer, BoxTransport, TransportConnect},
 };
-use ethers::prelude::k256::ecdsa::SigningKey;
-use ethers::prelude::transaction::eip2718::TypedTransaction;
-use ethers::providers::{JsonRpcClient, Middleware, Provider};
-use ethers::signers::{LocalWallet, Signer, Wallet};
-use ethers::types::{BlockId, NameOrAddress};
-use primitive_types::H160;
+use async_trait::async_trait;
+// use ethers::contract::{abigen, Multicall, MULTICALL_ADDRESS};
+// use ethers::middleware::{
+//     gas_oracle::GasOracleMiddleware, MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware,
+// };
+// use ethers::prelude::k256::ecdsa::SigningKey;
+// use ethers::prelude::transaction::eip2718::TypedTransaction;
+// use ethers::providers::{JsonRpcClient, Middleware, Provider};
+// use ethers::signers::{LocalWallet, Signer, Wallet};
+// use ethers::types::{BlockId, NameOrAddress};
+use primitive_types::{H160, U256};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
+use tower::Service;
 use tracing::debug;
 use url::Url;
 use validator::Validate;
+use SafeSingleton::SafeSingletonInstance;
 
-use hopr_bindings::hopr_node_management_module::HoprNodeManagementModule;
-use hopr_chain_types::{utils::DIV_BY_ZERO, ContractAddresses, ContractInstances, NetworkRegistryProxy};
+use hopr_bindings::hoprnodemanagementmodule::HoprNodeManagementModule::{self, HoprNodeManagementModuleInstance};
+use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_internal_types::prelude::{win_prob_to_f64, EncodedWinProb};
 use hopr_primitive_types::prelude::*;
 
-use crate::errors::RpcError::ContractError;
-use crate::errors::{Result, RpcError};
-use crate::middleware::GnosisScan;
-use crate::{HoprRpcOperations, HttpRequestor, NodeSafeModuleStatus, PendingTransaction};
+// use crate::middleware::GnosisScan;
+use crate::{
+    client::GasOracleFiller,
+    errors::{Result, RpcError},
+    transport::HttpRequestor,
+    HoprRpcOperations, NodeSafeModuleStatus,
+};
 
 // define basic safe abi
-abigen!(
-    SafeSingleton,
-    r#"[
-        function isModuleEnabled(address module) public view returns (bool)
-    ]"#,
+sol!(
+    #![sol(abi)]
+    #![sol(rpc)]
+    contract SafeSingleton {
+        function isModuleEnabled(address module) public view returns (bool);
+    }
 );
 
 /// Default gas oracle URL for Gnosis chain.
@@ -97,45 +124,96 @@ pub struct RpcOperationsConfig {
     pub gas_oracle_url: Option<Url>,
 }
 
-pub(crate) type HoprMiddleware<P, R> =
-    NonceManagerMiddleware<GasOracleMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>, GnosisScan<R>>>;
+// pub(crate) type HoprMiddleware<P, R> =
+//     NonceManagerMiddleware<GasOracleMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>, GnosisScan<R>>>;
+
+pub(crate) type HoprProvider<R> = FillProvider<
+    JoinFill<
+        JoinFill<
+            JoinFill<
+                JoinFill<
+                    JoinFill<JoinFill<Identity, WalletFiller<EthereumWallet>>, ChainIdFiller>,
+                    NonceFiller<CachedNonceManager>,
+                >,
+                GasOracleFiller<R>,
+            >,
+            GasFiller,
+        >,
+        BlobGasFiller,
+    >,
+    RootProvider,
+>;
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `ethers`
 #[derive(Debug)]
-pub struct RpcOperations<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> {
-    pub(crate) provider: Arc<HoprMiddleware<P, R>>,
+// pub struct RpcOperations<T: TransportConnect + Clone, R: HttpRequestor + 'static + Clone> {
+pub struct RpcOperations<R: HttpRequestor + 'static + Clone> {
+    pub(crate) provider: Arc<HoprProvider<R>>,
     pub(crate) cfg: RpcOperationsConfig,
-    contract_instances: Arc<ContractInstances<HoprMiddleware<P, R>>>,
-    node_module: HoprNodeManagementModule<HoprMiddleware<P, R>>,
-    node_safe: SafeSingleton<HoprMiddleware<P, R>>,
+    contract_instances: Arc<ContractInstances<HoprProvider<R>>>,
+    node_module: HoprNodeManagementModuleInstance<(), HoprProvider<R>>,
+    node_safe: SafeSingletonInstance<(), HoprProvider<R>>,
 }
+// pub struct RpcOperations<R: HttpRequestor + 'static + Clone> {
+//     pub(crate) provider: Arc<HoprProvider<R>>,
+//     pub(crate) cfg: RpcOperationsConfig,
+//     contract_instances: Arc<ContractInstances<HoprProvider<R>>>,
+//     node_module: HoprNodeManagementModuleInstance<(), HoprProvider<R>>,
+//     node_safe: SafeSingletonInstance<(), HoprProvider<R>>,
+// }
 
-// Needs manual impl not to impose Clone requirements on P
-// R does not need to be Clone as well, since it's always in an Arc
-impl<P: JsonRpcClient, R: HttpRequestor> Clone for RpcOperations<P, R> {
-    fn clone(&self) -> Self {
-        Self {
-            provider: self.provider.clone(),
-            cfg: self.cfg.clone(),
-            contract_instances: self.contract_instances.clone(),
-            node_module: HoprNodeManagementModule::new(self.cfg.module_address, self.provider.clone()),
-            node_safe: SafeSingleton::new(self.cfg.safe_address, self.provider.clone()),
-        }
-    }
-}
+// // Needs manual impl not to impose Clone requirements on P
+// // R does not need to be Clone as well, since it's always in an Arc
+// impl<R: HttpRequestor> Clone for RpcOperations<R> {
+//     fn clone(&self) -> Self {
+//         Self {
+//             provider: self.provider.clone(),
+//             cfg: self.cfg.clone(),
+//             contract_instances: self.contract_instances.clone(),
+//             node_module: HoprNodeManagementModule::new(self.cfg.module_address, self.provider.clone()),
+//             node_safe: SafeSingleton::new(self.cfg.safe_address, self.provider.clone()),
+//         }
+//     }
+// }
 
-impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R> {
-    pub fn new(json_rpc: P, requestor: R, chain_key: &ChainKeypair, cfg: RpcOperationsConfig) -> Result<Self> {
-        let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);
-        let gas_oracle = GnosisScan::with_client(requestor, cfg.gas_oracle_url.clone());
+impl<
+        // T: TransportConnect + Clone + Service<RequestPacket, Response = ResponsePacket>,
+        R: HttpRequestor + 'static + Clone,
+    > RpcOperations<R>
+{
+    pub fn new(
+        rpc_client: RpcClient,
+        requestor: R,
+        chain_key: &ChainKeypair,
+        cfg: RpcOperationsConfig,
+    ) -> Result<Self> {
+        let wallet = PrivateKeySigner::from_slice(chain_key.secret().as_ref()).expect("failed to construct wallet");
 
-        let provider = Arc::new(
-            Provider::new(json_rpc)
-                .interval(cfg.tx_polling_interval)
-                .with_signer(wallet)
-                .gas_oracle(gas_oracle)
-                .nonce_manager(chain_key.public().to_address().into()),
-        );
+        // let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(cfg.chain_id);
+        // let gas_oracle = GnosisScan::with_client(requestor, cfg.gas_oracle_url.clone());
+
+        // let provider = Arc::new(
+        //     Provider::new(json_rpc)
+        //         .interval(cfg.tx_polling_interval)
+        //         .with_signer(wallet)
+        //         .gas_oracle(gas_oracle)
+        //         .nonce_manager(chain_key.public().to_address().into()),
+        // );
+
+        // TODO: The rpc client MUST have retry backoff enabled
+        // let rpc_client = ClientBuilder::default()
+        //     .layer(RetryBackoffLayer::new(2, 100, 100))
+        //     .transport(transport_client.clone(), transport_client.is_local());
+
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .wallet(wallet)
+            .filler(ChainIdFiller::default())
+            .filler(NonceFiller::new(CachedNonceManager::default()))
+            .filler(GasOracleFiller::new(requestor.clone(), None))
+            .filler(GasFiller)
+            .filler(BlobGasFiller)
+            .on_client(rpc_client);
 
         debug!("{:?}", cfg.contract_addrs);
 
@@ -145,10 +223,10 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R>
                 provider.clone(),
                 cfg!(test),
             )),
-            node_module: HoprNodeManagementModule::new(cfg.module_address, provider.clone()),
-            node_safe: SafeSingleton::new(cfg.safe_address, provider.clone()),
+            node_module: HoprNodeManagementModule::new(cfg.module_address.into(), provider.clone()),
+            node_safe: SafeSingleton::new(cfg.safe_address.into(), provider.clone()),
             cfg,
-            provider,
+            provider: Arc::new(provider),
         })
     }
 
@@ -157,26 +235,21 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R>
             .provider
             .get_block_number()
             .await?
-            .as_u64()
             .saturating_sub(self.cfg.finality as u64))
     }
 
-    pub(crate) async fn get_block(
-        &self,
-        block_number: u64,
-    ) -> Result<Option<ethers::types::Block<ethers::types::H256>>> {
+    pub(crate) async fn get_block(&self, block_number: u64) -> Result<Option<Block>> {
+        // ) -> Result<Option<ethers::types::Block<ethers::types::H256>>> {
         let sanitized_block_number = block_number.saturating_sub(self.cfg.finality as u64);
-        Ok(self
-            .provider
-            .get_block(BlockId::Number(sanitized_block_number.into()))
-            .await?)
+        let result = self.provider.get_block_by_number(sanitized_block_number.into()).await?;
+        Ok(result)
     }
 }
 
 #[async_trait]
-impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprRpcOperations for RpcOperations<P, R> {
+impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> {
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
-        Ok(self.get_block(block_number).await?.map(|b| b.timestamp.as_u64()))
+        Ok(self.get_block(block_number).await?.map(|b| b.header.timestamp))
     }
 
     async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance> {
@@ -184,159 +257,130 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprRpcOperations f
             BalanceType::Native => {
                 let native = self
                     .provider
-                    .get_balance(
-                        NameOrAddress::Address(address.into()),
-                        Some(BlockId::Number(self.get_block_number().await?.into())),
-                    )
+                    .get_balance(address.into())
+                    .block_id(BlockId::Number(self.get_block_number().await?.into()))
                     .await?;
 
-                Ok(Balance::new(native, BalanceType::Native))
+                Ok(Balance::new(native.to_be_bytes(), BalanceType::Native))
             }
-            BalanceType::HOPR => match self.contract_instances.token.balance_of(address.into()).call().await {
-                Ok(token_balance) => Ok(Balance::new(token_balance, BalanceType::HOPR)),
-                Err(e) => Err(ContractError(
-                    "HoprToken".to_string(),
-                    "balance_of".to_string(),
-                    e.to_string(),
-                )),
+            BalanceType::HOPR => match self.contract_instances.token.balanceOf(address.into()).call().await {
+                Ok(token_balance) => Ok(Balance::new(token_balance._0.to_be_bytes(), BalanceType::HOPR)),
+                Err(e) => Err(e.into()),
             },
         }
     }
 
     async fn get_minimum_network_winning_probability(&self) -> Result<f64> {
-        match self.contract_instances.win_prob_oracle.current_win_prob().call().await {
+        match self.contract_instances.win_prob_oracle.currentWinProb().call().await {
             Ok(encoded_win_prob) => {
                 let mut encoded: EncodedWinProb = Default::default();
-                encoded.copy_from_slice(&encoded_win_prob.to_be_bytes()[1..]);
+                encoded.copy_from_slice(&encoded_win_prob._0.to_be_bytes_vec()[1..]);
                 Ok(win_prob_to_f64(&encoded))
             }
-            Err(e) => Err(ContractError(
-                "WinProbOracle".to_string(),
-                "current_win_prob".to_string(),
-                e.to_string(),
-            )),
+            Err(e) => Err(e.into()),
         }
     }
 
     async fn get_minimum_network_ticket_price(&self) -> Result<Balance> {
-        match self.contract_instances.price_oracle.current_ticket_price().call().await {
-            Ok(ticket_price) => Ok(BalanceType::HOPR.balance(ticket_price)),
-            Err(e) => Err(ContractError(
-                "PriceOracle".to_string(),
-                "current_ticket_price".to_string(),
-                e.to_string(),
-            )),
+        match self.contract_instances.price_oracle.currentTicketPrice().call().await {
+            Ok(ticket_price) => Ok(BalanceType::HOPR.balance(ticket_price._0.to_be_bytes_vec().as_slice())),
+            Err(e) => Err(e.into()),
         }
     }
 
     async fn get_eligibility_status(&self, address: Address) -> Result<bool> {
-        let mut multicall = Multicall::new(self.provider.clone(), Some(MULTICALL_ADDRESS))
-            .await
-            .map_err(|e| RpcError::MulticallError(e.to_string()))?;
+        // 2) check if the node is registered to an account. In case the selfRegister is disabled
+        // (i.e. when staking threshold is zero), this value is used to check if the node is eligible
+        let tx_2 = CallItemBuilder::new(
+            self.contract_instances
+                .network_registry
+                .nodeRegisterdToAccount(address.into()),
+        )
+        .allow_failure(false);
 
-        multicall
-            // 1) check if the staking threshold set in the implementation is above zero
-            .add_call(
-                match &self.contract_instances.network_registry_proxy {
-                    NetworkRegistryProxy::Dummy(c) => c.method::<H160, U256>("maxAllowedRegistrations", address.into())
-                    .map_err(|e| {
-                        RpcError::MulticallError(format!(
-                            "Error in checking maxAllowedRegistrations function of HoprDummyProxyForNetworkRegistry contract in get_eligibility_status, due to {e}"
-                        ))
-                    })?,
-                    NetworkRegistryProxy::Safe(c) => c.method::<_, U256>("stakeThreshold", ())
-                    .map_err(|e| {
-                        RpcError::MulticallError(format!(
-                            "Error in checking stakeThreshold function of HoprSafeProxyForNetworkRegistry contract in get_eligibility_status, due to {e}"
-                        ))
-                    })?,
-                },
-                false,
-            )
-            // 2) check if the node is registered to an account. In case the selfRegister is disabled (i.e. when staking threshold is zero), this value is used to check if the node is eligible
-            .add_call(
-                self
-                    .contract_instances
-                    .network_registry
-                    .method::<H160, H160>("nodeRegisterdToAccount", address.into())
-                    .map_err(|e| {
-                        RpcError::MulticallError(format!(
-                            "Error in checking nodeRegisterdToAccount function of NetworkRegistry contract in get_eligibility_status, due to {e}"
-                        ))
-                    })?,
-                false,
-            )
-            // 3) check if the node is registered and eligible
-            .add_call(
-                self
-                    .contract_instances
-                    .network_registry
-                    .method::<H160, bool>("isNodeRegisteredAndEligible", address.into())
-                    .map_err(|e| {
-                        RpcError::MulticallError(format!(
-                            "Error in checking isNodeRegisteredAndEligible function of NetworkRegistry contract in get_eligibility_status, due to {e}"
-                        ))
-                    })?,
-                true,
-            );
+        // 3) check if the node is registered and eligible
+        let tx_3 = CallItemBuilder::new(
+            self.contract_instances
+                .network_registry
+                .isNodeRegisteredAndEligible(address.into()),
+        )
+        .allow_failure(true);
 
-        match multicall.call_raw().await {
-            Ok(result_token_vec) => match &result_token_vec[2] {
-                // Ok(result_token_vec) => match Token::from_token(result_token_vec[2].map_err(Into::into)?) {
-                Ok(explicit_result) => Ok(explicit_result.clone().into_bool().unwrap_or(false)),
-                Err(e) => {
-                    // The "division by zero" error is caused by the self-registration,
-                    // which is forbidden to the public and thus returns false
-                    // therefore the eligibility check should be ignored
-                    // In EVM it returns `Panic(0x12)` error
-                    // https://docs.soliditylang.org/en/v0.8.12/control-structures.html#panic-via-assert-and-error-via-require
-                    if e.to_string().contains(DIV_BY_ZERO) {
-                        // let stake_threshold = result_token_vec[0].unwrap_or(Token::Uint(U256::zero()));
-                        let stake_threshold = result_token_vec[0]
-                            .clone()
-                            .map_err(|e| {
-                                RpcError::MulticallError(format!(
-                                    "Error in getting stake_threshold from get_eligibility_status, due to {e}"
-                                ))
-                            })?
-                            .into_uint()
-                            .unwrap_or(U256::zero());
-                        let registered_account = result_token_vec[1]
-                            .clone()
-                            .map_err(|e| {
-                                RpcError::MulticallError(format!(
-                                    "Error in getting registered_account from get_eligibility_status, due to {e}"
-                                ))
-                            })?
-                            .into_address()
-                            .unwrap_or(H160::zero());
+        // 1) check if the staking threshold set in the implementation is above zero
+        let (stake_threshold, node_registration, quick_check) = match &self.contract_instances.network_registry_proxy {
+            NetworkRegistryProxy::Dummy(c) => {
+                let tx_1_dummy = CallItemBuilder::new(c.maxAllowedRegistrations(address.into())).allow_failure(false);
+                let multicall = self
+                    .provider
+                    .multicall()
+                    .add_call(tx_1_dummy)
+                    .add_call(tx_2)
+                    .add_call(tx_3);
+                let (max_allowed_registration, node_registered_to_account, quick_check) = multicall
+                    .aggregate3_value()
+                    .await
+                    .map_err(|e| RpcError::MulticallError(e.into()))?;
+                (
+                    max_allowed_registration
+                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
+                        ._0,
+                    node_registered_to_account
+                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
+                        ._0,
+                    quick_check,
+                )
+            }
+            NetworkRegistryProxy::Safe(c) => {
+                let tx_1_proxy = CallItemBuilder::new(c.stakeThreshold()).allow_failure(false);
+                let multicall = self
+                    .provider
+                    .multicall()
+                    .add_call(tx_1_proxy)
+                    .add_call(tx_2)
+                    .add_call(tx_3);
+                let (stake_threshold, node_registered_to_account, quick_check) = multicall
+                    .aggregate3_value()
+                    .await
+                    .map_err(|e| RpcError::MulticallError(e.into()))?;
+                (
+                    stake_threshold
+                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
+                        ._0,
+                    node_registered_to_account
+                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
+                        ._0,
+                    quick_check,
+                )
+            }
+        };
 
-                        Ok(stake_threshold.is_zero() && !registered_account.is_zero())
-                    } else {
-                        // return a definite error
-                        Err(RpcError::MulticallError(format!(
-                            "Error in getting result from multicall in get_eligibility_status, due to {e}"
-                        )))
-                    }
-                }
-            },
+        match &quick_check {
+            Ok(eligiblity_quick_check) => return Ok(eligiblity_quick_check._0),
             Err(e) => {
-                // return a definite error
-                Err(RpcError::MulticallError(format!(
-                    "Error in getting result from get_eligibility_status, due to {e}"
-                )))
+                // check in details what is the failure message
+                // The "division by zero" error is caused by the self-registration,
+                // which is forbidden to the public and thus returns false
+                // therefore the eligibility check should be ignored
+                // In EVM it returns `Panic(0x12)` error, where `0x4e487b71` is the function selector
+                // https://docs.soliditylang.org/en/v0.8.12/control-structures.html#panic-via-assert-and-error-via-require
+                if e.return_data.starts_with(&[0x4e, 0x48, 0x7b, 0x71])
+                    && e.return_data[e.return_data.len() - 1] == 0x12
+                {
+                    // when receiving division by zero error, if the staking threshold is zero
+                    // and registered account is not zero, return true
+                    return Ok(stake_threshold.is_zero() && !node_registration.is_zero());
+                }
+                return Ok(false);
             }
         }
     }
 
     async fn get_node_management_module_target_info(&self, target: Address) -> Result<Option<U256>> {
-        match self.node_module.try_get_target(target.into()).call().await {
-            Ok((exists, target)) => Ok(exists.then_some(target)),
-            Err(e) => Err(ContractError(
-                "NodeModule".to_string(),
-                "try_get_target".to_string(),
-                e.to_string(),
-            )),
+        match self.node_module.tryGetTarget(target.into()).call().await {
+            Ok(returned_result) => Ok(returned_result
+                ._0
+                .then_some(returned_result._1.to_be_bytes_vec().as_slice().into())),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -344,27 +388,19 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprRpcOperations f
         match self
             .contract_instances
             .safe_registry
-            .node_to_safe(node_address.into())
+            .nodeToSafe(node_address.into())
             .call()
             .await
         {
-            Ok(addr) => Ok(addr.into()),
-            Err(e) => Err(ContractError(
-                "SafeRegistry".to_string(),
-                "node_to_safe".to_string(),
-                e.to_string(),
-            )),
+            Ok(returned_result) => Ok(returned_result._0.into()),
+            Err(e) => Err(e.into()),
         }
     }
 
     async fn get_module_target_address(&self) -> Result<Address> {
         match self.node_module.owner().call().await {
-            Ok(owner) => Ok(owner.into()),
-            Err(e) => Err(ContractError(
-                "NodeModule".to_string(),
-                "owner".to_string(),
-                e.to_string(),
-            )),
+            Ok(returned_result) => Ok(returned_result._0.into()),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -373,84 +409,60 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprRpcOperations f
         match self
             .contract_instances
             .channels
-            .notice_period_channel_closure()
+            .noticePeriodChannelClosure()
             .call()
             .await
         {
-            Ok(notice_period) => Ok(Duration::from_secs(notice_period as u64)),
-            Err(e) => Err(ContractError(
-                "HoprChannels".to_string(),
-                "notice_period_channel_closure".to_string(),
-                e.to_string(),
-            )),
+            Ok(returned_result) => Ok(Duration::from_secs(returned_result._0.into())),
+            Err(e) => Err(e.into()),
         }
     }
 
     // Check on-chain status of, node, safe, and module
     async fn check_node_safe_module_status(&self, node_address: Address) -> Result<NodeSafeModuleStatus> {
-        let mut multicall = Multicall::new(self.provider.clone(), Some(MULTICALL_ADDRESS))
+        // 1) check if the node is already included into the module
+        let tx_1 = CallItemBuilder::new(self.node_module.isNode(node_address.into())).allow_failure(false);
+        // 2) if the module is enabled in the safe
+        let tx_2 =
+            CallItemBuilder::new(self.node_safe.isModuleEnabled(self.cfg.module_address.into())).allow_failure(false);
+        // 3) if the safe is the owner of the module
+        let tx_3 = CallItemBuilder::new(self.node_module.owner()).allow_failure(false);
+        let multicall = self.provider.multicall().add_call(tx_1).add_call(tx_2).add_call(tx_3);
+
+        let (node_in_module_inclusion, module_safe_enabling, safe_of_module_ownership) = multicall
+            .aggregate3_value()
             .await
-            .map_err(|e| RpcError::MulticallError(e.to_string()))?;
+            .map_err(|e| RpcError::MulticallError(e.into()))?;
+        let is_node_included_in_module = node_in_module_inclusion
+            .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
+            ._0;
+        let is_module_enabled_in_safe = module_safe_enabling
+            .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
+            ._0;
+        let is_safe_owner_of_module = self.cfg.safe_address.eq(&safe_of_module_ownership
+            .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
+            ._0
+            .0
+             .0
+            .into());
 
-        multicall
-            // 1) check if the node is already included into the module
-            .add_call(
-                self.node_module
-                    .method::<H160, bool>("isNode", node_address.into())
-                    .map_err(|e| {
-                        RpcError::MulticallError(format!(
-                            "Error in checking isNode function in check_node_safe_module_status, due to {e}"
-                        ))
-                    })?,
-                false,
-            )
-            // 2) if the module is enabled in the safe
-            .add_call(
-                self.node_safe
-                    .method::<H160, bool>("isModuleEnabled", self.cfg.module_address.into())
-                    .map_err(|e| {
-                        RpcError::MulticallError(format!(
-                            "Error in checking isModuleEnabled function in check_node_safe_module_status, due to {e}"
-                        ))
-                    })?,
-                false,
-            )
-            // 3) if the safe is the owner of the module
-            .add_call(
-                self.node_module.method::<_, H160>("owner", ()).map_err(|e| {
-                    RpcError::MulticallError(format!(
-                        "Error in checking owner function in check_node_safe_module_status, due to {e}"
-                    ))
-                })?,
-                false,
-            );
-
-        let results: (bool, bool, H160) = multicall.call().await.map_err(|e| {
-            RpcError::MulticallError(format!(
-                "Error in getting result from check_node_safe_module_status, due to {e}"
-            ))
-        })?;
         Ok(NodeSafeModuleStatus {
-            is_node_included_in_module: results.0,
-            is_module_enabled_in_safe: results.1,
-            is_safe_owner_of_module: results.2 == self.cfg.safe_address.into(),
+            is_node_included_in_module,
+            is_module_enabled_in_safe,
+            is_safe_owner_of_module,
         })
     }
 
-    async fn send_transaction(&self, tx: TypedTransaction) -> Result<PendingTransaction> {
-        // This only sets the nonce on the first TX, otherwise it is a no-op
-        let _ = self.provider.initialize_nonce(None).await;
-        debug!("send outgoing tx: {:?}", tx);
+    async fn send_transaction(&self, tx: TransactionRequest) -> Result<PendingTransaction> {
+        let sent_tx = self.provider.send_transaction(tx.into()).await?;
 
-        // Also fills the transaction including the EIP1559 fee estimates from the provider
-        let sent_tx = self
-            .provider
-            .send_transaction(tx, None)
-            .await?
-            .confirmations(self.cfg.finality as usize)
-            .interval(self.cfg.tx_polling_interval);
+        let receipt = sent_tx
+            .with_required_confirmations(self.cfg.finality as u64)
+            .register()
+            .await
+            .map_err(|e| RpcError::PendingTransactionError(e.into()))?;
 
-        Ok(sent_tx.into())
+        Ok(receipt)
     }
 }
 
@@ -458,9 +470,9 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprRpcOperations f
 mod tests {
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
     use crate::{HoprRpcOperations, PendingTransaction};
-    use ethers::contract::ContractError;
-    use ethers::providers::Middleware;
-    use ethers::types::{Bytes, Eip1559TransactionRequest};
+    // use ethers::contract::ContractError;
+    // use ethers::providers::Middleware;
+    // use ethers::types::{Bytes, Eip1559TransactionRequest};
     use hex_literal::hex;
     use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
     use primitive_types::H160;
@@ -472,8 +484,8 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use std::str::FromStr;
 
-    use crate::client::surf_client::SurfRequestor;
-    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
+    // use crate::client::surf_client::SurfRequestor;
+    // use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 
     lazy_static::lazy_static! {
         static ref RANDY: Address = hex!("762614a5ed652457a2f1cdb8006380530c26ae6a").into();
@@ -481,451 +493,452 @@ mod tests {
     }
 
     pub const MULTICALL3_DEPLOYER: &str = "05f32b3cc3888453ff71b01135b34ff8e41263f2";
-    pub const ETH_VALUE_FOR_MULTICALL3_DEPLOYER: u128 = 100_000_000_000_000_000; // 0.1 (anvil) ETH
-
-    pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
-        let tx_hash = pending.tx_hash();
-        sleep(timeout).await;
-        pending
-            .await
-            .unwrap_or_else(|_| panic!("timeout awaiting tx hash {tx_hash} after {} seconds", timeout.as_secs()));
-    }
-
-    /// Deploy a MULTICALL contract into Anvil local chain for testing
-    pub async fn deploy_multicall3_to_anvil<M: Middleware>(provider: Arc<M>) -> Result<(), ContractError<M>> {
-        // Fund Multicall3 deployer and deploy ERC1820Registry
-        let mut tx = Eip1559TransactionRequest::new();
-        tx = tx.to(H160::from_str(MULTICALL3_DEPLOYER).unwrap());
-        tx = tx.value(ETH_VALUE_FOR_MULTICALL3_DEPLOYER);
-
-        provider
-            .send_transaction(tx, None)
-            .await
-            .map_err(|e| ContractError::MiddlewareError { e })?
-            .await?;
-
-        provider
-            .send_raw_transaction(Bytes::from_static(&*MULTICALL3_DEPLOY_CODE))
-            .await
-            .map_err(|e| ContractError::MiddlewareError { e })?
-            .await?;
-        Ok(())
-    }
-
-    #[async_std::test]
-    async fn test_should_estimate_tx() -> anyhow::Result<()> {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-
-        let mut server = mockito::Server::new();
-        let gas_oracle_mock = server.mock("GET", "/gas_oracle")
-            .with_header("content-type", "application/json")
-            .with_status(200)
-            .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"38791478","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999985432689946"}}"#)
-            .create();
-
-        let cfg = RpcOperationsConfig {
-            chain_id: anvil.chain_id(),
-            tx_polling_interval: Duration::from_millis(10),
-            expected_block_time,
-            finality: 2,
-            gas_oracle_url: Some((server.url() + "/gas_oracle").parse()?),
-            ..RpcOperationsConfig::default()
-        };
-
-        let client = JsonRpcProviderClient::new(
-            &anvil.endpoint(),
-            SurfRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
-
-        // Wait until contracts deployments are final
-        sleep((1 + cfg.finality) * expected_block_time).await;
-
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
-
-        // call eth_gas_estimate
-        let (_, estimated_max_priority_fee) = rpc.provider.estimate_eip1559_fees(None).await?;
-        assert!(
-            estimated_max_priority_fee.ge(&U256::from(100_000_000)),
-            "estimated_max_priority_fee must be equal or greater than 0, 0.1 gwei"
-        );
-
-        let estimated_gas_price = rpc.provider.get_gas_price().await?;
-        assert!(
-            estimated_gas_price.ge(&U256::from(100_000_000)),
-            "estimated_max_fee must be greater than 0.1 gwei"
-        );
-
-        gas_oracle_mock.assert();
-
-        Ok(())
-    }
-
-    #[async_std::test]
-    async fn test_should_send_tx() -> anyhow::Result<()> {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-
-        let cfg = RpcOperationsConfig {
-            chain_id: anvil.chain_id(),
-            tx_polling_interval: Duration::from_millis(10),
-            expected_block_time,
-            finality: 2,
-            gas_oracle_url: None,
-            ..RpcOperationsConfig::default()
-        };
-
-        let client = JsonRpcProviderClient::new(
-            &anvil.endpoint(),
-            SurfRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
-
-        // Wait until contracts deployments are final
-        sleep((1 + cfg.finality) * expected_block_time).await;
-
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
-
-        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
-        assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
-
-        // Send 1 ETH to some random address
-        let tx_hash = rpc
-            .send_transaction(hopr_chain_types::utils::create_native_transfer(
-                *RANDY,
-                1000000_u32.into(),
-            ))
-            .await?;
-
-        wait_until_tx(tx_hash, Duration::from_secs(8)).await;
-
-        Ok(())
-    }
-
-    #[async_std::test]
-    async fn test_should_send_consecutive_txs() -> anyhow::Result<()> {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-
-        let cfg = RpcOperationsConfig {
-            chain_id: anvil.chain_id(),
-            tx_polling_interval: Duration::from_millis(10),
-            expected_block_time,
-            finality: 2,
-            gas_oracle_url: None,
-            ..RpcOperationsConfig::default()
-        };
-
-        let client = JsonRpcProviderClient::new(
-            &anvil.endpoint(),
-            SurfRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
-
-        // Wait until contracts deployments are final
-        sleep((1 + cfg.finality) * expected_block_time).await;
-
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
-
-        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
-        assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
-
-        let txs_count = 5_u64;
-        let send_amount = 1000000_u64;
-
-        // Send 1 ETH to some random address
-        futures::future::join_all((0..txs_count).map(|_| async {
-            rpc.send_transaction(hopr_chain_types::utils::create_native_transfer(
-                *RANDY,
-                send_amount.into(),
-            ))
-            .await
-            .expect("tx should be sent")
-            .await
-            .expect("tx should resolve")
-        }))
-        .await;
-
-        let balance_2 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
-
-        assert!(
-            balance_2.amount() <= balance_1.amount() - txs_count * send_amount,
-            "balance must be less"
-        );
-
-        Ok(())
-    }
-
-    #[async_std::test]
-    async fn test_get_balance_native() -> anyhow::Result<()> {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-
-        let cfg = RpcOperationsConfig {
-            chain_id: anvil.chain_id(),
-            tx_polling_interval: Duration::from_millis(10),
-            expected_block_time,
-            finality: 2,
-            gas_oracle_url: None,
-            ..RpcOperationsConfig::default()
-        };
-
-        let client = JsonRpcProviderClient::new(
-            &anvil.endpoint(),
-            SurfRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
-
-        // Wait until contracts deployments are final
-        sleep((1 + cfg.finality) * expected_block_time).await;
-
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
-
-        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
-        assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
-
-        // Send 1 ETH to some random address
-        let tx_hash = rpc
-            .send_transaction(hopr_chain_types::utils::create_native_transfer(*RANDY, 1_u32.into()))
-            .await?;
-
-        wait_until_tx(tx_hash, Duration::from_secs(8)).await;
-
-        let balance_2 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
-        assert!(balance_2.lt(&balance_1), "balance must be diminished");
-
-        Ok(())
-    }
-
-    #[async_std::test]
-    async fn test_get_balance_token() -> anyhow::Result<()> {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-
-        // Deploy contracts
-        let contract_instances = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
-            ContractInstances::deploy_for_testing(client, &chain_key_0).await?
-        };
-
-        let cfg = RpcOperationsConfig {
-            chain_id: anvil.chain_id(),
-            tx_polling_interval: Duration::from_millis(10),
-            expected_block_time,
-            finality: 2,
-            contract_addrs: ContractAddresses::from(&contract_instances),
-            gas_oracle_url: None,
-            ..RpcOperationsConfig::default()
-        };
-
-        let amount = 1024_u64;
-        hopr_chain_types::utils::mint_tokens(contract_instances.token, amount.into()).await;
-
-        let client = JsonRpcProviderClient::new(
-            &anvil.endpoint(),
-            SurfRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
-
-        // Wait until contracts deployments are final
-        sleep((1 + cfg.finality) * expected_block_time).await;
-
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
-
-        let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await?;
-        assert_eq!(amount, balance.amount().as_u64(), "invalid balance");
-
-        Ok(())
-    }
-
-    #[async_std::test]
-    async fn test_check_node_safe_module_status() -> anyhow::Result<()> {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-
-        // Deploy contracts
-        let (contract_instances, module, safe) = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
-            let instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0).await?;
-
-            // deploy MULTICALL contract to anvil
-            deploy_multicall3_to_anvil(client.clone()).await?;
-
-            let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
-                &instances,
-                client.clone(),
-                &chain_key_0,
-            )
-            .await?;
-
-            // deploy a module and safe instance and add node into the module. The module is enabled by default in the safe
-            (instances, module, safe)
-        };
-
-        let cfg = RpcOperationsConfig {
-            chain_id: anvil.chain_id(),
-            tx_polling_interval: Duration::from_millis(10),
-            expected_block_time,
-            finality: 2,
-            contract_addrs: ContractAddresses::from(&contract_instances),
-            module_address: module,
-            safe_address: safe,
-            gas_oracle_url: None,
-            ..RpcOperationsConfig::default()
-        };
-
-        let client = JsonRpcProviderClient::new(
-            &anvil.endpoint(),
-            SurfRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
-
-        // Wait until contracts deployments are final
-        sleep((1 + cfg.finality) * expected_block_time).await;
-
-        let rpc = RpcOperations::new(client.clone(), SurfRequestor::default(), &chain_key_0, cfg)?;
-
-        let result_before_including_node = rpc.check_node_safe_module_status((&chain_key_0).into()).await?;
-        // before including node to the safe and module, only the first chck is false, the others are true
-        assert!(
-            !result_before_including_node.is_node_included_in_module,
-            "node should not be included in a default module"
-        );
-        assert!(
-            result_before_including_node.is_module_enabled_in_safe,
-            "module should be enabled in a default safe"
-        );
-        assert!(
-            result_before_including_node.is_safe_owner_of_module,
-            "safe should not be the owner of a default module"
-        );
-
-        // including node to the module
-        hopr_chain_types::utils::include_node_to_module_by_safe(
-            contract_instances.channels.client().clone(),
-            safe,
-            module,
-            (&chain_key_0).into(),
-            &chain_key_0,
-        )
-        .await?;
-
-        let result_with_node_included = rpc.check_node_safe_module_status((&chain_key_0).into()).await?;
-        // after the node gets included into the module, all checks should be true
-        assert!(
-            result_with_node_included.is_node_included_in_module,
-            "node should be included in a default module"
-        );
-        assert!(
-            result_with_node_included.is_module_enabled_in_safe,
-            "module should be enabled in a default safe"
-        );
-        assert!(
-            result_with_node_included.is_safe_owner_of_module,
-            "safe should be the owner of a default module"
-        );
-
-        Ok(())
-    }
-
-    #[async_std::test]
-    async fn test_get_eligibility_status() -> anyhow::Result<()> {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        let expected_block_time = Duration::from_secs(1);
-        let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
-        let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let node_address: H160 = chain_key_0.public().to_address().into();
-
-        // Deploy contracts
-        let (contract_instances, module, safe) = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
-            let instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0).await?;
-
-            // deploy MULTICALL contract to anvil
-            deploy_multicall3_to_anvil(client.clone()).await?;
-
-            let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
-                &instances,
-                client.clone(),
-                &chain_key_0,
-            )
-            .await?;
-
-            // deploy a module and safe instance and add node into the module. The module is enabled by default in the safe
-            (instances, module, safe)
-        };
-
-        let cfg = RpcOperationsConfig {
-            chain_id: anvil.chain_id(),
-            tx_polling_interval: Duration::from_millis(10),
-            expected_block_time,
-            finality: 2,
-            contract_addrs: ContractAddresses::from(&contract_instances),
-            module_address: module,
-            safe_address: safe,
-            gas_oracle_url: None,
-            ..RpcOperationsConfig::default()
-        };
-
-        let client = JsonRpcProviderClient::new(
-            &anvil.endpoint(),
-            SurfRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
-
-        // Wait until contracts deployments are final
-        sleep((1 + cfg.finality) * expected_block_time).await;
-
-        let rpc = RpcOperations::new(client.clone(), SurfRequestor::default(), &chain_key_0, cfg.clone())?;
-
-        // check the eligibility status (before registering in the NetworkRegistry contract)
-        let result_before_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).await?;
-
-        assert!(
-            !result_before_register_in_the_network_registry,
-            "node should not be eligible"
-        );
-
-        // register the node
-        match &rpc.contract_instances.network_registry_proxy {
-            NetworkRegistryProxy::Dummy(e) => {
-                let _ = e.owner_add_account(cfg.safe_address.into()).send().await?.await?;
-            }
-            NetworkRegistryProxy::Safe(_) => {}
-        };
-
-        let _ = rpc
-            .contract_instances
-            .network_registry
-            .manager_register(vec![cfg.safe_address.into()], vec![node_address])
-            .send()
-            .await?
-            .await?;
-
-        // check the eligibility status (after registering in the NetworkRegistry contract)
-        let result_after_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).await?;
-
-        assert!(result_after_register_in_the_network_registry, "node should be eligible");
-        Ok(())
-    }
+    pub const ETH_VALUE_FOR_MULTICALL3_DEPLOYER: u128 = 100_000_000_000_000_000;
+    // 0.1 (anvil) ETH
+
+    // pub async fn wait_until_tx(pending: PendingTransaction<'_>, timeout: Duration) {
+    //     let tx_hash = pending.tx_hash();
+    //     sleep(timeout).await;
+    //     pending
+    //         .await
+    //         .unwrap_or_else(|_| panic!("timeout awaiting tx hash {tx_hash} after {} seconds", timeout.as_secs()));
+    // }
+
+    // /// Deploy a MULTICALL contract into Anvil local chain for testing
+    // pub async fn deploy_multicall3_to_anvil<M: Middleware>(provider: Arc<M>) -> Result<(), ContractError<M>> {
+    //     // Fund Multicall3 deployer and deploy ERC1820Registry
+    //     let mut tx = Eip1559TransactionRequest::new();
+    //     tx = tx.to(H160::from_str(MULTICALL3_DEPLOYER).unwrap());
+    //     tx = tx.value(ETH_VALUE_FOR_MULTICALL3_DEPLOYER);
+
+    //     provider
+    //         .send_transaction(tx, None)
+    //         .await
+    //         .map_err(|e| ContractError::MiddlewareError { e })?
+    //         .await?;
+
+    //     provider
+    //         .send_raw_transaction(Bytes::from_static(&*MULTICALL3_DEPLOY_CODE))
+    //         .await
+    //         .map_err(|e| ContractError::MiddlewareError { e })?
+    //         .await?;
+    //     Ok(())
+    // }
+
+    // #[async_std::test]
+    // async fn test_should_estimate_tx() -> anyhow::Result<()> {
+    //     let _ = env_logger::builder().is_test(true).try_init();
+
+    //     let expected_block_time = Duration::from_secs(1);
+    //     let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+    //     let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+
+    //     let mut server = mockito::Server::new();
+    //     let gas_oracle_mock = server.mock("GET", "/gas_oracle")
+    //         .with_header("content-type", "application/json")
+    //         .with_status(200)
+    //         .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"38791478","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999985432689946"}}"#)
+    //         .create();
+
+    //     let cfg = RpcOperationsConfig {
+    //         chain_id: anvil.chain_id(),
+    //         tx_polling_interval: Duration::from_millis(10),
+    //         expected_block_time,
+    //         finality: 2,
+    //         gas_oracle_url: Some((server.url() + "/gas_oracle").parse()?),
+    //         ..RpcOperationsConfig::default()
+    //     };
+
+    //     let client = JsonRpcProviderClient::new(
+    //         &anvil.endpoint(),
+    //         SurfRequestor::default(),
+    //         SimpleJsonRpcRetryPolicy::default(),
+    //     );
+
+    //     // Wait until contracts deployments are final
+    //     sleep((1 + cfg.finality) * expected_block_time).await;
+
+    //     let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+
+    //     // call eth_gas_estimate
+    //     let (_, estimated_max_priority_fee) = rpc.provider.estimate_eip1559_fees(None).await?;
+    //     assert!(
+    //         estimated_max_priority_fee.ge(&U256::from(100_000_000)),
+    //         "estimated_max_priority_fee must be equal or greater than 0, 0.1 gwei"
+    //     );
+
+    //     let estimated_gas_price = rpc.provider.get_gas_price().await?;
+    //     assert!(
+    //         estimated_gas_price.ge(&U256::from(100_000_000)),
+    //         "estimated_max_fee must be greater than 0.1 gwei"
+    //     );
+
+    //     gas_oracle_mock.assert();
+
+    //     Ok(())
+    // }
+
+    // #[async_std::test]
+    // async fn test_should_send_tx() -> anyhow::Result<()> {
+    //     let _ = env_logger::builder().is_test(true).try_init();
+
+    //     let expected_block_time = Duration::from_secs(1);
+    //     let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+    //     let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+
+    //     let cfg = RpcOperationsConfig {
+    //         chain_id: anvil.chain_id(),
+    //         tx_polling_interval: Duration::from_millis(10),
+    //         expected_block_time,
+    //         finality: 2,
+    //         gas_oracle_url: None,
+    //         ..RpcOperationsConfig::default()
+    //     };
+
+    //     let client = JsonRpcProviderClient::new(
+    //         &anvil.endpoint(),
+    //         SurfRequestor::default(),
+    //         SimpleJsonRpcRetryPolicy::default(),
+    //     );
+
+    //     // Wait until contracts deployments are final
+    //     sleep((1 + cfg.finality) * expected_block_time).await;
+
+    //     let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+
+    //     let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+    //     assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
+
+    //     // Send 1 ETH to some random address
+    //     let tx_hash = rpc
+    //         .send_transaction(hopr_chain_types::utils::create_native_transfer(
+    //             *RANDY,
+    //             1000000_u32.into(),
+    //         ))
+    //         .await?;
+
+    //     wait_until_tx(tx_hash, Duration::from_secs(8)).await;
+
+    //     Ok(())
+    // }
+
+    // #[async_std::test]
+    // async fn test_should_send_consecutive_txs() -> anyhow::Result<()> {
+    //     let _ = env_logger::builder().is_test(true).try_init();
+
+    //     let expected_block_time = Duration::from_secs(1);
+    //     let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+    //     let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+
+    //     let cfg = RpcOperationsConfig {
+    //         chain_id: anvil.chain_id(),
+    //         tx_polling_interval: Duration::from_millis(10),
+    //         expected_block_time,
+    //         finality: 2,
+    //         gas_oracle_url: None,
+    //         ..RpcOperationsConfig::default()
+    //     };
+
+    //     let client = JsonRpcProviderClient::new(
+    //         &anvil.endpoint(),
+    //         SurfRequestor::default(),
+    //         SimpleJsonRpcRetryPolicy::default(),
+    //     );
+
+    //     // Wait until contracts deployments are final
+    //     sleep((1 + cfg.finality) * expected_block_time).await;
+
+    //     let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+
+    //     let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+    //     assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
+
+    //     let txs_count = 5_u64;
+    //     let send_amount = 1000000_u64;
+
+    //     // Send 1 ETH to some random address
+    //     futures::future::join_all((0..txs_count).map(|_| async {
+    //         rpc.send_transaction(hopr_chain_types::utils::create_native_transfer(
+    //             *RANDY,
+    //             send_amount.into(),
+    //         ))
+    //         .await
+    //         .expect("tx should be sent")
+    //         .await
+    //         .expect("tx should resolve")
+    //     }))
+    //     .await;
+
+    //     let balance_2 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+
+    //     assert!(
+    //         balance_2.amount() <= balance_1.amount() - txs_count * send_amount,
+    //         "balance must be less"
+    //     );
+
+    //     Ok(())
+    // }
+
+    // #[async_std::test]
+    // async fn test_get_balance_native() -> anyhow::Result<()> {
+    //     let _ = env_logger::builder().is_test(true).try_init();
+
+    //     let expected_block_time = Duration::from_secs(1);
+    //     let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+    //     let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+
+    //     let cfg = RpcOperationsConfig {
+    //         chain_id: anvil.chain_id(),
+    //         tx_polling_interval: Duration::from_millis(10),
+    //         expected_block_time,
+    //         finality: 2,
+    //         gas_oracle_url: None,
+    //         ..RpcOperationsConfig::default()
+    //     };
+
+    //     let client = JsonRpcProviderClient::new(
+    //         &anvil.endpoint(),
+    //         SurfRequestor::default(),
+    //         SimpleJsonRpcRetryPolicy::default(),
+    //     );
+
+    //     // Wait until contracts deployments are final
+    //     sleep((1 + cfg.finality) * expected_block_time).await;
+
+    //     let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+
+    //     let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+    //     assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
+
+    //     // Send 1 ETH to some random address
+    //     let tx_hash = rpc
+    //         .send_transaction(hopr_chain_types::utils::create_native_transfer(*RANDY, 1_u32.into()))
+    //         .await?;
+
+    //     wait_until_tx(tx_hash, Duration::from_secs(8)).await;
+
+    //     let balance_2 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+    //     assert!(balance_2.lt(&balance_1), "balance must be diminished");
+
+    //     Ok(())
+    // }
+
+    // #[async_std::test]
+    // async fn test_get_balance_token() -> anyhow::Result<()> {
+    //     let _ = env_logger::builder().is_test(true).try_init();
+
+    //     let expected_block_time = Duration::from_secs(1);
+    //     let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+    //     let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+
+    //     // Deploy contracts
+    //     let contract_instances = {
+    //         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+    //         ContractInstances::deploy_for_testing(client, &chain_key_0).await?
+    //     };
+
+    //     let cfg = RpcOperationsConfig {
+    //         chain_id: anvil.chain_id(),
+    //         tx_polling_interval: Duration::from_millis(10),
+    //         expected_block_time,
+    //         finality: 2,
+    //         contract_addrs: ContractAddresses::from(&contract_instances),
+    //         gas_oracle_url: None,
+    //         ..RpcOperationsConfig::default()
+    //     };
+
+    //     let amount = 1024_u64;
+    //     hopr_chain_types::utils::mint_tokens(contract_instances.token, amount.into()).await;
+
+    //     let client = JsonRpcProviderClient::new(
+    //         &anvil.endpoint(),
+    //         SurfRequestor::default(),
+    //         SimpleJsonRpcRetryPolicy::default(),
+    //     );
+
+    //     // Wait until contracts deployments are final
+    //     sleep((1 + cfg.finality) * expected_block_time).await;
+
+    //     let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+
+    //     let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await?;
+    //     assert_eq!(amount, balance.amount().as_u64(), "invalid balance");
+
+    //     Ok(())
+    // }
+
+    // #[async_std::test]
+    // async fn test_check_node_safe_module_status() -> anyhow::Result<()> {
+    //     let _ = env_logger::builder().is_test(true).try_init();
+
+    //     let expected_block_time = Duration::from_secs(1);
+    //     let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+    //     let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+
+    //     // Deploy contracts
+    //     let (contract_instances, module, safe) = {
+    //         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+    //         let instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0).await?;
+
+    //         // deploy MULTICALL contract to anvil
+    //         deploy_multicall3_to_anvil(client.clone()).await?;
+
+    //         let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
+    //             &instances,
+    //             client.clone(),
+    //             &chain_key_0,
+    //         )
+    //         .await?;
+
+    //         // deploy a module and safe instance and add node into the module. The module is enabled by default in the safe
+    //         (instances, module, safe)
+    //     };
+
+    //     let cfg = RpcOperationsConfig {
+    //         chain_id: anvil.chain_id(),
+    //         tx_polling_interval: Duration::from_millis(10),
+    //         expected_block_time,
+    //         finality: 2,
+    //         contract_addrs: ContractAddresses::from(&contract_instances),
+    //         module_address: module,
+    //         safe_address: safe,
+    //         gas_oracle_url: None,
+    //         ..RpcOperationsConfig::default()
+    //     };
+
+    //     let client = JsonRpcProviderClient::new(
+    //         &anvil.endpoint(),
+    //         SurfRequestor::default(),
+    //         SimpleJsonRpcRetryPolicy::default(),
+    //     );
+
+    //     // Wait until contracts deployments are final
+    //     sleep((1 + cfg.finality) * expected_block_time).await;
+
+    //     let rpc = RpcOperations::new(client.clone(), SurfRequestor::default(), &chain_key_0, cfg)?;
+
+    //     let result_before_including_node = rpc.check_node_safe_module_status((&chain_key_0).into()).await?;
+    //     // before including node to the safe and module, only the first chck is false, the others are true
+    //     assert!(
+    //         !result_before_including_node.is_node_included_in_module,
+    //         "node should not be included in a default module"
+    //     );
+    //     assert!(
+    //         result_before_including_node.is_module_enabled_in_safe,
+    //         "module should be enabled in a default safe"
+    //     );
+    //     assert!(
+    //         result_before_including_node.is_safe_owner_of_module,
+    //         "safe should not be the owner of a default module"
+    //     );
+
+    //     // including node to the module
+    //     hopr_chain_types::utils::include_node_to_module_by_safe(
+    //         contract_instances.channels.client().clone(),
+    //         safe,
+    //         module,
+    //         (&chain_key_0).into(),
+    //         &chain_key_0,
+    //     )
+    //     .await?;
+
+    //     let result_with_node_included = rpc.check_node_safe_module_status((&chain_key_0).into()).await?;
+    //     // after the node gets included into the module, all checks should be true
+    //     assert!(
+    //         result_with_node_included.is_node_included_in_module,
+    //         "node should be included in a default module"
+    //     );
+    //     assert!(
+    //         result_with_node_included.is_module_enabled_in_safe,
+    //         "module should be enabled in a default safe"
+    //     );
+    //     assert!(
+    //         result_with_node_included.is_safe_owner_of_module,
+    //         "safe should be the owner of a default module"
+    //     );
+
+    //     Ok(())
+    // }
+
+    // #[async_std::test]
+    // async fn test_get_eligibility_status() -> anyhow::Result<()> {
+    //     let _ = env_logger::builder().is_test(true).try_init();
+
+    //     let expected_block_time = Duration::from_secs(1);
+    //     let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
+    //     let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
+    //     let node_address: H160 = chain_key_0.public().to_address().into();
+
+    //     // Deploy contracts
+    //     let (contract_instances, module, safe) = {
+    //         let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+    //         let instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0).await?;
+
+    //         // deploy MULTICALL contract to anvil
+    //         deploy_multicall3_to_anvil(client.clone()).await?;
+
+    //         let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
+    //             &instances,
+    //             client.clone(),
+    //             &chain_key_0,
+    //         )
+    //         .await?;
+
+    //         // deploy a module and safe instance and add node into the module. The module is enabled by default in the safe
+    //         (instances, module, safe)
+    //     };
+
+    //     let cfg = RpcOperationsConfig {
+    //         chain_id: anvil.chain_id(),
+    //         tx_polling_interval: Duration::from_millis(10),
+    //         expected_block_time,
+    //         finality: 2,
+    //         contract_addrs: ContractAddresses::from(&contract_instances),
+    //         module_address: module,
+    //         safe_address: safe,
+    //         gas_oracle_url: None,
+    //         ..RpcOperationsConfig::default()
+    //     };
+
+    //     let client = JsonRpcProviderClient::new(
+    //         &anvil.endpoint(),
+    //         SurfRequestor::default(),
+    //         SimpleJsonRpcRetryPolicy::default(),
+    //     );
+
+    //     // Wait until contracts deployments are final
+    //     sleep((1 + cfg.finality) * expected_block_time).await;
+
+    //     let rpc = RpcOperations::new(client.clone(), SurfRequestor::default(), &chain_key_0, cfg.clone())?;
+
+    //     // check the eligibility status (before registering in the NetworkRegistry contract)
+    //     let result_before_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).await?;
+
+    //     assert!(
+    //         !result_before_register_in_the_network_registry,
+    //         "node should not be eligible"
+    //     );
+
+    //     // register the node
+    //     match &rpc.contract_instances.network_registry_proxy {
+    //         NetworkRegistryProxy::Dummy(e) => {
+    //             let _ = e.owner_add_account(cfg.safe_address.into()).send().await?.await?;
+    //         }
+    //         NetworkRegistryProxy::Safe(_) => {}
+    //     };
+
+    //     let _ = rpc
+    //         .contract_instances
+    //         .network_registry
+    //         .manager_register(vec![cfg.safe_address.into()], vec![node_address])
+    //         .send()
+    //         .await?
+    //         .await?;
+
+    //     // check the eligibility status (after registering in the NetworkRegistry contract)
+    //     let result_after_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).await?;
+
+    //     assert!(result_after_register_in_the_network_registry, "node should be eligible");
+    //     Ok(())
+    // }
 }

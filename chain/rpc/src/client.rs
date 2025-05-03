@@ -50,7 +50,7 @@ pub const EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS: u128 = 100_000_000
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
 
-use crate::transport::HttpRequestor;
+use crate::{rpc::DEFAULT_GAS_ORACLE_URL, transport::HttpRequestor};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -288,9 +288,6 @@ pub struct GasOracleFiller<C> {
     gas_category: GasCategory,
 }
 
-/// Default gas oracle URL for Gnosis chain.
-pub const DEFAULT_GAS_ORACLE_URL: &str = "https://ggnosis.blockscan.com/gasapi.ashx?apikey=key&method=gasoracle";
-
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct GasOracleResponse {
     pub status: String,
@@ -325,30 +322,9 @@ impl GasOracleResponseResult {
     }
 }
 
-// #[async_trait]
-// impl<C: Service<String> + std::fmt::Debug> GasOracle for GnosisScan<C> {
-//     async fn fetch(&self) -> Result<U256, GasOracleError> {
-//         let res: Response = self.query().await?;
-//         let gas_price_in_gwei = res.gas_from_category(self.gas_category);
-//         let gas_price = parse_units(gas_price_in_gwei, "gwei")?.into();
-//         Ok(gas_price)
-//     }
-
-//     // returns hardcoded (max_fee_per_gas, max_priority_fee_per_gas)
-//     // Due to foundry is unable to estimate EIP-1559 fees for L2s https://github.com/foundry-rs/foundry/issues/5709,
-//     // a hardcoded value of (3 gwei, 0.1 gwei) for Gnosischain is returned.
-//     async fn estimate_eip1559_fees(&self) -> Result<(U256, U256), GasOracleError> {
-//         Ok((
-//             U256::from(EIP1559_FEE_ESTIMATION_DEFAULT_MAX_FEE_GNOSIS),
-//             U256::from(EIP1559_FEE_ESTIMATION_DEFAULT_PRIORITY_FEE_GNOSIS),
-//         ))
-//     }
-// }
-
 impl<C> GasOracleFiller<C>
 where
-    // C: Service<String, Response = Box<RawValue>, Error = TransportError>,
-    C: HttpRequestor,
+    C: HttpRequestor + Clone,
 {
     /// Same as [`Self::new`] but with a custom [`Client`].
     pub fn new(client: C, url: Option<String>) -> Self {
@@ -372,15 +348,6 @@ where
             .http_get(&self.url)
             .await
             .map_err(|e| TransportErrorKind::custom(e))?;
-
-        // let url = self.url.as_ref();
-        // // .ok_or_else(|| TransportErrorKind::Custom("Cannot parse gas oracle url".into()))?;
-
-        // let raw_value: Box<[u8]> = self
-        //     .client
-        //     .http_get(url)
-        //     .await
-        //     .map_err(|_| TransportErrorKind::Custom("failed to query gas price API".into()))?;
 
         let parsed: GasOracleResponse = serde_json::from_slice(raw_value.as_ref()).map_err(|e| {
             error!(%e, "failed to deserialize gas price API response");
@@ -423,13 +390,6 @@ where
         })
     }
 
-    // async fn fetch(&self) -> Result<U256, GasOracleError> {
-    //     let res: Response = self.query().await?;
-    //     let gas_price_in_gwei = res.gas_from_category(self.gas_category);
-    //     let gas_price = parse_units(gas_price_in_gwei, "gwei")?.into();
-    //     Ok(gas_price)
-    // }
-
     // returns hardcoded (max_fee_per_gas, max_priority_fee_per_gas)
     // Due to foundry is unable to estimate EIP-1559 fees for L2s https://github.com/foundry-rs/foundry/issues/5709,
     // a hardcoded value of (3 gwei, 0.1 gwei) for Gnosischain is returned.
@@ -445,14 +405,6 @@ where
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GasOracleFillable {
-    // Legacy {
-    //     gas_limit: u64,
-    //     gas_price: u128,
-    // },
-    // Eip1559 {
-    //     gas_limit: u64,
-    //     estimate: Eip1559Estimation,
-    // },
     Legacy { gas_price: u128 },
     Eip1559 { estimate: Eip1559Estimation },
 }
@@ -460,8 +412,6 @@ pub enum GasOracleFillable {
 impl<N, C> TxFiller<N> for GasOracleFiller<C>
 where
     N: Network,
-    // C: Service<String, Response = Box<RawValue>, Error = TransportError> + Debug,
-    // C: Send + Sync + Clone,
     C: HttpRequestor + Clone,
 {
     type Fillable = GasOracleFillable;
@@ -890,7 +840,7 @@ mod tests {
         network::TransactionBuilder,
         primitives::{address, U256},
         providers::{
-            fillers::{CachedNonceManager, GasFiller, NonceFiller},
+            fillers::{BlobGasFiller, CachedNonceManager, ChainIdFiller, GasFiller, NonceFiller},
             Provider, ProviderBuilder,
         },
         rpc::{client::ClientBuilder, types::TransactionRequest},
@@ -1536,12 +1486,14 @@ mod tests {
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
             .wallet(signer)
+            .filler(ChainIdFiller::default())
             .filler(NonceFiller::new(CachedNonceManager::default()))
             .filler(GasOracleFiller::new(
                 transport_client.client().clone(),
                 Some(gas_oracle_req_uri),
             ))
             .filler(GasFiller)
+            .filler(BlobGasFiller)
             .on_client(rpc_client);
 
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
