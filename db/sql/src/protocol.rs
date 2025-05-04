@@ -530,8 +530,16 @@ impl HoprDbProtocolOperations for HoprDb {
                     tracing::trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
                 }
 
-                // The contained payload represents an Acknowledgement
-                if incoming.ack_key.is_none() {
+                if let Some(ack_key) = incoming.ack_key {
+                    Ok(Some(IncomingPacket::Final {
+                        packet_tag: incoming.packet_tag,
+                        previous_hop: incoming.previous_hop,
+                        sender: incoming.sender,
+                        plain_text: incoming.plain_text,
+                        ack_key,
+                    }))
+                } else {
+                    // The contained payload represents an Acknowledgement
                     let ack: Acknowledgement = incoming.plain_text.as_ref().try_into().map_err(|error| {
                         tracing::error!(%error, "failed to decode the acknowledgement");
 
@@ -547,14 +555,6 @@ impl HoprDbProtocolOperations for HoprDb {
                     self.handle_acknowledgement(ack).await?;
 
                     Ok(None)
-                } else {
-                    Ok(Some(IncomingPacket::Final {
-                        packet_tag: incoming.packet_tag,
-                        previous_hop: incoming.previous_hop,
-                        sender: incoming.sender,
-                    plain_text: incoming.plain_text,
-                    ack_key: incoming.ack_key.expect("should have contained an ack key"),
-                    }))
                 }
             }
             HoprPacket::Forwarded(fwd) => {
