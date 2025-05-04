@@ -11,12 +11,12 @@ use futures::stream::AbortHandle;
 use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
 use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
 use hopr_network_types::prelude::*;
+use hopr_primitive_types::prelude::Address;
 use std::ops::Range;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
-use hopr_primitive_types::prelude::Address;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -71,13 +71,6 @@ pub struct SessionManagerConfig {
     /// Default is 180 seconds.
     #[default(Duration::from_secs(180))]
     pub idle_timeout: Duration,
-
-    /// The initial amount Session initiator's SURB upload per second to the Session's counterparty.
-    ///
-    /// Default is 100 SURBs per second.
-    /// This is currently 50 HOPR packets per second (one empty packet can carry 2 SURBs).
-    #[default(100)]
-    pub initial_surb_upload_rate: usize,
 }
 
 fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
@@ -397,7 +390,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     /// this method returns [`TransportSessionError::Timeout`].
     ///
     /// It will also fail if the instance has not been [started](SessionManager::start).
-    pub async fn new_session(&self, destination: Address, target: SessionTarget, cfg: SessionClientConfig) -> crate::errors::Result<Session> {
+    pub async fn new_session(
+        &self,
+        destination: Address,
+        target: SessionTarget,
+        cfg: SessionClientConfig,
+    ) -> crate::errors::Result<Session> {
         let msg_sender = self.msg_sender.get().ok_or(SessionManagerError::NotStarted)?;
 
         let (tx_initiation_done, rx_initiation_done) = futures::channel::mpsc::unbounded();
@@ -981,11 +979,15 @@ mod tests {
 
         pin_mut!(new_session_rx_bob);
         let (alice_session, bob_session) = futures::future::join(
-            alice_mgr.new_session(bob_peer, SessionTarget::TcpStream(target.clone()),SessionClientConfig {
-                pseudonym: alice_pseudonym.into(),
-                surb_management: None,
-                ..Default::default()
-            }),
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(target.clone()),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            ),
             new_session_rx_bob.next(),
         )
         .timeout(Duration::from_secs(2))
@@ -1104,11 +1106,15 @@ mod tests {
 
         pin_mut!(new_session_rx_bob);
         let (alice_session, bob_session) = futures::future::join(
-            alice_mgr.new_session(bob_peer, SessionTarget::TcpStream(target.clone()), SessionClientConfig {
-                pseudonym: alice_pseudonym.into(),
-                surb_management: None,
-                ..Default::default()
-            }),
+            alice_mgr.new_session(
+                bob_peer,
+                SessionTarget::TcpStream(target.clone()),
+                SessionClientConfig {
+                    pseudonym: alice_pseudonym.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            ),
             new_session_rx_bob.next(),
         )
         .timeout(Duration::from_secs(2))
@@ -1198,12 +1204,16 @@ mod tests {
         jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
 
         let result = alice_mgr
-            .new_session(bob_peer, SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)), SessionClientConfig {
-                capabilities: vec![],
-                pseudonym: alice_pseudonym.into(),
-                surb_management: None,
-                ..Default::default()
-            })
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: vec![],
+                    pseudonym: alice_pseudonym.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
             .await;
 
         assert!(
@@ -1248,12 +1258,16 @@ mod tests {
         jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
 
         let result = alice_mgr
-            .new_session(bob_peer, SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)), SessionClientConfig {
-                capabilities: vec![],
-                pseudonym: None,
-                surb_management: None,
-                ..Default::default()
-            })
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: vec![],
+                    pseudonym: None,
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
             .await;
 
         assert!(matches!(result, Err(TransportSessionError::Timeout)));

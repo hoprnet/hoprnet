@@ -678,8 +678,13 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn new_session(&self, cfg: SessionClientConfig) -> errors::Result<Session> {
-        Ok(self.smgr.new_session(cfg).await?)
+    pub async fn new_session(
+        &self,
+        destination: Address,
+        target: SessionTarget,
+        cfg: SessionClientConfig,
+    ) -> errors::Result<Session> {
+        Ok(self.smgr.new_session(destination, target, cfg).await?)
     }
 
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]
