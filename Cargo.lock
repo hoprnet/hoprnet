@@ -5335,7 +5335,6 @@ dependencies = [
  "async-channel 2.3.1",
  "async-std",
  "async-trait",
- "ethers",
  "futures",
  "hex-literal",
  "hopr-async-runtime",

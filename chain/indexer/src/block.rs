@@ -570,10 +570,6 @@ mod tests {
     use alloy::primitives::{Address as AlloyAddress, B256};
     use alloy::sol_types::SolEvent;
     use async_trait::async_trait;
-    // use ethers::{
-    //     abi::{encode, Token},
-    //     contract::EthEvent,
-    // };
     use futures::{join, Stream};
     use hex_literal::hex;
     use mockall::mock;
@@ -581,7 +577,6 @@ mod tests {
     use std::collections::BTreeSet;
     use std::pin::Pin;
 
-    // use hopr_bindings::hopr_announcements::AddressAnnouncementFilter;
     use hopr_chain_rpc::BlockWithLogs;
     use hopr_chain_types::chain_events::ChainEventType;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
@@ -630,10 +625,6 @@ mod tests {
                     DynSolValue::String(test_multiaddr.to_string()),
                 ])
                 .abi_encode()
-                // encode(&[
-                //     Token::Address(ethers::abi::Address::from_slice(address.as_ref())),
-                //     Token::String(test_multiaddr.to_string()),
-                // ])
                 .into(),
                 tx_hash: Hash::create(&[format!("my tx hash {i}").as_bytes()]).into(),
                 tx_index: 0,

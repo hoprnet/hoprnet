@@ -1,4 +1,3 @@
-// use ethers::core::abi::Error as AbiError;
 use alloy::dyn_abi::Error as AbiError;
 use alloy::sol_types::Error as SolTypeError;
 use thiserror::Error;

@@ -31,7 +31,6 @@ prometheus = [
 alloy = { workspace = true, default-features = false, features = ["essentials", "json-rpc", "node-bindings"] }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
-ethers = { workspace = true, default-features = false, features = ["abigen"] }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = { workspace = true }
