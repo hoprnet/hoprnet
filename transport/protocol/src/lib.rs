@@ -317,6 +317,7 @@ where
                     match packet {
                         IncomingPacket::Final {
                             previous_hop,
+                            sender,
                             plain_text,
                             ack_key,
                             ..
@@ -338,7 +339,7 @@ where
                                             });
                                     }
 
-                                    Some(plain_text)
+                                    Some((sender, plain_text))
                                 }
                                 IncomingPacket::Forwarded {
                                     previous_hop,
@@ -377,8 +378,11 @@ where
                     }
                 }})
                 .filter_map(|maybe_data| async move {
-                    if let Some(data) = maybe_data {
-                        ApplicationData::from_bytes(data.as_ref()).inspect_err(|error| tracing::error!(error = %error, "Failed to decode application data")).ok()
+                    if let Some((sender, data)) = maybe_data {
+                        ApplicationData::from_bytes(data.as_ref())
+                            .inspect_err(|error| tracing::error!(error = %error, "Failed to decode application data"))
+                            .ok()
+                            .map(|data| (sender, data))
                     } else {
                         None
                     }

@@ -1,4 +1,3 @@
-use crate::prelude::DbError;
 use async_trait::async_trait;
 use hopr_crypto_packet::prelude::HoprSenderId;
 use hopr_crypto_packet::HoprSurb;

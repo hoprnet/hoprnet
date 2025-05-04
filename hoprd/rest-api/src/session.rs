@@ -363,7 +363,7 @@ pub enum RoutingOptions {
 }
 
 impl RoutingOptions {
-    pub async fn resolve<R: HoprDbResolverOperations>(
+    pub(crate) async fn resolve<R: HoprDbResolverOperations>(
         self,
         resolver: &R,
     ) -> Result<hopr_lib::RoutingOptions, ApiErrorStatus> {
@@ -459,12 +459,11 @@ impl SessionClientRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "target": "example.com:80",
+        "forward_path": { "Hops": 1 },
+        "return_path": { "Hops": 1 },
         "protocol": "tcp",
         "ip": "127.0.0.1",
-        "port": 5542,
-        "destination:" "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F",
-        "forward_path": { "Hops": 1 },
-        "return_path": { "Hops": 1 }
+        "port": 5542
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientResponse {
