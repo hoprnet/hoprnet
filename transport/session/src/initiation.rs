@@ -62,14 +62,15 @@ pub struct StartEstablished<T> {
 /// sequenceDiagram
 ///     Entry->>Exit: SessionInitiation (Challenge)
 ///     alt If Exit can accept a new session
-///     Note right of Exit: SessionID_Exit [Entry PeerID, Tag]
+///     Note right of Exit: SessionID [Pseudonym, Tag]
 ///     Exit->>Entry: SessionEstablished (Challenge, SessionID_Entry)
-///     Note left of Entry: SessionID_Entry [Exit PeerID, Tag]
+///     Note left of Entry: SessionID [Pseudonym, Tag]
+///     Entry->>Exit: KeepAlive (SessionID)
 ///     Note over Entry,Exit: Data
-///     Entry->>Exit: Close Session (SessionID_Entry)
-///     Exit->>Entry: Close Session (SessionID_Exit)
+///     Entry->>Exit: Close Session (SessionID)
+///     Exit->>Entry: Close Session (SessionID)
 ///     else If Exit cannot accept a new session
-///     Exit->>Entry: SesssionError (Challenge, Reason)
+///     Exit->>Entry: SessionError (Challenge, Reason)
 ///     end
 ///     opt If initiation attempt times out
 ///     Note left of Entry: Failure

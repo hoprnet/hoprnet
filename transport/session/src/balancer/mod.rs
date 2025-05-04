@@ -1,6 +1,7 @@
 mod controller;
 mod rate_limiting;
 
+use std::time::Duration;
 use futures::stream::AbortHandle;
 use hopr_crypto_packet::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -15,6 +16,7 @@ use crate::initiation::StartProtocol;
 use crate::traits::SendMsg;
 
 /// Allows estimating the flow of SURBs in a Session (production or depletion).
+#[cfg_attr(test, mockall::automock)]
 pub trait SurbFlowEstimator {
     /// Estimates the number of SURBs produced or depleted, depending on the context.
     fn estimate_surb_turnout(&self) -> u64;
@@ -27,6 +29,7 @@ impl SurbFlowEstimator for std::sync::Arc<std::sync::atomic::AtomicU64> {
 }
 
 /// Allows controlling the flow of non-organic SURBs in a Session.
+#[cfg_attr(test, mockall::automock)]
 pub trait SurbFlowController {
     /// Adjusts the amount of non-organic SURB flow.
     fn adjust_surb_flow(&self, surbs_per_sec: usize);
@@ -43,7 +46,7 @@ impl SurbFlowController for KeepAliveController {
     fn adjust_surb_flow(&self, surbs_per_sec: usize) {
         // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
         // so the correction by this factor is applied.
-        self.0.set_rate_per_sec(surbs_per_sec / HoprPacket::MAX_SURBS_IN_PACKET);
+        self.0.set_rate_per_unit(surbs_per_sec / HoprPacket::MAX_SURBS_IN_PACKET, Duration::from_secs(1));
     }
 }
 

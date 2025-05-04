@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
 use futures::Stream;
-use futures_timer::Delay;
+use futures_time::task::Sleep;
 use pin_project::pin_project;
 
 /// Controller for [`RateLimitedStream`] to allow dynamic controlling of the stream's rate.
@@ -15,21 +15,10 @@ pub struct RateController(Arc<AtomicUsize>, Arc<AtomicUsize>);
 
 #[allow(unused)]
 impl RateController {
-    /// Update the rate limit (elements per second)
-    pub fn set_rate_per_sec(&self, elements_per_second: usize) {
-        self.0.store(elements_per_second, Ordering::Relaxed);
-    }
-
     /// Update the rate limit (elements per unit).
     pub fn set_rate_per_unit(&self, elements_per_unit: usize, unit: Duration) {
         self.0.store(elements_per_unit, Ordering::Relaxed);
         self.1.store(unit.as_millis() as usize, Ordering::Relaxed);
-    }
-
-    /// Get the current rate limit per second.
-    pub fn get_rate_per_sec(&self) -> f64 {
-        self.0.load(Ordering::Relaxed) as f64
-            / Duration::from_millis(self.1.load(Ordering::Relaxed) as u64).as_secs_f64()
     }
 
     /// Get the current rate limit per time unit.
@@ -50,12 +39,13 @@ pub struct RateLimitedStream<S> {
     inner: S,
     elements_per_unit: Arc<AtomicUsize>,
     unit_in_ms: Arc<AtomicUsize>,
-    last_yield: Option<Instant>,
     #[pin]
-    delay: Option<Delay>,
+    delay: Option<Sleep>,
 }
 
 impl<S> RateLimitedStream<S> {
+    const MAX_RATE_PER_SEC: f64 = 10_000.0;
+
     /// Creates a stream with some initial rate limit of elements per a time unit.
     pub fn new_with_rate_per_unit(stream: S, initial_rate_per_unit: usize, unit: Duration) -> (Self, RateController) {
         assert!(unit > Duration::ZERO, "unit must be greater than zero");
@@ -67,7 +57,6 @@ impl<S> RateLimitedStream<S> {
                 inner: stream,
                 elements_per_unit: rate.clone(),
                 unit_in_ms: unit.clone(),
-                last_yield: None,
                 delay: None,
             },
             RateController(rate, unit),
@@ -84,44 +73,45 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
 
-        // Check if we're waiting for a delay to complete
-        if let Some(delay) = this.delay.as_mut().as_pin_mut() {
-            match delay.poll(cx) {
-                Poll::Ready(_) => {
-                    // Delay completed, clear it
-                    this.delay.set(None);
-                }
-                Poll::Pending => {
-                    // Still waiting
-                    return Poll::Pending;
-                }
+        // If the rate is zero, schedule the next fixed wake-up to check again
+        if this.elements_per_unit.load(Ordering::Relaxed) == 0 {
+            this.delay.set(Some(futures_time::task::sleep(Duration::from_millis(100).into())));
+        }
+
+        // Check if we are waiting for a delay to complete
+        while let Some(delay) = this.delay.as_mut().as_pin_mut() {
+            let _ = futures::ready!(delay.poll(cx));
+            if this.elements_per_unit.load(Ordering::Relaxed) == 0 {
+                // If the rate is still zero, schedule the next fixed wake-up to check again
+                this.delay.set(Some(futures_time::task::sleep(Duration::from_millis(100).into())));
+            } else {
+                this.delay.set(None);
             }
         }
 
         // Get the next item from the inner stream
-        match this.inner.as_mut().poll_next(cx) {
-            Poll::Ready(Some(item)) => {
-                let now = Instant::now();
+        let yield_start = Instant::now();
+        if let Some(item) = futures::ready!(this.inner.as_mut().poll_next(cx)) {
+            let time_to_yield = yield_start.elapsed();
 
-                // Update last yield time
-                *this.last_yield = Some(now);
+            // Calculate the next allowable time based on the rate
+            let units = this.elements_per_unit.load(Ordering::Relaxed);
+            let rate_per_sec = (units as f64
+                / Duration::from_millis(this.unit_in_ms.load(Ordering::Relaxed) as u64).as_secs_f64())
+                .min(Self::MAX_RATE_PER_SEC);
 
-                // Calculate the next allowable time based on the rate
-                let units = this.elements_per_unit.load(Ordering::Relaxed);
-                if units > 0 {
-                    let rate_per_sec = units as f64
-                        / Duration::from_millis(this.unit_in_ms.load(Ordering::Relaxed) as u64).as_secs_f64();
+            // Convert to duration (seconds per element) and subtract the duration
+            // it took to yield the element from the inner stream
+            let delay_duration = Duration::from_secs_f64(1.0 / rate_per_sec)
+                .saturating_sub(time_to_yield)
+                .max(Duration::from_secs_f64(1.0 / Self::MAX_RATE_PER_SEC));
 
-                    // Convert to duration (seconds per element)
-                    let delay_duration = Duration::from_secs_f64(1.0 / rate_per_sec);
+            // Create a delay for the calculated duration
+            *this.delay = Some(futures_time::task::sleep(delay_duration.into()));
 
-                    // Create a delay for the calculated duration
-                    *this.delay = Some(Delay::new(delay_duration));
-                }
-
-                Poll::Ready(Some(item))
-            }
-            other => other,
+            Poll::Ready(Some(item))
+        } else {
+            Poll::Ready(None)
         }
     }
 }
@@ -132,13 +122,14 @@ pub trait RateLimitExt: Stream + Sized {
     /// the rate can be controlled dynamically during the lifetime of the stream by using
     /// the returned [`RateController`].
     ///
-    /// If `elements_per_second` is 0, no rate limiting is applied.
+    /// If `elements_per_unit` is 0, the stream will not yield until the limit is changed
+    /// using the [`RateController`] to a non-zero value.
     fn rate_limit_per_unit(
         self,
-        elements_per_second: usize,
+        elements_per_unit: usize,
         unit: Duration,
     ) -> (RateLimitedStream<Self>, RateController) {
-        RateLimitedStream::new_with_rate_per_unit(self, elements_per_second, unit)
+        RateLimitedStream::new_with_rate_per_unit(self, elements_per_unit, unit)
     }
 }
 
@@ -149,6 +140,8 @@ mod tests {
     use super::*;
     use futures::stream::{self, StreamExt};
     use std::time::{Duration, Instant};
+    use futures::pin_mut;
+    use futures_time::future::FutureExt;
 
     #[async_std::test]
     async fn test_rate_limited_stream_respects_rate() {
@@ -158,7 +151,7 @@ mod tests {
         // Set a rate of 10 elements per second (100ms per element)
         let (rate_limited, controller) = stream.rate_limit_per_unit(10, Duration::from_secs(1));
 
-        assert_eq!(controller.get_rate_per_sec(), 10.0);
+        assert_eq!(controller.get_rate_per_unit().0, 10);
 
         let start = Instant::now();
 
@@ -188,6 +181,21 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn test_rate_limited_first_item_should_yield_immediately() {
+        // Create a stream with 3 elements
+        let stream = stream::iter(1..=1);
+
+        // Set a rate of 1 element per 100ms
+        let (rate_limited, _) = stream.rate_limit_per_unit(1, Duration::from_millis(100));
+
+        pin_mut!(rate_limited);
+
+        let start = Instant::now();
+        assert_eq!(Some(1), rate_limited.next().await);
+        assert!(start.elapsed() < Duration::from_millis(100));
+    }
+
+    #[async_std::test]
     async fn test_rate_limited_stream_empty() {
         // Create an empty stream
         let stream = stream::iter::<Vec<i32>>(vec![]);
@@ -200,29 +208,65 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_rate_limited_stream_zero_rate() {
+    async fn test_rate_limited_stream_zero_rate() -> anyhow::Result<()> {
         // Create a stream with 3 elements
         let stream = stream::iter(1..=3);
 
-        // Set a rate of 0 elements per second (no delay)
+        // Set a rate of 0 elements per second (= will not yield)
         let (rate_limited, _) = stream.rate_limit_per_unit(0, Duration::from_secs(1));
 
+        pin_mut!(rate_limited);
+
+        assert!(rate_limited.next().timeout(futures_time::time::Duration::from_millis(100)).await.is_err(), "zero rate should not yield anything");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_rate_limited_stream_should_pause_on_zero_rate() -> anyhow::Result<()> {
+        // Create a stream with 3 elements
+        let stream = stream::iter(1..=3);
+
+        // Set a rate of 1 element per 100ms
+        let (rate_limited, controller) = stream.rate_limit_per_unit(1, Duration::from_millis(100));
+
+        pin_mut!(rate_limited);
+
+        assert_eq!(Some(1), rate_limited.next().await);
+
         let start = Instant::now();
-
-        // Collect all elements from the stream
-        let items: Vec<i32> = rate_limited.collect().await;
-
+        assert_eq!(Some(2), rate_limited.next().await);
         let elapsed = start.elapsed();
+        assert!(elapsed >= Duration::from_millis(100), "first element too fast {elapsed:?}");
 
-        // Verify all elements were yielded
-        assert_eq!(items, vec![1, 2, 3]);
+        controller.set_rate_per_unit(0, Duration::from_millis(100));
 
-        // Verify there was no rate limiting (should be very fast)
-        assert!(
-            elapsed < Duration::from_millis(50),
-            "Stream with zero rate took too long: {:?}",
-            elapsed
-        );
+        assert!(rate_limited.next().timeout(futures_time::time::Duration::from_millis(200)).await.is_err(), "zero rate should not yield anything");
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_rate_limited_stream_zero_rate_should_restart_when_increased() -> anyhow::Result<()> {
+        // Create a stream with 3 elements
+        let stream = stream::iter(1..=3);
+
+        // Set a rate of 0 elements per second (= will not yield)
+        let (rate_limited, controller) = stream.rate_limit_per_unit(0, Duration::from_secs(1));
+        pin_mut!(rate_limited);
+
+        assert!(rate_limited.next().timeout(futures_time::time::Duration::from_millis(100)).await.is_err(), "zero rate should not yield anything");
+
+        controller.set_rate_per_unit(1, Duration::from_millis(100));
+
+        let start = Instant::now();
+        let all_items = rate_limited.collect::<Vec<_>>().await;
+        let all_items_elapsed = start.elapsed();
+
+        assert_eq!(all_items, vec![1, 2, 3]);
+        assert!(all_items_elapsed >= Duration::from_millis(300), "all items should have been yielded in at least 300ms");
+
+        Ok(())
     }
 
     #[async_std::test]
@@ -242,11 +286,11 @@ mod tests {
             assert_eq!(item, i);
         }
 
-        // Measure time for first 3 elements
+        // Measure time for the first 3 elements
         let first_half_elapsed = start.elapsed();
 
         // Change rate to 2 elements per second (500ms per element)
-        controller.set_rate_per_sec(2);
+        controller.set_rate_per_unit(2, Duration::from_secs(1));
 
         // Consume last 3 elements
         for i in 4..=6 {
@@ -258,7 +302,7 @@ mod tests {
         let total_elapsed = start.elapsed();
         let second_half_elapsed = total_elapsed - first_half_elapsed;
 
-        // First 3 elements at 5 per second should take ~400ms (2 delays)
+        // The first 3 elements at 5 per second should take ~400ms (2 delays)
         assert!(
             first_half_elapsed >= Duration::from_millis(300),
             "First half too fast: {:?}",
@@ -270,7 +314,7 @@ mod tests {
             first_half_elapsed
         );
 
-        // Last 3 elements at 2 per second should take ~1000ms (2 delays)
+        // The last 3 elements at 2 per second should take ~1000ms (2 delays)
         assert!(
             second_half_elapsed >= Duration::from_millis(800),
             "Second half too fast: {:?}",
@@ -333,7 +377,7 @@ mod tests {
 
                 // After 3 elements, wait briefly to allow rate change to take effect
                 if count == 3 {
-                    Delay::new(Duration::from_millis(50)).await;
+                    async_std::task::sleep(Duration::from_millis(50)).await;
                 }
             }
 
@@ -343,10 +387,10 @@ mod tests {
         // Set up a task to change the rate after a delay
         let rate_change_task = async move {
             // Wait a bit for the stream to start processing
-            Delay::new(Duration::from_millis(100)).await;
+            async_std::task::sleep(Duration::from_millis(100)).await;
 
             // Change the rate to 20 per second
-            controller.set_rate_per_sec(20);
+            controller.set_rate_per_unit(20, Duration::from_secs(1));
 
             // Return the new rate
             20

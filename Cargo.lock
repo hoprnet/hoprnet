@@ -5119,7 +5119,6 @@ dependencies = [
  "cfg_eval",
  "futures",
  "futures-time",
- "futures-timer",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",

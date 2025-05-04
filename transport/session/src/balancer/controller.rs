@@ -67,8 +67,8 @@ pub struct SurbBalancerConfig {
 pub struct SurbBalancer<I, O, F, S> {
     session_id: S,
     pid: Pid<f64>,
-    outflow_estimator: O,
-    inflow_estimator: I,
+    surb_production_estimator: O,
+    surb_consumption_estimator: I,
     controller: F,
     cfg: SurbBalancerConfig,
     current_target_buffer: u64,
@@ -76,6 +76,11 @@ pub struct SurbBalancer<I, O, F, S> {
     last_surbs_used: u64,
     last_update: std::time::Instant,
 }
+
+// Default coefficients for the PID controller
+const DEFAULT_P_GAIN: f64 = 0.6;
+const DEFAULT_I_GAIN: f64 = 0.7;
+const DEFAULT_D_GAIN: f64 = 0.2;
 
 impl<I, O, F, S> SurbBalancer<I, O, F, S>
 where
@@ -85,20 +90,28 @@ where
     S: Display,
 {
     pub fn new(
-        outflow_estimator: O,
-        inflow_estimator: I,
-        controller: F,
         session_id: S,
+        surb_production_estimator: O,
+        surb_consumption_estimator: I,
+        controller: F,
         cfg: SurbBalancerConfig,
     ) -> Self {
+        // Initialize the PID controller with default tuned gains
         let mut pid = Pid::new(cfg.target_surb_buffer_size as f64, cfg.max_surbs_per_sec as f64);
-        pid.p(0.6, cfg.max_surbs_per_sec as f64);
-        pid.i(0.7, cfg.max_surbs_per_sec as f64);
-        pid.d(0.2, cfg.max_surbs_per_sec as f64);
+        pid.p(DEFAULT_P_GAIN, cfg.max_surbs_per_sec as f64);
+        pid.i(DEFAULT_I_GAIN, cfg.max_surbs_per_sec as f64);
+        pid.d(DEFAULT_D_GAIN, cfg.max_surbs_per_sec as f64);
+
+        #[cfg(feature = "prometheus")]
+        {
+            let sid = session_id.to_string();
+            METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], 0.0);
+            METRIC_CONTROL_OUTPUT.set(&[&sid], 0.0);
+        }
 
         Self {
-            outflow_estimator,
-            inflow_estimator,
+            surb_production_estimator,
+            surb_consumption_estimator,
             controller,
             pid,
             cfg,
@@ -110,22 +123,28 @@ where
         }
     }
 
+    /// Computes the next control update and adjusts the [`SurbFlowController`] rate accordingly.
     #[tracing::instrument(level = "trace", skip(self), fields(session_id = %self.session_id))]
-    pub fn update(&mut self) {
+    pub fn update(&mut self) -> u64 {
         let dt = self.last_update.elapsed();
+        if dt < std::time::Duration::from_millis(10) {
+            tracing::debug!("time elapsed since last update is too short, skipping update");
+            return self.current_target_buffer;
+        }
+
         self.last_update = std::time::Instant::now();
 
         // Number of SURBs sent to the counterparty since the last update
-        let current_surbs_delivered = self.outflow_estimator.estimate_surb_turnout();
+        let current_surbs_delivered = self.surb_production_estimator.estimate_surb_turnout();
         let surbs_delivered_delta = current_surbs_delivered - self.last_surbs_delivered;
         self.last_surbs_delivered = current_surbs_delivered;
 
         // Number of SURBs used by the counterparty since the last update
-        let current_surbs_used = self.inflow_estimator.estimate_surb_turnout();
+        let current_surbs_used = self.surb_consumption_estimator.estimate_surb_turnout();
         let surbs_used_delta = current_surbs_used - self.last_surbs_used;
         self.last_surbs_used = current_surbs_used;
 
-        // Estimated change in counteparty's SURB buffer
+        // Estimated change in counterparty's SURB buffer
         let target_buffer_change = surbs_delivered_delta as i64 - surbs_used_delta as i64;
         self.current_target_buffer = self.current_target_buffer.saturating_add_signed(target_buffer_change);
         if self.current_target_buffer == 0 {
@@ -158,6 +177,95 @@ where
             METRIC_CONTROL_OUTPUT.set(&[&sid], corrected_output);
             METRIC_SURBS_CONSUMED.increment_by(&[&sid], surbs_used_delta);
             METRIC_SURBS_PRODUCED.increment_by(&[&sid], surbs_delivered_delta);
+        }
+
+        self.current_target_buffer
+    }
+
+    /// Allows setting the target buffer size when its value is known exactly.
+    #[allow(unused)]
+    pub fn set_exact_target_buffer_size(&mut self, target_buffer_size: u64) {
+        self.current_target_buffer = target_buffer_size;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicU64;
+    use crate::balancer::{MockSurbFlowController};
+
+    #[test_log::test]
+    fn surb_balancer_should_start_increase_level_when_below_target() {
+        let production_rate = Arc::new(AtomicU64::new(0));
+        let consumption_rate = 100;
+        let steps = 3;
+        let step_duration = std::time::Duration::from_millis(1000);
+
+        let mut controller = MockSurbFlowController::new();
+        let production_rate_clone = production_rate.clone();
+        controller.expect_adjust_surb_flow()
+            .times(steps)
+            .with(mockall::predicate::ge(100))
+            .returning(move |r| { production_rate_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed); });
+
+        let surb_production_count = Arc::new(AtomicU64::new(0));
+        let surb_consumption_count = Arc::new(AtomicU64::new(0));
+        let mut balancer = SurbBalancer::new(
+            "test",
+            surb_production_count.clone(),
+            surb_consumption_count.clone(),
+            controller,
+            SurbBalancerConfig::default()
+        );
+
+        let mut last_update = 0;
+        for i in 0..steps {
+            std::thread::sleep(step_duration);
+            surb_production_count.fetch_add(production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(), std::sync::atomic::Ordering::Relaxed);
+            surb_consumption_count.fetch_add(consumption_rate * step_duration.as_secs(), std::sync::atomic::Ordering::Relaxed);
+
+            let next_update = balancer.update();
+            assert!(i == 0 || next_update > last_update, "{next_update} should be greater than {last_update}");
+            last_update = next_update;
+        }
+    }
+
+    #[test_log::test]
+    fn surb_balancer_should_start_decrease_level_when_above_target() {
+        let production_rate = Arc::new(AtomicU64::new(11_000));
+        let consumption_rate = 100;
+        let steps = 3;
+        let step_duration = std::time::Duration::from_millis(1000);
+
+        let mut controller = MockSurbFlowController::new();
+        let production_rate_clone = production_rate.clone();
+        controller.expect_adjust_surb_flow()
+            .times(steps)
+            .with(mockall::predicate::ge(0))
+            .returning(move |r| { production_rate_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed); });
+
+        let surb_production_count = Arc::new(AtomicU64::new(0));
+        let surb_consumption_count = Arc::new(AtomicU64::new(0));
+        let mut balancer = SurbBalancer::new(
+            "test",
+            surb_production_count.clone(),
+            surb_consumption_count.clone(),
+            controller,
+            SurbBalancerConfig::default()
+        );
+
+        let mut last_update = 0;
+        for i in 0..steps {
+            std::thread::sleep(step_duration);
+            surb_production_count.fetch_add(production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(), std::sync::atomic::Ordering::Relaxed);
+            surb_consumption_count.fetch_add(consumption_rate * step_duration.as_secs(), std::sync::atomic::Ordering::Relaxed);
+
+            let next_update = balancer.update();
+            assert!(i == 0 || next_update < last_update, "{next_update} should be greater than {last_update}");
+            last_update = next_update;
         }
     }
 }

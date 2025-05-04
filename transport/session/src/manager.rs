@@ -470,12 +470,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     METRIC_ACTIVE_SESSIONS.increment(1.0);
                 }
 
-                let notifier = self.session_notifiers.get().map(|(_, c)| c.clone());
+                let notifier = self.session_notifiers.get().map(|(_, c)| c.clone()).ok_or(SessionManagerError::NotStarted)?;
                 if let Some(balancer_config) = cfg.surb_management {
                     let surb_production_counter = Arc::new(AtomicU64::new(0));
                     let surb_consumption_counter = Arc::new(AtomicU64::new(0));
 
-                    // Sender responsible for keep-alive and Session data is counting produced SURBS
+                    // Sender responsible for keep-alive and Session data is counting produced SURBs
                     let sender = Arc::new(CountingSendMsg::new(
                         msg_sender.clone(),
                         surb_production_counter.clone(),
@@ -497,11 +497,10 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         sender,
                         rx,
                         Some(Box::new(move |session_id: SessionId| {
-                            if let Some(notifier) = notifier {
-                                if let Err(error) = notifier.unbounded_send(session_id) {
-                                    tracing::error!(%session_id, %error, "failed to notify session closure");
-                                }
-                            }
+                            let _ = notifier
+                                .unbounded_send(session_id)
+                                .inspect_err(|error| tracing::error!(%session_id, %error, "failed to notify session closure"));
+
                             // Terminate also the SURB-bearing keep-alive sending and the Balancer
                             ka_abort.abort();
                             balancer_abort.abort();
@@ -511,10 +510,10 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
                     // Spawn the SURB balancer
                     let mut balancer = SurbBalancer::new(
+                        session_id,
                         surb_production_counter,
                         surb_consumption_counter,
                         ka_controller,
-                        session_id,
                         balancer_config,
                     );
                     hopr_async_runtime::prelude::spawn(
@@ -537,11 +536,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         Arc::new(msg_sender.clone()),
                         rx,
                         Some(Box::new(move |session_id: SessionId| {
-                            if let Some(notifier) = notifier {
-                                if let Err(error) = notifier.unbounded_send(session_id) {
-                                    tracing::error!(%session_id, %error, "failed to notify session closure");
-                                }
-                            }
+                            let _ = notifier
+                                .unbounded_send(session_id)
+                                .inspect_err(|error| tracing::error!(%session_id, %error, "failed to notify session closure"));
                         })),
                         Arc::new(AtomicU64::new(0)),
                     ))

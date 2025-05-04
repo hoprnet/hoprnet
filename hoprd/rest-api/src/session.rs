@@ -219,7 +219,6 @@ impl SessionWebsocketClientQueryRequest {
                 forward_path_options: path_options.clone(),
                 return_path_options: path_options.clone(), // TODO: allow using separate return options
                 capabilities: self.capabilities.into_iter().map(SessionCapability::into).collect(),
-                surb_management: None,
                 ..Default::default()
             },
         ))
@@ -458,6 +457,7 @@ impl SessionClientRequest {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
+        "destination": "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F",
         "target": "example.com:80",
         "forward_path": { "Hops": 1 },
         "return_path": { "Hops": 1 },
@@ -470,7 +470,7 @@ pub(crate) struct SessionClientResponse {
     pub target: String,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub destination: Address,
+    pub destination: PeerOrAddress,
     pub forward_path: RoutingOptions,
     pub return_path: RoutingOptions,
     #[serde_as(as = "DisplayFromStr")]
@@ -704,7 +704,7 @@ pub(crate) async fn create_client(
                 ip: bound_host.ip().to_string(),
                 port: bound_host.port(),
                 target: target_spec.to_string(),
-                destination: dst,
+                destination: dst.into(),
                 forward_path: args.forward_path.clone(),
                 return_path: args.return_path.clone(),
             }),
@@ -749,7 +749,7 @@ pub(crate) async fn list_clients(
             target: entry.target.to_string(),
             forward_path: entry.forward_path.clone(),
             return_path: entry.return_path.clone(),
-            destination: entry.destination,
+            destination: entry.destination.into(),
         })
         .collect::<Vec<_>>();
 
@@ -965,6 +965,7 @@ mod tests {
     use hopr_network_types::prelude::DestinationRouting;
     use hopr_transport_session::errors::TransportSessionError;
     use std::collections::HashSet;
+    use std::sync::atomic::AtomicU64;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     pub struct SendMsgResender {
@@ -1011,6 +1012,7 @@ mod tests {
             Arc::new(SendMsgResender::new(tx)),
             rx,
             None,
+            Arc::new(AtomicU64::new(0))
         );
 
         let (bound_addr, tcp_listener) = tcp_listen_on(("127.0.0.1", 0)).await.context("listen_on failed")?;
@@ -1057,6 +1059,7 @@ mod tests {
             Arc::new(SendMsgResender::new(tx)),
             rx,
             None,
+            Arc::new(AtomicU64::new(0))
         );
 
         let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0)).await.context("udp_bind_to failed")?;
