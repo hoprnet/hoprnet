@@ -4489,7 +4489,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -4581,7 +4581,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-api"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4632,7 +4632,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4876,7 +4876,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-strategy"
-version = "0.13.3"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -4896,6 +4896,7 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-transport-network",
  "hopr-transport-protocol",
+ "hopr-transport-ticket-aggregation",
  "lazy_static",
  "mockall",
  "rand 0.8.5",
@@ -4912,7 +4913,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.9.2"
+version = "0.10.0"
 dependencies = [
  "async-lock 3.4.0",
  "async-trait",
@@ -4937,6 +4938,7 @@ dependencies = [
  "hopr-transport-p2p",
  "hopr-transport-protocol",
  "hopr-transport-session",
+ "hopr-transport-ticket-aggregation",
  "lazy_static",
  "proc-macro-regex",
  "rust-stream-ext-concurrent",
@@ -5018,7 +5020,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-p2p"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-std",
@@ -5047,8 +5049,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-transport-packet"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hopr-crypto-packet",
+ "hopr-internal-types",
+ "libp2p-identity",
+]
+
+[[package]]
 name = "hopr-transport-protocol"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -5075,6 +5087,7 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-transport-identity",
  "hopr-transport-mixer",
+ "hopr-transport-packet",
  "lazy_static",
  "libp2p",
  "moka",
@@ -5128,6 +5141,38 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "hopr-transport-ticket-aggregation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-channel 2.3.1",
+ "async-std",
+ "async-trait",
+ "async_channel_io",
+ "bytesize",
+ "criterion",
+ "futures",
+ "hex-literal",
+ "hopr-async-runtime",
+ "hopr-crypto-types",
+ "hopr-db-api",
+ "hopr-db-sql",
+ "hopr-internal-types",
+ "hopr-metrics",
+ "hopr-primitive-types",
+ "hopr-transport-identity",
+ "hopr-transport-mixer",
+ "lazy_static",
+ "libp2p",
+ "more-asserts",
+ "rust-stream-ext-concurrent",
+ "serial_test",
+ "thiserror 2.0.12",
+ "tracing",
+ "tracing-test",
 ]
 
 [[package]]

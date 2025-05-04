@@ -59,12 +59,13 @@ use hopr_transport_p2p::{
 };
 use hopr_transport_protocol::{
     errors::ProtocolError,
-    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
-    ticket_aggregation::processor::{
-        AwaitingAggregator, TicketAggregationActions, TicketAggregationInteraction, TicketAggregatorTrait,
-    },
+    processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
+use hopr_transport_ticket_aggregation::{
+    AwaitingAggregator, TicketAggregationActions, TicketAggregationError, TicketAggregationInteraction,
+    TicketAggregatorTrait,
+};
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 
@@ -168,13 +169,13 @@ where
         &self,
         channel: &Hash,
         prerequisites: AggregationPrerequisites,
-    ) -> hopr_transport_protocol::errors::Result<()> {
+    ) -> hopr_transport_ticket_aggregation::Result<()> {
         if let Some(writer) = self.maybe_writer.clone().get() {
             AwaitingAggregator::new(self.db.clone(), writer.clone(), self.agg_timeout)
                 .aggregate_tickets(channel, prerequisites)
                 .await
         } else {
-            Err(ProtocolError::TransportError(
+            Err(TicketAggregationError::TransportError(
                 "Ticket aggregation writer not available, the object was not yet initialized".to_string(),
             ))
         }
@@ -508,45 +509,34 @@ where
             network_events_rx,
             discovery_updates,
             ping_rx,
-            ticket_agg_proc,
             self.my_multiaddresses.clone(),
             self.cfg.protocol,
         )
         .await;
 
         let msg_proto_control =
-            transport_layer.build_protocol_control(hopr_transport_protocol::msg::CURRENT_HOPR_MSG_PROTOCOL);
-        let msg_codec = hopr_transport_protocol::msg::MsgCodec;
+            transport_layer.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
+        let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
         let (wire_msg_tx, wire_msg_rx) =
             hopr_transport_protocol::stream::process_stream_protocol(msg_codec, msg_proto_control).await?;
 
         let _mixing_process_before_sending_out =
             hopr_async_runtime::prelude::spawn(mixing_channel_rx.map(Ok).forward(wire_msg_tx));
 
-        let ack_proto_control =
-            transport_layer.build_protocol_control(hopr_transport_protocol::ack::CURRENT_HOPR_ACK_PROTOCOL);
-        let ack_codec = hopr_transport_protocol::ack::AckCodec::new();
-        let (wire_ack_tx, wire_ack_rx) =
-            hopr_transport_protocol::stream::process_stream_protocol(ack_codec, ack_proto_control).await?;
-
-        let transport_layer = transport_layer.with_processors(tkt_agg_writer);
-
         processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
 
         // initiate the msg-ack protocol stack over the wire transport
-        let packet_cfg = PacketInteractionConfig::new(
-            &self.me,
-            me_onchain,
-            self.cfg.protocol.outgoing_ticket_winning_prob,
-            self.cfg.protocol.outgoing_ticket_price,
-        );
+        let packet_cfg = PacketInteractionConfig {
+            packet_keypair: self.me.clone(),
+            outgoing_ticket_win_prob: self.cfg.protocol.outgoing_ticket_winning_prob,
+            outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
+        };
 
         let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
             Some(tbf_path),
-            (wire_ack_tx, wire_ack_rx),
             (mixing_channel_tx, wire_msg_rx),
             (tx_from_protocol, external_msg_rx),
         )
@@ -615,7 +605,7 @@ where
         Arc::new(proxy::TicketAggregatorProxy::new(
             self.db.clone(),
             self.process_ticket_aggregate.clone(),
-            self.cfg.protocol.ticket_aggregation.timeout,
+            std::time::Duration::from_secs(15),
         ))
     }
 
@@ -746,13 +736,18 @@ where
             return Err(ProtocolError::ChannelClosed.into());
         }
 
-        Ok(Arc::new(proxy::TicketAggregatorProxy::new(
-            self.db.clone(),
-            self.process_ticket_aggregate.clone(),
-            self.cfg.protocol.ticket_aggregation.timeout,
-        ))
-        .aggregate_tickets(&entry.get_id(), Default::default())
-        .await?)
+        // Ok(Arc::new(proxy::TicketAggregatorProxy::new(
+        //     self.db.clone(),
+        //     self.process_ticket_aggregate.clone(),
+        //     std::time::Duration::from_secs(15),
+        // ))
+        // .aggregate_tickets(&entry.get_id(), Default::default())
+        // .await?)
+
+        Err(TicketAggregationError::TransportError(
+            "Ticket aggregation not supported as a session protocol yet".to_string(),
+        )
+        .into())
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
