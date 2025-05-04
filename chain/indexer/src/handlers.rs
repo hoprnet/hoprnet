@@ -2172,7 +2172,7 @@ mod tests {
             primitive_types::U256::one(),
         );
 
-        let ticket_index = primitive_types::U256::from((1u128 << 48) - 1);
+        let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
         let next_ticket_index = ticket_index + 1;
 
         let mut ticket =
@@ -2282,7 +2282,7 @@ mod tests {
             primitive_types::U256::one(),
         );
 
-        let ticket_index = primitive_types::U256::from((1u128 << 48) - 1);
+        let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
         let next_ticket_index = ticket_index + 1;
 
         let mut ticket =
@@ -2389,7 +2389,7 @@ mod tests {
             primitive_types::U256::one(),
         );
 
-        let ticket_index = primitive_types::U256::from((1u128 << 48) - 1);
+        let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
         let next_ticket_index = ticket_index + 1;
 
         db.upsert_channel(None, channel).await?;
