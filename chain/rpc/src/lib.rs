@@ -12,25 +12,21 @@ extern crate core;
 
 use alloy::primitives::B256;
 use alloy::providers::PendingTransaction;
-use alloy::rpc::types::{Filter, TransactionRequest};
+use alloy::rpc::types::TransactionRequest;
 use async_trait::async_trait;
-use futures::{FutureExt, Stream};
+use futures::Stream;
 use http_types::convert::Deserialize;
-use primitive_types::H256;
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
-use std::future::{Future, IntoFuture};
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::time::Duration;
 
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
 
-// use crate::errors::RpcError::{ProviderError, TransactionDropped};
-use crate::errors::{HttpRequestError, Result};
+use crate::errors::Result;
 use crate::RetryAction::NoRetry;
 
 pub mod client;

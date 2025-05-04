@@ -14,7 +14,7 @@
 use alloy::{
     eips::eip1559::Eip1559Estimation,
     network::{EthereumWallet, Network, TransactionBuilder},
-    primitives::{utils::parse_units, U256},
+    primitives::utils::parse_units,
     providers::{
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller, TxFiller,
@@ -27,10 +27,9 @@ use alloy::{
 };
 use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use serde_json::value::RawValue;
 use std::future::IntoFuture;
 use std::{
-    fmt::{format, Debug},
+    fmt::Debug,
     io::{BufWriter, Write},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -788,7 +787,7 @@ where
 
             let inserted = AtomicBool::new(false);
 
-            let result = snapshot_requestor
+            let _result = snapshot_requestor
                 .entries
                 .entry(request_string.clone())
                 .or_try_insert_with(async {

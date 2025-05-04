@@ -3,32 +3,25 @@
 //! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
 //! [RpcOperations] type, which is the main API exposed by this crate.
 use alloy::{
-    eips::{BlockId, BlockNumberOrTag},
-    network::{Ethereum, EthereumWallet, TransactionResponse},
+    eips::BlockId,
+    network::EthereumWallet,
     providers::{
         fillers::{
             BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
-        CallItemBuilder, Identity, MulticallBuilder, MulticallItem, PendingTransaction, Provider, ProviderBuilder,
-        RootProvider,
+        CallItemBuilder, Identity, PendingTransaction, Provider, ProviderBuilder, RootProvider,
     },
     rpc::types::Block,
-    rpc::{
-        client::{ClientBuilder, RpcClient},
-        json_rpc::{RequestPacket, ResponsePacket},
-        types::TransactionRequest,
-    },
+    rpc::{client::RpcClient, types::TransactionRequest},
     signers::local::PrivateKeySigner,
     sol,
-    transports::{layers::RetryBackoffLayer, BoxTransport, TransportConnect},
 };
 use async_trait::async_trait;
-use primitive_types::{H160, U256};
+use primitive_types::U256;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use tower::Service;
 use tracing::debug;
 use url::Url;
 use validator::Validate;
