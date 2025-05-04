@@ -10,6 +10,7 @@
 
 extern crate core;
 
+use alloy::primitives::B256;
 use alloy::providers::PendingTransaction;
 use alloy::rpc::types::{Filter, TransactionRequest};
 use async_trait::async_trait;
@@ -76,6 +77,32 @@ impl From<alloy::rpc::types::Log> for Log {
             log_index: value.log_index.expect("log index must be present").into(),
             tx_hash: value.transaction_hash.expect("tx hash must be present").0.into(),
             removed: value.removed,
+        }
+    }
+}
+
+// impl From<Log> for alloy::rpc::types::Log {
+//     fn from(value: Log) -> Self {
+//         alloy::rpc::types::Log {
+//             address: value.address.into(),
+//             topics: value.inner.topics().into_iter().map(|t| Hash::from(t.0)).collect(),
+//             data: Box::from(value.inner.data.data.as_ref()),
+//             transaction_index: Some(value.tx_index),
+//             block_number: value.block_number.expect("block id must be present"),
+//             block_hash: value.block_hash.expect("block hash must be present").0.into(),
+//             log_index: Some(Into::<u64>::into(value.log_index)),
+//             transaction_hash: Some(B256::from_slice(value.tx_hash.as_ref())),
+//             removed: value.removed,
+//         }
+//     }
+// }
+
+impl From<Log> for alloy::rpc::types::RawLog {
+    fn from(value: Log) -> Self {
+        alloy::rpc::types::RawLog {
+            address: value.address.into(),
+            topics: value.topics.into_iter().map(|h| B256::from_slice(h.as_ref())).collect(),
+            data: value.data.into(),
         }
     }
 }

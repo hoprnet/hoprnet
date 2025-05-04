@@ -1,5 +1,6 @@
 // use ethers::core::abi::Error as AbiError;
 use alloy::dyn_abi::Error as AbiError;
+use alloy::sol_types::Error as SolTypeError;
 use thiserror::Error;
 
 use hopr_primitive_types::{errors::GeneralError, primitives::Address};
@@ -20,6 +21,9 @@ pub enum CoreEthereumIndexerError {
 
     #[error(transparent)]
     AbiError(#[from] AbiError),
+
+    #[error(transparent)]
+    SolTypeError(#[from] SolTypeError),
 
     #[error(transparent)]
     GeneralError(#[from] GeneralError),
