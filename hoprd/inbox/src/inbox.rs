@@ -246,7 +246,7 @@ mod tests {
 
         assert_eq!(1, mi.size(None).await);
 
-        async_std::task::sleep(Duration::from_millis(2500)).await;
+        tokio::time::sleep(Duration::from_millis(2500)).await;
 
         assert_eq!(0, mi.size(None).await);
 

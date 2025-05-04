@@ -746,12 +746,12 @@ mod tests {
     use crate::types::SessionTarget;
     use crate::Capability;
     use anyhow::anyhow;
-    use async_std::prelude::FutureExt;
     use async_trait::async_trait;
     use futures::AsyncWriteExt;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
     use hopr_primitive_types::bounded::BoundedSize;
+    use tokio::time::timeout;
 
     mockall::mock! {
         MsgSender {}
@@ -811,7 +811,9 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Runtime::new()
+                    .expect("tokio runtime must build")
+                    .block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -830,7 +832,9 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Runtime::new()
+                    .expect("tokio runtime must build")
+                    .block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -849,7 +853,9 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Runtime::new()
+                    .expect("tokio runtime must build")
+                    .block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -861,7 +867,9 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Runtime::new()
+                    .expect("tokio runtime must build")
+                    .block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -878,16 +886,18 @@ mod tests {
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
         pin_mut!(new_session_rx_bob);
-        let (alice_session, bob_session) = futures::future::join(
-            alice_mgr.new_session(SessionClientConfig {
-                peer: bob_peer,
-                path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                target: SessionTarget::TcpStream(target.clone()),
-                capabilities: vec![Capability::Segmentation],
-            }),
-            new_session_rx_bob.next(),
+        let (alice_session, bob_session) = timeout(
+            Duration::from_secs(2),
+            futures::future::join(
+                alice_mgr.new_session(SessionClientConfig {
+                    peer: bob_peer,
+                    path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                    target: SessionTarget::TcpStream(target.clone()),
+                    capabilities: vec![Capability::Segmentation],
+                }),
+                new_session_rx_bob.next(),
+            ),
         )
-        .timeout(Duration::from_secs(2))
         .await?;
 
         let mut alice_session = alice_session?;
@@ -899,10 +909,10 @@ mod tests {
         assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
-        async_std::task::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
         alice_session.close().await?;
 
-        async_std::task::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
         futures::stream::iter(jhs)
             .for_each(hopr_async_runtime::prelude::cancel_join_handle)
             .await;
@@ -935,7 +945,9 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Runtime::new()
+                    .expect("tokio runtime must build")
+                    .block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -954,7 +966,9 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Runtime::new()
+                    .expect("tokio runtime must build")
+                    .block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -973,7 +987,9 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Runtime::new()
+                    .expect("tokio runtime must build")
+                    .block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -985,7 +1001,9 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Runtime::new()
+                    .expect("tokio runtime must build")
+                    .block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -1002,16 +1020,18 @@ mod tests {
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
         pin_mut!(new_session_rx_bob);
-        let (alice_session, bob_session) = futures::future::join(
-            alice_mgr.new_session(SessionClientConfig {
-                peer: bob_peer,
-                path_options: RoutingOptions::Hops(BoundedSize::MIN),
-                target: SessionTarget::TcpStream(target.clone()),
-                capabilities: vec![Capability::Segmentation],
-            }),
-            new_session_rx_bob.next(),
+        let (alice_session, bob_session) = timeout(
+            Duration::from_secs(2),
+            futures::future::join(
+                alice_mgr.new_session(SessionClientConfig {
+                    peer: bob_peer,
+                    path_options: RoutingOptions::Hops(BoundedSize::MIN),
+                    target: SessionTarget::TcpStream(target.clone()),
+                    capabilities: vec![Capability::Segmentation],
+                }),
+                new_session_rx_bob.next(),
+            ),
         )
-        .timeout(Duration::from_secs(2))
         .await?;
 
         let alice_session = alice_session?;
@@ -1024,7 +1044,7 @@ mod tests {
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
         // Let the session timeout
-        async_std::task::sleep(Duration::from_millis(300)).await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
 
         futures::stream::iter(jhs)
             .for_each(hopr_async_runtime::prelude::cancel_join_handle)
@@ -1071,7 +1091,9 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Runtime::new()
+                    .expect("tokio runtime must build")
+                    .block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -1083,7 +1105,9 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Runtime::new()
+                    .expect("tokio runtime must build")
+                    .block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 

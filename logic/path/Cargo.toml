@@ -50,3 +50,4 @@ lazy_static = { workspace = true }
 parameterized = { workspace = true }
 regex = { workspace = true }
 mockall = { workspace = true }
+tokio = { workspace = true }

@@ -259,12 +259,12 @@ mod tests {
     use super::*;
 
     use anyhow::Context;
-    use async_std::future::timeout;
     use futures::StreamExt;
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::HoprPseudonym;
     use hopr_path::ValidatedPath;
     use std::time::Duration;
+    use tokio::time::timeout;
 
     #[tokio::test]
     pub async fn packet_send_finalizer_is_triggered() {
@@ -310,8 +310,8 @@ mod tests {
         assert_eq!(data, expected_data);
         assert!(matches!(path, ResolvedTransportRouting::Forward { forward_path,.. } if forward_path == expected_path));
 
-        async_std::task::spawn(async move {
-            async_std::task::sleep(Duration::from_millis(3)).await;
+        tokio::task::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(3)).await;
             finalizer.finalize(Ok(()))
         });
 

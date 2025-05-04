@@ -316,7 +316,7 @@ mod tests {
 
         let delay = std::time::Duration::from_millis(10);
 
-        async_std::task::sleep(delay).await;
+        tokio::time::sleep(delay).await;
         replier.notify(
             ControlMessage::generate_pong_response(&challenge.1)?,
             "version".to_owned(),
@@ -338,7 +338,7 @@ mod tests {
     async fn ping_empty_vector_of_peers_should_not_do_any_api_calls() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
-        let ideal_channel = async_std::task::spawn(async move {
+        let ideal_channel = tokio::task::spawn(async move {
             while let Some((_peer, replier)) = rx.next().await {
                 let challenge = replier.challenge.1.clone();
 
@@ -356,7 +356,7 @@ mod tests {
 
         assert!(pinger.ping(vec![]).try_collect::<Vec<_>>().await?.is_empty());
 
-        ideal_channel.cancel().await;
+        ideal_channel.abort();
 
         Ok(())
     }
@@ -365,7 +365,7 @@ mod tests {
     async fn test_ping_peers_with_happy_path_should_trigger_the_desired_external_api_calls() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
-        let ideal_channel = async_std::task::spawn(async move {
+        let ideal_channel = tokio::task::spawn(async move {
             while let Some((_peer, replier)) = rx.next().await {
                 let challenge = replier.challenge.1.clone();
 
@@ -391,7 +391,7 @@ mod tests {
         let pinger = Pinger::new(simple_ping_config(), tx, mock);
         pinger.ping(vec![peer]).try_collect::<Vec<_>>().await?;
 
-        ideal_channel.cancel().await;
+        ideal_channel.abort();
 
         Ok(())
     }
@@ -400,7 +400,7 @@ mod tests {
     async fn test_ping_should_invoke_a_failed_ping_reply_for_an_incorrect_reply() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
-        let failing_channel = async_std::task::spawn(async move {
+        let failing_channel = tokio::task::spawn(async move {
             while let Some((_peer, replier)) = rx.next().await {
                 replier.notify(
                     ControlMessage::generate_pong_response(&ControlMessage::generate_ping_request())
@@ -425,7 +425,7 @@ mod tests {
         let pinger = Pinger::new(simple_ping_config(), tx, mock);
         assert!(pinger.ping(vec![peer]).try_collect::<Vec<_>>().await.is_err());
 
-        failing_channel.cancel().await;
+        failing_channel.abort();
 
         Ok(())
     }
@@ -435,11 +435,11 @@ mod tests {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
         let delay = std::time::Duration::from_millis(10);
-        let delaying_channel = async_std::task::spawn(async move {
+        let delaying_channel = tokio::task::spawn(async move {
             while let Some((_peer, replier)) = rx.next().await {
                 let challenge = replier.challenge.1.clone();
 
-                async_std::task::sleep(delay).await;
+                tokio::time::sleep(delay).await;
                 replier.notify(
                     ControlMessage::generate_pong_response(&challenge).expect("valid challenge reply"),
                     "version".to_owned(),
@@ -466,7 +466,7 @@ mod tests {
         let pinger = Pinger::new(ping_config, tx, mock);
         assert!(pinger.ping(vec![peer]).try_collect::<Vec<_>>().await.is_err());
 
-        delaying_channel.cancel().await;
+        delaying_channel.abort();
 
         Ok(())
     }
@@ -475,7 +475,7 @@ mod tests {
     async fn test_ping_peers_multiple_peers_are_pinged_in_parallel() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
-        let ideal_channel = async_std::task::spawn(async move {
+        let ideal_channel = tokio::task::spawn(async move {
             while let Some((_peer, replier)) = rx.next().await {
                 let challenge = replier.challenge.1.clone();
 
@@ -509,7 +509,7 @@ mod tests {
         let pinger = Pinger::new(simple_ping_config(), tx, mock);
         pinger.ping(peers).try_collect::<Vec<_>>().await?;
 
-        ideal_channel.cancel().await;
+        ideal_channel.abort();
 
         Ok(())
     }
@@ -520,11 +520,11 @@ mod tests {
 
         let delay = 10u64;
 
-        let ideal_delaying_channel = async_std::task::spawn(async move {
+        let ideal_delaying_channel = tokio::task::spawn(async move {
             while let Some((_peer, replier)) = rx.next().await {
                 let challenge = replier.challenge.1.clone();
 
-                async_std::task::sleep(std::time::Duration::from_millis(delay)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
                 replier.notify(
                     ControlMessage::generate_pong_response(&challenge).expect("valid challenge reply"),
                     "version".to_owned(),
@@ -567,7 +567,7 @@ mod tests {
 
         assert_ge!(end.saturating_sub(start), std::time::Duration::from_millis(delay));
 
-        ideal_delaying_channel.cancel().await;
+        ideal_delaying_channel.abort();
 
         Ok(())
     }

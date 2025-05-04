@@ -244,9 +244,9 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_std::task::sleep;
     use futures::Stream;
     use std::time::Duration;
+    use tokio::time::sleep;
 
     fn simple_heartbeat_config() -> HeartbeatConfig {
         HeartbeatConfig {

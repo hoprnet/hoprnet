@@ -1,9 +1,10 @@
-use async_std::task::sleep;
 use ethers::utils::AnvilInstance;
 use std::time::Duration;
+use tokio::time::sleep;
+
 use tracing::info;
 
-use hopr_chain_rpc::client::surf_client::SurfRequestor;
+use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
 use hopr_chain_rpc::client::{
     create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
 };
@@ -20,7 +21,7 @@ pub type AnvilRpcClient<R> = ethers::middleware::SignerMiddleware<
 >;
 
 /// Snapshot requestor used for testing.
-pub type Requestor = SnapshotRequestor<SurfRequestor>;
+pub type Requestor = SnapshotRequestor<ReqwestRequestor>;
 
 /// Represents a HOPR environment deployment into Anvil.
 #[allow(unused)]

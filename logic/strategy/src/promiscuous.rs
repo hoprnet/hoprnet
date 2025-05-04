@@ -869,7 +869,7 @@ mod tests {
 
         let strat = PromiscuousStrategy::new(strat_cfg.clone(), db, actions);
 
-        async_std::task::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         strat.on_tick().await?;
 

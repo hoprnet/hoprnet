@@ -115,7 +115,6 @@ impl SelfClosingJoinHandle {
     }
 }
 
-// TODO: Replace this with tokio
 impl Drop for SelfClosingJoinHandle {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {

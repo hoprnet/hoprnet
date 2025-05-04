@@ -300,8 +300,8 @@ pub fn channel<T>(cfg: crate::config::MixerConfig) -> (Sender<T>, Receiver<T>) {
 
 #[cfg(test)]
 mod tests {
-    use async_std::prelude::FutureExt;
     use futures::StreamExt;
+    use tokio::time::timeout;
 
     use super::*;
 
@@ -348,7 +348,7 @@ mod tests {
             tx.send(i)?;
         }
         for _ in 0..ITERATIONS {
-            let data = rx.next().timeout(MAXIMUM_SINGLE_DELAY_DURATION).await?;
+            let data = timeout(MAXIMUM_SINGLE_DELAY_DURATION, rx.next()).await?;
             assert!(data.is_some());
         }
 
@@ -367,24 +367,22 @@ mod tests {
 
         let (tx, mut rx) = channel(MixerConfig::default());
 
-        let recv_task = async_std::task::spawn(async move {
-            while let Some(_item) = rx
-                .next()
-                .timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION)
+        let recv_task = tokio::task::spawn(async move {
+            while let Some(_item) = timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION, rx.next())
                 .await
                 .expect("receiver should not fail")
             {}
         });
 
         let send_task =
-            async_std::task::spawn(async move { futures::stream::iter(0..ITERATIONS).map(Ok).forward(tx).await });
+            tokio::task::spawn(async move { futures::stream::iter(0..ITERATIONS).map(Ok).forward(tx).await });
 
         let (_recv, send) = futures::try_join!(
-            recv_task.timeout(MAXIMUM_SINGLE_DELAY_DURATION),
-            send_task.timeout(MAXIMUM_SINGLE_DELAY_DURATION)
+            timeout(MAXIMUM_SINGLE_DELAY_DURATION, recv_task),
+            timeout(MAXIMUM_SINGLE_DELAY_DURATION, send_task)
         )?;
 
-        send?;
+        send??;
 
         Ok(())
     }
@@ -402,11 +400,11 @@ mod tests {
             tx.send(*i)?;
         }
 
-        let mixed_output = rx
-            .take(ITERATIONS)
-            .collect::<Vec<_>>()
-            .timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION)
-            .await?;
+        let mixed_output = timeout(
+            2 * MAXIMUM_SINGLE_DELAY_DURATION,
+            rx.take(ITERATIONS).collect::<Vec<_>>(),
+        )
+        .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
         Ok(assert_ne!(input, mixed_output))
@@ -426,11 +424,11 @@ mod tests {
             SinkExt::send(&mut tx, *i).await?;
         }
 
-        let mixed_output = rx
-            .take(ITERATIONS)
-            .collect::<Vec<_>>()
-            .timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION)
-            .await?;
+        let mixed_output = timeout(
+            2 * MAXIMUM_SINGLE_DELAY_DURATION,
+            rx.take(ITERATIONS).collect::<Vec<_>>(),
+        )
+        .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
         Ok(assert_ne!(input, mixed_output))
@@ -451,11 +449,11 @@ mod tests {
         }
         SinkExt::flush(&mut tx).await?;
 
-        let mixed_output = rx
-            .take(ITERATIONS)
-            .collect::<Vec<_>>()
-            .timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION)
-            .await?;
+        let mixed_output = timeout(
+            2 * MAXIMUM_SINGLE_DELAY_DURATION,
+            rx.take(ITERATIONS).collect::<Vec<_>>(),
+        )
+        .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
         Ok(assert_ne!(input, mixed_output))
@@ -478,11 +476,11 @@ mod tests {
             tx.send(*i)?;
         }
 
-        let mixed_output = rx
-            .take(ITERATIONS)
-            .collect::<Vec<_>>()
-            .timeout(2 * MAXIMUM_SINGLE_DELAY_DURATION)
-            .await?;
+        let mixed_output = timeout(
+            2 * MAXIMUM_SINGLE_DELAY_DURATION,
+            rx.take(ITERATIONS).collect::<Vec<_>>(),
+        )
+        .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
         Ok(assert_eq!(input, mixed_output))

@@ -472,7 +472,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use std::str::FromStr;
 
-    use crate::client::surf_client::SurfRequestor;
+    use crate::client::reqwest_client::ReqwestRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 
     lazy_static::lazy_static! {
@@ -538,14 +538,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         // call eth_gas_estimate
         let (_, estimated_max_priority_fee) = rpc.provider.estimate_eip1559_fees(None).await?;
@@ -584,14 +584,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -628,14 +628,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -685,14 +685,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -720,7 +720,7 @@ mod tests {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
@@ -739,14 +739,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await?;
         assert_eq!(amount, balance.amount().as_u64(), "invalid balance");
@@ -764,7 +764,7 @@ mod tests {
 
         // Deploy contracts
         let (contract_instances, module, safe) = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
             let instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0).await?;
 
             // deploy MULTICALL contract to anvil
@@ -795,14 +795,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client.clone(), SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client.clone(), ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let result_before_including_node = rpc.check_node_safe_module_status((&chain_key_0).into()).await?;
         // before including node to the safe and module, only the first chck is false, the others are true
@@ -858,7 +858,7 @@ mod tests {
 
         // Deploy contracts
         let (contract_instances, module, safe) = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
             let instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0).await?;
 
             // deploy MULTICALL contract to anvil
@@ -889,14 +889,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client.clone(), SurfRequestor::default(), &chain_key_0, cfg.clone())?;
+        let rpc = RpcOperations::new(client.clone(), ReqwestRequestor::default(), &chain_key_0, cfg.clone())?;
 
         // check the eligibility status (before registering in the NetworkRegistry contract)
         let result_before_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).await?;

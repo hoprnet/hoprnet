@@ -2,7 +2,6 @@ mod common;
 
 use futures::{pin_mut, StreamExt};
 use hex_literal::hex;
-use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
 use std::time::Duration;
 use tracing::info;
 
@@ -16,6 +15,7 @@ use hopr_chain_actions::redeem::TicketRedeemActions;
 use hopr_chain_actions::ChainActions;
 use hopr_chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
+use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
 use hopr_chain_rpc::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor};
 use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use hopr_chain_types::chain_events::ChainEventType;

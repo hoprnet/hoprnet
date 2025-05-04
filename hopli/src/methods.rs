@@ -1452,7 +1452,7 @@ mod tests {
     use std::vec;
 
     use hopr_bindings::{hopr_announcements::HoprAnnouncements, hopr_channels::HoprChannels};
-    use hopr_chain_rpc::client::{create_rpc_client_to_anvil, surf_client::SurfRequestor};
+    use hopr_chain_rpc::client::{create_rpc_client_to_anvil, reqwest_client::ReqwestRequestor};
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::BytesRepresentable;
@@ -1566,7 +1566,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
@@ -1596,7 +1596,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
@@ -1656,7 +1656,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
@@ -1715,7 +1715,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         // deploy hopr contracts
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
@@ -1756,7 +1756,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
@@ -1797,7 +1797,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
@@ -1892,7 +1892,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
@@ -1990,7 +1990,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
@@ -2058,7 +2058,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
@@ -2150,7 +2150,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
@@ -2230,7 +2230,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
@@ -2289,7 +2289,7 @@ mod tests {
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let self_address: H160 = contract_deployer.public().to_address().into();
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
@@ -2381,7 +2381,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");
@@ -2454,7 +2454,7 @@ mod tests {
         // launch local anvil instance
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &contract_deployer);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &contract_deployer);
         let instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
             .await
             .expect("failed to deploy");

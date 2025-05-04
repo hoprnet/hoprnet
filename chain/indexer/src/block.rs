@@ -688,7 +688,7 @@ mod tests {
         .without_panic_on_completion();
 
         let (indexing, _) = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
         assert!(indexing.is_err()); // terminated by the close channel
@@ -754,7 +754,7 @@ mod tests {
         .without_panic_on_completion();
 
         let (indexing, _) = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
         assert!(indexing.is_err()); // terminated by the close channel
@@ -806,7 +806,7 @@ mod tests {
         let indexer =
             Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0).without_panic_on_completion();
         let _ = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
 
@@ -868,7 +868,7 @@ mod tests {
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
             });
             assert!(indexing.is_err()); // terminated by the close channel
@@ -949,7 +949,7 @@ mod tests {
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
             });
             assert!(indexing.is_err()); // terminated by the close channel

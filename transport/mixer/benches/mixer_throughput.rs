@@ -74,7 +74,7 @@ fn send_continuous_channel_load_through_sink_pipe(
         let (o_tx, o_rx) = futures::channel::mpsc::unbounded();
         let (tx, mut rx) = channel(cfg);
 
-        let pipe = async_std::task::spawn(o_rx.map(Ok).forward(tx));
+        let pipe = tokio::task::spawn(o_rx.map(Ok).forward(tx));
 
         for _ in 0..iterations {
             o_tx.unbounded_send(item).expect("send must succeed");
@@ -116,7 +116,7 @@ fn send_continuous_stream_load(item: &str, iterations: usize, cfg: MixerConfig) 
             async move {
                 let random_delay = cfg.random_delay();
 
-                async_std::task::sleep(random_delay).await;
+                tokio::time::sleep(random_delay).await;
 
                 v
             }

@@ -845,7 +845,6 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use crate::client::reqwest_client::ReqwestRequestor;
-    use crate::client::surf_client::SurfRequestor;
     use crate::client::{
         create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
     };
@@ -863,20 +862,6 @@ mod tests {
             .expect("deploy failed");
 
         Ok(ContractAddresses::from(&contracts))
-    }
-
-    #[tokio::test]
-    async fn test_client_should_deploy_contracts_via_surf() -> anyhow::Result<()> {
-        let contract_addrs = deploy_contracts(SurfRequestor::default()).await?;
-
-        assert_ne!(contract_addrs.token, Address::default());
-        assert_ne!(contract_addrs.channels, Address::default());
-        assert_ne!(contract_addrs.announcements, Address::default());
-        assert_ne!(contract_addrs.network_registry, Address::default());
-        assert_ne!(contract_addrs.safe_registry, Address::default());
-        assert_ne!(contract_addrs.price_oracle, Address::default());
-
-        Ok(())
     }
 
     #[tokio::test]
@@ -900,7 +885,7 @@ mod tests {
         let anvil = create_anvil(Some(block_time));
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
@@ -929,7 +914,7 @@ mod tests {
         let anvil = create_anvil(None);
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
@@ -955,7 +940,7 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &server.url(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
@@ -982,7 +967,7 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &server.url(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy {
                 max_retries: Some(2),
                 retryable_http_errors: vec![http_types::StatusCode::TooManyRequests],
@@ -1017,7 +1002,7 @@ mod tests {
             .expect(1)
             .create();
 
-        let client = JsonRpcProviderClient::new(&server.url(), SurfRequestor::default(), ZeroRetryPolicy::default());
+        let client = JsonRpcProviderClient::new(&server.url(), ReqwestRequestor::default(), ZeroRetryPolicy::default());
 
         let err = client
             .request::<_, ethers::types::U64>("eth_blockNumber", ())
@@ -1056,7 +1041,7 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &server.url(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy {
                 max_retries: Some(2),
                 retryable_json_rpc_errors: vec![-32603],
@@ -1102,7 +1087,7 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &server.url(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy {
                 max_retries: Some(2),
                 retryable_json_rpc_errors: vec![],
@@ -1148,7 +1133,7 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &server.url(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy {
                 min_retries: Some(1),
                 max_retries: Some(2),
@@ -1194,7 +1179,7 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &server.url(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy {
                 max_retries: Some(2),
                 retryable_json_rpc_errors: vec![-32600],
@@ -1241,7 +1226,7 @@ mod tests {
         {
             let client = JsonRpcProviderClient::new(
                 &anvil.endpoint(),
-                SnapshotRequestor::new(SurfRequestor::default(), snapshot_file.path().to_str().unwrap()),
+                SnapshotRequestor::new(ReqwestRequestor::default(), snapshot_file.path().to_str().unwrap()),
                 SimpleJsonRpcRetryPolicy::default(),
             );
 

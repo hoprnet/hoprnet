@@ -166,7 +166,6 @@ mod tests {
     use crate::action_state::{ActionState, IndexerActionTracker, IndexerExpectation};
     use crate::errors::ChainActionsError;
     use anyhow::Context;
-    use async_std::prelude::FutureExt;
     use hex_literal::hex;
     use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hopr_crypto_random::random_bytes;
@@ -174,6 +173,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use std::sync::Arc;
     use std::time::Duration;
+    use tokio::time::timeout;
 
     lazy_static::lazy_static! {
         // some random address
@@ -192,25 +192,24 @@ mod tests {
 
         let sample_event_clone = sample_event.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn(async move {
-            let hash = exp_clone
-                .match_and_resolve(&sample_event_clone)
-                .delay(Duration::from_millis(200))
-                .await;
+        tokio::task::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(200)).await; // delay
+            let hash = exp_clone.match_and_resolve(&sample_event_clone).await;
             assert!(
                 hash.iter().all(|e| e.tx_hash == random_hash),
                 "hash must be present as resolved"
             );
         });
 
-        let resolution = exp
-            .register_expectation(IndexerExpectation::new(random_hash, move |e| {
+        let resolution = timeout(
+            Duration::from_secs(5),
+            exp.register_expectation(IndexerExpectation::new(random_hash, move |e| {
                 matches!(e, ChainEventType::NodeSafeRegistered(_))
             }))
-            .await?
-            .timeout(Duration::from_secs(5))
-            .await?
-            .context("resolver must not be cancelled")?;
+            .await?,
+        )
+        .await?
+        .context("resolver must not be cancelled")?;
 
         assert_eq!(sample_event, resolution, "resolving event must be equal");
 
@@ -228,21 +227,20 @@ mod tests {
 
         let sample_event_clone = sample_event.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn(async move {
-            exp_clone
-                .unregister_expectation(sample_event_clone.tx_hash)
-                .delay(Duration::from_millis(200))
-                .await;
+        tokio::task::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(200)).await; // delay
+            exp_clone.unregister_expectation(sample_event_clone.tx_hash).await;
         });
 
-        let err = exp
-            .register_expectation(IndexerExpectation::new(sample_event.tx_hash, move |e| {
+        let err = timeout(
+            Duration::from_secs(5),
+            exp.register_expectation(IndexerExpectation::new(sample_event.tx_hash, move |e| {
                 matches!(e, ChainEventType::NodeSafeRegistered(_))
             }))
-            .await?
-            .timeout(Duration::from_secs(5))
-            .await?
-            .expect_err("should return with error");
+            .await?,
+        )
+        .await?
+        .expect_err("should return with error");
 
         assert!(
             matches!(err, ChainActionsError::ExpectationUnregistered),
@@ -274,26 +272,25 @@ mod tests {
 
         let sample_events_clone = sample_events.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             for sample_event in sample_events_clone {
-                exp_clone
-                    .match_and_resolve(&sample_event)
-                    .delay(Duration::from_millis(200))
-                    .await;
+                tokio::time::sleep(Duration::from_millis(200)).await; // delay
+                exp_clone.match_and_resolve(&sample_event).await;
             }
         });
 
-        let resolution = exp
-            .register_expectation(IndexerExpectation::new(tx_hash, move |e| {
+        let resolution = timeout(
+            Duration::from_secs(5),
+            exp.register_expectation(IndexerExpectation::new(tx_hash, move |e| {
                 matches!(
                     e,
                     ChainEventType::NetworkRegistryUpdate(_, NetworkRegistryStatus::Allowed)
                 )
             }))
-            .await?
-            .timeout(Duration::from_secs(5))
-            .await?
-            .context("resolver must not be cancelled")?;
+            .await?,
+        )
+        .await?
+        .context("resolver must not be cancelled")?;
 
         assert_eq!(sample_events[2], resolution, "resolving event must be equal");
 
@@ -321,12 +318,10 @@ mod tests {
 
         let sample_events_clone = sample_events.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             for sample_event in sample_events_clone {
-                exp_clone
-                    .match_and_resolve(&sample_event)
-                    .delay(Duration::from_millis(100))
-                    .await;
+                tokio::time::sleep(Duration::from_millis(100)).await; // delay
+                exp_clone.match_and_resolve(&sample_event).await;
             }
         });
 
@@ -346,8 +341,7 @@ mod tests {
             .context("should register 2")?,
         ];
 
-        let resolutions = futures::future::try_join_all(registered_exps)
-            .timeout(Duration::from_secs(5))
+        let resolutions = timeout(Duration::from_secs(5), futures::future::try_join_all(registered_exps))
             .await?
             .context("no resolver can cancel")?;
 
