@@ -147,7 +147,7 @@ pub type WireChannels = (
 
 pub type LogicalChannels = (
     futures::channel::mpsc::UnboundedSender<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>,
-    futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym,ApplicationData)>,
+    futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationData)>,
 );
 
 pub type TicketChannel = futures::channel::mpsc::UnboundedReceiver<AcknowledgedTicket>;
@@ -192,7 +192,7 @@ pub async fn peer_setup_for(
 
         let (api_send_tx, api_send_rx) =
             futures::channel::mpsc::unbounded::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>();
-        let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym,ApplicationData)>();
+        let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
 
         let opk: &OffchainKeypair = &PEERS[i];
         let packet_cfg = PacketInteractionConfig {
@@ -415,9 +415,9 @@ pub async fn send_relay_receive_channel_of_n_peers(
         assert_eq!(recv_packets.len(), test_msgs.len());
 
         test_msgs.sort_by(|a, b| a.plain_text.cmp(&b.plain_text));
-        recv_packets.sort_by(|(_,a), (_,b)| a.plain_text.cmp(&b.plain_text));
+        recv_packets.sort_by(|(_, a), (_, b)| a.plain_text.cmp(&b.plain_text));
 
-        assert_eq!(recv_packets.into_iter().map(|(_,b)| b).collect::<Vec<_>>(), test_msgs);
+        assert_eq!(recv_packets.into_iter().map(|(_, b)| b).collect::<Vec<_>>(), test_msgs);
     };
 
     let res = compare_packets.timeout(TIMEOUT_SECONDS).await;

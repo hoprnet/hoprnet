@@ -41,11 +41,6 @@ pub struct SurbBalancerConfig {
     /// at the counterparty at all times, by regulating the [flow of non-organic SURBs](SurbFlowController).
     #[default(5_000)]
     pub target_surb_buffer_size: u64,
-    /// Initial outflow of non-organic SURBs.
-    ///
-    /// The default is 100 (which is 50 packets/second currently)
-    #[default(100)]
-    pub initial_surbs_per_sec: u64,
     /// Maximum outflow of non-organic surbs.
     ///
     /// The default is 2500 (which is 1250 packets/second currently)
@@ -147,9 +142,6 @@ where
         // Estimated change in counterparty's SURB buffer
         let target_buffer_change = surbs_delivered_delta as i64 - surbs_used_delta as i64;
         self.current_target_buffer = self.current_target_buffer.saturating_add_signed(target_buffer_change);
-        if self.current_target_buffer == 0 {
-            tracing::warn!("target SURB buffer size is 0")
-        }
 
         // Error from the desired target SURB buffer size at counterparty
         let error = self.cfg.target_surb_buffer_size as i64 - self.current_target_buffer as i64;

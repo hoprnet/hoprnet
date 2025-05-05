@@ -310,12 +310,14 @@ mod tests {
     }
 
     #[test]
-    fn start_protocol_message_keep_alive_message_should_allow_for_at_least_two_surbs() -> anyhow::Result<()> {
+    fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
         let msg = StartProtocol::KeepAlive(SessionId::new(u16::MAX, HoprPseudonym::random()));
         let len = msg.encode()?.1.len();
         assert!(
-            HoprPacket::max_surbs_with_message(len) >= 2,
-            "KeepAlive message size ({len}) must allow for at least two surbs in packet"
+            HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
+            "KeepAlive message size ({}) must allow for at least {} SURBs in packet",
+            len,
+            HoprPacket::MAX_SURBS_IN_PACKET
         );
 
         Ok(())

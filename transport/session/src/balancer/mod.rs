@@ -46,18 +46,18 @@ impl SurbFlowController for KeepAliveController {
     fn adjust_surb_flow(&self, surbs_per_sec: usize) {
         // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
         // so the correction by this factor is applied.
-        self.0
-            .set_rate_per_unit(surbs_per_sec / HoprPacket::MAX_SURBS_IN_PACKET, Duration::from_secs(1));
+        self.0.set_rate_per_unit(
+            surbs_per_sec,
+            HoprPacket::MAX_SURBS_IN_PACKET as u32 * Duration::from_secs(1),
+        );
     }
 }
 
 /// Returns an infinite rate-limited stream of [`StartProtocol::KeepAlive`] messages and its [controller](KeepAliveController).
 ///
-/// If `initial_msg_per_sec` is 0, the no rate limiting will apply.
+/// The stream is initialized with 0 rate (suspended), until a non-zero rate is set via the controller.
 pub fn keep_alive_stream<S: Clone>(
     session_id: S,
-    initial_msg_per_unit: usize,
-    unit: std::time::Duration,
 ) -> (
     impl futures::Stream<Item = StartProtocol<S>>,
     KeepAliveController,
@@ -65,7 +65,7 @@ pub fn keep_alive_stream<S: Clone>(
 ) {
     let elem = StartProtocol::KeepAlive(session_id);
     let (stream, abort_handle) = futures::stream::abortable(futures::stream::repeat(elem));
-    let (stream, controller) = stream.rate_limit_per_unit(initial_msg_per_unit, unit);
+    let (stream, controller) = stream.rate_limit_per_unit(0, Duration::from_secs(1));
 
     (stream, KeepAliveController(controller), abort_handle)
 }
@@ -87,7 +87,7 @@ impl<T: SendMsg + Send + Sync> SendMsg for CountingSendMsg<T> {
     ) -> Result<(), TransportSessionError> {
         let num_surbs = HoprPacket::max_surbs_with_message(data.len()) as u64;
         let res = self.0.send_message(data, destination).await;
-        if res.is_err() {
+        if res.is_ok() {
             self.1.fetch_add(num_surbs, std::sync::atomic::Ordering::Relaxed);
         }
         res
