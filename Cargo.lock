@@ -5274,7 +5274,6 @@ dependencies = [
  "async-lock 3.4.0",
  "async-std",
  "async-trait",
- "ethers",
  "futures",
  "futures-timer",
  "hex-literal",

@@ -13,12 +13,11 @@
 
 use alloy::consensus::TypedTransaction;
 use alloy::network::TransactionBuilder;
+use alloy::primitives::aliases::U96;
 use alloy::primitives::aliases::{U24, U48, U56};
-use alloy::primitives::{B256, U256, U64};
+use alloy::primitives::{B256, U256};
 use alloy::rpc::types::TransactionRequest;
 use alloy::sol_types::SolCall;
-use alloy::{dyn_abi::SolType, primitives::aliases::U96};
-use hopr_bindings::hoprchannels::HoprChannels::TicketIndex;
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{
         announceCall, announceSafeCall, bindKeysAnnounceCall, bindKeysAnnounceSafeCall,
@@ -139,15 +138,6 @@ fn register_safe_tx(safe_addr: Address) -> TransactionRequest {
         .abi_encode(),
     );
     tx
-    // let mut tx = create_eip1559_transaction();
-    // tx.set_data(
-    //     registerSafeByNodeCall {
-    //         safeAddr: safe_addr.into(),
-    //     }
-    //     .abi_encode()
-    //     .into(),
-    // );
-    // tx
 }
 
 /// Generates transaction payloads that do not use Safe-compliant ABI
@@ -207,28 +197,6 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
         let tx = TransactionRequest::default()
             .with_input(payload)
             .with_to(self.contract_addrs.announcements.into());
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(
-        //     match &announcement.key_binding {
-        //         Some(binding) => {
-        //             let serialized_signature = binding.signature.as_ref();
-
-        //             bindKeysAnnounceCall {
-        //                 ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]).into(),
-        //                 ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]).into(),
-        //                 ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()).into(),
-        //                 baseMultiaddr: announcement.multiaddress().to_string(),
-        //             }
-        //             .abi_encode()
-        //         }
-        //         None => announceCall {
-        //             baseMultiaddr: announcement.multiaddress().to_string(),
-        //         }
-        //         .abi_encode(),
-        //     }
-        //     .into(),
-        // );
-        // tx.set_to(NameOrAddress::Address(self.contract_addrs.announcements.into()));
         Ok(tx)
     }
 
@@ -253,22 +221,6 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
             )
             .with_to(self.contract_addrs.channels.into());
         Ok(tx)
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(
-        //     fundChannelCall {
-        //         account: dest.into(),
-        //         amount: U96::from_be_slice(&amount.amount().to_be_bytes()),
-        //         // amount: hopr_bindings::hoprchannels::HoprChannels::Balance::abi_decode(
-        //         //     amount.amount().to_be_bytes(),
-        //         //     true,
-        //         // ),
-        //     }
-        //     .abi_encode()
-        //     .into(),
-        // );
-        // tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
-
-        // Ok(tx)
     }
 
     fn close_incoming_channel(&self, source: Address) -> Result<TransactionRequest> {
@@ -280,11 +232,6 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
             .with_input(closeIncomingChannelCall { source: source.into() }.abi_encode())
             .with_to(self.contract_addrs.channels.into());
         Ok(tx)
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(closeIncomingChannelCall { source: source.into() }.abi_encode().into());
-        // tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
-
-        // Ok(tx)
     }
 
     fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TransactionRequest> {
@@ -303,18 +250,6 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
             )
             .with_to(self.contract_addrs.channels.into());
         Ok(tx)
-
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(
-        //     initiateOutgoingChannelClosureCall {
-        //         destination: destination.into(),
-        //     }
-        //     .abi_encode()
-        //     .into(),
-        // );
-        // tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
-
-        // Ok(tx)
     }
 
     fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TransactionRequest> {
@@ -333,17 +268,6 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
             )
             .with_to(self.contract_addrs.channels.into());
         Ok(tx)
-
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(
-        //     finalizeOutgoingChannelClosureCall {
-        //         destination: destination.into(),
-        //     }
-        //     .abi_encode()
-        //     .into(),
-        // );
-        // tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
-        // Ok(tx)
     }
 
     fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TransactionRequest> {
@@ -360,11 +284,6 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
             .with_input(redeemTicketCall { redeemable, params }.abi_encode())
             .with_to(self.contract_addrs.channels.into());
         Ok(tx)
-
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(redeemTicketCall { redeemable, params }.abi_encode().into());
-        // tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
-        // Ok(tx)
     }
 
     fn register_safe_by_node(&self, safe_addr: Address) -> Result<TransactionRequest> {
@@ -409,9 +328,6 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
         let tx = approve_tx(spender, amount)
             .with_to(self.contract_addrs.token.into())
             .with_gas_limit(DEFAULT_TX_GAS);
-        // let mut tx = approve_tx(spender, amount);
-        // tx.set_to(NameOrAddress::Address(self.contract_addrs.token.into()));
-        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
@@ -424,14 +340,6 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
         let tx = transfer_tx(destination, amount)
             .with_to(to.into())
             .with_gas_limit(DEFAULT_TX_GAS);
-        // tx.set_to(NameOrAddress::Address(
-        //     match amount.balance_type() {
-        //         BalanceType::Native => destination,
-        //         BalanceType::HOPR => self.contract_addrs.token,
-        //     }
-        //     .into(),
-        // ));
-        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
@@ -470,20 +378,6 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
             .with_to(self.module.into())
             .with_gas_limit(DEFAULT_TX_GAS);
 
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(
-        //     execTransactionFromModuleCall {
-        //         to: self.contract_addrs.announcements.into(),
-        //         value: U256::ZERO,
-        //         data: call_data.into(),
-        //         operation: Operation::Call as u8,
-        //     }
-        //     .abi_encode()
-        //     .into(),
-        // );
-        // tx.set_to(NameOrAddress::Address(self.module.into()));
-        // tx.set_gas(DEFAULT_TX_GAS);
-
         Ok(tx)
     }
 
@@ -510,11 +404,6 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
             .with_to(self.module.into())
             .with_gas_limit(DEFAULT_TX_GAS);
 
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        // tx.set_to(NameOrAddress::Address(self.module.into()));
-        // tx.set_gas(DEFAULT_TX_GAS);
-
         Ok(tx)
     }
 
@@ -533,11 +422,6 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
             .with_to(self.module.into())
             .with_gas_limit(DEFAULT_TX_GAS);
-
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        // tx.set_to(NameOrAddress::Address(self.module.into()));
-        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
@@ -560,11 +444,6 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
             .with_to(self.module.into())
             .with_gas_limit(DEFAULT_TX_GAS);
 
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        // tx.set_to(NameOrAddress::Address(self.module.into()));
-        // tx.set_gas(DEFAULT_TX_GAS);
-
         Ok(tx)
     }
 
@@ -585,11 +464,6 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
             .with_to(self.module.into())
             .with_gas_limit(DEFAULT_TX_GAS);
-
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        // tx.set_to(NameOrAddress::Address(self.module.into()));
-        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
@@ -615,10 +489,6 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
             .with_input(channels_payload(self.contract_addrs.channels, call_data))
             .with_to(self.module.into())
             .with_gas_limit(DEFAULT_TX_GAS);
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        // tx.set_to(NameOrAddress::Address(self.module.into()));
-        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
@@ -627,9 +497,6 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
         let tx = register_safe_tx(safe_addr)
             .with_to(self.contract_addrs.safe_registry.into())
             .with_gas_limit(DEFAULT_TX_GAS);
-        // let mut tx = register_safe_tx(safe_addr);
-        // tx.set_to(NameOrAddress::Address(self.contract_addrs.safe_registry.into()));
-        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
@@ -644,17 +511,6 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
             )
             .with_to(self.module.into())
             .with_gas_limit(DEFAULT_TX_GAS);
-
-        // let mut tx = create_eip1559_transaction();
-        // tx.set_data(
-        //     deregisterNodeBySafeCall {
-        //         nodeAddr: self.me.into(),
-        //     }
-        //     .abi_encode()
-        //     .into(),
-        // );
-        // tx.set_to(NameOrAddress::Address(self.module.into()));
-        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
@@ -706,8 +562,7 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
             "off_chain.verified_ticket().amount.amount() {:?}",
             off_chain.verified_ticket().amount.amount()
         );
-        // let mut encoded_win_prob = [0u8; 8];
-        // encoded_win_prob[1..].copy_from_slice(&off_chain.verified_ticket().encoded_win_prob);
+
         Ok(OnChainRedeemableTicket {
             data: TicketData {
                 channelId: B256::from_slice(&off_chain.verified_ticket().channel_id.as_ref()).into(),
@@ -717,14 +572,6 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
                 epoch: U24::from_be_slice(&off_chain.verified_ticket().channel_epoch.to_be_bytes()[4 - 3..]),
                 winProb: U56::from_be_slice(&off_chain.verified_ticket().encoded_win_prob),
             },
-            // data: TicketData {
-            //     channelId: off_chain.verified_ticket().channel_id.into(),
-            //     amount: off_chain.verified_ticket().amount.amount().as_u128(),
-            //     ticketIndex: off_chain.verified_ticket().index,
-            //     indexOffset: off_chain.verified_ticket().index_offset,
-            //     epoch: off_chain.verified_ticket().channel_epoch,
-            //     winProb: u64::from_be_bytes(encoded_win_prob),
-            // },
             signature: CompactSignature {
                 r: B256::from_slice(&serialized_signature[0..32]).into(),
                 vs: B256::from_slice(&serialized_signature[32..64]).into(),
@@ -793,7 +640,6 @@ mod tests {
             .get_receipt()
             .await?
             .status());
-        // assert!(client.send_transaction(reannounce_tx).await?.await?.is_some());
 
         Ok(())
     }
