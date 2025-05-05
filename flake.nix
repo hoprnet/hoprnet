@@ -504,7 +504,7 @@
           devShell = import ./nix/devShell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
           ciShell = import ./nix/ciShell.nix { inherit pkgs config crane; };
           testShell = import ./nix/testShell.nix { inherit pkgs config crane solcDefault; };
-          ciTestShell = import ./nix/ciTestShell.nix { inherit pkgs config crane solcDefault; hoprd = hoprd-dev; hopli = hopli-dev; };
+          ciTestShell = import ./nix/ciTestShell.nix { inherit pkgs config crane solcDefault; hoprd = hoprd-candidate; hopli = hopli-candidate; };
           docsShell = import ./nix/devShell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
