@@ -193,9 +193,9 @@ where
 mod tests {
     use super::*;
 
-    use std::sync::Arc;
+    use crate::balancer::MockSurbFlowController;
     use std::sync::atomic::AtomicU64;
-    use crate::balancer::{MockSurbFlowController};
+    use std::sync::Arc;
 
     #[test_log::test]
     fn surb_balancer_should_start_increase_level_when_below_target() {
@@ -206,10 +206,13 @@ mod tests {
 
         let mut controller = MockSurbFlowController::new();
         let production_rate_clone = production_rate.clone();
-        controller.expect_adjust_surb_flow()
+        controller
+            .expect_adjust_surb_flow()
             .times(steps)
             .with(mockall::predicate::ge(100))
-            .returning(move |r| { production_rate_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed); });
+            .returning(move |r| {
+                production_rate_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed);
+            });
 
         let surb_production_count = Arc::new(AtomicU64::new(0));
         let surb_consumption_count = Arc::new(AtomicU64::new(0));
@@ -218,17 +221,26 @@ mod tests {
             surb_production_count.clone(),
             surb_consumption_count.clone(),
             controller,
-            SurbBalancerConfig::default()
+            SurbBalancerConfig::default(),
         );
 
         let mut last_update = 0;
         for i in 0..steps {
             std::thread::sleep(step_duration);
-            surb_production_count.fetch_add(production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(), std::sync::atomic::Ordering::Relaxed);
-            surb_consumption_count.fetch_add(consumption_rate * step_duration.as_secs(), std::sync::atomic::Ordering::Relaxed);
+            surb_production_count.fetch_add(
+                production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(),
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            surb_consumption_count.fetch_add(
+                consumption_rate * step_duration.as_secs(),
+                std::sync::atomic::Ordering::Relaxed,
+            );
 
             let next_update = balancer.update();
-            assert!(i == 0 || next_update > last_update, "{next_update} should be greater than {last_update}");
+            assert!(
+                i == 0 || next_update > last_update,
+                "{next_update} should be greater than {last_update}"
+            );
             last_update = next_update;
         }
     }
@@ -242,10 +254,13 @@ mod tests {
 
         let mut controller = MockSurbFlowController::new();
         let production_rate_clone = production_rate.clone();
-        controller.expect_adjust_surb_flow()
+        controller
+            .expect_adjust_surb_flow()
             .times(steps)
             .with(mockall::predicate::ge(0))
-            .returning(move |r| { production_rate_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed); });
+            .returning(move |r| {
+                production_rate_clone.store(r as u64, std::sync::atomic::Ordering::Relaxed);
+            });
 
         let surb_production_count = Arc::new(AtomicU64::new(0));
         let surb_consumption_count = Arc::new(AtomicU64::new(0));
@@ -254,17 +269,26 @@ mod tests {
             surb_production_count.clone(),
             surb_consumption_count.clone(),
             controller,
-            SurbBalancerConfig::default()
+            SurbBalancerConfig::default(),
         );
 
         let mut last_update = 0;
         for i in 0..steps {
             std::thread::sleep(step_duration);
-            surb_production_count.fetch_add(production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(), std::sync::atomic::Ordering::Relaxed);
-            surb_consumption_count.fetch_add(consumption_rate * step_duration.as_secs(), std::sync::atomic::Ordering::Relaxed);
+            surb_production_count.fetch_add(
+                production_rate.load(std::sync::atomic::Ordering::Relaxed) * step_duration.as_secs(),
+                std::sync::atomic::Ordering::Relaxed,
+            );
+            surb_consumption_count.fetch_add(
+                consumption_rate * step_duration.as_secs(),
+                std::sync::atomic::Ordering::Relaxed,
+            );
 
             let next_update = balancer.update();
-            assert!(i == 0 || next_update < last_update, "{next_update} should be greater than {last_update}");
+            assert!(
+                i == 0 || next_update < last_update,
+                "{next_update} should be greater than {last_update}"
+            );
             last_update = next_update;
         }
     }

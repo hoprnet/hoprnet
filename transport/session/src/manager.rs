@@ -470,7 +470,11 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     METRIC_ACTIVE_SESSIONS.increment(1.0);
                 }
 
-                let notifier = self.session_notifiers.get().map(|(_, c)| c.clone()).ok_or(SessionManagerError::NotStarted)?;
+                let notifier = self
+                    .session_notifiers
+                    .get()
+                    .map(|(_, c)| c.clone())
+                    .ok_or(SessionManagerError::NotStarted)?;
                 if let Some(balancer_config) = cfg.surb_management {
                     let surb_production_counter = Arc::new(AtomicU64::new(0));
                     let surb_consumption_counter = Arc::new(AtomicU64::new(0));
@@ -497,9 +501,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         sender,
                         rx,
                         Some(Box::new(move |session_id: SessionId| {
-                            let _ = notifier
-                                .unbounded_send(session_id)
-                                .inspect_err(|error| tracing::error!(%session_id, %error, "failed to notify session closure"));
+                            let _ = notifier.unbounded_send(session_id).inspect_err(
+                                |error| tracing::error!(%session_id, %error, "failed to notify session closure"),
+                            );
 
                             // Terminate also the SURB-bearing keep-alive sending and the Balancer
                             ka_abort.abort();
@@ -536,9 +540,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         Arc::new(msg_sender.clone()),
                         rx,
                         Some(Box::new(move |session_id: SessionId| {
-                            let _ = notifier
-                                .unbounded_send(session_id)
-                                .inspect_err(|error| tracing::error!(%session_id, %error, "failed to notify session closure"));
+                            let _ = notifier.unbounded_send(session_id).inspect_err(
+                                |error| tracing::error!(%session_id, %error, "failed to notify session closure"),
+                            );
                         })),
                         Arc::new(AtomicU64::new(0)),
                     ))

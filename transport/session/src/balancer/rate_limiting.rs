@@ -6,6 +6,7 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
 use futures::Stream;
+use futures_time::future::Timer;
 use futures_time::task::Sleep;
 use pin_project::pin_project;
 
@@ -30,20 +31,27 @@ impl RateController {
     }
 }
 
+enum State {
+    Read,
+    Wait,
+}
+
 /// A stream adapter that yields elements at a controlled rate, with dynamic rate adjustment.
 ///
 /// See [`RateLimitExt::rate_limit_per_unit`].
 #[pin_project]
-pub struct RateLimitedStream<S> {
+pub struct RateLimitedStream<S: Stream> {
     #[pin]
     inner: S,
-    elements_per_unit: Arc<AtomicUsize>,
-    unit_in_ms: Arc<AtomicUsize>,
+    item: Option<S::Item>,
     #[pin]
     delay: Option<Sleep>,
+    state: State,
+    elements_per_unit: Arc<AtomicUsize>,
+    unit_in_ms: Arc<AtomicUsize>,
 }
 
-impl<S> RateLimitedStream<S> {
+impl<S: Stream> RateLimitedStream<S> {
     const MAX_RATE_PER_SEC: f64 = 10_000.0;
 
     /// Creates a stream with some initial rate limit of elements per a time unit.
@@ -55,9 +63,11 @@ impl<S> RateLimitedStream<S> {
         (
             Self {
                 inner: stream,
+                item: None,
+                delay: None,
+                state: State::Read,
                 elements_per_unit: rate.clone(),
                 unit_in_ms: unit.clone(),
-                delay: None,
             },
             RateController(rate, unit),
         )
@@ -73,45 +83,48 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
 
-        // If the rate is zero, schedule the next fixed wake-up to check again
-        if this.elements_per_unit.load(Ordering::Relaxed) == 0 {
-            this.delay.set(Some(futures_time::task::sleep(Duration::from_millis(100).into())));
-        }
+        loop {
+            match this.state {
+                State::Read => {
+                    let yield_start = Instant::now();
+                    if let Some(item) = futures::ready!(this.inner.as_mut().poll_next(cx)) {
+                        let offset = yield_start.elapsed();
+                        let units = this.elements_per_unit.load(Ordering::Relaxed);
+                        let delay = if units > 0 {
+                            // Calculate the next allowable time based on the rate
+                            let rate_per_sec = (units as f64
+                                / Duration::from_millis(this.unit_in_ms.load(Ordering::Relaxed) as u64).as_secs_f64())
+                            .min(Self::MAX_RATE_PER_SEC);
 
-        // Check if we are waiting for a delay to complete
-        while let Some(delay) = this.delay.as_mut().as_pin_mut() {
-            let _ = futures::ready!(delay.poll(cx));
-            if this.elements_per_unit.load(Ordering::Relaxed) == 0 {
-                // If the rate is still zero, schedule the next fixed wake-up to check again
-                this.delay.set(Some(futures_time::task::sleep(Duration::from_millis(100).into())));
-            } else {
-                this.delay.set(None);
+                            // Convert to duration (seconds per element) and subtract the duration
+                            // it took to yield the element from the inner stream
+                            Duration::from_secs_f64(1.0 / rate_per_sec)
+                                .saturating_sub(offset)
+                                .max(Duration::from_secs_f64(1.0 / Self::MAX_RATE_PER_SEC))
+                        } else {
+                            Duration::from_millis(100)
+                        };
+
+                        *this.delay = Some(futures_time::task::sleep(delay.into()));
+                        *this.item = Some(item);
+                        *this.state = State::Wait;
+                    } else {
+                        return Poll::Ready(None);
+                    }
+                }
+                State::Wait => {
+                    if let Some(mut delay) = this.delay.as_mut().as_pin_mut() {
+                        let _ = futures::ready!(delay.as_mut().poll(cx));
+
+                        if this.elements_per_unit.load(Ordering::Relaxed) > 0 {
+                            *this.state = State::Read;
+                            return Poll::Ready(this.item.take());
+                        } else {
+                            delay.reset_timer();
+                        }
+                    }
+                }
             }
-        }
-
-        // Get the next item from the inner stream
-        let yield_start = Instant::now();
-        if let Some(item) = futures::ready!(this.inner.as_mut().poll_next(cx)) {
-            let time_to_yield = yield_start.elapsed();
-
-            // Calculate the next allowable time based on the rate
-            let units = this.elements_per_unit.load(Ordering::Relaxed);
-            let rate_per_sec = (units as f64
-                / Duration::from_millis(this.unit_in_ms.load(Ordering::Relaxed) as u64).as_secs_f64())
-                .min(Self::MAX_RATE_PER_SEC);
-
-            // Convert to duration (seconds per element) and subtract the duration
-            // it took to yield the element from the inner stream
-            let delay_duration = Duration::from_secs_f64(1.0 / rate_per_sec)
-                .saturating_sub(time_to_yield)
-                .max(Duration::from_secs_f64(1.0 / Self::MAX_RATE_PER_SEC));
-
-            // Create a delay for the calculated duration
-            *this.delay = Some(futures_time::task::sleep(delay_duration.into()));
-
-            Poll::Ready(Some(item))
-        } else {
-            Poll::Ready(None)
         }
     }
 }
@@ -138,10 +151,10 @@ impl<S: Stream + Sized> RateLimitExt for S {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::stream::{self, StreamExt};
-    use std::time::{Duration, Instant};
     use futures::pin_mut;
+    use futures::stream::{self, StreamExt};
     use futures_time::future::FutureExt;
+    use std::time::{Duration, Instant};
 
     #[async_std::test]
     async fn test_rate_limited_stream_respects_rate() {
@@ -180,8 +193,8 @@ mod tests {
         );
     }
 
-    #[async_std::test]
-    async fn test_rate_limited_first_item_should_yield_immediately() {
+    #[test_log::test(async_std::test)]
+    async fn test_rate_limited_first_item_should_be_delayed() {
         // Create a stream with 3 elements
         let stream = stream::iter(1..=1);
 
@@ -192,7 +205,7 @@ mod tests {
 
         let start = Instant::now();
         assert_eq!(Some(1), rate_limited.next().await);
-        assert!(start.elapsed() < Duration::from_millis(100));
+        assert!(start.elapsed() >= Duration::from_millis(100));
     }
 
     #[async_std::test]
@@ -213,11 +226,16 @@ mod tests {
         let stream = stream::iter(1..=3);
 
         // Set a rate of 0 elements per second (= will not yield)
-        let (rate_limited, _) = stream.rate_limit_per_unit(0, Duration::from_secs(1));
+        let (mut rate_limited, _) = stream.rate_limit_per_unit(0, Duration::from_millis(50));
 
-        pin_mut!(rate_limited);
-
-        assert!(rate_limited.next().timeout(futures_time::time::Duration::from_millis(100)).await.is_err(), "zero rate should not yield anything");
+        assert!(
+            rate_limited
+                .next()
+                .timeout(futures_time::time::Duration::from_millis(100))
+                .await
+                .is_err(),
+            "zero rate should not yield anything"
+        );
 
         Ok(())
     }
@@ -228,20 +246,34 @@ mod tests {
         let stream = stream::iter(1..=3);
 
         // Set a rate of 1 element per 100ms
-        let (rate_limited, controller) = stream.rate_limit_per_unit(1, Duration::from_millis(100));
+        let (mut rate_limited, controller) = stream.rate_limit_per_unit(1, Duration::from_millis(100));
 
-        pin_mut!(rate_limited);
-
+        let start = Instant::now();
         assert_eq!(Some(1), rate_limited.next().await);
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed >= Duration::from_millis(100),
+            "first element too fast {elapsed:?}"
+        );
 
         let start = Instant::now();
         assert_eq!(Some(2), rate_limited.next().await);
         let elapsed = start.elapsed();
-        assert!(elapsed >= Duration::from_millis(100), "first element too fast {elapsed:?}");
+        assert!(
+            elapsed >= Duration::from_millis(100),
+            "first element too fast {elapsed:?}"
+        );
 
         controller.set_rate_per_unit(0, Duration::from_millis(100));
 
-        assert!(rate_limited.next().timeout(futures_time::time::Duration::from_millis(200)).await.is_err(), "zero rate should not yield anything");
+        assert!(
+            rate_limited
+                .next()
+                .timeout(futures_time::time::Duration::from_millis(200))
+                .await
+                .is_err(),
+            "zero rate should not yield anything"
+        );
 
         Ok(())
     }
@@ -252,10 +284,16 @@ mod tests {
         let stream = stream::iter(1..=3);
 
         // Set a rate of 0 elements per second (= will not yield)
-        let (rate_limited, controller) = stream.rate_limit_per_unit(0, Duration::from_secs(1));
-        pin_mut!(rate_limited);
+        let (mut rate_limited, controller) = stream.rate_limit_per_unit(0, Duration::from_secs(1));
 
-        assert!(rate_limited.next().timeout(futures_time::time::Duration::from_millis(100)).await.is_err(), "zero rate should not yield anything");
+        assert!(
+            rate_limited
+                .next()
+                .timeout(futures_time::time::Duration::from_millis(100))
+                .await
+                .is_err(),
+            "zero rate should not yield anything"
+        );
 
         controller.set_rate_per_unit(1, Duration::from_millis(100));
 
@@ -264,7 +302,10 @@ mod tests {
         let all_items_elapsed = start.elapsed();
 
         assert_eq!(all_items, vec![1, 2, 3]);
-        assert!(all_items_elapsed >= Duration::from_millis(300), "all items should have been yielded in at least 300ms");
+        assert!(
+            all_items_elapsed >= Duration::from_millis(300),
+            "all items should have been yielded in at least 300ms"
+        );
 
         Ok(())
     }
@@ -277,13 +318,10 @@ mod tests {
         // Start with 5 elements per second (200ms per element)
         let (mut rate_limited, controller) = stream.rate_limit_per_unit(5, Duration::from_secs(1));
 
-        // Get a timer
-        let start = Instant::now();
-
         // Consume first 3 elements
+        let start = Instant::now();
         for i in 1..=3 {
-            let item = rate_limited.next().await.unwrap();
-            assert_eq!(item, i);
+            assert_eq!(Some(i), rate_limited.next().await);
         }
 
         // Measure time for the first 3 elements
@@ -294,17 +332,16 @@ mod tests {
 
         // Consume last 3 elements
         for i in 4..=6 {
-            let item = rate_limited.next().await.unwrap();
-            assert_eq!(item, i);
+            assert_eq!(Some(i), rate_limited.next().await);
         }
 
         // Measure total time
         let total_elapsed = start.elapsed();
         let second_half_elapsed = total_elapsed - first_half_elapsed;
 
-        // The first 3 elements at 5 per second should take ~400ms (2 delays)
+        // The first 3 elements at 5 per second should take ~600ms (200 ms each)
         assert!(
-            first_half_elapsed >= Duration::from_millis(300),
+            first_half_elapsed >= Duration::from_millis(600),
             "First half too fast: {:?}",
             first_half_elapsed
         );
@@ -314,14 +351,14 @@ mod tests {
             first_half_elapsed
         );
 
-        // The last 3 elements at 2 per second should take ~1000ms (2 delays)
+        // The last 3 elements at 2 per second should take ~1500ms (500 ms each)
         assert!(
-            second_half_elapsed >= Duration::from_millis(800),
+            second_half_elapsed >= Duration::from_millis(1500),
             "Second half too fast: {:?}",
             second_half_elapsed
         );
         assert!(
-            second_half_elapsed <= Duration::from_millis(1500),
+            second_half_elapsed <= Duration::from_millis(1600),
             "Second half too slow: {:?}",
             second_half_elapsed
         );
@@ -348,9 +385,15 @@ mod tests {
         assert_eq!(items.last(), Some(&100));
 
         // Even at a high rate, processing 100 elements should take some time
-        // but less than 200ms (theoretical time would be ~99ms)
+        // but less than 150 ms (theoretical time would be ~99ms)
         assert!(
-            elapsed < Duration::from_millis(200),
+            elapsed >= Duration::from_millis(100),
+            "Very high rate stream took too long: {:?}",
+            elapsed
+        );
+
+        assert!(
+            elapsed < Duration::from_millis(150),
             "Very high rate stream took too long: {:?}",
             elapsed
         );
