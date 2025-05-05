@@ -107,7 +107,7 @@ k256 = { version = "0.13.4", features = [
 ] }
 lazy_static = "1.5.0"
 libp2p = { version = "0.55.0" }
-libp2p-identity = { version = "0.2.10", features = [
+libp2p-identity = { version = "0.2.11", features = [
   "peerid",
   "ed25519",
   "rand",
