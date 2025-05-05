@@ -11,29 +11,33 @@
 //!   SAFE transaction. This is currently the main mode of HOPR node operation.
 //!
 
-// TODO: Replace those with alloy-rs
-// use ethers::types::NameOrAddress;
-// use ethers::{
-//     abi::AbiEncode,
-//     types::{H160, H256, U256},
-// };
-
+use alloy::consensus::TypedTransaction;
+use alloy::network::TransactionBuilder;
+use alloy::primitives::aliases::{U24, U48, U56};
+use alloy::primitives::{B256, U256, U64};
+use alloy::rpc::types::TransactionRequest;
+use alloy::sol_types::SolCall;
+use alloy::{dyn_abi::SolType, primitives::aliases::U96};
+use hopr_bindings::hoprchannels::HoprChannels::TicketIndex;
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{
-        AnnounceCall, AnnounceSafeCall, BindKeysAnnounceCall, BindKeysAnnounceSafeCall,
+        announceCall, announceSafeCall, bindKeysAnnounceCall, bindKeysAnnounceSafeCall,
     },
-    hoprchannels::HoprChannels::{
-        CloseIncomingChannelCall, CloseIncomingChannelSafeCall, CompactSignature, FinalizeOutgoingChannelClosureCall,
-        FinalizeOutgoingChannelClosureSafeCall, FundChannelCall, FundChannelSafeCall,
-        InitiateOutgoingChannelClosureCall, InitiateOutgoingChannelClosureSafeCall, RedeemTicketCall,
-        RedeemTicketSafeCall, RedeemableTicket as OnChainRedeemableTicket, TicketData, Vrfparameters,
+    hoprchannels::{
+        HoprChannels::{
+            closeIncomingChannelCall, closeIncomingChannelSafeCall, finalizeOutgoingChannelClosureCall,
+            finalizeOutgoingChannelClosureSafeCall, fundChannelCall, fundChannelSafeCall,
+            initiateOutgoingChannelClosureCall, initiateOutgoingChannelClosureSafeCall, redeemTicketCall,
+            redeemTicketSafeCall, RedeemableTicket as OnChainRedeemableTicket, TicketData,
+        },
+        HoprCrypto::{CompactSignature, VRFParameters},
     },
-    hoprnodemanagementmodule::HoprNodeManagementModule::ExecTransactionFromModuleCall,
-    hoprnodesaferegistry::HoprNodeSafeRegistry::{DeregisterNodeBySafeCall, RegisterSafeByNodeCall},
-    hoprtoken::HoprToken::{ApproveCall, TransferCall},
+    hoprnodemanagementmodule::HoprNodeManagementModule::execTransactionFromModuleCall,
+    hoprnodesaferegistry::HoprNodeSafeRegistry::{deregisterNodeBySafeCall, registerSafeByNodeCall},
+    hoprtoken::HoprToken::{approveCall, transferCall},
 };
 use hopr_chain_types::ContractAddresses;
-use hopr_chain_types::{create_eip1559_transaction, TypedTransaction};
+// use hopr_chain_types::{create_eip1559_transaction, TypedTransaction};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -51,7 +55,7 @@ enum Operation {
 }
 
 /// Trait for various implementations of generators of common on-chain transaction payloads.
-pub trait PayloadGenerator<T: Into<TypedTransaction>> {
+pub trait PayloadGenerator<T: Into<TransactionRequest>> {
     /// Create a ERC20 approve transaction payload. Pre-requisite to open payment channels.
     /// The `spender` address is typically the HOPR Channels contract address.
     fn approve(&self, spender: Address, amount: Balance) -> Result<T>;
@@ -91,58 +95,59 @@ pub trait PayloadGenerator<T: Into<TypedTransaction>> {
 }
 
 fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
-    ExecTransactionFromModuleCall {
+    execTransactionFromModuleCall {
         to: hopr_channels.into(),
-        value: U256::zero(),
+        value: U256::ZERO,
         data: call_data.into(),
         operation: Operation::Call as u8,
     }
-    .encode()
+    .abi_encode()
 }
 
-fn approve_tx(spender: Address, amount: Balance) -> TypedTransaction {
-    let mut tx = create_eip1559_transaction();
-    tx.set_data(
-        ApproveCall {
+fn approve_tx(spender: Address, amount: Balance) -> TransactionRequest {
+    let tx = TransactionRequest::default().with_input(
+        approveCall {
             spender: spender.into(),
-            value: amount.amount(),
+            value: U256::from_be_bytes(amount.amount().to_be_bytes()),
         }
-        .encode()
-        .into(),
+        .abi_encode(),
     );
     tx
 }
 
-fn transfer_tx(destination: Address, amount: Balance) -> TypedTransaction {
-    let mut tx = create_eip1559_transaction();
-    match amount.balance_type() {
-        BalanceType::HOPR => {
-            tx.set_data(
-                TransferCall {
-                    recipient: destination.into(),
-                    amount: amount.amount(),
-                }
-                .encode()
-                .into(),
-            );
-        }
-        BalanceType::Native => {
-            tx.set_value(amount.amount());
-        }
-    }
+fn transfer_tx(destination: Address, amount: Balance) -> TransactionRequest {
+    let amount_u256 = U256::from_be_bytes(amount.amount().to_be_bytes());
+    let mut tx = TransactionRequest::default();
+    tx = match amount.balance_type() {
+        BalanceType::HOPR => tx.with_input(
+            transferCall {
+                recipient: destination.into(),
+                amount: amount_u256,
+            }
+            .abi_encode(),
+        ),
+        BalanceType::Native => tx.with_value(amount_u256),
+    };
     tx
 }
 
-fn register_safe_tx(safe_addr: Address) -> TypedTransaction {
-    let mut tx = create_eip1559_transaction();
-    tx.set_data(
-        RegisterSafeByNodeCall {
-            safe_addr: safe_addr.into(),
+fn register_safe_tx(safe_addr: Address) -> TransactionRequest {
+    let tx = TransactionRequest::default().with_input(
+        registerSafeByNodeCall {
+            safeAddr: safe_addr.into(),
         }
-        .encode()
-        .into(),
+        .abi_encode(),
     );
     tx
+    // let mut tx = create_eip1559_transaction();
+    // tx.set_data(
+    //     registerSafeByNodeCall {
+    //         safeAddr: safe_addr.into(),
+    //     }
+    //     .abi_encode()
+    //     .into(),
+    // );
+    // tx
 }
 
 /// Generates transaction payloads that do not use Safe-compliant ABI
@@ -158,54 +163,76 @@ impl BasicPayloadGenerator {
     }
 }
 
-impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
-    fn approve(&self, spender: Address, amount: Balance) -> Result<TypedTransaction> {
+impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
+    fn approve(&self, spender: Address, amount: Balance) -> Result<TransactionRequest> {
         if amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments(
                 "Invalid balance type. Expected a HOPR balance.".into(),
             ));
         }
-        let mut tx = approve_tx(spender, amount);
-        tx.set_to(NameOrAddress::Address(self.contract_addrs.token.into()));
+
+        let tx = approve_tx(spender, amount).with_to(self.contract_addrs.token.into());
+        // tx.set_to(NameOrAddress::Address(self.contract_addrs.token.into()));
         Ok(tx)
     }
 
-    fn transfer(&self, destination: Address, amount: Balance) -> Result<TypedTransaction> {
-        let mut tx = transfer_tx(destination, amount);
-        tx.set_to(H160::from(match amount.balance_type() {
+    fn transfer(&self, destination: Address, amount: Balance) -> Result<TransactionRequest> {
+        let to = match amount.balance_type() {
             BalanceType::Native => destination,
             BalanceType::HOPR => self.contract_addrs.token,
-        }));
+        };
+        let tx = transfer_tx(destination, amount).with_to(to.into());
         Ok(tx)
     }
 
-    fn announce(&self, announcement: AnnouncementData) -> Result<TypedTransaction> {
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(
-            match &announcement.key_binding {
-                Some(binding) => {
-                    let serialized_signature = binding.signature.as_ref();
+    fn announce(&self, announcement: AnnouncementData) -> Result<TransactionRequest> {
+        let payload = match &announcement.key_binding {
+            Some(binding) => {
+                let serialized_signature = binding.signature.as_ref();
 
-                    BindKeysAnnounceCall {
-                        ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
-                        ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-                        ed_25519_pub_key: H256::from_slice(binding.packet_key.as_ref()).into(),
-                        base_multiaddr: announcement.multiaddress().to_string(),
-                    }
-                    .encode()
+                bindKeysAnnounceCall {
+                    ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]).into(),
+                    ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]).into(),
+                    ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()).into(),
+                    baseMultiaddr: announcement.multiaddress().to_string(),
                 }
-                None => AnnounceCall {
-                    base_multiaddr: announcement.multiaddress().to_string(),
-                }
-                .encode(),
+                .abi_encode()
             }
-            .into(),
-        );
-        tx.set_to(NameOrAddress::Address(self.contract_addrs.announcements.into()));
+            None => announceCall {
+                baseMultiaddr: announcement.multiaddress().to_string(),
+            }
+            .abi_encode(),
+        };
+
+        let tx = TransactionRequest::default()
+            .with_input(payload)
+            .with_to(self.contract_addrs.announcements.into());
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(
+        //     match &announcement.key_binding {
+        //         Some(binding) => {
+        //             let serialized_signature = binding.signature.as_ref();
+
+        //             bindKeysAnnounceCall {
+        //                 ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]).into(),
+        //                 ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]).into(),
+        //                 ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()).into(),
+        //                 baseMultiaddr: announcement.multiaddress().to_string(),
+        //             }
+        //             .abi_encode()
+        //         }
+        //         None => announceCall {
+        //             baseMultiaddr: announcement.multiaddress().to_string(),
+        //         }
+        //         .abi_encode(),
+        //     }
+        //     .into(),
+        // );
+        // tx.set_to(NameOrAddress::Address(self.contract_addrs.announcements.into()));
         Ok(tx)
     }
 
-    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<TypedTransaction> {
+    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<TransactionRequest> {
         if dest.eq(&self.me) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
         }
@@ -216,72 +243,110 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
             ));
         }
 
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(
-            FundChannelCall {
-                account: dest.into(),
-                amount: amount.amount().as_u128(),
-            }
-            .encode()
-            .into(),
-        );
-        tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
-
+        let tx = TransactionRequest::default()
+            .with_input(
+                fundChannelCall {
+                    account: dest.into(),
+                    amount: U96::from_be_slice(&amount.amount().to_be_bytes()),
+                }
+                .abi_encode(),
+            )
+            .with_to(self.contract_addrs.channels.into());
         Ok(tx)
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(
+        //     fundChannelCall {
+        //         account: dest.into(),
+        //         amount: U96::from_be_slice(&amount.amount().to_be_bytes()),
+        //         // amount: hopr_bindings::hoprchannels::HoprChannels::Balance::abi_decode(
+        //         //     amount.amount().to_be_bytes(),
+        //         //     true,
+        //         // ),
+        //     }
+        //     .abi_encode()
+        //     .into(),
+        // );
+        // tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
+
+        // Ok(tx)
     }
 
-    fn close_incoming_channel(&self, source: Address) -> Result<TypedTransaction> {
+    fn close_incoming_channel(&self, source: Address) -> Result<TransactionRequest> {
         if source.eq(&self.me) {
             return Err(InvalidArguments("Cannot close incoming channel from self".into()));
         }
 
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(CloseIncomingChannelCall { source: source.into() }.encode().into());
-        tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
-
+        let tx = TransactionRequest::default()
+            .with_input(closeIncomingChannelCall { source: source.into() }.abi_encode())
+            .with_to(self.contract_addrs.channels.into());
         Ok(tx)
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(closeIncomingChannelCall { source: source.into() }.abi_encode().into());
+        // tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
+
+        // Ok(tx)
     }
 
-    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
+    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TransactionRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
             ));
         }
 
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(
-            InitiateOutgoingChannelClosureCall {
-                destination: destination.into(),
-            }
-            .encode()
-            .into(),
-        );
-        tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
-
+        let tx = TransactionRequest::default()
+            .with_input(
+                initiateOutgoingChannelClosureCall {
+                    destination: destination.into(),
+                }
+                .abi_encode(),
+            )
+            .with_to(self.contract_addrs.channels.into());
         Ok(tx)
+
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(
+        //     initiateOutgoingChannelClosureCall {
+        //         destination: destination.into(),
+        //     }
+        //     .abi_encode()
+        //     .into(),
+        // );
+        // tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
+
+        // Ok(tx)
     }
 
-    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
+    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TransactionRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
             ));
         }
 
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(
-            FinalizeOutgoingChannelClosureCall {
-                destination: destination.into(),
-            }
-            .encode()
-            .into(),
-        );
-        tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
+        let tx = TransactionRequest::default()
+            .with_input(
+                finalizeOutgoingChannelClosureCall {
+                    destination: destination.into(),
+                }
+                .abi_encode(),
+            )
+            .with_to(self.contract_addrs.channels.into());
         Ok(tx)
+
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(
+        //     finalizeOutgoingChannelClosureCall {
+        //         destination: destination.into(),
+        //     }
+        //     .abi_encode()
+        //     .into(),
+        // );
+        // tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
+        // Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TypedTransaction> {
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TransactionRequest> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
         let params = convert_vrf_parameters(
@@ -290,19 +355,24 @@ impl PayloadGenerator<TypedTransaction> for BasicPayloadGenerator {
             acked_ticket.ticket.verified_hash(),
             &acked_ticket.channel_dst,
         );
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(RedeemTicketCall { redeemable, params }.encode().into());
-        tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
+
+        let tx = TransactionRequest::default()
+            .with_input(redeemTicketCall { redeemable, params }.abi_encode())
+            .with_to(self.contract_addrs.channels.into());
+        Ok(tx)
+
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(redeemTicketCall { redeemable, params }.abi_encode().into());
+        // tx.set_to(NameOrAddress::Address(self.contract_addrs.channels.into()));
+        // Ok(tx)
+    }
+
+    fn register_safe_by_node(&self, safe_addr: Address) -> Result<TransactionRequest> {
+        let tx = register_safe_tx(safe_addr).with_to(self.contract_addrs.safe_registry.into());
         Ok(tx)
     }
 
-    fn register_safe_by_node(&self, safe_addr: Address) -> Result<TypedTransaction> {
-        let mut tx = register_safe_tx(safe_addr);
-        tx.set_to(NameOrAddress::Address(self.contract_addrs.safe_registry.into()));
-        Ok(tx)
-    }
-
-    fn deregister_node_by_safe(&self) -> Result<TypedTransaction> {
+    fn deregister_node_by_safe(&self) -> Result<TransactionRequest> {
         Err(InvalidState(
             "Can only deregister an address if Safe is activated".into(),
         ))
@@ -329,73 +399,95 @@ impl SafePayloadGenerator {
     }
 }
 
-impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
-    fn approve(&self, spender: Address, amount: Balance) -> Result<TypedTransaction> {
+impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
+    fn approve(&self, spender: Address, amount: Balance) -> Result<TransactionRequest> {
         if amount.balance_type() != BalanceType::HOPR {
             return Err(InvalidArguments(
                 "Invalid balance type. Expected a HOPR balance.".into(),
             ));
         }
-        let mut tx = approve_tx(spender, amount);
-        tx.set_to(NameOrAddress::Address(self.contract_addrs.token.into()));
-        tx.set_gas(DEFAULT_TX_GAS);
+        let tx = approve_tx(spender, amount)
+            .with_to(self.contract_addrs.token.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+        // let mut tx = approve_tx(spender, amount);
+        // tx.set_to(NameOrAddress::Address(self.contract_addrs.token.into()));
+        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn transfer(&self, destination: Address, amount: Balance) -> Result<TypedTransaction> {
-        let mut tx = transfer_tx(destination, amount);
-        tx.set_to(NameOrAddress::Address(
-            match amount.balance_type() {
-                BalanceType::Native => destination,
-                BalanceType::HOPR => self.contract_addrs.token,
-            }
-            .into(),
-        ));
-        tx.set_gas(DEFAULT_TX_GAS);
+    fn transfer(&self, destination: Address, amount: Balance) -> Result<TransactionRequest> {
+        let to = match amount.balance_type() {
+            BalanceType::Native => destination,
+            BalanceType::HOPR => self.contract_addrs.token,
+        };
+        let tx = transfer_tx(destination, amount)
+            .with_to(to.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+        // tx.set_to(NameOrAddress::Address(
+        //     match amount.balance_type() {
+        //         BalanceType::Native => destination,
+        //         BalanceType::HOPR => self.contract_addrs.token,
+        //     }
+        //     .into(),
+        // ));
+        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn announce(&self, announcement: AnnouncementData) -> Result<TypedTransaction> {
+    fn announce(&self, announcement: AnnouncementData) -> Result<TransactionRequest> {
         let call_data = match &announcement.key_binding {
             Some(binding) => {
                 let serialized_signature = binding.signature.as_ref();
 
-                BindKeysAnnounceSafeCall {
-                    self_: self.me.into(),
-                    ed_25519_sig_0: H256::from_slice(&serialized_signature[0..32]).into(),
-                    ed_25519_sig_1: H256::from_slice(&serialized_signature[32..64]).into(),
-                    ed_25519_pub_key: H256::from_slice(binding.packet_key.as_ref()).into(),
-                    base_multiaddr: announcement.multiaddress().to_string(),
+                bindKeysAnnounceSafeCall {
+                    selfAddress: self.me.into(),
+                    ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]).into(),
+                    ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]).into(),
+                    ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()).into(),
+                    baseMultiaddr: announcement.multiaddress().to_string(),
                 }
-                .encode()
+                .abi_encode()
             }
-            None => AnnounceSafeCall {
-                self_: self.me.into(),
-                base_multiaddr: announcement.multiaddress().to_string(),
+            None => announceSafeCall {
+                selfAddress: self.me.into(),
+                baseMultiaddr: announcement.multiaddress().to_string(),
             }
-            .encode(),
+            .abi_encode(),
         };
 
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(
-            ExecTransactionFromModuleCall {
-                to: self.contract_addrs.announcements.into(),
-                value: U256::zero(),
-                data: call_data.into(),
-                operation: Operation::Call as u8,
-            }
-            .encode()
-            .into(),
-        );
-        tx.set_to(NameOrAddress::Address(self.module.into()));
-        tx.set_gas(DEFAULT_TX_GAS);
+        let tx = TransactionRequest::default()
+            .with_input(
+                execTransactionFromModuleCall {
+                    to: self.contract_addrs.announcements.into(),
+                    value: U256::ZERO,
+                    data: call_data.into(),
+                    operation: Operation::Call as u8,
+                }
+                .abi_encode(),
+            )
+            .with_to(self.module.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(
+        //     execTransactionFromModuleCall {
+        //         to: self.contract_addrs.announcements.into(),
+        //         value: U256::ZERO,
+        //         data: call_data.into(),
+        //         operation: Operation::Call as u8,
+        //     }
+        //     .abi_encode()
+        //     .into(),
+        // );
+        // tx.set_to(NameOrAddress::Address(self.module.into()));
+        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<TypedTransaction> {
+    fn fund_channel(&self, dest: Address, amount: Balance) -> Result<TransactionRequest> {
         if dest.eq(&self.me) {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
         }
@@ -406,83 +498,103 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
             ));
         }
 
-        let call_data = FundChannelSafeCall {
-            self_: self.me.into(),
+        let call_data = fundChannelSafeCall {
+            selfAddress: self.me.into(),
             account: dest.into(),
-            amount: amount.amount().as_u128(),
+            amount: U96::from_be_slice(&amount.amount().to_be_bytes()),
         }
-        .encode();
+        .abi_encode();
 
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        tx.set_to(NameOrAddress::Address(self.module.into()));
-        tx.set_gas(DEFAULT_TX_GAS);
+        let tx = TransactionRequest::default()
+            .with_input(channels_payload(self.contract_addrs.channels, call_data))
+            .with_to(self.module.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
+        // tx.set_to(NameOrAddress::Address(self.module.into()));
+        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn close_incoming_channel(&self, source: Address) -> Result<TypedTransaction> {
+    fn close_incoming_channel(&self, source: Address) -> Result<TransactionRequest> {
         if source.eq(&self.me) {
             return Err(InvalidArguments("Cannot close incoming channel from self".into()));
         }
 
-        let call_data = CloseIncomingChannelSafeCall {
-            self_: self.me.into(),
+        let call_data = closeIncomingChannelSafeCall {
+            selfAddress: self.me.into(),
             source: source.into(),
         }
-        .encode();
+        .abi_encode();
 
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        tx.set_to(NameOrAddress::Address(self.module.into()));
-        tx.set_gas(DEFAULT_TX_GAS);
+        let tx = TransactionRequest::default()
+            .with_input(channels_payload(self.contract_addrs.channels, call_data))
+            .with_to(self.module.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
+        // tx.set_to(NameOrAddress::Address(self.module.into()));
+        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
+    fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TransactionRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
             ));
         }
 
-        let call_data = InitiateOutgoingChannelClosureSafeCall {
-            self_: self.me.into(),
+        let call_data = initiateOutgoingChannelClosureSafeCall {
+            selfAddress: self.me.into(),
             destination: destination.into(),
         }
-        .encode();
+        .abi_encode();
 
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        tx.set_to(NameOrAddress::Address(self.module.into()));
-        tx.set_gas(DEFAULT_TX_GAS);
+        let tx = TransactionRequest::default()
+            .with_input(channels_payload(self.contract_addrs.channels, call_data))
+            .with_to(self.module.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
+        // tx.set_to(NameOrAddress::Address(self.module.into()));
+        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TypedTransaction> {
+    fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TransactionRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
                 "Cannot initiate closure of incoming channel to self".into(),
             ));
         }
 
-        let call_data = FinalizeOutgoingChannelClosureSafeCall {
-            self_: self.me.into(),
+        let call_data = finalizeOutgoingChannelClosureSafeCall {
+            selfAddress: self.me.into(),
             destination: destination.into(),
         }
-        .encode();
+        .abi_encode();
 
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        tx.set_to(NameOrAddress::Address(self.module.into()));
-        tx.set_gas(DEFAULT_TX_GAS);
+        let tx = TransactionRequest::default()
+            .with_input(channels_payload(self.contract_addrs.channels, call_data))
+            .with_to(self.module.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
+        // tx.set_to(NameOrAddress::Address(self.module.into()));
+        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TypedTransaction> {
+    fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<TransactionRequest> {
         let redeemable = convert_acknowledged_ticket(&acked_ticket)?;
 
         let params = convert_vrf_parameters(
@@ -492,40 +604,57 @@ impl PayloadGenerator<TypedTransaction> for SafePayloadGenerator {
             &acked_ticket.channel_dst,
         );
 
-        let call_data = RedeemTicketSafeCall {
-            self_: self.me.into(),
+        let call_data = redeemTicketSafeCall {
+            selfAddress: self.me.into(),
             redeemable,
             params,
         }
-        .encode();
+        .abi_encode();
 
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
-        tx.set_to(NameOrAddress::Address(self.module.into()));
-        tx.set_gas(DEFAULT_TX_GAS);
-
-        Ok(tx)
-    }
-
-    fn register_safe_by_node(&self, safe_addr: Address) -> Result<TypedTransaction> {
-        let mut tx = register_safe_tx(safe_addr);
-        tx.set_to(NameOrAddress::Address(self.contract_addrs.safe_registry.into()));
-        tx.set_gas(DEFAULT_TX_GAS);
+        let tx = TransactionRequest::default()
+            .with_input(channels_payload(self.contract_addrs.channels, call_data))
+            .with_to(self.module.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(channels_payload(self.contract_addrs.channels, call_data).into());
+        // tx.set_to(NameOrAddress::Address(self.module.into()));
+        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
 
-    fn deregister_node_by_safe(&self) -> Result<TypedTransaction> {
-        let mut tx = create_eip1559_transaction();
-        tx.set_data(
-            DeregisterNodeBySafeCall {
-                node_addr: self.me.into(),
-            }
-            .encode()
-            .into(),
-        );
-        tx.set_to(NameOrAddress::Address(self.module.into()));
-        tx.set_gas(DEFAULT_TX_GAS);
+    fn register_safe_by_node(&self, safe_addr: Address) -> Result<TransactionRequest> {
+        let tx = register_safe_tx(safe_addr)
+            .with_to(self.contract_addrs.safe_registry.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+        // let mut tx = register_safe_tx(safe_addr);
+        // tx.set_to(NameOrAddress::Address(self.contract_addrs.safe_registry.into()));
+        // tx.set_gas(DEFAULT_TX_GAS);
+
+        Ok(tx)
+    }
+
+    fn deregister_node_by_safe(&self) -> Result<TransactionRequest> {
+        let tx = TransactionRequest::default()
+            .with_input(
+                deregisterNodeBySafeCall {
+                    nodeAddr: self.me.into(),
+                }
+                .abi_encode(),
+            )
+            .with_to(self.module.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+
+        // let mut tx = create_eip1559_transaction();
+        // tx.set_data(
+        //     deregisterNodeBySafeCall {
+        //         nodeAddr: self.me.into(),
+        //     }
+        //     .abi_encode()
+        //     .into(),
+        // );
+        // tx.set_to(NameOrAddress::Address(self.module.into()));
+        // tx.set_gas(DEFAULT_TX_GAS);
 
         Ok(tx)
     }
@@ -540,7 +669,7 @@ pub fn convert_vrf_parameters(
     signer: &Address,
     ticket_hash: &Hash,
     domain_separator: &Hash,
-) -> Vrfparameters {
+) -> VRFParameters {
     // skip the secp256k1 curvepoint prefix
     let v = off_chain.V.as_uncompressed();
     let s_b = off_chain
@@ -553,15 +682,15 @@ pub fn convert_vrf_parameters(
 
     let h_v = off_chain.get_h_v_witness();
 
-    Vrfparameters {
-        vx: U256::from_big_endian(&v.as_bytes()[1..33]),
-        vy: U256::from_big_endian(&v.as_bytes()[33..65]),
-        s: U256::from_big_endian(&off_chain.s.to_bytes()),
-        h: U256::from_big_endian(&off_chain.h.to_bytes()),
-        s_bx: U256::from_big_endian(&s_b.as_bytes()[1..33]),
-        s_by: U256::from_big_endian(&s_b.as_bytes()[33..65]),
-        h_vx: U256::from_big_endian(&h_v.as_bytes()[1..33]),
-        h_vy: U256::from_big_endian(&h_v.as_bytes()[33..65]),
+    VRFParameters {
+        vx: U256::from_be_slice(&v.as_bytes()[1..33]),
+        vy: U256::from_be_slice(&v.as_bytes()[33..65]),
+        s: U256::from_be_slice(&off_chain.s.to_bytes()),
+        h: U256::from_be_slice(&off_chain.h.to_bytes()),
+        sBx: U256::from_be_slice(&s_b.as_bytes()[1..33]),
+        sBy: U256::from_be_slice(&s_b.as_bytes()[33..65]),
+        hVx: U256::from_be_slice(&h_v.as_bytes()[1..33]),
+        hVy: U256::from_be_slice(&h_v.as_bytes()[33..65]),
     }
 }
 
@@ -573,23 +702,34 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
     if let Some(ref signature) = off_chain.verified_ticket().signature {
         let serialized_signature = signature.as_ref();
 
-        let mut encoded_win_prob = [0u8; 8];
-        encoded_win_prob[1..].copy_from_slice(&off_chain.verified_ticket().encoded_win_prob);
-
+        println!(
+            "off_chain.verified_ticket().amount.amount() {:?}",
+            off_chain.verified_ticket().amount.amount()
+        );
+        // let mut encoded_win_prob = [0u8; 8];
+        // encoded_win_prob[1..].copy_from_slice(&off_chain.verified_ticket().encoded_win_prob);
         Ok(OnChainRedeemableTicket {
             data: TicketData {
-                channelId: off_chain.verified_ticket().channel_id.into(),
-                amount: off_chain.verified_ticket().amount.amount().as_u128(),
-                ticketIndex: off_chain.verified_ticket().index,
-                indexOffset: off_chain.verified_ticket().index_offset,
-                epoch: off_chain.verified_ticket().channel_epoch,
-                winProb: u64::from_be_bytes(encoded_win_prob),
+                channelId: B256::from_slice(&off_chain.verified_ticket().channel_id.as_ref()).into(),
+                amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), // Extract only the last 12 bytes (lowest 96 bits)
+                ticketIndex: U48::from_be_slice(&off_chain.verified_ticket().index.to_be_bytes()[8 - 6..]),
+                indexOffset: off_chain.verified_ticket().index_offset.into(),
+                epoch: U24::from_be_slice(&off_chain.verified_ticket().channel_epoch.to_be_bytes()[4 - 3..]),
+                winProb: U56::from_be_slice(&off_chain.verified_ticket().encoded_win_prob),
             },
+            // data: TicketData {
+            //     channelId: off_chain.verified_ticket().channel_id.into(),
+            //     amount: off_chain.verified_ticket().amount.amount().as_u128(),
+            //     ticketIndex: off_chain.verified_ticket().index,
+            //     indexOffset: off_chain.verified_ticket().index_offset,
+            //     epoch: off_chain.verified_ticket().channel_epoch,
+            //     winProb: u64::from_be_bytes(encoded_win_prob),
+            // },
             signature: CompactSignature {
-                r: H256::from_slice(&serialized_signature[0..32]).into(),
-                vs: H256::from_slice(&serialized_signature[32..64]).into(),
+                r: B256::from_slice(&serialized_signature[0..32]).into(),
+                vs: B256::from_slice(&serialized_signature[32..64]).into(),
             },
-            porSecret: U256::from_big_endian(off_chain.response.as_ref()),
+            porSecret: U256::from_be_slice(off_chain.response.as_ref()),
         })
     } else {
         Err(InvalidArguments("Acknowledged ticket must be signed".into()))
@@ -601,14 +741,12 @@ mod tests {
     use super::{BasicPayloadGenerator, PayloadGenerator};
 
     use anyhow::Context;
-    // TODO: Replace those with alloy-rs
-    // use ethers::providers::Middleware;
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use std::str::FromStr;
 
+    use alloy::{primitives::U256, providers::Provider};
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
-    use hopr_chain_rpc::client::surf_client::SurfRequestor;
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
@@ -617,13 +755,13 @@ mod tests {
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_announce() -> anyhow::Result<()> {
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56")?;
 
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+        let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
@@ -642,47 +780,54 @@ mod tests {
 
         let tx = generator.announce(ad)?;
 
-        assert!(client.send_transaction(tx, None).await?.await?.is_some());
+        assert!(client.send_transaction(tx).await?.get_receipt().await?.status());
 
         let test_multiaddr_reannounce = Multiaddr::from_str("/ip4/5.6.7.8/tcp/99")?;
 
         let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None)?;
         let reannounce_tx = generator.announce(ad_reannounce)?;
 
-        assert!(client.send_transaction(reannounce_tx, None).await?.await?.is_some());
+        assert!(client
+            .send_transaction(reannounce_tx)
+            .await?
+            .get_receipt()
+            .await?
+            .status());
+        // assert!(client.send_transaction(reannounce_tx).await?.await?.is_some());
 
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn redeem_ticket() -> anyhow::Result<()> {
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
+        let client = create_rpc_client_to_anvil(&anvil, &chain_key_alice);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice).await?;
 
         // Mint 1000 HOPR to Alice
-        hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+        let _ = hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128)).await;
 
-        let domain_separator: Hash = contract_instances.channels.domain_separator().call().await?.into();
+        // let domain_separator = contract_instances.channels.domainSeparator().call().await?._0;
+        let domain_separator: Hash = contract_instances.channels.domainSeparator().call().await?._0.0.into();
 
         // Open channel Alice -> Bob
-        hopr_chain_types::utils::fund_channel(
+        let _ = hopr_chain_types::utils::fund_channel(
             (&chain_key_bob).into(),
             contract_instances.token.clone(),
             contract_instances.channels.clone(),
-            1_u128.into(),
+            U256::from(1_u128),
         )
         .await;
 
         // Fund Bob's node
-        hopr_chain_types::utils::fund_node(
+        let _ = hopr_chain_types::utils::fund_node(
             (&chain_key_bob).into(),
-            1000000000000000000_u128.into(),
-            10_u128.into(),
+            U256::from(1000000000000000000_u128),
+            U256::from(10_u128),
             contract_instances.token.clone(),
         )
         .await;
@@ -708,49 +853,60 @@ mod tests {
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
-        println!("{:?}", client.send_transaction(redeem_ticket_tx, None).await?.await);
+        let client = create_rpc_client_to_anvil(&anvil, &chain_key_bob);
+
+        assert!(client
+            .send_transaction(redeem_ticket_tx)
+            .await?
+            .get_receipt()
+            .await?
+            .status());
 
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn withdraw_token() -> anyhow::Result<()> {
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
+        let client = create_rpc_client_to_anvil(&anvil, &chain_key_alice);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice).await?;
         let generator = BasicPayloadGenerator::new((&chain_key_alice).into(), (&contract_instances).into());
 
         // Mint 1000 HOPR to Alice
-        hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+        let _ = hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128)).await;
 
         // Check balance is 1000 HOPR
-        let balance: ethers::types::U256 = contract_instances
+        let balance = contract_instances
             .token
-            .balance_of(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
+            .balanceOf(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
             .call()
-            .await?;
-        assert_eq!(balance, 1000_u128.into());
+            .await?
+            ._0;
+        assert_eq!(balance, U256::from(1000_u128));
 
         // Alice withdraws 100 HOPR (to Bob's address)
         let tx = generator.transfer(
             (&chain_key_bob).into(),
-            Balance::new(ethers::types::U256::from(100_u128), BalanceType::HOPR),
+            Balance::new(
+                hopr_primitive_types::primitives::U256::from(100_u128),
+                BalanceType::HOPR,
+            ),
         )?;
 
-        assert!(client.send_transaction(tx, None).await?.await?.is_some());
+        assert!(client.send_transaction(tx).await?.get_receipt().await?.status());
 
         // Alice withdraws 100 HOPR, leaving 900 HOPR to the node
-        let balance: ethers::types::U256 = contract_instances
+        let balance = contract_instances
             .token
-            .balance_of(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
+            .balanceOf(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
             .call()
-            .await?;
-        assert_eq!(balance, 900_u128.into());
+            .await?
+            ._0;
+        assert_eq!(balance, U256::from(900_u128));
 
         Ok(())
     }
