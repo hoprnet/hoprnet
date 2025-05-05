@@ -1,6 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -12,27 +12,42 @@ use pin_project::pin_project;
 
 /// Controller for [`RateLimitedStream`] to allow dynamic controlling of the stream's rate.
 #[derive(Debug)]
-pub struct RateController(Arc<AtomicUsize>, Arc<AtomicUsize>);
+pub struct RateController(Arc<AtomicU64>);
 
 #[allow(unused)]
 impl RateController {
+    const MIN_DELAY: Duration = Duration::from_micros(100);
+
     /// Update the rate limit (elements per unit).
     pub fn set_rate_per_unit(&self, elements_per_unit: usize, unit: Duration) {
-        self.0.store(elements_per_unit, Ordering::Relaxed);
-        self.1.store(unit.as_millis() as usize, Ordering::Relaxed);
+        assert!(unit > Duration::ZERO, "unit must be greater than zero");
+
+        if elements_per_unit > 0 {
+            // Calculate the next allowable time based on the rate
+            let rate_per_sec = (elements_per_unit as f64 / unit.as_secs_f64());
+
+            // Convert to duration (seconds per element) and subtract the duration
+            // it took to yield the element from the inner stream
+            self.0.store(
+                Duration::from_secs_f64(1.0 / rate_per_sec)
+                    .max(Self::MIN_DELAY)
+                    .as_millis() as u64,
+                Ordering::Relaxed,
+            );
+        } else {
+            self.0.store(0, Ordering::Relaxed);
+        }
     }
 
     /// Get the current rate limit per time unit.
-    pub fn get_rate_per_unit(&self) -> (usize, Duration) {
-        (
-            self.0.load(Ordering::Relaxed),
-            Duration::from_millis(self.1.load(Ordering::Relaxed) as u64),
-        )
+    pub fn get_rate_per_sec(&self) -> f64 {
+        1.0 / Duration::from_millis(self.0.load(Ordering::Relaxed)).as_secs_f64()
     }
 }
 
 enum State {
     Read,
+    NoRate,
     Wait,
 }
 
@@ -47,29 +62,24 @@ pub struct RateLimitedStream<S: Stream> {
     #[pin]
     delay: Option<Sleep>,
     state: State,
-    elements_per_unit: Arc<AtomicUsize>,
-    unit_in_ms: Arc<AtomicUsize>,
+    delay_time: Arc<AtomicU64>,
 }
 
 impl<S: Stream> RateLimitedStream<S> {
-    const MAX_RATE_PER_SEC: f64 = 10_000.0;
-
     /// Creates a stream with some initial rate limit of elements per a time unit.
     pub fn new_with_rate_per_unit(stream: S, initial_rate_per_unit: usize, unit: Duration) -> (Self, RateController) {
-        assert!(unit > Duration::ZERO, "unit must be greater than zero");
+        let rc = RateController(Arc::new(AtomicU64::new(0)));
+        rc.set_rate_per_unit(initial_rate_per_unit, unit);
 
-        let rate = Arc::new(AtomicUsize::new(initial_rate_per_unit));
-        let unit = Arc::new(AtomicUsize::new(unit.as_millis() as usize));
         (
             Self {
                 inner: stream,
                 item: None,
                 delay: None,
                 state: State::Read,
-                elements_per_unit: rate.clone(),
-                unit_in_ms: unit.clone(),
+                delay_time: rc.0.clone(),
             },
-            RateController(rate, unit),
+            rc,
         )
     }
 }
@@ -88,40 +98,40 @@ where
                 State::Read => {
                     let yield_start = Instant::now();
                     if let Some(item) = futures::ready!(this.inner.as_mut().poll_next(cx)) {
-                        let offset = yield_start.elapsed();
-                        let units = this.elements_per_unit.load(Ordering::Relaxed);
-                        let delay = if units > 0 {
-                            // Calculate the next allowable time based on the rate
-                            let rate_per_sec = (units as f64
-                                / Duration::from_millis(this.unit_in_ms.load(Ordering::Relaxed) as u64).as_secs_f64())
-                            .min(Self::MAX_RATE_PER_SEC);
-
-                            // Convert to duration (seconds per element) and subtract the duration
-                            // it took to yield the element from the inner stream
-                            Duration::from_secs_f64(1.0 / rate_per_sec)
-                                .saturating_sub(offset)
-                                .max(Duration::from_secs_f64(1.0 / Self::MAX_RATE_PER_SEC))
-                        } else {
-                            Duration::from_millis(100)
-                        };
-
-                        *this.delay = Some(futures_time::task::sleep(delay.into()));
                         *this.item = Some(item);
-                        *this.state = State::Wait;
+                        let delay_time = this.delay_time.load(Ordering::Relaxed);
+                        if delay_time > 0 {
+                            let wait = Duration::from_millis(delay_time)
+                                .saturating_sub(yield_start.elapsed())
+                                .max(RateController::MIN_DELAY);
+                            *this.delay = Some(futures_time::task::sleep(wait.into()));
+                            *this.state = State::Wait;
+                        } else {
+                            *this.delay = Some(futures_time::task::sleep(Duration::from_millis(100).into()));
+                            *this.state = State::NoRate;
+                        }
                     } else {
                         return Poll::Ready(None);
+                    }
+                }
+                State::NoRate => {
+                    if let Some(mut delay) = this.delay.as_mut().as_pin_mut() {
+                        let _ = futures::ready!(delay.as_mut().poll(cx));
+                        let delay_time = this.delay_time.load(Ordering::Relaxed);
+                        if delay_time > 0 {
+                            *this.delay = Some(futures_time::task::sleep(Duration::from_millis(delay_time).into()));
+                            *this.state = State::Wait;
+                        } else {
+                            delay.reset_timer();
+                            *this.state = State::NoRate;
+                        }
                     }
                 }
                 State::Wait => {
                     if let Some(mut delay) = this.delay.as_mut().as_pin_mut() {
                         let _ = futures::ready!(delay.as_mut().poll(cx));
-
-                        if this.elements_per_unit.load(Ordering::Relaxed) > 0 {
-                            *this.state = State::Read;
-                            return Poll::Ready(this.item.take());
-                        } else {
-                            delay.reset_timer();
-                        }
+                        *this.state = State::Read;
+                        return Poll::Ready(this.item.take());
                     }
                 }
             }
@@ -164,7 +174,7 @@ mod tests {
         // Set a rate of 10 elements per second (100ms per element)
         let (rate_limited, controller) = stream.rate_limit_per_unit(10, Duration::from_secs(1));
 
-        assert_eq!(controller.get_rate_per_unit().0, 10);
+        assert_eq!(controller.get_rate_per_sec(), 10.0);
 
         let start = Instant::now();
 
@@ -304,7 +314,7 @@ mod tests {
         assert_eq!(all_items, vec![1, 2, 3]);
         assert!(
             all_items_elapsed >= Duration::from_millis(300),
-            "all items should have been yielded in at least 300ms"
+            "all items should have been yielded in at least 300ms instead {all_items_elapsed:?}"
         );
 
         Ok(())
