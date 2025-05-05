@@ -520,12 +520,13 @@ mod tests {
         let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
-        let mut server = mockito::Server::new();
+        let mut server = mockito::Server::new_async().await;
         let gas_oracle_mock = server.mock("GET", "/gas_oracle")
             .with_header("content-type", "application/json")
             .with_status(200)
             .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"38791478","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999985432689946"}}"#)
-            .create();
+            .create_async()
+            .await;
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),

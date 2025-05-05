@@ -1010,7 +1010,10 @@ mod tests {
             .expect_err("expected error");
 
         m.assert();
-        assert!(matches!(err, JsonRpcProviderClientError::BackendError(_)));
+        assert!(
+            matches!(err, JsonRpcProviderClientError::BackendError(_)),
+            "expected backend error, but got: {err:?}"
+        );
         assert_eq!(
             0,
             client.requests_enqueued.load(Ordering::SeqCst),
