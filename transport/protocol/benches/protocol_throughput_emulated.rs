@@ -10,7 +10,7 @@ use hopr_crypto_types::keypairs::Keypair;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::{Balance, BalanceType};
-use hopr_transport_protocol::msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
+use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
 use libp2p::PeerId;
 
 const SAMPLE_SIZE: usize = 20;
@@ -47,11 +47,6 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                     let dbs = dbs.clone();
 
                     async move {
-                        let (wire_ack_send_tx, _wire_ack_send_rx) =
-                            futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-                        let (_wire_ack_recv_tx, wire_ack_recv_rx) =
-                            futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-
                         let (wire_msg_send_tx, wire_msg_send_rx) =
                             futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
 
@@ -67,7 +62,6 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
                         let cfg = PacketInteractionConfig {
                             packet_keypair: (&PEERS[TESTED_PEER_ID]).clone(),
-                            chain_keypair: (&PEERS_CHAIN[TESTED_PEER_ID]).clone(),
                             outgoing_ticket_win_prob: Some(1.0),
                             outgoing_ticket_price: Some(Balance::new(1, BalanceType::HOPR)),
                         };
@@ -76,7 +70,6 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             cfg,
                             dbs[TESTED_PEER_ID].clone(),
                             None,
-                            (wire_ack_send_tx, wire_ack_recv_rx),
                             (wire_msg_send_tx, wire_msg_recv_rx),
                             (api_recv_tx, api_send_rx),
                         )
@@ -84,7 +77,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
                         let path = resolve_mock_path(
                             PEERS_CHAIN[TESTED_PEER_ID].public().to_address(),
-                            PEERS[1..PEER_COUNT].iter().map(|p| p.public().clone().into()).collect(),
+                            PEERS[1..PEER_COUNT].iter().map(|p| p.public().clone()).collect(),
                             PEERS_CHAIN[1..PEER_COUNT]
                                 .iter()
                                 .map(|key| key.public().to_address())
