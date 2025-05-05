@@ -68,7 +68,7 @@ jobs:
           USER: runner
 
       - name: Cleanup Docker images
-        run: nix develop -c ./scripts/clean-docker-images.py "${{ vars.DOCKER_IMAGE_REGISTRY }}"
+        run: nix develop -L .#ci -c ./scripts/clean-docker-images.py "${{ vars.DOCKER_IMAGE_REGISTRY }}"
 
   # cleanup-git:
   #   name: Cleanup Git
