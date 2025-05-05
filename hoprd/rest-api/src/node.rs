@@ -365,7 +365,7 @@ pub(super) async fn channel_graph(
         "hoprManagementModule": "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0",
         "hoprNetworkRegistry": "0x3aa5ebb10dc797cac828524e59a333d0a371443c",
         "hoprNodeSafe": "0x42bc901b1d040f984ed626eff550718498a6798a",
-        "hoprNodeSageRegistry": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
+        "hoprNodeSafeRegistry": "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82",
         "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
         "isEligible": true,
         "listeningAddress": [
@@ -498,7 +498,7 @@ pub(crate) struct EntryNode {
         responses(
             (status = 200, description = "Fetched public nodes' information", body = HashMap<String, EntryNode>, example = json!({
                 "0x188c4462b75e46f0c7262d7f48d182447b93a93c": {
-                    "isElligible": true,
+                    "isEligible": true,
                     "multiaddrs": ["/ip4/10.0.2.100/tcp/19091"]
                 }
             })),

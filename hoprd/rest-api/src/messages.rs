@@ -49,7 +49,7 @@ pub(crate) struct SizeResponse {
 #[schema(example = json!({
     "body": "Test message",
     "hops": 1,
-    "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
+    "destination": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
     "tag": 2000
 }))]
 /// Body and all routing information required to send a message to another peer.
@@ -59,6 +59,7 @@ pub(crate) struct SendMessageBodyRequest {
     tag: u16,
     /// Message to be transmitted over the network
     #[serde_as(as = "Bytes")]
+    #[schema(value_type = String)]
     body: Vec<u8>,
     /// The recipient HOPR PeerId or address
     #[serde_as(as = "DisplayFromStr")]
@@ -76,7 +77,8 @@ pub(crate) struct SendMessageBodyRequest {
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "timestamp": 2147483647
+        "timestamp": 2147483647,
+        "challenge": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
     }))]
 #[serde(rename_all = "camelCase")]
 /// Response to a message sent to another peer.

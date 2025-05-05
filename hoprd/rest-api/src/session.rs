@@ -51,13 +51,13 @@ lazy_static::lazy_static! {
         &["type"]
     ).unwrap();
 }
-
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 /// Session target specification.
 pub enum SessionTargetSpec {
     Plain(String),
     Sealed(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>),
+    #[schema(value_type = u32)]
     Service(ServiceId),
 }
 
