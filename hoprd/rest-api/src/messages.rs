@@ -22,12 +22,15 @@ use hopr_network_types::prelude::DestinationRouting;
 
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
+/// Filter applied when interacting with the message inbox.
 pub(crate) struct TagQueryRequest {
     #[schema(required = false)]
+    /// The message tag used to filter messages based on application
     tag: Option<u16>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, Deserialize, utoipa::ToSchema)]
+/// Number of messages in the inbox
 pub(crate) struct SizeResponse {
     size: usize,
 }
@@ -49,6 +52,7 @@ pub(crate) struct SizeResponse {
     "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
     "tag": 2000
 }))]
+/// Body and all routing information required to send a message to another peer.
 pub(crate) struct SendMessageBodyRequest {
     /// The message tag used to filter messages based on application, must be from range <1024,65535>
     #[schema(minimum = 1024, maximum = 65535)]
@@ -75,6 +79,7 @@ pub(crate) struct SendMessageBodyRequest {
         "timestamp": 2147483647
     }))]
 #[serde(rename_all = "camelCase")]
+/// Response to a message sent to another peer.
 pub(crate) struct SendMessageResponse {
     #[serde_as(as = "DurationMilliSeconds<u64>")]
     #[schema(value_type = u64)]
@@ -90,6 +95,7 @@ pub(crate) struct SendMessageResponse {
     "tag": 801,
     "timestamp": 2147483647
 }))]
+/// Message tag and timestamp to peek/pop from.
 pub(crate) struct GetMessageBodyRequest {
     /// The message tag used to filter messages based on application
     #[schema(required = false)]
@@ -107,6 +113,7 @@ pub(crate) struct GetMessageBodyRequest {
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages"),
+        description = "Send a message to another peer using the given path",
         request_body(
             content = SendMessageBodyRequest,
             description = "Body of a message to send",
@@ -228,6 +235,7 @@ pub(super) async fn send_message(
 #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/messages"),
+        description = "Delete messages from nodes message inbox",
         params(TagQueryRequest),
         responses(
             (status = 204, description = "Messages successfully deleted."),
@@ -259,6 +267,7 @@ pub(super) async fn delete_messages(
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/messages/size"),
+        description = "Get size of filtered message inbox for a specific tag",
         params(TagQueryRequest),
         responses(
             (status = 200, description = "Returns the message inbox size filtered by the given tag", body = SizeResponse),
@@ -295,7 +304,8 @@ pub(super) async fn size(
         "tag": 2000
     }))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MessagePopResponse {
+/// Single message from the inbox
+pub(crate) struct MessageInboxResponse {
     tag: u16,
     body: String,
     #[serde_as(as = "DurationMilliSeconds<u64>")]
@@ -303,9 +313,9 @@ pub(crate) struct MessagePopResponse {
     received_at: std::time::Duration,
 }
 
-fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Result<MessagePopResponse, String> {
+fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Result<MessageInboxResponse, String> {
     match std::str::from_utf8(&data.plain_text) {
-        Ok(data_str) => Ok(MessagePopResponse {
+        Ok(data_str) => Ok(MessageInboxResponse {
             tag: data.application_tag,
             body: data_str.into(),
             received_at,
@@ -320,13 +330,14 @@ fn to_api_message(data: hopr_lib::ApplicationData, received_at: Duration) -> Res
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages/pop"),
+        description = "Get the oldest message currently present in the nodes message inbox",
         request_body(
             content = TagQueryRequest,
             description = "Tag of message queue to pop from",
             content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "Message successfully extracted.", body = MessagePopResponse),
+            (status = 200, description = "Message successfully extracted.", body = MessageInboxResponse),
             (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
@@ -361,8 +372,9 @@ pub(super) async fn pop(
 }
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
-pub(crate) struct MessagePopAllResponse {
-    messages: Vec<MessagePopResponse>,
+/// All messages matching the filters criteria from the pop/peek request
+pub(crate) struct MessageInboxAllResponse {
+    messages: Vec<MessageInboxResponse>,
 }
 
 /// Get the list of messages currently present in the nodes message inbox.
@@ -377,7 +389,7 @@ pub(crate) struct MessagePopAllResponse {
             content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "All message successfully extracted.", body = MessagePopAllResponse),
+            (status = 200, description = "All message successfully extracted.", body = MessageInboxAllResponse),
             (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
@@ -401,7 +413,7 @@ pub(super) async fn pop_all(
 
     let inbox = state.inbox.clone();
     let inbox = inbox.write().await;
-    let messages: Vec<MessagePopResponse> = inbox
+    let messages: Vec<MessageInboxResponse> = inbox
         .pop_all(tag)
         .await
         .into_iter()
@@ -414,7 +426,7 @@ pub(super) async fn pop_all(
         })
         .collect::<Vec<_>>();
 
-    (StatusCode::OK, Json(MessagePopAllResponse { messages })).into_response()
+    (StatusCode::OK, Json(MessageInboxAllResponse { messages })).into_response()
 }
 
 /// Peek the oldest message currently present in the nodes message inbox.
@@ -423,13 +435,14 @@ pub(super) async fn pop_all(
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages/peek"),
+        description = "Peek the oldest message currently present in the nodes message inbox",
         request_body(
             content = TagQueryRequest,
             description = "Tag of message queue to peek from",
             content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "Message successfully peeked at.", body = MessagePopResponse),
+            (status = 200, description = "Message successfully peeked at.", body = MessageInboxResponse),
             (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
@@ -469,13 +482,14 @@ pub(super) async fn peek(
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/messages/peek-all"),
+        description = "Peek the list of messages currently present in the nodes message inbox",
         request_body(
             content = GetMessageBodyRequest,
             description = "Tag of message queue and optionally a timestamp since from to start peeking. When an empty object or an object with a `tag: 0` is provided, it fetches all the messages.",
             content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "All messages successfully peeked at.", body = MessagePopAllResponse),
+            (status = 200, description = "All messages successfully peeked at.", body = MessageInboxAllResponse),
             (status = 400, description = "Bad request.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "The specified resource was not found."),
@@ -513,7 +527,7 @@ pub(super) async fn peek_all(
         })
         .collect::<Vec<_>>();
 
-    (StatusCode::OK, Json(MessagePopAllResponse { messages })).into_response()
+    (StatusCode::OK, Json(MessageInboxAllResponse { messages })).into_response()
 }
 
 #[cfg(test)]

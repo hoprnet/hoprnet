@@ -54,6 +54,7 @@ lazy_static::lazy_static! {
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+/// Session target specification.
 pub enum SessionTargetSpec {
     Plain(String),
     Sealed(#[serde_as(as = "serde_with::base64::Base64")] Vec<u8>),
@@ -131,6 +132,7 @@ pub struct StoredSessionEntry {
 #[derive(
     Debug, Clone, strum::EnumIter, strum::Display, strum::EnumString, Serialize, Deserialize, utoipa::ToSchema,
 )]
+/// Session capabilities that can be negotiated with the target peer.
 pub enum SessionCapability {
     /// Frame segmentation
     Segmentation,
@@ -234,6 +236,7 @@ struct WssData(Vec<u8>);
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/session/websocket"),
+        description = "Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR sessions.",
         params(SessionWebsocketClientQueryRequest),
         responses(
             (status = 200, description = "Successfully created a new client websocket session."),
@@ -346,6 +349,7 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
 
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+/// Routing options for the Session.
 pub enum RoutingOptions {
     #[cfg(feature = "explicit-path")]
     #[schema(value_type = Vec<String>)]
@@ -365,6 +369,7 @@ pub enum RoutingOptions {
         "capabilities": ["Retransmission", "Segmentation"]
     }))]
 #[serde(rename_all = "camelCase")]
+/// Request body for creating a new client session.
 pub(crate) struct SessionClientRequest {
     /// Peer ID of the Exit node.
     #[serde_as(as = "DisplayFromStr")]
@@ -442,6 +447,7 @@ impl SessionClientRequest {
         "path": { "Hops": 1 }
     }))]
 #[serde(rename_all = "camelCase")]
+/// Response body for creating a new client session.
 pub(crate) struct SessionClientResponse {
     pub target: String,
     #[serde_as(as = "DisplayFromStr")]
@@ -499,6 +505,7 @@ fn build_binding_host(requested: Option<&str>, default: std::net::SocketAddr) ->
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
+        description = "Creates a new client HOPR session that will start listening on a dedicated port. Once the port is bound, it is possible to use the socket for bidirectional read and write communication.",
         params(
             ("protocol" = String, Path, description = "IP transport protocol")
         ),
@@ -682,6 +689,7 @@ pub(crate) async fn create_client(
 #[utoipa::path(
     get,
     path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
+    description = "Lists existing Session listeners for the given IP protocol.",
     params(
             ("protocol" = String, Path, description = "IP transport protocol")
     ),
@@ -724,6 +732,7 @@ pub(crate) async fn list_clients(
 )]
 #[strum(serialize_all = "lowercase", ascii_case_insensitive)]
 #[serde(rename_all = "lowercase")]
+/// IP transport protocol
 pub enum IpProtocol {
     #[allow(clippy::upper_case_acronyms)]
     TCP,
@@ -745,8 +754,13 @@ impl From<IpProtocol> for hopr_lib::IpProtocol {
 pub struct SessionCloseClientQuery {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
+    /// IP transport protocol
     pub protocol: IpProtocol,
+
+    /// Listening IP address of the Session.
     pub ip: String,
+
+    /// Session port used for the listener.
     pub port: u16,
 }
 
@@ -758,6 +772,7 @@ pub struct SessionCloseClientQuery {
 #[utoipa::path(
     delete,
     path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}/{{ip}}/{{port}}"),
+    description = "Closes an existing Session listener.",
     params(SessionCloseClientQuery),
     responses(
             (status = 204, description = "Listener closed successfully"),

@@ -23,6 +23,7 @@ use crate::{
         "apiVersion": "3.10.0"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Running node version alongside the API version.
 pub(crate) struct NodeVersionResponse {
     version: String,
     api_version: String,
@@ -32,6 +33,7 @@ pub(crate) struct NodeVersionResponse {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/version"),
+        description = "Get the release version of the running node",
         responses(
             (status = 200, description = "Fetched node version", body = NodeVersionResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -52,6 +54,7 @@ pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl Int
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/configuration"),
+        description = "Get the configuration of the running node",
         responses(
             (status = 200, description = "Fetched node configuration", body = String),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -71,9 +74,11 @@ pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> im
         "quality": 0.7
     }))]
 #[into_params(parameter_in = Query)]
+/// Quality information for a peer.
 pub(crate) struct NodePeersQueryRequest {
     #[schema(required = false)]
     #[serde(default)]
+    /// Minimum peer quality to be include in the response.
     quality: f64,
 }
 
@@ -83,6 +88,7 @@ pub(crate) struct NodePeersQueryRequest {
     "success": 10
 }))]
 #[serde(rename_all = "camelCase")]
+/// Heartbeat information for a peer.
 pub(crate) struct HeartbeatInfo {
     sent: u64,
     success: u64,
@@ -91,6 +97,7 @@ pub(crate) struct HeartbeatInfo {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// All information about a known peer.
 pub(crate) struct PeerInfo {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
@@ -118,6 +125,7 @@ pub(crate) struct PeerInfo {
     "multiaddr": "/ip4/178.12.1.9/tcp/19092"
 }))]
 #[serde(rename_all = "camelCase")]
+/// Represents a peer that has been announced on-chain.
 pub(crate) struct AnnouncedPeer {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
@@ -132,6 +140,7 @@ pub(crate) struct AnnouncedPeer {
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// All connected and announced peers.
 pub(crate) struct NodePeersResponse {
     connected: Vec<PeerInfo>,
     announced: Vec<AnnouncedPeer>,
@@ -147,6 +156,7 @@ pub(crate) struct NodePeersResponse {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/peers"),
+        description = "Lists information for connected and announced peers",
         params(NodePeersQueryRequest),
         responses(
             (status = 200, description = "Successfully returned observed peers", body = NodePeersResponse),
@@ -251,6 +261,7 @@ fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/metrics"),
+        description = "Retrieve Prometheus metrics from the running node",
         responses(
             (status = 200, description = "Fetched node metrics", body = String),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -272,6 +283,7 @@ pub(super) async fn metrics() -> impl IntoResponse {
 #[derive(Debug, Clone, Deserialize, Default, utoipa::IntoParams, utoipa::ToSchema)]
 #[into_params(parameter_in = Query)]
 #[serde(default, rename_all = "camelCase")]
+/// Query parameters for the channel graph export.
 pub(crate) struct GraphExportQuery {
     /// If set, nodes that are not connected to this node (via open channels) will not be exported.
     /// This setting automatically implies `ignore_non_opened_channels`.
@@ -309,6 +321,7 @@ impl From<GraphExportQuery> for GraphExportConfig {
 #[utoipa::path(
     get,
     path = const_format::formatcp!("{BASE_PATH}/node/graph"),
+    description = "Retrieve node's channel graph in DOT or JSON format",
     params(GraphExportQuery),
     responses(
             (status = 200, description = "Fetched channel graph", body = String),
@@ -366,6 +379,7 @@ pub(super) async fn channel_graph(
         "indexerLastLogChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
     }))]
 #[serde(rename_all = "camelCase")]
+/// Information about the current node. Covers network, addresses, eligibility, connectivity status, contracts addresses and indexer state.
 pub(crate) struct NodeInfoResponse {
     network: String,
     #[serde_as(as = "Vec<DisplayFromStr>")]
@@ -411,6 +425,7 @@ pub(crate) struct NodeInfoResponse {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/node/info"),
+        description = "Get information about this HOPR Node",
         responses(
             (status = 200, description = "Fetched node version", body = NodeInfoResponse),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -467,6 +482,7 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// Reachable entry node information
 pub(crate) struct EntryNode {
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>)]
@@ -477,7 +493,8 @@ pub(crate) struct EntryNode {
 /// List all known entry nodes with multiaddrs and eligibility.
 #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/node/entryNodes"),
+        path = const_format::formatcp!("{BASE_PATH}/node/entry-nodes"),
+        description = "List all known entry nodes with multiaddrs and eligibility",
         responses(
             (status = 200, description = "Fetched public nodes' information", body = HashMap<String, EntryNode>, example = json!({
                 "0x188c4462b75e46f0c7262d7f48d182447b93a93c": {

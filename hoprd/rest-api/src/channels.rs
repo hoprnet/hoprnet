@@ -25,6 +25,7 @@ use crate::{
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+/// Channel information as seen by the node.
 pub(crate) struct NodeChannel {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
@@ -53,6 +54,7 @@ pub(crate) struct NodeChannel {
         "ticketIndex": 0
     }))]
 #[serde(rename_all = "camelCase")]
+/// General information about a channel state.
 pub(crate) struct ChannelInfoResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
@@ -138,10 +140,10 @@ async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<Chan
     })
 }
 
-/// Parameters for enumerating channels.
 #[derive(Debug, Default, Copy, Clone, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 #[into_params(parameter_in = Query)]
 #[serde(default, rename_all = "camelCase")]
+/// Parameters for enumerating channels.
 pub(crate) struct ChannelsQueryRequest {
     /// Should be the closed channels included?
     #[schema(required = false)]
@@ -158,6 +160,7 @@ pub(crate) struct ChannelsQueryRequest {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
+        description = "List channels opened to/from this node. Alternatively, it can print all the channels in the network as this node sees them.",
         params(ChannelsQueryRequest),
         responses(
             (status = 200, description = "Channels fetched successfully", body = NodeChannelsResponse),
@@ -247,6 +250,7 @@ pub(super) async fn list_channels(
         "amount": "10",
         "destination": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
     }))]
+/// Request body for opening a channel.
 pub(crate) struct OpenChannelBodyRequest {
     /// On-chain address of the counterparty.
     #[serde_as(as = "DisplayFromStr")]
@@ -263,6 +267,7 @@ pub(crate) struct OpenChannelBodyRequest {
         "transactionReceipt": "0x5181ac24759b8e01b3c932e4636c3852f386d17517a8dfc640a5ba6f2258f29c"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Response body for opening a channel.
 pub(crate) struct OpenChannelResponse {
     /// ID of the new channel.
     #[serde_as(as = "DisplayFromStr")]
@@ -278,6 +283,7 @@ pub(crate) struct OpenChannelResponse {
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
+        description = "Opens a channel to the given on-chain address with the given initial stake of HOPR tokens.",
         request_body(
             content = OpenChannelBodyRequest,
             description = "Open channel request specification: on-chain address of the counterparty and the initial HOPR token stake.",
@@ -349,6 +355,7 @@ pub(crate) struct ChannelIdParams {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
+        description = "Returns information about the given channel.",
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
@@ -394,6 +401,7 @@ pub(super) async fn show_channel(
         "channelStatus": "PendingToClose"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Status of the channel after a close operation.
 pub(crate) struct CloseChannelResponse {
     /// Receipt for the channel close transaction.
     #[serde_as(as = "DisplayFromStr")]
@@ -413,6 +421,7 @@ pub(crate) struct CloseChannelResponse {
 #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
+        description = "Closes the given channel.",
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
@@ -475,6 +484,7 @@ pub(crate) struct FundBodyRequest {
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
+        description = "Funds the given channel with the given amount of HOPR tokens.",
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),

@@ -26,6 +26,7 @@ use crate::{
         "/ip4/10.0.2.100/tcp/19093"
     ]
 }))]
+/// Contains the multiaddresses of peers that are `announced` on-chain and `observed` by the node.
 pub(crate) struct NodePeerInfoResponse {
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[schema(value_type = Vec<String>)]
@@ -91,6 +92,7 @@ pub(super) async fn show_peer_info(
     "reportedVersion": "2.1.0"
 }))]
 #[serde(rename_all = "camelCase")]
+/// Contains the latency and the reported version of a peer that has been pinged.
 pub(crate) struct PingResponse {
     #[serde_as(as = "DurationMilliSeconds<u64>")]
     #[schema(value_type = u64)]
@@ -102,6 +104,7 @@ pub(crate) struct PingResponse {
 #[utoipa::path(
     post,
     path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}/ping"),
+    description = "Directly ping the given peer",
     params(
         ("destination" = String, Path, description = "PeerID or address of the requested peer")
     ),

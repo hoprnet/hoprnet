@@ -27,6 +27,7 @@ use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
         "winProb": "1"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Represents a ticket in a channel.
 pub(crate) struct ChannelTicket {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
@@ -63,6 +64,7 @@ pub(crate) struct ChannelIdParams {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
+        description = "Lists all tickets for the given channel ID.",
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
@@ -102,6 +104,7 @@ pub(super) async fn show_channel_tickets(
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets"),
+        description = "(deprecated) Returns an empty array.",
         responses(
             (status = 200, description = "Fetched all tickets in all the channels", body = [ChannelTicket]),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -127,6 +130,7 @@ pub(super) async fn show_all_tickets() -> impl IntoResponse {
         "unredeemedValue": "2000000000000000",
     }))]
 #[serde(rename_all = "camelCase")]
+/// Received tickets statistics.
 pub(crate) struct NodeTicketStatisticsResponse {
     winning_count: u64,
     unredeemed_value: String,
@@ -151,6 +155,7 @@ impl From<TicketStatistics> for NodeTicketStatisticsResponse {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
+        description = "Returns current complete statistics on tickets.",
         responses(
             (status = 200, description = "Tickets statistics fetched successfully. Check schema for description of every field in the statistics.", body = NodeTicketStatisticsResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -174,6 +179,7 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
 #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
+        description = "Resets the ticket metrics.",
         responses(
             (status = 204, description = "Ticket statistics reset successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -200,6 +206,7 @@ pub(super) async fn reset_ticket_statistics(State(state): State<Arc<InternalStat
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
+        description = "Starts redeeming of all tickets in all channels.",
         responses(
             (status = 204, description = "Tickets redeemed successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -230,6 +237,7 @@ pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) 
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/redeem"),
+        description = "Starts redeeming all tickets in the given channel.",
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),
@@ -270,6 +278,7 @@ pub(super) async fn redeem_tickets_in_channel(
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/aggregate"),
+        description = "Starts aggregation of tickets in the given channel.",
         params(
             ("channelId" = String, Path, description = "ID of the channel.")
         ),

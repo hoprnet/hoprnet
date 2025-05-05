@@ -20,6 +20,7 @@ use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
         "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Contains the node's HOPR and native addresses.
 pub(crate) struct AccountAddressesResponse {
     native: String,
     hopr: String,
@@ -60,6 +61,7 @@ pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl I
         "safeNative": "10000000000000000000"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Contains all node's and safe's related balances.
 pub(crate) struct AccountBalancesResponse {
     safe_native: String,
     native: String,
@@ -155,6 +157,7 @@ where
         "currency": "HOPR"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Request body for the withdraw endpoint.
 pub(crate) struct WithdrawBodyRequest {
     // #[serde_as(as = "DisplayFromStr")]
     #[serde(deserialize_with = "deserialize_balance_type")]
@@ -173,6 +176,7 @@ pub(crate) struct WithdrawBodyRequest {
         "receipt": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     }))]
 #[serde(rename_all = "camelCase")]
+/// Response body for the withdraw endpoint.
 pub(crate) struct WithdrawResponse {
     receipt: String,
 }
@@ -183,9 +187,12 @@ pub(crate) struct WithdrawResponse {
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/account/withdraw"),
+        description = "Withdraw funds from this node to the ethereum wallet address",
         request_body(
             content = WithdrawBodyRequest,
-            content_type = "application/json"),
+            content_type = "application/json",
+            description = "Request body for the withdraw endpoint",
+        ),
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = WithdrawResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
