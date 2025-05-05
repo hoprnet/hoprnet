@@ -65,3 +65,4 @@ hex-literal = { workspace = true }
 test-log = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
+tracing-test = { workspace = true }

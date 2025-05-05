@@ -959,7 +959,7 @@ mod tests {
 
         let m = server
             .mock("POST", "/")
-            .with_status(http_types::StatusCode::TooManyRequests as usize)
+            .with_status(http_types::StatusCode::TooManyRequests as usize) // TODO: This value is not respected
             .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
             .with_body("{}")
             .expect(3)
@@ -983,37 +983,6 @@ mod tests {
 
         m.assert();
         assert!(matches!(err, JsonRpcProviderClientError::BackendError(_)));
-        assert_eq!(
-            0,
-            client.requests_enqueued.load(Ordering::SeqCst),
-            "retry queue should be zero when policy says no more retries"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_client_should_not_retry_with_zero_retry_policy() {
-        let mut server = mockito::Server::new_async().await;
-
-        let m = server
-            .mock("POST", "/")
-            .with_status(404)
-            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
-            .with_body("{}")
-            .expect(1)
-            .create();
-
-        let client = JsonRpcProviderClient::new(&server.url(), ReqwestRequestor::default(), ZeroRetryPolicy::default());
-
-        let err = client
-            .request::<_, ethers::types::U64>("eth_blockNumber", ())
-            .await
-            .expect_err("expected error");
-
-        m.assert();
-        assert!(
-            matches!(err, JsonRpcProviderClientError::BackendError(_)),
-            "expected backend error, but got: {err:?}"
-        );
         assert_eq!(
             0,
             client.requests_enqueued.load(Ordering::SeqCst),
@@ -1052,6 +1021,43 @@ mod tests {
                 ..SimpleJsonRpcRetryPolicy::default()
             },
         );
+
+        let err = client
+            .request::<_, ethers::types::U64>("eth_blockNumber", ())
+            .await
+            .expect_err("expected error");
+
+        m.assert();
+        assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(_)));
+        assert_eq!(
+            0,
+            client.requests_enqueued.load(Ordering::SeqCst),
+            "retry queue should be zero when policy says no more retries"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_client_should_not_retry_with_zero_retry_policy() {
+        let mut server = mockito::Server::new_async().await;
+
+        let m = server
+            .mock("POST", "/")
+            .with_status(404)
+            .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
+            .with_body(
+                r#"{
+              "jsonrpc": "2.0",
+              "id": 1,
+              "error": {
+                "message": "some message",
+                "code": -32603
+              }
+            }"#,
+            )
+            .expect(1)
+            .create();
+
+        let client = JsonRpcProviderClient::new(&server.url(), ReqwestRequestor::default(), ZeroRetryPolicy::default());
 
         let err = client
             .request::<_, ethers::types::U64>("eth_blockNumber", ())
