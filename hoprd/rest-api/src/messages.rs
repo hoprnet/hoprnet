@@ -22,16 +22,23 @@ use hopr_network_types::prelude::DestinationRouting;
 
 #[derive(Debug, Default, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
 #[into_params(parameter_in = Query)]
+#[schema(example = json!({
+        "tag": 1050
+    }))]
 /// Filter applied when interacting with the message inbox.
 pub(crate) struct TagQueryRequest {
-    #[schema(required = false)]
+    #[schema(required = false, example = 1050)]
     /// The message tag used to filter messages based on application
     tag: Option<u16>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "size": 1841
+    }))]
 /// Number of messages in the inbox
 pub(crate) struct SizeResponse {
+    #[schema(example = 1841)]
     size: usize,
 }
 
@@ -55,21 +62,23 @@ pub(crate) struct SizeResponse {
 /// Body and all routing information required to send a message to another peer.
 pub(crate) struct SendMessageBodyRequest {
     /// The message tag used to filter messages based on application, must be from range <1024,65535>
-    #[schema(minimum = 1024, maximum = 65535)]
+    #[schema(minimum = 1024, maximum = 65535, example = 2000)]
     tag: u16,
     /// Message to be transmitted over the network
     #[serde_as(as = "Bytes")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "Test message")]
     body: Vec<u8>,
     /// The recipient HOPR PeerId or address
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1")]
     destination: PeerOrAddress,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     #[validate(length(min = 0, max = 3))]
-    #[schema(value_type = Option<Vec<String>>)]
+    #[schema(value_type = Option<Vec<String>>, example = json!([
+        "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
+    ]))]
     path: Option<Vec<PeerOrAddress>>,
-    #[schema(minimum = 0, maximum = 3)]
+    #[schema(minimum = 0, maximum = 3, example = 1)]
     #[validate(range(min = 0, max = 3))]
     hops: Option<u16>,
 }
@@ -84,10 +93,10 @@ pub(crate) struct SendMessageBodyRequest {
 /// Response to a message sent to another peer.
 pub(crate) struct SendMessageResponse {
     #[serde_as(as = "DurationMilliSeconds<u64>")]
-    #[schema(value_type = u64)]
+    #[schema(value_type = u64, example = 2147483647)]
     timestamp: std::time::Duration,
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")]
     challenge: Hash,
 }
 
@@ -100,11 +109,11 @@ pub(crate) struct SendMessageResponse {
 /// Message tag and timestamp to peek/pop from.
 pub(crate) struct GetMessageBodyRequest {
     /// The message tag used to filter messages based on application
-    #[schema(required = false)]
+    #[schema(required = false, example = 801)]
     tag: Option<u16>,
     /// Timestamp to filter messages received after this timestamp
     #[serde_as(as = "Option<DurationMilliSeconds<u64>>")]
-    #[schema(required = false, value_type = u64)]
+    #[schema(required = false, value_type = u64, example = 2147483647)]
     timestamp: Option<std::time::Duration>,
 }
 
@@ -308,10 +317,12 @@ pub(super) async fn size(
 #[serde(rename_all = "camelCase")]
 /// Single message from the inbox
 pub(crate) struct MessageInboxResponse {
+    #[schema(example = 2000)]
     tag: u16,
+    #[schema(example = "Test message 1")]
     body: String,
     #[serde_as(as = "DurationMilliSeconds<u64>")]
-    #[schema(value_type = u64)]
+    #[schema(value_type = u64, example = 1704453953073i64)]
     received_at: std::time::Duration,
 }
 
@@ -374,8 +385,34 @@ pub(super) async fn pop(
 }
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "messages": [
+            {
+                "body": "Test message 1",
+                "receivedAt": 1704453953073i64,
+                "tag": 2000
+            },
+            {
+                "body": "Test message 2",
+                "receivedAt": 1704453953074i64,
+                "tag": 2000
+            }
+        ]
+    }))]
 /// All messages matching the filters criteria from the pop/peek request
 pub(crate) struct MessageInboxAllResponse {
+    #[schema(example = json!([
+        {
+            "body": "Test message 1",
+            "receivedAt": 1704453953073i64,
+            "tag": 2000
+        },
+        {
+            "body": "Test message 2",
+            "receivedAt": 1704453953074i64,
+            "tag": 2000
+        }
+    ]))]
     messages: Vec<MessageInboxResponse>,
 }
 

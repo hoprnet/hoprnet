@@ -15,6 +15,7 @@ use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 /// Contains the ticket price in HOPR tokens.
 pub(crate) struct TicketPriceResponse {
     /// Price of the ticket in HOPR tokens.
+    #[schema(example = "30000000000000000")]
     price: String,
 }
 
@@ -61,6 +62,7 @@ pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoR
 #[serde(rename_all = "camelCase")]
 /// Contains the winning probability of a ticket.
 pub(crate) struct TicketProbabilityResponse {
+    #[schema(example = 0.5)]
     /// Winning probability of a ticket.
     probability: f64,
 }

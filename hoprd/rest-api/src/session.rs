@@ -53,6 +53,7 @@ lazy_static::lazy_static! {
 }
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(example = 0)]
 /// Session target specification.
 pub enum SessionTargetSpec {
     Plain(String),
@@ -132,6 +133,7 @@ pub struct StoredSessionEntry {
 #[derive(
     Debug, Clone, strum::EnumIter, strum::Display, strum::EnumString, Serialize, Deserialize, utoipa::ToSchema,
 )]
+#[schema(example = "Segmentation")]
 /// Session capabilities that can be negotiated with the target peer.
 pub enum SessionCapability {
     /// Frame segmentation
@@ -352,7 +354,10 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
 /// Routing options for the Session.
 pub enum RoutingOptions {
     #[cfg(feature = "explicit-path")]
-    #[schema(value_type = Vec<String>)]
+    #[schema(value_type = Vec<String>, example = json!([
+        "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
+        "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
+    ]))]
     IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<PeerOrAddress>),
     Hops(usize),
 }
@@ -360,32 +365,44 @@ pub enum RoutingOptions {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "destination": "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
-        "path": {
-            "Hops": 1
-        },
-        "target": {"Plain": "localhost:8080"},
-        "listenHost": "127.0.0.1:10000",
-        "capabilities": ["Retransmission", "Segmentation"]
-    }))]
+    "destination": "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
+    "path": {
+        "Hops": 1
+    },
+    "target": {"Plain": "localhost:8080"},
+    "listenHost": "127.0.0.1:10000",
+    "capabilities": ["Retransmission", "Segmentation"]
+}))]
 #[serde(rename_all = "camelCase")]
 /// Request body for creating a new client session.
 pub(crate) struct SessionClientRequest {
     /// Peer ID of the Exit node.
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33")]
     pub destination: PeerOrAddress,
+    #[schema(example = json!({
+        "Hops": 1
+    }))]
     pub path: RoutingOptions,
+    #[schema(example = json!({
+        "Plain": "localhost:8080"
+    }))]
     pub target: SessionTargetSpec,
     /// Listen host (`ip:port`) for the Session socket at the Entry node.
     ///
     /// Supports also partial specification (only `ip` or only `:port`) with the
     /// respective part replaced by the node's configured default.
+    #[schema(example = "127.0.0.1:10000")]
     pub listen_host: Option<String>,
+
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     /// Capabilities for the Session protocol.
     ///
     /// Defaults to `Segmentation` and `Retransmission` for TCP and nothing for UDP.
+    #[schema(example = json!([
+        "Retransmission",
+        "Segmentation"
+    ]))]
     pub capabilities: Option<Vec<SessionCapability>>,
 }
 
@@ -449,12 +466,18 @@ impl SessionClientRequest {
 #[serde(rename_all = "camelCase")]
 /// Response body for creating a new client session.
 pub(crate) struct SessionClientResponse {
+    #[schema(value_type = String, example = "example.com:80")]
     pub target: String,
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "tcp")]
     pub protocol: IpProtocol,
+    #[schema(value_type = String, example = "127.0.0.1")]
     pub ip: String,
+    #[schema(example = json!({
+        "Hops": 1
+    }))]
     pub path: RoutingOptions,
+    #[schema(example = 5542)]
     pub port: u16,
 }
 
@@ -507,7 +530,7 @@ fn build_binding_host(requested: Option<&str>, default: std::net::SocketAddr) ->
         path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
         description = "Creates a new client HOPR session that will start listening on a dedicated port. Once the port is bound, it is possible to use the socket for bidirectional read and write communication.",
         params(
-            ("protocol" = String, Path, description = "IP transport protocol")
+            ("protocol" = String, Path, description = "IP transport protocol", example = "tcp"),
         ),
         request_body(
             content = SessionClientRequest,
@@ -691,7 +714,7 @@ pub(crate) async fn create_client(
     path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
     description = "Lists existing Session listeners for the given IP protocol.",
     params(
-            ("protocol" = String, Path, description = "IP transport protocol")
+            ("protocol" = String, Path, description = "IP transport protocol", example = "tcp"),
     ),
     responses(
             (status = 200, description = "Opened session listeners for the given IP protocol.", body = Vec<SessionClientResponse>),
@@ -732,6 +755,7 @@ pub(crate) async fn list_clients(
 )]
 #[strum(serialize_all = "lowercase", ascii_case_insensitive)]
 #[serde(rename_all = "lowercase")]
+#[schema(example = "tcp")]
 /// IP transport protocol
 pub enum IpProtocol {
     #[allow(clippy::upper_case_acronyms)]
@@ -753,14 +777,16 @@ impl From<IpProtocol> for hopr_lib::IpProtocol {
 #[derive(Debug, Serialize, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 pub struct SessionCloseClientQuery {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "tcp")]
     /// IP transport protocol
     pub protocol: IpProtocol,
 
     /// Listening IP address of the Session.
+    #[schema(example = "127.0.0.1:8545")]
     pub ip: String,
 
     /// Session port used for the listener.
+    #[schema(value_type = u16, example = 10101)]
     pub port: u16,
 }
 

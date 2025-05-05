@@ -30,13 +30,21 @@ use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 /// Represents a ticket in a channel.
 pub(crate) struct ChannelTicket {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
     channel_id: Hash,
+    #[schema(example = "100")]
     amount: String,
+    #[schema(example = 0)]
     index: u64,
+    #[schema(example = 1)]
     index_offset: u32,
+    #[schema(example = "1")]
     win_prob: String,
+    #[schema(example = 1)]
     channel_epoch: u32,
+    #[schema(
+        example = "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891"
+    )]
     signature: String,
 }
 
@@ -66,7 +74,7 @@ pub(crate) struct ChannelIdParams {
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
         description = "Lists all tickets for the given channel ID.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.")
+            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         responses(
             (status = 200, description = "Fetched all tickets for the given channel ID", body = [ChannelTicket]),
@@ -132,10 +140,15 @@ pub(super) async fn show_all_tickets() -> impl IntoResponse {
 #[serde(rename_all = "camelCase")]
 /// Received tickets statistics.
 pub(crate) struct NodeTicketStatisticsResponse {
+    #[schema(example = 0)]
     winning_count: u64,
+    #[schema(example = "2000000000000000")]
     unredeemed_value: String,
+    #[schema(example = "1000000000000000000")]
     redeemed_value: String,
+    #[schema(example = "0")]
     neglected_value: String,
+    #[schema(example = "0")]
     rejected_value: String,
 }
 
@@ -239,7 +252,7 @@ pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) 
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/redeem"),
         description = "Starts redeeming all tickets in the given channel.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.")
+            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         responses(
             (status = 204, description = "Tickets redeemed successfully."),
@@ -280,7 +293,7 @@ pub(super) async fn redeem_tickets_in_channel(
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/aggregate"),
         description = "Starts aggregation of tickets in the given channel.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.")
+            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         responses(
             (status = 204, description = "Tickets successfully aggregated"),

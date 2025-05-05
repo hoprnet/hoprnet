@@ -25,7 +25,7 @@ use crate::{
 /// (deprecated, will be removed in v3.0) Contains the node's PeerId (from an alias).
 pub(crate) struct PeerIdResponse {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA")]
     pub peer_id: String,
 }
 
@@ -38,7 +38,7 @@ pub(crate) struct PeerIdResponse {
 /// (deprecated, will be removed in v3.0) Contains the node's ETH address (from an alias).
 pub(crate) struct AddressResponse {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6")]
     pub address: Address,
 }
 
@@ -51,9 +51,10 @@ pub(crate) struct AddressResponse {
 #[serde(rename_all = "camelCase")]
 /// (deprecated, will be removed in v3.0) Contains the alias and the PeerId to be aliased.
 pub(crate) struct AliasDestinationBodyRequest {
+    #[schema(example = "Alice")]
     pub alias: String,
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA")]
     pub destination: PeerOrAddress,
 }
 
@@ -215,7 +216,7 @@ pub(crate) struct GetAliasRequest {
         path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
         description = "Get PeerId for an alias",
         params(
-            ("alias" = String, Path, description = "Alias to be shown"),
+            ("alias" = String, Path, description = "Alias to be shown", example = "Alice"),
         ),
         responses(
             (status = 200, description = "Get PeerId for an alias", body = PeerIdResponse),
@@ -253,7 +254,7 @@ pub(super) async fn get_alias(
         path = const_format::formatcp!("{BASE_PATH}/aliases-addresses/{{alias}}"),
         description = "Get alias for the address (ETH address) that have this alias assigned to it",
         params(
-            ("alias" = String, Path, description = "Alias to be shown"),
+            ("alias" = String, Path, description = "Alias to be shown", example = "Alice"),
         ),
         responses(
             (status = 200, description = "Get ETH address for an alias", body = AddressResponse),
@@ -318,7 +319,7 @@ pub(crate) struct DeleteAliasRequest {
         path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
         description = "Delete an alias",
         params(
-            ("alias" = String, Path, description = "Alias to be shown"),
+            ("alias" = String, Path, description = "Alias to be shown", example = "Alice"),
         ),
         responses(
             (status = 204, description = "Alias removed successfully"),

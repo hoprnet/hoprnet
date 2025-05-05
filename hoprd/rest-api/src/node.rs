@@ -25,7 +25,9 @@ use crate::{
 #[serde(rename_all = "camelCase")]
 /// Running node version alongside the API version.
 pub(crate) struct NodeVersionResponse {
+    #[schema(example = "2.1.0")]
     version: String,
+    #[schema(example = "3.10.0")]
     api_version: String,
 }
 
@@ -70,14 +72,14 @@ pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> im
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
 #[schema(example = json!({
         "quality": 0.7
     }))]
-#[into_params(parameter_in = Query)]
 /// Quality information for a peer.
 pub(crate) struct NodePeersQueryRequest {
-    #[schema(required = false)]
     #[serde(default)]
+    #[schema(required = false, example = 0.7)]
     /// Minimum peer quality to be include in the response.
     quality: f64,
 }
@@ -90,30 +92,57 @@ pub(crate) struct NodePeersQueryRequest {
 #[serde(rename_all = "camelCase")]
 /// Heartbeat information for a peer.
 pub(crate) struct HeartbeatInfo {
+    #[schema(example = 10)]
     sent: u64,
+    #[schema(example = 10)]
     success: u64,
 }
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+#[schema(example = json!({
+    "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
+    "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    "multiaddr": "/ip4/178.12.1.9/tcp/19092",
+    "heartbeats": {
+        "sent": 10,
+        "success": 10
+    },
+    "lastSeen": 1690000000,
+    "lastSeenLatency": 100,
+    "quality": 0.7,
+    "backoff": 0.5,
+    "isNew": true,
+    "reportedVersion": "2.1.0"
+}))]
 /// All information about a known peer.
 pub(crate) struct PeerInfo {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA")]
     peer_id: PeerId,
     #[serde(serialize_with = "option_checksum_address_serializer")]
-    #[schema(value_type = Option<String>)]
+    #[schema(value_type = Option<String>, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
     peer_address: Option<Address>,
     #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = Option<String>)]
+    #[schema(value_type = Option<String>, example = "/ip4/178.12.1.9/tcp/19092")]
     multiaddr: Option<Multiaddr>,
+    #[schema(example = json!({
+        "sent": 10,
+        "success": 10
+    }))]
     heartbeats: HeartbeatInfo,
+    #[schema(example = 1690000000)]
     last_seen: u128,
+    #[schema(example = 100)]
     last_seen_latency: u128,
+    #[schema(example = 0.7)]
     quality: f64,
+    #[schema(example = 0.5)]
     backoff: f64,
+    #[schema(example = true)]
     is_new: bool,
+    #[schema(example = "2.1.0")]
     reported_version: String,
 }
 
@@ -128,21 +157,49 @@ pub(crate) struct PeerInfo {
 /// Represents a peer that has been announced on-chain.
 pub(crate) struct AnnouncedPeer {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA")]
     peer_id: PeerId,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
     peer_address: Address,
     #[serde_as(as = "Option<DisplayFromStr>")]
-    #[schema(value_type = Option<String>)]
+    #[schema(value_type = Option<String>, example = "/ip4/178.12.1.9/tcp/19092")]
     multiaddr: Option<Multiaddr>,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+#[schema(example = json!({
+        "connected": [{}],
+        "announced": [{
+            "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
+            "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+            "multiaddr": "/ip4/178.12.1.9/tcp/19092"
+        }]
+    }))]
 /// All connected and announced peers.
 pub(crate) struct NodePeersResponse {
+    #[schema(example = json!([{
+        "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
+        "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+        "multiaddr": "/ip4/178.12.1.9/tcp/19092",
+        "heartbeats": {
+            "sent": 10,
+            "success": 10
+        },
+        "lastSeen": 1690000000,
+        "lastSeenLatency": 100,
+        "quality": 0.7,
+        "backoff": 0.5,
+        "isNew": true,
+        "reportedVersion": "2.1.0"
+    }]))]
     connected: Vec<PeerInfo>,
+    #[schema(example = json!([{
+        "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
+        "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+        "multiaddr": "/ip4/178.12.1.9/tcp/19092"
+    }]))]
     announced: Vec<AnnouncedPeer>,
 }
 
@@ -283,6 +340,12 @@ pub(super) async fn metrics() -> impl IntoResponse {
 #[derive(Debug, Clone, Deserialize, Default, utoipa::IntoParams, utoipa::ToSchema)]
 #[into_params(parameter_in = Query)]
 #[serde(default, rename_all = "camelCase")]
+#[schema(example = json!({
+        "ignoreDisconnectedComponents": true,
+        "ignoreNonOpenedChannels": true,
+        "only3HopPaths": true,
+        "rawGraph": true
+    }))]
 /// Query parameters for the channel graph export.
 pub(crate) struct GraphExportQuery {
     /// If set, nodes that are not connected to this node (via open channels) will not be exported.
@@ -381,43 +444,50 @@ pub(super) async fn channel_graph(
 #[serde(rename_all = "camelCase")]
 /// Information about the current node. Covers network, addresses, eligibility, connectivity status, contracts addresses and indexer state.
 pub(crate) struct NodeInfoResponse {
+    #[schema(value_type = String, example = "anvil-localhost")]
     network: String,
     #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[schema(value_type = Vec<String>)]
+    #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19092"]))]
     announced_address: Vec<Multiaddr>,
     #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[schema(value_type = Vec<String>)]
+    #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19092"]))]
     listening_address: Vec<Multiaddr>,
+    #[schema(example = "anvil-localhost")]
     chain: String,
+    #[schema(example = "http://127.0.0.1:8545")]
     provider: String,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x9a676e781a523b5d0c0e43731313a708cb607508")]
     hopr_token: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae")]
     hopr_channels: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x3aa5ebb10dc797cac828524e59a333d0a371443c")]
     hopr_network_registry: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x0dcd1bf9a1b36ce34237eeafef220932846bcd82")]
     hopr_node_safe_registry: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0")]
     hopr_management_module: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x42bc901b1d040f984ed626eff550718498a6798a")]
     hopr_node_safe: Address,
+    #[schema(example = true)]
     is_eligible: bool,
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "Green")]
     connectivity_status: Health,
     /// Channel closure period in seconds
+    #[schema(example = 15)]
     channel_closure_period: u64,
+    #[schema(example = 123456)]
     indexer_block: u32,
+    #[schema(example = 123450)]
     indexer_last_log_block: u32,
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae")]
     indexer_last_log_checksum: Hash,
 }
 
@@ -482,11 +552,16 @@ pub(super) async fn info(State(state): State<Arc<InternalState>>) -> Result<impl
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+#[schema(example = json!({
+        "isEligible": true,
+        "multiaddrs": ["/ip4/10.0.2.100/tcp/19091"]
+}))]
 /// Reachable entry node information
 pub(crate) struct EntryNode {
     #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[schema(value_type = Vec<String>)]
+    #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19091"]))]
     multiaddrs: Vec<Multiaddr>,
+    #[schema(example = true)]
     is_eligible: bool,
 }
 

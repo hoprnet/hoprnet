@@ -396,8 +396,10 @@ fn option_checksum_address_serializer<S: serde::Serializer>(a: &Option<Address>,
 }))]
 /// Standardized error response for the API
 pub(crate) struct ApiError {
+    #[schema(example = "INVALID_INPUT")]
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "Invalid value passed in parameter 'XYZ'")]
     pub error: Option<String>,
 }
 
