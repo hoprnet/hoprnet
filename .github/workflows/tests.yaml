@@ -162,7 +162,7 @@ jobs:
         # choose different ports on our runners, this only minimizes the risk,
         # does not prevent collisions with other workflow runs
         suite:
-          - websocket
+          - websocket_api
           - hopli
           - rest_api
           - session
