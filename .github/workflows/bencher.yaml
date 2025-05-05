@@ -93,7 +93,7 @@ jobs:
           fi
 
       - name: Setup Bencher
-        uses: bencherdev/bencher@v0.5.0
+        uses: bencherdev/bencher@v0.5.1
 
       - name: Execute benchmarks
         run: |
