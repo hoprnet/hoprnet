@@ -55,8 +55,7 @@ jobs:
           USER: runner
 
       - name: Run unit tests
-        run: |
-          nix build .#hopr-test
+        run: nix build -L .#hopr-test
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -107,8 +106,7 @@ jobs:
           USER: runner
 
       - name: Run unit tests nightly
-        run: |
-          nix build .#hopr-test-nightly
+        run: nix build -L .#hopr-test-nightly
 
   tests-smart-contracts:
     runs-on: self-hosted-hoprnet-bigger
