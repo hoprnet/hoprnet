@@ -36,6 +36,9 @@ pub mod indexer;
 pub mod rpc;
 pub mod transport;
 
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+pub use crate::transport::ReqwestClient;
+
 /// A type containing selected fields from  the `eth_getLogs` RPC calls.
 ///
 /// This is further restricted to already mined blocks.

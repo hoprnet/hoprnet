@@ -875,15 +875,21 @@ pub fn create_rpc_client_to_anvil(
     anvil: &alloy::node_bindings::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
 ) -> Arc<AnvilRpcClient> {
+    #[cfg(all(feature = "runtime-async-std"))]
     use crate::transport::SurfTransport;
     use alloy::providers::ProviderBuilder;
     use alloy::rpc::client::ClientBuilder;
     use alloy::signers::local::PrivateKeySigner;
+    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+    use alloy::transports::http::ReqwestTransport;
     use hopr_crypto_types::keypairs::Keypair;
 
     let wallet = PrivateKeySigner::from_slice(signer.secret().as_ref()).expect("failed to construct wallet");
 
+    #[cfg(feature = "runtime-async-std")]
     let transport_client = SurfTransport::new(anvil.endpoint_url());
+    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+    let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
     let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
 

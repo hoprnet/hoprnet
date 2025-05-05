@@ -3,13 +3,17 @@
 use alloy::{
     rpc::json_rpc::{RequestPacket, ResponsePacket},
     transports::{
-        http::HttpConnect, utils::guess_local_url, BoxTransport, TransportConnect, TransportError, TransportErrorKind,
-        TransportFut, TransportResult,
+        http::{Http, HttpConnect},
+        utils::guess_local_url,
+        BoxTransport, TransportConnect, TransportError, TransportErrorKind, TransportFut, TransportResult,
     },
 };
 use async_trait::async_trait;
 
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+pub use reqwest::Client as ReqwestClient;
 use std::task;
+#[cfg(feature = "runtime-async-std")]
 pub use surf::Client as SurfClient;
 use tower::Service;
 use tracing::{debug, debug_span, info, trace, Instrument};
@@ -19,7 +23,7 @@ use crate::errors::HttpRequestError;
 
 /// Abstraction for an HTTP client that performs HTTP GET with serializable request data.
 #[async_trait]
-pub trait HttpRequestor: std::fmt::Debug + Send + Sync {
+pub trait HttpRequestor: std::fmt::Debug + Send + Sync + Clone {
     /// Performs HTTP GET query to the given URL and gets the JSON response.
     async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError>;
 }
@@ -67,24 +71,26 @@ impl<T> HttpWrapper<T> {
     }
 }
 
-// impl<T> From<Http<T>> for HttpWrapper<T> {
-//     fn from(value: Http<T>) -> Self {
-//         Self {
-//             client: *value.client(),
-//             url: Url::parse(value.url()).unwrap(),
-//         }
-//     }
-// }
+impl<T: Clone> From<Http<T>> for HttpWrapper<T> {
+    fn from(value: Http<T>) -> Self {
+        Self {
+            client: value.client().clone(),
+            url: Url::parse(value.url()).unwrap(),
+        }
+    }
+}
 
-// impl<T> From<HttpWrapper<T>> for Http<T> {
-//     fn from(value: HttpWrapper<T>) -> Self {
-//         Self::with_client(*value.client(), Url::parse(value.url()).unwrap())
-//     }
-// }
+impl<T: Clone> From<HttpWrapper<T>> for Http<T> {
+    fn from(value: HttpWrapper<T>) -> Self {
+        Self::with_client(value.client().clone(), Url::parse(value.url()).unwrap())
+    }
+}
 
 /// An [`Http`] transport using [`surf`].
+#[cfg(all(feature = "runtime-async-std"))]
 pub type SurfTransport = HttpWrapper<SurfClient>;
 
+#[cfg(all(feature = "runtime-async-std"))]
 impl SurfTransport {
     /// Create a new [`SurfTransport`] with the given URL and default client.
     pub fn new(url: Url) -> Self {
@@ -137,8 +143,10 @@ impl SurfTransport {
 }
 
 /// Connection details for a [`SurfTransport`].
+#[cfg(all(feature = "runtime-async-std"))]
 pub type SurfConnect = HttpConnect<SurfTransport>;
 
+#[cfg(all(feature = "runtime-async-std"))]
 impl TransportConnect for SurfTransport {
     fn is_local(&self) -> bool {
         guess_local_url(self.url.as_str())
@@ -152,6 +160,7 @@ impl TransportConnect for SurfTransport {
     }
 }
 /// HTTP Post requestor
+#[cfg(all(feature = "runtime-async-std"))]
 impl Service<RequestPacket> for HttpWrapper<SurfClient> {
     type Response = ResponsePacket;
     type Error = TransportError;
@@ -172,6 +181,7 @@ impl Service<RequestPacket> for HttpWrapper<SurfClient> {
 }
 
 #[async_trait]
+#[cfg(all(feature = "runtime-async-std"))]
 impl HttpRequestor for SurfClient {
     #[inline]
     async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError> {
@@ -197,6 +207,40 @@ impl HttpRequestor for SurfClient {
         }
 
         Ok(body.into_boxed_slice())
+    }
+}
+
+#[async_trait]
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+impl HttpRequestor for ReqwestClient {
+    #[inline]
+    async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError> {
+        let res = self
+            .get(url)
+            .send()
+            .await
+            .map_err(|e| HttpRequestError::TransportError(e.to_string()))?;
+
+        let status = res.status();
+
+        debug!(%status, "received response from server");
+
+        let body = res
+            .bytes()
+            .await
+            .map_err(|e| HttpRequestError::UnknownError(e.to_string().into()))?;
+
+        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
+        trace!(body = %String::from_utf8_lossy(&body), "response body");
+
+        if !status.is_success() {
+            return Err(HttpRequestError::HttpError(
+                http_types::StatusCode::try_from(status.as_u16())
+                    .unwrap_or(http_types::StatusCode::InternalServerError),
+            ));
+        }
+
+        Ok(body.to_vec().into_boxed_slice())
     }
 }
 
