@@ -252,12 +252,23 @@ hoprd-db-api = { path = "hoprd/db/api" }
 hoprd-db-entity = { path = "hoprd/db/entity" }
 hoprd-db-migration = { path = "hoprd/db/migration" }
 
-# [build]
-# rustflags = ["-C", "link-arg=-fuse-ld=lld"]       # needs the "pkgs.llvmPackages.bintools" nix package
-
 [profile.dev]
 panic = "abort"
 
+# this profile focuses on speed of compilation
+[profile.candidate]
+inherits = "release"
+codegen-units = 16   # normal release default
+lto = false          # do the smallest amount of link-time optimization
+panic = "abort"
+strip = true
+opt-level = 2
+
+# perform minimal optimizations to prevent stack overflows in large tests
+[profile.test]
+opt-level = 1
+
+# this profile focuses on best runtime performance and smallest binary size
 [profile.release]
 codegen-units = 1
 lto = "fat"
