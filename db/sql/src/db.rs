@@ -54,6 +54,13 @@ pub const SQL_DB_LOGS_FILE_NAME: &str = "hopr_logs.db";
 
 impl HoprDb {
     pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprDbConfig) -> Result<Self> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            lazy_static::initialize(&crate::protocol::METRIC_RECEIVED_ACKS);
+            lazy_static::initialize(&crate::protocol::METRIC_SENT_ACKS);
+            lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
+        }
+
         std::fs::create_dir_all(directory).map_err(|_e| {
             crate::errors::DbSqlError::Construction(format!("cannot create main database directory {directory:?}"))
         })?;

@@ -1,0 +1,21 @@
+[package]
+name = "hopr-transport-packet"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+
+[dependencies]
+libp2p-identity = { workspace = true }
+
+hopr-crypto-packet = { workspace = true }
+hopr-internal-types = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
