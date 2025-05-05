@@ -969,7 +969,7 @@ mod tests {
 
     #[async_std::test]
     async fn test_client_should_get_block_number() -> anyhow::Result<()> {
-        let block_time = Duration::from_secs(1);
+        let block_time = Duration::from_millis(1100);
 
         let anvil = create_anvil(Some(block_time));
         let client = JsonRpcProviderClient::new(

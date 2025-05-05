@@ -90,7 +90,7 @@ async def swarm7(request):
 async def swarm7_reset(swarm7: dict[str, Node]):
     yield
 
-    logging.info("Resetting swarm7 nodes")
+    logging.debug("Resetting swarm7 nodes")
     try:
         await asyncio.gather(*[node.api.reset_tickets_statistics() for node in swarm7.values()])
     except Exception as e:

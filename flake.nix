@@ -142,8 +142,11 @@
           });
 
           hoprd-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runClippy = true; });
-          hoprd-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+          hoprd-dev = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
             CARGO_PROFILE = "dev";
+          });
+          hoprd-candidate = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // {
+            CARGO_PROFILE = "candidate";
           });
           hoprd-bench = rust-builder-local.callPackage ./nix/rust-package.nix (hoprdBuildArgs // { runBench = true; });
 
@@ -166,8 +169,11 @@
           hopli-aarch64-darwin = rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix hopliBuildArgs;
 
           hopli-clippy = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // { runClippy = true; });
-          hopli-debug = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
+          hopli-dev = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
             CARGO_PROFILE = "dev";
+          });
+          hopli-candidate = rust-builder-local.callPackage ./nix/rust-package.nix (hopliBuildArgs // {
+            CARGO_PROFILE = "candidate";
           });
 
           profileDeps = with pkgs; [
@@ -226,7 +232,7 @@
             Cmd = [ "hoprd" ];
           };
           hoprd-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd [ ]);
-          hoprd-debug-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-debug [ ]);
+          hoprd-dev-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-dev [ ]);
           hoprd-profile-docker = import ./nix/docker-builder.nix (hoprdDockerArgs hoprd profileDeps);
 
           hopliDockerArgs = package: deps: {
@@ -244,7 +250,7 @@
             ];
           };
           hopli-docker = import ./nix/docker-builder.nix (hopliDockerArgs hopli [ ]);
-          hopli-debug-docker = import ./nix/docker-builder.nix (hopliDockerArgs hopli-debug [ ]);
+          hopli-dev-docker = import ./nix/docker-builder.nix (hopliDockerArgs hopli-dev [ ]);
           hopli-profile-docker = import ./nix/docker-builder.nix (hopliDockerArgs hopli profileDeps);
 
           anvilSrc = fs.toSource {
@@ -429,8 +435,8 @@
           hoprd-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-docker;
           };
-          hoprd-debug-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hoprd-debug-docker;
+          hoprd-dev-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript hoprd-dev-docker;
           };
           hoprd-profile-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hoprd-profile-docker;
@@ -438,8 +444,8 @@
           hopli-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-docker;
           };
-          hopli-debug-docker-build-and-upload = flake-utils.lib.mkApp {
-            drv = dockerImageUploadScript hopli-debug-docker;
+          hopli-dev-docker-build-and-upload = flake-utils.lib.mkApp {
+            drv = dockerImageUploadScript hopli-dev-docker;
           };
           hopli-profile-docker-build-and-upload = flake-utils.lib.mkApp {
             drv = dockerImageUploadScript hopli-profile-docker;
@@ -468,11 +474,11 @@
               uv
               foundry-bin
               solcDefault
-              hopli-debug
-              hoprd # must be a release build to circumvent a panic within libp2p-request-response
-              python39
+              hopli-dev
+              hoprd-dev
             ];
             buildPhase = ''
+              uv sync --frozen
               unset SOURCE_DATE_EPOCH
             '';
             checkPhase = ''
@@ -495,16 +501,11 @@
             };
             tools = pkgs;
           };
-          defaultDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
-          smoketestsDevShell = import ./nix/shell.nix {
-            inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [
-            hoprd # must be a release build to circumvent a panic within libp2p-request-response
-            hopli-debug
-            tcpdump
-          ];
-          };
-          docsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
-          clusterDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
+          devShell = import ./nix/devShell.nix { inherit pkgs config crane pre-commit-check solcDefault; };
+          ciShell = import ./nix/ciShell.nix { inherit pkgs config crane; };
+          testShell = import ./nix/testShell.nix { inherit pkgs config crane solcDefault; };
+          ciTestShell = import ./nix/ciTestShell.nix { inherit pkgs config crane solcDefault; hoprd = hoprd-candidate; hopli = hopli-candidate; };
+          docsShell = import ./nix/devShell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
               set -e
@@ -640,10 +641,10 @@
 
           apps = {
             inherit hoprd-docker-build-and-upload;
-            inherit hoprd-debug-docker-build-and-upload;
+            inherit hoprd-dev-docker-build-and-upload;
             inherit hoprd-profile-docker-build-and-upload;
             inherit hopli-docker-build-and-upload;
-            inherit hopli-debug-docker-build-and-upload;
+            inherit hopli-dev-docker-build-and-upload;
             inherit hopli-profile-docker-build-and-upload;
             inherit hopr-pluto-docker-build-and-upload;
             inherit update-github-labels;
@@ -652,8 +653,9 @@
           };
 
           packages = {
-            inherit hoprd hoprd-debug hoprd-docker hoprd-debug-docker hoprd-profile-docker;
-            inherit hopli hopli-debug hopli-docker hopli-debug-docker hopli-profile-docker;
+            inherit hoprd hoprd-dev hoprd-docker hoprd-dev-docker hoprd-profile-docker;
+            inherit hopli hopli-dev hopli-docker hopli-dev-docker hopli-profile-docker;
+            inherit hoprd-candidate hopli-candidate;
             inherit hopr-test hopr-test-nightly;
             inherit anvil-docker hopr-pluto;
             inherit smoke-tests docs;
@@ -668,10 +670,11 @@
             default = hoprd;
           };
 
-          devShells.default = defaultDevShell;
-          devShells.smoke-tests = smoketestsDevShell;
-          devShells.docs = docsDevShell;
-          devShells.cluster = clusterDevShell;
+          devShells.default = devShell;
+          devShells.ci = ciShell;
+          devShells.test = testShell;
+          devShells.citest = ciTestShell;
+          devShells.docs = docsShell;
 
           formatter = config.treefmt.build.wrapper;
         };
