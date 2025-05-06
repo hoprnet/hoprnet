@@ -42,7 +42,7 @@ let
   packages = minimumPackages ++ shellPackages;
 
   # mold is only supported on Linux, so falling back to lld on Darwin
-  linker = if pkgs.stdenv.buildPlatform.isDarwin then "ld" else "mold";
+  linker = if pkgs.stdenv.buildPlatform.isDarwin then "lld" else "mold";
 in
 craneLib.devShell {
   inherit shellHook packages;
