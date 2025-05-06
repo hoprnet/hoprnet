@@ -1,14 +1,8 @@
-use crate::balancer::{keep_alive_stream, CountingSendMsg, KeepAliveController, SurbBalancer};
-use crate::errors::{SessionManagerError, TransportSessionError};
-use crate::initiation::{
-    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
-};
-use crate::traits::SendMsg;
-use crate::{IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget};
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::Either;
 use futures::stream::AbortHandle;
 use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
+use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
@@ -17,7 +11,14 @@ use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
-use hopr_crypto_random::Randomizable;
+
+use crate::balancer::{keep_alive_stream, CountingSendMsg, KeepAliveController, SurbBalancer};
+use crate::errors::{SessionManagerError, TransportSessionError};
+use crate::initiation::{
+    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
+};
+use crate::traits::SendMsg;
+use crate::{IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -76,8 +77,8 @@ pub struct SessionManagerConfig {
     /// The sampling interval for SURB balancer.
     /// It will make SURB control decisions regularly at this interval.
     ///
-    /// Default is 1 second.
-    #[default(Duration::from_secs(1))]
+    /// Default is 500 milliseconds.
+    #[default(Duration::from_millis(500))]
     pub balancer_sampling_interval: Duration,
 }
 
@@ -180,6 +181,9 @@ where
 
 /// The first challenge value used in Start protocol to initiate a session.
 pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
+
+/// Maximum time to wait for counterparty to receive the target amount of SURBs.
+const SESSION_READINESS_TIMEOUT: Duration = Duration::from_secs(10);
 
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
@@ -520,7 +524,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         surb_consumption_counter.clone(), // Received packets = SURB consumption estimate
                     );
 
-                    // Spawn the SURB balancer, which will decided on the initial SURB rate.
+                    // Spawn the SURB balancer, which will decide on the initial SURB rate.
                     debug!(%session_id, ?balancer_config, "spawning SURB balancer");
                     let mut balancer = SurbBalancer::new(
                         session_id,
@@ -529,13 +533,19 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         ka_controller,
                         balancer_config,
                     );
+                    let (surbs_ready_tx, surbs_ready_rx) = futures::channel::oneshot::channel();
+                    let mut surbs_ready_tx = Some(surbs_ready_tx);
                     hopr_async_runtime::prelude::spawn(
                         futures::stream::Abortable::new(
                             futures_time::stream::interval(self.cfg.balancer_sampling_interval.into()),
                             balancer_ar,
                         )
                         .for_each(move |_| {
-                            balancer.update();
+                            let level = balancer.update();
+                            // We will wait until at least half of the target buffer has been sent
+                            if surbs_ready_tx.is_some() && level >= balancer_config.target_surb_buffer_size / 2 {
+                                let _ = surbs_ready_tx.take().unwrap().send(level);
+                            }
                             futures::future::ready(())
                         })
                         .then(move |_| {
@@ -543,6 +553,23 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                             futures::future::ready(())
                         }),
                     );
+
+                    // Wait for enough SURBs to be sent to the counterparty
+                    let timeout = hopr_async_runtime::prelude::sleep(SESSION_READINESS_TIMEOUT);
+                    pin_mut!(timeout);
+                    match futures::future::select(surbs_ready_rx, timeout).await {
+                        Either::Left((Ok(surb_level), _)) => {
+                            info!(%session_id, surb_level, "session is ready");
+                        }
+                        Either::Left((Err(_), _)) => {
+                            return Err(
+                                SessionManagerError::Other("surb balancer was cancelled prematurely".into()).into(),
+                            );
+                        }
+                        Either::Right(_) => {
+                            warn!(%session_id, "session didn't reach target SURB buffer size");
+                        }
+                    }
 
                     Ok(session)
                 } else {

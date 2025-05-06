@@ -32,7 +32,7 @@ lazy_static::lazy_static! {
 }
 
 /// Configuration for the [`SurbBalancer`].
-#[derive(Clone, Debug, PartialEq, Eq, smart_default::SmartDefault)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, smart_default::SmartDefault)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SurbBalancerConfig {
     /// The desired number of SURBs to be always kept as a buffer at the Session counterparty.

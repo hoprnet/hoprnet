@@ -66,21 +66,19 @@ pub struct RateLimitedStream<S: Stream> {
 impl<S: Stream> RateLimitedStream<S> {
     /// Creates a stream with some initial rate limit of elements per a time unit.
     pub fn new_with_rate_per_unit(stream: S, initial_rate_per_unit: usize, unit: Duration) -> (Self, RateController) {
-        let (stream, rc) = Self::new(stream);
-        rc.set_rate_per_unit(initial_rate_per_unit, unit);
-        (stream, rc)
-    }
-
-    /// Creates a stream that has 0 rate (`poll_next` returns Pending) until
-    /// some non-zero rate is set via the returned [`RateController`].
-    pub fn new(stream: S) -> (Self, RateController) {
         let rc = RateController(Arc::new(AtomicU64::new(0)));
+        rc.set_rate_per_unit(initial_rate_per_unit, unit);
+
         (
             Self {
                 inner: stream,
                 item: None,
                 delay: None,
-                state: State::Read,
+                state: if initial_rate_per_unit > 0 {
+                    State::Read
+                } else {
+                    State::NoRate
+                },
                 delay_time: rc.0.clone(),
             },
             rc,
@@ -121,18 +119,18 @@ where
                 State::NoRate => {
                     if let Some(mut delay) = this.delay.as_mut().as_pin_mut() {
                         let _ = futures::ready!(delay.as_mut().poll(cx));
-                        let delay_time = this.delay_time.load(Ordering::Relaxed);
-                        if delay_time > 0 {
-                            *this.delay = Some(futures_time::task::sleep(Duration::from_micros(delay_time).into()));
-                            if this.item.is_some() {
-                                *this.state = State::Wait;
-                            } else {
-                                *this.state = State::Read;
-                            }
+                    }
+                    let delay_time = this.delay_time.load(Ordering::Relaxed);
+                    if delay_time > 0 {
+                        *this.delay = Some(futures_time::task::sleep(Duration::from_micros(delay_time).into()));
+                        if this.item.is_some() {
+                            *this.state = State::Wait;
                         } else {
-                            *this.delay = Some(futures_time::task::sleep(Duration::from_millis(100).into()));
-                            *this.state = State::NoRate;
+                            *this.state = State::Read;
                         }
+                    } else {
+                        *this.delay = Some(futures_time::task::sleep(Duration::from_millis(100).into()));
+                        *this.state = State::NoRate;
                     }
                 }
                 State::Wait => {

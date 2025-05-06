@@ -84,7 +84,10 @@ mod tests {
             hopr_packet_len
         );
 
-        assert!(hopr_packet_len < 1492 - 32, "HOPR packet {hopr_packet_len} must fit within a layer 4 packet with libp2p overhead");
+        assert!(
+            hopr_packet_len < 1492 - 32,
+            "HOPR packet {hopr_packet_len} must fit within a layer 4 packet with libp2p overhead"
+        );
     }
 
     #[test]

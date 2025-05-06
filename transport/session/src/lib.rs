@@ -11,16 +11,16 @@ mod manager;
 pub mod traits;
 mod types;
 
-pub use hopr_network_types::types::*;
 pub use balancer::SurbBalancerConfig;
+pub use hopr_network_types::types::*;
 pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
 pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, SESSION_USABLE_MTU_SIZE};
 
 #[cfg(feature = "runtime-tokio")]
 pub use types::transfer_session;
 
-use hopr_network_types::prelude::state::SessionFeature;
 use hopr_internal_types::prelude::HoprPseudonym;
+use hopr_network_types::prelude::state::SessionFeature;
 
 /// Capabilities of a session.
 #[repr(u8)]

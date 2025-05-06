@@ -47,8 +47,6 @@ pub enum SessionManagerError {
     NotStarted,
     #[error("manager is already started")]
     AlreadyStarted,
-    #[error("no session backrouting information was given")]
-    NoBackRoutingInfo,
     #[error("all challenge slots are occupied")]
     NoChallengeSlots,
     #[error("non-specific session manager error: {0}")]

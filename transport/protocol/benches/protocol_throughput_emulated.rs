@@ -58,7 +58,8 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             ResolvedTransportRouting,
                             PacketSendFinalizer,
                         )>();
-                        let (api_recv_tx, _api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym,ApplicationData)>();
+                        let (api_recv_tx, _api_recv_rx) =
+                            futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
 
                         let cfg = PacketInteractionConfig {
                             packet_keypair: (&PEERS[TESTED_PEER_ID]).clone(),
