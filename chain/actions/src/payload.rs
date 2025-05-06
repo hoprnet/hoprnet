@@ -1,7 +1,7 @@
 //! Module defining various Ethereum transaction payload generators for the actions.
 //!
 //! This module defines the basic [PayloadGenerator] trait that describes how an action
-//! is translated into a [TypedTransaction] that can be submitted on-chain (via an RPC provider)
+//! is translated into a [TransactionRequest] that can be submitted on-chain (via an RPC provider)
 //! using a [TransactionExecutor](crate::action_queue::TransactionExecutor).
 //!
 //! There are two main implementations:
@@ -11,7 +11,6 @@
 //!   SAFE transaction. This is currently the main mode of HOPR node operation.
 //!
 
-use alloy::consensus::TypedTransaction;
 use alloy::network::TransactionBuilder;
 use alloy::primitives::aliases::U96;
 use alloy::primitives::aliases::{U24, U48, U56};
@@ -215,7 +214,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
             .with_input(
                 fundChannelCall {
                     account: dest.into(),
-                    amount: U96::from_be_slice(&amount.amount().to_be_bytes()),
+                    amount: U96::from_be_slice(&amount.amount().to_be_bytes()[32 - 12..]),
                 }
                 .abi_encode(),
             )
@@ -395,7 +394,7 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
         let call_data = fundChannelSafeCall {
             selfAddress: self.me.into(),
             account: dest.into(),
-            amount: U96::from_be_slice(&amount.amount().to_be_bytes()),
+            amount: U96::from_be_slice(&amount.amount().to_be_bytes()[32 - 12..]),
         }
         .abi_encode();
 
