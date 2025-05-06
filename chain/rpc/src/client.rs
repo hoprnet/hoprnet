@@ -558,6 +558,13 @@ pub mod reqwest_client {
                         } else {
                             HttpRequestError::UnknownError(e.to_string())
                         }
+                    })?
+                    .error_for_status() // needed to turn 4xx and 5xx errors into reqwest::Error
+                    .map_err(|e| {
+                        HttpRequestError::HttpError(
+                            StatusCode::try_from(e.status().map(|s| s.as_u16()).unwrap_or(500))
+                                .expect("status code must be compatible"), // cannot happen
+                        )
                     })?;
 
                 resp.bytes()
@@ -953,7 +960,7 @@ mod tests {
         assert!(matches!(err, JsonRpcProviderClientError::SerdeJson { .. }));
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn test_client_should_retry_on_http_error() {
         let mut server = mockito::Server::new_async().await;
 
@@ -971,7 +978,7 @@ mod tests {
             SimpleJsonRpcRetryPolicy {
                 max_retries: Some(2),
                 retryable_http_errors: vec![http_types::StatusCode::TooManyRequests],
-                initial_backoff: Duration::from_millis(100),
+                initial_backoff: Duration::from_millis(10),
                 ..SimpleJsonRpcRetryPolicy::default()
             },
         );
@@ -1044,16 +1051,7 @@ mod tests {
             .mock("POST", "/")
             .with_status(404)
             .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
-            .with_body(
-                r#"{
-              "jsonrpc": "2.0",
-              "id": 1,
-              "error": {
-                "message": "some message",
-                "code": -32603
-              }
-            }"#,
-            )
+            .with_body("{}")
             .expect(1)
             .create();
 
@@ -1065,7 +1063,8 @@ mod tests {
             .expect_err("expected error");
 
         m.assert();
-        assert!(matches!(err, JsonRpcProviderClientError::JsonRpcError(_)));
+        assert!(matches!(err, JsonRpcProviderClientError::BackendError(_)));
+
         assert_eq!(
             0,
             client.requests_enqueued.load(Ordering::SeqCst),
