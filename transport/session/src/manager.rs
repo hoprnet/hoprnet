@@ -1,7 +1,7 @@
 use futures::channel::mpsc::UnboundedSender;
-use futures::future::Either;
-use futures::stream::AbortHandle;
+use futures::future::{AbortHandle, Either};
 use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
+use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
 use hopr_network_types::prelude::*;
@@ -12,7 +12,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::balancer::{keep_alive_stream, CountingSendMsg, KeepAliveController, SurbBalancer};
+use crate::balancer::{RateController, RateLimitExt, SurbBalancer, SurbFlowController};
 use crate::errors::{SessionManagerError, TransportSessionError};
 use crate::initiation::{
     StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
@@ -130,6 +130,9 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
                     "session has been closed due to cache eviction"
                 );
 
+                // Terminate any additional tasks spawned by the Session
+                session_data.abort_handles.into_iter().for_each(|h| h.abort());
+
                 #[cfg(all(feature = "prometheus", not(test)))]
                 METRIC_ACTIVE_SESSIONS.decrement(1.0);
             }
@@ -197,6 +200,7 @@ struct CachedSession {
     // This makes sure that the entire channel closes once the one and only sender is closed.
     session_tx: Arc<UnboundedSender<Box<[u8]>>>,
     routing_opts: DestinationRouting,
+    abort_handles: Vec<AbortHandle>,
 }
 
 /// Indicates the result of processing a message.
@@ -206,6 +210,41 @@ pub enum DispatchResult {
     Processed,
     /// The message was not related to Start or Session protocol.
     Unrelated(ApplicationData),
+}
+
+pub(crate) struct KeepAliveController(pub(crate) RateController);
+
+impl SurbFlowController for KeepAliveController {
+    fn adjust_surb_flow(&self, surbs_per_sec: usize) {
+        // Currently, a keep-alive message can bear `HoprPacket::MAX_SURBS_IN_PACKET` SURBs,
+        // so the correction by this factor is applied.
+        self.0.set_rate_per_unit(
+            surbs_per_sec,
+            HoprPacket::MAX_SURBS_IN_PACKET as u32 * Duration::from_secs(1),
+        );
+    }
+}
+
+pub(crate) struct CountingSendMsg<T>(T, Arc<AtomicU64>);
+
+impl<T: SendMsg> CountingSendMsg<T> {
+    pub fn new(msg: T, counter: Arc<AtomicU64>) -> Self {
+        Self(msg, counter)
+    }
+}
+
+#[async_trait::async_trait]
+impl<T: SendMsg + Send + Sync> SendMsg for CountingSendMsg<T> {
+    async fn send_message(
+        &self,
+        data: ApplicationData,
+        destination: DestinationRouting,
+    ) -> Result<(), TransportSessionError> {
+        let num_surbs = HoprPacket::max_surbs_with_message(data.len()) as u64;
+        self.0.send_message(data, destination).await.inspect(|_| {
+            self.1.fetch_add(num_surbs, std::sync::atomic::Ordering::Relaxed);
+        })
+    }
 }
 
 /// Manages lifecycles of Sessions.
@@ -347,14 +386,16 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             .min(myself.cfg.idle_timeout)
             .mul_f64(jitter)
                 / 2;
-            loop {
-                hopr_async_runtime::prelude::sleep(timeout).await;
-                trace!("executing session cache evictions");
-                futures::join!(
-                    myself.sessions.run_pending_tasks(),
-                    myself.session_initiations.run_pending_tasks()
-                );
-            }
+            futures_time::stream::interval(timeout.into())
+                .for_each(|_| {
+                    trace!("executing session cache evictions");
+                    futures::future::join(
+                        myself.sessions.run_pending_tasks(),
+                        myself.session_initiations.run_pending_tasks(),
+                    )
+                    .map(|_| ())
+                })
+                .await;
         });
 
         Ok(vec![jh_closure_notifications, jh_session_expiration])
@@ -371,8 +412,13 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         sender: Arc<CountingSendMsg<S>>,
         routing: DestinationRouting,
     ) -> (KeepAliveController, AbortHandle) {
+        let elem = StartProtocol::KeepAlive(session_id);
+
         // The stream is suspended until the caller sets a rate via the Controller
-        let (ka_stream, ka_controller, abort_handle) = keep_alive_stream(session_id);
+        let (abort_handle, reg) = AbortHandle::new_pair();
+        let (ka_stream, controller) = futures::stream::Abortable::new(futures::stream::repeat(elem), reg)
+            .rate_limit_per_unit(0, Duration::from_secs(1));
+
         let sender_clone = sender.clone();
         let fwd_routing_clone = routing.clone();
 
@@ -381,7 +427,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         hopr_async_runtime::prelude::spawn(
             ka_stream
                 .map(ApplicationData::try_from)
-                .try_for_each(move |msg| {
+                .try_for_each_concurrent(None, move |msg| {
                     let sender_clone = sender_clone.clone();
                     let fwd_routing_clone = fwd_routing_clone.clone();
                     async move { sender_clone.send_message(msg, fwd_routing_clone).await }
@@ -395,7 +441,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 }),
         );
 
-        (ka_controller, abort_handle)
+        (KeepAliveController(controller), abort_handle)
     }
 
     /// Initiates a new outgoing Session to `destination` with the given configuration.
@@ -468,30 +514,22 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 let session_id = est.session_id;
                 debug!(challenge = est.orig_challenge, ?session_id, "started a new session");
 
-                // Insert the Session object, forcibly overwrite any other session with the same ID
                 let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
-                self.sessions
-                    .insert(
-                        session_id,
-                        CachedSession {
-                            session_tx: Arc::new(tx),
-                            routing_opts: forward_routing.clone(),
-                        },
-                    )
-                    .await;
-
-                #[cfg(all(feature = "prometheus", not(test)))]
-                {
-                    METRIC_NUM_INITIATED_SESSIONS.increment();
-                    METRIC_ACTIVE_SESSIONS.increment(1.0);
-                }
-
+                let mut abort_handles = Vec::new();
                 let notifier = self
                     .session_notifiers
                     .get()
-                    .map(|(_, c)| c.clone())
+                    .map(|(_, notifier)| {
+                        let notifier = notifier.clone();
+                        Box::new(move |session_id: SessionId| {
+                            let _ = notifier
+                                .unbounded_send(session_id)
+                                .inspect_err(|error| error!(%session_id, %error, "failed to notify session closure"));
+                        })
+                    })
                     .ok_or(SessionManagerError::NotStarted)?;
-                if let Some(balancer_config) = cfg.surb_management {
+
+                let session = if let Some(balancer_config) = cfg.surb_management {
                     let surb_production_counter = Arc::new(AtomicU64::new(0));
                     let surb_consumption_counter = Arc::new(AtomicU64::new(0));
 
@@ -502,43 +540,27 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     ));
 
                     // Spawn the SURB-bearing keep alive stream
-                    let (ka_controller, ka_abort) =
+                    let (ka_controller, ka_abort_handle) =
                         self.spawn_keep_alive_stream(session_id, sender.clone(), forward_routing.clone());
-
-                    let (balancer_abort, balancer_ar) = AbortHandle::new_pair();
-                    let session = Session::new(
-                        session_id,
-                        forward_routing,
-                        cfg.capabilities.into_iter().collect(),
-                        sender,
-                        rx,
-                        Some(Box::new(move |session_id: SessionId| {
-                            let _ = notifier
-                                .unbounded_send(session_id)
-                                .inspect_err(|error| error!(%session_id, %error, "failed to notify session closure"));
-
-                            // Terminate also the SURB-bearing keep-alive sending and the Balancer
-                            ka_abort.abort();
-                            balancer_abort.abort();
-                        })),
-                        surb_consumption_counter.clone(), // Received packets = SURB consumption estimate
-                    );
+                    abort_handles.push(ka_abort_handle);
 
                     // Spawn the SURB balancer, which will decide on the initial SURB rate.
                     debug!(%session_id, ?balancer_config, "spawning SURB balancer");
                     let mut balancer = SurbBalancer::new(
                         session_id,
                         surb_production_counter,
-                        surb_consumption_counter,
+                        surb_consumption_counter.clone(),
                         ka_controller,
                         balancer_config,
                     );
+
                     let (surbs_ready_tx, surbs_ready_rx) = futures::channel::oneshot::channel();
                     let mut surbs_ready_tx = Some(surbs_ready_tx);
+                    let (balancer_abort_handle, reg) = AbortHandle::new_pair();
                     hopr_async_runtime::prelude::spawn(
                         futures::stream::Abortable::new(
                             futures_time::stream::interval(self.cfg.balancer_sampling_interval.into()),
-                            balancer_ar,
+                            reg,
                         )
                         .for_each(move |_| {
                             let level = balancer.update();
@@ -553,6 +575,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                             futures::future::ready(())
                         }),
                     );
+                    abort_handles.push(balancer_abort_handle);
 
                     // Wait for enough SURBs to be sent to the counterparty
                     let timeout = hopr_async_runtime::prelude::sleep(SESSION_READINESS_TIMEOUT);
@@ -571,22 +594,46 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         }
                     }
 
-                    Ok(session)
-                } else {
-                    Ok(Session::new(
+                    Session::new(
                         session_id,
-                        forward_routing,
+                        forward_routing.clone(),
+                        cfg.capabilities.into_iter().collect(),
+                        sender,
+                        rx,
+                        Some(notifier),
+                        surb_consumption_counter, // Received packets = SURB consumption estimate
+                    )
+                } else {
+                    Session::new(
+                        session_id,
+                        forward_routing.clone(),
                         cfg.capabilities.into_iter().collect(),
                         Arc::new(msg_sender.clone()),
                         rx,
-                        Some(Box::new(move |session_id: SessionId| {
-                            let _ = notifier
-                                .unbounded_send(session_id)
-                                .inspect_err(|error| error!(%session_id, %error, "failed to notify session closure"));
-                        })),
+                        Some(notifier),
                         Arc::new(AtomicU64::new(0)),
-                    ))
+                    )
+                };
+
+                // Insert the Session object, forcibly overwrite any other session with the same ID
+                self.sessions
+                    .insert(
+                        session_id,
+                        CachedSession {
+                            session_tx: Arc::new(tx),
+                            routing_opts: forward_routing,
+                            abort_handles,
+                        },
+                    )
+                    .await;
+
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    METRIC_NUM_INITIATED_SESSIONS.increment();
+                    METRIC_ACTIVE_SESSIONS.increment(1.0);
                 }
+
+                Ok(session)
             }
             Either::Left((Ok(None), _)) => Err(SessionManagerError::Other(
                 "internal error: sender has been closed without completing the session establishment".into(),
@@ -692,6 +739,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     CachedSession {
                         session_tx: Arc::new(tx_session_data),
                         routing_opts: reply_routing.clone(),
+                        abort_handles: vec![],
                     },
                 )
                 .await
@@ -866,6 +914,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             // Closing the data sender on the session will cause the Session to terminate
             session_data.session_tx.close_channel();
             trace!(?session_id, "data tx channel closed on session");
+
+            // Terminate any additional tasks spawned by the Session
+            session_data.abort_handles.into_iter().for_each(|h| h.abort());
 
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_ACTIVE_SESSIONS.decrement(1.0);
@@ -1239,6 +1290,7 @@ mod tests {
                 CachedSession {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
+                    abort_handles: Vec::new(),
                 },
             )
             .await;
