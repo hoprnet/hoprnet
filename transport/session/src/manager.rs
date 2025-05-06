@@ -811,9 +811,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                tokio::runtime::Runtime::new()
-                    .expect("tokio runtime must build")
-                    .block_on(bob_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Handle::current().block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -832,9 +830,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                tokio::runtime::Runtime::new()
-                    .expect("tokio runtime must build")
-                    .block_on(alice_mgr_clone.dispatch_message(data))?;
+                tokio::runtime::Handle::current().block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
 
@@ -853,8 +849,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                tokio::runtime::Runtime::new()
-                    .expect("tokio runtime must build")
+                tokio::runtime::Handle::current()
                     .block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -867,8 +862,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                tokio::runtime::Runtime::new()
-                    .expect("tokio runtime must build")
+                tokio::runtime::Handle::current()
                     .block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -945,8 +939,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                tokio::runtime::Runtime::new()
-                    .expect("tokio runtime must build")
+                tokio::runtime::Handle::current()
                     .block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -966,8 +959,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                tokio::runtime::Runtime::new()
-                    .expect("tokio runtime must build")
+                tokio::runtime::Handle::current()
                     .block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -987,8 +979,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                tokio::runtime::Runtime::new()
-                    .expect("tokio runtime must build")
+                tokio::runtime::Handle::current()
                     .block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1001,8 +992,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                tokio::runtime::Runtime::new()
-                    .expect("tokio runtime must build")
+                tokio::runtime::Handle::current()
                     .block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1091,8 +1081,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                tokio::runtime::Runtime::new()
-                    .expect("tokio runtime must build")
+                tokio::runtime::Handle::current()
                     .block_on(bob_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
@@ -1105,8 +1094,7 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                tokio::runtime::Runtime::new()
-                    .expect("tokio runtime must build")
+                tokio::runtime::Handle::current()
                     .block_on(alice_mgr_clone.dispatch_message(data))?;
                 Ok(())
             });
