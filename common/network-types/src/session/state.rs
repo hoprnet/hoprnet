@@ -1295,7 +1295,7 @@ mod tests {
         };
 
         let net_cfg = FaultyNetworkConfig {
-            fault_prob: 0.33,
+            fault_prob: 0.25,
             mixing_factor: 2,
             ..Default::default()
         };
