@@ -9,14 +9,19 @@
 //!
 //! [NetworkDetail] specifies the environment type of the network, the starting block number, and
 //! the deployed contract addresses in [ContractAddresses]
-
-use clap::Parser;
-use ethers::{
-    core::k256::ecdsa::SigningKey,
-    middleware::{MiddlewareBuilder, NonceManagerMiddleware, SignerMiddleware},
-    providers::{Middleware, Provider},
-    signers::{LocalWallet, Signer, Wallet},
+use alloy::{
+    network::EthereumWallet,
+    providers::{
+        fillers::{
+            BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
+            WalletFiller,
+        },
+        Identity, ProviderBuilder, RootProvider,
+    },
+    rpc::client::ClientBuilder,
+    signers::local::PrivateKeySigner,
 };
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::{
@@ -27,18 +32,18 @@ use std::{
 };
 
 use hopr_chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
-use hopr_chain_rpc::{
-    client::{surf_client::SurfRequestor as DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy},
-    errors::RpcError,
-    rpc::RpcOperationsConfig,
-};
+use hopr_chain_rpc::transport::SurfTransport;
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::keypairs::Keypair;
 
 use crate::utils::HelperErrors;
 
-pub type JsonRpcClient =
-    hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>;
+type SharedFillerChain = JoinFill<
+    JoinFill<JoinFill<JoinFill<Identity, ChainIdFiller>, NonceFiller<CachedNonceManager>>, GasFiller>,
+    BlobGasFiller,
+>;
+pub type RpcProvider = FillProvider<JoinFill<SharedFillerChain, WalletFiller<EthereumWallet>>, RootProvider>;
+pub type RpcProviderWithoutSigner = FillProvider<SharedFillerChain, RootProvider>;
 
 // replace NetworkConfig with ProtocolConfig
 #[serde_as]
@@ -123,63 +128,58 @@ impl NetworkProviderArgs {
     }
 
     /// get the provider object
-    pub async fn get_provider_with_signer(
-        &self,
-        chain_key: &ChainKeypair,
-    ) -> Result<Arc<NonceManagerMiddleware<SignerMiddleware<Provider<JsonRpcClient>, Wallet<SigningKey>>>>, HelperErrors>
+    pub async fn get_provider_with_signer(&self, chain_key: &ChainKeypair) -> Result<Arc<RpcProvider>, HelperErrors>
+// ) -> Result<Arc<NonceManagerMiddleware<SignerMiddleware<Provider<JsonRpcClient>, Wallet<SigningKey>>>>, HelperErrors>
     {
+        // Build transport
+        let parsed_url = url::Url::parse(&self.provider_url.as_str()).unwrap();
+        let transport_client = SurfTransport::new(parsed_url);
+
         // Build JSON RPC client
-        let rpc_client = JsonRpcClient::new(
-            self.provider_url.as_str(),
-            DefaultHttpPostRequestor::new(hopr_chain_rpc::HttpPostRequestorConfig {
-                max_requests_per_sec: None,
-                ..Default::default()
-            }),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
+        let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
+
+        if rpc_client.is_local() {
+            rpc_client.set_poll_interval(std::time::Duration::from_millis(10));
+        };
+
+        // build wallet
+        let wallet = PrivateKeySigner::from_slice(chain_key.secret().as_ref()).expect("failed to construct wallet");
 
         // Build default JSON RPC provider
-        let mut provider = Provider::new(rpc_client);
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            .filler(ChainIdFiller::default())
+            .filler(NonceFiller::new(CachedNonceManager::default()))
+            .filler(GasFiller)
+            .filler(BlobGasFiller)
+            .wallet(wallet)
+            .on_client(rpc_client);
 
-        let chain_id = provider.get_chainid().await.map_err(RpcError::ProviderError)?;
-        let default_tx_polling_interval = if chain_id.eq(&ethers::types::U256::from(31337u32)) {
-            std::time::Duration::from_millis(10)
-        } else {
-            RpcOperationsConfig::default().tx_polling_interval
-        };
-        provider.set_interval(default_tx_polling_interval);
-
-        let wallet = LocalWallet::from_bytes(chain_key.secret().as_ref())?.with_chain_id(chain_id.as_u64());
-
-        Ok(Arc::new(
-            provider
-                .with_signer(wallet)
-                .nonce_manager(chain_key.public().to_address().into()),
-        ))
+        Ok(Arc::new(provider))
     }
 
     /// get the provider object without signer
-    pub async fn get_provider_without_signer(&self) -> Result<Arc<Provider<JsonRpcClient>>, HelperErrors> {
+    pub async fn get_provider_without_signer(&self) -> Result<Arc<RpcProviderWithoutSigner>, HelperErrors> {
+        // Build transport
+        let parsed_url = url::Url::parse(&self.provider_url.as_str()).unwrap();
+        let transport_client = SurfTransport::new(parsed_url);
+
         // Build JSON RPC client
-        let rpc_client = JsonRpcClient::new(
-            self.provider_url.as_str(),
-            DefaultHttpPostRequestor::new(hopr_chain_rpc::HttpPostRequestorConfig {
-                max_requests_per_sec: None,
-                ..Default::default()
-            }),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
+        let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
+
+        if rpc_client.is_local() {
+            rpc_client.set_poll_interval(std::time::Duration::from_millis(10));
+        };
 
         // Build default JSON RPC provider
-        let mut provider = Provider::new(rpc_client);
-
-        let chain_id = provider.get_chainid().await.map_err(RpcError::ProviderError)?;
-        let default_tx_polling_interval = if chain_id.eq(&ethers::types::U256::from(31337u32)) {
-            std::time::Duration::from_millis(10)
-        } else {
-            RpcOperationsConfig::default().tx_polling_interval
-        };
-        provider.set_interval(default_tx_polling_interval);
+        let provider = ProviderBuilder::new()
+            .disable_recommended_fillers()
+            // .wallet(wallet)
+            .filler(ChainIdFiller::default())
+            .filler(NonceFiller::new(CachedNonceManager::default()))
+            .filler(GasFiller)
+            .filler(BlobGasFiller)
+            .on_client(rpc_client);
 
         Ok(Arc::new(provider))
     }
@@ -231,6 +231,7 @@ pub fn get_network_details_from_name(make_root_dir_path: &Path, network: &str) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy::providers::Provider;
     use anyhow::Context;
 
     fn create_anvil_at_port(default: bool) -> ethers::utils::AnvilInstance {
@@ -323,8 +324,8 @@ mod tests {
 
         let provider = network_provider_args.get_provider_with_signer(&chain_key).await?;
 
-        let chain_id = provider.get_chainid().await?;
-        assert_eq!(chain_id, anvil.chain_id().into());
+        let chain_id = provider.get_chain_id().await?;
+        assert_eq!(chain_id, anvil.chain_id());
         Ok(())
     }
 
@@ -344,8 +345,8 @@ mod tests {
 
         let provider = network_provider_args.get_provider_with_signer(&chain_key).await?;
 
-        let chain_id = provider.get_chainid().await?;
-        assert_eq!(chain_id, anvil.chain_id().into());
+        let chain_id = provider.get_chain_id().await?;
+        assert_eq!(chain_id, anvil.chain_id());
         Ok(())
     }
 }
