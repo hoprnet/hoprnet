@@ -1,7 +1,9 @@
 //! [`Session`] object providing the session functionality over the HOPR transport
 //!
-//! The session proxies the user interactions with the transport in order to hide the
+//! The session proxies the user interactions with the transport to hide the
 //! advanced interactions and functionality.
+//!
+//! The [`SessionManager`] allows for automatic management of sessions via the Start protocol.
 pub(crate) mod balancer;
 pub mod errors;
 mod initiation;
@@ -10,6 +12,7 @@ pub mod traits;
 mod types;
 
 pub use hopr_network_types::types::*;
+pub use balancer::SurbBalancerConfig;
 pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
 pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, SESSION_USABLE_MTU_SIZE};
 
@@ -17,8 +20,6 @@ pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, S
 pub use types::transfer_session;
 
 use hopr_network_types::prelude::state::SessionFeature;
-
-use crate::balancer::SurbBalancerConfig;
 use hopr_internal_types::prelude::HoprPseudonym;
 
 /// Capabilities of a session.
@@ -57,7 +58,6 @@ impl IntoIterator for Capability {
     }
 }
 
-// TODO: make this defaultable by moving `peer` and `target` out of the object
 /// Configuration for the session.
 ///
 /// Relevant primarily for the client, since the server is only

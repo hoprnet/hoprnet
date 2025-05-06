@@ -3,7 +3,7 @@ use std::fmt::Display;
 
 use crate::balancer::{SurbFlowController, SurbFlowEstimator};
 
-#[cfg(feature = "prometheus")]
+#[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_TARGET_ERROR_ESTIMATE: hopr_metrics::metrics::MultiGauge =
         hopr_metrics::metrics::MultiGauge::new(
@@ -97,7 +97,7 @@ where
         pid.i(DEFAULT_I_GAIN, cfg.max_surbs_per_sec as f64);
         pid.d(DEFAULT_D_GAIN, cfg.max_surbs_per_sec as f64);
 
-        #[cfg(feature = "prometheus")]
+        #[cfg(all(feature = "prometheus", not(test)))]
         {
             let sid = session_id.to_string();
             METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], 0.0);
@@ -162,7 +162,7 @@ where
 
         tracing::trace!(control_output = corrected_output, "next control output");
 
-        #[cfg(feature = "prometheus")]
+        #[cfg(all(feature = "prometheus", not(test)))]
         {
             let sid = self.session_id.to_string();
             METRIC_TARGET_ERROR_ESTIMATE.set(&[&sid], error as f64);

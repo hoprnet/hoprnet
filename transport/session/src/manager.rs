@@ -71,6 +71,13 @@ pub struct SessionManagerConfig {
     /// Default is 180 seconds.
     #[default(Duration::from_secs(180))]
     pub idle_timeout: Duration,
+
+    /// The sampling interval for SURB balancer. It will make SURB control decisions
+    /// regularly at this interval.
+    ///
+    /// Default is 1 second.
+    #[default(Duration::from_secs(1))]
+    pub balancer_sampling_interval: Duration,
 }
 
 fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
@@ -173,9 +180,6 @@ where
 /// The first challenge value used in Start protocol to initiate a session.
 pub(crate) const MIN_CHALLENGE: StartChallenge = 1;
 
-/// How often the SURB rate sampling and SURB balancer control decisions are done.
-pub(crate) const BALANCER_SAMPLE_INTERVAL: Duration = Duration::from_secs(1);
-
 // Needs to use an UnboundedSender instead of oneshot
 // because Moka cache requires the value to be Clone, which oneshot Sender is not.
 // It also cannot be enclosed in an Arc, since calling `send` consumes the oneshot Sender.
@@ -211,6 +215,12 @@ pub enum DispatchResult {
 /// Since the `SessionManager` operates over the HOPR protocol,
 /// the [message transport `S`](SendMsg) is required.
 /// Such transport must also be `Clone`, since it will be cloned into the created [`Session`] objects.
+///
+/// The manager also can take care of [SURB balancing](SurbBalancerConfig) per Session. When enabled,
+/// a desired target level of SURBs at the Session counterparty is set. According to measured
+/// inflow and outflow of SURBS to/from the counterparty, the production of non-organic SURBs
+/// through keep-alive messages (sent to counterparty) is controlled to maintain that target level.
+///
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<(UnboundedSender<IncomingSession>, UnboundedSender<SessionId>)>>,
@@ -519,7 +529,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     );
                     hopr_async_runtime::prelude::spawn(
                         futures::stream::Abortable::new(
-                            futures_time::stream::interval(BALANCER_SAMPLE_INTERVAL.into()),
+                            futures_time::stream::interval(self.cfg.balancer_sampling_interval.into()),
                             balancer_ar,
                         )
                         .for_each(move |_| {

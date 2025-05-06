@@ -5116,7 +5116,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "bincode",
- "cfg_eval",
  "futures",
  "futures-time",
  "hopr-async-runtime",

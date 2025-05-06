@@ -86,7 +86,7 @@ where
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    pub(crate) async fn resolve_path(
+    async fn resolve_path(
         &self,
         source: Address,
         destination: Address,

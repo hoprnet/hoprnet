@@ -25,7 +25,8 @@ pub trait HoprDbProtocolOperations {
     /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
     async fn get_network_ticket_price(&self) -> Result<Balance>;
 
-    async fn find_surb(&self, matcher: SurbMatcher) -> crate::errors::Result<(HoprSenderId, HoprSurb)>;
+    /// Attempts to find SURB and its ID given the [`SurbMatcher`].
+    async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)>;
 
     /// Process the data into an outgoing packet that is not going to be acknowledged.
     async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingPacket>;

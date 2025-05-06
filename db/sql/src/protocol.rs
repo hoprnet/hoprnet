@@ -519,10 +519,11 @@ impl HoprDbProtocolOperations for HoprDb {
                 if !incoming.surbs.is_empty() {
                     let num_surbs = incoming.surbs.len();
 
+                    // TODO: make the capacity of the SURB RB configurable
                     self.caches
                         .surbs_per_pseudonym
                         .entry_by_ref(&incoming.sender)
-                        .or_default() // Default SurbRingBuffer
+                        .or_default() // Default capacity SurbRingBuffer
                         .await
                         .value()
                         .push(incoming.surbs)?;

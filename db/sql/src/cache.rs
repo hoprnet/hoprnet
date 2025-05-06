@@ -57,18 +57,24 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
+/// Ring buffer containing SURBs along with their IDs.
+/// All these SURBs usually belong to the same pseudonym.
 #[derive(Clone, Debug)]
 pub(crate) struct SurbRingBuffer(Arc<Mutex<AllocRingBuffer<(HoprSurbId, HoprSurb)>>>);
 
 impl Default for SurbRingBuffer {
     fn default() -> Self {
-        // TODO: make the RB capacity configurable in the future ?
         // With the current packet size, this is roughly for 7 MB of data budget in SURBs
         Self(Arc::new(Mutex::new(AllocRingBuffer::new(10_000))))
     }
 }
 
 impl SurbRingBuffer {
+    pub fn new(capacity: usize) -> Self {
+        Self(Arc::new(Mutex::new(AllocRingBuffer::new(capacity))))
+    }
+
+    /// Push all SURBs with their IDs into the RB.
     pub fn push<I: IntoIterator<Item = (HoprSurbId, HoprSurb)>>(&self, surbs: I) -> Result<(), DbSqlError> {
         self.0
             .lock()
@@ -76,6 +82,8 @@ impl SurbRingBuffer {
             .extend(surbs);
         Ok(())
     }
+
+    /// Pop the latest SURB and its IDs from the RB.
     pub fn pop_one(&self) -> Result<(HoprSurbId, HoprSurb), DbSqlError> {
         self.0
             .lock()
@@ -84,7 +92,7 @@ impl SurbRingBuffer {
             .ok_or(DbSqlError::NoSurbAvailable("no more surbs".into()))
     }
 
-    /// Check if the next SURB has the given ID and pop it.
+    /// Check if the next SURB has the given ID and pop it from the RB.
     pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<(HoprSurbId, HoprSurb), DbSqlError> {
         let mut rb = self
             .0
@@ -144,14 +152,18 @@ impl Default for HoprDbCaches {
             .max_capacity(10_000)
             .build();
 
+        // SURB openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
+        // and therefore, there's more but with a shorter lifetime
         let pseudonym_openers = moka::sync::Cache::builder()
             .time_to_live(Duration::from_secs(60))
             .max_capacity(100_000)
             .build();
 
+        // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
+        // For each Pseudonym, there's an RB of SURBs and their IDs.
         let surbs_per_pseudonym = Cache::builder()
-            .time_to_idle(Duration::from_secs(60))
-            .max_capacity(100_000)
+            .time_to_idle(Duration::from_secs(600))
+            .max_capacity(10_000)
             .build();
 
         Self {
