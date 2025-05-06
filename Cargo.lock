@@ -5227,6 +5227,7 @@ dependencies = [
  "axum 0.8.4",
  "axum-extra",
  "base64 0.22.1",
+ "bytesize",
  "const_format",
  "either",
  "futures",

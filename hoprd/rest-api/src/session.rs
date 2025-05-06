@@ -2,6 +2,8 @@ use std::fmt::Formatter;
 use std::future::Future;
 use std::str::FromStr;
 
+use crate::types::{HoprIdentifier, PeerOrAddress};
+use crate::{ApiError, ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use axum::extract::Path;
 use axum::Error;
 use axum::{
@@ -21,6 +23,7 @@ use hopr_db_api::prelude::HoprDbResolverOperations;
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::{transfer_session, Address};
 use hopr_lib::{HoprSession, ServiceId, SessionClientConfig, SessionTarget};
+use hopr_lib::{SurbBalancerConfig, SESSION_PAYLOAD_SIZE};
 use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
@@ -30,9 +33,6 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info, trace};
-
-use crate::types::{HoprIdentifier, PeerOrAddress};
-use crate::{ApiError, ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -390,7 +390,8 @@ impl RoutingOptions {
         "returnPath": { "Hops": 1 },
         "target": {"Plain": "localhost:8080"},
         "listenHost": "127.0.0.1:10000",
-        "capabilities": ["Retransmission", "Segmentation"]
+        "capabilities": ["Retransmission", "Segmentation"],
+        "responseBuffer": "2 MB"
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientRequest {
@@ -414,6 +415,15 @@ pub(crate) struct SessionClientRequest {
     ///
     /// Defaults to `Segmentation` and `Retransmission` for TCP and nothing for UDP.
     pub capabilities: Option<Vec<SessionCapability>>,
+    /// The amount of response data the Session counterparty can deliver back to us,
+    /// without us sending any SURBs to them.
+    ///
+    /// In other words, this size is recalculated to a number of SURBs delivered
+    /// to the counterparty upfront and then maintained.
+    /// The maintenance is dynamic, based on the number of responses we receive.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = String)]
+    pub response_buffer: Option<bytesize::ByteSize>,
 }
 
 impl SessionClientRequest {
@@ -448,6 +458,13 @@ impl SessionClientRequest {
                         }
                         _ => vec![], // no default capabilities for UDP, etc.
                     }),
+                surb_management: Some(SurbBalancerConfig {
+                    target_surb_buffer_size: self
+                        .response_buffer
+                        .map(|b| b.as_u64() / SESSION_PAYLOAD_SIZE as u64)
+                        .unwrap_or(5_000),
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
         ))

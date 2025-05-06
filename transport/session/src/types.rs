@@ -104,7 +104,7 @@ impl Hash for SessionId {
     }
 }
 
-/// Inner MTU size of what the HOPR payload can take (payload - peer address - application_tag)
+/// Inner MTU size of what the HOPR packet can tag as payload
 pub const SESSION_USABLE_MTU_SIZE: usize = HoprPacket::PAYLOAD_SIZE - size_of::<Tag>();
 
 /// Helper trait to allow Box aliasing

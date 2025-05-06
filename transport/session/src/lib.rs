@@ -20,7 +20,10 @@ pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, S
 pub use types::transfer_session;
 
 use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_network_types::prelude::state::SessionFeature;
+use hopr_network_types::prelude::state::{SessionFeature, SessionSocket};
+
+/// Number of bytes that can be sent in a single session payload.
+pub const SESSION_PAYLOAD_SIZE: usize = SessionSocket::<SESSION_USABLE_MTU_SIZE>::PAYLOAD_CAPACITY;
 
 /// Capabilities of a session.
 #[repr(u8)]

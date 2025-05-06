@@ -85,7 +85,8 @@ pub use {
         errors::{HoprTransportError, NetworkingError, ProtocolError},
         HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
         OffchainKeypair as HoprOffchainKeypair, PeerId, SendMsg, ServiceId, Session as HoprSession, SessionCapability,
-        SessionClientConfig, SessionId as HoprSessionId, SessionTarget, TicketStatistics, SESSION_USABLE_MTU_SIZE,
+        SessionClientConfig, SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig, TicketStatistics,
+        SESSION_PAYLOAD_SIZE, SESSION_USABLE_MTU_SIZE,
     },
 };
 
