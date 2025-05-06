@@ -746,7 +746,6 @@ mod tests {
     use crate::types::SessionTarget;
     use crate::Capability;
     use anyhow::anyhow;
-    use async_trait::async_trait;
     use futures::AsyncWriteExt;
     use hopr_crypto_types::keypairs::ChainKeypair;
     use hopr_crypto_types::prelude::Keypair;
@@ -758,13 +757,17 @@ mod tests {
         impl Clone for MsgSender {
             fn clone(&self) -> Self;
         }
-        #[async_trait]
         impl SendMsg for MsgSender {
-            async fn send_message(
-                &self,
+            fn send_message<'life0, 'async_trait>
+            (
+                &'life0 self,
                 data: ApplicationData,
                 routing: DestinationRouting,
-            ) -> std::result::Result<(), TransportSessionError>;
+            )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output=std::result::Result<(),TransportSessionError>> + Send + 'async_trait>>
+            where
+                'life0: 'async_trait,
+                Self: Sync + 'async_trait;
         }
     }
 
@@ -811,8 +814,11 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                tokio::runtime::Handle::current().block_on(bob_mgr_clone.dispatch_message(data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(data).await?;
+                    Ok(())
+                })
             });
 
         // Bob clones transport for Session
@@ -830,8 +836,10 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                tokio::runtime::Handle::current().block_on(alice_mgr_clone.dispatch_message(data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+
+                Box::pin(async move {alice_mgr_clone.dispatch_message(data).await?;
+                Ok(())})
             });
 
         // Alice clones transport for Session
@@ -849,9 +857,11 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                tokio::runtime::Handle::current()
-                    .block_on(bob_mgr_clone.dispatch_message(data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(data).await?;
+                    Ok(())
+                })
             });
 
         // Bob sends the CloseSession message to confirm
@@ -862,9 +872,11 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                tokio::runtime::Handle::current()
-                    .block_on(alice_mgr_clone.dispatch_message(data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(data).await?;
+                    Ok(())
+                })
             });
 
         let mut jhs = Vec::new();
@@ -939,9 +951,11 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                tokio::runtime::Handle::current()
-                    .block_on(bob_mgr_clone.dispatch_message(data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(data).await?;
+                    Ok(())
+                })
             });
 
         // Bob clones transport for Session
@@ -959,9 +973,10 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                tokio::runtime::Handle::current()
-                    .block_on(alice_mgr_clone.dispatch_message(data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+
+                Box::pin(async move {alice_mgr_clone.dispatch_message(data).await?;
+                Ok(())})
             });
 
         // Alice clones transport for Session
@@ -979,9 +994,11 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                tokio::runtime::Handle::current()
-                    .block_on(bob_mgr_clone.dispatch_message(data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(data).await?;
+                    Ok(())
+                })
             });
 
         // Bob sends the CloseSession message to confirm
@@ -992,9 +1009,10 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                tokio::runtime::Handle::current()
-                    .block_on(alice_mgr_clone.dispatch_message(data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+
+                Box::pin(async move {alice_mgr_clone.dispatch_message(data).await?;
+                Ok(())})
             });
 
         let mut jhs = Vec::new();
@@ -1081,9 +1099,11 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
             .returning(move |data, _| {
-                tokio::runtime::Handle::current()
-                    .block_on(bob_mgr_clone.dispatch_message(data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(data).await?;
+                    Ok(())
+                })
             });
 
         // Bob sends the SessionError message
@@ -1094,9 +1114,11 @@ mod tests {
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &alice_peer))
             .returning(move |data, _| {
-                tokio::runtime::Handle::current()
-                    .block_on(alice_mgr_clone.dispatch_message(data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(data).await?;
+                    Ok(())
+                })
             });
 
         let mut jhs = Vec::new();
@@ -1148,7 +1170,7 @@ mod tests {
             .once()
             .in_sequence(&mut sequence)
             .withf(move |_, peer| matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer))
-            .returning(|_, _| Ok(()));
+            .returning(|_, _| Box::pin(async { Ok(()) }));
 
         let mut jhs = Vec::new();
 
