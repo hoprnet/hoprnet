@@ -415,17 +415,16 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         let elem = StartProtocol::KeepAlive(session_id);
 
         // The stream is suspended until the caller sets a rate via the Controller
-        let (abort_handle, reg) = AbortHandle::new_pair();
-        let (ka_stream, controller) = futures::stream::Abortable::new(futures::stream::repeat(elem), reg)
-            .rate_limit_per_unit(0, Duration::from_secs(1));
+        let (ka_stream, controller) = futures::stream::repeat(elem).rate_limit_per_unit(0, Duration::from_secs(1));
 
+        let (abort_handle, reg) = AbortHandle::new_pair();
         let sender_clone = sender.clone();
         let fwd_routing_clone = routing.clone();
 
         // This task will automatically terminate once the returned abort handle is used.
         debug!(%session_id, "spawning keep-alive stream");
         hopr_async_runtime::prelude::spawn(
-            ka_stream
+            futures::stream::Abortable::new(ka_stream, reg)
                 .map(ApplicationData::try_from)
                 .try_for_each_concurrent(None, move |msg| {
                     let sender_clone = sender_clone.clone();
