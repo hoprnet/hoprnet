@@ -1,12 +1,13 @@
 [package]
 name = "hopli"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 license = "GPL-3.0-only"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = ["essentials", "json-rpc", "node-bindings"] }
 # using own fork until the PR was merged
 clap = { workspace = true }
 ethers = { workspace = true }
@@ -21,6 +22,7 @@ uuid = { workspace = true }
 async-std = { workspace = true, features = ["attributes"] }
 hex-literal = { workspace = true }
 rpassword = { workspace = true }
+url = { workspace = true }
 
 hopr-bindings = { workspace = true }
 hopr-chain-api = { workspace = true, features = ["runtime-async-std"] }

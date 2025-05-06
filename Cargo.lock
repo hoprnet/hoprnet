@@ -5218,8 +5218,9 @@ dependencies = [
 
 [[package]]
 name = "hopli"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "async-std",
  "clap",
@@ -5244,6 +5245,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tracing",
  "tracing-subscriber",
+ "url",
  "uuid 1.16.0",
 ]
 
