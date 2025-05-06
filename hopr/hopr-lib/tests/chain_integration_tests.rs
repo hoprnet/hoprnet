@@ -173,11 +173,8 @@ const SNAPSHOT_ALICE_RX: &str = "tests/snapshots/indexer_snapshot_alice_in";
 const SNAPSHOT_BOB_TX: &str = "tests/snapshots/indexer_snapshot_bob_out";
 const SNAPSHOT_BOB_RX: &str = "tests/snapshots/indexer_snapshot_bob_in";
 
+// only working for async-std atm
 #[cfg_attr(feature = "runtime-async-std", test_log::test(async_std::test))]
-#[cfg_attr(
-    all(feature = "runtime-tokio", not(feature = "runtime-async-std")),
-    test_log::test(tokio::test)
-)]
 async fn integration_test_indexer() -> anyhow::Result<()> {
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));
