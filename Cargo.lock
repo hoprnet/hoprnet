@@ -5632,7 +5632,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-lib"
-version = "3.0.0"
+version = "3.1.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -5644,7 +5644,6 @@ dependencies = [
  "backon",
  "const_format",
  "either",
- "ethers",
  "futures",
  "futures-timer",
  "hex-literal",
