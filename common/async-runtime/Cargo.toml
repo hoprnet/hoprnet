@@ -1,6 +1,6 @@
 [package]
 name = "hopr-async-runtime"
-version = "0.1.1"
+version = "0.1.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Feature-selected async executor for HOPR"
