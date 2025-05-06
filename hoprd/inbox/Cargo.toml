@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-inbox"
-version = "0.2.1"
+version = "0.2.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Implements Message inbox and filtering functionality on top of HOPR protocol messages"
