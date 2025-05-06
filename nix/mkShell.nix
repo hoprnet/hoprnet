@@ -14,7 +14,10 @@ let
     then pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)
     else
       (pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile
-        ../rust-toolchain.toml).override { targets = [ cargoTarget ]; };
+        ../rust-toolchain.toml).override {
+        targets = [ cargoTarget ];
+        extensions = [ "llvm-tools-preview" ];
+      };
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
   minimumPackages = with pkgs; [
     bash

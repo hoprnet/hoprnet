@@ -96,8 +96,7 @@ let
 
   sharedArgs =
     if runTests then sharedArgsBase // {
-      cargoTestExtraArgs = "--workspace -F runtime-async-std -F runtime-tokio";
-      doCheck = true;
+      cargoExtraArgs = "--workspace -F runtime-async-std -F runtime-tokio";
       LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
       RUST_BACKTRACE = "full";
     }
@@ -139,7 +138,7 @@ let
   };
 
   builder =
-    if runTests then craneLib.cargoTest
+    if runTests then craneLib.cargoLlvmCov
     else if runClippy then craneLib.cargoClippy
     else if buildDocs then craneLib.cargoDoc
     else if runBench then mkBench
