@@ -49,6 +49,7 @@ hopr-transport-protocol = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 lazy_static = { workspace = true }
+more-asserts = { workspace = true }
 tracing-test = { workspace = true }
 tokio = { workspace = true }
 

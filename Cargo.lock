@@ -4887,6 +4887,7 @@ dependencies = [
  "libp2p",
  "libp2p-stream",
  "moka",
+ "more-asserts",
  "serde",
  "thiserror 2.0.12",
  "tokio",
