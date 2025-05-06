@@ -24,6 +24,7 @@ let
     gnumake
     gnuplot
     jq
+    llvmPackages.bintools
     lsof
     mold
     openssl
