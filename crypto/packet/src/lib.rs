@@ -68,7 +68,7 @@ pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 /// Adjust this value to change the maximum packet size.
 ///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
-pub(crate) const PAYLOAD_SIZE_INT: usize = 900;
+pub(crate) const PAYLOAD_SIZE_INT: usize = 1000;
 
 #[cfg(test)]
 mod tests {
@@ -84,7 +84,7 @@ mod tests {
             hopr_packet_len
         );
 
-        assert!(hopr_packet_len < 1492, "HOPR packet must fit within a layer 4 packet");
+        assert!(hopr_packet_len < 1492 - 32, "HOPR packet {hopr_packet_len} must fit within a layer 4 packet with libp2p overhead");
     }
 
     #[test]

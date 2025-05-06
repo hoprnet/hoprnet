@@ -72,8 +72,8 @@ pub struct SessionManagerConfig {
     #[default(Duration::from_secs(180))]
     pub idle_timeout: Duration,
 
-    /// The sampling interval for SURB balancer. It will make SURB control decisions
-    /// regularly at this interval.
+    /// The sampling interval for SURB balancer.
+    /// It will make SURB control decisions regularly at this interval.
     ///
     /// Default is 1 second.
     #[default(Duration::from_secs(1))]
