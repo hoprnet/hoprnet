@@ -1,7 +1,8 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::{future::BoxFuture, StreamExt};
-use hopr_transport_mixer::{channel, config::MixerConfig};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+
+use hopr_transport_mixer::{channel, config::MixerConfig};
 
 const SAMPLE_SIZE: usize = 10;
 
@@ -40,7 +41,7 @@ pub fn mixer_throughput(
             )),
             bytes,
             |b, _| {
-                let runtime = criterion::async_executor::AsyncStdExecutor {};
+                let runtime = tokio::runtime::Runtime::new().expect("failed to create runtime");
 
                 b.to_async(runtime)
                     .iter(|| f(RANDOM_GIBBERISH, bytes / RANDOM_GIBBERISH.len(), cfg));
@@ -84,7 +85,7 @@ fn send_continuous_channel_load_through_sink_pipe(
             rx.next().await.expect("receive must succeed");
         }
 
-        pipe.cancel().await;
+        pipe.abort();
     })
 }
 

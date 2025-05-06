@@ -29,12 +29,12 @@ hopr-metrics = { workspace = true, optional = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-tokio = { workspace = true }
 bytesize = { workspace = true }
 criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 futures = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
+tokio = { workspace = true, features = ["time"] }
 tracing-test = { workspace = true }
 
 [[bench]]
