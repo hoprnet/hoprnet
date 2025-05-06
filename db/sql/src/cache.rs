@@ -65,7 +65,7 @@ pub(crate) struct SurbRingBuffer(Arc<Mutex<AllocRingBuffer<(HoprSurbId, HoprSurb
 impl Default for SurbRingBuffer {
     fn default() -> Self {
         // With the current packet size, this is roughly for 7 MB of data budget in SURBs
-        Self(Arc::new(Mutex::new(AllocRingBuffer::new(10_000))))
+        Self::new(10_000)
     }
 }
 

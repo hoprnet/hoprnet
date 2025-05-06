@@ -86,10 +86,10 @@ impl<T: SendMsg + Send + Sync> SendMsg for CountingSendMsg<T> {
         destination: DestinationRouting,
     ) -> Result<(), TransportSessionError> {
         let num_surbs = HoprPacket::max_surbs_with_message(data.len()) as u64;
-        let res = self.0.send_message(data, destination).await;
-        if res.is_ok() {
-            self.1.fetch_add(num_surbs, std::sync::atomic::Ordering::Relaxed);
-        }
-        res
+        self.0
+            .send_message(data, destination).await
+            .inspect(|_| {
+                self.1.fetch_add(num_surbs, std::sync::atomic::Ordering::Relaxed);
+            })
     }
 }

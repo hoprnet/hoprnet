@@ -385,9 +385,9 @@ impl RoutingOptions {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "destination": "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F",
-        "forward_path": { "Hops": 1 },
-        "return_path": { "Hops": 1 },
+        "destination": "0x1B482420Afa04aeC1Ef0e4a00C18451E84466c75",
+        "forwardPath": { "Hops": 1 },
+        "returnPath": { "Hops": 1 },
         "target": {"Plain": "localhost:8080"},
         "listenHost": "127.0.0.1:10000",
         "capabilities": ["Retransmission", "Segmentation"]

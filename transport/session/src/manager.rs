@@ -17,6 +17,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
+use hopr_crypto_random::Randomizable;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -376,7 +377,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         hopr_async_runtime::prelude::spawn(
             ka_stream
                 .map(ApplicationData::try_from)
-                .try_for_each_concurrent(None, move |msg| {
+                .try_for_each(move |msg| {
                     let sender_clone = sender_clone.clone();
                     let fwd_routing_clone = fwd_routing_clone.clone();
                     async move { sender_clone.send_message(msg, fwd_routing_clone).await }
@@ -431,15 +432,16 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             capabilities: cfg.capabilities.iter().copied().collect(),
         });
 
+        let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
         let forward_routing = DestinationRouting::Forward {
             destination,
-            pseudonym: cfg.pseudonym,
+            pseudonym: Some(pseudonym), // Session must use a fixed pseudonym already
             forward_options: cfg.forward_path_options.clone(),
             return_options: cfg.return_path_options.clone().into(),
         };
 
         // Send the Session initiation message
-        trace!(challenge, "sending new session request");
+        trace!(challenge, %pseudonym, "sending new session request");
         msg_sender
             .send_message(start_session_msg.try_into()?, forward_routing.clone())
             .await?;

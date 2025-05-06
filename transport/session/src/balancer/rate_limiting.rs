@@ -60,7 +60,7 @@ pub struct RateLimitedStream<S: Stream> {
     inner: S,
     item: Option<S::Item>,
     #[pin]
-    delay: Option<Sleep>,
+    delay: Option<futures_timer::Delay>,
     state: State,
     delay_time: Arc<AtomicU64>,
 }
@@ -104,10 +104,10 @@ where
                             let wait = Duration::from_millis(delay_time)
                                 .saturating_sub(yield_start.elapsed())
                                 .max(RateController::MIN_DELAY);
-                            *this.delay = Some(futures_time::task::sleep(wait.into()));
+                            *this.delay = Some(futures_timer::Delay::new(wait));
                             *this.state = State::Wait;
                         } else {
-                            *this.delay = Some(futures_time::task::sleep(Duration::from_millis(100).into()));
+                            *this.delay = Some(futures_timer::Delay::new(Duration::from_millis(100)));
                             *this.state = State::NoRate;
                         }
                     } else {
@@ -119,10 +119,10 @@ where
                         let _ = futures::ready!(delay.as_mut().poll(cx));
                         let delay_time = this.delay_time.load(Ordering::Relaxed);
                         if delay_time > 0 {
-                            *this.delay = Some(futures_time::task::sleep(Duration::from_millis(delay_time).into()));
+                            *this.delay = Some(futures_timer::Delay::new(Duration::from_millis(delay_time)));
                             *this.state = State::Wait;
                         } else {
-                            delay.reset_timer();
+                            *this.delay = Some(futures_timer::Delay::new(Duration::from_millis(100)));
                             *this.state = State::NoRate;
                         }
                     }
@@ -430,7 +430,7 @@ mod tests {
 
                 // After 3 elements, wait briefly to allow rate change to take effect
                 if count == 3 {
-                    async_std::task::sleep(Duration::from_millis(50)).await;
+                    futures_time::task::sleep(Duration::from_millis(50).into()).await;
                 }
             }
 
@@ -440,7 +440,7 @@ mod tests {
         // Set up a task to change the rate after a delay
         let rate_change_task = async move {
             // Wait a bit for the stream to start processing
-            async_std::task::sleep(Duration::from_millis(100)).await;
+            futures_time::task::sleep(Duration::from_millis(100).into()).await;
 
             // Change the rate to 20 per second
             controller.set_rate_per_unit(20, Duration::from_secs(1));

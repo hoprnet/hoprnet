@@ -70,6 +70,7 @@ pub struct SurbBalancer<I, O, F, S> {
     last_surbs_delivered: u64,
     last_surbs_used: u64,
     last_update: std::time::Instant,
+    was_below_target: bool,
 }
 
 // Default coefficients for the PID controller
@@ -115,6 +116,7 @@ where
             last_surbs_delivered: 0,
             last_surbs_used: 0,
             last_update: std::time::Instant::now(),
+            was_below_target: true,
         }
     }
 
@@ -144,9 +146,18 @@ where
         self.current_target_buffer = self.current_target_buffer.saturating_add_signed(target_buffer_change);
 
         // Error from the desired target SURB buffer size at counterparty
-        let error = self.cfg.target_surb_buffer_size as i64 - self.current_target_buffer as i64;
+        let error = self.current_target_buffer as i64 - self.cfg.target_surb_buffer_size as i64;
+
+        if self.was_below_target && error >= 0 {
+            tracing::debug!(session_id = %self.session_id, current = self.current_target_buffer, "reached target SURB buffer size");
+            self.was_below_target = false;
+        } else if !self.was_below_target && error < 0 {
+            tracing::debug!(session_id = %self.session_id, current = self.current_target_buffer, "SURB buffer size is below target");
+            self.was_below_target = true;
+        }
 
         tracing::trace!(
+            session_id = %self.session_id,
             ?dt,
             delta = target_buffer_change,
             current = self.current_target_buffer,
