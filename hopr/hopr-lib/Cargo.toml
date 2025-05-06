@@ -46,6 +46,7 @@ prometheus = [
 ]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = ["essentials", "json-rpc", "node-bindings"] }
 async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
@@ -63,6 +64,7 @@ serde_json = { workspace = true }
 strum = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
+url = { workspace = true }
 validator = { workspace = true }
 
 hopr-async-runtime = { workspace = true }
