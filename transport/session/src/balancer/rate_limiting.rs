@@ -6,7 +6,6 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
 use futures::Stream;
-use futures_time::future::Timer;
 use futures_time::task::Sleep;
 use pin_project::pin_project;
 
@@ -28,12 +27,11 @@ impl RateController {
 
             // Convert to duration (seconds per element) and subtract the duration
             // it took to yield the element from the inner stream
-            self.0.store(
-                Duration::from_secs_f64(1.0 / rate_per_sec)
-                    .max(Self::MIN_DELAY)
-                    .as_millis() as u64,
-                Ordering::Relaxed,
-            );
+            let new_rate = Duration::from_secs_f64(1.0 / rate_per_sec)
+                .max(Self::MIN_DELAY)
+                .as_micros() as u64;
+
+            self.0.store(new_rate, Ordering::Relaxed);
         } else {
             self.0.store(0, Ordering::Relaxed);
         }
@@ -41,7 +39,7 @@ impl RateController {
 
     /// Get the current rate limit per time unit.
     pub fn get_rate_per_sec(&self) -> f64 {
-        1.0 / Duration::from_millis(self.0.load(Ordering::Relaxed)).as_secs_f64()
+        1.0 / Duration::from_micros(self.0.load(Ordering::Relaxed)).as_secs_f64()
     }
 }
 
@@ -60,7 +58,7 @@ pub struct RateLimitedStream<S: Stream> {
     inner: S,
     item: Option<S::Item>,
     #[pin]
-    delay: Option<futures_timer::Delay>,
+    delay: Option<Sleep>,
     state: State,
     delay_time: Arc<AtomicU64>,
 }
@@ -68,9 +66,15 @@ pub struct RateLimitedStream<S: Stream> {
 impl<S: Stream> RateLimitedStream<S> {
     /// Creates a stream with some initial rate limit of elements per a time unit.
     pub fn new_with_rate_per_unit(stream: S, initial_rate_per_unit: usize, unit: Duration) -> (Self, RateController) {
-        let rc = RateController(Arc::new(AtomicU64::new(0)));
+        let (stream, rc) = Self::new(stream);
         rc.set_rate_per_unit(initial_rate_per_unit, unit);
+        (stream, rc)
+    }
 
+    /// Creates a stream that has 0 rate (`poll_next` returns Pending) until
+    /// some non-zero rate is set via the returned [`RateController`].
+    pub fn new(stream: S) -> (Self, RateController) {
+        let rc = RateController(Arc::new(AtomicU64::new(0)));
         (
             Self {
                 inner: stream,
@@ -101,13 +105,13 @@ where
                         *this.item = Some(item);
                         let delay_time = this.delay_time.load(Ordering::Relaxed);
                         if delay_time > 0 {
-                            let wait = Duration::from_millis(delay_time)
+                            let wait = Duration::from_micros(delay_time)
                                 .saturating_sub(yield_start.elapsed())
                                 .max(RateController::MIN_DELAY);
-                            *this.delay = Some(futures_timer::Delay::new(wait));
+                            *this.delay = Some(futures_time::task::sleep(wait.into()));
                             *this.state = State::Wait;
                         } else {
-                            *this.delay = Some(futures_timer::Delay::new(Duration::from_millis(100)));
+                            *this.delay = Some(futures_time::task::sleep(Duration::from_millis(100).into()));
                             *this.state = State::NoRate;
                         }
                     } else {
@@ -119,10 +123,14 @@ where
                         let _ = futures::ready!(delay.as_mut().poll(cx));
                         let delay_time = this.delay_time.load(Ordering::Relaxed);
                         if delay_time > 0 {
-                            *this.delay = Some(futures_timer::Delay::new(Duration::from_millis(delay_time)));
-                            *this.state = State::Wait;
+                            *this.delay = Some(futures_time::task::sleep(Duration::from_micros(delay_time).into()));
+                            if this.item.is_some() {
+                                *this.state = State::Wait;
+                            } else {
+                                *this.state = State::Read;
+                            }
                         } else {
-                            *this.delay = Some(futures_timer::Delay::new(Duration::from_millis(100)));
+                            *this.delay = Some(futures_time::task::sleep(Duration::from_millis(100).into()));
                             *this.state = State::NoRate;
                         }
                     }
@@ -165,6 +173,13 @@ mod tests {
     use futures::stream::{self, StreamExt};
     use futures_time::future::FutureExt;
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn test_rate_controller_set_rate_per_unit() {
+        let rc = RateController(Arc::new(AtomicU64::new(0)));
+        rc.set_rate_per_unit(2500, 2 * Duration::from_secs(1));
+        assert_eq!(rc.get_rate_per_sec(), 1250.0);
+    }
 
     #[async_std::test]
     async fn test_rate_limited_stream_respects_rate() {
