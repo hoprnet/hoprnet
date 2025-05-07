@@ -22,7 +22,6 @@ use hopr_bindings::{
     hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::{self, HoprWinningProbabilityOracleInstance},
 };
 
-// use ethers::abi::Token;
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
 

@@ -425,7 +425,6 @@ mod tests {
             .last()
             .context("a log should be present")?
             .clone()
-            .unwrap()
             .logs;
 
         let channel_open_filter = ChannelOpened::SIGNATURE_HASH;
@@ -568,7 +567,7 @@ mod tests {
 
         // The last block must contain all 2 events
         let last_block_logs = retrieved_logs
-            .expect("there is no retrieved logs at first place")
+            // .expect("there is no retrieved logs at first place")
             // .into_iter()
             .first()
             .context("a value should be present")?

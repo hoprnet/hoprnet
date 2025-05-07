@@ -106,15 +106,6 @@ impl From<Log> for alloy::rpc::types::RawLog {
     }
 }
 
-// impl From<Log> for ethers::abi::RawLog {
-//     fn from(value: Log) -> Self {
-//         ethers::abi::RawLog {
-//             topics: value.topics.into_iter().map(H256::from).collect(),
-//             data: value.data.into(),
-//         }
-//     }
-// }
-
 impl From<SerializableLog> for Log {
     fn from(value: SerializableLog) -> Self {
         let topics = value
@@ -322,86 +313,6 @@ pub struct HttpPostRequestorConfig {
     #[default(Some(10))]
     pub max_requests_per_sec: Option<u32>,
 }
-
-// /// Shorthand for creating a new EIP1559 transaction object.
-// pub fn create_eip1559_transaction() -> TypedTransaction {
-//     TypedTransaction::Eip1559(ethers::types::Eip1559TransactionRequest::new())
-// }
-
-// /// Contains some selected fields of a receipt for a transaction that has been
-// /// already included in the blockchain.
-// #[derive(Debug, Clone)]
-// pub struct TransactionReceipt {
-//     /// Hash of the transaction.
-//     pub tx_hash: Hash,
-//     /// Number of the block in which the transaction has been included into the blockchain.
-//     pub block_number: u64,
-// }
-
-// impl Display for TransactionReceipt {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "receipt of tx {} in block {}", self.tx_hash, self.block_number)
-//     }
-// }
-
-// impl From<ethers::types::TransactionReceipt> for TransactionReceipt {
-//     fn from(value: ethers::prelude::TransactionReceipt) -> Self {
-//         Self {
-//             tx_hash: value.transaction_hash.into(),
-//             block_number: value.block_number.expect("invalid transaction receipt").as_u64(),
-//         }
-//     }
-// }
-
-// type Resolver<'a> = Box<dyn Future<Output = Result<TransactionReceipt>> + Send + 'a>;
-
-// /// Represents a pending transaction that can be eventually
-// /// resolved until confirmation, which is done by polling
-// /// the respective RPC provider.
-// ///
-// /// The polling interval and number of confirmations are defined by the underlying provider.
-// pub struct PendingTransaction<'a> {
-//     tx_hash: Hash,
-//     resolver: Resolver<'a>,
-// }
-
-// impl PendingTransaction<'_> {
-//     /// Hash of the pending transaction.
-//     pub fn tx_hash(&self) -> Hash {
-//         self.tx_hash
-//     }
-// }
-
-// impl<'a, P: ethers::providers::JsonRpcClient> From<ethers::providers::PendingTransaction<'a, P>>
-//     for PendingTransaction<'a>
-// {
-//     fn from(value: ethers::providers::PendingTransaction<'a, P>) -> Self {
-//         let tx_hash = Hash::from(value.tx_hash());
-//         Self {
-//             tx_hash,
-//             resolver: Box::new(value.map(move |result| match result {
-//                 Ok(Some(tx)) => Ok(TransactionReceipt::from(tx)),
-//                 Ok(None) => Err(TransactionDropped(tx_hash.to_string())),
-//                 Err(err) => Err(ProviderError(err)),
-//             })),
-//         }
-//     }
-// }
-
-// impl Display for PendingTransaction<'_> {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "pending tx {}", self.tx_hash)
-//     }
-// }
-
-// impl<'a> IntoFuture for PendingTransaction<'a> {
-//     type Output = Result<TransactionReceipt>;
-//     type IntoFuture = Pin<Resolver<'a>>;
-
-//     fn into_future(self) -> Self::IntoFuture {
-//         Box::into_pin(self.resolver)
-//     }
-// }
 
 /// Represents the on-chain status for the Node Safe module.
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]

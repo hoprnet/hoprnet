@@ -1,5 +1,4 @@
 //! This module contains errors produced in this crate
-// use ethers::providers::{Http, JsonRpcClient, ProviderError};
 use alloy::{
     contract::Error as ContractError,
     primitives::{keccak256, Address},
@@ -103,13 +102,6 @@ pub enum HelperErrors {
     #[error(transparent)]
     RpcError(#[from] hopr_chain_rpc::errors::RpcError),
 
-    // /// Error with signer wallet error
-    // #[error(transparent)]
-    // WalletError(#[from] ethers::signers::WalletError),
-
-    // /// Fail to make a multicall
-    // #[error("multicall Error: {0}")]
-    // MulticallError(String),
     /// Fail to make a multicall
     #[error(transparent)]
     MulticallError(#[from] MulticallError),
@@ -129,10 +121,6 @@ pub enum HelperErrors {
     /// A required smart contract (Safe or module proxy instance) is not deployed
     #[error("contract not deployed: {0}")]
     ContractNotDeployed(String),
-
-    // // encode packed error
-    // #[error(transparent)]
-    // EncodePackedError(#[from] ethers::abi::EncodePackedError),
 
     // error of parsing addresses
     #[error("Cannot parse address: {0}")]

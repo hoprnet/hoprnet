@@ -461,10 +461,8 @@ mod tests {
     use alloy::network::{Ethereum, TransactionBuilder};
     use alloy::primitives::{address, U256};
     use alloy::providers::Provider;
-    use alloy::providers::ProviderBuilder;
     use alloy::rpc::client::ClientBuilder;
     use alloy::rpc::types::TransactionRequest;
-    use alloy::signers::local::PrivateKeySigner;
     use alloy::transports::layers::RetryBackoffLayer;
     use hex_literal::hex;
     use hopr_chain_types::utils::create_native_transfer;

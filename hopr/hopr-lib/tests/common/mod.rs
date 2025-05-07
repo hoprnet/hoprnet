@@ -1,19 +1,14 @@
 use alloy::network::Ethereum;
 use alloy::node_bindings::AnvilInstance;
 use alloy::primitives::U256;
-use alloy::rpc::client::{ClientBuilder, RpcClient};
+use alloy::rpc::client::RpcClient;
 use alloy::transports::http::{Http, ReqwestTransport};
 use async_std::task::sleep;
+use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+use hopr_chain_rpc::transport::ReqwestClient;
 #[cfg(all(feature = "runtime-async-std"))]
 use hopr_chain_rpc::transport::{SurfClient, SurfTransport};
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-use hopr_chain_rpc::ReqwestClient;
-// use ethers::utils::AnvilInstance;
-// use hopr_chain_rpc::client::surf_client::SurfRequestor;
-// use hopr_chain_rpc::client::{
-//     create_rpc_client_to_anvil_with_snapshot, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
-// };
-use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
 use hopr_chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
 };
@@ -23,11 +18,6 @@ use hopr_primitive_types::prelude::*;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::info;
-
-// pub type AnvilRpcClient<R> = ethers::middleware::SignerMiddleware<
-//     ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
-//     ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
-// >;
 
 // /// Snapshot requestor used for testing.
 // pub type Requestor = SnapshotRequestor<SurfRequestor>;
@@ -53,13 +43,10 @@ pub fn create_rpc_client_to_anvil_with_snapshot(
 ) -> RpcClient {
     #[cfg(all(feature = "runtime-async-std"))]
     use crate::transport::SurfTransport;
-    use alloy::providers::ProviderBuilder;
     use alloy::rpc::client::{ClientBuilder, RpcClient};
-    use alloy::signers::local::PrivateKeySigner;
     #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     use alloy::transports::http::ReqwestTransport;
-    use hopr_chain_rpc::client::{DefaultRetryPolicy, SnapshotRequestorLayer};
-    use hopr_crypto_types::keypairs::Keypair;
+    use hopr_chain_rpc::client::SnapshotRequestorLayer;
 
     // #[cfg(feature = "runtime-async-std")]
     // let transport_client = SurfTransport::new(anvil.endpoint_url());

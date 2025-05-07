@@ -10,7 +10,6 @@ use alloy::{
 };
 use async_trait::async_trait;
 
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 pub use reqwest::Client as ReqwestClient;
 use std::task;
 #[cfg(feature = "runtime-async-std")]
