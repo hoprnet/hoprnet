@@ -30,6 +30,7 @@ prometheus = ["dep:lazy_static", "dep:hopr-metrics"]
 aquamarine = { workspace = true }
 arrayvec = { workspace = true }
 bitvec = { workspace = true }
+cfg-if = { workspace = true }
 crossbeam-queue = { workspace = true }
 crossbeam-skiplist = { workspace = true }
 dashmap = { workspace = true }

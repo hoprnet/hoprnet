@@ -76,7 +76,18 @@ impl IpOrHost {
     /// Uses `tokio` resolver.
     #[cfg(feature = "runtime-tokio")]
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<SocketAddr>> {
-        let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
+        cfg_if::cfg_if! {
+            if #[cfg(test)] {
+                // This resolver setup is used in the tests to be executed in a sandbox environment
+                // which prevents IO access to system-level files.
+                let config = hickory_resolver::config::ResolverConfig::new();
+                let options = hickory_resolver::config::ResolverOpts::default();
+                let resolver = hickory_resolver::AsyncResolver::tokio(config, options);
+            } else {
+                let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
+            }
+        };
+
         self.resolve(resolver).await
     }
 
