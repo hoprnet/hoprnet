@@ -231,11 +231,14 @@ pub fn get_network_details_from_name(make_root_dir_path: &Path, network: &str) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy::providers::Provider;
+    use alloy::{
+        node_bindings::{Anvil, AnvilInstance},
+        providers::Provider,
+    };
     use anyhow::Context;
 
-    fn create_anvil_at_port(default: bool) -> ethers::utils::AnvilInstance {
-        let mut anvil = ethers::utils::Anvil::new();
+    fn create_anvil_at_port(default: bool) -> AnvilInstance {
+        let mut anvil = Anvil::new();
 
         if !default {
             let listener =
@@ -245,7 +248,7 @@ mod tests {
                 .unwrap_or_else(|_| panic!("Failed to get local address"))
                 .port();
             anvil = anvil.port(random_port);
-            anvil = anvil.chain_id(random_port);
+            anvil = anvil.chain_id(random_port.into());
         } else {
             anvil = anvil.port(8545u16);
         }
