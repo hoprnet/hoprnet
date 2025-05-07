@@ -20,7 +20,6 @@ runtime-async-std = [
 ]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
-  "dep:reqwest",
   "dep:governor",
 ]
 
