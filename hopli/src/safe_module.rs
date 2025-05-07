@@ -95,28 +95,27 @@
 //!     --provider-url "http://localhost:8545"
 //! ```
 use crate::key_pair::{ArgEnvReader, ManagerPrivateKeyArgs};
-use crate::methods::{debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries};
+use crate::methods::{
+    debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries, SafeSingleton,
+};
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{IdentityFileArgs, PrivateKeyArgs},
     methods::{
         deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry_and_remove_from_module,
-        include_nodes_to_module, migrate_nodes, register_safes_and_nodes_on_network_registry, safe_singleton,
-        transfer_native_tokens, transfer_or_mint_tokens,
+        include_nodes_to_module, migrate_nodes, register_safes_and_nodes_on_network_registry, transfer_native_tokens,
+        transfer_or_mint_tokens,
     },
     utils::{Cmd, HelperErrors},
 };
+use alloy::primitives::utils::parse_units;
+use alloy::primitives::{Address, U256};
 use clap::{builder::RangedU64ValueParser, Parser};
-use ethers::{
-    types::{H160, U256},
-    utils::parse_units,
-};
-use hopr_bindings::{
-    hopr_network_registry::HoprNetworkRegistry, hopr_node_safe_registry::HoprNodeSafeRegistry,
-    hopr_node_stake_factory::HoprNodeStakeFactory, hopr_token::HoprToken,
-};
+use hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry;
+use hopr_bindings::hoprnodesaferegistry::HoprNodeSafeRegistry;
+use hopr_bindings::hoprnodestakefactory::HoprNodeStakeFactory;
+use hopr_bindings::hoprtoken::HoprToken;
 use hopr_crypto_types::keypairs::Keypair;
-use safe_singleton::SafeSingleton;
 use std::str::FromStr;
 use tracing::{info, warn};
 
@@ -344,13 +343,13 @@ impl SafeModuleSubcommands {
         manager_private_key: ManagerPrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
-        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        let mut node_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = node_address {
             node_eth_addresses.extend(
                 addresses
                     .split(',')
                     .map(|addr| {
-                        H160::from_str(addr)
+                        Address::from_str(addr)
                             .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -362,7 +361,7 @@ impl SafeModuleSubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
                 .into_iter()
-                .map(H160::from),
+                .map(Address::from),
         );
 
         let node_addresses = if node_eth_addresses.is_empty() {
@@ -372,12 +371,11 @@ impl SafeModuleSubcommands {
         };
 
         // get allowance
-        let token_allowance = match allowance {
-            Some(allw) => U256::from(
-                parse_units(allw, "ether")
-                    .map_err(|_| HelperErrors::ParseError("Failed to parse allowance units".into()))?,
-            ),
-            None => U256::max_value(),
+        let token_allowance: U256 = match allowance {
+            Some(allw) => parse_units(&allw.to_string(), "ether")
+                .map_err(|_| HelperErrors::ParseError("Failed to parse allowance units".into()))?
+                .into(),
+            None => U256::MAX,
         };
 
         // read private key
@@ -387,10 +385,10 @@ impl SafeModuleSubcommands {
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
         // read all the admin addresses
-        let admin_eth_addresses: Vec<H160> = match admin_address {
+        let admin_eth_addresses: Vec<Address> = match admin_address {
             Some(admin_address_str) => admin_address_str
                 .split(',')
-                .map(|addr| H160::from_str(addr).unwrap())
+                .map(|addr| Address::from_str(addr).unwrap())
                 .collect(),
             None => vec![signer_private_key.clone().public().to_address().into()],
         };
@@ -402,8 +400,10 @@ impl SafeModuleSubcommands {
         // if node addresses are known, include nodes to the module by safe
         // transfer safe ownership to actual admins
         // set desired threshold
-        let hopr_stake_factory =
-            HoprNodeStakeFactory::new(contract_addresses.addresses.node_stake_v2_factory, rpc_provider.clone());
+        let hopr_stake_factory = HoprNodeStakeFactory::new(
+            contract_addresses.addresses.node_stake_v2_factory.into(),
+            rpc_provider.clone(),
+        );
 
         let (safe, node_module) = deploy_safe_module_with_targets_and_nodes(
             hopr_stake_factory,
@@ -423,13 +423,12 @@ impl SafeModuleSubcommands {
 
         // direct transfer of some HOPR tokens to the safe
         if let Some(hopr_amount_for_safe) = hopr_amount {
-            let hopr_token = HoprToken::new(contract_addresses.addresses.token, rpc_provider.clone());
-            let hopr_to_be_transferred = U256::from(
-                parse_units(hopr_amount_for_safe, "ether")
-                    .map_err(|_| HelperErrors::ParseError("Failed to parse HOPR amount units".into()))?,
-            );
+            let hopr_token = HoprToken::new(contract_addresses.addresses.token.into(), rpc_provider.clone());
+            let hopr_to_be_transferred: U256 = parse_units(&hopr_amount_for_safe.to_string(), "ether")
+                .map_err(|_| HelperErrors::ParseError("Failed to parse HOPR amount units".into()))?
+                .into();
 
-            transfer_or_mint_tokens(hopr_token, vec![safe.address()], vec![hopr_to_be_transferred]).await?;
+            transfer_or_mint_tokens(hopr_token, vec![*safe.address()], vec![hopr_to_be_transferred]).await?;
             info!(
                 "safe {:?} has received {:?} HOPR tokens",
                 safe.address(),
@@ -439,10 +438,9 @@ impl SafeModuleSubcommands {
 
         // distribute some native tokens to the nodes
         if let Some(native_amount_for_node) = native_amount {
-            let native_to_be_transferred = U256::from(
-                parse_units(native_amount_for_node, "ether")
-                    .map_err(|_| HelperErrors::ParseError("Failed to parse HOPR amount units".into()))?,
-            );
+            let native_to_be_transferred: U256 = parse_units(&native_amount_for_node.to_string(), "ether")
+                .map_err(|_| HelperErrors::ParseError("Failed to parse HOPR amount units".into()))?
+                .into();
             let native_amounts = vec![native_to_be_transferred; node_eth_addresses.len()];
             transfer_native_tokens(rpc_provider.clone(), node_eth_addresses.clone(), native_amounts).await?;
             info!(
@@ -462,14 +460,14 @@ impl SafeModuleSubcommands {
             // get RPC provider for the given network and environment
             let manager_rpc_provider = network_provider.get_provider_with_signer(&manager_private_key).await?;
             let hopr_network_registry = HoprNetworkRegistry::new(
-                contract_addresses.addresses.network_registry,
+                contract_addresses.addresses.network_registry.into(),
                 manager_rpc_provider.clone(),
             );
             // Overwrite any past registration of provided nodes in the network registry.
             // This action is the same as calling `hopli network-registry manager-register`
             let (removed_pairs_num, added_pairs_num) = register_safes_and_nodes_on_network_registry(
                 hopr_network_registry,
-                vec![safe.address(); node_eth_addresses.len()],
+                vec![*safe.address(); node_eth_addresses.len()],
                 node_eth_addresses.clone(),
             )
             .await?;
@@ -499,13 +497,13 @@ impl SafeModuleSubcommands {
         manager_private_key: ManagerPrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
-        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        let mut node_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = node_address {
             node_eth_addresses.extend(
                 addresses
                     .split(',')
                     .map(|addr| {
-                        H160::from_str(addr)
+                        Address::from_str(addr)
                             .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -517,18 +515,18 @@ impl SafeModuleSubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
                 .into_iter()
-                .map(H160::from),
+                .map(Address::from),
         );
 
         // parse safe and module addresses
-        let safe_addr = H160::from_str(&new_safe_address)
+        let safe_addr = Address::from_str(&new_safe_address)
             .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {:?}", new_safe_address)))?;
-        let module_addr = H160::from_str(&new_module_address).map_err(|_| {
+        let module_addr = Address::from_str(&new_module_address).map_err(|_| {
             HelperErrors::InvalidAddress(format!("Cannot parse module address {:?}", new_module_address))
         })?;
-        let old_module_addr: Vec<H160> = old_module_address
+        let old_module_addr: Vec<Address> = old_module_address
             .split(',')
-            .map(|addr| H160::from_str(addr).unwrap())
+            .map(|addr| Address::from_str(addr).unwrap())
             .collect();
 
         // read private key
@@ -542,8 +540,10 @@ impl SafeModuleSubcommands {
         // 3. Include node to the new module
         // 4. Remove node from network registry
         // 5. Include node to network registry
-        let hopr_node_safe_registry =
-            HoprNodeSafeRegistry::new(contract_addresses.addresses.node_safe_registry, rpc_provider.clone());
+        let hopr_node_safe_registry = HoprNodeSafeRegistry::new(
+            contract_addresses.addresses.node_safe_registry.into(),
+            rpc_provider.clone(),
+        );
         let safe = SafeSingleton::new(safe_addr, rpc_provider.clone());
 
         if !node_eth_addresses.is_empty() {
@@ -593,14 +593,14 @@ impl SafeModuleSubcommands {
             // get RPC provider for the given network and environment
             let manager_rpc_provider = network_provider.get_provider_with_signer(&manager_private_key).await?;
             let hopr_network_registry = HoprNetworkRegistry::new(
-                contract_addresses.addresses.network_registry,
+                contract_addresses.addresses.network_registry.into(),
                 manager_rpc_provider.clone(),
             );
             // Overwrite any past registration of provided nodes in the network registry.
             // This action is the same as calling `hopli network-registry manager-register`
             let (removed_pairs_num, added_pairs_num) = register_safes_and_nodes_on_network_registry(
                 hopr_network_registry,
-                vec![safe.address(); node_eth_addresses.len()],
+                vec![*safe.address(); node_eth_addresses.len()],
                 node_eth_addresses.clone(),
             )
             .await?;
@@ -630,13 +630,13 @@ impl SafeModuleSubcommands {
         manager_private_key: ManagerPrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
-        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        let mut node_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = node_address {
             node_eth_addresses.extend(
                 addresses
                     .split(',')
                     .map(|addr| {
-                        H160::from_str(addr)
+                        Address::from_str(addr)
                             .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -648,22 +648,21 @@ impl SafeModuleSubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
                 .into_iter()
-                .map(H160::from),
+                .map(Address::from),
         );
 
         // get allowance
-        let token_allowance = match allowance {
-            Some(allw) => U256::from(
-                parse_units(allw, "ether")
-                    .map_err(|_| HelperErrors::ParseError("Failed to parse allowance units".into()))?,
-            ),
-            None => U256::max_value(),
+        let token_allowance: U256 = match allowance {
+            Some(allw) => parse_units(&allw.to_string(), "ether")
+                .map_err(|_| HelperErrors::ParseError("Failed to parse allowance units".into()))?
+                .into(),
+            None => U256::MAX,
         };
 
         // parse safe and module addresses
-        let safe_addr = H160::from_str(&safe_address)
+        let safe_addr = Address::from_str(&safe_address)
             .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {:?}", safe_address)))?;
-        let module_addr = H160::from_str(&module_address)
+        let module_addr = Address::from_str(&module_address)
             .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse module address {:?}", module_address)))?;
 
         // read private key
@@ -701,14 +700,14 @@ impl SafeModuleSubcommands {
             // get RPC provider for the given network and environment
             let manager_rpc_provider = network_provider.get_provider_with_signer(&manager_private_key).await?;
             let hopr_network_registry = HoprNetworkRegistry::new(
-                contract_addresses.addresses.network_registry,
+                contract_addresses.addresses.network_registry.into(),
                 manager_rpc_provider.clone(),
             );
             // Overwrite any past registration of provided nodes in the network registry.
             // This action is the same as calling `hopli network-registry manager-register`
             let (removed_pairs_num, added_pairs_num) = register_safes_and_nodes_on_network_registry(
                 hopr_network_registry,
-                vec![safe.address(); node_eth_addresses.len()],
+                vec![*safe.address(); node_eth_addresses.len()],
                 node_eth_addresses.clone(),
             )
             .await?;
@@ -742,13 +741,13 @@ impl SafeModuleSubcommands {
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
         info!("Reading all the node addresses...");
-        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        let mut node_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = node_address {
             node_eth_addresses.extend(
                 addresses
                     .split(',')
                     .map(|addr| {
-                        H160::from_str(addr)
+                        Address::from_str(addr)
                             .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -760,24 +759,28 @@ impl SafeModuleSubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
                 .into_iter()
-                .map(H160::from),
+                .map(Address::from),
         );
 
         // parse safe and module addresses
-        let safe_addr = H160::from_str(&safe_address)
+        let safe_addr = Address::from_str(&safe_address)
             .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse safe address {:?}", safe_address)))?;
-        let module_addr = H160::from_str(&module_address)
+        let module_addr = Address::from_str(&module_address)
             .map_err(|_| HelperErrors::InvalidAddress(format!("Cannot parse module address {:?}", module_address)))?;
 
         // get RPC provider for the given network and environment
         let rpc_provider = network_provider.get_provider_without_signer().await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_token = HoprToken::new(contract_addresses.addresses.token, rpc_provider.clone());
-        let network_registry =
-            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
-        let node_safe_registry =
-            HoprNodeSafeRegistry::new(contract_addresses.addresses.node_safe_registry, rpc_provider.clone());
+        let hopr_token = HoprToken::new(contract_addresses.addresses.token.into(), rpc_provider.clone());
+        let network_registry = HoprNetworkRegistry::new(
+            contract_addresses.addresses.network_registry.into(),
+            rpc_provider.clone(),
+        );
+        let node_safe_registry = HoprNodeSafeRegistry::new(
+            contract_addresses.addresses.node_safe_registry.into(),
+            rpc_provider.clone(),
+        );
 
         // loop through all the nodes and debug
         for node in node_eth_addresses {
@@ -789,11 +792,7 @@ impl SafeModuleSubcommands {
                 &node,
             )
             .await
-            .map_err(|e| {
-                HelperErrors::MulticallError(
-                    format!("failed in getting node balance their registration in network registry and node-safe registry: {:?}", e)
-                )
-            })?;
+            .map_err(|e| HelperErrors::MulticallError(e.into()))?;
 
             // compare the registered safe with the provided safe
             if registered_safe != safe_addr {
@@ -812,7 +811,7 @@ impl SafeModuleSubcommands {
                 &contract_addresses.addresses.announcements.into(),
             )
             .await
-            .map_err(|e| HelperErrors::MulticallError(format!("failed in debugging safe and module: {:?}", e)))?;
+            .map_err(|e| HelperErrors::MulticallError(e.into()))?;
         }
         Ok(())
     }
