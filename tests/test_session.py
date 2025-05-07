@@ -294,7 +294,7 @@ class TestSessionWithSwarm:
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
         fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
-        ret_path = [swarm7[node].peer_id for node in route[-1:1]]
+        ret_path = fwd_path[::-1]
 
         async with AsyncExitStack() as channels:
             channels_to = [
@@ -473,7 +473,7 @@ class TestSessionWithSwarm:
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
         fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
-        ret_path = [swarm7[node].peer_id for node in route[-1:1]]
+        ret_path = fwd_path[::-1]
 
         async with AsyncExitStack() as channels:
             channels_to = [
@@ -572,7 +572,7 @@ class TestSessionWithSwarm:
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
         fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
-        ret_path = [swarm7[node].peer_id for node in route[-1:1]]
+        ret_path = fwd_path[::-1]
 
         async with AsyncExitStack() as channels:
             channels_to = [
@@ -634,7 +634,7 @@ class TestSessionWithSwarm:
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
         fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
-        ret_path = [swarm7[node].peer_id for node in route[-1:1]]
+        ret_path = fwd_path[::-1]
 
         logging.info(f"Opening channels for route '{route}'")
 
