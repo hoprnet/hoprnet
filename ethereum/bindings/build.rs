@@ -72,7 +72,7 @@ fn main() -> anyhow::Result<()> {
             "--alloy",
             "--overwrite",
             "--select",
-            "^Hopr.*?(Boost|[^t])$"
+            "^Hopr(?!Distributor$|Stake).*"
         ])
         .current_dir(contracts_package_path.clone())
         .status()?
