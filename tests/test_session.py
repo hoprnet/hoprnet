@@ -253,7 +253,8 @@ class TestSessionWithSwarm:
 
             session = await src_peer.api.session_client(
                 dest_peer.peer_id,
-                path={"Hops": 0},
+                forward_path={"Hops": 0},
+                return_path={"Hops": 0},
                 protocol=Protocol.TCP,
                 target=f"localhost:{server.port}",
                 capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
@@ -292,7 +293,8 @@ class TestSessionWithSwarm:
 
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
-        path = [swarm7[node].peer_id for node in route[1:-1]]
+        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
+        ret_path = [swarm7[node].peer_id for node in route[-1:1]]
 
         async with AsyncExitStack() as channels:
             channels_to = [
@@ -322,7 +324,8 @@ class TestSessionWithSwarm:
 
                 session = await src_peer.api.session_client(
                     dest_peer.peer_id,
-                    path={"IntermediatePath": path},
+                    forward_path={"IntermediatePath": fwd_path},
+                    return_path={"IntermediatePath": ret_path},
                     protocol=Protocol.TCP,
                     target=f"localhost:{server.port}",
                     capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
@@ -363,7 +366,11 @@ class TestSessionWithSwarm:
             await asyncio.sleep(1.0)
 
             session = await src_peer.api.session_client(
-                dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP, target=f"localhost:{server.port}"
+                dest_peer.peer_id,
+                forward_path={"Hops": 0},
+                return_path={"Hops": 0},
+                protocol=Protocol.UDP,
+                target=f"localhost:{server.port}",
             )
 
             assert session.port is not None, "Failed to open session"
@@ -411,7 +418,12 @@ class TestSessionWithSwarm:
         # Service 0 session will loop back all the data at Exit back to the Entry
         # Therefore, we do not need the Echo service here
         session: Session | None = await src_peer.api.session_client(
-            dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP, target="0", service=True
+            dest_peer.peer_id,
+            forward_path={"Hops": 0},
+            return_path={"Hops": 0},
+            protocol=Protocol.UDP,
+            target="0",
+            service=True,
         )
 
         assert session.port is not None, "Failed to open session"
@@ -460,7 +472,8 @@ class TestSessionWithSwarm:
 
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
-        path = [swarm7[node].peer_id for node in route[1:-1]]
+        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
+        ret_path = [swarm7[node].peer_id for node in route[-1:1]]
 
         async with AsyncExitStack() as channels:
             channels_to = [
@@ -484,7 +497,8 @@ class TestSessionWithSwarm:
 
                 session = await src_peer.api.session_client(
                     dest_peer.peer_id,
-                    path={"IntermediatePath": path},
+                    forward_path={"IntermediatePath": fwd_path},
+                    return_path={"IntermediatePath": ret_path},
                     protocol=Protocol.UDP,
                     target=f"localhost:{server.port}",
                 )
@@ -530,7 +544,8 @@ class TestSessionWithSwarm:
         with run_https_server(expected) as dst_sock_port:
             session = await src_peer.api.session_client(
                 dest_peer.peer_id,
-                path={"Hops": 0},
+                forward_path={"Hops": 0},
+                return_path={"Hops": 0},
                 protocol=Protocol.TCP,
                 target=f"localhost:{dst_sock_port}",
                 sealed_target=True,
@@ -556,7 +571,8 @@ class TestSessionWithSwarm:
     async def test_session_communication_over_n_hop_with_an_https_server(self, route, swarm7: dict[str, Node]):
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
-        path = [swarm7[node].peer_id for node in route[1:-1]]
+        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
+        ret_path = [swarm7[node].peer_id for node in route[-1:1]]
 
         async with AsyncExitStack() as channels:
             channels_to = [
@@ -584,7 +600,8 @@ class TestSessionWithSwarm:
             with run_https_server(expected) as dst_sock_port:
                 session = await src_peer.api.session_client(
                     dest_peer.peer_id,
-                    path={"IntermediatePath": path},
+                    forward_path={"IntermediatePath": fwd_path},
+                    return_path={"IntermediatePath": ret_path},
                     protocol=Protocol.TCP,
                     target=f"localhost:{dst_sock_port}",
                     capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
@@ -616,7 +633,8 @@ class TestSessionWithSwarm:
 
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
-        path = [swarm7[node].peer_id for node in route[1:-1]]
+        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
+        ret_path = [swarm7[node].peer_id for node in route[-1:1]]
 
         logging.info(f"Opening channels for route '{route}'")
 
@@ -647,11 +665,13 @@ class TestSessionWithSwarm:
 
             session = await src_peer.api.session_client(
                 dest_peer.peer_id,
-                path={"IntermediatePath": path},
+                forward_path={"IntermediatePath": fwd_path},
+                return_path={"IntermediatePath": ret_path},
                 protocol=Protocol.UDP,
                 target=wireguard_tunnel,
                 listen_on="127.0.0.1:60006",
                 capabilities=SessionCapabilitiesBody(segmentation=True),
+                response_buffer="5 MB",
             )
 
             assert session.port is not None, "Failed to open session"

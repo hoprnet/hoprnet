@@ -466,8 +466,13 @@ pub(crate) mod tests {
         assert_eq!(hops + 1, chain_path.num_hops(), "must be a {hops} hop path");
         ensure!(!chain_path.contains_cycle(), "must not be cyclic");
 
-        let validated = async_std::task::block_on(ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref()))
-            .context(format!("must be valid {hops} hop path"))?;
+        let validated = async_std::task::block_on(ValidatedPath::new(
+            ADDRESSES[0],
+            chain_path.clone(),
+            &cg,
+            PATH_ADDRS.deref(),
+        ))
+        .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(
             chain_path.num_hops(),
@@ -501,11 +506,21 @@ pub(crate) mod tests {
         // path: 0 -> 1 -> 2 -> 3 -> 4
         let chain_path = ChainPath::new(peers.iter().skip(1).take(hops + 1).map(|(_, a)| *a))?;
 
-        let validated_1 = async_std::task::block_on(ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref()))
-            .context(format!("must be valid {hops} hop path"))?;
+        let validated_1 = async_std::task::block_on(ValidatedPath::new(
+            ADDRESSES[0],
+            chain_path.clone(),
+            &cg,
+            PATH_ADDRS.deref(),
+        ))
+        .context(format!("must be valid {hops} hop path"))?;
 
-        let validated_2 = async_std::task::block_on(ValidatedPath::new(ADDRESSES[0], validated_1.clone(), &cg, PATH_ADDRS.deref()))
-            .context(format!("must be valid {hops} hop path"))?;
+        let validated_2 = async_std::task::block_on(ValidatedPath::new(
+            ADDRESSES[0],
+            validated_1.clone(),
+            &cg,
+            PATH_ADDRS.deref(),
+        ))
+        .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(validated_1, validated_2, "revalidation must be identity");
 
@@ -529,8 +544,13 @@ pub(crate) mod tests {
         assert_eq!(hops + 1, chain_path.num_hops(), "must be a {hops} hop path");
         assert!(chain_path.contains_cycle(), "must be cyclic");
 
-        let validated = async_std::task::block_on(ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref()))
-            .context(format!("must be valid {hops} hop path"))?;
+        let validated = async_std::task::block_on(ValidatedPath::new(
+            ADDRESSES[0],
+            chain_path.clone(),
+            &cg,
+            PATH_ADDRS.deref(),
+        ))
+        .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(
             chain_path.num_hops(),
@@ -570,8 +590,13 @@ pub(crate) mod tests {
         // path: 0 -> 3 (channel 0 -> 3 does not exist)
         let chain_path = ChainPath::new([peers[3].1])?;
 
-        let validated = async_std::task::block_on(ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref()))
-            .context("must be valid path")?;
+        let validated = async_std::task::block_on(ValidatedPath::new(
+            ADDRESSES[0],
+            chain_path.clone(),
+            &cg,
+            PATH_ADDRS.deref(),
+        ))
+        .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
 
@@ -585,8 +610,13 @@ pub(crate) mod tests {
         // path: 4 -> 0 (channel 4 -> 0 is PendingToClose)
         let chain_path = ChainPath::new([peers[0].1])?;
 
-        let validated = async_std::task::block_on(ValidatedPath::new(ADDRESSES[4], chain_path.clone(), &cg, PATH_ADDRS.deref()))
-            .context("must be valid path")?;
+        let validated = async_std::task::block_on(ValidatedPath::new(
+            ADDRESSES[4],
+            chain_path.clone(),
+            &cg,
+            PATH_ADDRS.deref(),
+        ))
+        .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
 
@@ -600,8 +630,13 @@ pub(crate) mod tests {
         // path: 0 -> 1 -> 3 (channel 1 -> 3 does not exist)
         let chain_path = ChainPath::new([peers[1].1, peers[3].1])?;
 
-        let validated = async_std::task::block_on(ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref()))
-            .context("must be valid path")?;
+        let validated = async_std::task::block_on(ValidatedPath::new(
+            ADDRESSES[0],
+            chain_path.clone(),
+            &cg,
+            PATH_ADDRS.deref(),
+        ))
+        .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
 
@@ -615,8 +650,13 @@ pub(crate) mod tests {
         // path: 3 -> 4 -> 0 (channel 4 -> 0 is PendingToClose)
         let chain_path = ChainPath::new([peers[4].1, peers[0].1])?;
 
-        let validated = async_std::task::block_on(ValidatedPath::new(ADDRESSES[3], chain_path.clone(), &cg, PATH_ADDRS.deref()))
-            .context("must be valid path")?;
+        let validated = async_std::task::block_on(ValidatedPath::new(
+            ADDRESSES[3],
+            chain_path.clone(),
+            &cg,
+            PATH_ADDRS.deref(),
+        ))
+        .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
 
@@ -711,8 +751,13 @@ pub(crate) mod tests {
 
         assert!(chain_path.contains_cycle(), "path must contain a cycle");
 
-        let validated = async_std::task::block_on(ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref()))
-            .context("must be valid path")?;
+        let validated = async_std::task::block_on(ValidatedPath::new(
+            ADDRESSES[0],
+            chain_path.clone(),
+            &cg,
+            PATH_ADDRS.deref(),
+        ))
+        .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
 

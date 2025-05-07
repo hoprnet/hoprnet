@@ -462,7 +462,7 @@ impl SessionClientRequest {
                     target_surb_buffer_size: self
                         .response_buffer
                         .map(|b| b.as_u64() / SESSION_PAYLOAD_SIZE as u64)
-                        .unwrap_or(5_000),
+                        .unwrap_or(SurbBalancerConfig::default().target_surb_buffer_size),
                     ..Default::default()
                 }),
                 ..Default::default()
