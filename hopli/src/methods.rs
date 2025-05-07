@@ -270,7 +270,7 @@ pub async fn send_multisend_safe_transaction_with_threshold_one<P: WalletProvide
         .get_receipt()
         .await?;
 
-    let tx_execution_log = tx_receipt
+    tx_receipt
         .decoded_log::<SafeSingleton::ExecutionSuccess>()
         .ok_or(HelperErrors::MultiSendError)?;
     Ok(())
@@ -333,8 +333,8 @@ pub async fn get_native_and_token_balances<P: Provider>(
         let (native_balance, token_balance) = multicall.aggregate().await?;
         return Ok((vec![native_balance.balance], vec![token_balance._0]));
     } else {
-        let mut native_balances_multicall = MulticallBuilder::new_dynamic(provider.clone());
-        let mut token_balances_multicall = MulticallBuilder::new_dynamic(provider.clone());
+        let mut native_balances_multicall = MulticallBuilder::new_dynamic(provider);
+        let mut token_balances_multicall = MulticallBuilder::new_dynamic(provider);
 
         for address in addresses {
             native_balances_multicall =
@@ -1920,7 +1920,6 @@ mod tests {
         )
         .await?;
 
-        let node_module_data = client.get_code_at(*node_module.address()).await?;
         // check announcement is a target
         let try_get_announcement_target = node_module
             .tryGetTarget(*instances.announcements.address())
