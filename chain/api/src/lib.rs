@@ -6,6 +6,8 @@ pub mod executors;
 
 use alloy::rpc::client::ClientBuilder;
 use alloy::rpc::types::TransactionRequest;
+#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+use alloy::transports::http::{Http, ReqwestTransport};
 use alloy::transports::layers::RetryBackoffLayer;
 use hopr_chain_rpc::client::DefaultRetryPolicy;
 use hopr_chain_rpc::transport::HttpWrapper;
