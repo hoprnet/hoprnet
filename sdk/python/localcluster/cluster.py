@@ -88,7 +88,8 @@ class Cluster:
                 raise RuntimeError(f"Node {node} did not return addresses")
 
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
-        logging.info(f"Waiting up to {2 * GLOBAL_TIMEOUT}s for nodes to connect to all peers")
+        peer_connection_timeout = 2 * GLOBAL_TIMEOUT
+        logging.info(f"Waiting up to {peer_connection_timeout}s for nodes to connect to all peers")
 
         tasks = []
         for node in self.nodes.values():
@@ -96,7 +97,7 @@ class Cluster:
             tasks.append(asyncio.create_task(node.all_peers_connected(required_peers)))
 
         try:
-            await asyncio.wait_for(asyncio.gather(*tasks), 2 * GLOBAL_TIMEOUT)
+            await asyncio.wait_for(asyncio.gather(*tasks), peer_connection_timeout)
         except asyncio.TimeoutError:
             raise RuntimeError("Not all nodes are connected to all peers, interrupting setup")
 
