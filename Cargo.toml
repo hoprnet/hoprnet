@@ -46,7 +46,7 @@ members = [
 
 [workspace.dependencies]
 aes = "0.8"
-alloy = { version = "0.12.6" , default-features = false, features = ["full"] }
+alloy = { version = "0.12.6" , default-features = false, features = ["essentials", "json-rpc", "node-bindings", "contract", "k256", "std"] }
 anyhow = "1.0.98"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
