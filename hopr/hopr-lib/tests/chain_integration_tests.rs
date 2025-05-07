@@ -89,17 +89,12 @@ async fn start_node_chain_logic(
     // DB
     let db = HoprDb::new_in_memory(chain_key.clone()).await?;
     let self_db = db.clone();
-    let ock = offchain_key.public().clone();
-    let ckp = chain_key.public().to_address().clone();
     db.begin_transaction()
         .await?
         .perform(|tx| {
             Box::pin(async move {
                 self_db
                     .set_domain_separator(Some(tx), DomainSeparator::Channel, Hash::default())
-                    .await?;
-                self_db
-                    .insert_account(Some(tx), AccountEntry::new(ock, ckp, AccountType::NotAnnounced))
                     .await
             })
         })
@@ -191,11 +186,8 @@ const SNAPSHOT_ALICE_RX: &str = "tests/snapshots/indexer_snapshot_alice_in";
 const SNAPSHOT_BOB_TX: &str = "tests/snapshots/indexer_snapshot_bob_out";
 const SNAPSHOT_BOB_RX: &str = "tests/snapshots/indexer_snapshot_bob_in";
 
+// only working for async-std atm
 #[cfg_attr(feature = "runtime-async-std", test_log::test(async_std::test))]
-#[cfg_attr(
-    all(feature = "runtime-tokio", not(feature = "runtime-async-std")),
-    test_log::test(tokio::test)
-)]
 async fn integration_test_indexer() -> anyhow::Result<()> {
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));

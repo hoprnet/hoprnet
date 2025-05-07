@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -17,6 +17,7 @@ prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
+bincode = { workspace = true }
 futures = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
@@ -41,12 +42,14 @@ hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-crypto-packet = { workspace = true }
 hopr-db-api = { workspace = true }
-hopr-internal-types = { workspace = true }
+hopr-internal-types = { workspace = true, features = ["serde"] }
+hopr-network-types = { workspace = true }
 hopr-metrics = { optional = true, workspace = true }
 hopr-path = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-transport-identity = { workspace = true }
+hopr-transport-packet = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }

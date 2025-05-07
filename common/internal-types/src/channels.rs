@@ -1,11 +1,11 @@
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::time::{Duration, SystemTime};
 
 /// Describes status of a channel
-#[derive(Copy, Clone, Debug, smart_default::SmartDefault, Serialize, Deserialize, strum::Display)]
+#[derive(Copy, Clone, Debug, smart_default::SmartDefault, strum::Display)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[strum(serialize_all = "PascalCase")]
 pub enum ChannelStatus {
     /// The channel is closed.
@@ -63,7 +63,8 @@ pub enum ChannelDirection {
 pub type ChannelId = Hash;
 
 /// Overall description of a channel
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ChannelEntry {
     pub source: Address,
     pub destination: Address,
@@ -166,7 +167,7 @@ pub fn generate_channel_id(source: &Address, destination: &Address) -> Hash {
     Hash::create(&[source.as_ref(), destination.as_ref()])
 }
 
-/// Enumerates possible changes on a channel entry update
+/// Lists possible changes on a channel entry update
 #[derive(Clone, Copy, Debug)]
 pub enum ChannelChange {
     /// Channel status has changed

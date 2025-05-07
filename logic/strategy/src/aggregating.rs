@@ -38,7 +38,7 @@ use hopr_crypto_types::prelude::Hash;
 use hopr_db_sql::api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
 use hopr_db_sql::channels::HoprDbChannelOperations;
 use hopr_internal_types::prelude::*;
-use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
+use hopr_transport_ticket_aggregation::TicketAggregatorTrait;
 
 use crate::{strategy::SingularStrategy, Strategy};
 
@@ -311,7 +311,7 @@ mod tests {
     use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
-    use hopr_transport_protocol::ticket_aggregation::processor::{
+    use hopr_transport_ticket_aggregation::{
         AwaitingAggregator, TicketAggregationInteraction, TicketAggregationProcessed,
     };
     use lazy_static::lazy_static;
@@ -434,11 +434,12 @@ mod tests {
                         db_clone
                             .insert_account(
                                 Some(tx),
-                                AccountEntry::new(
-                                    *PEERS[i].public(),
-                                    PEERS_CHAIN[i].public().to_address(),
-                                    AccountType::NotAnnounced,
-                                ),
+                                AccountEntry {
+                                    public_key: *PEERS[i].public(),
+                                    chain_addr: PEERS_CHAIN[i].public().to_address(),
+                                    entry_type: AccountType::NotAnnounced,
+                                    published_at: 1,
+                                },
                             )
                             .await?;
                     }

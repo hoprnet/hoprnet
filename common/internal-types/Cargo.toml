@@ -17,20 +17,21 @@ aquamarine = { workspace = true }
 bloomfilter = { workspace = true, features = ["serde"] }
 bincode = { workspace = true }
 hex-literal = { workspace = true }
+hex = { workspace = true }
 k256 = {workspace = true}
 num_enum = { workspace = true }
 multiaddr = { workspace = true }
-serde = { workspace = true }
-serde_bytes = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-hopr-bindings = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
+hopr-bindings = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -41,6 +42,12 @@ lazy_static = { workspace = true }
 
 [features]
 default = []
+serde = [
+  "dep:serde",
+  "dep:serde_bytes",
+  "hopr-crypto-types/serde",
+  "bloomfilter/serde",
+]
 
 [[bench]]
 name = "bloom_filter"

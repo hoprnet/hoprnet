@@ -19,6 +19,7 @@ primitive-types = { workspace = true }
 regex = { workspace = true }
 strum = { workspace = true }
 serde = { workspace = true }
+serde_bytes = { workspace = true }
 sha3 = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }

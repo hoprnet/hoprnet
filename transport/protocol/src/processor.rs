@@ -1,23 +1,17 @@
 use futures::{future::Either, SinkExt};
 use futures::{pin_mut, Sink};
-use hopr_crypto_packet::errors::PacketError;
-use hopr_db_api::protocol::TransportPacketWithChainData;
-use hopr_transport_identity::PeerId;
 use tracing::error;
 
 use hopr_async_runtime::prelude::sleep;
-use hopr_crypto_packet::errors::{
-    PacketError::{TagReplay, TransportError},
-    Result,
-};
+use hopr_crypto_packet::errors::PacketError;
+use hopr_crypto_packet::errors::{PacketError::TransportError, Result};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::HoprDbProtocolOperations;
+use hopr_db_api::protocol::{IncomingPacket, OutgoingPacket};
 use hopr_internal_types::prelude::*;
-use hopr_path::path::{Path, TransportPath};
+use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
-
-use super::packet::OutgoingPacket;
-use crate::bloom;
+use hopr_transport_identity::PeerId;
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -28,7 +22,7 @@ lazy_static::lazy_static! {
 pub trait PacketWrapping {
     type Input;
 
-    async fn send(&self, data: ApplicationData, path: TransportPath) -> Result<(PeerId, Box<[u8]>)>;
+    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<OutgoingPacket>;
 }
 
 pub struct SendPkt {
@@ -38,7 +32,7 @@ pub struct SendPkt {
 
 pub struct SendAck {
     pub peer: PeerId,
-    pub ack: Acknowledgement,
+    pub ack: Box<[u8]>,
 }
 
 pub enum RecvOperation {
@@ -50,7 +44,7 @@ pub enum RecvOperation {
 pub trait PacketUnwrapping {
     type Packet;
 
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Self::Packet>;
+    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Option<Self::Packet>>;
 }
 
 /// Implements protocol acknowledgement logic for msg packets
@@ -60,7 +54,6 @@ where
     Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     db: Db,
-    tbf: bloom::WrappedTagBloomFilter,
     cfg: PacketInteractionConfig,
 }
 
@@ -72,27 +65,19 @@ where
     type Input = ApplicationData;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn send(&self, data: ApplicationData, path: TransportPath) -> Result<(PeerId, Box<[u8]>)> {
-        let path: std::result::Result<Vec<OffchainPublicKey>, hopr_primitive_types::errors::GeneralError> =
-            path.hops().iter().map(OffchainPublicKey::try_from).collect();
-
+    async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<OutgoingPacket> {
         let packet = self
             .db
             .to_send(
                 data.to_bytes(),
-                self.cfg.chain_keypair.clone(),
-                path?,
+                routing,
                 self.determine_actual_outgoing_win_prob().await,
                 self.determine_actual_outgoing_ticket_price().await?,
             )
             .await
             .map_err(|e| PacketError::PacketConstructionError(e.to_string()))?;
 
-        let packet: OutgoingPacket = packet
-            .try_into()
-            .map_err(|e: crate::errors::ProtocolError| PacketError::LogicError(e.to_string()))?;
-
-        Ok((packet.next_hop, packet.data))
+        Ok(packet)
     }
 }
 
@@ -101,18 +86,16 @@ impl<Db> PacketUnwrapping for PacketProcessor<Db>
 where
     Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
-    type Packet = RecvOperation;
+    type Packet = IncomingPacket;
 
     #[tracing::instrument(level = "trace", skip(self, data))]
-    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<RecvOperation> {
+    async fn recv(&self, peer: &PeerId, data: Box<[u8]>) -> Result<Option<Self::Packet>> {
         let previous_hop = OffchainPublicKey::try_from(peer)
             .map_err(|e| PacketError::LogicError(format!("failed to convert '{peer}' into the public key: {e}")))?;
 
-        let packet = self
-            .db
+        self.db
             .from_recv(
                 data,
-                self.cfg.chain_keypair.clone(),
                 &self.cfg.packet_keypair,
                 previous_hop,
                 self.determine_actual_outgoing_win_prob().await,
@@ -127,54 +110,7 @@ where
                     })
                 }
                 _ => PacketError::PacketConstructionError(e.to_string()),
-            })?;
-
-        if let TransportPacketWithChainData::Final { packet_tag, .. }
-        | TransportPacketWithChainData::Forwarded { packet_tag, .. } = &packet
-        {
-            if self.is_tag_replay(packet_tag).await {
-                return Err(TagReplay);
-            }
-        };
-
-        Ok(match packet {
-            TransportPacketWithChainData::Final {
-                previous_hop,
-                plain_text,
-                ack,
-                ..
-            } => {
-                let app_data = ApplicationData::from_bytes(plain_text.as_ref())?;
-                RecvOperation::Receive {
-                    data: app_data,
-                    ack: SendAck {
-                        peer: previous_hop.into(),
-                        ack,
-                    },
-                }
-            }
-            TransportPacketWithChainData::Forwarded {
-                previous_hop,
-                next_hop,
-                data,
-                ack,
-                ..
-            } => RecvOperation::Forward {
-                msg: SendPkt {
-                    peer: next_hop.into(),
-                    data,
-                },
-                ack: SendAck {
-                    peer: previous_hop.into(),
-                    ack,
-                },
-            },
-            TransportPacketWithChainData::Outgoing { .. } => {
-                return Err(PacketError::LogicError(
-                    "Attempting to process an outgoing packet in the incoming pipeline".into(),
-                ))
-            }
-        })
+            })
     }
 }
 
@@ -183,18 +119,8 @@ where
     Db: HoprDbProtocolOperations + Send + Sync + std::fmt::Debug + Clone,
 {
     /// Creates a new instance given the DB and configuration.
-    pub fn new(db: Db, tbf: bloom::WrappedTagBloomFilter, cfg: PacketInteractionConfig) -> Self {
-        Self { db, tbf, cfg }
-    }
-
-    #[tracing::instrument(level = "trace", name = "check_tag_replay", skip(self, tag))]
-    /// Check whether the packet is replayed using a packet tag.
-    ///
-    /// There is a 0.1% chance that the positive result is not a replay because a Bloom filter is used.
-    pub async fn is_tag_replay(&self, tag: &PacketTag) -> bool {
-        self.tbf
-            .with_write_lock(|inner: &mut TagBloomFilter| inner.check_and_set(tag))
-            .await
+    pub fn new(db: Db, cfg: PacketInteractionConfig) -> Self {
+        Self { db, cfg }
     }
 
     // NOTE: as opposed to the winning probability, the ticket price does not have
@@ -281,7 +207,7 @@ impl PacketSendAwaiter {
     }
 }
 
-pub type SendMsgInput = (ApplicationData, TransportPath, PacketSendFinalizer);
+pub type SendMsgInput = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer);
 
 #[derive(Debug, Clone)]
 pub struct MsgSender<T>
@@ -301,12 +227,16 @@ where
 
     /// Pushes a new packet into processing.
     #[tracing::instrument(level = "trace", skip(self, data))]
-    pub async fn send_packet(&self, data: ApplicationData, path: TransportPath) -> Result<PacketSendAwaiter> {
+    pub async fn send_packet(
+        &self,
+        data: ApplicationData,
+        routing: ResolvedTransportRouting,
+    ) -> Result<PacketSendAwaiter> {
         let (tx, rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
 
         self.tx
             .clone()
-            .send((data, path, tx.into()))
+            .send((data, routing, tx.into()))
             .await
             .map_err(|_| TransportError("Failed to send a message".into()))
             .map(move |_| {
@@ -320,34 +250,20 @@ where
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {
     pub packet_keypair: OffchainKeypair,
-    pub chain_keypair: ChainKeypair,
     pub outgoing_ticket_win_prob: Option<f64>,
     pub outgoing_ticket_price: Option<Balance>,
 }
 
-impl PacketInteractionConfig {
-    pub fn new(
-        packet_keypair: &OffchainKeypair,
-        chain_keypair: &ChainKeypair,
-        outgoing_ticket_win_prob: Option<f64>,
-        outgoing_ticket_price: Option<Balance>,
-    ) -> Self {
-        Self {
-            packet_keypair: packet_keypair.clone(),
-            chain_keypair: chain_keypair.clone(),
-            outgoing_ticket_win_prob,
-            outgoing_ticket_price,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use anyhow::Context;
     use async_std::future::timeout;
     use futures::StreamExt;
-
-    use super::*;
+    use hopr_crypto_random::Randomizable;
+    use hopr_internal_types::prelude::HoprPseudonym;
+    use hopr_path::ValidatedPath;
     use std::time::Duration;
 
     #[async_std::test]
@@ -371,9 +287,18 @@ mod tests {
         let sender = MsgSender::new(tx);
 
         let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03])?;
-        let expected_path = TransportPath::direct(PeerId::random());
+        let expected_path = ValidatedPath::direct(
+            *OffchainKeypair::random().public(),
+            ChainKeypair::random().public().to_address(),
+        );
 
-        let result = sender.send_packet(expected_data.clone(), expected_path.clone()).await;
+        let routing = ResolvedTransportRouting::Forward {
+            pseudonym: HoprPseudonym::random(),
+            forward_path: expected_path.clone(),
+            return_paths: vec![],
+        };
+
+        let result = sender.send_packet(expected_data.clone(), routing.clone()).await;
         assert!(result.is_ok());
 
         let received = rx.next();
@@ -383,7 +308,7 @@ mod tests {
             .context("value should be present")?;
 
         assert_eq!(data, expected_data);
-        assert_eq!(path, expected_path);
+        assert!(matches!(path, ResolvedTransportRouting::Forward { forward_path,.. } if forward_path == expected_path));
 
         async_std::task::spawn(async move {
             async_std::task::sleep(Duration::from_millis(3)).await;

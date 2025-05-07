@@ -1,17 +1,20 @@
 use async_lock::RwLock;
 use futures::channel::mpsc::Sender;
+use futures::stream::FuturesUnordered;
+use futures::TryStreamExt;
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
-use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_db_sql::HoprDbAllOperations;
-use hopr_internal_types::protocol::ApplicationData;
-use hopr_network_types::prelude::RoutingOptions;
-use hopr_path::{path::TransportPath, selectors::PathSelector};
+use hopr_internal_types::prelude::*;
+use hopr_network_types::prelude::{ResolvedTransportRouting, RoutingOptions};
+use hopr_network_types::types::DestinationRouting;
+use hopr_path::{selectors::PathSelector, ChainPath, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::primitives::Address;
-use hopr_transport_identity::PeerId;
-use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
+use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
     traits::SendMsg,
@@ -25,8 +28,6 @@ lazy_static::lazy_static! {
         vec![0.0, 1.0, 2.0, 3.0, 4.0]
     ).unwrap();
 }
-
-use crate::{constants::RESERVED_SESSION_TAG_UPPER_LIMIT, errors::HoprTransportError};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PeerEligibility {
@@ -63,20 +64,20 @@ pub(crate) struct PathPlanner<T, S> {
 
 impl<T, S> PathPlanner<T, S>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
     pub(crate) fn new(
+        me: Address,
         db: T,
         selector: S,
         channel_graph: Arc<RwLock<hopr_path::channel_graph::ChannelGraph>>,
-        me: Address,
     ) -> Self {
         Self {
             db,
             channel_graph,
-            me,
             selector,
+            me,
         }
     }
 
@@ -87,60 +88,88 @@ where
     #[tracing::instrument(level = "trace", skip(self))]
     pub(crate) async fn resolve_path(
         &self,
-        destination: PeerId,
+        source: Address,
+        destination: Address,
         options: RoutingOptions,
-    ) -> crate::errors::Result<TransportPath> {
+    ) -> crate::errors::Result<ValidatedPath> {
+        let cg = self.channel_graph.read().await;
         let path = match options {
             RoutingOptions::IntermediatePath(path) => {
-                let complete_path = Vec::from_iter(path.into_iter().chain([destination]));
-                trace!(full_path = ?complete_path, "resolved a specific path");
+                trace!(?path, "resolving a specific path");
 
-                let cg = self.channel_graph.read().await;
-
-                TransportPath::resolve(complete_path, &self.db, &cg)
-                    .await
-                    .map(|(p, _)| p)?
+                ValidatedPath::new(
+                    ChainPath::new(path.into_iter().chain(std::iter::once(destination)))?,
+                    &cg,
+                    &self.db,
+                )
+                .await?
             }
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
-                trace!(hops = 0, %destination, "resolved zero-hop path");
-                TransportPath::direct(destination)
+                trace!(hops = 0, "resolving zero-hop path");
+
+                ValidatedPath::new(ChainPath::direct(destination), &cg, &self.db).await?
             }
             RoutingOptions::Hops(hops) => {
-                trace!(%hops, "resolved path using hop count");
+                trace!(%hops, "resolving path using hop count");
 
-                let pk = OffchainPublicKey::try_from(destination)?;
+                let cp = self
+                    .selector
+                    .select_path(source, destination, hops.into(), hops.into())
+                    .await?;
 
-                if let Some(chain_key) = self
-                    .db
-                    .translate_key(None, pk)
-                    .await
-                    .map_err(hopr_db_sql::api::errors::DbError::from)?
-                {
-                    let target_chain_key: Address = chain_key.try_into()?;
-                    let cp = self
-                        .selector
-                        .select_path(self.me, target_chain_key, hops.into(), hops.into())
-                        .await?;
-
-                    let full_path = cp.into_path(&self.db, target_chain_key).await?;
-                    trace!(%full_path, "resolved automatic path");
-
-                    full_path
-                } else {
-                    return Err(HoprTransportError::Api(
-                        "send msg: unknown destination peer id encountered".to_owned(),
-                    ));
-                }
+                ValidatedPath::new(ChainPath::from_channel_path(cp, destination), &cg, &self.db).await?
             }
         };
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {
-            use hopr_path::path::Path;
-            hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.hops().len() - 1) as f64);
+            use hopr_path::Path;
+            hopr_metrics::SimpleHistogram::observe(&METRIC_PATH_LENGTH, (path.num_hops() - 1) as f64);
         }
 
+        trace!(%path, "validated resolved path");
+
         Ok(path)
+    }
+
+    #[tracing::instrument(level = "trace", skip(self))]
+    pub(crate) async fn resolve_routing(
+        &self,
+        size_hint: usize,
+        routing: DestinationRouting,
+    ) -> crate::errors::Result<ResolvedTransportRouting> {
+        match routing {
+            DestinationRouting::Forward {
+                destination,
+                pseudonym,
+                forward_options,
+                return_options,
+            } => {
+                let forward_path = self.resolve_path(self.me, destination, forward_options).await?;
+
+                let return_paths = if let Some(return_options) = return_options {
+                    let num_possible_surbs = HoprPacket::max_surbs_with_message(size_hint);
+                    trace!(%destination, %num_possible_surbs, data_len = size_hint, "resolving packet return paths");
+
+                    (0..num_possible_surbs)
+                        .map(|_| self.resolve_path(destination, self.me, return_options.clone()))
+                        .collect::<FuturesUnordered<_>>()
+                        .try_collect::<Vec<ValidatedPath>>()
+                        .await?
+                } else {
+                    vec![]
+                };
+
+                trace!(%destination, num_surbs = return_paths.len(), data_len = size_hint, "resolved packet");
+
+                Ok(ResolvedTransportRouting::Forward {
+                    pseudonym: pseudonym.unwrap_or_else(HoprPseudonym::random),
+                    forward_path,
+                    return_paths,
+                })
+            }
+            DestinationRouting::Return(pseudonym) => Ok(ResolvedTransportRouting::Return(pseudonym)),
+        }
     }
 }
 
@@ -152,7 +181,7 @@ pub(crate) struct MessageSender<T, S> {
 
 impl<T, S> MessageSender<T, S>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
     pub fn new(
@@ -169,38 +198,35 @@ where
 #[async_trait::async_trait]
 impl<T, S> SendMsg for MessageSender<T, S>
 where
-    T: HoprDbAllOperations + std::fmt::Debug + Send + Sync + 'static,
+    T: HoprDbAllOperations + PathAddressResolver + std::fmt::Debug + Send + Sync + 'static,
     S: PathSelector + Send + Sync,
 {
     #[tracing::instrument(level = "debug", skip(self, data))]
     async fn send_message(
         &self,
         data: ApplicationData,
-        destination: PeerId,
-        options: RoutingOptions,
+        routing: DestinationRouting,
     ) -> std::result::Result<(), TransportSessionError> {
-        data.application_tag
-            .is_some_and(|application_tag| application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT)
-            .then_some(())
-            .ok_or(TransportSessionError::Tag)?;
-
-        let path = self
+        let routing = self
             .resolver
-            .resolve_path(destination, options)
+            .resolve_routing(data.len(), routing)
             .await
-            .map_err(|_| TransportSessionError::Path)?;
+            .map_err(|err| {
+                tracing::error!(%err, "failed to resolve routing");
+                TransportSessionError::Path
+            })?;
 
         self.process_packet_send
             .get()
             .ok_or_else(|| SessionManagerError::NotStarted)?
-            .send_packet(data, path)
+            .send_packet(data, routing)
             .await
             .map_err(|_| TransportSessionError::Closed)?
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
             .await
             .map_err(|_e| TransportSessionError::Timeout)?;
 
-        trace!("Packet sent to the outgoing queue");
+        trace!("packet sent to the outgoing queue");
 
         Ok(())
     }

@@ -139,7 +139,12 @@ where
                         self.db
                             .insert_account(
                                 Some(tx),
-                                AccountEntry::new(binding.packet_key, binding.chain_key, AccountType::NotAnnounced),
+                                AccountEntry {
+                                    public_key: binding.packet_key,
+                                    chain_addr: binding.chain_key,
+                                    entry_type: AccountType::NotAnnounced,
+                                    published_at: block_number,
+                                },
                             )
                             .await?;
                     }
@@ -998,7 +1003,12 @@ mod tests {
             ..test_log()
         };
 
-        let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
+        let account_entry = AccountEntry {
+            public_key: *SELF_PRIV_KEY.public(),
+            chain_addr: *SELF_CHAIN_ADDRESS,
+            entry_type: AccountType::NotAnnounced,
+            published_at: 0,
+        };
 
         let event_type = db
             .begin_transaction()
@@ -1024,7 +1034,12 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         // Assume that there is a keybinding
-        let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
+        let account_entry = AccountEntry {
+            public_key: *SELF_PRIV_KEY.public(),
+            chain_addr: *SELF_CHAIN_ADDRESS,
+            entry_type: AccountType::NotAnnounced,
+            published_at: 1,
+        };
         db.insert_account(None, account_entry.clone()).await?;
 
         let test_multiaddr_empty: Multiaddr = "".parse()?;
@@ -1089,14 +1104,15 @@ mod tests {
             ..test_log()
         };
 
-        let announced_account_entry = AccountEntry::new(
-            *SELF_PRIV_KEY.public(),
-            *SELF_CHAIN_ADDRESS,
-            AccountType::Announced {
+        let announced_account_entry = AccountEntry {
+            public_key: *SELF_PRIV_KEY.public(),
+            chain_addr: *SELF_CHAIN_ADDRESS,
+            entry_type: AccountType::Announced {
                 multiaddr: test_multiaddr.clone(),
                 updated_block: 1,
             },
-        );
+            published_at: 1,
+        };
 
         let handlers_clone = handlers.clone();
         let event_type = db
@@ -1154,14 +1170,15 @@ mod tests {
             ..test_log()
         };
 
-        let announced_dns_account_entry = AccountEntry::new(
-            *SELF_PRIV_KEY.public(),
-            *SELF_CHAIN_ADDRESS,
-            AccountType::Announced {
+        let announced_dns_account_entry = AccountEntry {
+            public_key: *SELF_PRIV_KEY.public(),
+            chain_addr: *SELF_CHAIN_ADDRESS,
+            entry_type: AccountType::Announced {
                 multiaddr: test_multiaddr_dns.clone(),
                 updated_block: 2,
             },
-        );
+            published_at: 1,
+        };
 
         let event_type = db
             .begin_transaction()
@@ -1209,14 +1226,16 @@ mod tests {
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse()?;
 
         // Assume that there is a keybinding and an address announcement
-        let announced_account_entry = AccountEntry::new(
-            *SELF_PRIV_KEY.public(),
-            *SELF_CHAIN_ADDRESS,
-            AccountType::Announced {
+        let announced_account_entry = AccountEntry {
+            public_key: *SELF_PRIV_KEY.public(),
+            chain_addr: *SELF_CHAIN_ADDRESS,
+            entry_type: AccountType::Announced {
                 multiaddr: test_multiaddr,
                 updated_block: 0,
             },
-        );
+            published_at: 1,
+        };
+
         db.insert_account(None, announced_account_entry).await?;
 
         let encoded_data = (AlloyAddress::from_slice(SELF_CHAIN_ADDRESS.as_ref()),).abi_encode();
@@ -1231,7 +1250,12 @@ mod tests {
             ..test_log()
         };
 
-        let account_entry = AccountEntry::new(*SELF_PRIV_KEY.public(), *SELF_CHAIN_ADDRESS, AccountType::NotAnnounced);
+        let account_entry = AccountEntry {
+            public_key: *SELF_PRIV_KEY.public(),
+            chain_addr: *SELF_CHAIN_ADDRESS,
+            entry_type: AccountType::NotAnnounced,
+            published_at: 1,
+        };
 
         let event_type = db
             .begin_transaction()

@@ -52,7 +52,7 @@ impl Address {
     }
 
     /// Turns the address into a checksum-ed address string
-    /// according to https://eips.ethereum.org/EIPS/eip-55>
+    /// according to [EIP-55](https://eips.ethereum.org/EIPS/eip-55).
     pub fn to_checksum(&self) -> String {
         let address_hex = hex::encode(self.0);
 
@@ -88,7 +88,7 @@ impl TryFrom<&[u8]> for Address {
 }
 
 impl BytesRepresentable for Address {
-    /// Fixed size of the address when encoded as bytes (e.g., via `as_ref()`).
+    /// Fixed the size of the address when encoded as bytes (e.g., via `as_ref()`).
     const SIZE: usize = 20;
 }
 
@@ -513,6 +513,64 @@ impl PartialOrd<Self> for SerializableLog {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
+}
+
+/// Identifier of public keys.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct KeyIdent<const N: usize = 4>(#[serde(with = "serde_bytes")] [u8; N]);
+
+impl<const N: usize> Display for KeyIdent<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl From<u32> for KeyIdent<4> {
+    fn from(value: u32) -> Self {
+        Self(value.to_be_bytes())
+    }
+}
+
+impl From<KeyIdent<4>> for u32 {
+    fn from(value: KeyIdent<4>) -> Self {
+        u32::from_be_bytes(value.0)
+    }
+}
+
+impl From<u64> for KeyIdent<8> {
+    fn from(value: u64) -> Self {
+        Self(value.to_be_bytes())
+    }
+}
+
+impl From<KeyIdent<8>> for u64 {
+    fn from(value: KeyIdent<8>) -> Self {
+        u64::from_be_bytes(value.0)
+    }
+}
+
+impl<const N: usize> TryFrom<&[u8]> for KeyIdent<N> {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| ParseError("KeyIdent".into()))?))
+    }
+}
+
+impl<const N: usize> AsRef<[u8]> for KeyIdent<N> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<const N: usize> Default for KeyIdent<N> {
+    fn default() -> Self {
+        Self([0u8; N])
+    }
+}
+
+impl<const N: usize> BytesRepresentable for KeyIdent<N> {
+    const SIZE: usize = N;
 }
 
 /// Unit tests of pure Rust code

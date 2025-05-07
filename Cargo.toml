@@ -39,13 +39,14 @@ members = [
   "transport/identity",
   "transport/mixer",
   "transport/network",
+  "transport/packet",
   "transport/p2p",
   "transport/protocol",
   "transport/session",
+  "transport/ticket-aggregation",
 ]
 
 [workspace.dependencies]
-aes = "0.8"
 alloy = { version = "0.12.6" , default-features = false, features = ["essentials", "json-rpc", "node-bindings", "contract", "k256", "std"] }
 anyhow = "1.0.98"
 aquamarine = "0.6.0"
@@ -59,7 +60,7 @@ async-stream = "0.3.6"
 async-trait = "0.1.88"
 asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 atomic_enum = "0.3.0"
-axum = { version = "0.8.3", features = ["ws", "http2"] }
+axum = { version = "0.8.4", features = ["ws", "http2"] }
 axum-extra = { version = "0.10.1", features = ["query"] }
 backon = { version = "1.5.0", default-features = false }
 base64 = "0.22.1"
@@ -69,7 +70,8 @@ bitvec = "1.0.1"
 bloomfilter = { version = "3.0.1", features = ["serde"] }
 bytesize = { version = "2.0.1", features = ["serde"] }
 cbor4ii = { version = "1.0.0" }
-chrono = { version = "0.4.40", default-features = false }
+cfg-if = "1.0.0"
+chrono = { version = "0.4.41", default-features = false }
 clap = { version = "4.5.36", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
@@ -91,10 +93,7 @@ float-cmp = "0.10.0"
 futures = "0.3.31"
 futures-concurrency = "7.6.3"
 futures-timer = "3.0.3"
-generic-array = { version = "0.14.7", features = [
-  "zeroize",
-] } # ignored in renovate, waiting for type update
-getrandom = "0.3.2"
+generic-array = "1.2.0"
 governor = { version = "0.10" }
 hex = "0.4.3"
 hex-literal = "1.0.0"
@@ -108,7 +107,7 @@ k256 = { version = "0.13.4", features = [
 ] }
 lazy_static = "1.5.0"
 libp2p = { version = "0.55.0" }
-libp2p-identity = { version = "0.2.10", features = [
+libp2p-identity = { version = "0.2.11", features = [
   "peerid",
   "ed25519",
   "rand",
@@ -187,7 +186,7 @@ tokio = { version = "1.44.2", features = [
   "macros",
   "tracing",
 ] }
-tokio-util = { version = "0.7.14", default-features = false, features = [
+tokio-util = { version = "0.7.15", default-features = false, features = [
   "codec",
   "compat",
 ] }
@@ -208,7 +207,6 @@ url = { version = "2.5.4", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
 void = "1.0.2"
-zeroize = { version = "1.8.1" }
 
 
 hopr-async-runtime = { path = "common/async-runtime" }
@@ -242,8 +240,10 @@ hopr-transport-identity = { path = "transport/identity" }
 hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
 hopr-transport-protocol = { path = "transport/protocol" }
+hopr-transport-packet = { path = "transport/packet" }
 hopr-transport-p2p = { path = "transport/p2p" }
 hopr-transport-session = { path = "transport/session" }
+hopr-transport-ticket-aggregation = { path = "transport/ticket-aggregation" } # dead package waiting for reimplementation as a session protocol
 hoprd-api = { path = "hoprd/rest-api", default-features = false }
 hoprd-inbox = { path = "hoprd/inbox", default-features = false }
 hoprd-keypair = { path = "hoprd/keypair", default-features = false }
@@ -251,12 +251,23 @@ hoprd-db-api = { path = "hoprd/db/api" }
 hoprd-db-entity = { path = "hoprd/db/entity" }
 hoprd-db-migration = { path = "hoprd/db/migration" }
 
-# [build]
-# rustflags = ["-C", "link-arg=-fuse-ld=lld"]       # needs the "pkgs.llvmPackages.bintools" nix package
-
 [profile.dev]
 panic = "abort"
 
+# this profile focuses on speed of compilation
+[profile.candidate]
+inherits = "release"
+codegen-units = 16   # normal release default
+lto = false          # do the smallest amount of link-time optimization
+panic = "abort"
+strip = true
+opt-level = 2
+
+# perform minimal optimizations to prevent stack overflows in large tests
+[profile.test]
+opt-level = 1
+
+# this profile focuses on best runtime performance and smallest binary size
 [profile.release]
 codegen-units = 1
 lto = "fat"

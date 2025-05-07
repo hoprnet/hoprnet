@@ -6,13 +6,11 @@ pub mod executors;
 
 use alloy::rpc::client::ClientBuilder;
 use alloy::rpc::types::TransactionRequest;
-use alloy::transports::http::{Http, ReqwestTransport};
 use alloy::transports::layers::RetryBackoffLayer;
-use alloy::transports::{IntoBoxTransport, TransportConnect};
 use hopr_chain_rpc::client::DefaultRetryPolicy;
+use hopr_chain_rpc::transport::HttpWrapper;
 #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use hopr_chain_rpc::transport::ReqwestClient;
-use hopr_chain_rpc::transport::{HttpRequestor, HttpWrapper};
 #[cfg(all(feature = "runtime-async-std"))]
 use hopr_chain_rpc::transport::{SurfClient, SurfTransport};
 use std::collections::HashMap;

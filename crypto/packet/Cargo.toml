@@ -1,6 +1,6 @@
 [package]
 name = "hopr-crypto-packet"
-version = "0.8.0"
+version = "0.10.0"
 description = "Contains high-level HOPR protocol building blocks for packet interaction"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
@@ -13,27 +13,34 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+serde = [
+  "dep:serde",
+  "dep:serde_bytes",
+  "hopr-crypto-sphinx/serde",
+  "hopr-path/serde",
+]
 
 [dependencies]
 hex = { workspace = true }
-lazy_static = { workspace = true }
+strum = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-typenum = { workspace = true }
 
 hopr-crypto-sphinx = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-internal-types = { workspace = true }
+hopr-path = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 async-std = { workspace = true }
-async-trait = { workspace = true }
+bimap = "0.6.3"
 criterion = { workspace = true }
 hex-literal = { workspace = true }
-libp2p-identity = { workspace = true }
-mockall = { workspace = true }
+lazy_static = { workspace = true }
 parameterized = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
@@ -42,10 +49,12 @@ hopr-crypto-sphinx = { workspace = true, features = [
   "secp256k1",
   "x25519",
 ] }
-hopr-db-api = { workspace = true }
-hopr-path = { workspace = true }
 
 
 [[bench]]
-name = "packet_crypto"
+name = "packet_benches"
+harness = false
+
+[[bench]]
+name = "por_benches"
 harness = false

@@ -179,7 +179,7 @@ class TestIntegrationWithSwarm:
     async def test_hoprd_should_fail_sending_a_message_that_is_too_large(
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
-        maximum_payload_size = 500
+        maximum_payload_size = 800
         random_tag = gen_random_tag()
 
         packet = "0 hop message too large: " + "".join(
@@ -248,6 +248,7 @@ class TestIntegrationWithSwarm:
         assert count_metrics(await swarm7[dest].api.metrics()) == 0
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")
     @pytest.mark.parametrize(
         "src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
@@ -344,6 +345,7 @@ class TestIntegrationWithSwarm:
 
     # generate a 1-hop route with a node using strategies in the middle
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")
     @pytest.mark.parametrize(
         "route",
         [

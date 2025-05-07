@@ -10,17 +10,18 @@ use std::time::Duration;
 use tracing::debug;
 use tracing::log::LevelFilter;
 
-use hopr_crypto_types::keypairs::Keypair;
-use hopr_crypto_types::prelude::ChainKeypair;
-use hopr_db_entity::ticket;
-use hopr_internal_types::prelude::{AcknowledgedTicket, AcknowledgedTicketStatus};
-use hopr_primitive_types::primitives::Address;
-use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
-
+use crate::accounts::model_to_account_entry;
 use crate::cache::HoprDbCaches;
 use crate::errors::Result;
 use crate::ticket_manager::TicketManager;
 use crate::HoprDbAllOperations;
+use hopr_crypto_types::keypairs::Keypair;
+use hopr_crypto_types::prelude::ChainKeypair;
+use hopr_db_entity::prelude::{Account, Announcement};
+use hopr_db_entity::ticket;
+use hopr_internal_types::prelude::{AcknowledgedTicket, AcknowledgedTicketStatus};
+use hopr_primitive_types::primitives::Address;
+use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
 
 pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
@@ -53,6 +54,13 @@ pub const SQL_DB_LOGS_FILE_NAME: &str = "hopr_logs.db";
 
 impl HoprDb {
     pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprDbConfig) -> Result<Self> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            lazy_static::initialize(&crate::protocol::METRIC_RECEIVED_ACKS);
+            lazy_static::initialize(&crate::protocol::METRIC_SENT_ACKS);
+            lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
+        }
+
         std::fs::create_dir_all(directory).map_err(|_e| {
             crate::errors::DbSqlError::Construction(format!("cannot create main database directory {directory:?}"))
         })?;
@@ -192,6 +200,21 @@ impl HoprDb {
 
         let caches = Arc::new(HoprDbCaches::default());
         caches.invalidate_all();
+
+        // Initialize KeyId mapping for accounts
+        Account::find()
+            .find_with_related(Announcement)
+            .all(&index_db)
+            .await?
+            .into_iter()
+            .try_for_each(|(a, b)| match model_to_account_entry(a, b) {
+                Ok(account) => caches.key_id_mapper.update_key_id_binding(&account),
+                Err(error) => {
+                    // Undecodeable accounts are skipped and will be unreachable
+                    tracing::error!(%error, "undecodeable account");
+                    Ok(())
+                }
+            })?;
 
         Ok(Self {
             me_onchain: chain_key.public().to_address(),

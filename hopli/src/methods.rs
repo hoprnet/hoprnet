@@ -1027,7 +1027,7 @@ pub async fn get_registered_safes_for_nodes_on_node_safe_registry<P: Provider>(
     node_addresses: Vec<Address>,
 ) -> Result<Vec<Address>, MulticallError> {
     let provider = node_safe_registry.provider();
-    let mut dyn_multicall = MulticallBuilder::new_dynamic(provider.clone());
+    let mut dyn_multicall = MulticallBuilder::new_dynamic(provider);
 
     for node in node_addresses {
         dyn_multicall = dyn_multicall.add_dynamic(node_safe_registry.nodeToSafe(node));

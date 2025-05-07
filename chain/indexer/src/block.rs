@@ -879,12 +879,22 @@ mod tests {
             // thus storing some data.
             db.insert_account(
                 None,
-                AccountEntry::new(*ALICE_OKP.public(), *ALICE, AccountType::NotAnnounced).into(),
+                AccountEntry {
+                    public_key: *ALICE_OKP.public(),
+                    chain_addr: *ALICE,
+                    entry_type: AccountType::NotAnnounced,
+                    published_at: 1,
+                },
             )
             .await?;
             db.insert_account(
                 None,
-                AccountEntry::new(*BOB_OKP.public(), *BOB, AccountType::NotAnnounced).into(),
+                AccountEntry {
+                    public_key: *BOB_OKP.public(),
+                    chain_addr: *BOB,
+                    entry_type: AccountType::NotAnnounced,
+                    published_at: 1,
+                },
             )
             .await?;
         }

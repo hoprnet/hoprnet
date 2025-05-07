@@ -101,13 +101,13 @@ where
     /// has been excluded based on the configured excluded tags.
     #[tracing::instrument(level = "debug", skip(self))]
     pub async fn push(&self, payload: ApplicationData) -> bool {
-        if self.is_excluded_tag(&payload.application_tag) {
+        if self.is_excluded_tag(&Some(payload.application_tag)) {
             return false;
         }
 
         // Push only if there is no tag, or if the tag is not excluded
         let mut db = self.backend.lock().await;
-        db.push(payload.application_tag, payload).await;
+        db.push(Some(payload.application_tag), payload).await;
         db.purge((self.time)().saturating_sub(self.cfg.max_age)).await;
 
         true
@@ -207,28 +207,28 @@ mod tests {
 
         assert!(
             mi.push(ApplicationData {
-                application_tag: None,
+                application_tag: 0,
                 plain_text: (*b"test msg 0").into()
             })
             .await
         );
         assert!(
             mi.push(ApplicationData {
-                application_tag: Some(1),
+                application_tag: 1,
                 plain_text: (*b"test msg 1").into()
             })
             .await
         );
         assert!(
             mi.push(ApplicationData {
-                application_tag: Some(1),
+                application_tag: 1,
                 plain_text: (*b"test msg 2").into()
             })
             .await
         );
         assert!(
             !mi.push(ApplicationData {
-                application_tag: Some(2),
+                application_tag: 2,
                 plain_text: (*b"test msg").into()
             })
             .await

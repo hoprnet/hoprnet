@@ -34,8 +34,8 @@ pub fn mixer_throughput(
         group.throughput(Throughput::Bytes(*bytes as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(format!(
-                "random data with size {} through a {}",
-                bytesize::ByteSize::b(*bytes as u64),
+                "random_data_size_{}_through_{}",
+                bytesize::ByteSize::b(*bytes as u64).to_string().replace(" ", "_"),
                 description
             )),
             bytes,
@@ -92,7 +92,7 @@ pub fn mixer_channel_throughput_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
         minimal_delay_mixer_cfg(),
-        "mixer channel",
+        "mixer_channel",
         send_continuous_channel_load,
     );
 }
@@ -101,7 +101,7 @@ pub fn mixer_channel_throughput_through_sink_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
         minimal_delay_mixer_cfg(),
-        "mixer channel through sink pipe",
+        "mixer_channel_sink_pipe",
         send_continuous_channel_load_through_sink_pipe,
     );
 }
@@ -136,7 +136,7 @@ pub fn mixer_stream_throughput_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
         minimal_delay_mixer_cfg(),
-        "mixer stream",
+        "mixer_stream",
         send_continuous_stream_load,
     );
 }

@@ -79,7 +79,7 @@ hopr-db-sql = { workspace = true }
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-network-types = { workspace = true }
-hopr-path = { workspace = true }
+hopr-path = { workspace = true, features = ["serde"] }
 hopr-platform = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-strategy = { workspace = true }
