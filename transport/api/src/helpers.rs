@@ -98,6 +98,7 @@ where
                 trace!(?path, "resolving a specific path");
 
                 ValidatedPath::new(
+                    source,
                     ChainPath::new(path.into_iter().chain(std::iter::once(destination)))?,
                     &cg,
                     &self.db,
@@ -107,7 +108,7 @@ where
             RoutingOptions::Hops(hops) if u32::from(hops) == 0 => {
                 trace!(hops = 0, "resolving zero-hop path");
 
-                ValidatedPath::new(ChainPath::direct(destination), &cg, &self.db).await?
+                ValidatedPath::new(source, ChainPath::direct(destination), &cg, &self.db).await?
             }
             RoutingOptions::Hops(hops) => {
                 trace!(%hops, "resolving path using hop count");
@@ -117,7 +118,7 @@ where
                     .select_path(source, destination, hops.into(), hops.into())
                     .await?;
 
-                ValidatedPath::new(ChainPath::from_channel_path(cp, destination), &cg, &self.db).await?
+                ValidatedPath::new(source, ChainPath::from_channel_path(cp, destination), &cg, &self.db).await?
             }
         };
 

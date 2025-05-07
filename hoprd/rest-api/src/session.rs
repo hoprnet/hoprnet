@@ -476,8 +476,8 @@ impl SessionClientRequest {
 #[schema(example = json!({
         "destination": "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F",
         "target": "example.com:80",
-        "forward_path": { "Hops": 1 },
-        "return_path": { "Hops": 1 },
+        "forwardPath": { "Hops": 1 },
+        "returnPath": { "Hops": 1 },
         "protocol": "tcp",
         "ip": "127.0.0.1",
         "port": 5542
