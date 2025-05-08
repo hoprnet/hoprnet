@@ -1,10 +1,9 @@
 //! Creates a build specification for the smart contract codegen.
 
+use anyhow::Context;
 use std::env;
 use std::path::Path;
 use std::process::Command;
-
-use anyhow::Context;
 
 fn main() -> anyhow::Result<()> {
     let cargo_manifest_dir = &env::var("CARGO_MANIFEST_DIR")?;
