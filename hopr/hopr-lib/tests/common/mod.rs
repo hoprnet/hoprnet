@@ -1,7 +1,6 @@
 use ethers::utils::AnvilInstance;
 use std::time::Duration;
 use tokio::time::sleep;
-
 use tracing::info;
 
 use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
