@@ -922,39 +922,9 @@ mod tests {
     use std::time::Duration;
     use tempfile::NamedTempFile;
 
-    use crate::client::reqwest_client::ReqwestRequestor;
     use crate::client::{
         DefaultRetryPolicy, GasOracleFiller, MetricsLayer, SnapshotRequestor, SnapshotRequestorLayer, ZeroRetryPolicy,
     };
-    use crate::transport::ReqwestTransport;
-
-    #[tokio::test]
-    async fn test_client_should_deploy_contracts_via_surf() -> anyhow::Result<()> {
-        let anvil = create_anvil(None);
-        let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
-        let signer_chain_key = ChainKeypair::from_secret(signer.to_bytes().as_ref())?;
-
-        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
-
-        let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
-
-        let provider = ProviderBuilder::new().wallet(signer).on_client(rpc_client);
-
-        let contracts = ContractInstances::deploy_for_testing(provider.clone(), &signer_chain_key)
-            .await
-            .expect("deploy failed");
-
-        let contract_addrs = ContractAddresses::from(&contracts);
-
-        assert_ne!(contract_addrs.token, Address::default());
-        assert_ne!(contract_addrs.channels, Address::default());
-        assert_ne!(contract_addrs.announcements, Address::default());
-        assert_ne!(contract_addrs.network_registry, Address::default());
-        assert_ne!(contract_addrs.safe_registry, Address::default());
-        assert_ne!(contract_addrs.price_oracle, Address::default());
-
-        Ok(())
-    }
 
     #[tokio::test]
     async fn test_client_should_deploy_contracts_via_reqwest() -> anyhow::Result<()> {
@@ -1210,7 +1180,7 @@ mod tests {
 
         let simple_json_rpc_retry_policy = DefaultRetryPolicy {
             initial_backoff: Duration::from_millis(100),
-            retryable_json_rpc_errors: vec![],
+            retryable_json_rpc_errors: vec![-32603],
             ..DefaultRetryPolicy::default()
         };
         let rpc_client = ClientBuilder::default()

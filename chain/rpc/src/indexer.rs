@@ -245,7 +245,6 @@ mod tests {
     use crate::errors::RpcError;
     use crate::indexer::split_range;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::transport::SurfTransport;
     use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 
     fn filter_bounds(filter: &Filter) -> anyhow::Result<(u64, u64)> {
@@ -358,7 +357,7 @@ mod tests {
 
         let contract_addrs = ContractAddresses::from(&contract_instances);
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))

@@ -8,11 +8,8 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::info;
 
-use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
-use hopr_chain_rpc::client::{
-    create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
-};
-use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
+use hopr_chain_rpc::client::AnvilRpcClient;
+use hopr_chain_rpc::client::{create_rpc_client_to_anvil, SnapshotRequestor};
 use hopr_chain_rpc::transport::ReqwestClient;
 use hopr_chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
@@ -73,7 +70,7 @@ pub fn create_provider_to_anvil_with_snapshot(
 }
 
 /// Snapshot requestor used for testing.
-pub type Requestor = SnapshotRequestor<ReqwestRequestor>;
+pub type Requestor = SnapshotRequestor;
 
 /// Represents a HOPR environment deployment into Anvil.
 #[allow(unused)]

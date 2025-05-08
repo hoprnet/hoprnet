@@ -456,7 +456,6 @@ mod tests {
     use crate::client::{create_rpc_client_to_anvil, AnvilRpcClient};
     use crate::errors::Result;
     use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::transport::SurfTransport;
     use crate::{HoprRpcOperations, PendingTransaction};
     use alloy::network::{Ethereum, TransactionBuilder};
     use alloy::primitives::{address, U256};
@@ -518,7 +517,7 @@ mod tests {
         let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
-        let mut server = mockito::Server::new().await;
+        let mut server = mockito::Server::new_async().await;
         let gas_oracle_mock = server.mock("GET", "/gas_oracle")
             .with_status(200)
             .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"38791478","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999985432689946"}}"#)

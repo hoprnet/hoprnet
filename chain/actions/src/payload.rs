@@ -586,14 +586,13 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 mod tests {
     use super::{BasicPayloadGenerator, PayloadGenerator};
 
+    use alloy::{primitives::U256, providers::Provider};
     use anyhow::Context;
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use std::str::FromStr;
 
-    use alloy::{primitives::U256, providers::Provider};
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
-    use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
