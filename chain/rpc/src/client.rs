@@ -11,33 +11,26 @@
 //!
 //! This module contains defalut gas estimation constants for EIP-1559 for Gnosis chain,
 /// as GasOracleMiddleware middleware is migrated to GasFiller
-use alloy::{
-    eips::eip1559::Eip1559Estimation,
-    network::{EthereumWallet, Network, TransactionBuilder},
-    primitives::utils::parse_units,
-    providers::{
-        fillers::{
-            BlobGasFiller, ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller, TxFiller,
-            WalletFiller,
-        },
-        Identity, Provider, RootProvider, SendableTx,
-    },
-    rpc::json_rpc::{ErrorPayload, RequestPacket, ResponsePacket, ResponsePayload},
-    transports::{layers::RetryPolicy, HttpError, TransportError, TransportErrorKind, TransportFut, TransportResult},
+use alloy::eips::eip1559::Eip1559Estimation;
+use alloy::network::{EthereumWallet, Network, TransactionBuilder};
+use alloy::primitives::utils::parse_units;
+use alloy::providers::fillers::{
+    BlobGasFiller, ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller, TxFiller,
+    WalletFiller,
 };
+use alloy::providers::{Identity, Provider, RootProvider, SendableTx};
+use alloy::rpc::json_rpc::{ErrorPayload, RequestPacket, ResponsePacket, ResponsePayload};
+use alloy::transports::layers::RetryPolicy;
+use alloy::transports::{HttpError, TransportError, TransportErrorKind, TransportFut, TransportResult};
 use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::future::IntoFuture;
-use std::{
-    fmt::Debug,
-    io::{BufWriter, Write},
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc,
-    },
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::io::{BufWriter, Write};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use std::time::Duration;
 use tower::{Layer, Service};
 use tracing::{error, trace};
 use url::Url;
