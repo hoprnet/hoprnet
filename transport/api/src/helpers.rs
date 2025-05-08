@@ -5,9 +5,11 @@ use futures::TryStreamExt;
 use std::sync::{Arc, OnceLock};
 use tracing::trace;
 
+use crate::errors::HoprTransportError;
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_types::crypto_traits::Randomizable;
+use hopr_db_sql::api::prelude::DbError;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, RoutingOptions};
@@ -215,9 +217,14 @@ where
             .resolver
             .resolve_routing(data.len(), routing)
             .await
-            .map_err(|err| {
-                tracing::error!(%err, "failed to resolve routing");
-                TransportSessionError::Path
+            .map_err(|error| {
+                tracing::error!(%error, "failed to resolve routing");
+                // Out of SURBs error gets a special distinction by the Session code
+                if let HoprTransportError::Db(DbError::NoSurbAvailable(_)) = error {
+                    TransportSessionError::OutOfSurbs
+                } else {
+                    TransportSessionError::Path
+                }
             })?;
 
         self.process_packet_send

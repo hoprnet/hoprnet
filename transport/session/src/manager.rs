@@ -603,6 +603,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         surb_consumption_counter, // Received packets = SURB consumption estimate
                     )
                 } else {
+                    warn!(%session_id, "session ready without SURB balancing");
                     Session::new(
                         session_id,
                         forward_routing.clone(),

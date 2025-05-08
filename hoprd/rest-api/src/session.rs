@@ -458,13 +458,19 @@ impl SessionClientRequest {
                         }
                         _ => vec![], // no default capabilities for UDP, etc.
                     }),
-                surb_management: Some(SurbBalancerConfig {
-                    target_surb_buffer_size: self
-                        .response_buffer
-                        .map(|b| b.as_u64() / SESSION_PAYLOAD_SIZE as u64)
-                        .unwrap_or(SurbBalancerConfig::default().target_surb_buffer_size),
-                    ..Default::default()
-                }),
+                surb_management: match self.response_buffer {
+                    // Buffer worth at least 2 reply packets
+                    Some(buffer_size) if buffer_size.as_u64() >= 2 * SESSION_PAYLOAD_SIZE as u64 => {
+                        Some(SurbBalancerConfig {
+                            target_surb_buffer_size: buffer_size.as_u64() / SESSION_PAYLOAD_SIZE as u64,
+                            ..Default::default()
+                        })
+                    }
+                    // No SURBs are set up and maintained, useful for high-send low-reply sessions
+                    Some(_) => None,
+                    // Use defaults otherwise
+                    None => Some(SurbBalancerConfig::default()),
+                },
                 ..Default::default()
             },
         ))

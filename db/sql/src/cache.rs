@@ -4,6 +4,7 @@ use hopr_crypto_packet::prelude::{HoprSenderId, HoprSurbId};
 use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::info::{IndexerData, SafeInfo};
+use hopr_db_api::prelude::DbError;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::{Address, Balance, KeyIdent, U256};
 use moka::future::Cache;
@@ -75,33 +76,33 @@ impl SurbRingBuffer {
     }
 
     /// Push all SURBs with their IDs into the RB.
-    pub fn push<I: IntoIterator<Item = (HoprSurbId, HoprSurb)>>(&self, surbs: I) -> Result<(), DbSqlError> {
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, HoprSurb)>>(&self, surbs: I) -> Result<(), DbError> {
         self.0
             .lock()
-            .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?
             .extend(surbs);
         Ok(())
     }
 
     /// Pop the latest SURB and its IDs from the RB.
-    pub fn pop_one(&self) -> Result<(HoprSurbId, HoprSurb), DbSqlError> {
+    pub fn pop_one(&self) -> Result<(HoprSurbId, HoprSurb), DbError> {
         self.0
             .lock()
-            .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?
             .dequeue()
-            .ok_or(DbSqlError::NoSurbAvailable("no more surbs".into()))
+            .ok_or(DbError::NoSurbAvailable("no more surbs".into()))
     }
 
     /// Check if the next SURB has the given ID and pop it from the RB.
-    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<(HoprSurbId, HoprSurb), DbSqlError> {
+    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<(HoprSurbId, HoprSurb), DbError> {
         let mut rb = self
             .0
             .lock()
-            .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?;
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
         if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
-            rb.dequeue().ok_or(DbSqlError::NoSurbAvailable("no more surbs".into()))
+            rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))
         } else {
-            Err(DbSqlError::NoSurbAvailable("surb does not match the given id".into()))
+            Err(DbError::NoSurbAvailable("surb does not match the given id".into()))
         }
     }
 }

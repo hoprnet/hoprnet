@@ -1,8 +1,14 @@
+use crate::channels::HoprDbChannelOperations;
+use crate::db::HoprDb;
+use crate::errors::DbSqlError;
+use crate::info::HoprDbInfoOperations;
+use crate::prelude::HoprDbTicketOperations;
 use async_trait::async_trait;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
+use hopr_db_api::prelude::DbError;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement};
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::prelude::*;
@@ -13,12 +19,6 @@ use hopr_path::{Path, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use std::ops::{Mul, Sub};
 use tracing::{instrument, trace, warn};
-
-use crate::channels::HoprDbChannelOperations;
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::info::HoprDbInfoOperations;
-use crate::prelude::HoprDbTicketOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
@@ -308,7 +308,7 @@ impl HoprDbProtocolOperations for HoprDb {
             .surbs_per_pseudonym
             .get(&pseudonym)
             .await
-            .ok_or(DbSqlError::NoSurbAvailable("pseudonym not found".into()))?;
+            .ok_or(DbError::NoSurbAvailable("pseudonym not found".into()))?;
 
         match matcher {
             SurbMatcher::Pseudonym(_) => Ok(surbs_for_pseudonym

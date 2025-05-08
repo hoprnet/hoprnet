@@ -21,9 +21,6 @@ pub enum DbSqlError {
     #[error("list of logs is empty")]
     EmptyLogsList,
 
-    #[error("cannot find a surb: {0}")]
-    NoSurbAvailable(String),
-
     #[error("log status could not be updated")]
     UpdateLogStatusError,
 

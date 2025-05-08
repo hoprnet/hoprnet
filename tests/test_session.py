@@ -288,6 +288,7 @@ class TestSessionWithSwarm:
     async def test_session_communication_over_n_hop_with_a_tcp_echo_server(self, route, swarm7: dict[str, Node]):
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
         expected = [f"{i}".ljust(STANDARD_MTU_SIZE) for i in range(packet_count)]
+        surb_pre_buffer = 6000
 
         assert [len(x) for x in expected] == packet_count * [STANDARD_MTU_SIZE]
 
@@ -300,7 +301,9 @@ class TestSessionWithSwarm:
             channels_to = [
                 channels.enter_async_context(
                     create_channel(
-                        swarm7[route[i]], swarm7[route[i + 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP
+                        swarm7[route[i]],
+                        swarm7[route[i + 1]],
+                        funding=20 * (surb_pre_buffer + packet_count) * TICKET_PRICE_PER_HOP,
                     )
                 )
                 for i in range(len(route) - 1)
@@ -467,6 +470,7 @@ class TestSessionWithSwarm:
     async def test_session_communication_over_n_hop_with_a_udp_echo_server(self, route, swarm7: dict[str, Node]):
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
         expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
+        surb_pre_buffer = 6000
 
         assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
@@ -478,7 +482,11 @@ class TestSessionWithSwarm:
         async with AsyncExitStack() as channels:
             channels_to = [
                 channels.enter_async_context(
-                    create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=packet_count * TICKET_PRICE_PER_HOP)
+                    create_channel(
+                        swarm7[route[i]],
+                        swarm7[route[i + 1]],
+                        funding=(surb_pre_buffer + packet_count) * TICKET_PRICE_PER_HOP,
+                    )
                 )
                 for i in range(len(route) - 1)
             ]
@@ -573,12 +581,15 @@ class TestSessionWithSwarm:
         dest_peer = swarm7[route[-1]]
         fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
         ret_path = fwd_path[::-1]
+        surb_pre_buffer = 6000
 
         async with AsyncExitStack() as channels:
             channels_to = [
                 channels.enter_async_context(
                     create_channel(
-                        swarm7[route[i]], swarm7[route[i + 1]], funding=100 * DOWNLOAD_FILE_SIZE * TICKET_PRICE_PER_HOP
+                        swarm7[route[i]],
+                        swarm7[route[i + 1]],
+                        funding=100 * (surb_pre_buffer + DOWNLOAD_FILE_SIZE) * TICKET_PRICE_PER_HOP,
                     )
                 )
                 for i in range(len(route) - 1)

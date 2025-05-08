@@ -360,8 +360,13 @@ impl futures::AsyncWrite for InnerSession {
                     Poll::Ready(Some(Ok(()))) => {
                         continue;
                     }
+                    Poll::Ready(Some(Err(TransportSessionError::OutOfSurbs))) => {
+                        // Discard messages until SURBs are available
+                        error!(session_id = %self.id, "message discarded due to missing SURB for reply");
+                        continue;
+                    }
                     Poll::Ready(Some(Err(e))) => {
-                        error!(error = %e, "failed to send the message chunk inside a session");
+                        error!(session_id = %self.id, error = %e, "failed to send the message chunk inside a session");
                         return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
                     }
                     Poll::Ready(None) => {
@@ -399,8 +404,13 @@ impl futures::AsyncWrite for InnerSession {
                 Poll::Ready(Some(Ok(_))) => {
                     continue;
                 }
+                Poll::Ready(Some(Err(TransportSessionError::OutOfSurbs))) => {
+                    // Discard messages until SURBs are available
+                    error!(session_id = %self.id, "message discarded due to missing SURB for reply");
+                    continue;
+                }
                 Poll::Ready(Some(Err(error))) => {
-                    error!(%error, "failed to send the message chunk inside a session");
+                    error!(session_id = %self.id, %error, "failed to send the message chunk inside a session");
                     break Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
                 }
                 Poll::Ready(None) => {
@@ -421,7 +431,7 @@ impl futures::AsyncWrite for InnerSession {
 
         while let Poll::Ready(Some(result)) = self.tx_buffer.poll_next_unpin(cx) {
             if let Err(error) = result {
-                error!(%error, "failed to send message chunk inside session during flush");
+                error!(session_id = %self.id, %error, "failed to send message chunk inside session during flush");
                 return Poll::Ready(Err(Error::from(ErrorKind::BrokenPipe)));
             }
         }

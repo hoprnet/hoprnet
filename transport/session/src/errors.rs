@@ -25,6 +25,9 @@ pub enum TransportSessionError {
     #[error("impossible transport path")]
     Path,
 
+    #[error("no surb available for sending reply data")]
+    OutOfSurbs,
+
     #[error("the other party rejected session initiation with error: {0}")]
     Rejected(StartErrorReason),
 
