@@ -28,7 +28,7 @@ use validator::Validate;
 
 use hopr_chain_actions::ChainActions;
 use hopr_internal_types::prelude::*;
-use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
+use hopr_transport_ticket_aggregation::TicketAggregatorTrait;
 
 use crate::aggregating::AggregatingStrategy;
 use crate::auto_funding::AutoFundingStrategy;

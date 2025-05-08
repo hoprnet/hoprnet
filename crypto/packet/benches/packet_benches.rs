@@ -35,7 +35,7 @@ pub fn packet_sending_bench(c: &mut Criterion) {
 
     for hop in [0, 1, 2, 3].iter() {
         group.throughput(Throughput::BytesDecimal(msg.len() as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop}_hop")), hop, |b, &hop| {
             b.iter(|| {
                 // The number of hops for ticket creation does not matter for benchmark purposes
                 let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
@@ -85,7 +85,7 @@ pub fn packet_precompute_1rp_bench(c: &mut Criterion) {
 
     for hop in [0, 1, 2, 3].iter() {
         group.throughput(Throughput::Elements(1));
-        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop}_hop")), hop, |b, &hop| {
             b.iter(|| {
                 // The number of hops for ticket creation does not matter for benchmark purposes
                 let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
@@ -134,7 +134,7 @@ pub fn packet_precompute_2rp_bench(c: &mut Criterion) {
 
     for hop in [0, 1, 2, 3].iter() {
         group.throughput(Throughput::Elements(1));
-        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop}_hop")), hop, |b, &hop| {
             b.iter(|| {
                 // The number of hops for ticket creation does not matter for benchmark purposes
                 let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
@@ -184,7 +184,7 @@ pub fn packet_sending_precomputed_bench(c: &mut Criterion) {
 
     for hop in [0, 1, 2, 3].iter() {
         group.throughput(Throughput::BytesDecimal(msg.len() as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
+        group.bench_with_input(BenchmarkId::from_parameter(format!("{hop}_hop")), hop, |b, &hop| {
             // The number of hops for ticket creation does not matter for benchmark purposes
             let tb = TicketBuilder::zero_hop().direction(&(&chain_key).into(), &destination);
             let tp = TransportPath::new(path.iter().take(hop + 1).copied()).unwrap();
@@ -263,7 +263,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("packet_forwarding");
     group.sample_size(SAMPLE_SIZE);
     group.throughput(Throughput::BytesDecimal(msg.len() as u64));
-    group.bench_function("any hop", |b| {
+    group.bench_function("any_hop", |b| {
         b.iter(|| {
             HoprPacket::from_incoming(&packet, &relayer, sender.public().clone(), &mapper, |_| None).unwrap();
         })
@@ -336,7 +336,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("packet_receiving");
     group.sample_size(SAMPLE_SIZE);
     group.throughput(Throughput::BytesDecimal(msg.len() as u64));
-    group.bench_function("any hop", |b| {
+    group.bench_function("any_hop", |b| {
         b.iter(|| {
             HoprPacket::from_incoming(&packet, &recipient, relayer.public().clone(), &mapper, |_| None).unwrap();
         })

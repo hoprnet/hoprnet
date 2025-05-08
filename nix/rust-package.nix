@@ -12,6 +12,8 @@
 , lib
 , libiconv
 , makeSetupHook
+, mold
+, llvmPackages
 , openssl
 , pandoc
 , pkg-config
@@ -20,6 +22,7 @@
 , rev
 , runClippy ? false
 , runTests ? false
+, runBench ? false
 , solcDefault
 , src
 , stdenv
@@ -51,9 +54,10 @@ let
 
   crateInfo = craneLib.crateNameFromCargoToml { inherit cargoToml; };
   pname = crateInfo.pname;
-  pnameSuffix =
-    if CARGO_PROFILE == "release" then ""
-    else "-${CARGO_PROFILE}";
+  actualCargoProfile = if runTests then "test" else if runClippy then "dev" else if buildDocs then "dev" else CARGO_PROFILE;
+  pnameSuffix = if actualCargoProfile == "release" then "" else "-${actualCargoProfile}";
+  pnameDeps = if actualCargoProfile == "release" then pname else "${pname}-${actualCargoProfile}";
+
   version = lib.strings.concatStringsSep "." (lib.lists.take 3 (builtins.splitVersion crateInfo.version));
 
   isDarwinForDarwin = buildPlatform.isDarwin && hostPlatform.isDarwin;
@@ -72,11 +76,12 @@ let
       [ setupHookDarwin ] else [ ];
 
   sharedArgsBase = {
-    inherit pname pnameSuffix version CARGO_PROFILE;
+    inherit pname pnameSuffix version;
+    CARGO_PROFILE = actualCargoProfile;
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
-    nativeBuildInputs = [ solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl pkgs.cacert libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
+    nativeBuildInputs = [ llvmPackages.bintools mold solcDefault foundryBin pkg-config pkgs.pkgsBuildHost.openssl pkgs.cacert libiconv ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
     buildInputs = [ openssl pkgs.cacert ] ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
@@ -93,8 +98,12 @@ let
     if runTests then sharedArgsBase // {
       cargoTestExtraArgs = "--workspace -F runtime-async-std -F runtime-tokio";
       doCheck = true;
+      LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
+      RUST_BACKTRACE = "full";
     }
-    else if runClippy then sharedArgsBase // { cargoClippyExtraArgs = "-- -Dwarnings"; }
+    else if runClippy then sharedArgsBase // {
+      cargoClippyExtraArgs = "-- -Dwarnings";
+    }
     else sharedArgsBase;
 
   docsArgs = {
@@ -116,16 +125,24 @@ let
 
   defaultArgs = {
     cargoArtifacts = craneLib.buildDepsOnly (sharedArgs // {
+      pname = pnameDeps;
       src = depsSrc;
     });
   };
 
-  args = if buildDocs then sharedArgs // docsArgs else sharedArgs // defaultArgs;
+  args =
+    if buildDocs then sharedArgs // docsArgs
+    else sharedArgs // defaultArgs;
+
+  mkBench = import ./cargo-bench.nix {
+    mkCargoDerivation = craneLib.mkCargoDerivation;
+  };
 
   builder =
     if runTests then craneLib.cargoTest
     else if runClippy then craneLib.cargoClippy
     else if buildDocs then craneLib.cargoDoc
+    else if runBench then mkBench
     else craneLib.buildPackage;
 in
 builder (args // {

@@ -14,7 +14,7 @@ use hopr_network_types::prelude::{ResolvedTransportRouting, RoutingOptions};
 use hopr_network_types::types::DestinationRouting;
 use hopr_path::{selectors::PathSelector, ChainPath, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::primitives::Address;
-use hopr_transport_protocol::msg::processor::{MsgSender, SendMsgInput};
+use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
     traits::SendMsg,
