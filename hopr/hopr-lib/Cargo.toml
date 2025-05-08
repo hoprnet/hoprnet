@@ -17,30 +17,30 @@ session-client = []
 session-server = []
 transport-quic = ["hopr-transport/transport-quic"]
 runtime-tokio = [
-    "hopr-chain-api/runtime-tokio",
-    "hopr-chain-rpc/runtime-tokio",
-    "hopr-async-runtime/runtime-tokio",
-    "hopr-db-sql/runtime-tokio",
-    "hopr-network-types/runtime-tokio",
-    "hopr-strategy/runtime-tokio",
-    "hopr-transport/runtime-tokio",
+  "hopr-chain-api/runtime-tokio",
+  "hopr-chain-rpc/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
+  "hopr-db-sql/runtime-tokio",
+  "hopr-network-types/runtime-tokio",
+  "hopr-strategy/runtime-tokio",
+  "hopr-transport/runtime-tokio",
 ]
 prometheus = [
-    "hopr-chain-api/prometheus",
-    "hopr-chain-indexer/prometheus",
-    "hopr-chain-rpc/prometheus",
-    "dep:hopr-metrics",
-    "hopr-db-sql/prometheus",
-    "hopr-transport/prometheus",
-    "hopr-network-types/prometheus",
-    "hopr-strategy/prometheus",
+  "hopr-chain-api/prometheus",
+  "hopr-chain-indexer/prometheus",
+  "hopr-chain-rpc/prometheus",
+  "dep:hopr-metrics",
+  "hopr-db-sql/prometheus",
+  "hopr-transport/prometheus",
+  "hopr-network-types/prometheus",
+  "hopr-strategy/prometheus",
 ]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
-    "essentials",
-    "json-rpc",
-    "node-bindings",
+  "essentials",
+  "json-rpc",
+  "node-bindings",
 ] }
 async-channel = { workspace = true }
 async-lock = { workspace = true }

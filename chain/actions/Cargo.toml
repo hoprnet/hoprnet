@@ -14,21 +14,21 @@ crate-type = ["rlib"]
 [features]
 default = []
 runtime-tokio = [
-    "hopr-db-sql/runtime-tokio",
-    "hopr-async-runtime/runtime-tokio",
-    "hopr-chain-rpc/runtime-tokio",
+  "hopr-db-sql/runtime-tokio",
+  "hopr-async-runtime/runtime-tokio",
+  "hopr-chain-rpc/runtime-tokio",
 ]
 prometheus = [
-    "dep:hopr-metrics",
-    "hopr-chain-rpc/prometheus",
-    "hopr-db-sql/prometheus",
+  "dep:hopr-metrics",
+  "hopr-chain-rpc/prometheus",
+  "hopr-db-sql/prometheus",
 ]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
-    "essentials",
-    "json-rpc",
-    "node-bindings",
+  "essentials",
+  "json-rpc",
+  "node-bindings",
 ] }
 async-channel = { workspace = true }
 async-lock = { workspace = true }
@@ -60,4 +60,3 @@ hex-literal = { workspace = true }
 tokio = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
-tokio = { workspace = true }

@@ -13,7 +13,6 @@ use hopr_chain_rpc::client::{
     create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
 };
 use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
-#[cfg(feature = "runtime-tokio")]
 use hopr_chain_rpc::transport::ReqwestClient;
 use hopr_chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
@@ -22,7 +21,6 @@ use hopr_chain_types::{ContractAddresses, ContractInstances};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-#[cfg(feature = "runtime-tokio")]
 fn build_transport_client(url: &str) -> Http<ReqwestClient> {
     let parsed_url = url::Url::parse(url).unwrap();
     ReqwestTransport::new(parsed_url).into()
@@ -35,17 +33,10 @@ pub fn create_rpc_client_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,
     anvil: &alloy::node_bindings::AnvilInstance,
 ) -> RpcClient {
-    #[cfg(all(feature = "runtime-async-std"))]
-    use crate::transport::SurfTransport;
     use alloy::rpc::client::{ClientBuilder, RpcClient};
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     use alloy::transports::http::ReqwestTransport;
     use hopr_chain_rpc::client::SnapshotRequestorLayer;
 
-    // #[cfg(feature = "runtime-async-std")]
-    // let transport_client = SurfTransport::new(anvil.endpoint_url());
-    // #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-    // let transport_client = ReqwestTransport::new(anvil.endpoint_url());
     let transport_client = build_transport_client(anvil.endpoint_url().as_str());
 
     let rpc_client = ClientBuilder::default()
@@ -61,21 +52,15 @@ pub fn create_provider_to_anvil_with_snapshot(
     anvil: &alloy::node_bindings::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
 ) -> Arc<AnvilRpcClient> {
-    #[cfg(all(feature = "runtime-async-std"))]
-    use crate::transport::SurfTransport;
     use alloy::providers::ProviderBuilder;
     use alloy::rpc::client::ClientBuilder;
     use alloy::signers::local::PrivateKeySigner;
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     use alloy::transports::http::ReqwestTransport;
     use hopr_chain_rpc::client::SnapshotRequestorLayer;
     use hopr_crypto_types::keypairs::Keypair;
 
     let wallet = PrivateKeySigner::from_slice(signer.secret().as_ref()).expect("failed to construct wallet");
 
-    #[cfg(feature = "runtime-async-std")]
-    let transport_client = SurfTransport::new(anvil.endpoint_url());
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
     let rpc_client = ClientBuilder::default()

@@ -1,5 +1,3 @@
-/// Extend implementation of `alloy::transport::Http` so that it can
-/// operate with [`surf`]. This should be used in `async-std` runtime
 use alloy::{
     rpc::json_rpc::{RequestPacket, ResponsePacket},
     transports::{
@@ -9,11 +7,8 @@ use alloy::{
     },
 };
 use async_trait::async_trait;
-
 pub use reqwest::Client as ReqwestClient;
 use std::task;
-#[cfg(feature = "runtime-async-std")]
-pub use surf::Client as SurfClient;
 use tower::Service;
 use tracing::{debug, debug_span, info, trace, Instrument};
 use url::Url;
@@ -85,132 +80,7 @@ impl<T: Clone> From<HttpWrapper<T>> for Http<T> {
     }
 }
 
-/// An [`Http`] transport using [`surf`].
-#[cfg(all(feature = "runtime-async-std"))]
-pub type SurfTransport = HttpWrapper<SurfClient>;
-
-#[cfg(all(feature = "runtime-async-std"))]
-impl SurfTransport {
-    /// Create a new [`SurfTransport`] with the given URL and default client.
-    pub fn new(url: Url) -> Self {
-        info!("creating surf client");
-        Self {
-            client: surf::client(),
-            url,
-        }
-    }
-
-    /// Do POST query with SurfRequestor
-    async fn do_surf(self, req: RequestPacket) -> TransportResult<ResponsePacket> {
-        // when POST method
-        let req = self
-            .client
-            .post(self.url)
-            .content_type("application/json")
-            .body_json(&req)
-            .map_err(|e| TransportErrorKind::Custom(e.to_string().into()))?;
-
-        let mut res = req
-            .await
-            .map_err(|e| TransportErrorKind::Custom(e.to_string().into()))?;
-
-        let status = res.status();
-
-        debug!(%status, "received response from server");
-
-        let body = res
-            .body_bytes()
-            .await
-            .map_err(|e| TransportErrorKind::Custom(e.to_string().into()))?;
-
-        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
-        trace!(body = %String::from_utf8_lossy(&body), "response body");
-
-        if !status.is_success() {
-            return Err(TransportErrorKind::http_error(
-                status as u16,
-                String::from_utf8_lossy(&body).into_owned(),
-            ));
-        }
-
-        // Deserialize a Box<RawValue> from the body. If deserialization fails, return
-        // the body as a string in the error. The conversion to String
-        // is lossy and may not cover all the bytes in the body.
-        serde_json::from_slice(&body)
-            .map_err(|err| TransportError::deser_err(err, String::from_utf8_lossy(body.as_ref())))
-    }
-}
-
-/// Connection details for a [`SurfTransport`].
-#[cfg(all(feature = "runtime-async-std"))]
-pub type SurfConnect = HttpConnect<SurfTransport>;
-
-#[cfg(all(feature = "runtime-async-std"))]
-impl TransportConnect for SurfTransport {
-    fn is_local(&self) -> bool {
-        guess_local_url(self.url.as_str())
-    }
-
-    async fn get_transport(&self) -> Result<BoxTransport, TransportError> {
-        Ok(BoxTransport::new(HttpWrapper::with_client(
-            SurfClient::new(),
-            self.url.clone(),
-        )))
-    }
-}
-/// HTTP Post requestor
-#[cfg(all(feature = "runtime-async-std"))]
-impl Service<RequestPacket> for HttpWrapper<SurfClient> {
-    type Response = ResponsePacket;
-    type Error = TransportError;
-    type Future = TransportFut<'static>;
-
-    #[inline]
-    fn poll_ready(&mut self, _cx: &mut task::Context<'_>) -> task::Poll<Result<(), Self::Error>> {
-        // always returns `Ok(())`.
-        task::Poll::Ready(Ok(()))
-    }
-
-    #[inline]
-    fn call(&mut self, req: RequestPacket) -> Self::Future {
-        let this = self.clone();
-        let span = debug_span!("SurfTransport", url = %this.url);
-        Box::pin(this.do_surf(req).instrument(span))
-    }
-}
-
 #[async_trait]
-#[cfg(all(feature = "runtime-async-std"))]
-impl HttpRequestor for SurfClient {
-    #[inline]
-    async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError> {
-        let mut res = self
-            .get(url)
-            .await
-            .map_err(|e| HttpRequestError::TransportError(e.to_string()))?;
-
-        let status = res.status();
-
-        debug!(%status, "received response from server");
-
-        let body = res
-            .body_bytes()
-            .await
-            .map_err(|e| HttpRequestError::UnknownError(e.to_string().into()))?;
-
-        debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
-        trace!(body = %String::from_utf8_lossy(&body), "response body");
-
-        if !status.is_success() {
-            return Err(HttpRequestError::HttpError(status));
-        }
-
-        Ok(body.into_boxed_slice())
-    }
-}
-
-#[async_trait]
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 impl HttpRequestor for ReqwestClient {
     #[inline]
     async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError> {

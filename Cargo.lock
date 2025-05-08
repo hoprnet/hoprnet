@@ -465,7 +465,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c77490fe91a0ce933a1f219029521f20fc28c2c0ca95d53fa4da9c00b8d9d4e"
 dependencies = [
  "alloy-rlp",
- "bytes 1.10.1",
+ "bytes",
  "cfg-if",
  "const-hex",
  "derive_more 2.0.1",
@@ -508,7 +508,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "auto_impl",
- "dashmap 6.1.0",
+ "dashmap",
  "futures",
  "futures-utils-wasm",
  "lru 0.13.0",
@@ -532,7 +532,7 @@ checksum = "3d6c1d995bff8d011f7cd6c81820d51825e6e06d6db73914c1630ecf544d83d6"
 dependencies = [
  "alloy-rlp-derive",
  "arrayvec",
- "bytes 1.10.1",
+ "bytes",
 ]
 
 [[package]]
@@ -3018,7 +3018,7 @@ checksum = "139834ddba373bbdd213dffe02c8d110508dcf1726c2be27e8d1f7d7e1856418"
 dependencies = [
  "arrayvec",
  "auto_impl",
- "bytes 1.10.1",
+ "bytes",
 ]
 
 [[package]]
@@ -3029,7 +3029,7 @@ checksum = "ce8dba4714ef14b8274c371879b175aa55b16b30f269663f19d576f380018dc4"
 dependencies = [
  "arrayvec",
  "auto_impl",
- "bytes 1.10.1",
+ "bytes",
 ]
 
 [[package]]
@@ -4992,8 +4992,8 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
- "url",
  "tracing-test",
+ "url",
  "validator",
 ]
 
@@ -5966,7 +5966,6 @@ dependencies = [
  "netlink-proto",
  "netlink-sys",
  "rtnetlink",
- "smol",
  "system-configuration",
  "tokio",
  "windows 0.53.0",
@@ -8480,7 +8479,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb919243f34364b6bd2fc10ef797edbfa75f33c252e7998527479c6d6b47e1ec"
 dependencies = [
- "bytes 1.10.1",
+ "bytes",
  "rustc-hex",
 ]
 
@@ -8552,7 +8551,7 @@ dependencies = [
  "alloy-rlp",
  "ark-ff 0.3.0",
  "ark-ff 0.4.2",
- "bytes 1.10.1",
+ "bytes",
  "fastrlp 0.3.1",
  "fastrlp 0.4.0",
  "num-bigint",
@@ -10382,7 +10381,7 @@ dependencies = [
  "async-trait",
  "axum 0.7.9",
  "base64 0.22.1",
- "bytes 1.10.1",
+ "bytes",
  "h2",
  "http 1.3.1",
  "http-body",

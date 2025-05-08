@@ -14,17 +14,13 @@ crate-type = ["rlib"]
 [features]
 default = []
 prometheus = ["dep:hopr-metrics"]
-runtime-tokio = [
-    "hopr-async-runtime/runtime-tokio",
-    "dep:reqwest",
-    "dep:governor",
-]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio", "dep:governor"]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
-    "essentials",
-    "json-rpc",
-    "node-bindings",
+  "essentials",
+  "json-rpc",
+  "node-bindings",
 ] }
 async-trait = { workspace = true }
 async-stream = { workspace = true }

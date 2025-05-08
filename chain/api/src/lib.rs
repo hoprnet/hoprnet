@@ -6,30 +6,23 @@ pub mod executors;
 
 use alloy::rpc::client::ClientBuilder;
 use alloy::rpc::types::TransactionRequest;
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use alloy::transports::http::{Http, ReqwestTransport};
 use alloy::transports::layers::RetryBackoffLayer;
-use hopr_chain_rpc::client::DefaultRetryPolicy;
-use hopr_chain_rpc::transport::HttpWrapper;
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-use hopr_chain_rpc::transport::ReqwestClient;
-#[cfg(all(feature = "runtime-async-std"))]
-use hopr_chain_rpc::transport::{SurfClient, SurfTransport};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
-use config::ChainNetworkConfig;
-use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
 use hopr_chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
 use hopr_chain_actions::action_state::IndexerActionTracker;
 use hopr_chain_actions::payload::SafePayloadGenerator;
 use hopr_chain_actions::ChainActions;
 use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-// use hopr_chain_rpc::client::SimpleJsonRpcRetryPolicy;
+use hopr_chain_rpc::client::DefaultRetryPolicy;
 use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
+use hopr_chain_rpc::transport::HttpWrapper;
+use hopr_chain_rpc::transport::ReqwestClient;
 use hopr_chain_rpc::HoprRpcOperations;
 pub use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_chain_types::ContractAddresses;
@@ -40,25 +33,12 @@ pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::prelude::ChannelDirection;
 use hopr_primitive_types::prelude::*;
 
+use config::ChainNetworkConfig;
+use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
+
 use crate::errors::{HoprChainError, Result};
 
 pub type DefaultHttpRequestor = hopr_chain_rpc::transport::ReqwestClient;
-
-// /// The default HTTP request engine
-// ///
-// /// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
-// #[cfg(feature = "runtime-async-std")]
-// pub type DefaultHttpRequestor = hopr_chain_rpc::client::surf_client::SurfRequestor;
-
-// // Both features could be enabled during testing; therefore, we only use tokio when its
-// // exclusively enabled.
-// #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-// pub type DefaultHttpRequestor = hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
-
-// /// The default JSON RPC provider client
-// ///
-// /// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
-// pub type JsonRpcClient = hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpRequestor, SimpleJsonRpcRetryPolicy>;
 
 /// Checks whether the node can be registered with the Safe in the NodeSafeRegistry
 pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
@@ -123,32 +103,9 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     Err(HoprChainError::Api("timeout waiting for funds".into()))
 }
 
-// fn build_transport_client(url: &str) -> HttpWrapper<impl HttpRequestor> {
-//     let parsed_url = url::Url::parse(url).unwrap();
-
-//     #[cfg(feature = "runtime-async-std")]
-//     {
-//         SurfTransport::new(parsed_url).into()
-//     }
-
-//     #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
-//     {
-//         ReqwestTransport::new(parsed_url).into()
-//     }
-// }
-
-#[cfg(feature = "runtime-async-std")]
-fn build_transport_client(url: &str) -> HttpWrapper<SurfClient> {
-    let parsed_url = url::Url::parse(url).unwrap();
-    SurfTransport::new(parsed_url).into()
-    // Http::new(HttpWrapper::new(SurfClient::new(parsed_url)))
-}
-
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 fn build_transport_client(url: &str) -> Http<ReqwestClient> {
     let parsed_url = url::Url::parse(url).unwrap();
     ReqwestTransport::new(parsed_url).into()
-    // Http::new(HttpWrapper::new(ReqwestClient::new(parsed_url)))
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

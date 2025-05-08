@@ -536,14 +536,14 @@ where
 
         // metrics after calling
         Box::pin(async move {
-            let res = future.await
-                .error_for_status() // needed to turn 4xx and 5xx errors into reqwest::Error
-                      .map_err(|e| {
-                          HttpRequestError::HttpError(
-                              StatusCode::try_from(e.status().map(|s| s.as_u16()).unwrap_or(500))
-                                  .expect("status code must be compatible"), // cannot happen
-                          )
-                      })?;
+            let res = future.await;
+            // .error_for_status() // needed to turn 4xx and 5xx errors into reqwest::Error
+            // .map_err(|e| {
+            //     HttpRequestError::HttpError(
+            //         StatusCode::try_from(e.status().map(|s| s.as_u16()).unwrap_or(500))
+            //             .expect("status code must be compatible"), // cannot happen
+            //     )
+            // })?;
 
             let req_duration = start.elapsed();
             method_names.iter().for_each(|method| {
@@ -559,7 +559,7 @@ where
                         ResponsePayload::Success(_) => {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_COUNT_RPC_CALLS.increment(&[&method_names[0], "success"]);
-                          }
+                        }
                         ResponsePayload::Failure(_) => {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_COUNT_RPC_CALLS.increment(&[&method_names[0], "failure"]);
@@ -1207,6 +1207,16 @@ mod tests {
             .create();
 
         let transport_client = ReqwestTransport::new(url::Url::parse(&server.url()).unwrap());
+
+        let simple_json_rpc_retry_policy = DefaultRetryPolicy {
+            initial_backoff: Duration::from_millis(100),
+            retryable_json_rpc_errors: vec![],
+            ..DefaultRetryPolicy::default()
+        };
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new_with_policy(
+                2,
+                100,
                 100,
                 simple_json_rpc_retry_policy,
             ))
