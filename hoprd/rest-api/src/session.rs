@@ -1033,9 +1033,8 @@ mod tests {
             ),
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
-            rx,
+            Box::pin(rx),
             None,
-            Arc::new(AtomicU64::new(0)),
         );
 
         let (bound_addr, tcp_listener) = tcp_listen_on(("127.0.0.1", 0)).await.context("listen_on failed")?;
@@ -1080,9 +1079,8 @@ mod tests {
             ),
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
-            rx,
+            Box::pin(rx),
             None,
-            Arc::new(AtomicU64::new(0)),
         );
 
         let (listen_addr, udp_listener) = udp_bind_to(("127.0.0.1", 0)).await.context("udp_bind_to failed")?;

@@ -10,7 +10,6 @@ use hopr_transport::{Session, SessionId, TransportSessionError};
 use hopr_transport_session::transfer_session;
 use hopr_transport_session::Capability;
 use std::collections::HashSet;
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
@@ -44,9 +43,8 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
         HashSet::new(),
         Arc::new(BufferingMsgSender { buffer: buffer_tx }),
-        rx,
+        Box::pin(rx),
         None,
-        Arc::new(AtomicU64::new(0)),
     );
 
     const BUF_LEN: usize = 16384;
@@ -103,9 +101,8 @@ async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
         HashSet::from_iter([Capability::Segmentation]),
         Arc::new(BufferingMsgSender { buffer: buffer_tx }),
-        rx,
+        Box::pin(rx),
         None,
-        Arc::new(AtomicU64::new(0)),
     );
 
     const BUF_LEN: usize = 16384;

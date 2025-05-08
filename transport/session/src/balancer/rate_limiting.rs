@@ -39,7 +39,12 @@ impl RateController {
 
     /// Get the current rate limit per time unit.
     pub fn get_rate_per_sec(&self) -> f64 {
-        1.0 / Duration::from_micros(self.0.load(Ordering::Relaxed)).as_secs_f64()
+        let delim = self.0.load(Ordering::Relaxed);
+        if delim > 0 {
+            1.0 / Duration::from_micros(delim).as_secs_f64()
+        } else {
+            0.0
+        }
     }
 }
 

@@ -333,7 +333,7 @@ pub async fn resolve_mock_path(
         last_addr = *addr;
     }
 
-    Ok(ValidatedPath::new(ChainPath::new(peers_onchain)?, &cg, &TestResolver(peers_addrs)).await?)
+    Ok(ValidatedPath::new(me, ChainPath::new(peers_onchain)?, &cg, &TestResolver(peers_addrs)).await?)
 }
 
 pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {

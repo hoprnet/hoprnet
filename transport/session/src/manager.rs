@@ -577,6 +577,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     abort_handles.push(balancer_abort_handle);
 
                     // Wait for enough SURBs to be sent to the counterparty
+                    // TODO: consider making this interactive = other party reports the exact level periodically
                     let timeout = hopr_async_runtime::prelude::sleep(SESSION_READINESS_TIMEOUT);
                     pin_mut!(timeout);
                     match futures::future::select(surbs_ready_rx, timeout).await {
@@ -598,9 +599,11 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         forward_routing.clone(),
                         cfg.capabilities.into_iter().collect(),
                         sender,
-                        rx,
+                        Box::pin(rx.inspect(move |_| {
+                            // Received packets = SURB consumption estimate
+                            surb_consumption_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        })),
                         Some(notifier),
-                        surb_consumption_counter, // Received packets = SURB consumption estimate
                     )
                 } else {
                     warn!(%session_id, "session ready without SURB balancing");
@@ -609,9 +612,8 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         forward_routing.clone(),
                         cfg.capabilities.into_iter().collect(),
                         Arc::new(msg_sender.clone()),
-                        rx,
+                        Box::pin(rx),
                         Some(notifier),
-                        Arc::new(AtomicU64::new(0)),
                     )
                 };
 
@@ -751,13 +753,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         reply_routing.clone(),
                         session_req.capabilities,
                         Arc::new(msg_sender.clone()),
-                        rx_session_data,
+                        Box::pin(rx_session_data),
                         Some(Box::new(move |session_id: SessionId| {
                             if let Err(error) = close_session_notifier.unbounded_send(session_id) {
                                 error!(%session_id, %error, "failed to notify session closure");
                             }
                         })),
-                        Arc::new(AtomicU64::new(0)),
                     );
 
                     // Extract useful information about the session from the Start protocol message
