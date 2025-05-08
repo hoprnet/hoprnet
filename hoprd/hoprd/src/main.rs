@@ -142,8 +142,7 @@ impl std::fmt::Debug for HoprdProcesses {
     }
 }
 
-#[cfg_attr(all(feature = "runtime-tokio", not(feature = "runtime-async-std")), tokio::main)]
-#[cfg_attr(feature = "runtime-async-std", async_std::main)]
+#[cfg_attr(feature = "runtime-tokio", tokio::main)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger()?;
 

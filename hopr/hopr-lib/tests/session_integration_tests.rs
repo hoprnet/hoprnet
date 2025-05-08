@@ -30,7 +30,7 @@ impl SendMsg for BufferingMsgSender {
     }
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
 async fn udp_session_bridging() -> anyhow::Result<()> {
     let id = SessionId::new(1, (&ChainKeypair::random()).into());
     let (_tx, rx) = futures::channel::mpsc::unbounded();
@@ -88,7 +88,7 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
 async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
     let id = SessionId::new(1, (&ChainKeypair::random()).into());
     let (_tx, rx) = futures::channel::mpsc::unbounded();

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-actions"
-version = "0.7.3"
+version = "0.7.4"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "High-level Core-Ethereum functions that translate to on-chain transactions"
@@ -13,11 +13,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = [
-  "hopr-db-sql/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-  "hopr-chain-rpc/runtime-async-std",
-]
 runtime-tokio = [
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
@@ -56,7 +51,8 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
+tokio = { workspace = true }
+
 hopr-crypto-random = { workspace = true }
