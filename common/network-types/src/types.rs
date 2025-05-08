@@ -1,6 +1,8 @@
 use crate::errors::NetworkTypeError;
 use hickory_resolver::name_server::ConnectionProvider;
 use hickory_resolver::AsyncResolver;
+use hopr_crypto_packet::prelude::HoprSenderId;
+use hopr_crypto_packet::HoprSurb;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_path::ValidatedPath;
@@ -318,6 +320,26 @@ impl RoutingOptions {
     }
 }
 
+/// Allows finding saved SURBs based on different criteria.
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SurbMatcher {
+    /// Try to find a SURB that has the exact given [`HoprSenderId`].
+    Exact(HoprSenderId),
+    /// Find any SURB with the given pseudonym.
+    Pseudonym(HoprPseudonym),
+}
+
+impl SurbMatcher {
+    /// Get the pseudonym part of the match.
+    pub fn pseudonym(&self) -> HoprPseudonym {
+        match self {
+            SurbMatcher::Exact(id) => id.pseudonym(),
+            SurbMatcher::Pseudonym(p) => *p,
+        }
+    }
+}
+
 /// Routing information containing forward or return routing options.
 ///
 /// Information in this object represents the minimum required basis
@@ -334,7 +356,7 @@ pub enum DestinationRouting {
         destination: Address,
         /// Our pseudonym shown to the destination.
         ///
-        /// If not given, will be resolved as random.
+        /// If not given, it will be resolved as random.
         pseudonym: Option<HoprPseudonym>,
         /// The path to the destination.
         forward_options: RoutingOptions,
@@ -344,7 +366,7 @@ pub enum DestinationRouting {
     /// Return routing using a SURB with the given pseudonym.
     ///
     /// Will fail if no SURB for this pseudonym is found.
-    Return(HoprPseudonym),
+    Return(SurbMatcher),
 }
 
 impl DestinationRouting {
@@ -366,7 +388,7 @@ impl DestinationRouting {
 ///
 /// It contains the actual forward and return paths for forward packets,
 /// or an actual SURB for return (reply) packets.
-#[derive(Debug, Clone, strum::EnumIs)]
+#[derive(Clone, Debug, strum::EnumIs)]
 pub enum ResolvedTransportRouting {
     /// Concrete routing information for a forward packet.
     Forward {
@@ -377,8 +399,8 @@ pub enum ResolvedTransportRouting {
         /// Optional list of return paths.
         return_paths: Vec<ValidatedPath>,
     },
-    /// Pseudonym of a SURB to retrieve.
-    Return(HoprPseudonym),
+    /// Sender ID and the corresponding SURB.
+    Return(HoprSenderId, HoprSurb),
 }
 
 impl ResolvedTransportRouting {

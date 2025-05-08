@@ -85,7 +85,8 @@ pub use {
         errors::{HoprTransportError, NetworkingError, ProtocolError},
         HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
         OffchainKeypair as HoprOffchainKeypair, PeerId, SendMsg, ServiceId, Session as HoprSession, SessionCapability,
-        SessionClientConfig, SessionId as HoprSessionId, SessionTarget, TicketStatistics, SESSION_USABLE_MTU_SIZE,
+        SessionClientConfig, SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig, TicketStatistics,
+        SESSION_PAYLOAD_SIZE, SESSION_USABLE_MTU_SIZE,
     },
 };
 
@@ -1060,7 +1061,12 @@ impl Hopr {
     /// Create a client session connection returning a session object that implements
     /// [`AsyncRead`] and [`AsyncWrite`] and can bu used as a read/write binary session.
     #[cfg(feature = "session-client")]
-    pub async fn connect_to(&self, cfg: SessionClientConfig) -> errors::Result<HoprSession> {
+    pub async fn connect_to(
+        &self,
+        destination: Address,
+        target: SessionTarget,
+        cfg: SessionClientConfig,
+    ) -> errors::Result<HoprSession> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let backoff = backon::ConstantBuilder::default()
@@ -1081,7 +1087,8 @@ impl Hopr {
 
         Ok((|| {
             let cfg = cfg.clone();
-            async { self.transport_api.new_session(cfg).await }
+            let target = target.clone();
+            async { self.transport_api.new_session(destination, target, cfg).await }
         })
         .retry(backoff)
         .sleep(Sleeper)

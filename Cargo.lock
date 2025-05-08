@@ -2989,6 +2989,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f90f7dce0722e95104fcb095585910c0977252f286e354b5e3bd38902cd99988"
 
 [[package]]
+name = "futures-time"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6404853a6824881fe5f7d662d147dc4e84ecd2259ba0378f272a71dab600758a"
+dependencies = [
+ "async-channel 1.9.0",
+ "async-io 1.13.0",
+ "futures-core",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "futures-timer"
 version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5096,7 +5108,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.4.2"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5105,6 +5117,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "futures",
+ "futures-time",
  "hopr-async-runtime",
  "hopr-crypto-packet",
  "hopr-crypto-random",
@@ -5116,6 +5129,8 @@ dependencies = [
  "lazy_static",
  "mockall",
  "moka",
+ "pid",
+ "pin-project",
  "serde",
  "serde_with",
  "smart-default",
@@ -5205,13 +5220,14 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.12.0"
+version = "3.13.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
  "axum 0.8.4",
  "axum-extra",
  "base64 0.22.1",
+ "bytesize",
  "const_format",
  "either",
  "futures",
@@ -7498,6 +7514,15 @@ checksum = "e9567389417feee6ce15dd6527a8a1ecac205ef62c2932bcf3d9f6fc5b78b414"
 dependencies = [
  "futures",
  "rustc_version 0.4.1",
+]
+
+[[package]]
+name = "pid"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c931ef9756cd5e3fa3d395bfe09df4dfa6f0612c6ca8f6b12927d17ca34e36"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]

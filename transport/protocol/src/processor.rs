@@ -36,8 +36,15 @@ pub struct SendAck {
 }
 
 pub enum RecvOperation {
-    Receive { data: ApplicationData, ack: SendAck },
-    Forward { msg: SendPkt, ack: SendAck },
+    Receive {
+        pseudonym: HoprPseudonym,
+        data: ApplicationData,
+        ack: SendAck,
+    },
+    Forward {
+        msg: SendPkt,
+        ack: SendAck,
+    },
 }
 
 #[async_trait::async_trait]

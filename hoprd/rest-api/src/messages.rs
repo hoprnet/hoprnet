@@ -43,12 +43,6 @@ pub(crate) struct SizeResponse {
         "destination": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
         "tag": 2000
     }))]
-#[schema(example = json!({
-    "body": "Test message",
-    "hops": 1,
-    "peerId": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
-    "tag": 2000
-}))]
 pub(crate) struct SendMessageBodyRequest {
     /// The message tag used to filter messages based on application, must be from range <1024,65535>
     #[schema(minimum = 1024, maximum = 65535)]

@@ -12,7 +12,7 @@ pub mod prelude {
     }
 }
 
-// Both features could be enabled during testing, therefore we only use tokio when its
+// Both features could be enabled during testing; therefore, we only use tokio when it's
 // exclusively enabled.
 #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 pub mod prelude {

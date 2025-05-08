@@ -1226,21 +1226,10 @@ impl Eq for Signature {}
 /// public key or public key identifier.
 pub trait Pseudonym: BytesRepresentable + hash::Hash + Eq + Display + Randomizable {}
 
-/// Represents a simple UUID-like pseudonym consisting of 16 bytes.
+/// Represents a simple UUID-like pseudonym consisting of 10 bytes.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SimplePseudonym(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] pub [u8; Self::SIZE]);
-
-impl SimplePseudonym {
-    /// Generates a random pseudonym with a given prefix.
-    /// The prefix can be up to the half of [`SimplePseudonym::SIZE`].
-    pub fn random_with_prefix(prefix: &[u8]) -> Self {
-        let len = prefix.len().min(Self::SIZE / 2);
-        let mut ret = Self::random();
-        ret.0[0..len].copy_from_slice(prefix);
-        ret
-    }
-}
 
 impl Display for SimplePseudonym {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1249,7 +1238,7 @@ impl Display for SimplePseudonym {
 }
 
 impl BytesRepresentable for SimplePseudonym {
-    const SIZE: usize = 16;
+    const SIZE: usize = 10;
 }
 
 impl AsRef<[u8]> for SimplePseudonym {

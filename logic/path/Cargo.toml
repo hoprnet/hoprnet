@@ -26,7 +26,7 @@ prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 [dependencies]
 async-trait = { workspace = true }
 async-lock = { workspace = true }
-cfg_eval = { version = "0.1.2", optional = true }
+cfg_eval = { workspace = true, optional = true }
 lazy_static = { workspace = true, optional = true }
 petgraph = { workspace = true }
 serde = { workspace = true, optional = true }

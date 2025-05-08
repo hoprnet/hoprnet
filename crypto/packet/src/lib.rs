@@ -3,7 +3,7 @@
 //! This crate contains the main packet processing functionality for the HOPR protocol.
 //! It implements the following important protocol building blocks:
 //!
-//! - SPHINX packet format
+//! - HOPR specific instantiation of the SPHINX packet format
 //! - Proof of Relay
 //!
 //! Finally, it also implements a utility function which is used to validate tickets (module `validation`).
@@ -11,7 +11,7 @@
 //! The currently used implementation is selected using the [`HoprSphinxSuite`] type in the `packet` module.
 //!
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
-//! In particular, as soon as there's a way to represent `Ed448` PeerIDs, it would be straightforward to create e.g. `X448Suite`.
+//! In particular, as soon as there is a way to represent `Ed448` PeerIDs, it would be straightforward to create e.g. `X448Suite`.
 //!
 
 use hopr_crypto_sphinx::prelude::*;
@@ -35,6 +35,7 @@ pub mod prelude {
     pub use crate::packet::{
         HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
     };
+    pub use crate::types::{HoprSenderId, HoprSurbId};
     pub use crate::validation::validate_unacknowledged_ticket;
 }
 
@@ -53,7 +54,8 @@ impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
     type KeyId = KeyIdent<4>;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
-    type SurbReceiverData = por::ProofOfRelayValues;
+    type PacketReceiverData = types::HoprSenderId;
+    type SurbReceiverData = por::SurbReceiverInfo;
     type PRG = hopr_crypto_types::primitives::ChaCha20;
     type UH = hopr_crypto_types::primitives::Poly1305;
 }
@@ -66,7 +68,7 @@ pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 /// Adjust this value to change the maximum packet size.
 ///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
-pub(crate) const PAYLOAD_SIZE_INT: usize = 800;
+pub(crate) const PAYLOAD_SIZE_INT: usize = 1000;
 
 #[cfg(test)]
 mod tests {
@@ -82,6 +84,28 @@ mod tests {
             hopr_packet_len
         );
 
-        assert!(hopr_packet_len < 1492, "HOPR packet must fit within a layer 4 packet");
+        assert!(
+            hopr_packet_len < 1492 - 32,
+            "HOPR packet {hopr_packet_len} must fit within a layer 4 packet with libp2p overhead"
+        );
+    }
+
+    #[test]
+    fn packet_length() {
+        let packet_len = HoprPacket::SIZE;
+        assert_eq!(packet_len, 438 + PAYLOAD_SIZE_INT);
+    }
+
+    #[test]
+    fn header_length() {
+        let header_len = HoprSphinxHeaderSpec::HEADER_LEN;
+        assert_eq!(header_len, 241);
+    }
+
+    #[test]
+    fn surb_length() {
+        let surb_len = HoprSurb::SIZE;
+        assert_eq!(surb_len, 395);
+        assert!(HoprPacket::PAYLOAD_SIZE > surb_len * 2);
     }
 }

@@ -197,6 +197,8 @@ const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 
 const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
 
+const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_secs(1);
+
 fn default_session_establish_max_retries() -> u32 {
     DEFAULT_SESSION_ESTABLISH_MAX_RETRIES
 }
@@ -207,6 +209,10 @@ fn default_session_idle_timeout() -> std::time::Duration {
 
 fn default_session_establish_retry_delay() -> std::time::Duration {
     DEFAULT_SESSION_ESTABLISH_RETRY_DELAY
+}
+
+fn default_session_balancer_sampling() -> std::time::Duration {
+    DEFAULT_SESSION_BALANCER_SAMPLING
 }
 
 fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), ValidationError> {
@@ -247,6 +253,14 @@ pub struct SessionGlobalConfig {
     #[serde(default = "default_session_establish_retry_delay")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub establish_retry_timeout: std::time::Duration,
+
+    /// Sampling interval for SURB balancer in milliseconds.
+    ///
+    /// Default is 1000 milliseconds.
+    #[default(DEFAULT_SESSION_BALANCER_SAMPLING)]
+    #[serde(default = "default_session_balancer_sampling")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    pub balancer_sampling_interval: std::time::Duration,
 }
 
 #[cfg(test)]

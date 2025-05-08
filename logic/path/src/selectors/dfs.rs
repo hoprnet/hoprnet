@@ -338,6 +338,7 @@ mod tests {
 
     async fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) -> anyhow::Result<()> {
         let _ = ValidatedPath::new(
+            graph.my_address(),
             ChainPath::from_channel_path(path.clone(), dst),
             graph,
             PATH_ADDRS.deref(),
