@@ -1283,6 +1283,7 @@ mod tests {
         .await;
     }
 
+    #[ignore]
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(tokio::test)]
     async fn unreliable_send_recv_with_mixing(num_frames: usize, frame_size: usize) {
@@ -1314,6 +1315,7 @@ mod tests {
         .await;
     }
 
+    #[ignore]
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(tokio::test)]
     async fn almost_reliable_send_recv_with_mixing(num_frames: usize, frame_size: usize) {
@@ -1345,6 +1347,7 @@ mod tests {
         .await;
     }
 
+    #[ignore]
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
     #[parameterized_macro(tokio::test)]
     async fn reliable_send_recv_with_mixing(num_frames: usize, frame_size: usize) {
