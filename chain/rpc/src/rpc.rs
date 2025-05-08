@@ -463,6 +463,7 @@ mod tests {
     use alloy::providers::Provider;
     use alloy::rpc::client::ClientBuilder;
     use alloy::rpc::types::TransactionRequest;
+    use alloy::transports::http::ReqwestTransport;
     use alloy::transports::layers::RetryBackoffLayer;
     use hex_literal::hex;
     use hopr_chain_types::utils::create_native_transfer;
@@ -475,8 +476,6 @@ mod tests {
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::*;
 
-    // use crate::client::surf_client::SurfRequestor;
-    // use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 
     lazy_static::lazy_static! {
         static ref RANDY: Address = hex!("762614a5ed652457a2f1cdb8006380530c26ae6a").into();
@@ -520,14 +519,13 @@ mod tests {
         let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
-        let mut server = mockito::Server::new_async().await;
-
-        // When using eip1559, it doesn't query gas oracle
+        let mut server = mockito::Server::new().await;
         let gas_oracle_mock = server.mock("GET", "/gas_oracle")
             .with_status(200)
             .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"38791478","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999985432689946"}}"#)
             .expect(0)
-            .create();
+            .create_async();
+            .await;
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
@@ -538,7 +536,7 @@ mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))
@@ -586,7 +584,7 @@ mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))
@@ -626,7 +624,7 @@ mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))
@@ -682,7 +680,7 @@ mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))
@@ -736,7 +734,7 @@ mod tests {
         let amount = 1024_u64;
         let _ = hopr_chain_types::utils::mint_tokens(contract_instances.token, U256::from(amount)).await;
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))
@@ -792,7 +790,7 @@ mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))
@@ -886,7 +884,7 @@ mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))

@@ -3,16 +3,18 @@ use alloy::node_bindings::AnvilInstance;
 use alloy::primitives::U256;
 use alloy::rpc::client::RpcClient;
 use alloy::transports::http::{Http, ReqwestTransport};
-use async_std::task::sleep;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::time::sleep;
 use tracing::info;
 
+use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
+use hopr_chain_rpc::client::{
+    create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
+};
 use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+#[cfg(feature = "runtime-tokio")]
 use hopr_chain_rpc::transport::ReqwestClient;
-#[cfg(all(feature = "runtime-async-std"))]
-use hopr_chain_rpc::transport::{HttpWrapper, SurfClient, SurfTransport};
 use hopr_chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
 };
@@ -20,16 +22,7 @@ use hopr_chain_types::{ContractAddresses, ContractInstances};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-// /// Snapshot requestor used for testing.
-// pub type Requestor = SnapshotRequestor<SurfRequestor>;
-#[cfg(feature = "runtime-async-std")]
-fn build_transport_client(url: &str) -> HttpWrapper<SurfClient> {
-    let parsed_url = url::Url::parse(url).unwrap();
-    SurfTransport::new(parsed_url).into()
-    // Http::new(HttpWrapper::new(SurfClient::new(parsed_url)))
-}
-
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+#[cfg(feature = "runtime-tokio")]
 fn build_transport_client(url: &str) -> Http<ReqwestClient> {
     let parsed_url = url::Url::parse(url).unwrap();
     ReqwestTransport::new(parsed_url).into()
@@ -93,6 +86,9 @@ pub fn create_provider_to_anvil_with_snapshot(
 
     Arc::new(provider)
 }
+
+/// Snapshot requestor used for testing.
+pub type Requestor = SnapshotRequestor<ReqwestRequestor>;
 
 /// Represents a HOPR environment deployment into Anvil.
 #[allow(unused)]

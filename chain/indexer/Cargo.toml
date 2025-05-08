@@ -13,25 +13,21 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = [
-  "hopr-db-sql/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-]
 runtime-tokio = [
-  "hopr-db-sql/runtime-tokio",
-  "hopr-async-runtime/runtime-tokio",
+    "hopr-db-sql/runtime-tokio",
+    "hopr-async-runtime/runtime-tokio",
 ]
 prometheus = [
-  "dep:hopr-metrics",
-  "hopr-chain-rpc/prometheus",
-  "hopr-db-sql/prometheus",
+    "dep:hopr-metrics",
+    "hopr-chain-rpc/prometheus",
+    "hopr-db-sql/prometheus",
 ]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
-  "essentials",
-  "json-rpc",
-  "node-bindings",
+    "essentials",
+    "json-rpc",
+    "node-bindings",
 ] }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
@@ -56,10 +52,11 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 hex-literal = { workspace = true }
 mockall = { workspace = true }
 primitive-types = { workspace = true }
-hopr-crypto-random = { workspace = true }
 test-log = { workspace = true }
+tokio = { workspace = true }
+
+hopr-crypto-random = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }

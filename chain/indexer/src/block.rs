@@ -652,7 +652,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_none_if_none_is_found(
     ) -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
@@ -687,7 +687,7 @@ mod tests {
         .without_panic_on_completion();
 
         let (indexing, _) = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
         assert!(indexing.is_err()); // terminated by the close channel
@@ -695,7 +695,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_it_when_found() -> anyhow::Result<()>
     {
         let mut handlers = MockChainLogHandler::new();
@@ -753,7 +753,7 @@ mod tests {
         .without_panic_on_completion();
 
         let (indexing, _) = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
         assert!(indexing.is_err()); // terminated by the close channel
@@ -761,7 +761,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_indexer_should_pass_blocks_that_are_finalized() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
@@ -805,14 +805,14 @@ mod tests {
         let indexer =
             Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0).without_panic_on_completion();
         let _ = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
 
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_fast_sync_full_with_resume() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -867,7 +867,7 @@ mod tests {
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
             });
             assert!(indexing.is_err()); // terminated by the close channel
@@ -948,7 +948,7 @@ mod tests {
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
             });
             assert!(indexing.is_err()); // terminated by the close channel
@@ -960,7 +960,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_should_yield_back_once_the_past_events_are_indexed() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
@@ -1030,7 +1030,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_should_not_reprocess_last_processed_block() -> anyhow::Result<()> {
         let last_processed_block = 100_u64;
 

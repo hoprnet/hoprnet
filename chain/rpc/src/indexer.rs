@@ -226,14 +226,15 @@ mod tests {
     use alloy::rpc::client::ClientBuilder;
     use alloy::rpc::types::Filter;
     use alloy::sol_types::SolEvent;
+    use alloy::transports::http::ReqwestTransport;
     use alloy::transports::layers::RetryBackoffLayer;
     use anyhow::Context;
-    use async_std::prelude::FutureExt;
     use futures::StreamExt;
     use hopr_bindings::hoprchannelsevents::HoprChannelsEvents::{ChannelBalanceIncreased, ChannelOpened};
     use hopr_bindings::hoprtoken::HoprToken::{Approval, Transfer};
     use hopr_crypto_types::types::Hash;
     use std::time::Duration;
+    use tokio::time::timeout;
     use tracing::debug;
 
     use hopr_async_runtime::prelude::{sleep, spawn};
@@ -304,7 +305,7 @@ mod tests {
         let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))
@@ -375,7 +376,6 @@ mod tests {
         sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
-        // let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.token, contract_addrs.channels],
@@ -415,9 +415,8 @@ mod tests {
         )
         .await;
 
-        let retrieved_logs = retrieved_logs
-            .timeout(Duration::from_secs(30)) // Give up after 30 seconds
-            .await??;
+        let retrieved_logs = timeout(Duration::from_secs(30), retrieved_logs) // Give up after 30 seconds
+            .await???;
 
         // The last block must contain all 4 events
         let last_block_logs = retrieved_logs
@@ -516,7 +515,7 @@ mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))
@@ -525,7 +524,6 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        // let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
@@ -561,9 +559,8 @@ mod tests {
         )
         .await;
 
-        let retrieved_logs = retrieved_logs
-            .timeout(Duration::from_secs(30)) // Give up after 30 seconds
-            .await??;
+        let retrieved_logs = timeout(Duration::from_secs(30), retrieved_logs) // Give up after 30 seconds
+            .await???;
 
         // The last block must contain all 2 events
         let last_block_logs = retrieved_logs

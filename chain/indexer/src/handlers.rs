@@ -977,7 +977,7 @@ mod tests {
         SerializableLog { ..Default::default() }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn announce_keybinding() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1027,7 +1027,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn announce_address_announcement() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1218,7 +1218,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn announce_revoke() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let handlers = init_handlers(db.clone());
@@ -1277,7 +1277,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_token_transfer_to() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1314,7 +1314,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_token_transfer_from() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1351,7 +1351,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_token_approval_correct() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1414,7 +1414,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_registered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1458,7 +1458,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_registered_by_manager() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1501,7 +1501,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_deregistered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1547,7 +1547,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_deregistered_by_manager() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1594,7 +1594,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_enabled() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1626,7 +1626,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_disabled() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1660,7 +1660,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_set_eligible() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1696,7 +1696,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_set_not_eligible() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1734,7 +1734,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_event_balance_increased() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1787,7 +1787,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_event_domain_separator_updated() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1832,7 +1832,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_event_balance_decreased() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1890,7 +1890,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1951,7 +1951,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_foreign_channel_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2001,7 +2001,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_opened() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2051,7 +2051,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_reopened() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2111,7 +2111,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_should_not_reopen_when_not_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2179,7 +2179,7 @@ mod tests {
             .into_acknowledged(response))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_incoming_channel() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
@@ -2289,7 +2289,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_incoming_channel_neglect_left_over_tickets() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
@@ -2396,7 +2396,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_outgoing_channel() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
@@ -2467,7 +2467,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_on_incoming_channel_with_non_existent_ticket_should_pass() -> anyhow::Result<()>
     {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
@@ -2523,7 +2523,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_on_foreign_channel_should_pass() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2576,7 +2576,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_closure_initiated() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2633,7 +2633,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_node_safe_registry_registered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2665,7 +2665,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_node_safe_registry_deregistered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2702,7 +2702,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn ticket_price_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2741,7 +2741,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn minimum_win_prob_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2792,7 +2792,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn lowering_minimum_win_prob_update_should_reject_non_satisfying_unredeemed_tickets() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_minimum_incoming_ticket_win_prob(None, 0.1).await?;

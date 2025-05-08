@@ -1472,7 +1472,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_native_and_token_balances_in_anvil_with_multicall() -> anyhow::Result<()> {
         // create a keypair
         let kp = ChainKeypair::random();
@@ -1500,7 +1500,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_transfer_or_mint_tokens_in_anvil_with_multicall() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -1567,7 +1567,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_transfer_or_mint_tokens_in_anvil_with_one_recipient() -> anyhow::Result<()> {
         let addresses: Vec<Address> = vec![get_random_address_for_testing().into()];
         let desired_amount = vec![U256::from(42)];
@@ -1627,7 +1627,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_transfer_or_mint_tokens_in_anvil_without_recipient() -> anyhow::Result<()> {
         let addresses: Vec<Address> = Vec::new();
         let desired_amount: Vec<U256> = Vec::new();
@@ -1665,7 +1665,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_transfer_native_tokens_in_anvil_with_multicall() -> anyhow::Result<()> {
         let mut addresses: Vec<Address> = Vec::new();
         for _ in 0..4 {
@@ -1705,7 +1705,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_register_safes_and_nodes_then_deregister_nodes_in_anvil_with_multicall() -> anyhow::Result<()> {
         let mut safe_addresses: Vec<Address> = Vec::new();
         let mut node_addresses: Vec<Address> = Vec::new();
@@ -1768,7 +1768,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_deploy_proxy() -> anyhow::Result<()> {
         let prediction = deploy_proxy(
             address!("41675c099f32341bf84bfc5382af534df5c7461a"),
@@ -1783,7 +1783,7 @@ mod tests {
         );
         Ok(())
     }
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_salt_from_salt_nonce() -> anyhow::Result<()> {
         let salt = get_salt_from_salt_nonce(
             hex!("b63e800d00000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001400000000000000000000000002a15de4410d4c8af0a7b6c12803120f43c42b8200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000098b275485c406573d042848d66eb9d63fca311c00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000").into(),
@@ -1798,7 +1798,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_safe_and_module_address_prediction() -> anyhow::Result<()> {
         // testing value extracted from https://dashboard.tenderly.co/tx/xdai/0x510e3ac3dc7939cae2525a0b0f096ad709b23d94169e0fbf2e1154fdd6911c49?trace=0
         let _ = env_logger::builder().is_test(true).try_init();
@@ -1880,7 +1880,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_deploy_safe_and_module() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -1956,7 +1956,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_safe_tx_via_multisend() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
@@ -2055,7 +2055,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_register_nodes_to_node_safe_registry() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
@@ -2132,7 +2132,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_include_nodes_to_module() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
@@ -2190,7 +2190,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_migrate_nodes_to_new_network() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
@@ -2274,7 +2274,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_debug_node_safe_module_setup_on_balance_and_registries() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();
@@ -2347,7 +2347,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_debug_node_safe_module_setup_main() -> anyhow::Result<()> {
         // set allowance for token transfer for the safe multiple times
         let _ = env_logger::builder().is_test(true).try_init();

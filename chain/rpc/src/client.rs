@@ -536,7 +536,14 @@ where
 
         // metrics after calling
         Box::pin(async move {
-            let res = future.await;
+            let res = future.await
+                .error_for_status() // needed to turn 4xx and 5xx errors into reqwest::Error
+                      .map_err(|e| {
+                          HttpRequestError::HttpError(
+                              StatusCode::try_from(e.status().map(|s| s.as_u16()).unwrap_or(500))
+                                  .expect("status code must be compatible"), // cannot happen
+                          )
+                      })?;
 
             let req_duration = start.elapsed();
             method_names.iter().for_each(|method| {
@@ -552,7 +559,7 @@ where
                         ResponsePayload::Success(_) => {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_COUNT_RPC_CALLS.increment(&[&method_names[0], "success"]);
-                        }
+                          }
                         ResponsePayload::Failure(_) => {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             METRIC_COUNT_RPC_CALLS.increment(&[&method_names[0], "failure"]);
@@ -875,20 +882,14 @@ pub fn create_rpc_client_to_anvil(
     anvil: &alloy::node_bindings::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
 ) -> Arc<AnvilRpcClient> {
-    #[cfg(all(feature = "runtime-async-std"))]
-    use crate::transport::SurfTransport;
     use alloy::providers::ProviderBuilder;
     use alloy::rpc::client::ClientBuilder;
     use alloy::signers::local::PrivateKeySigner;
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     use alloy::transports::http::ReqwestTransport;
     use hopr_crypto_types::keypairs::Keypair;
 
     let wallet = PrivateKeySigner::from_slice(signer.secret().as_ref()).expect("failed to construct wallet");
 
-    #[cfg(feature = "runtime-async-std")]
-    let transport_client = SurfTransport::new(anvil.endpoint_url());
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
     let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
@@ -909,7 +910,7 @@ mod tests {
         },
         rpc::{client::ClientBuilder, types::TransactionRequest},
         signers::local::PrivateKeySigner,
-        transports::layers::RetryBackoffLayer,
+        transports::{http::ReqwestTransport, layers::RetryBackoffLayer},
     };
     use anyhow::Ok;
     use hopr_async_runtime::prelude::sleep;
@@ -921,10 +922,11 @@ mod tests {
     use std::time::Duration;
     use tempfile::NamedTempFile;
 
+    use crate::client::reqwest_client::ReqwestRequestor;
     use crate::client::{
         DefaultRetryPolicy, GasOracleFiller, MetricsLayer, SnapshotRequestor, SnapshotRequestorLayer, ZeroRetryPolicy,
     };
-    use crate::transport::SurfTransport;
+    use crate::transport::ReqwestTransport;
 
     #[tokio::test]
     async fn test_client_should_deploy_contracts_via_surf() -> anyhow::Result<()> {
@@ -932,7 +934,7 @@ mod tests {
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
         let signer_chain_key = ChainKeypair::from_secret(signer.to_bytes().as_ref())?;
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
 
@@ -987,7 +989,7 @@ mod tests {
         let anvil = create_anvil(Some(block_time));
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
 
@@ -1014,7 +1016,7 @@ mod tests {
         let anvil = create_anvil(Some(block_time));
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         // additional retry layer
         let retry_layer = RetryBackoffLayer::new(2, 100, 100);
@@ -1052,7 +1054,7 @@ mod tests {
         let anvil = create_anvil(None);
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
 
@@ -1080,7 +1082,7 @@ mod tests {
             .expect(1)
             .create();
 
-        let transport_client = SurfTransport::new(url::Url::parse(&server.url()).unwrap());
+        let transport_client = ReqwestTransport::new(url::Url::parse(&server.url()).unwrap());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))
@@ -1106,13 +1108,13 @@ mod tests {
 
         let m = server
             .mock("POST", "/")
-            .with_status(http_types::StatusCode::TooManyRequests as usize)
+            .with_status(http_types::StatusCode::TooManyRequests as usize) // TODO: This value is not respected
             .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
             .with_body("{}")
             .expect(3)
             .create();
 
-        let transport_client = SurfTransport::new(url::Url::parse(&server.url()).unwrap());
+        let transport_client = ReqwestTransport::new(url::Url::parse(&server.url()).unwrap());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))
@@ -1160,7 +1162,7 @@ mod tests {
             .expect(1)
             .create();
 
-        let transport_client = SurfTransport::new(url::Url::parse(&server.url()).unwrap());
+        let transport_client = ReqwestTransport::new(url::Url::parse(&server.url()).unwrap());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new_with_policy(2, 100, 100, ZeroRetryPolicy))
@@ -1204,17 +1206,7 @@ mod tests {
             .expect(3)
             .create();
 
-        let transport_client = SurfTransport::new(url::Url::parse(&server.url()).unwrap());
-
-        let simple_json_rpc_retry_policy = DefaultRetryPolicy {
-            initial_backoff: Duration::from_millis(100),
-            retryable_json_rpc_errors: vec![-32603],
-            ..DefaultRetryPolicy::default()
-        };
-        let rpc_client = ClientBuilder::default()
-            .layer(RetryBackoffLayer::new_with_policy(
-                2,
-                100,
+        let transport_client = ReqwestTransport::new(url::Url::parse(&server.url()).unwrap());
                 100,
                 simple_json_rpc_retry_policy,
             ))
@@ -1258,7 +1250,7 @@ mod tests {
             .expect(1)
             .create();
 
-        let transport_client = SurfTransport::new(url::Url::parse(&server.url()).unwrap());
+        let transport_client = ReqwestTransport::new(url::Url::parse(&server.url()).unwrap());
 
         let simple_json_rpc_retry_policy = DefaultRetryPolicy {
             initial_backoff: Duration::from_millis(100),
@@ -1313,7 +1305,7 @@ mod tests {
             .expect(2)
             .create();
 
-        let transport_client = SurfTransport::new(url::Url::parse(&server.url()).unwrap());
+        let transport_client = ReqwestTransport::new(url::Url::parse(&server.url()).unwrap());
 
         let simple_json_rpc_retry_policy = DefaultRetryPolicy {
             initial_backoff: Duration::from_millis(100),
@@ -1369,7 +1361,7 @@ mod tests {
             .expect(3)
             .create();
 
-        let transport_client = SurfTransport::new(url::Url::parse(&server.url()).unwrap());
+        let transport_client = ReqwestTransport::new(url::Url::parse(&server.url()).unwrap());
 
         let simple_json_rpc_retry_policy = DefaultRetryPolicy {
             initial_backoff: Duration::from_millis(100),
@@ -1414,7 +1406,7 @@ mod tests {
         {
             let mut last_number = 0;
 
-            let transport_client = SurfTransport::new(anvil.endpoint_url());
+            let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
             let rpc_client = ClientBuilder::default()
                 .layer(RetryBackoffLayer::new_with_policy(
@@ -1439,7 +1431,7 @@ mod tests {
         }
 
         {
-            let transport_client = SurfTransport::new(anvil.endpoint_url());
+            let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
             let snapshot_requestor = SnapshotRequestor::new(snapshot_file.path().to_str().unwrap())
                 .load(true)
@@ -1487,7 +1479,7 @@ mod tests {
         let anvil = create_anvil(None);
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
         // let underlying_transport_client = transport_client.client().clone();
 
         let rpc_client = ClientBuilder::default()
@@ -1534,7 +1526,7 @@ mod tests {
         let anvil = create_anvil(None);
         let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
 
-        let transport_client = SurfTransport::new(anvil.endpoint_url());
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new(2, 100, 100))

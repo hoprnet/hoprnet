@@ -203,18 +203,22 @@ mod tests {
     use super::*;
     use futures::io::{AsyncReadExt, AsyncWriteExt};
     use std::future::Future;
+    use tokio::task::JoinError;
 
     fn spawn_single_byte_read_write<C>(
         channel: C,
         data: Vec<u8>,
-    ) -> (impl Future<Output = Vec<u8>>, impl Future<Output = Vec<u8>>)
+    ) -> (
+        impl Future<Output = std::result::Result<Vec<u8>, JoinError>>,
+        impl Future<Output = std::result::Result<Vec<u8>, JoinError>>,
+    )
     where
         C: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
         let (mut recv, mut send) = channel.split();
 
         let len = data.len();
-        let read = async_std::task::spawn(async move {
+        let read = tokio::task::spawn(async move {
             let mut out = Vec::with_capacity(len);
             for _ in 0..len {
                 let mut bytes = [0u8; 1];
@@ -227,7 +231,7 @@ mod tests {
             out
         });
 
-        let written = async_std::task::spawn(async move {
+        let written = tokio::task::spawn(async move {
             let mut out = Vec::with_capacity(len);
             for byte in data {
                 send.write(&[byte]).await.unwrap();
@@ -240,7 +244,7 @@ mod tests {
         (read, written)
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn faulty_network_mixing() {
         const MIX_FACTOR: usize = 2;
         const COUNT: usize = 20;
@@ -254,7 +258,10 @@ mod tests {
         );
 
         let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, _) = futures::future::join(read, written).await;
+        let (read, _) = futures::future::join(async move { read.await.expect("read must resolve") }, async move {
+            written.await.expect("write must resolve")
+        })
+        .await;
 
         for (pos, value) in read.into_iter().enumerate() {
             assert!(
@@ -264,7 +271,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn faulty_network_packet_drop() {
         const DROP: f64 = 0.3333;
         const COUNT: usize = 20;
@@ -278,20 +285,28 @@ mod tests {
         );
 
         let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, written) = futures::future::join(read, written).await;
+        let (read, written) =
+            futures::future::join(async move { read.await.expect("read must resolve") }, async move {
+                written.await.expect("write must resolve")
+            })
+            .await;
 
         let max_drop = (written.len() as f64 * (1.0 - DROP) - 2.0).floor() as usize;
         assert!(read.len() >= max_drop, "dropped more than {max_drop}: {}", read.len());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn faulty_network_reliable() {
         const COUNT: usize = 20;
 
         let net = FaultyNetwork::<466>::new(Default::default(), None);
 
         let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, written) = futures::future::join(read, written).await;
+        let (read, written) =
+            futures::future::join(async move { read.await.expect("read must resolve") }, async move {
+                written.await.expect("write must resolve")
+            })
+            .await;
 
         assert_eq!(read, written);
     }

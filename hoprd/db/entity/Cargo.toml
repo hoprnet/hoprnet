@@ -12,7 +12,7 @@ default = ["sqlite"]
 sqlite = []
 
 [build-dependencies]
-async-std = { workspace = true }
+tokio = { workspace = true }
 clap = { workspace = true }
 hoprd-db-migration = { path = "../migration" }
 sea-orm = { workspace = true }

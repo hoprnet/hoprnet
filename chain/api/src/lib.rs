@@ -42,15 +42,6 @@ use hopr_primitive_types::prelude::*;
 
 use crate::errors::{HoprChainError, Result};
 
-/// The default HTTP request engine
-///
-/// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
-#[cfg(feature = "runtime-async-std")]
-pub type DefaultHttpRequestor = hopr_chain_rpc::transport::SurfClient;
-
-// Both features could be enabled during testing; therefore, we only use tokio when its
-// exclusively enabled.
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 pub type DefaultHttpRequestor = hopr_chain_rpc::transport::ReqwestClient;
 
 // /// The default HTTP request engine

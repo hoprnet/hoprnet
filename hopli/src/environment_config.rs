@@ -20,6 +20,7 @@ use alloy::{
     },
     rpc::client::ClientBuilder,
     signers::local::PrivateKeySigner,
+    transports::http::ReqwestTransport,
 };
 use clap::Parser;
 use serde::{Deserialize, Serialize};
@@ -32,7 +33,6 @@ use std::{
 };
 
 use hopr_chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
-use hopr_chain_rpc::transport::SurfTransport;
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::keypairs::Keypair;
 
@@ -133,7 +133,7 @@ impl NetworkProviderArgs {
     {
         // Build transport
         let parsed_url = url::Url::parse(&self.provider_url.as_str()).unwrap();
-        let transport_client = SurfTransport::new(parsed_url);
+        let transport_client = ReqwestTransport::new(parsed_url);
 
         // Build JSON RPC client
         let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
@@ -162,7 +162,7 @@ impl NetworkProviderArgs {
     pub async fn get_provider_without_signer(&self) -> Result<Arc<RpcProviderWithoutSigner>, HelperErrors> {
         // Build transport
         let parsed_url = url::Url::parse(&self.provider_url.as_str()).unwrap();
-        let transport_client = SurfTransport::new(parsed_url);
+        let transport_client = ReqwestTransport::new(parsed_url);
 
         // Build JSON RPC client
         let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
@@ -311,7 +311,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_provider_with_signer() -> anyhow::Result<()> {
         // create an identity
         let chain_key = ChainKeypair::random();
@@ -332,7 +332,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_default_contracts_root() -> anyhow::Result<()> {
         // create an identity
         let chain_key = ChainKeypair::random();

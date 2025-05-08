@@ -593,6 +593,7 @@ mod tests {
 
     use alloy::{primitives::U256, providers::Provider};
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
+    use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;

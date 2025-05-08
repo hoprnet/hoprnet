@@ -167,7 +167,7 @@ mod tests {
             .expect("lazy static address should be valid");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_registry_db() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -196,7 +196,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_eligiblity_db() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
