@@ -1,16 +1,7 @@
-use alloy::{
-    rpc::json_rpc::{RequestPacket, ResponsePacket},
-    transports::{
-        http::{Http, HttpConnect},
-        utils::guess_local_url,
-        BoxTransport, TransportConnect, TransportError, TransportErrorKind, TransportFut, TransportResult,
-    },
-};
+use alloy::transports::{http::Http, utils::guess_local_url};
 use async_trait::async_trait;
 pub use reqwest::Client as ReqwestClient;
-use std::task;
-use tower::Service;
-use tracing::{debug, debug_span, info, trace, Instrument};
+use tracing::{debug, trace};
 use url::Url;
 
 use crate::errors::HttpRequestError;

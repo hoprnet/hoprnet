@@ -21,7 +21,6 @@ use hopr_chain_actions::ChainActions;
 use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
 use hopr_chain_rpc::client::DefaultRetryPolicy;
 use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
-use hopr_chain_rpc::transport::HttpWrapper;
 use hopr_chain_rpc::transport::ReqwestClient;
 use hopr_chain_rpc::HoprRpcOperations;
 pub use hopr_chain_types::chain_events::SignificantChainEvent;
