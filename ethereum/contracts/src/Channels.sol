@@ -500,7 +500,13 @@ contract HoprChannels is
     /**
      * See `_closeIncomingChannelInternal`, entrypoint for MultiSig contract
      */
-    function closeIncomingChannelSafe(address selfAddress, address source) external HoprMultiSig.onlySafe(selfAddress) {
+    function closeIncomingChannelSafe(
+        address selfAddress,
+        address source
+    )
+        external
+        HoprMultiSig.onlySafe(selfAddress)
+    {
         _closeIncomingChannelInternal(selfAddress, source);
     }
 
@@ -718,7 +724,14 @@ contract HoprChannels is
      * @param account address of the destination
      * @param amount amount to fund for channel
      */
-    function fundChannelSafe(address selfAddress, address account, Balance amount) external HoprMultiSig.onlySafe(selfAddress) {
+    function fundChannelSafe(
+        address selfAddress,
+        address account,
+        Balance amount
+    )
+        external
+        HoprMultiSig.onlySafe(selfAddress)
+    {
         _fundChannelInternal(selfAddress, account, amount);
 
         // pull tokens from Safe and handle result

@@ -101,7 +101,13 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
         _announceInternal(msg.sender, baseMultiaddr);
     }
 
-    function announceSafe(address selfAddress, string calldata baseMultiaddr) external HoprMultiSig.onlySafe(selfAddress) {
+    function announceSafe(
+        address selfAddress,
+        string calldata baseMultiaddr
+    )
+        external
+        HoprMultiSig.onlySafe(selfAddress)
+    {
         _announceInternal(selfAddress, baseMultiaddr);
     }
 

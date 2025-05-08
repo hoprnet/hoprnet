@@ -14,17 +14,15 @@ crate-type = ["rlib"]
 [features]
 default = []
 prometheus = ["dep:hopr-metrics"]
-runtime-async-std = [
-  "dep:async-std",
-  "hopr-async-runtime/runtime-async-std",
-]
-runtime-tokio = [
-  "hopr-async-runtime/runtime-tokio",
-  "dep:governor",
-]
+runtime-async-std = ["dep:async-std", "hopr-async-runtime/runtime-async-std"]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio", "dep:governor"]
 
 [dependencies]
-alloy = { workspace = true, default-features = false, features = ["essentials", "json-rpc", "node-bindings"] }
+alloy = { workspace = true, default-features = false, features = [
+  "essentials",
+  "json-rpc",
+  "node-bindings",
+] }
 async-trait = { workspace = true }
 async-std = { workspace = true, optional = true, features = [
   "attributes",
@@ -38,12 +36,7 @@ http-types = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 primitive-types = { workspace = true }
-reqwest = { workspace = true, features = [
-  "brotli",
-  "zstd",
-  "gzip",
-  "json",
-] }
+reqwest = { workspace = true, features = ["brotli", "zstd", "gzip", "json"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }

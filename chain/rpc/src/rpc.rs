@@ -474,7 +474,6 @@ mod tests {
     use hopr_async_runtime::prelude::sleep;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::*;
-    use std::str::FromStr;
 
     // use crate::client::surf_client::SurfRequestor;
     // use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};

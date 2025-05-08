@@ -28,7 +28,11 @@ prometheus = [
 ]
 
 [dependencies]
-alloy = { workspace = true, default-features = false, features = ["essentials", "json-rpc", "node-bindings"] }
+alloy = { workspace = true, default-features = false, features = [
+  "essentials",
+  "json-rpc",
+  "node-bindings",
+] }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
 futures = { workspace = true }

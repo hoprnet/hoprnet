@@ -12,7 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
-alloy = {workspace = true, default-features = false, features = ["std"]}
+alloy = { workspace = true, default-features = false, features = ["std"] }
 float-cmp = { workspace = true }
 hex = { workspace = true }
 primitive-types = { workspace = true }
