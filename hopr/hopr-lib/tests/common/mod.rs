@@ -4,20 +4,21 @@ use alloy::primitives::U256;
 use alloy::rpc::client::RpcClient;
 use alloy::transports::http::{Http, ReqwestTransport};
 use async_std::task::sleep;
+use std::sync::Arc;
+use std::time::Duration;
+use tracing::info;
+
 use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
 #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
 use hopr_chain_rpc::transport::ReqwestClient;
 #[cfg(all(feature = "runtime-async-std"))]
-use hopr_chain_rpc::transport::{SurfClient, SurfTransport};
+use hopr_chain_rpc::transport::{HttpWrapper, SurfClient, SurfTransport};
 use hopr_chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
 };
 use hopr_chain_types::{ContractAddresses, ContractInstances};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::info;
 
 // /// Snapshot requestor used for testing.
 // pub type Requestor = SnapshotRequestor<SurfRequestor>;
