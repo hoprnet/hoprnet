@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["IncomingPacket","ResolvedAcknowledgement"],"struct":["OutgoingPacket"],"trait":["HoprDbProtocolOperations"]};
