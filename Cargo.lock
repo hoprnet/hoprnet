@@ -4570,6 +4570,7 @@ version = "0.2.1"
 dependencies = [
  "alloy",
  "anyhow",
+ "glob",
  "serde",
 ]
 

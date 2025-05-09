@@ -3,57 +3,57 @@
 resolver = "2"
 
 members = [
-  "chain/actions",
-  "chain/api",
-  "chain/indexer",
-  "chain/rpc",
-  "chain/types",
-  "common/async-runtime",
-  "common/internal-types",
-  "common/network-types",
-  "common/parallelize",
-  "common/primitive-types",
-  "crypto/packet",
-  "crypto/random",
-  "crypto/sphinx",
-  "crypto/types",
-  "db/api",
-  "db/entity",
-  "db/migration",
-  "db/sql",
-  "ethereum/bindings",
-  "hopli",
-  "hopr/hopr-lib",
-  "hoprd/db/api",
-  "hoprd/db/migration",
-  "hoprd/db/entity",
-  "hoprd/hoprd",
-  "hoprd/inbox",
-  "hoprd/keypair",
-  "hoprd/rest-api",
-  "logic/path",
-  "logic/strategy",
-  "misc/metrics",
-  "misc/platform",
-  "transport/api",
-  "transport/identity",
-  "transport/mixer",
-  "transport/network",
-  "transport/packet",
-  "transport/p2p",
-  "transport/protocol",
-  "transport/session",
-  "transport/ticket-aggregation",
+    "chain/actions",
+    "chain/api",
+    "chain/indexer",
+    "chain/rpc",
+    "chain/types",
+    "common/async-runtime",
+    "common/internal-types",
+    "common/network-types",
+    "common/parallelize",
+    "common/primitive-types",
+    "crypto/packet",
+    "crypto/random",
+    "crypto/sphinx",
+    "crypto/types",
+    "db/api",
+    "db/entity",
+    "db/migration",
+    "db/sql",
+    "ethereum/bindings",
+    "hopli",
+    "hopr/hopr-lib",
+    "hoprd/db/api",
+    "hoprd/db/migration",
+    "hoprd/db/entity",
+    "hoprd/hoprd",
+    "hoprd/inbox",
+    "hoprd/keypair",
+    "hoprd/rest-api",
+    "logic/path",
+    "logic/strategy",
+    "misc/metrics",
+    "misc/platform",
+    "transport/api",
+    "transport/identity",
+    "transport/mixer",
+    "transport/network",
+    "transport/packet",
+    "transport/p2p",
+    "transport/protocol",
+    "transport/session",
+    "transport/ticket-aggregation",
 ]
 
 [workspace.dependencies]
 alloy = { version = "0.12.6", default-features = false, features = [
-  "essentials",
-  "json-rpc",
-  "node-bindings",
-  "contract",
-  "k256",
-  "std",
+    "essentials",
+    "json-rpc",
+    "node-bindings",
+    "contract",
+    "k256",
+    "std",
 ] }
 anyhow = "1.0.98"
 aquamarine = "0.6.0"
@@ -83,9 +83,9 @@ clap = { version = "4.5.37", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.5.1", features = [
-  "async_tokio",
-  "async-std",
-  "html_reports",
+    "async_tokio",
+    "async-std",
+    "html_reports",
 ] }
 crossbeam-queue = "0.3.12"
 crossbeam-skiplist = "0.1.3"
@@ -101,23 +101,24 @@ futures = "0.3.31"
 futures-concurrency = "7.6.3"
 futures-timer = "3.0.3"
 generic-array = "1.2.0"
+glob = "0.3.2"
 governor = { version = "0.10" }
 hex = "0.4.3"
 hex-literal = "1.0.0"
 hickory-resolver = "0.24.4" # # ignored in renovate, cannot be updated, until libp2p-dns is updated
 http-types = "2.12.0"
 k256 = { version = "0.13.4", features = [
-  "arithmetic",
-  "ecdh",
-  "hash2curve",
-  "serde",
+    "arithmetic",
+    "ecdh",
+    "hash2curve",
+    "serde",
 ] }
 lazy_static = "1.5.0"
 libp2p = { version = "0.55.0" }
 libp2p-identity = { version = "0.2.11", features = [
-  "peerid",
-  "ed25519",
-  "rand",
+    "peerid",
+    "ed25519",
+    "rand",
 ] }
 libp2p-stream = { version = "0.3.0-alpha" }
 mockall = "0.13.1"
@@ -134,7 +135,7 @@ temp-env = "0.3.6"
 parameterized = "2.0.0"
 petgraph = { version = "0.8.1", features = ["serde-1"] }
 primitive-types = { version = "0.12.2", features = [ # ignored in renovate, primitive-types 0.13 not compatible with ethers.rs
-  "serde",
+    "serde",
 ] }
 proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
@@ -148,20 +149,20 @@ rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
 sea-orm = { version = "1.1.10", features = [ # ?
-  "sqlx-sqlite",
-  "with-chrono",
-  "debug-print",
+    "sqlx-sqlite",
+    "with-chrono",
+    "debug-print",
 ] }
 sea-orm-cli = { version = "1.1.10", features = ["codegen"] }
 sea-orm-migration = { version = "1.1.10", features = [
-  "sqlx-sqlite",
-  "with-chrono",
+    "sqlx-sqlite",
+    "with-chrono",
 ] }
 sea-query = { version = "0.32.4", default-features = false }
 sea-query-binder = { version = "0.7.0", default-features = false, features = [
-  "with-chrono",
-  "sqlx-sqlite",
-  "runtime-tokio-rustls",
+    "with-chrono",
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
 ] }
 semver = "1.0.26"
 serde = { version = "1.0.219", features = ["derive"] }
@@ -177,9 +178,9 @@ signal-hook = "0.3.17"
 smart-default = "0.7.1"
 socket2 = "0.5.9"
 sqlx = { version = "0.8.5", default-features = false, features = [
-  "sqlite",
-  "macros",
-  "migrate",
+    "sqlite",
+    "macros",
+    "migrate",
 ] }
 strum = { version = "0.27.1", features = ["derive"] }
 subtle = "2.6.1"
@@ -189,23 +190,23 @@ tempfile = "3.19.1"
 test-log = { version = "0.2.17", features = ["trace"] }
 thiserror = "2.0.12"
 tokio = { version = "1.45.0", features = [
-  "rt-multi-thread",
-  "macros",
-  "tracing",
+    "rt-multi-thread",
+    "macros",
+    "tracing",
 ] }
 tokio-util = { version = "0.7.15", default-features = false, features = [
-  "codec",
-  "compat",
+    "codec",
+    "compat",
 ] }
 tokio-retry = "0.3.0"
 tower = { version = "0.5", default-features = false, features = ["util"] }
 tracing = { version = "0.1.41" }
 tracing-futures = { version = "0.2.5" }
 tracing-subscriber = { version = "0.3.19", features = [
-  "env-filter",
-  "fmt",
-  "registry",
-  "std",
+    "env-filter",
+    "fmt",
+    "registry",
+    "std",
 ] }
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.18.0"
@@ -226,7 +227,7 @@ hopr-chain-types = { path = "chain/types", default-features = false }
 hopr-crypto-packet = { path = "crypto/packet", default-features = false }
 hopr-crypto-random = { path = "crypto/random", default-features = false }
 hopr-crypto-sphinx = { path = "crypto/sphinx", default-features = false, features = [
-  "x25519",
+    "x25519",
 ] }
 hopr-crypto-types = { path = "crypto/types", default-features = false }
 hopr-db-api = { path = "db/api" }
