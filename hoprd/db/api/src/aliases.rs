@@ -138,7 +138,7 @@ mod tests {
     use super::*;
     use libp2p_identity::PeerId;
 
-    #[async_std::test]
+    #[tokio::test]
     async fn set_alias_should_succeed() {
         let db = HoprdDb::new_in_memory().await;
 
@@ -151,7 +151,7 @@ mod tests {
         assert_eq!(aliases.len(), 1);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn set_alias_should_set_multiple_aliases_in_a_transaction() -> Result<()> {
         let db: HoprdDb = HoprdDb::new_in_memory().await;
         let entries = vec![
@@ -174,7 +174,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn set_me_among_other_alias_should_fail() {
         let db = HoprdDb::new_in_memory().await;
 
@@ -201,7 +201,7 @@ mod tests {
         assert!(res.is_err());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn set_me_alias_should_fail_if_set() {
         let db = HoprdDb::new_in_memory().await;
 
@@ -217,7 +217,7 @@ mod tests {
         assert!(res.is_err());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn set_alias_should_fail_if_the_alias_already_is_assigned_to_any_peer_id() -> anyhow::Result<()> {
         let db = HoprdDb::new_in_memory().await;
 
@@ -237,7 +237,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn set_alias_should_fail_if_the_peerid_already_is_aliased() -> anyhow::Result<()> {
         let db = HoprdDb::new_in_memory().await;
 
@@ -257,7 +257,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn resolve_alias_should_return_alias() {
         let db = HoprdDb::new_in_memory().await;
 
@@ -273,7 +273,7 @@ mod tests {
         assert!(alias.is_some());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn resolve_not_stored_alias_should_return_none() {
         let db = HoprdDb::new_in_memory().await;
 
@@ -292,7 +292,7 @@ mod tests {
         assert!(alias.is_none());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn delete_stored_alias() {
         let db = HoprdDb::new_in_memory().await;
 
@@ -310,7 +310,7 @@ mod tests {
         assert_eq!(aliases.len(), 0);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn delete_all_aliases() {
         let db = HoprdDb::new_in_memory().await;
 
@@ -336,7 +336,7 @@ mod tests {
         assert_eq!(aliases[0].peer_id, me_peer_id);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn set_aliases_with_existing_alias_should_replace_peer_id() {
         let db = HoprdDb::new_in_memory().await;
 
@@ -361,7 +361,7 @@ mod tests {
         assert_eq!(aliases[0].peer_id, new_peer_id);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn set_aliases_with_existing_peer_id_should_replace_alias() {
         let db = HoprdDb::new_in_memory().await;
 
@@ -385,7 +385,7 @@ mod tests {
         assert_eq!(aliases[0].alias, alias.to_uppercase());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn set_aliases_with_existing_entry_should_do_nothing() {
         let db = HoprdDb::new_in_memory().await;
 
