@@ -8,8 +8,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::info;
 
-use hopr_chain_rpc::client::AnvilRpcClient;
-use hopr_chain_rpc::client::{create_rpc_client_to_anvil, SnapshotRequestor};
+use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
 use hopr_chain_rpc::transport::ReqwestClient;
 use hopr_chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
@@ -21,7 +20,6 @@ use hopr_primitive_types::prelude::*;
 fn build_transport_client(url: &str) -> Http<ReqwestClient> {
     let parsed_url = url::Url::parse(url).unwrap();
     ReqwestTransport::new(parsed_url).into()
-    // Http::new(HttpWrapper::new(ReqwestClient::new(parsed_url)))
 }
 
 /// Used for testing. Creates RPC client to the local Anvil instance.
@@ -30,8 +28,7 @@ pub fn create_rpc_client_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,
     anvil: &alloy::node_bindings::AnvilInstance,
 ) -> RpcClient {
-    use alloy::rpc::client::{ClientBuilder, RpcClient};
-    use alloy::transports::http::ReqwestTransport;
+    use alloy::rpc::client::ClientBuilder;
     use hopr_chain_rpc::client::SnapshotRequestorLayer;
 
     let transport_client = build_transport_client(anvil.endpoint_url().as_str());
@@ -52,7 +49,6 @@ pub fn create_provider_to_anvil_with_snapshot(
     use alloy::providers::ProviderBuilder;
     use alloy::rpc::client::ClientBuilder;
     use alloy::signers::local::PrivateKeySigner;
-    use alloy::transports::http::ReqwestTransport;
     use hopr_chain_rpc::client::SnapshotRequestorLayer;
     use hopr_crypto_types::keypairs::Keypair;
 
@@ -68,9 +64,6 @@ pub fn create_provider_to_anvil_with_snapshot(
 
     Arc::new(provider)
 }
-
-/// Snapshot requestor used for testing.
-pub type Requestor = SnapshotRequestor;
 
 /// Represents a HOPR environment deployment into Anvil.
 #[allow(unused)]
