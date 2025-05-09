@@ -28,7 +28,7 @@ use validator::Validate;
 
 use hopr_chain_actions::ChainActions;
 use hopr_internal_types::prelude::*;
-use hopr_transport_protocol::ticket_aggregation::processor::TicketAggregatorTrait;
+use hopr_transport_ticket_aggregation::TicketAggregatorTrait;
 
 use crate::aggregating::AggregatingStrategy;
 use crate::auto_funding::AutoFundingStrategy;
@@ -279,7 +279,7 @@ mod tests {
     use crate::strategy::{MockSingularStrategy, MultiStrategy, MultiStrategyConfig, SingularStrategy};
     use mockall::Sequence;
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_multi_strategy_logical_or_flow() -> anyhow::Result<()> {
         let mut seq = Sequence::new();
 
@@ -308,7 +308,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_multi_strategy_logical_and_flow() {
         let mut seq = Sequence::new();
 

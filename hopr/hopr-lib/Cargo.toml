@@ -16,15 +16,6 @@ default = []
 session-client = []
 session-server = []
 transport-quic = ["hopr-transport/transport-quic"]
-runtime-async-std = [
-  "hopr-chain-api/runtime-async-std",
-  "hopr-chain-rpc/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-  "hopr-db-sql/runtime-async-std",
-  "hopr-network-types/runtime-async-std",
-  "hopr-strategy/runtime-async-std",
-  "hopr-transport/runtime-async-std",
-]
 runtime-tokio = [
   "hopr-chain-api/runtime-tokio",
   "hopr-chain-rpc/runtime-tokio",
@@ -85,14 +76,14 @@ hopr-transport = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
 ethers = { workspace = true }
 hex-literal = { workspace = true }
-hopr-crypto-types = { workspace = true }
-hopr-crypto-random = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
-hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }
 serde_yaml = { workspace = true }
-test-log = { workspace = true }
+tracing-test = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+
+hopr-crypto-types = { workspace = true }
+hopr-crypto-random = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
+hopr-transport-session = { workspace = true, features = ["runtime-tokio"] }

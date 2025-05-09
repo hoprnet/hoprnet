@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use anyhow::Context;
-use async_std::prelude::FutureExt;
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use hex_literal::hex;
@@ -24,9 +23,10 @@ use hopr_path::{channel_graph::ChannelGraph, ChainPath, Path, PathAddressResolve
 use hopr_primitive_types::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
-    msg::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
+    processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
     DEFAULT_PRICE_PER_PACKET,
 };
+use tokio::time::timeout;
 use tracing::debug;
 
 lazy_static! {
@@ -141,14 +141,8 @@ pub async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()
 }
 
 pub type WireChannels = (
-    (
-        futures::channel::mpsc::UnboundedSender<(PeerId, Acknowledgement)>,
-        futures::channel::mpsc::UnboundedReceiver<(PeerId, Acknowledgement)>,
-    ),
-    (
-        futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
-        hopr_transport_mixer::channel::Receiver<(PeerId, Box<[u8]>)>,
-    ),
+    futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
+    hopr_transport_mixer::channel::Receiver<(PeerId, Box<[u8]>)>,
 );
 
 pub type LogicalChannels = (
@@ -192,9 +186,6 @@ pub async fn peer_setup_for(
         let (received_ack_tickets_tx, received_ack_tickets_rx) =
             futures::channel::mpsc::unbounded::<AcknowledgedTicket>();
 
-        let (wire_ack_send_tx, wire_ack_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-        let (wire_ack_recv_tx, wire_ack_recv_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-
         let (wire_msg_send_tx, wire_msg_send_rx) = futures::channel::mpsc::unbounded::<(PeerId, Box<[u8]>)>();
         let (mixer_channel_tx, mixer_channel_rx) =
             hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(MixerConfig::default());
@@ -204,10 +195,8 @@ pub async fn peer_setup_for(
         let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
 
         let opk: &OffchainKeypair = &PEERS[i];
-        let ock: &ChainKeypair = &PEERS_CHAIN[i];
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: opk.clone(),
-            chain_keypair: ock.clone(),
             outgoing_ticket_win_prob: Some(1.0),
             outgoing_ticket_price: Some(BalanceType::HOPR.balance(100)),
         };
@@ -218,16 +207,12 @@ pub async fn peer_setup_for(
             packet_cfg,
             db,
             None,
-            (wire_ack_recv_tx, wire_ack_send_rx),
             (mixer_channel_tx, wire_msg_send_rx),
             (api_recv_tx, api_send_rx),
         )
         .await;
 
-        wire_channels.push((
-            (wire_ack_send_tx, wire_ack_recv_rx),
-            (wire_msg_send_tx, mixer_channel_rx),
-        ));
+        wire_channels.push((wire_msg_send_tx, mixer_channel_rx));
 
         logical_channels.push((api_send_tx, api_recv_rx));
         ticket_channels.push(received_ack_tickets_rx)
@@ -242,47 +227,50 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
         for j in 0..pending_packet_count {
             debug!("Component: {i} on packet {j}");
 
-            if i != components.len() - 1 {
-                debug!("Resending message to the next");
-                let (peer, data) = components[i]
+            let count = if i == 0 || i == components.len() - 1 { 1 } else { 2 };
+
+            for _i in 0..count {
+                let (dest, payload) = components[i]
                     .1
-                     .1
                     .next()
                     .await
                     .expect("MSG relayer should forward a msg to the next");
 
-                assert_eq!(peer, PEERS[i + 1].public().into());
+                let destination = if i == 0 {
+                    assert_eq!(
+                        dest,
+                        PEERS[i + 1].public().into(),
+                        "first peer should send only data to the next one"
+                    );
+                    i + 1
+                } else if i == components.len() - 1 {
+                    assert_eq!(
+                        dest,
+                        PEERS[i - 1].public().into(),
+                        "last peer should send only ack to the previous one"
+                    );
+                    i - 1
+                } else if dest == PEERS[i + 1].public().into() {
+                    debug!(%dest, "sending data to next");
+                    i + 1
+                } else if dest == PEERS[i - 1].public().into() {
+                    debug!(%dest, "sending ack to previous");
+                    i - 1
+                } else {
+                    panic!("Unexpected destination");
+                };
 
-                debug!(from = i, to = i + 1, "relaying packet");
-                components[i + 1]
-                    .1
-                     .0
-                    .send((PEERS[i].public().into(), data))
-                    .await
-                    .expect("Send to relayer should succeed");
-            }
-
-            if i != 0 {
-                debug!("Peeking into the ack queue");
-                let (peer, ack) = components[i]
+                components[destination]
                     .0
-                     .1
-                    .next()
+                    .send((PEERS[i].public().into(), payload))
                     .await
-                    .expect("MSG relayer should ack the forwarded packet back");
-
-                assert_eq!(peer, PEERS[i - 1].public().into());
-
-                debug!(from = i, to = i - 1, "sending ack back");
-                components[i - 1]
-                    .0
-                     .0
-                    .send((PEERS[i].public().into(), ack))
-                    .await
-                    .expect("ACK send to originator should succeed");
+                    .expect("Sending of payload to the peer failed");
             }
         }
     }
+
+    // TODO: let it live for a while
+    futures::future::pending::<()>().await;
 }
 
 struct TestResolver(Vec<(OffchainPublicKey, Address)>);
@@ -387,7 +375,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     assert_eq!(peer_count - 1, packet_path.num_hops(), "path has invalid length");
 
-    async_std::task::spawn(emulate_channel_communication(packet_count, wire_apis));
+    tokio::task::spawn(emulate_channel_communication(packet_count, wire_apis));
 
     let mut sent_packet_count = 0;
     for i in 0..packet_count {
@@ -431,7 +419,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
         assert_eq!(recv_packets, test_msgs);
     };
 
-    let res = compare_packets.timeout(TIMEOUT_SECONDS).await;
+    let res = timeout(TIMEOUT_SECONDS, compare_packets).await;
 
     assert!(
         res.is_ok(),
@@ -445,9 +433,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
         let expected_tickets = if i != 0 && i != peer_count - 1 { packet_count } else { 0 };
 
         assert_eq!(
-            rx.take(expected_tickets)
-                .count()
-                .timeout(std::time::Duration::from_secs(1))
+            timeout(std::time::Duration::from_secs(1), rx.take(expected_tickets).count())
                 .await
                 .context("peer should be able to extract expected tickets")?,
             expected_tickets,

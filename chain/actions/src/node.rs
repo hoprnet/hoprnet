@@ -115,7 +115,7 @@ mod tests {
         static ref ALICE_OFFCHAIN: OffchainKeypair = OffchainKeypair::from_secret(&hex!("e0bf93e9c916104da00b1850adc4608bd7e9087bbd3f805451f4556aa6b3fd6e")).expect("lazy static keypair should be constructible");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_announce() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009")?;
@@ -156,7 +156,7 @@ mod tests {
 
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -173,7 +173,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_announce_should_not_allow_reannouncing_with_same_multiaddress() -> anyhow::Result<()> {
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009")?;
 
@@ -214,7 +214,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_withdraw() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -235,7 +235,7 @@ mod tests {
 
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -256,7 +256,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_withdraw_zero_amount() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())

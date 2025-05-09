@@ -219,7 +219,8 @@ class Node:
         ready = False
 
         while not ready:
-            peers_info = await asyncio.wait_for(self.api.peers(), timeout=1)
+            # we choose a long timeout here to accomodate the node just starting
+            peers_info = await asyncio.wait_for(self.api.peers(), timeout=10)
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 
             # filter out peers that are not well-connected yet
