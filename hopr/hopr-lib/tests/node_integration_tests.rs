@@ -3,7 +3,7 @@ mod common;
 use alloy::primitives::U256;
 use std::time::Duration;
 
-use hopr_chain_rpc::client::{reqwest_client::ReqwestRequestor, SnapshotRequestor};
+use hopr_chain_rpc::client::SnapshotRequestor;
 use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
 
 use crate::common::{deploy_test_environment, onboard_node};
