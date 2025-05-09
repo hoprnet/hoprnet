@@ -97,7 +97,7 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 .PHONY: localcluster
 localcluster: args=
 localcluster: ## spin up the localcluster using the default configuration file
-	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected $(args)
+	@uv run -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected $(args)
 
 .PHONY: localcluster-exposed
 localcluster-exposed: ## spin up the localcluster using the default configuration file, exposing all nodes in the local network
