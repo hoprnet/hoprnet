@@ -11,6 +11,11 @@ use tracing::info;
 use hopr_chain_rpc::client::AnvilRpcClient;
 use hopr_chain_rpc::client::{create_rpc_client_to_anvil, SnapshotRequestor};
 use hopr_chain_rpc::transport::ReqwestClient;
+||||||| 82381cf104
+use hopr_chain_rpc::client::surf_client::SurfRequestor;
+use hopr_chain_rpc::client::{
+    create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
+};
 use hopr_chain_types::utils::{
     add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
 };
