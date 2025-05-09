@@ -123,7 +123,7 @@ impl FaucetArgs {
         let (native_balances, token_balances) =
             get_native_and_token_balances(hopr_token.clone(), eth_addresses_all.clone())
                 .await
-                .map_err(|e| HelperErrors::MulticallError(e.into()))?;
+                .map_err(HelperErrors::MulticallError)?;
         // Get the amount of HOPR tokens that addresses need to receive to reach the desired amount
         let hopr_token_amount: U256 = parse_units(&hopr_amount.to_string(), "ether")
             .map_err(|_| HelperErrors::ParseError("Failed to parse hopr_amount units".into()))?

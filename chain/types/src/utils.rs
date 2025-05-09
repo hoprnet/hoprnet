@@ -1,7 +1,7 @@
+#![allow(clippy::too_many_arguments)]
 //! Chain utilities used for testing.
 //!
 //! This used in unit and integration tests.
-use crate::{constants, errors::Result as ChainTypesResult, ContractInstances};
 use alloy::{
     contract::{Error as ContractError, Result as ContractResult},
     network::{ReceiptResponse, TransactionBuilder},
@@ -11,6 +11,9 @@ use alloy::{
     sol,
     sol_types::{SolCall, SolValue},
 };
+use std::str::FromStr;
+use tracing::debug;
+
 use hopr_bindings::{
     hoprchannels::HoprChannels::HoprChannelsInstance,
     hoprnodemanagementmodule::HoprNodeManagementModule,
@@ -19,9 +22,9 @@ use hopr_bindings::{
 };
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
-use std::str::FromStr;
-use tracing::debug;
 use SafeContract::SafeContractInstance;
+
+use crate::{constants, errors::Result as ChainTypesResult, ContractInstances};
 
 // define basic safe abi
 sol!(
@@ -94,9 +97,7 @@ pub fn create_native_transfer<N>(to: Address, amount: U256) -> N::TransactionReq
 where
     N: alloy::providers::Network,
 {
-    let tx = N::TransactionRequest::default().with_to(to.into()).with_value(amount);
-
-    tx
+    N::TransactionRequest::default().with_to(to.into()).with_value(amount)
 }
 
 /// Funds the given wallet address with specified amount of native tokens and HOPR tokens.
@@ -374,7 +375,7 @@ where
     P: alloy::providers::Provider + Clone,
 {
     // Get deployer address
-    let self_address: Address = deployer.public().to_address().into();
+    let self_address: Address = deployer.public().to_address();
 
     // Check if safe suite has been deployed. If so, skip this step
     let code = provider

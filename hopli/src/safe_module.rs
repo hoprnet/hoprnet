@@ -792,7 +792,7 @@ impl SafeModuleSubcommands {
                 &node,
             )
             .await
-            .map_err(|e| HelperErrors::MulticallError(e.into()))?;
+            .map_err(HelperErrors::MulticallError)?;
 
             // compare the registered safe with the provided safe
             if registered_safe != safe_addr {
@@ -811,7 +811,7 @@ impl SafeModuleSubcommands {
                 &contract_addresses.addresses.announcements.into(),
             )
             .await
-            .map_err(|e| HelperErrors::MulticallError(e.into()))?;
+            .map_err(HelperErrors::MulticallError)?;
         }
         Ok(())
     }

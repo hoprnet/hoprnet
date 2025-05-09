@@ -132,7 +132,7 @@ impl NetworkProviderArgs {
 // ) -> Result<Arc<NonceManagerMiddleware<SignerMiddleware<Provider<JsonRpcClient>, Wallet<SigningKey>>>>, HelperErrors>
     {
         // Build transport
-        let parsed_url = url::Url::parse(&self.provider_url.as_str()).unwrap();
+        let parsed_url = url::Url::parse(self.provider_url.as_str()).unwrap();
         let transport_client = ReqwestTransport::new(parsed_url);
 
         // Build JSON RPC client
@@ -161,7 +161,7 @@ impl NetworkProviderArgs {
     /// get the provider object without signer
     pub async fn get_provider_without_signer(&self) -> Result<Arc<RpcProviderWithoutSigner>, HelperErrors> {
         // Build transport
-        let parsed_url = url::Url::parse(&self.provider_url.as_str()).unwrap();
+        let parsed_url = url::Url::parse(self.provider_url.as_str()).unwrap();
         let transport_client = ReqwestTransport::new(parsed_url);
 
         // Build JSON RPC client

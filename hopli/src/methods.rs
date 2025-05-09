@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments)]
 //! This module contains all the methods used for onchain interaction, especially with Safe instance, Mutlicall, and Multisend contracts.
 //!
 //! [SafeTxOperation] corresponds to the `Operation` Enum used in Safe smart contract.
@@ -16,6 +17,12 @@ use alloy::{
     sol_types::{SolCall, SolValue},
 };
 use hex_literal::hex;
+use std::sync::Arc;
+use std::{ops::Add, str::FromStr};
+use tracing::{debug, info};
+use IMulticall3Extract::IMulticall3ExtractInstance;
+use SafeSingleton::{execTransactionCall, removeOwnerCall, setupCall, SafeSingletonInstance};
+
 use hopr_bindings::{
     hoprnetworkregistry::HoprNetworkRegistry::HoprNetworkRegistryInstance,
     hoprnodemanagementmodule::HoprNodeManagementModule::{
@@ -26,12 +33,6 @@ use hopr_bindings::{
     hoprnodestakefactory::HoprNodeStakeFactory::{cloneCall, HoprNodeStakeFactoryInstance},
     hoprtoken::HoprToken::{approveCall, HoprTokenInstance},
 };
-use std::sync::Arc;
-use std::{ops::Add, str::FromStr};
-use tracing::{debug, info};
-use IMulticall3Extract::IMulticall3ExtractInstance;
-use SafeSingleton::{execTransactionCall, removeOwnerCall, setupCall, SafeSingletonInstance};
-
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 
 use crate::utils::{
@@ -126,7 +127,7 @@ impl MultisendTransaction {
 
         let value = (
             tx_operation_bytes,                  // 1 bytes
-            Address::from(self.to),              // 20 bytes
+            self.to,                             // 20 bytes
             U256::from(self.value),              // 32 bytes
             U256::from(self.encoded_data.len()), // 32 bytes
             self.encoded_data.clone(),           // bytes
@@ -262,7 +263,7 @@ pub async fn send_multisend_safe_transaction_with_threshold_one<P: WalletProvide
             U256::ZERO,
             Address::ZERO,
             signer,
-            Bytes::from(signature.as_bytes()).into(),
+            Bytes::from(signature.as_bytes()),
         )
         .send()
         .await?
@@ -321,8 +322,8 @@ pub async fn get_native_and_token_balances<P: Provider>(
 
     // if there is less than two addresses, use multicall3 on each address
     // otherwise, make multicall on all addresses
-    if addresses.len() == 0 {
-        return Ok((vec![], vec![]));
+    if addresses.is_empty() {
+        Ok((vec![], vec![]))
     } else if addresses.len() == 1 {
         let address = addresses[0];
         let multicall = provider
@@ -331,7 +332,7 @@ pub async fn get_native_and_token_balances<P: Provider>(
             .add(hopr_token.balanceOf(address));
 
         let (native_balance, token_balance) = multicall.aggregate().await?;
-        return Ok((vec![native_balance.balance], vec![token_balance._0]));
+        Ok((vec![native_balance.balance], vec![token_balance._0]))
     } else {
         let mut native_balances_multicall = MulticallBuilder::new_dynamic(provider);
         let mut token_balances_multicall = MulticallBuilder::new_dynamic(provider);
@@ -507,14 +508,11 @@ pub async fn transfer_native_tokens<P: Provider + WalletProvider>(
         .clone()
         .into_iter()
         .enumerate()
-        .map(|(i, addr)| {
-            let call = Call3Value {
-                target: addr,
-                allowFailure: false,
-                value: amounts[i],
-                callData: Bytes::default(),
-            };
-            call
+        .map(|(i, addr)| Call3Value {
+            target: addr,
+            allowFailure: false,
+            value: amounts[i],
+            callData: Bytes::default(),
         })
         .collect::<Vec<_>>();
     let aggregate3_value_payload = aggregate3ValueCall { calls }.abi_encode();
@@ -784,9 +782,7 @@ pub fn prepare_safe_tx_multicall_payload_from_owner_contract(
     }
     .abi_encode();
 
-    let call_item = CallItem::<execTransactionCall>::new(deployed_safe, input.into());
-
-    call_item
+    CallItem::<execTransactionCall>::new(deployed_safe, input.into())
 }
 
 /// Deploy a safe and a module proxies via HoprStakeFactory contract with default permissions and announcement targets

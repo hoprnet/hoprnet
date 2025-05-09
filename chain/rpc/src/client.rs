@@ -3,8 +3,8 @@
 //!
 //! Extended layers of RPC clients:
 //! - Replace the legacy retry backoff layer with the default [`RetryBackoffService`].
-//! However the backoff calculation still needs to be improved, as the number of retries
-//! is not passed to the `backoff_hint` method.
+//!   However the backoff calculation still needs to be improved, as the number of retries
+//!   is not passed to the `backoff_hint` method.
 //! - Add Metrics Layer
 //! - Add Snapshot Layer
 //! - Use tokio runtime for most of the tests
@@ -36,7 +36,7 @@ use tracing::{error, trace};
 use url::Url;
 use validator::Validate;
 
-//// Gas estimation constants for EIP-1559 for Gnosis chain.
+/// Gas estimation constants for EIP-1559 for Gnosis chain.
 /// These values are used to estimate the gas price for transactions.
 /// As GasOracleMiddleware is migrated to GasFiller, they are replaced with
 /// default values.
@@ -83,7 +83,7 @@ lazy_static::lazy_static! {
 ///
 /// The standard `RetryBackoffLayer` defines the following properties:
 /// - `max_rate_limit_retries`: (u32) The maximum number of retries for rate limit errors.
-/// Different from the legacy implementation, there is always an upper limit.
+///   Different from the legacy implementation, there is always an upper limit.
 /// - `initial_backoff`: (u64) The initial backoff in milliseconds
 /// - `compute_units_per_second`: (u64) The number of compute units per second for this service
 ///
@@ -341,9 +341,9 @@ where
     pub async fn query(&self) -> Result<GasOracleResponse, TransportError> {
         let raw_value = self
             .client
-            .http_get(&self.url.as_str())
+            .http_get(self.url.as_str())
             .await
-            .map_err(|e| TransportErrorKind::custom(e))?;
+            .map_err(TransportErrorKind::custom)?;
 
         let parsed: GasOracleResponse = serde_json::from_slice(raw_value.as_ref()).map_err(|e| {
             error!(%e, "failed to deserialize gas price API response");
@@ -575,7 +575,7 @@ where
                     error!(error = ?err, "Error occurred while processing request");
                     method_names.iter().for_each(|m| {
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_RPC_CALLS.increment(&[&m, "failure"]);
+                        METRIC_COUNT_RPC_CALLS.increment(&[m, "failure"]);
                     });
                 }
             };

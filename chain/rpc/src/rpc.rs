@@ -302,10 +302,8 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                     .add_call(tx_1_dummy)
                     .add_call(tx_2)
                     .add_call(tx_3);
-                let (max_allowed_registration, node_registered_to_account, quick_check) = multicall
-                    .aggregate3_value()
-                    .await
-                    .map_err(|e| RpcError::MulticallError(e.into()))?;
+                let (max_allowed_registration, node_registered_to_account, quick_check) =
+                    multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
                 (
                     max_allowed_registration
                         .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
@@ -324,10 +322,8 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                     .add_call(tx_1_proxy)
                     .add_call(tx_2)
                     .add_call(tx_3);
-                let (stake_threshold, node_registered_to_account, quick_check) = multicall
-                    .aggregate3_value()
-                    .await
-                    .map_err(|e| RpcError::MulticallError(e.into()))?;
+                let (stake_threshold, node_registered_to_account, quick_check) =
+                    multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
                 (
                     stake_threshold
                         .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
@@ -415,10 +411,8 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         let tx_3 = CallItemBuilder::new(self.node_module.owner()).allow_failure(false);
         let multicall = self.provider.multicall().add_call(tx_1).add_call(tx_2).add_call(tx_3);
 
-        let (node_in_module_inclusion, module_safe_enabling, safe_of_module_ownership) = multicall
-            .aggregate3_value()
-            .await
-            .map_err(|e| RpcError::MulticallError(e.into()))?;
+        let (node_in_module_inclusion, module_safe_enabling, safe_of_module_ownership) =
+            multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
         let is_node_included_in_module = node_in_module_inclusion
             .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
             ._0;
@@ -440,13 +434,13 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
     }
 
     async fn send_transaction(&self, tx: TransactionRequest) -> Result<PendingTransaction> {
-        let sent_tx = self.provider.send_transaction(tx.into()).await?;
+        let sent_tx = self.provider.send_transaction(tx).await?;
 
         let receipt = sent_tx
             .with_required_confirmations(self.cfg.finality as u64)
             .register()
             .await
-            .map_err(|e| RpcError::PendingTransactionError(e.into()))?;
+            .map_err(RpcError::PendingTransactionError)?;
 
         Ok(receipt)
     }

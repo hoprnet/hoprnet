@@ -88,7 +88,7 @@ impl HttpRequestor for ReqwestClient {
         let body = res
             .bytes()
             .await
-            .map_err(|e| HttpRequestError::UnknownError(e.to_string().into()))?;
+            .map_err(|e| HttpRequestError::UnknownError(e.to_string()))?;
 
         debug!(bytes = body.len(), "retrieved response body. Use `trace` for full body");
         trace!(body = %String::from_utf8_lossy(&body), "response body");

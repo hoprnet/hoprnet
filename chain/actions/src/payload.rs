@@ -17,6 +17,7 @@ use alloy::primitives::aliases::{U24, U48, U56};
 use alloy::primitives::{B256, U256};
 use alloy::rpc::types::TransactionRequest;
 use alloy::sol_types::SolCall;
+
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{
         announceCall, announceSafeCall, bindKeysAnnounceCall, bindKeysAnnounceSafeCall,
@@ -103,20 +104,19 @@ fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
 }
 
 fn approve_tx(spender: Address, amount: Balance) -> TransactionRequest {
-    let tx = TransactionRequest::default().with_input(
+    TransactionRequest::default().with_input(
         approveCall {
             spender: spender.into(),
             value: U256::from_be_bytes(amount.amount().to_be_bytes()),
         }
         .abi_encode(),
-    );
-    tx
+    )
 }
 
 fn transfer_tx(destination: Address, amount: Balance) -> TransactionRequest {
     let amount_u256 = U256::from_be_bytes(amount.amount().to_be_bytes());
-    let mut tx = TransactionRequest::default();
-    tx = match amount.balance_type() {
+    let tx = TransactionRequest::default();
+    match amount.balance_type() {
         BalanceType::HOPR => tx.with_input(
             transferCall {
                 recipient: destination.into(),
@@ -125,18 +125,16 @@ fn transfer_tx(destination: Address, amount: Balance) -> TransactionRequest {
             .abi_encode(),
         ),
         BalanceType::Native => tx.with_value(amount_u256),
-    };
-    tx
+    }
 }
 
 fn register_safe_tx(safe_addr: Address) -> TransactionRequest {
-    let tx = TransactionRequest::default().with_input(
+    TransactionRequest::default().with_input(
         registerSafeByNodeCall {
             safeAddr: safe_addr.into(),
         }
         .abi_encode(),
-    );
-    tx
+    )
 }
 
 /// Generates transaction payloads that do not use Safe-compliant ABI
@@ -180,9 +178,9 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
                 let serialized_signature = binding.signature.as_ref();
 
                 bindKeysAnnounceCall {
-                    ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]).into(),
-                    ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]).into(),
-                    ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()).into(),
+                    ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
+                    ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
+                    ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()),
                     baseMultiaddr: announcement.multiaddress().to_string(),
                 }
                 .abi_encode()
@@ -350,9 +348,9 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
 
                 bindKeysAnnounceSafeCall {
                     selfAddress: self.me.into(),
-                    ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]).into(),
-                    ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]).into(),
-                    ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()).into(),
+                    ed25519_sig_0: B256::from_slice(&serialized_signature[0..32]),
+                    ed25519_sig_1: B256::from_slice(&serialized_signature[32..64]),
+                    ed25519_pub_key: B256::from_slice(binding.packet_key.as_ref()),
                     baseMultiaddr: announcement.multiaddress().to_string(),
                 }
                 .abi_encode()
@@ -564,16 +562,16 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 
         Ok(OnChainRedeemableTicket {
             data: TicketData {
-                channelId: B256::from_slice(&off_chain.verified_ticket().channel_id.as_ref()).into(),
+                channelId: B256::from_slice(off_chain.verified_ticket().channel_id.as_ref()),
                 amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), // Extract only the last 12 bytes (lowest 96 bits)
                 ticketIndex: U48::from_be_slice(&off_chain.verified_ticket().index.to_be_bytes()[8 - 6..]),
-                indexOffset: off_chain.verified_ticket().index_offset.into(),
+                indexOffset: off_chain.verified_ticket().index_offset,
                 epoch: U24::from_be_slice(&off_chain.verified_ticket().channel_epoch.to_be_bytes()[4 - 3..]),
                 winProb: U56::from_be_slice(&off_chain.verified_ticket().encoded_win_prob),
             },
             signature: CompactSignature {
-                r: B256::from_slice(&serialized_signature[0..32]).into(),
-                vs: B256::from_slice(&serialized_signature[32..64]).into(),
+                r: B256::from_slice(&serialized_signature[0..32]),
+                vs: B256::from_slice(&serialized_signature[32..64]),
             },
             porSecret: U256::from_be_slice(off_chain.response.as_ref()),
         })

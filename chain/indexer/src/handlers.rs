@@ -16,7 +16,6 @@ use hopr_bindings::{
     hoprticketpriceoracle::HoprTicketPriceOracle::HoprTicketPriceOracleEvents, hoprtoken::HoprToken::HoprTokenEvents,
     hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::HoprWinningProbabilityOracleEvents,
 };
-
 use hopr_chain_rpc::{BlockWithLogs, Log};
 use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
 use hopr_chain_types::ContractAddresses;
@@ -190,7 +189,7 @@ where
 
                 if let Some(channel_edits) = maybe_channel {
                     let new_balance = Balance::new(
-                        U256::from_be_bytes(&balance_decreased.newBalance.to_be_bytes::<12>()),
+                        U256::from_be_bytes(balance_decreased.newBalance.to_be_bytes::<12>()),
                         BalanceType::HOPR,
                     );
                     let diff = channel_edits.entry().balance.sub(&new_balance);
@@ -214,7 +213,7 @@ where
 
                 if let Some(channel_edits) = maybe_channel {
                     let new_balance = Balance::new(
-                        U256::from_be_bytes(&balance_increased.newBalance.to_be_bytes::<12>()),
+                        U256::from_be_bytes(balance_increased.newBalance.to_be_bytes::<12>()),
                         BalanceType::HOPR,
                     );
                     let diff = new_balance.sub(&channel_edits.entry().balance);
@@ -439,7 +438,7 @@ where
                         .finish_channel_update(
                             tx.into(),
                             channel_edits.change_ticket_index(U256::from_be_bytes(
-                                &ticket_redeemed.newTicketIndex.to_be_bytes::<6>(),
+                                ticket_redeemed.newTicketIndex.to_be_bytes::<6>(),
                             )),
                         )
                         .await?;
@@ -795,28 +794,28 @@ where
 
         if log.address.eq(&self.addresses.announcements) {
             let bn = log.block_number as u32;
-            let event = HoprAnnouncementsEvents::decode_log(&primitive_log.into(), true)?;
+            let event = HoprAnnouncementsEvents::decode_log(&primitive_log, true)?;
             self.on_announcement_event(tx, event.data, bn).await
         } else if log.address.eq(&self.addresses.channels) {
-            let event = HoprChannelsEvents::decode_log(&primitive_log.into(), true)?;
+            let event = HoprChannelsEvents::decode_log(&primitive_log, true)?;
             self.on_channel_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.network_registry) {
-            let event = HoprNetworkRegistryEvents::decode_log(&primitive_log.into(), true)?;
+            let event = HoprNetworkRegistryEvents::decode_log(&primitive_log, true)?;
             self.on_network_registry_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.token) {
-            let event = HoprTokenEvents::decode_log(&primitive_log.into(), true)?;
+            let event = HoprTokenEvents::decode_log(&primitive_log, true)?;
             self.on_token_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.safe_registry) {
-            let event = HoprNodeSafeRegistryEvents::decode_log(&primitive_log.into(), true)?;
+            let event = HoprNodeSafeRegistryEvents::decode_log(&primitive_log, true)?;
             self.on_node_safe_registry_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.module_implementation) {
-            let event = HoprNodeManagementModuleEvents::decode_log(&primitive_log.into(), true)?;
+            let event = HoprNodeManagementModuleEvents::decode_log(&primitive_log, true)?;
             self.on_node_management_module_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.price_oracle) {
-            let event = HoprTicketPriceOracleEvents::decode_log(&primitive_log.into(), true)?;
+            let event = HoprTicketPriceOracleEvents::decode_log(&primitive_log, true)?;
             self.on_ticket_price_oracle_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.win_prob_oracle) {
-            let event = HoprWinningProbabilityOracleEvents::decode_log(&primitive_log.into(), true)?;
+            let event = HoprWinningProbabilityOracleEvents::decode_log(&primitive_log, true)?;
             self.on_ticket_winning_probability_oracle_event(tx, event.data).await
         } else {
             #[cfg(all(feature = "prometheus", not(test)))]
