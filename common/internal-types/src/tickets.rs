@@ -1,11 +1,12 @@
 use alloy::sol_types::SolCall;
 use hex_literal::hex;
-use hopr_bindings::hoprchannels::HoprChannels::redeemTicketCall;
-use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::prelude::*;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use tracing::{debug, error};
+
+use hopr_bindings::hoprchannels::HoprChannels::redeemTicketCall;
+use hopr_crypto_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 
 use crate::errors;
 use crate::errors::CoreTypesError;
