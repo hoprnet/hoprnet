@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "3.12.0"
+version = "3.12.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "API enabling developers to interact with a hoprd node programatically through HTTP REST API."
@@ -21,7 +21,7 @@ prometheus = [
 ]
 explicit-path = []
 # placeholder feature so we can enable it globally during tests
-runtime-async-std = []
+runtime-tokio = []
 
 [dependencies]
 async-lock = { workspace = true }
