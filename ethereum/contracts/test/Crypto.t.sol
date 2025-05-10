@@ -158,6 +158,25 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         assertEq(maybe_p_double_y, p_double.y);
     }
 
+    function testEcAddPointDoubleWhenAIsNotZero() public {
+        // for a general elliptic curver where a != 0 over prime field
+        // where F_p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+        // y^2 = x^3 + 2x + 1 (mod F_p) where a simple point P (0, 1)  is on the curve
+        // its double point should be calculated with
+        // lambda: (3 * p.x ^ 2 + a) * (2 * p.y) ^ - 1 = 1
+        // r.x = lambda ^2 - 2 * p.x = 1
+        // r.y = lambada * (p.x - r.x - p.y) = F_p - 2
+        CurvePoint memory p = CurvePoint(0x00, 0x01);
+
+        CurvePoint memory p_double =
+            CurvePoint(0x01, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2D);
+
+        (uint256 maybe_p_double_x, uint256 maybe_p_double_y) = crypto.ecAddProxy(p.x, p.y, p.x, p.y, 2);
+
+        assertEq(maybe_p_double_x, p_double.x);
+        assertEq(maybe_p_double_y, p_double.y);
+    }
+
     function testEcAddFuzzy(uint256 u_0, uint256 u_1) public {
         vm.assume(crypto.isFieldElementInternalProxy(u_0));
         vm.assume(crypto.isFieldElementInternalProxy(u_1));
