@@ -77,8 +77,7 @@ class Cluster:
                 logging.error(f"Node {node} not ready after {GLOBAL_TIMEOUT} seconds")
 
         if not all(nodes_readyness):
-            logging.critical("Not all nodes are ready, interrupting setup")
-            raise RuntimeError
+            raise RuntimeError("Not all nodes are ready, interrupting setup")
 
         logging.info("Retrieve nodes addresses and peer ids")
         for node in self.nodes.values():
@@ -86,8 +85,7 @@ class Cluster:
                 node.peer_id = addresses.hopr
                 node.address = addresses.native
             else:
-                logging.critical(f"Node {node} did not return addresses")
-                raise RuntimeError
+                raise RuntimeError(f"Node {node} did not return addresses")
 
         # WAIT FOR NODES TO CONNECT TO ALL PEERS
         peer_connection_timeout = 2 * GLOBAL_TIMEOUT
@@ -101,8 +99,7 @@ class Cluster:
         try:
             await asyncio.wait_for(asyncio.gather(*tasks), peer_connection_timeout)
         except asyncio.TimeoutError:
-            logging.critical("Not all nodes are connected to all peers, interrupting setup")
-            raise RuntimeError
+            raise RuntimeError("Not all nodes are connected to all peers, interrupting setup")
 
     def fund_nodes(self):
         logging.info("Funding nodes")

@@ -23,7 +23,7 @@ class Anvil:
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
 
     def run(self, state=AnvilState.DUMP):
-        logging.info("Starting and waiting for local anvil server to be up" + f"({state.name.lower()} state enabled)")
+        logging.info("Starting and waiting for local anvil server to be up " + f"({state.name.lower()} state enabled)")
 
         command = f"""
             bash scripts/run-local-anvil.sh
@@ -65,5 +65,5 @@ class Anvil:
 
     @classmethod
     def kill(cls):
-        logging.info("Stop all local anvil servers running")
+        logging.info("Stopping all local anvil servers running")
         run(f"make -s kill-anvil port={PORT_BASE}".split(), cwd=PWD, check=False)
