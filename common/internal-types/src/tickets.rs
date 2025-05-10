@@ -1,9 +1,12 @@
+use alloy::sol_types::SolCall;
 use hex_literal::hex;
-use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::prelude::*;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use tracing::{debug, error};
+
+use hopr_bindings::hoprchannels::HoprChannels::redeemTicketCall;
+use hopr_crypto_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 
 use crate::errors;
 use crate::errors::CoreTypesError;
@@ -419,8 +422,7 @@ impl Ticket {
     /// must be equal to on-chain computation
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
         let ticket_hash = Hash::create(&[self.encode_without_signature().as_ref()]); // cannot fail
-                                                                                     // This contains on-chain prefix: RedeemTicketCall::selector() and zeroes
-        let hash_struct = Hash::create(&[&[252u8, 183u8, 121u8, 111u8], &[0u8; 28], ticket_hash.as_ref()]);
+        let hash_struct = Hash::create(&[&redeemTicketCall::SELECTOR, &[0u8; 28], ticket_hash.as_ref()]);
         Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
 

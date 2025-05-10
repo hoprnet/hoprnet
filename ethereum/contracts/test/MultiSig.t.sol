@@ -10,7 +10,7 @@ import { HoprNodeSafeRegistry } from "../src/node-stake/NodeSafeRegistry.sol";
 // We need this dummy contract to correctly set msg.sender
 // when testing modifiers of abstract contracts
 contract MultiSigContract is HoprMultiSig {
-    function modifierOnlySafe(address self) public onlySafe(self) { }
+    function modifierOnlySafe(address selfAddress) public onlySafe(selfAddress) { }
 
     function modifierNoSafeSet() public noSafeSet { }
 

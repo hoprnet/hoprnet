@@ -54,9 +54,9 @@ use crate::{
     },
     utils::{Cmd, HelperErrors},
 };
+use alloy::primitives::Address;
 use clap::Parser;
-use ethers::types::H160;
-use hopr_bindings::hopr_network_registry::HoprNetworkRegistry;
+use hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry;
 use std::str::FromStr;
 use tracing::info;
 
@@ -165,13 +165,13 @@ impl NetworkRegistrySubcommands {
         private_key: PrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
-        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        let mut node_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = node_address {
             node_eth_addresses.extend(
                 addresses
                     .split(',')
                     .map(|addr| {
-                        H160::from_str(addr)
+                        Address::from_str(addr)
                             .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -183,13 +183,13 @@ impl NetworkRegistrySubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
                 .into_iter()
-                .map(H160::from),
+                .map(Address::from),
         );
 
         // read all the safe addresses
-        let mut safe_eth_addresses: Vec<H160> = Vec::new();
+        let mut safe_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = safe_address {
-            safe_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+            safe_eth_addresses.extend(addresses.split(',').map(|addr| Address::from_str(addr).unwrap()));
         }
 
         // Read the private key from arguments or the "MANAGER_PRIVATE_KEY" environment variable
@@ -199,8 +199,10 @@ impl NetworkRegistrySubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_network_registry =
-            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
+        let hopr_network_registry = HoprNetworkRegistry::new(
+            contract_addresses.addresses.network_registry.into(),
+            rpc_provider.clone(),
+        );
 
         // get registered safe of all the nodes
         // check if any of the node has been registered to a different address than the given safe address.
@@ -228,13 +230,13 @@ impl NetworkRegistrySubcommands {
         private_key: PrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
-        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        let mut node_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = node_address {
             node_eth_addresses.extend(
                 addresses
                     .split(',')
                     .map(|addr| {
-                        H160::from_str(addr)
+                        Address::from_str(addr)
                             .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -246,7 +248,7 @@ impl NetworkRegistrySubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
                 .into_iter()
-                .map(H160::from),
+                .map(Address::from),
         );
         info!(
             "Will deregister {:?} nodes from the network registry",
@@ -260,8 +262,10 @@ impl NetworkRegistrySubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_network_registry =
-            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
+        let hopr_network_registry = HoprNetworkRegistry::new(
+            contract_addresses.addresses.network_registry.into(),
+            rpc_provider.clone(),
+        );
 
         // deregister all the given nodes from the network registry
         let removed_pairs_num =
@@ -284,9 +288,9 @@ impl NetworkRegistrySubcommands {
         eligibility: Option<bool>,
     ) -> Result<(), HelperErrors> {
         // read all the safe addresses
-        let mut safe_eth_addresses: Vec<H160> = Vec::new();
+        let mut safe_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = safe_address {
-            safe_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+            safe_eth_addresses.extend(addresses.split(',').map(|addr| Address::from_str(addr).unwrap()));
         }
 
         info!(
@@ -301,8 +305,10 @@ impl NetworkRegistrySubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_network_registry =
-            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
+        let hopr_network_registry = HoprNetworkRegistry::new(
+            contract_addresses.addresses.network_registry.into(),
+            rpc_provider.clone(),
+        );
 
         // deregister all the given nodes from the network registry
         match eligibility {
