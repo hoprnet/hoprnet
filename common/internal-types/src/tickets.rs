@@ -23,7 +23,10 @@ const ENCODED_WIN_PROB_LENGTH: usize = 7;
 pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
 
 /// Represents a ticket winning probability.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+///
+/// It holds the modified IEEE-754, but behaves like a reduced precision float
+/// when compared. It can also be fully ordered, because there cannot be NaNs or infinity.
+#[derive(Clone, Copy, Debug)]
 pub struct WinningProbability(EncodedWinProb);
 
 impl WinningProbability {
@@ -32,7 +35,9 @@ impl WinningProbability {
     /// 0% winning probability.
     pub const NEVER: Self = Self([0u8; ENCODED_WIN_PROB_LENGTH]);
 
-    const LOWEST_NON_ZERO: f64 = 0.00000001;
+    // This value can no longer be represented with the winning probability encoding
+    // and is equal to 0
+    const EPSILON: f64 = 0.00000001;
 
     /// Converts winning probability to an unsigned integer (luck).
     pub fn as_luck(&self) -> u64 {
@@ -48,11 +53,11 @@ impl WinningProbability {
 
     /// Convert probability to a float.
     pub fn as_f64(&self) -> f64 {
-        if self.eq(&Self::NEVER) {
+        if self.0.eq(&Self::NEVER.0) {
             return 0.0;
         }
 
-        if self.eq(&Self::ALWAYS) {
+        if self.0.eq(&Self::ALWAYS.0) {
             return 1.0;
         }
 
@@ -69,15 +74,16 @@ impl WinningProbability {
 
     /// Tries to get probability from a float.
     pub fn try_from_f64(win_prob: f64) -> errors::Result<Self> {
+        // Also makes sure the input value is not NaN or infinite.
         if !(0.0..=1.0).contains(&win_prob) {
-            return Err(InvalidInputData("Winning probability must be in [0.0, 1.0]".into()));
+            return Err(InvalidInputData("winning probability must be in [0.0, 1.0]".into()));
         }
 
-        if f64_approx_eq(0.0, win_prob, Self::LOWEST_NON_ZERO / 10.0) {
+        if f64_approx_eq(0.0, win_prob, Self::EPSILON) {
             return Ok(Self::NEVER);
         }
 
-        if f64_approx_eq(1.0, win_prob, Self::LOWEST_NON_ZERO / 10.0) {
+        if f64_approx_eq(1.0, win_prob, Self::EPSILON) {
             return Ok(Self::ALWAYS);
         }
 
@@ -96,6 +102,33 @@ impl WinningProbability {
     }
 }
 
+impl PartialEq for WinningProbability {
+    fn eq(&self, other: &Self) -> bool {
+        f64_approx_eq(self.as_f64(), other.as_f64(), Self::EPSILON)
+    }
+}
+
+impl Eq for WinningProbability {}
+
+impl PartialOrd<Self> for WinningProbability {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for WinningProbability {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let a = self.as_f64();
+        let b = other.as_f64();
+        if !f64_approx_eq(a, b, Self::EPSILON) {
+            a.partial_cmp(&b)
+                .expect("comparison must not fail on non-NAN a finite floats")
+        } else {
+            Ordering::Equal
+        }
+    }
+}
+
 impl Default for WinningProbability {
     fn default() -> Self {
         Self::ALWAYS
@@ -104,7 +137,7 @@ impl Default for WinningProbability {
 
 impl Display for WinningProbability {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:.9}", self.as_f64())
+        write!(f, "{:.8}", self.as_f64())
     }
 }
 
@@ -150,13 +183,13 @@ impl From<WinningProbability> for f64 {
 
 impl PartialEq<f64> for WinningProbability {
     fn eq(&self, other: &f64) -> bool {
-        f64_approx_eq(self.as_f64(), *other, Self::LOWEST_NON_ZERO / 10.0)
+        f64_approx_eq(self.as_f64(), *other, Self::EPSILON)
     }
 }
 
 impl PartialEq<WinningProbability> for f64 {
     fn eq(&self, other: &WinningProbability) -> bool {
-        f64_approx_eq(*self, other.as_f64(), WinningProbability::LOWEST_NON_ZERO / 10.0)
+        f64_approx_eq(*self, other.as_f64(), WinningProbability::EPSILON)
     }
 }
 
@@ -1107,7 +1140,7 @@ pub mod tests {
         let wp_0 = WinningProbability::try_from(&hex!("0020C49BBFFFFF"))?;
         let wp_1 = WinningProbability::try_from(&hex!("0020C49BA5E34F"))?;
 
-        assert_ne!(wp_0, wp_1);
+        assert_ne!(wp_0.as_ref(), wp_1.as_ref());
         assert_eq!(wp_0, wp_1.as_f64());
 
         Ok(())
@@ -1124,12 +1157,32 @@ pub mod tests {
 
     #[test]
     pub fn test_win_prob_must_be_correctly_ordered() {
-        let increment = WinningProbability::LOWEST_NON_ZERO * 100.0; // Testing the entire range would take too long
+        let increment = WinningProbability::EPSILON * 100.0; // Testing the entire range would take too long
         let mut prev = WinningProbability::NEVER;
         while let Ok(next) = WinningProbability::try_from_f64(prev.as_f64() + increment) {
             assert!(prev < next);
             prev = next;
         }
+    }
+
+    #[test]
+    pub fn test_win_prob_epsilon_must_be_never() -> anyhow::Result<()> {
+        assert_eq!(
+            WinningProbability::NEVER,
+            WinningProbability::try_from_f64(WinningProbability::EPSILON)?
+        );
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_win_prob_bounds_must_be_eq() -> anyhow::Result<()> {
+        let bound = 0.1 + WinningProbability::EPSILON;
+        let other = 0.1;
+        assert_eq!(
+            WinningProbability::try_from_f64(bound)?,
+            WinningProbability::try_from_f64(other)?
+        );
+        Ok(())
     }
 
     #[test]
