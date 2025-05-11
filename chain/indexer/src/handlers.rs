@@ -707,7 +707,7 @@ where
 
                 // If the old minimum was less strict, we need to mark of all the
                 // tickets below the new higher minimum as rejected
-                if old_minimum_win_prob < new_minimum_win_prob {
+                if old_minimum_win_prob.approx_cmp(&new_minimum_win_prob).is_lt() {
                     let mut selector: Option<TicketSelector> = None;
                     for channel in self.db.get_incoming_channels(tx.into()).await? {
                         selector = selector

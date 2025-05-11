@@ -42,7 +42,7 @@ impl Display for TicketIndexSelector {
 /// Allows selecting multiple tickets (if `index` does not contain a single value)
 /// or a single ticket (with unitary `index`) in the given channel and epoch.
 /// The selection can be further restricted to select ticket only in the given `state`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct TicketSelector {
     /// Channel ID and Epoch pairs.
     pub channel_identifiers: Vec<(Hash, U256)>,

@@ -14,7 +14,7 @@ use std::time::Duration;
 
 /// Lists all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for the long term.
-#[derive(Debug, Clone, PartialEq, strum::EnumDiscriminants)]
+#[derive(Debug, Clone, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(Hash))]
 pub enum CachedValue {
     /// Cached [IndexerData].

@@ -121,7 +121,7 @@ impl HoprDb {
         // We currently take the maximum of the win prob from the incoming ticket
         // and the one configured on this node.
         // Therefore, the winning probability can only increase along the path.
-        let outgoing_ticket_win_prob = outgoing_ticket_win_prob.max(verified_incoming_ticket.win_prob());
+        let outgoing_ticket_win_prob = outgoing_ticket_win_prob.max(&verified_incoming_ticket.win_prob());
 
         // The ticket is now validated, let's place it into the acknowledgement waiting queue
         self.caches

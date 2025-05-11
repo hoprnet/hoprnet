@@ -171,7 +171,7 @@ pub(crate) fn filter_satisfying_ticket_models(
             .try_into()
             .map_err(|_| DbSqlError::DecodingError)?;
 
-        if ticket_wp < min_win_prob {
+        if ticket_wp.approx_cmp(&min_win_prob).is_lt() {
             warn!(
                 channel_id = %channel_entry.get_id(),
                 %ticket_wp, %min_win_prob, "encountered ticket with winning probability lower than the minimum threshold"
@@ -1011,7 +1011,7 @@ impl HoprDbTicketOperations for HoprDb {
             })?;
 
         // Aggregated tickets always have 100% winning probability
-        if aggregated_ticket.win_prob() != WinningProbability::ALWAYS {
+        if !aggregated_ticket.win_prob().approx_eq(&WinningProbability::ALWAYS) {
             return Err(DbSqlError::LogicalError("Aggregated tickets must have 100% win probability".into()).into());
         }
 
@@ -1187,7 +1187,12 @@ impl HoprDbTicketOperations for HoprDb {
                 return Err(DbSqlError::LogicalError("tickets with overlapping index intervals".into()).into());
             }
 
-            if acked_ticket.verified_ticket().win_prob() < min_win_prob {
+            if acked_ticket
+                .verified_ticket()
+                .win_prob()
+                .approx_cmp(&min_win_prob)
+                .is_lt()
+            {
                 return Err(DbSqlError::LogicalError(
                     "cannot aggregate ticket with lower than minimum winning probability in network".into(),
                 )

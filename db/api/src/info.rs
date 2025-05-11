@@ -5,7 +5,7 @@ use hopr_primitive_types::prelude::*;
 /// Contains various on-chain information collected by Indexer,
 /// such as domain separators, ticket price, Network Registry status...etc.
 /// All these members change very rarely and therefore can be cached.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug)]
 pub struct IndexerData {
     /// Ledger smart contract domain separator
     pub ledger_dst: Option<Hash>,

@@ -100,31 +100,38 @@ impl WinningProbability {
 
         Ok(Self(res))
     }
-}
 
-impl PartialEq for WinningProbability {
-    fn eq(&self, other: &Self) -> bool {
-        f64_approx_eq(self.as_f64(), other.as_f64(), Self::EPSILON)
-    }
-}
-
-impl Eq for WinningProbability {}
-
-impl PartialOrd<Self> for WinningProbability {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for WinningProbability {
-    fn cmp(&self, other: &Self) -> Ordering {
+    /// Performs approximate comparison.
+    pub fn approx_cmp(&self, other: &Self) -> Ordering {
         let a = self.as_f64();
         let b = other.as_f64();
         if !f64_approx_eq(a, b, Self::EPSILON) {
-            a.partial_cmp(&b)
-                .expect("comparison must not fail on non-NAN a finite floats")
+            a.partial_cmp(&b).expect("finite non-NaN f64 comparison cannot fail")
         } else {
             Ordering::Equal
+        }
+    }
+
+    /// Performs approximate equality check.
+    pub fn approx_eq(&self, other: &Self) -> bool {
+        self.approx_cmp(other) == Ordering::Equal
+    }
+
+    /// Gets the mininum of two winning probabilities.
+    pub fn min(&self, other: &Self) -> Self {
+        if self.approx_cmp(other) == Ordering::Less {
+            *self
+        } else {
+            *other
+        }
+    }
+
+    /// Gets the maximum of two winning probabilities.
+    pub fn max(&self, other: &Self) -> Self {
+        if self.approx_cmp(other) == Ordering::Greater {
+            *self
+        } else {
+            *other
         }
     }
 }
@@ -1160,17 +1167,14 @@ pub mod tests {
         let increment = WinningProbability::EPSILON * 100.0; // Testing the entire range would take too long
         let mut prev = WinningProbability::NEVER;
         while let Ok(next) = WinningProbability::try_from_f64(prev.as_f64() + increment) {
-            assert!(prev < next);
+            assert!(prev.approx_cmp(&next).is_lt());
             prev = next;
         }
     }
 
     #[test]
     pub fn test_win_prob_epsilon_must_be_never() -> anyhow::Result<()> {
-        assert_eq!(
-            WinningProbability::NEVER,
-            WinningProbability::try_from_f64(WinningProbability::EPSILON)?
-        );
+        assert!(WinningProbability::NEVER.approx_eq(&WinningProbability::try_from_f64(WinningProbability::EPSILON)?));
         Ok(())
     }
 
@@ -1178,10 +1182,7 @@ pub mod tests {
     pub fn test_win_prob_bounds_must_be_eq() -> anyhow::Result<()> {
         let bound = 0.1 + WinningProbability::EPSILON;
         let other = 0.1;
-        assert_eq!(
-            WinningProbability::try_from_f64(bound)?,
-            WinningProbability::try_from_f64(other)?
-        );
+        assert!(WinningProbability::try_from_f64(bound)?.approx_eq(&WinningProbability::try_from_f64(other)?));
         Ok(())
     }
 
