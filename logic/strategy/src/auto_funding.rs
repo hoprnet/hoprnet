@@ -158,7 +158,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_auto_funding_strategy() -> anyhow::Result<()> {
         let stake_limit = Balance::new(7_u32, BalanceType::HOPR);
         let fund_amount = Balance::new(5_u32, BalanceType::HOPR);

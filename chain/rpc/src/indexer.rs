@@ -226,10 +226,10 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprIndexerRpcOpera
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use async_std::prelude::FutureExt;
     use ethers::contract::EthEvent;
     use futures::StreamExt;
     use std::time::Duration;
+    use tokio::time::timeout;
     use tracing::debug;
 
     use hopr_async_runtime::prelude::{sleep, spawn};
@@ -238,7 +238,7 @@ mod tests {
     use hopr_chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 
-    use crate::client::surf_client::SurfRequestor;
+    use crate::client::reqwest_client::ReqwestRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
     use crate::errors::RpcError;
     use crate::indexer::split_range;
@@ -264,7 +264,7 @@ mod tests {
         ))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_split_range() -> anyhow::Result<()> {
         let ranges = split_range(LogFilter::default(), 0, 10, 2).collect::<Vec<_>>().await;
 
@@ -298,7 +298,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_get_block_number() -> anyhow::Result<()> {
         let expected_block_time = Duration::from_secs(1);
         let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
@@ -306,7 +306,7 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
@@ -320,7 +320,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let b1 = rpc.block_number().await?;
 
@@ -333,7 +333,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_try_stream_logs_should_contain_all_logs_when_opening_channel() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -345,7 +345,7 @@ mod tests {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
@@ -365,14 +365,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.token, contract_addrs.channels],
@@ -408,9 +408,8 @@ mod tests {
         )
         .await;
 
-        let retrieved_logs = retrieved_logs
-            .timeout(Duration::from_secs(30)) // Give up after 30 seconds
-            .await??;
+        let retrieved_logs = timeout(Duration::from_secs(30), retrieved_logs) // Give up after 30 seconds
+            .await???;
 
         // The last block must contain all 4 events
         let last_block_logs = retrieved_logs.last().context("a log should be present")?.clone().logs;
@@ -469,7 +468,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel(
     ) -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
@@ -482,7 +481,7 @@ mod tests {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
@@ -503,14 +502,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.channels],
@@ -544,9 +543,8 @@ mod tests {
         )
         .await;
 
-        let retrieved_logs = retrieved_logs
-            .timeout(Duration::from_secs(30)) // Give up after 30 seconds
-            .await??;
+        let retrieved_logs = timeout(Duration::from_secs(30), retrieved_logs) // Give up after 30 seconds
+            .await???;
 
         // The last block must contain all 2 events
         let last_block_logs = retrieved_logs

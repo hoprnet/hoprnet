@@ -349,7 +349,7 @@ mod tests {
         Ok((channel, input_tickets))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_redeem_flow() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
@@ -415,7 +415,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -449,7 +449,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_redeem_in_channel() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
@@ -494,7 +494,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -536,7 +536,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_redeem_must_not_work_for_tickets_being_aggregated_and_being_redeemed() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
@@ -584,7 +584,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -617,7 +617,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed(
     ) -> anyhow::Result<()> {
         let ticket_count = 3;
@@ -666,7 +666,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -688,7 +688,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_redeem_must_not_work_for_tickets_of_next_epoch_being_redeemed() -> anyhow::Result<()> {
         let ticket_count = 4;
         let ticket_from_next_epoch_count = 2;
@@ -736,7 +736,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -763,7 +763,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_redeem_single_ticket() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -796,7 +796,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -817,7 +817,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_redeem_single_ticket_with_lower_index_than_channel_index() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -853,7 +853,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 

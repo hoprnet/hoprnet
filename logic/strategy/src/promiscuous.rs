@@ -803,7 +803,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_promiscuous_strategy_tick_decisions() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
@@ -869,7 +869,7 @@ mod tests {
 
         let strat = PromiscuousStrategy::new(strat_cfg.clone(), db, actions);
 
-        async_std::task::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         strat.on_tick().await?;
 

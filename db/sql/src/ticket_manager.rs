@@ -372,7 +372,7 @@ mod tests {
         Ok(ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_insert_ticket_properly_resolves_the_cached_value() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())

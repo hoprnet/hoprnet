@@ -188,7 +188,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_close_only_non_overdue_pending_to_close_channels_with_elapsed_closure() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
 

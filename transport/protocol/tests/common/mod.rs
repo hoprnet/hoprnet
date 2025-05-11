@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use anyhow::Context;
-use async_std::prelude::FutureExt;
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use hex_literal::hex;
@@ -27,6 +26,7 @@ use hopr_transport_protocol::{
     processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
     DEFAULT_PRICE_PER_PACKET,
 };
+use tokio::time::timeout;
 use tracing::debug;
 
 lazy_static! {
@@ -375,7 +375,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     assert_eq!(peer_count - 1, packet_path.num_hops(), "path has invalid length");
 
-    async_std::task::spawn(emulate_channel_communication(packet_count, wire_apis));
+    tokio::task::spawn(emulate_channel_communication(packet_count, wire_apis));
 
     let mut sent_packet_count = 0;
     for i in 0..packet_count {
@@ -419,7 +419,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
         assert_eq!(recv_packets, test_msgs);
     };
 
-    let res = compare_packets.timeout(TIMEOUT_SECONDS).await;
+    let res = timeout(TIMEOUT_SECONDS, compare_packets).await;
 
     assert!(
         res.is_ok(),
@@ -433,9 +433,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
         let expected_tickets = if i != 0 && i != peer_count - 1 { packet_count } else { 0 };
 
         assert_eq!(
-            rx.take(expected_tickets)
-                .count()
-                .timeout(std::time::Duration::from_secs(1))
+            timeout(std::time::Duration::from_secs(1), rx.take(expected_tickets).count())
                 .await
                 .context("peer should be able to extract expected tickets")?,
             expected_tickets,

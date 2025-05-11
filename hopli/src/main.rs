@@ -61,7 +61,7 @@ enum Commands {
     },
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() -> Result<(), HelperErrors> {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));

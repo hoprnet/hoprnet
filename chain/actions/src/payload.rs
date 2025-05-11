@@ -603,7 +603,7 @@ mod tests {
     use std::str::FromStr;
 
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
-    use hopr_chain_rpc::client::surf_client::SurfRequestor;
+    use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
@@ -612,13 +612,13 @@ mod tests {
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_announce() -> anyhow::Result<()> {
         let test_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/56")?;
 
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0)
@@ -649,12 +649,12 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn redeem_ticket() -> anyhow::Result<()> {
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_alice);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice).await?;
@@ -703,18 +703,18 @@ mod tests {
         // Bob redeems the ticket
         let generator = BasicPayloadGenerator::new((&chain_key_bob).into(), (&contract_instances).into());
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_bob);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_bob);
         println!("{:?}", client.send_transaction(redeem_ticket_tx, None).await?.await);
 
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn withdraw_token() -> anyhow::Result<()> {
         let anvil = hopr_chain_types::utils::create_anvil(None);
         let chain_key_alice = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
         let chain_key_bob = ChainKeypair::from_secret(anvil.keys()[1].to_bytes().as_ref())?;
-        let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_alice);
+        let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_alice);
 
         // Deploy contracts
         let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_alice).await?;

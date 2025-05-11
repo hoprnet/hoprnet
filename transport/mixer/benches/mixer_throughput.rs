@@ -1,7 +1,8 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::{future::BoxFuture, StreamExt};
-use hopr_transport_mixer::{channel, config::MixerConfig};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+
+use hopr_transport_mixer::{channel, config::MixerConfig};
 
 const SAMPLE_SIZE: usize = 10;
 
@@ -40,7 +41,7 @@ pub fn mixer_throughput(
             )),
             bytes,
             |b, _| {
-                let runtime = criterion::async_executor::AsyncStdExecutor {};
+                let runtime = tokio::runtime::Runtime::new().expect("failed to create runtime");
 
                 b.to_async(runtime)
                     .iter(|| f(RANDOM_GIBBERISH, bytes / RANDOM_GIBBERISH.len(), cfg));
@@ -74,7 +75,7 @@ fn send_continuous_channel_load_through_sink_pipe(
         let (o_tx, o_rx) = futures::channel::mpsc::unbounded();
         let (tx, mut rx) = channel(cfg);
 
-        let pipe = async_std::task::spawn(o_rx.map(Ok).forward(tx));
+        let pipe = tokio::task::spawn(o_rx.map(Ok).forward(tx));
 
         for _ in 0..iterations {
             o_tx.unbounded_send(item).expect("send must succeed");
@@ -84,7 +85,7 @@ fn send_continuous_channel_load_through_sink_pipe(
             rx.next().await.expect("receive must succeed");
         }
 
-        pipe.cancel().await;
+        pipe.abort();
     })
 }
 
@@ -116,7 +117,7 @@ fn send_continuous_stream_load(item: &str, iterations: usize, cfg: MixerConfig) 
             async move {
                 let random_delay = cfg.random_delay();
 
-                async_std::task::sleep(random_delay).await;
+                tokio::time::sleep(random_delay).await;
 
                 v
             }

@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-api"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR chain interface"
 edition = "2021"
@@ -11,12 +11,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = [
-  "hopr-chain-actions/runtime-async-std",
-  "hopr-chain-indexer/runtime-async-std",
-  "hopr-db-sql/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-]
 runtime-tokio = [
   "hopr-chain-actions/runtime-tokio",
   "hopr-chain-indexer/runtime-tokio",
@@ -55,5 +49,5 @@ hopr-internal-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-async-std = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+tokio = { workspace = true }
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }

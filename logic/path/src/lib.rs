@@ -458,7 +458,10 @@ pub(crate) mod tests {
         assert_eq!(hops + 1, chain_path.num_hops(), "must be a {hops} hop path");
         ensure!(!chain_path.contains_cycle(), "must not be cyclic");
 
-        let validated = async_std::task::block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
+        let runtime = tokio::runtime::Runtime::new().expect("runtime must exist");
+
+        let validated = runtime
+            .block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
             .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(
@@ -493,10 +496,14 @@ pub(crate) mod tests {
         // path: 0 -> 1 -> 2 -> 3 -> 4
         let chain_path = ChainPath::new(peers.iter().skip(1).take(hops + 1).map(|(_, a)| *a))?;
 
-        let validated_1 = async_std::task::block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
+        let runtime = tokio::runtime::Runtime::new().expect("runtime must exist");
+
+        let validated_1 = runtime
+            .block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
             .context(format!("must be valid {hops} hop path"))?;
 
-        let validated_2 = async_std::task::block_on(ValidatedPath::new(validated_1.clone(), &cg, PATH_ADDRS.deref()))
+        let validated_2 = runtime
+            .block_on(ValidatedPath::new(validated_1.clone(), &cg, PATH_ADDRS.deref()))
             .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(validated_1, validated_2, "revalidation must be identity");
@@ -521,7 +528,9 @@ pub(crate) mod tests {
         assert_eq!(hops + 1, chain_path.num_hops(), "must be a {hops} hop path");
         assert!(chain_path.contains_cycle(), "must be cyclic");
 
-        let validated = async_std::task::block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
+        let validated = tokio::runtime::Runtime::new()
+            .expect("runtime must exist")
+            .block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
             .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(
@@ -555,14 +564,15 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[test]
-    fn validated_path_should_allow_zero_hop_with_non_existing_channel() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn validated_path_should_allow_zero_hop_with_non_existing_channel() -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
 
         // path: 0 -> 3 (channel 0 -> 3 does not exist)
         let chain_path = ChainPath::new([peers[3].1])?;
 
-        let validated = async_std::task::block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
+        let validated = ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref())
+            .await
             .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
@@ -570,14 +580,15 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[test]
-    fn validated_path_should_allow_zero_hop_with_non_open_channel() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn validated_path_should_allow_zero_hop_with_non_open_channel() -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[4]);
 
         // path: 4 -> 0 (channel 4 -> 0 is PendingToClose)
         let chain_path = ChainPath::new([peers[0].1])?;
 
-        let validated = async_std::task::block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
+        let validated = ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref())
+            .await
             .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
@@ -585,14 +596,15 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[test]
-    fn validated_path_should_allow_non_existing_channel_for_last_hop() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn validated_path_should_allow_non_existing_channel_for_last_hop() -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
 
         // path: 0 -> 1 -> 3 (channel 1 -> 3 does not exist)
         let chain_path = ChainPath::new([peers[1].1, peers[3].1])?;
 
-        let validated = async_std::task::block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
+        let validated = ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref())
+            .await
             .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
@@ -600,14 +612,15 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[test]
-    fn validated_path_should_allow_non_open_channel_for_the_last_hop() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn validated_path_should_allow_non_open_channel_for_the_last_hop() -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[3]);
 
         // path: 3 -> 4 -> 0 (channel 4 -> 0 is PendingToClose)
         let chain_path = ChainPath::new([peers[4].1, peers[0].1])?;
 
-        let validated = async_std::task::block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
+        let validated = ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref())
+            .await
             .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
@@ -615,15 +628,15 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[test]
-    fn validated_path_should_fail_for_non_open_channel_not_in_the_last_hop() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn validated_path_should_fail_for_non_open_channel_not_in_the_last_hop() -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[4]);
 
         // path: 4 -> 0 -> 1 (channel 4 -> 0 is PendingToClose)
         let chain_path = ChainPath::new([peers[0].1, peers[1].1])?;
 
         ensure!(
-            async_std::task::block_on(ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref())).is_err(),
+            ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
             "path must not be constructible"
         );
 
@@ -633,7 +646,7 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[4].1, peers[0].1, peers[1].1])?;
 
         ensure!(
-            async_std::task::block_on(ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref())).is_err(),
+            ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
             "path must not be constructible"
         );
 
@@ -643,22 +656,22 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[3].1, peers[4].1, peers[0].1, peers[1].1])?;
 
         ensure!(
-            async_std::task::block_on(ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref())).is_err(),
+            ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
             "path must not be constructible"
         );
 
         Ok(())
     }
 
-    #[test]
-    fn validated_path_should_fail_for_non_existing_channel_not_in_the_last_hop() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn validated_path_should_fail_for_non_existing_channel_not_in_the_last_hop() -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
 
         // path: 0 -> 3 -> 4 (channel 0 -> 3 does not exist)
         let chain_path = ChainPath::new([peers[3].1, peers[4].1])?;
 
         ensure!(
-            async_std::task::block_on(ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref())).is_err(),
+            ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
             "path must not be constructible"
         );
 
@@ -666,7 +679,7 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[1].1, peers[3].1, peers[0].1])?;
 
         ensure!(
-            async_std::task::block_on(ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref())).is_err(),
+            ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
             "path must not be constructible"
         );
 
@@ -674,15 +687,15 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[1].1, peers[2].1, peers[2].1, peers[0].1])?;
 
         ensure!(
-            async_std::task::block_on(ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref())).is_err(),
+            ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
             "path must not be constructible"
         );
 
         Ok(())
     }
 
-    #[test]
-    fn validated_path_should_not_allow_simple_loops() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn validated_path_should_not_allow_simple_loops() -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
 
         // path: 0 -> 1 -> 1 -> 2
@@ -691,15 +704,15 @@ pub(crate) mod tests {
         assert!(chain_path.contains_cycle(), "path must contain a cycle");
 
         ensure!(
-            async_std::task::block_on(ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref())).is_err(),
+            ValidatedPath::new(chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
             "path must not be constructible"
         );
 
         Ok(())
     }
 
-    #[test]
-    fn validated_path_should_allow_long_cycles() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn validated_path_should_allow_long_cycles() -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
 
         // path 0 -> 1 -> 2 -> 3 -> 1 -> 2
@@ -707,7 +720,8 @@ pub(crate) mod tests {
 
         assert!(chain_path.contains_cycle(), "path must contain a cycle");
 
-        let validated = async_std::task::block_on(ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref()))
+        let validated = ValidatedPath::new(chain_path.clone(), &cg, PATH_ADDRS.deref())
+            .await
             .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");

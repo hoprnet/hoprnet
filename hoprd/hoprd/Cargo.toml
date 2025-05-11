@@ -24,12 +24,6 @@ prometheus = [
   "hoprd-api/prometheus",
   "hopr-network-types/prometheus",
 ]
-runtime-async-std = [
-  "dep:async-std",
-  "hopr-lib/runtime-async-std",
-  "hopr-network-types/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-]
 runtime-tokio = [
   "dep:tokio",
   "dep:tokio-retry",
@@ -57,10 +51,6 @@ prof = [
 anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }
-async-std = { workspace = true, features = [
-  "attributes",
-  "tokio1",
-], optional = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
