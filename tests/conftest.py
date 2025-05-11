@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import re
+import yaml
 from subprocess import PIPE, STDOUT, CalledProcessError, Popen
 
 import pytest
@@ -70,10 +71,51 @@ def nodes_with_lower_outgoing_win_prob():
     """Nodes with outgoing ticket winning probability"""
     return ["6"]
 
+def attacking_nodes():
+    return ["1", "2"]
+
+def session_attack_nodes():
+    return ["1", "2", "3"]
+
 
 def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
 
+def first_two_from(values: list):
+    return [(left, right) for left, right in itertools.product(values, repeat=2) if left != right]
+
+@pytest.fixture(scope="function", autouse=True)
+def config_to_yaml(request):
+    """
+    Fixture to convert the nodes_config parameter to yaml
+    """
+    if "nodes_config" in request.fixturenames:
+        nodes_config = request.getfixturevalue("nodes_config")
+        yaml_config = yaml.dump(nodes_config, default_flow_style=False)
+        request.config.cache.set("yaml_config", yaml_config)
+
+@pytest.fixture(scope="function")
+async def swarm3(request):
+    params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
+
+    # load cache created by autouse xiture config_to_yaml
+    extra_params = request.config.cache.get("yaml_config", None)
+    if extra_params is not None:
+        extra_params = yaml.safe_load(extra_params)
+        request.config.cache.set("yaml_config", None)
+
+    cluster, anvil = await localcluster.bringup(params_path, test_mode=True, fully_connected=False, use_nat=True, extra_env=extra_params)
+
+    yield cluster.nodes
+
+    cluster.clean_up()
+    anvil.kill()
+
+@pytest.fixture(scope="function")
+async def swarm3_reset(request):
+    request.config.cache.set("yaml_config", None)
+
+    yield
 
 @pytest.fixture(scope="session")
 async def swarm7(request):
