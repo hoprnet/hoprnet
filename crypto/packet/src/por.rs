@@ -98,11 +98,11 @@ impl BytesRepresentable for ProofOfRelayValues {
 pub struct SurbReceiverInfo(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
 
 impl SurbReceiverInfo {
-    pub fn new(pov: ProofOfRelayValues, _share: [u8; 32]) -> Self {
+    pub fn new(pov: ProofOfRelayValues, share: [u8; 32]) -> Self {
         let mut ret = [0u8; Self::SIZE];
         ret[0..ProofOfRelayValues::SIZE].copy_from_slice(&pov.0);
         // Share is currently not used but will be used in the future
-        // ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + 32].copy_from_slice(&share);
+        ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + 32].copy_from_slice(&share);
         Self(ret)
     }
     pub fn proof_of_relay_values(&self) -> ProofOfRelayValues {

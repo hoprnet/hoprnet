@@ -645,7 +645,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn session_should_write_data_on_return_path() -> anyhow::Result<()> {
         let id = SessionId::new(1, HoprPseudonym::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();

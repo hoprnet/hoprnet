@@ -13,7 +13,7 @@ pub trait SurbFlowEstimator {
 
 impl SurbFlowEstimator for std::sync::Arc<std::sync::atomic::AtomicU64> {
     fn estimate_surb_turnout(&self) -> u64 {
-        self.load(std::sync::atomic::Ordering::Relaxed)
+        self.load(std::sync::atomic::Ordering::SeqCst)
     }
 }
 

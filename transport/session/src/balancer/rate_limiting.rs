@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(rc.get_rate_per_sec(), 1250.0);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_rate_limited_stream_respects_rate() {
         // Create a stream with 5 elements
         let stream = stream::iter(1..=5);
@@ -221,7 +221,7 @@ mod tests {
         );
     }
 
-    #[test_log::test(async_std::test)]
+    #[tokio::test]
     async fn test_rate_limited_first_item_should_be_delayed() {
         // Create a stream with 3 elements
         let stream = stream::iter(1..=1);
@@ -236,7 +236,7 @@ mod tests {
         assert!(start.elapsed() >= Duration::from_millis(100));
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_rate_limited_stream_empty() {
         // Create an empty stream
         let stream = stream::iter::<Vec<i32>>(vec![]);
@@ -248,7 +248,7 @@ mod tests {
         assert_eq!(rate_limited.next().await, None);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_rate_limited_stream_zero_rate() -> anyhow::Result<()> {
         // Create a stream with 3 elements
         let stream = stream::iter(1..=3);
@@ -268,7 +268,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_rate_limited_stream_should_pause_on_zero_rate() -> anyhow::Result<()> {
         // Create a stream with 3 elements
         let stream = stream::iter(1..=3);
@@ -306,7 +306,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_rate_limited_stream_zero_rate_should_restart_when_increased() -> anyhow::Result<()> {
         // Create a stream with 3 elements
         let stream = stream::iter(1..=3);
@@ -338,7 +338,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_rate_changing_during_stream() {
         // Create a stream with 6 elements
         let stream = stream::iter(1..=6);
@@ -392,7 +392,7 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_very_high_rate() {
         // Create a stream with 100 elements
         let stream = stream::iter(1..=100);
@@ -427,7 +427,7 @@ mod tests {
         );
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_concurrent_rate_change() {
         use futures::future::join;
 

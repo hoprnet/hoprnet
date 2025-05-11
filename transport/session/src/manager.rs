@@ -292,6 +292,9 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
 /// The Minimum Session tag due to Start-protocol messages.
 pub const MIN_SESSION_TAG_RANGE_RESERVATION: Tag = 16;
 
+/// Smallest possible interval for balancer sampling.
+pub const MIN_BALANCER_SAMPLING_INTERVAL: Duration = Duration::from_millis(100);
+
 impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
     pub fn new(mut cfg: SessionManagerConfig) -> Self {
@@ -558,7 +561,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     let (balancer_abort_handle, reg) = AbortHandle::new_pair();
                     hopr_async_runtime::prelude::spawn(
                         futures::stream::Abortable::new(
-                            futures_time::stream::interval(self.cfg.balancer_sampling_interval.into()),
+                            futures_time::stream::interval(
+                                self.cfg
+                                    .balancer_sampling_interval
+                                    .max(MIN_BALANCER_SAMPLING_INTERVAL)
+                                    .into(),
+                            ),
                             reg,
                         )
                         .for_each(move |_| {
@@ -1050,8 +1058,10 @@ mod tests {
             .returning(move |data, _| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
 
-                Box::pin(async move {alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
-                Ok(())})
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // Alice clones transport for Session
@@ -1115,12 +1125,12 @@ mod tests {
             futures::future::join(
                 alice_mgr.new_session(
                     bob_peer,
-                SessionTarget::TcpStream(target.clone()),
-                SessionClientConfig {
-                    pseudonym: alice_pseudonym.into(),
-                    surb_management: None,
-                    ..Default::default()
-                },
+                    SessionTarget::TcpStream(target.clone()),
+                    SessionClientConfig {
+                        pseudonym: alice_pseudonym.into(),
+                        surb_management: None,
+                        ..Default::default()
+                    },
                 ),
                 new_session_rx_bob.next(),
             ),
@@ -1202,8 +1212,10 @@ mod tests {
             .returning(move |data, _| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
 
-                Box::pin(async move {alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
-                Ok(())})
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // Alice clones transport for Session
@@ -1244,8 +1256,10 @@ mod tests {
             .returning(move |data, _| {
                 let alice_mgr_clone = alice_mgr_clone.clone();
 
-                Box::pin(async move {alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
-                Ok(())})
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         let mut jhs = Vec::new();
@@ -1266,12 +1280,12 @@ mod tests {
             futures::future::join(
                 alice_mgr.new_session(
                     bob_peer,
-                SessionTarget::TcpStream(target.clone()),
-                SessionClientConfig {
-                    pseudonym: alice_pseudonym.into(),
-                    surb_management: None,
-                    ..Default::default()
-                },
+                    SessionTarget::TcpStream(target.clone()),
+                    SessionClientConfig {
+                        pseudonym: alice_pseudonym.into(),
+                        surb_management: None,
+                        ..Default::default()
+                    },
                 ),
                 new_session_rx_bob.next(),
             ),
@@ -1449,7 +1463,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_send_keep_alives_via_surb_balancer() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
@@ -1472,8 +1486,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // Bob clones transport for Session
@@ -1494,8 +1511,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // On cloned SendMsg: Alice sends the KeepAlive messages
@@ -1509,8 +1529,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // Alice clones transport for Session
@@ -1531,8 +1554,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // Bob sends the CloseSession message to confirm
@@ -1546,8 +1572,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         let mut jhs = Vec::new();
@@ -1563,22 +1592,24 @@ mod tests {
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
         pin_mut!(new_session_rx_bob);
-        let (alice_session, bob_session) = futures::future::join(
-            alice_mgr.new_session(
-                bob_peer,
-                SessionTarget::TcpStream(target.clone()),
-                SessionClientConfig {
-                    pseudonym: alice_pseudonym.into(),
-                    surb_management: Some(SurbBalancerConfig {
-                        target_surb_buffer_size: 10,
-                        max_surbs_per_sec: 100,
-                    }),
-                    ..Default::default()
-                },
+        let (alice_session, bob_session) = timeout(
+            Duration::from_secs(2),
+            futures::future::join(
+                alice_mgr.new_session(
+                    bob_peer,
+                    SessionTarget::TcpStream(target.clone()),
+                    SessionClientConfig {
+                        pseudonym: alice_pseudonym.into(),
+                        surb_management: Some(SurbBalancerConfig {
+                            target_surb_buffer_size: 10,
+                            max_surbs_per_sec: 100,
+                        }),
+                        ..Default::default()
+                    },
+                ),
+                new_session_rx_bob.next(),
             ),
-            new_session_rx_bob.next(),
         )
-        .timeout(Duration::from_secs(2))
         .await?;
 
         let mut alice_session = alice_session?;
@@ -1587,10 +1618,10 @@ mod tests {
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
         // Let the Surb balancer send enough KeepAlive messages
-        async_std::task::sleep(Duration::from_millis(3000)).await;
+        tokio::time::sleep(Duration::from_millis(3000)).await;
         alice_session.close().await?;
 
-        async_std::task::sleep(Duration::from_millis(300)).await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
         futures::stream::iter(jhs)
             .for_each(hopr_async_runtime::prelude::cancel_join_handle)
             .await;

@@ -988,7 +988,6 @@ mod tests {
     use hopr_network_types::prelude::DestinationRouting;
     use hopr_transport_session::errors::TransportSessionError;
     use std::collections::HashSet;
-    use std::sync::atomic::AtomicU64;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     pub struct SendMsgResender {

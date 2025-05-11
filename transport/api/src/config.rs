@@ -8,11 +8,11 @@ use std::str::FromStr;
 use std::time::Duration;
 use validator::{Validate, ValidationError};
 
+use crate::errors::HoprTransportError;
 use hopr_transport_identity::Multiaddr;
 pub use hopr_transport_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
 pub use hopr_transport_protocol::config::ProtocolConfig;
-
-use crate::errors::HoprTransportError;
+use hopr_transport_session::MIN_BALANCER_SAMPLING_INTERVAL;
 
 pub struct HoprTransportConfig {
     pub transport: TransportConfig,
@@ -223,6 +223,14 @@ fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), Vali
     }
 }
 
+fn validate_balancer_sampling(value: &std::time::Duration) -> Result<(), ValidationError> {
+    if MIN_BALANCER_SAMPLING_INTERVAL <= *value {
+        Ok(())
+    } else {
+        Err(ValidationError::new("balancer sampling interval is too low"))
+    }
+}
+
 /// Global configuration of Sessions.
 #[serde_as]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Validate, smart_default::SmartDefault)]
@@ -257,6 +265,7 @@ pub struct SessionGlobalConfig {
     /// Sampling interval for SURB balancer in milliseconds.
     ///
     /// Default is 1000 milliseconds.
+    #[validate(custom(function = "validate_balancer_sampling"))]
     #[default(DEFAULT_SESSION_BALANCER_SAMPLING)]
     #[serde(default = "default_session_balancer_sampling")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]

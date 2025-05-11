@@ -470,12 +470,12 @@ pub(crate) mod tests {
 
         let validated = runtime
             .block_on(ValidatedPath::new(
-            ADDRESSES[0],
-            chain_path.clone(),
-            &cg,
-            PATH_ADDRS.deref(),
-        ))
-        .context(format!("must be valid {hops} hop path"))?;
+                ADDRESSES[0],
+                chain_path.clone(),
+                &cg,
+                PATH_ADDRS.deref(),
+            ))
+            .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(
             chain_path.num_hops(),
@@ -513,21 +513,21 @@ pub(crate) mod tests {
 
         let validated_1 = runtime
             .block_on(ValidatedPath::new(
-            ADDRESSES[0],
-            chain_path.clone(),
-            &cg,
-            PATH_ADDRS.deref(),
-        ))
-        .context(format!("must be valid {hops} hop path"))?;
+                ADDRESSES[0],
+                chain_path.clone(),
+                &cg,
+                PATH_ADDRS.deref(),
+            ))
+            .context(format!("must be valid {hops} hop path"))?;
 
         let validated_2 = runtime
             .block_on(ValidatedPath::new(
-            ADDRESSES[0],
-            validated_1.clone(),
-            &cg,
-            PATH_ADDRS.deref(),
-        ))
-        .context(format!("must be valid {hops} hop path"))?;
+                ADDRESSES[0],
+                validated_1.clone(),
+                &cg,
+                PATH_ADDRS.deref(),
+            ))
+            .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(validated_1, validated_2, "revalidation must be identity");
 
@@ -554,12 +554,12 @@ pub(crate) mod tests {
         let validated = tokio::runtime::Runtime::new()
             .expect("runtime must exist")
             .block_on(ValidatedPath::new(
-            ADDRESSES[0],
-            chain_path.clone(),
-            &cg,
-            PATH_ADDRS.deref(),
-        ))
-        .context(format!("must be valid {hops} hop path"))?;
+                ADDRESSES[0],
+                chain_path.clone(),
+                &cg,
+                PATH_ADDRS.deref(),
+            ))
+            .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(
             chain_path.num_hops(),
@@ -599,14 +599,9 @@ pub(crate) mod tests {
         // path: 0 -> 3 (channel 0 -> 3 does not exist)
         let chain_path = ChainPath::new([peers[3].1])?;
 
-        let validated = ValidatedPath::new(
-            ADDRESSES[0],
-            chain_path.clone(),
-            &cg,
-            PATH_ADDRS.deref(),
-        )
+        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
             .await
-        .context("must be valid path")?;
+            .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
 
@@ -620,14 +615,9 @@ pub(crate) mod tests {
         // path: 4 -> 0 (channel 4 -> 0 is PendingToClose)
         let chain_path = ChainPath::new([peers[0].1])?;
 
-        let validated = ValidatedPath::new(
-            ADDRESSES[4],
-            chain_path.clone(),
-            &cg,
-            PATH_ADDRS.deref(),
-        )
+        let validated = ValidatedPath::new(ADDRESSES[4], chain_path.clone(), &cg, PATH_ADDRS.deref())
             .await
-        .context("must be valid path")?;
+            .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
 
@@ -641,14 +631,9 @@ pub(crate) mod tests {
         // path: 0 -> 1 -> 3 (channel 1 -> 3 does not exist)
         let chain_path = ChainPath::new([peers[1].1, peers[3].1])?;
 
-        let validated = ValidatedPath::new(
-            ADDRESSES[0],
-            chain_path.clone(),
-            &cg,
-            PATH_ADDRS.deref(),
-        )
+        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
             .await
-        .context("must be valid path")?;
+            .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
 
@@ -662,14 +647,9 @@ pub(crate) mod tests {
         // path: 3 -> 4 -> 0 (channel 4 -> 0 is PendingToClose)
         let chain_path = ChainPath::new([peers[4].1, peers[0].1])?;
 
-        let validated = ValidatedPath::new(
-            ADDRESSES[3],
-            chain_path.clone(),
-            &cg,
-            PATH_ADDRS.deref(),
-        )
+        let validated = ValidatedPath::new(ADDRESSES[3], chain_path.clone(), &cg, PATH_ADDRS.deref())
             .await
-        .context("must be valid path")?;
+            .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
 
@@ -684,7 +664,9 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[0].1, peers[1].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[4], chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
+            ValidatedPath::new(ADDRESSES[4], chain_path, &cg, PATH_ADDRS.deref())
+                .await
+                .is_err(),
             "path must not be constructible"
         );
 
@@ -692,7 +674,9 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[4].1, peers[0].1, peers[1].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[3], chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
+            ValidatedPath::new(ADDRESSES[3], chain_path, &cg, PATH_ADDRS.deref())
+                .await
+                .is_err(),
             "path must not be constructible"
         );
 
@@ -700,7 +684,9 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[3].1, peers[4].1, peers[0].1, peers[1].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[2], chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
+            ValidatedPath::new(ADDRESSES[2], chain_path, &cg, PATH_ADDRS.deref())
+                .await
+                .is_err(),
             "path must not be constructible"
         );
 
@@ -715,7 +701,9 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[3].1, peers[4].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
+            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref())
+                .await
+                .is_err(),
             "path must not be constructible"
         );
 
@@ -723,7 +711,9 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[1].1, peers[3].1, peers[0].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
+            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref())
+                .await
+                .is_err(),
             "path must not be constructible"
         );
 
@@ -731,7 +721,9 @@ pub(crate) mod tests {
         let chain_path = ChainPath::new([peers[1].1, peers[2].1, peers[2].1, peers[0].1])?;
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
+            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref())
+                .await
+                .is_err(),
             "path must not be constructible"
         );
 
@@ -748,7 +740,9 @@ pub(crate) mod tests {
         assert!(chain_path.contains_cycle(), "path must contain a cycle");
 
         ensure!(
-            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref()).await.is_err(),
+            ValidatedPath::new(ADDRESSES[0], chain_path, &cg, PATH_ADDRS.deref())
+                .await
+                .is_err(),
             "path must not be constructible"
         );
 
@@ -764,14 +758,9 @@ pub(crate) mod tests {
 
         assert!(chain_path.contains_cycle(), "path must contain a cycle");
 
-        let validated = ValidatedPath::new(
-            ADDRESSES[0],
-            chain_path.clone(),
-            &cg,
-            PATH_ADDRS.deref(),
-        )
+        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
             .await
-        .context("must be valid path")?;
+            .context("must be valid path")?;
 
         assert_eq!(&chain_path, validated.chain_path(), "path must be the same");
 

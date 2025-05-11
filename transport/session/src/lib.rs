@@ -13,7 +13,7 @@ mod types;
 
 pub use balancer::SurbBalancerConfig;
 pub use hopr_network_types::types::*;
-pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
+pub use manager::{DispatchResult, SessionManager, SessionManagerConfig, MIN_BALANCER_SAMPLING_INTERVAL};
 pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, SESSION_USABLE_MTU_SIZE};
 
 #[cfg(feature = "runtime-tokio")]
@@ -66,7 +66,6 @@ impl IntoIterator for Capability {
 /// Relevant primarily for the client, since the server is only
 /// a reactive component in regard to the session concept.
 #[derive(Debug, PartialEq, Clone, smart_default::SmartDefault)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SessionClientConfig {
     /// The forward path options for the session.
     #[default(RoutingOptions::Hops(hopr_primitive_types::bounded::BoundedSize::MIN))]
