@@ -95,8 +95,13 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	lsof -i :$(port) -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: localcluster
+localcluster: args=
 localcluster: ## spin up the localcluster using the default configuration file
-	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected
+	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected $(args)
+
+.PHONY: localcluster-exposed
+localcluster-exposed: ## spin up the localcluster using the default configuration file, exposing all nodes in the local network
+	@make localcluster args="--exposed"
 
 .PHONY: create-local-identity
 create-local-identity: id_dir=/tmp/
@@ -366,28 +371,6 @@ ifeq ($(script),)
 endif
 	bash "${script}"
 
-.PHONY: generate-python-sdk
-generate-python-sdk: ## generate Python SDK via Swagger Codegen, not using the official swagger-codegen-cli as it does not offer a multiplatform image
-generate-python-sdk:
-ifeq (, $(shell which hoprd-api-schema))
-	$(cargo) run --bin hoprd-api-schema >| /tmp/openapi.spec.json
-else
-	hoprd-api-schema >| /tmp/openapi.spec.json
-endif
-
-	echo '{"packageName":"hoprd_sdk","projectName":"hoprd-sdk","packageVersion":"'$(shell ./scripts/get-current-version.sh docker)'","packageUrl":"https://github.com/hoprnet/hoprd-sdk-python"}' >| /tmp/python-sdk-config.json
-
-	mkdir -p ./hoprd-sdk-python/
-	rm -rf ./hoprd-sdk-python/*
-
-	swagger-codegen3 generate \
-		-l python \
-		-o hoprd-sdk-python \
-		-i /tmp/openapi.spec.json \
-		-c /tmp/python-sdk-config.json
-
-	patch ./hoprd-sdk-python/hoprd_sdk/api_client.py ./scripts/python-sdk.patch
-	
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

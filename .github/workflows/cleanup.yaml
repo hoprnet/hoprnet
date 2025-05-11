@@ -4,6 +4,9 @@
 #################################################################################
 name: Cleanup
 
+env:
+  needs_nix_setup: true
+
 on:
   schedule:
     - cron: "30 1 * * *"
@@ -14,8 +17,14 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     timeout-minutes: 10
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       # See docs: https://github.com/actions/stale
-      - uses: actions/stale@v9
+      - uses: actions/stale@5bef64f19d7facfb25b37b414482c7164d639639 # v9.1.0
         with:
           stale-issue-message: "This issue is stale because it has been open 60 days with no activity. Remove stale label or comment or this will be closed in 30 days."
           days-before-stale: 60
@@ -30,26 +39,36 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     timeout-minutes: 30
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: false
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@72b6f30b6d0e2fa7298034156f503f2a2bd0f9c6 # master
         with:
           google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           login-artifact-registry: 'true'
           install-sdk: 'true'
 
+      - name: Install Nix
+        if: env.needs_nix_setup == 'true'
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
+        if: env.needs_nix_setup == 'true'
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
       - name: Cleanup Docker images
-        run: |
-          date=`date +%Y-%m-%d'T'%H:%M'Z' -d "60 days ago"`
-          images=('hopli' 'hoprd')
-          for image in "${images[@]}"; do
-            old_pr_image_tags=$(gcloud artifacts docker images list --include-tags ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | match("-commit.")).version')
-            old_untagged_images=$(gcloud artifacts docker images list --include-tags ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image} --format="json" 2> /dev/null | jq -r --arg date "$date"  '.[]  | select(.updateTime < $date) | select(.tags | length == 0).version')
-            old_image_tags=($(echo -e "${old_pr_image_tags}\n${old_untagged_images}" | sed '/^$/d' | tr '\n' ' '))
-            for old_image_tag in "$old_image_tags[@]"; do
-              gcloud artifacts docker images delete --quiet --delete-tags --async ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}@${old_image_tag}
-            done
-          done
+        run: nix develop -c ./scripts/clean-docker-images.py "${{ vars.DOCKER_IMAGE_REGISTRY }}"
 
   # cleanup-git:
   #   name: Cleanup Git

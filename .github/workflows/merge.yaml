@@ -27,8 +27,16 @@ jobs:
     name: Cleanup Actions
     runs-on: self-hosted-hoprnet-small
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Cleanup
         run: |
@@ -75,6 +83,14 @@ jobs:
       production: true
     secrets: inherit
 
+  cache_deps:
+    name: Cache deps
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/cache-deps.yaml
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+    secrets: inherit
+
   load_test:
     name: Load tests
     if: contains(github.event.pull_request.labels.*.name, 'load_tests') && contains(github.event.pull_request.base.ref, 'master')
@@ -83,12 +99,15 @@ jobs:
     uses: ./.github/workflows/load-tests.yaml
     with:
       test_id: pr-${{ github.event.pull_request.number }}
-      cluster_nodes: core
-      topology: many2many
+      cluster_nodes: core-rotsee
+      topology: receiver
       workload: constant
-      duration: ${{ vars.LOAD_TESTING_DURATION }}
-      vu: ${{ vars.LOAD_TESTING_VU }}
-      rate: ${{ vars.LOAD_TESTING_RATE }}
+      duration: ${{ vars.K6_TEST_DURATION }}
+      echo_service_replicas: ${{ vars.K6_ECHO_SERVERS_REPLICAS }}
+      payload_size: ${{ vars.K6_PAYLOAD_SIZE }}
+      download_throughput: ${{ vars.K6_DOWNLOAD_THROUGHPUT }}
+      upload_throughput: ${{ vars.K6_UPLOAD_THROUGHPUT }}
+
     secrets: inherit
 
   create_release:
@@ -98,19 +117,27 @@ jobs:
     needs:
       - build_docker
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@72b6f30b6d0e2fa7298034156f503f2a2bd0f9c6 # master
         with:
           google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           login-artifact-registry: 'true'
           install-sdk: 'true'
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
@@ -178,7 +205,7 @@ jobs:
           done
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
         with:
           body_path: docs/changelog/changelog.md
           prerelease: ${{ steps.setup.outputs.prerelease }}
@@ -201,14 +228,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
       - name: Notify release
-        uses: zulip/github-actions-zulip/send-message@v1
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
         with:
           api-key: ${{ secrets.ZULIP_API_KEY }}
           email: ${{ secrets.ZULIP_EMAIL }}
           organization-url: "https://hopr.zulipchat.com"
           type: "stream"
-          to: "Releases"
-          topic: "main"
+          to: "HOPRd"
+          topic: "Releases"
           content: |
             I'm thrilled to inform the new hoprd version v${{ steps.setup.outputs.current_version }} has been released.
             [Release Notes](https://github.com/hoprnet/hoprnet/releases/tag/v${{ steps.setup.outputs.current_version }})
@@ -235,6 +262,21 @@ jobs:
       base_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
 
+  build_pluto:
+    strategy:
+      matrix:
+        package:
+          - hopr-pluto
+    name: Build ${{ matrix.package }}
+    # only run build and tag if the PR is merged, not if its closed
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/build-docker.yaml
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+      package: ${{ matrix.package }}
+      production: true
+    secrets: inherit
+
   docs:
     name: Docs
     needs:
@@ -244,12 +286,27 @@ jobs:
     with:
       publish: true
 
+  bencher:
+    name: Benchmarks
+    uses: ./.github/workflows/bencher.yaml
+    secrets: inherit
+    with:
+      branch: ${{ github.event.pull_request.base.ref }}
+
   notify:
     name: Notify Changes
     runs-on: self-hosted-hoprnet-small
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
       - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Check for changes in specific folder
         id: folder_changes
@@ -267,14 +324,14 @@ jobs:
       # Conditional step to notify if the folder has changed
       - name: Notify deployment changes
         if: steps.folder_changes.outputs.folder_changed == 'true'
-        uses: zulip/github-actions-zulip/send-message@v1
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
         with:
           api-key: ${{ secrets.ZULIP_API_KEY }}
           email: ${{ secrets.ZULIP_EMAIL }}
           organization-url: "https://hopr.zulipchat.com"
           type: "stream"
-          to: "Products"
-          topic: "uHTTP"
+          to: "GnosisVPN"
+          topic: "gnosisvpn-js"
           content: |
             The PR ${{ github.event.pull_request.number }} has changed the folder `deploy/` which contains the deployment files for hoprnet.
             Review the changes manually and update the `uhttp-docker` repository accordingly.

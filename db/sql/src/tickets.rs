@@ -1,20 +1,19 @@
 use async_stream::stream;
-use hopr_db_api::resolver::HoprDbResolverOperations;
-use hopr_db_api::tickets::AggregationPrerequisites;
+use async_trait::async_trait;
+use futures::stream::BoxStream;
+use futures::{StreamExt, TryStreamExt};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
+use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use std::cmp;
 use std::ops::{Add, Bound};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-
-use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::TryStreamExt;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
-use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
 use tracing::{debug, error, info, trace, warn};
 
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::prelude::{TicketIndexSelector, TicketMarker};
+use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_db_api::tickets::AggregationPrerequisites;
 use hopr_db_api::{
     errors::Result,
     info::DomainSeparator,
@@ -45,7 +44,7 @@ lazy_static::lazy_static! {
 }
 
 /// The maximum number of tickets that can sent for aggregation in a single request.
-const MAX_TICKETS_TO_AGGREGATE_BATCH: u64 = 500;
+pub const MAX_TICKETS_TO_AGGREGATE_BATCH: u64 = 500;
 
 /// The type is necessary solely to allow
 /// implementing the [`IntoCondition`] trait for [`TicketSelector`]
@@ -164,7 +163,6 @@ pub(crate) fn filter_satisfying_ticket_models(
 
     let mut to_be_aggregated = Vec::with_capacity(models.len());
     let mut total_balance = BalanceType::HOPR.zero();
-    let mut unaggregated_balance = BalanceType::HOPR.zero();
 
     for m in models {
         let ticket_wp: WinningProbability = m
@@ -182,14 +180,12 @@ pub(crate) fn filter_satisfying_ticket_models(
         }
 
         let to_add = BalanceType::HOPR.balance_bytes(&m.amount);
-        // Count only balances of unaggregated tickets
-        if m.index_offset == 1 {
-            unaggregated_balance = unaggregated_balance.add(to_add);
-        }
 
         // Do a balance check to be sure not to aggregate more than the current channel stake
         total_balance = total_balance + to_add;
         if total_balance.gt(&channel_entry.balance) {
+            // Remove last sub-balance which led to the overflow before breaking out of the loop.
+            total_balance = total_balance - to_add;
             break;
         }
 
@@ -219,15 +215,15 @@ pub(crate) fn filter_satisfying_ticket_models(
 
         // Trigger aggregation if unrealized balance greater or equal to X percentage of the current balance
         // and there are at least two tickets
-        if unaggregated_balance.ge(&diminished_balance) {
+        if total_balance.ge(&diminished_balance) {
             if to_be_agg_count > 1 {
-                info!(channel = %channel_id, count = to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check OK: less unrealized than diminished balance");
+                info!(channel = %channel_id, count = to_be_agg_count, balance = ?total_balance, ?diminished_balance, "Aggregation check OK: more unrealized than diminished balance");
                 return Ok(to_be_aggregated);
             } else {
-                debug!(channel = %channel_id, count = to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: more unrealized than diminished balance");
+                debug!(channel = %channel_id, count = to_be_agg_count, balance = ?total_balance, ?diminished_balance, "Aggregation check FAIL: more unrealized than diminished balance but only 1 ticket");
             }
         } else {
-            debug!(channel = %channel_id, count = to_be_agg_count, balance = ?unaggregated_balance, ?diminished_balance, "Aggregation check FAIL: less unrealized than diminished balance");
+            debug!(channel = %channel_id, count = to_be_agg_count, balance = ?total_balance, ?diminished_balance, "Aggregation check FAIL: less unrealized than diminished balance");
         }
     }
 
@@ -384,7 +380,7 @@ impl HoprDbTicketOperations for HoprDb {
                                         let unredeemed_value = myself
                                             .caches
                                             .unrealized_value
-                                            .get(channel_id)
+                                            .get(&(*channel_id, *epoch))
                                             .await
                                             .unwrap_or(Balance::zero(BalanceType::HOPR));
 
@@ -395,7 +391,7 @@ impl HoprDbTicketOperations for HoprDb {
                                     }
                                 }
 
-                                myself.caches.unrealized_value.invalidate(channel_id).await;
+                                myself.caches.unrealized_value.invalidate(&(*channel_id, *epoch)).await;
                             } else {
                                 return Err(DbSqlError::LogicalError(format!(
                                     "could not mark {marked_count} ticket as {mark_as}"
@@ -866,7 +862,7 @@ impl HoprDbTicketOperations for HoprDb {
                         .await?;
 
                     // Filter the list of tickets according to the prerequisites
-                    let mut to_be_aggregated =
+                    let mut to_be_aggregated: Vec<TransferableWinningTicket> =
                         filter_satisfying_ticket_models(prerequisites, to_be_aggregated, &channel_entry, min_win_prob)?
                             .into_iter()
                             .map(|model| {
@@ -1230,6 +1226,29 @@ impl HoprDbTicketOperations for HoprDb {
             .build_signed(me, &domain_separator)
             .map_err(DbSqlError::from)?)
     }
+
+    async fn fix_channels_next_ticket_state(&self) -> Result<()> {
+        let channels = self.get_incoming_channels(None).await?;
+
+        for channel in channels.into_iter() {
+            let selector = TicketSelector::from(&channel)
+                .with_state(AcknowledgedTicketStatus::BeingRedeemed)
+                .with_index(channel.ticket_index.as_u64());
+
+            let mut tickets_stream = self
+                .update_ticket_states_and_fetch(selector, AcknowledgedTicketStatus::Untouched)
+                .await?;
+
+            while let Some(ticket) = tickets_stream.next().await {
+                let channel_id = channel.get_id();
+                let ticket_index = ticket.verified_ticket().index;
+                let ticket_amount = ticket.verified_ticket().amount;
+                info!(%channel_id, %ticket_index, %ticket_amount, "fixed next out-of-sync ticket");
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl HoprDb {
@@ -1265,6 +1284,21 @@ impl HoprDb {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::{anyhow, Context};
+    use futures::{pin_mut, StreamExt};
+    use hex_literal::hex;
+    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
+    use std::ops::Add;
+    use std::sync::atomic::Ordering;
+    use std::time::{Duration, SystemTime};
+
+    use hopr_crypto_types::prelude::*;
+    use hopr_db_api::prelude::{DbError, TicketMarker};
+    use hopr_db_api::{info::DomainSeparator, tickets::ChannelTicketStatistics};
+    use hopr_db_entity::ticket;
+    use hopr_internal_types::prelude::*;
+    use hopr_primitive_types::prelude::*;
+
     use crate::accounts::HoprDbAccountOperations;
     use crate::channels::HoprDbChannelOperations;
     use crate::db::HoprDb;
@@ -1274,19 +1308,6 @@ mod tests {
         filter_satisfying_ticket_models, AggregationPrerequisites, HoprDbTicketOperations, TicketSelector,
     };
     use crate::{HoprDbGeneralModelOperations, TargetDb};
-    use anyhow::{anyhow, Context};
-    use futures::{pin_mut, StreamExt};
-    use hex_literal::hex;
-    use hopr_crypto_types::prelude::*;
-    use hopr_db_api::prelude::{DbError, TicketMarker};
-    use hopr_db_api::{info::DomainSeparator, tickets::ChannelTicketStatistics};
-    use hopr_db_entity::ticket;
-    use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::*;
-    use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
-    use std::ops::Add;
-    use std::sync::atomic::Ordering;
-    use std::time::{Duration, SystemTime};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
@@ -1347,11 +1368,19 @@ mod tests {
         db: &HoprDb,
         count_tickets: u64,
     ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
+        init_db_with_tickets_and_channel(db, count_tickets, None).await
+    }
+
+    async fn init_db_with_tickets_and_channel(
+        db: &HoprDb,
+        count_tickets: u64,
+        channel_ticket_index: Option<u32>,
+    ) -> anyhow::Result<(ChannelEntry, Vec<AcknowledgedTicket>)> {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
             BalanceType::HOPR.balance(u32::MAX),
-            0_u32.into(),
+            channel_ticket_index.unwrap_or(0u32).into(),
             ChannelStatus::Open,
             4_u32.into(),
         );
@@ -2228,7 +2257,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_only_aggregated_ratio_is_met(
+    async fn test_aggregation_prerequisites_must_return_tickets_when_minimum_incl_aggregated_ratio_is_met(
     ) -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 90;
 
@@ -2254,7 +2283,7 @@ mod tests {
         let filtered_tickets =
             filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
-        assert!(filtered_tickets.is_empty(), "must return empty");
+        assert_eq!(filtered_tickets.len(), TICKET_COUNT);
         Ok(())
     }
 
@@ -3321,6 +3350,94 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None).await.expect("must not fail");
         assert_eq!(stats.redeemed_value, BalanceType::HOPR.zero());
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_fix_channels_ticket_state() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        const COUNT_TICKETS: u64 = 1;
+
+        let (_, _) = init_db_with_tickets(&db, COUNT_TICKETS).await?;
+
+        // mark the first ticket as being redeemed
+        let mut ticket = hopr_db_entity::ticket::Entity::find()
+            .one(&db.tickets_db)
+            .await?
+            .context("should have one active model")?
+            .into_active_model();
+        ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as i8);
+        ticket.save(&db.tickets_db).await?;
+
+        assert!(
+            hopr_db_entity::ticket::Entity::find()
+                .one(&db.tickets_db)
+                .await?
+                .context("should have one active model")?
+                .state
+                == AcknowledgedTicketStatus::BeingRedeemed as i8,
+        );
+
+        db.fix_channels_next_ticket_state().await.expect("must not fail");
+
+        assert!(
+            hopr_db_entity::ticket::Entity::find()
+                .one(&db.tickets_db)
+                .await?
+                .context("should have one active model")?
+                .state
+                == AcknowledgedTicketStatus::Untouched as i8,
+        );
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_dont_fix_correct_channels_ticket_state() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE.clone()).await?;
+        const COUNT_TICKETS: u64 = 2;
+
+        // we set up the channel to have ticket index 1, and ensure that fix does not trigger
+        let (_, _) = init_db_with_tickets_and_channel(&db, COUNT_TICKETS, Some(1u32)).await?;
+
+        // mark the first ticket as being redeemed
+        let mut ticket = hopr_db_entity::ticket::Entity::find()
+            .filter(ticket::Column::Index.eq(0u64.to_be_bytes().to_vec()))
+            .one(&db.tickets_db)
+            .await?
+            .context("should have one active model")?
+            .into_active_model();
+        ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as i8);
+        ticket.save(&db.tickets_db).await?;
+
+        assert!(
+            hopr_db_entity::ticket::Entity::find()
+                .filter(ticket::Column::Index.eq(0u64.to_be_bytes().to_vec()))
+                .one(&db.tickets_db)
+                .await?
+                .context("should have one active model")?
+                .state
+                == AcknowledgedTicketStatus::BeingRedeemed as i8,
+        );
+
+        db.fix_channels_next_ticket_state().await.expect("must not fail");
+
+        // first ticket should still be in BeingRedeemed state
+        let ticket0 = hopr_db_entity::ticket::Entity::find()
+            .filter(ticket::Column::Index.eq(0u64.to_be_bytes().to_vec()))
+            .one(&db.tickets_db)
+            .await?
+            .context("should have one active model")?;
+        assert_eq!(ticket0.state, AcknowledgedTicketStatus::BeingRedeemed as i8);
+
+        // second ticket should be in Untouched state
+        let ticket1 = hopr_db_entity::ticket::Entity::find()
+            .filter(ticket::Column::Index.eq(1u64.to_be_bytes().to_vec()))
+            .one(&db.tickets_db)
+            .await?
+            .context("should have one active model")?;
+        assert_eq!(ticket1.state, AcknowledgedTicketStatus::Untouched as i8);
 
         Ok(())
     }

@@ -384,6 +384,9 @@ pub trait HoprDbTicketOperations {
         acked_tickets: Vec<TransferableWinningTicket>,
         me: &ChainKeypair,
     ) -> Result<VerifiedTicket>;
+
+    /// Fix next ticket state if its out-of-sync in all this node's channels.
+    async fn fix_channels_next_ticket_state(&self) -> Result<()>;
 }
 
 /// Can contain ticket statistics for a channel or aggregated ticket statistics for all channels.

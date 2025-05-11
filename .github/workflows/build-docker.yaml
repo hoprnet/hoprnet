@@ -31,9 +31,16 @@ jobs:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
     steps:
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+      - name: Harden Runner
+        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
         with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
           ref: ${{ inputs.branch }}
 
       # - name: Replace the crates.io registry with a private proxy registry
@@ -43,7 +50,7 @@ jobs:
 
       - name: Setup GCP
         id: gcp
-        uses: hoprnet/hopr-workflows/actions/setup-gcp@master
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@72b6f30b6d0e2fa7298034156f503f2a2bd0f9c6 # master
         with:
           google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
           login-artifact-registry: 'true'
@@ -51,11 +58,11 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == true
-        uses: cachix/install-nix-action@v30
+        uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: cachix/cachix-action@v15
+      - uses: cachix/cachix-action@ad2ddac53f961de1989924296a1f236fcfbaa4fc # v15
         if: env.needs_nix_setup == true
         with:
           name: hoprnet
@@ -65,13 +72,13 @@ jobs:
 
       - name: Get PR labels
         id: pr-labels
-        uses: joerick/pr-labels-action@v1.0.9
+        uses: joerick/pr-labels-action@0543b277721e852d821c6738d449f2f4dea03d5f # v1.0.9
 
       - name: Determine build options
         id: options
         run: |
           nix_debug_option="-debug"
-          if [[ ${{ inputs.production }} || ${{ contains(steps.pr-labels.outputs.labels, ' docker-production-build ') }} ]]; then
+          if [[ "${{ inputs.production }}" = "true" || -n "${GITHUB_PR_LABEL_DOCKER_PRODUCTION_BUILD}" ]]; then
             nix_debug_option=""
           fi
           declare docker_tag docker_tag_pr docker_release_latest_tag
@@ -106,34 +113,34 @@ jobs:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
 
       - name: Build and push ${{ inputs.package }} docker image - Commit
-        run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG }}
 
       - name: Build and push ${{ inputs.package }} docker image - PR
-        run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_TAG_PR }}
 
       - name: Build and push ${{ inputs.package }} docker image - latest
-        run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         if: inputs.production && github.event.pull_request.base.ref == 'master'
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:latest
 
       - name: Build and push ${{ inputs.package }} docker image - release-latest
-        run: nix run .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
+        run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
         if: inputs.production
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}
 
       - name: Trigger deploy workflow if needed
-        if: (contains(github.event.pull_request.labels.*.name, 'deploy_nodes') || inputs.production ) && contains(inputs.package,'hoprd' && vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true')
-        uses: peter-evans/repository-dispatch@v3
+        if: (env.GITHUB_PR_LABEL_DEPLOY_NODES || inputs.production ) && contains(inputs.package,'hoprd') && vars.CONTINUOUS_DEPLOYMENT_ENABLED == 'true'
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
