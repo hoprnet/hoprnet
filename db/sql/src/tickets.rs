@@ -2381,7 +2381,7 @@ mod tests {
             .await?
             .context("should have an active model")?
             .into_active_model();
-        ticket.winning_probability = Set(WinningProbability::from_f64(0.5)?.as_ref().to_vec());
+        ticket.winning_probability = Set(WinningProbability::try_from_f64(0.5)?.as_ref().to_vec());
         ticket.save(&db.tickets_db).await?;
 
         let prepared_tickets = db

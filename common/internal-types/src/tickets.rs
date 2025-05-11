@@ -67,17 +67,17 @@ impl WinningProbability {
         f64::from_bits((1023u64 << 52) | (significand >> 4)) - 1.0
     }
 
-    /// Get probability from a float.
-    pub fn from_f64(win_prob: f64) -> errors::Result<Self> {
+    /// Tries to get probability from a float.
+    pub fn try_from_f64(win_prob: f64) -> errors::Result<Self> {
         if !(0.0..=1.0).contains(&win_prob) {
             return Err(InvalidInputData("Winning probability must be in [0.0, 1.0]".into()));
         }
 
-        if f64_approx_eq(0.0, win_prob, Self::LOWEST_NON_ZERO) {
+        if f64_approx_eq(0.0, win_prob, Self::LOWEST_NON_ZERO / 10.0) {
             return Ok(Self::NEVER);
         }
 
-        if f64_approx_eq(1.0, win_prob, Self::LOWEST_NON_ZERO) {
+        if f64_approx_eq(1.0, win_prob, Self::LOWEST_NON_ZERO / 10.0) {
             return Ok(Self::ALWAYS);
         }
 
@@ -138,7 +138,7 @@ impl TryFrom<f64> for WinningProbability {
     type Error = CoreTypesError;
 
     fn try_from(value: f64) -> Result<Self, Self::Error> {
-        Self::from_f64(value)
+        Self::try_from_f64(value)
     }
 }
 
@@ -150,13 +150,13 @@ impl From<WinningProbability> for f64 {
 
 impl PartialEq<f64> for WinningProbability {
     fn eq(&self, other: &f64) -> bool {
-        f64_approx_eq(self.as_f64(), *other, Self::LOWEST_NON_ZERO)
+        f64_approx_eq(self.as_f64(), *other, Self::LOWEST_NON_ZERO / 10.0)
     }
 }
 
 impl PartialEq<WinningProbability> for f64 {
     fn eq(&self, other: &WinningProbability) -> bool {
-        f64_approx_eq(*self, other.as_f64(), WinningProbability::LOWEST_NON_ZERO)
+        f64_approx_eq(*self, other.as_f64(), WinningProbability::LOWEST_NON_ZERO / 10.0)
     }
 }
 
@@ -1045,7 +1045,6 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::tickets::AcknowledgedTicket;
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
@@ -1117,10 +1116,20 @@ pub mod tests {
     #[test]
     pub fn test_win_prob_back_and_forth() -> anyhow::Result<()> {
         for float in [0.1f64, 0.002f64, 0.00001f64, 0.7311111f64, 1.0f64, 0.0f64] {
-            assert!((float - WinningProbability::from_f64(float)?.as_f64()).abs() < f64::EPSILON);
+            assert!((float - WinningProbability::try_from_f64(float)?.as_f64()).abs() < f64::EPSILON);
         }
 
         Ok(())
+    }
+
+    #[test]
+    pub fn test_win_prob_must_be_correctly_ordered() {
+        let increment = WinningProbability::LOWEST_NON_ZERO * 100.0; // Testing the entire range would take too long
+        let mut prev = WinningProbability::NEVER;
+        while let Ok(next) = WinningProbability::try_from_f64(prev.as_f64() + increment) {
+            assert!(prev < next);
+            prev = next;
+        }
     }
 
     #[test]

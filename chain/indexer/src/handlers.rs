@@ -2639,7 +2639,7 @@ mod tests {
             topics: vec![WinProbUpdatedFilter::signature().into()],
             data: encode(&[
                 Token::Uint(EthU256::from(WinningProbability::ALWAYS.as_ref())),
-                Token::Uint(EthU256::from(WinningProbability::from_f64(0.5)?.as_ref())),
+                Token::Uint(EthU256::from(WinningProbability::try_from_f64(0.5)?.as_ref())),
             ])
             .into(),
             ..test_log()

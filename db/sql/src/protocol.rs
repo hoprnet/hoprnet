@@ -52,7 +52,7 @@ impl HoprDb {
         &self,
         mut fwd: HoprForwardedPacket,
         me: &ChainKeypair,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> std::result::Result<HoprForwardedPacket, DbSqlError> {
         let previous_hop_addr = self.resolve_chain_key(&fwd.previous_hop).await?.ok_or_else(|| {
@@ -96,7 +96,7 @@ impl HoprDb {
             .mul(U256::from(fwd.path_pos));
 
         #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_INCOMING_WIN_PROB.observe(fwd.outgoing.ticket.win_prob());
+        METRIC_INCOMING_WIN_PROB.observe(fwd.outgoing.ticket.win_prob().as_f64());
 
         let remaining_balance = incoming_channel
             .balance
@@ -123,7 +123,7 @@ impl HoprDb {
         // Therefore, the winning probability can only increase along the path.
         let outgoing_ticket_win_prob = outgoing_ticket_win_prob.max(verified_incoming_ticket.win_prob());
 
-        // The ticket is now validated, let's place it into acknowledgement waiting queue
+        // The ticket is now validated, let's place it into the acknowledgement waiting queue
         self.caches
             .unacked_tickets
             .insert(
