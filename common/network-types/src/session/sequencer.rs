@@ -197,10 +197,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_std::prelude::FutureExt;
     use futures::{pin_mut, SinkExt, StreamExt, TryStreamExt};
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn sequencer_should_return_entries_in_order() -> anyhow::Result<()> {
         let cfg = SequencerConfig {
             timeout: Duration::from_secs(2),
@@ -226,7 +225,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn sequencer_should_return_entries_in_order_without_flush() -> anyhow::Result<()> {
         let cfg = SequencerConfig {
             timeout: Duration::from_secs(1),
@@ -256,7 +255,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn sequencer_should_not_allow_emitted_entries() -> anyhow::Result<()> {
         let cfg = SequencerConfig::default();
 
@@ -280,7 +279,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn sequencer_should_discard_entry_on_timeout() -> anyhow::Result<()> {
         let cfg = SequencerConfig {
             timeout: Duration::from_millis(25),
@@ -332,7 +331,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn sequencer_should_discard_entry_close() -> anyhow::Result<()> {
         let cfg = SequencerConfig {
             timeout: Duration::from_millis(25),
@@ -375,7 +374,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn sequencer_should_wait_if_full() -> anyhow::Result<()> {
         let cfg = SequencerConfig {
             timeout: Duration::from_millis(25),

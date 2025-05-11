@@ -287,7 +287,7 @@ mod tests {
         (DuplexIO(alice_reader, bob_writer), DuplexIO(bob_reader, alice_writer))
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn stateless_socket_unidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob(FaultyNetworkConfig::default(), None, None);
 
@@ -309,7 +309,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn stateless_socket_bidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob(FaultyNetworkConfig::default(), None, None);
 
@@ -335,7 +335,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn stateless_socket_bidirectional_should_work_with_mixing() -> anyhow::Result<()> {
         let network_cfg = FaultyNetworkConfig {
             mixing_factor: 10,
@@ -366,7 +366,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn stateless_socket_unidirectional_should_should_skip_missing_frames() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob(FaultyNetworkConfig {
             avg_delay: Duration::from_millis(50),

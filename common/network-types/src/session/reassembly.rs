@@ -229,7 +229,6 @@ impl<M: FrameMap> futures::Stream for Reassembler<M> {
 mod tests {
     use super::*;
 
-    use async_std::prelude::FutureExt;
     use futures::{pin_mut, SinkExt, StreamExt, TryStreamExt};
     use hex_literal::hex;
     use rand::prelude::SliceRandom;
@@ -242,7 +241,7 @@ mod tests {
 
     type BasicReassembler = Reassembler<FrameHashMap>;
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     pub async fn reassembler_should_reassemble_frames() -> anyhow::Result<()> {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
@@ -278,7 +277,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     pub async fn reassembler_should_discard_incomplete_frames_on_expiration() -> anyhow::Result<()> {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
@@ -342,7 +341,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     pub async fn reassembler_should_discard_incomplete_frames_on_close() -> anyhow::Result<()> {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
@@ -391,7 +390,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     pub async fn reassembler_should_wait_if_full() -> anyhow::Result<()> {
         let expected = (1u32..=5)
             .map(|frame_id| Frame {
@@ -460,7 +459,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     pub async fn reassembler_should_fail_with_too_many_incomplete_frames() -> anyhow::Result<()> {
         let expected = (1u32..=5)
             .map(|frame_id| Frame {

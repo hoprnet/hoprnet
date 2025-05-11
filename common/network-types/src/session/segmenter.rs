@@ -193,11 +193,10 @@ mod tests {
     use super::*;
 
     use anyhow::anyhow;
-    use async_std::prelude::FutureExt;
     use futures::{pin_mut, AsyncWriteExt, StreamExt};
     use std::time::Duration;
 
-    #[async_std::test]
+    #[tokio::test]
     async fn segmenter_should_not_segment_small_data_unless_flushed() -> anyhow::Result<()> {
         let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
         writer.write_all(b"test").await?;
@@ -220,7 +219,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn segmenter_should_segment_complete_frame() -> anyhow::Result<()> {
         let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
 
@@ -250,7 +249,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn segmenter_should_segment_complete_frame_with_misaligned_mtu() -> anyhow::Result<()> {
         const MTU: usize = 462;
         const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
@@ -291,7 +290,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn segmenter_should_segment_multiple_complete_frames() -> anyhow::Result<()> {
         let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
 
@@ -317,7 +316,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn segmenter_should_segment_multiple_complete_frames_and_incomplete_frame_on_close() -> anyhow::Result<()> {
         let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
 
@@ -356,7 +355,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn segmenter_should_segment_multiple_complete_frames_and_incomplete_frame_on_flush() -> anyhow::Result<()> {
         let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
 
