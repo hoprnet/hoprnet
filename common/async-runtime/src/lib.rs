@@ -3,6 +3,7 @@
 //!
 //!
 #[cfg(feature = "runtime-async-std")]
+#[deprecated(note = "Use `runtime-tokio` feature, the `async-std` crate is deprecated")]
 pub mod prelude {
     pub use async_std::future::timeout as timeout_fut;
     pub use async_std::task::{sleep, spawn, spawn_blocking, spawn_local, JoinHandle};
@@ -14,7 +15,7 @@ pub mod prelude {
 
 // Both features could be enabled during testing; therefore, we only use tokio when it's
 // exclusively enabled.
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+#[cfg(feature = "runtime-tokio")]
 pub mod prelude {
     pub use tokio::time::timeout as timeout_fut;
     pub use tokio::{

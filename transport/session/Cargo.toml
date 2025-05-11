@@ -19,7 +19,6 @@ serde = [
   "dep:bincode",
   "hopr-network-types/serde",
 ]
-runtime-async-std = ["hopr-network-types/runtime-async-std"]
 runtime-tokio = ["hopr-network-types/runtime-tokio", "dep:tokio"]
 prometheus = ["dep:hopr-metrics", "dep:lazy_static"]
 
@@ -53,7 +52,7 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
-hopr-network-types = { workspace = true, features = ["runtime-async-std"] }
+tokio = { workspace = true }
+hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
 mockall = { workspace = true }
 test-log = { workspace = true }

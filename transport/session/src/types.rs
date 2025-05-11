@@ -545,7 +545,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn session_should_read_data_in_one_swoop_if_the_buffer_is_sufficiently_large() -> anyhow::Result<()> {
         let addr: Address = (&ChainKeypair::random()).into();
         let id = SessionId::new(1, HoprPseudonym::random());
@@ -576,7 +576,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn session_should_read_data_in_multiple_rounds_if_the_buffer_is_not_sufficiently_large() -> anyhow::Result<()>
     {
         let addr: Address = (&ChainKeypair::random()).into();
@@ -614,7 +614,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn session_should_write_data_on_forward_path() -> anyhow::Result<()> {
         let addr: Address = (&ChainKeypair::random()).into();
         let id = SessionId::new(1, HoprPseudonym::random());
@@ -675,7 +675,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size(
     ) -> anyhow::Result<()> {
         const TO_SEND: usize = SESSION_USABLE_MTU_SIZE * 2 + 10;

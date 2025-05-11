@@ -472,7 +472,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_path_if_isolated() {
         let graph = Arc::new(RwLock::new(define_graph("", ADDRESSES[0], |_| 1.0, |_, _| 0.0)));
 
@@ -484,7 +484,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_zero_weight_path() {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [0] -> 1",
@@ -501,7 +501,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_one_hop_path_when_unrelated_channels_are_in_the_graph() {
         let graph = Arc::new(RwLock::new(define_graph(
             "1 [1] -> 2",
@@ -518,7 +518,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_one_hop_path_in_empty_graph() {
         let graph = Arc::new(RwLock::new(define_graph("", ADDRESSES[0], |_| 1.0, |_, _| 0.0)));
 
@@ -530,7 +530,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_path_with_unreliable_node() {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] -> 1",
@@ -547,7 +547,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_loopback_path() {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] <-> [1] 1",
@@ -564,7 +564,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_include_destination_in_path() {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] -> 1",
@@ -581,7 +581,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_find_path_in_reliable_star() -> anyhow::Result<()> {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] <-> [2] 1, 0 [1] <-> [3] 2, 0 [1] <-> [4] 3, 0 [1] <-> [5] 4",
@@ -599,7 +599,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_find_path_in_reliable_arrow_with_lower_weight() -> anyhow::Result<()> {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] -> 1, 1 [1] -> 2, 2 [1] -> 3, 1 [1] -> 3",
@@ -616,7 +616,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_find_path_in_reliable_arrow_with_higher_weight() -> anyhow::Result<()> {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] -> 1, 1 [2] -> 2, 2 [3] -> 3, 1 [2] -> 3",
@@ -633,7 +633,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_find_path_in_reliable_arrow_with_random_weight() -> anyhow::Result<()> {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [29] -> 1, 1 [5] -> 2, 2 [31] -> 3, 1 [2] -> 3",

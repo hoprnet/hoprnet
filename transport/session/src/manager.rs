@@ -940,8 +940,6 @@ mod tests {
     use crate::types::SessionTarget;
     use crate::Capability;
     use anyhow::anyhow;
-    use async_std::prelude::FutureExt;
-    use async_trait::async_trait;
     use futures::AsyncWriteExt;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::keypairs::ChainKeypair;
@@ -950,19 +948,24 @@ mod tests {
 
     use crate::balancer::SurbBalancerConfig;
     use crate::initiation::StartProtocolDiscriminants;
+    use tokio::time::timeout;
 
     mockall::mock! {
         MsgSender {}
         impl Clone for MsgSender {
             fn clone(&self) -> Self;
         }
-        #[async_trait]
         impl SendMsg for MsgSender {
-            async fn send_message(
-                &self,
+            fn send_message<'life0, 'async_trait>
+            (
+                &'life0 self,
                 data: ApplicationData,
                 routing: DestinationRouting,
-            ) -> std::result::Result<(), TransportSessionError>;
+            )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output=std::result::Result<(),TransportSessionError>> + Send + 'async_trait>>
+            where
+                'life0: 'async_trait,
+                Self: Sync + 'async_trait;
         }
     }
 
@@ -974,7 +977,7 @@ mod tests {
             )
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_insert_into_next_slot() -> anyhow::Result<()> {
         let cache = moka::future::Cache::new(10);
 
@@ -996,7 +999,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_follow_start_protocol_to_establish_new_session_and_close_it() -> anyhow::Result<()>
     {
         let alice_pseudonym = HoprPseudonym::random();
@@ -1020,8 +1023,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // Bob clones transport for Session
@@ -1042,8 +1048,10 @@ mod tests {
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+
+                Box::pin(async move {alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                Ok(())})
             });
 
         // Alice clones transport for Session
@@ -1064,8 +1072,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // Bob sends the CloseSession message to confirm
@@ -1079,8 +1090,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         let mut jhs = Vec::new();
@@ -1096,19 +1110,21 @@ mod tests {
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
         pin_mut!(new_session_rx_bob);
-        let (alice_session, bob_session) = futures::future::join(
-            alice_mgr.new_session(
-                bob_peer,
+        let (alice_session, bob_session) = timeout(
+            Duration::from_secs(2),
+            futures::future::join(
+                alice_mgr.new_session(
+                    bob_peer,
                 SessionTarget::TcpStream(target.clone()),
                 SessionClientConfig {
                     pseudonym: alice_pseudonym.into(),
                     surb_management: None,
                     ..Default::default()
                 },
+                ),
+                new_session_rx_bob.next(),
             ),
-            new_session_rx_bob.next(),
         )
-        .timeout(Duration::from_secs(2))
         .await?;
 
         let mut alice_session = alice_session?;
@@ -1120,10 +1136,10 @@ mod tests {
         assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
-        async_std::task::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
         alice_session.close().await?;
 
-        async_std::task::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
         futures::stream::iter(jhs)
             .for_each(hopr_async_runtime::prelude::cancel_join_handle)
             .await;
@@ -1131,7 +1147,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_close_idle_session_automatically() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
@@ -1159,8 +1175,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // Bob clones transport for Session
@@ -1181,8 +1200,10 @@ mod tests {
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+
+                Box::pin(async move {alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                Ok(())})
             });
 
         // Alice clones transport for Session
@@ -1203,8 +1224,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // Bob sends the CloseSession message to confirm
@@ -1218,8 +1242,10 @@ mod tests {
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+
+                Box::pin(async move {alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                Ok(())})
             });
 
         let mut jhs = Vec::new();
@@ -1235,19 +1261,21 @@ mod tests {
         let target = SealedHost::Plain("127.0.0.1:80".parse()?);
 
         pin_mut!(new_session_rx_bob);
-        let (alice_session, bob_session) = futures::future::join(
-            alice_mgr.new_session(
-                bob_peer,
+        let (alice_session, bob_session) = timeout(
+            Duration::from_secs(2),
+            futures::future::join(
+                alice_mgr.new_session(
+                    bob_peer,
                 SessionTarget::TcpStream(target.clone()),
                 SessionClientConfig {
                     pseudonym: alice_pseudonym.into(),
                     surb_management: None,
                     ..Default::default()
                 },
+                ),
+                new_session_rx_bob.next(),
             ),
-            new_session_rx_bob.next(),
         )
-        .timeout(Duration::from_secs(2))
         .await?;
 
         let alice_session = alice_session?;
@@ -1260,7 +1288,7 @@ mod tests {
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
 
         // Let the session timeout
-        async_std::task::sleep(Duration::from_millis(300)).await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
 
         futures::stream::iter(jhs)
             .for_each(hopr_async_runtime::prelude::cancel_join_handle)
@@ -1269,7 +1297,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_not_allow_establish_session_when_tag_range_is_used_up() -> anyhow::Result<()> {
         let alice_pseudonym = HoprPseudonym::random();
         let bob_peer: Address = (&ChainKeypair::random()).into();
@@ -1311,8 +1339,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(bob_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let bob_mgr_clone = bob_mgr_clone.clone();
+                Box::pin(async move {
+                    bob_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         // Bob sends the SessionError message
@@ -1326,8 +1357,11 @@ mod tests {
                     && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
             })
             .returning(move |data, _| {
-                async_std::task::block_on(alice_mgr_clone.dispatch_message(alice_pseudonym, data))?;
-                Ok(())
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
             });
 
         let mut jhs = Vec::new();
@@ -1360,7 +1394,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_timeout_new_session_attempt_when_no_response() -> anyhow::Result<()> {
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
@@ -1385,7 +1419,7 @@ mod tests {
                 msg_type(data, StartProtocolDiscriminants::StartSession)
                     && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
             })
-            .returning(|_, _| Ok(()));
+            .returning(|_, _| Box::pin(async { Ok(()) }));
 
         let mut jhs = Vec::new();
 
