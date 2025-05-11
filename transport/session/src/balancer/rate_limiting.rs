@@ -29,7 +29,8 @@ impl RateController {
             // it took to yield the element from the inner stream
             let new_rate = Duration::from_secs_f64(1.0 / rate_per_sec)
                 .max(Self::MIN_DELAY)
-                .as_micros() as u64;
+                .as_micros()
+                .min(u64::MAX as u128) as u64; // Clamp to u64 to avoid overflow
 
             self.0.store(new_rate, Ordering::Relaxed);
         } else {
