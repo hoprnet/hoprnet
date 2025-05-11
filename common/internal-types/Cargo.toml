@@ -1,6 +1,6 @@
 [package]
 name = "hopr-internal-types"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types required internally by the HOPR library, these are not generic enough to be used in the external APIs"
 edition = "2021"
@@ -14,19 +14,17 @@ crate-type = ["rlib"]
 [dependencies]
 aquamarine = { workspace = true }
 bloomfilter = { workspace = true }
-bincode = { workspace = true }
-ethers = { workspace = true, default-features = false }
 hex-literal = { workspace = true }
+hex = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = { workspace = true }
-serde = { workspace = true }
-serde_bytes = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
-hopr-bindings = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
@@ -40,6 +38,12 @@ lazy_static = { workspace = true }
 
 [features]
 default = []
+serde = [
+  "dep:serde",
+  "dep:serde_bytes",
+  "hopr-crypto-types/serde",
+  "bloomfilter/serde",
+]
 
 [[bench]]
 name = "bloom_filter"

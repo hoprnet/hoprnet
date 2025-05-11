@@ -455,7 +455,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_async_read_streamer_complete_chunk() {
         let data = b"Hello, World!!";
         let mut streamer = AsyncReadStreamer::<14, _>(&data[..]);
@@ -468,7 +468,7 @@ mod tests {
         assert_eq!(results, vec![Box::from(*data)]);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_async_read_streamer_complete_more_chunks() {
         let data = b"Hello, World and do it twice";
         let mut streamer = AsyncReadStreamer::<14, _>(&data[..]);
@@ -482,7 +482,7 @@ mod tests {
         assert_eq!(results, vec![Box::from(data1), Box::from(data2)]);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_async_read_streamer_complete_more_chunks_with_incomplete() -> anyhow::Result<()> {
         let data = b"Hello, World and do it twice, ...";
         let streamer = AsyncReadStreamer::<14, _>(&data[..]);
@@ -496,7 +496,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_async_read_streamer_incomplete_chunk() -> anyhow::Result<()> {
         let data = b"Hello, World!!";
         let reader = &data[0..8]; // An incomplete chunk

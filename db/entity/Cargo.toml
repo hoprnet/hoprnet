@@ -9,12 +9,6 @@ license = "GPL-3.0-only"
 
 [features]
 default = ["sqlite"]
-runtime-async-std = [
-  "async-std",
-  "sea-orm/runtime-async-std-rustls",
-  "sea-orm-cli/runtime-async-std-rustls",
-  "sea-orm-migration/runtime-async-std-rustls",
-]
 runtime-tokio = [
   "tokio",
   "sea-orm/runtime-tokio-rustls",
@@ -25,7 +19,6 @@ sqlite = []
 
 [build-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true, optional = true }
 clap = { workspace = true }
 futures = { workspace = true }
 sea-orm = { workspace = true }

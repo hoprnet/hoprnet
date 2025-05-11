@@ -129,7 +129,7 @@ mod tests {
         )
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_pass_if_ticket_ok() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let channel = create_channel_entry();
@@ -150,7 +150,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_fail_if_signer_not_sender() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let channel = create_channel_entry();
@@ -169,7 +169,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_fail_if_ticket_amount_is_low() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let channel = create_channel_entry();
@@ -188,7 +188,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_fail_if_ticket_chance_is_low() -> anyhow::Result<()> {
         let mut ticket = create_valid_ticket()?;
         ticket.encoded_win_prob = WinningProbability::try_from(0.5f64)?.into();
@@ -213,7 +213,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_fail_if_channel_is_closed() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let mut channel = create_channel_entry();
@@ -233,7 +233,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match_2() -> anyhow::Result<()> {
         let mut ticket = create_valid_ticket()?;
         ticket.channel_epoch = 2u32;
@@ -258,7 +258,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_fail_if_does_not_have_funds() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let mut channel = create_channel_entry();

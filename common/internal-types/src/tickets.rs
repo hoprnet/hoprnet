@@ -1,9 +1,6 @@
-use ethers::contract::EthCall;
 use hex_literal::hex;
-use hopr_bindings::hopr_channels::RedeemTicketCall;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use tracing::{debug, error};
@@ -398,7 +395,7 @@ impl TicketBuilder {
         }
     }
 
-    /// Validates all input and builds the [VerifiedTicket] by **assuming** the previously
+    /// Validates all inputs and builds the [VerifiedTicket] by **assuming** the previously
     /// set [signature](TicketBuilder::signature) is valid and belongs to the given ticket `hash`.
     /// It does **not** check whether `hash` matches the input data nor that the signature verifies
     /// the given hash.
@@ -455,7 +452,8 @@ impl From<Ticket> for TicketBuilder {
 ///     E --> |into_transferable| F
 ///     F --> |into_redeemable| E
 ///```
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ticket {
     /// Channel ID.
     /// See [generate_channel_id] for how this value is generated.
@@ -475,7 +473,7 @@ pub struct Ticket {
     /// Epoch of the channel this ticket belongs to.
     /// Always between 0 and 2^24.
     pub channel_epoch: u32, // 24 bits
-    /// Represent the Proof of Relay challenge encoded as Ethereum address.
+    /// Represent the Proof of Relay challenge encoded as an Ethereum address.
     pub challenge: EthereumChallenge,
     /// ECDSA secp256k1 signature of all the above values.
     pub signature: Option<Signature>,
@@ -548,7 +546,8 @@ impl Ticket {
     /// must be equal to on-chain computation
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
         let ticket_hash = Hash::create(&[self.encode_without_signature().as_ref()]); // cannot fail
-        let hash_struct = Hash::create(&[&RedeemTicketCall::selector(), &[0u8; 28], ticket_hash.as_ref()]);
+                                                                                     // This contains on-chain prefix: RedeemTicketCall::selector() and zeroes
+        let hash_struct = Hash::create(&[&[252u8, 183u8, 121u8, 111u8], &[0u8; 28], ticket_hash.as_ref()]);
         Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
 
@@ -672,7 +671,8 @@ impl BytesEncodable<TICKET_SIZE> for Ticket {}
 /// Holds a ticket that has been already verified.
 /// This structure guarantees that [`Ticket::get_hash()`] of [`VerifiedTicket::verified_ticket()`]
 /// is always equal to [`VerifiedTicket::verified_hash`]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VerifiedTicket(Ticket, Hash, Address);
 
 impl VerifiedTicket {
@@ -785,7 +785,8 @@ impl Ord for VerifiedTicket {
 /// Represents a [VerifiedTicket] with an unknown other part of the [HalfKey].
 /// Once the other [HalfKey] is known (forming a [Response]),
 /// it can be [acknowledged](UnacknowledgedTicket::acknowledge).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UnacknowledgedTicket {
     pub ticket: VerifiedTicket,
     pub(crate) own_key: HalfKey,
@@ -822,13 +823,12 @@ impl UnacknowledgedTicket {
     Default,
     Eq,
     PartialEq,
-    Serialize,
-    Deserialize,
     strum::Display,
     strum::EnumString,
     num_enum::IntoPrimitive,
     num_enum::TryFromPrimitive,
 )]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[strum(serialize_all = "PascalCase")]
 pub enum AcknowledgedTicketStatus {
     /// The ticket is available for redeeming or aggregating
@@ -841,9 +841,10 @@ pub enum AcknowledgedTicketStatus {
 }
 
 /// Contains acknowledgment information and the respective ticket
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AcknowledgedTicket {
-    #[serde(default)]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub status: AcknowledgedTicketStatus,
     pub ticket: VerifiedTicket,
     pub response: Response,
@@ -915,7 +916,8 @@ impl Display for AcknowledgedTicket {
 }
 
 /// Represents a winning ticket that can be successfully redeemed on chain.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RedeemableTicket {
     /// Verified ticket that can be redeemed.
     pub ticket: VerifiedTicket,
@@ -964,7 +966,8 @@ impl From<RedeemableTicket> for AcknowledgedTicket {
 /// information about verification.
 /// [TransferableWinningTicket] can be attempted to be converted back to [RedeemableTicket] only
 /// when verified via [`TransferableWinningTicket::into_redeemable`] again.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TransferableWinningTicket {
     pub ticket: Ticket,
     pub response: Response,
@@ -976,7 +979,7 @@ impl TransferableWinningTicket {
     /// Attempts to transform this ticket back into a [RedeemableTicket].
     ///
     /// Verifies that the `signer` matches the `expected_issuer` and that the
-    /// ticket has valid signature from the `signer`.
+    /// ticket has a valid signature from the `signer`.
     /// Then it verifies if the ticket is winning and therefore if it can be successfully
     /// redeemed on-chain.
     pub fn into_redeemable(
@@ -1044,6 +1047,7 @@ pub mod tests {
     use super::*;
     use crate::tickets::AcknowledgedTicket;
     use hex_literal::hex;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, Response},
@@ -1055,6 +1059,11 @@ pub mod tests {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
         static ref BOB: ChainKeypair = ChainKeypair::from_secret(&hex!("48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c")).expect("lazy static keypair should be constructible");
     }
+
+    #[cfg(feature = "serde")]
+    const BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+        .with_little_endian()
+        .with_variable_int_encoding();
 
     #[test]
     pub fn test_win_prob_to_f64() -> anyhow::Result<()> {
@@ -1153,6 +1162,7 @@ pub mod tests {
     }
 
     #[test]
+    #[cfg(feature = "serde")]
     pub fn test_ticket_serialize_deserialize_serde() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
@@ -1166,7 +1176,11 @@ pub mod tests {
 
         assert_eq!(
             initial_ticket,
-            bincode::deserialize(&bincode::serialize(&initial_ticket)?)?
+            bincode::serde::decode_from_slice(
+                &bincode::serde::encode_to_vec(&initial_ticket, BINCODE_CONFIGURATION)?,
+                BINCODE_CONFIGURATION
+            )
+            .map(|v| v.0)?
         );
         Ok(())
     }
@@ -1250,7 +1264,8 @@ pub mod tests {
     }
 
     #[test]
-    fn test_acknowledged_ticket() -> anyhow::Result<()> {
+    #[cfg(feature = "serde")]
+    fn test_acknowledged_ticket_serde() -> anyhow::Result<()> {
         let response =
             Response::try_from(hex!("876a41ee5fb2d27ac14d8e8d552692149627c2f52330ba066f9e549aef762f73").as_ref())?;
 
@@ -1265,7 +1280,11 @@ pub mod tests {
 
         let acked_ticket = ticket.into_acknowledged(response);
 
-        let mut deserialized_ticket = bincode::deserialize::<AcknowledgedTicket>(&bincode::serialize(&acked_ticket)?)?;
+        let mut deserialized_ticket = bincode::serde::decode_from_slice(
+            &bincode::serde::encode_to_vec(&acked_ticket, BINCODE_CONFIGURATION)?,
+            BINCODE_CONFIGURATION,
+        )
+        .map(|v| v.0)?;
         assert_eq!(acked_ticket, deserialized_ticket);
 
         assert!(deserialized_ticket.is_winning(&BOB, &dst));
@@ -1274,7 +1293,11 @@ pub mod tests {
 
         assert_eq!(
             deserialized_ticket,
-            bincode::deserialize(&bincode::serialize(&deserialized_ticket)?)?
+            bincode::serde::decode_from_slice(
+                &bincode::serde::encode_to_vec(&deserialized_ticket, BINCODE_CONFIGURATION)?,
+                BINCODE_CONFIGURATION,
+            )
+            .map(|v| v.0)?
         );
         Ok(())
     }

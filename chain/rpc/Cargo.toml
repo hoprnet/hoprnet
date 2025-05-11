@@ -14,12 +14,6 @@ crate-type = ["rlib"]
 [features]
 default = []
 prometheus = ["dep:hopr-metrics"]
-runtime-async-std = [
-  "dep:async-std",
-  "hopr-async-runtime/runtime-async-std",
-  "dep:surf",
-  "dep:surf-governor",
-]
 runtime-tokio = [
   "hopr-async-runtime/runtime-tokio",
   "dep:reqwest",
@@ -28,10 +22,6 @@ runtime-tokio = [
 
 [dependencies]
 async-trait = { workspace = true }
-async-std = { workspace = true, optional = true, features = [
-  "attributes",
-  "unstable",
-] }
 async-stream = { workspace = true }
 ethers = { workspace = true }
 futures = { workspace = true }
@@ -51,8 +41,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 smart-default = { workspace = true }
-surf = { workspace = true, optional = true }
-surf-governor = { workspace = true, optional = true }
 thiserror = { workspace = true }
 url = { workspace = true }
 validator = { workspace = true }
@@ -68,8 +56,6 @@ hopr-async-runtime = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true, features = ["attributes", "unstable"] }
-tokio = { workspace = true }
 reqwest = { workspace = true }
 governor = { workspace = true }
 env_logger = { workspace = true }
@@ -78,3 +64,5 @@ mockito = { workspace = true }
 hex-literal = { workspace = true }
 test-log = { workspace = true }
 tempfile = { workspace = true }
+tokio = { workspace = true }
+tracing-test = { workspace = true }

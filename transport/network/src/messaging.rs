@@ -1,10 +1,27 @@
-use crate::errors::NetworkingError::MessagingError;
-use hopr_crypto_sphinx::derivation::derive_ping_pong;
+use hopr_crypto_random::random_fill;
+use hopr_crypto_types::prelude::blake3_hash;
 use hopr_primitive_types::errors::GeneralError;
 use hopr_primitive_types::prelude::BytesEncodable;
 use serde::{Deserialize, Serialize};
 
+use crate::errors::NetworkingError::MessagingError;
 use crate::errors::Result;
+
+/// Size of the nonce in the Ping sub protocol
+pub const PING_PONG_NONCE_SIZE: usize = 16;
+
+/// Derives a ping challenge (if no challenge is given) or a pong response to a ping challenge.
+pub fn derive_ping_pong(challenge: Option<&[u8]>) -> [u8; PING_PONG_NONCE_SIZE] {
+    let mut ret = [0u8; PING_PONG_NONCE_SIZE];
+    match challenge {
+        None => random_fill(&mut ret),
+        Some(chal) => {
+            let hash = blake3_hash(chal);
+            ret.copy_from_slice(&hash.as_bytes()[0..PING_PONG_NONCE_SIZE]);
+        }
+    }
+    ret
+}
 
 /// Implementation of the Control Message sub-protocol, which currently consists of Ping/Pong
 /// messaging for the HOPR protocol.
@@ -64,7 +81,7 @@ impl ControlMessage {
 
 #[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub struct PingMessage {
-    nonce: [u8; hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE],
+    nonce: [u8; PING_PONG_NONCE_SIZE],
 }
 
 impl PingMessage {
@@ -96,7 +113,7 @@ impl TryFrom<&[u8]> for PingMessage {
     }
 }
 
-const PING_MESSAGE_LEN: usize = hopr_crypto_sphinx::derivation::PING_PONG_NONCE_SIZE;
+const PING_MESSAGE_LEN: usize = PING_PONG_NONCE_SIZE;
 impl BytesEncodable<PING_MESSAGE_LEN> for PingMessage {}
 
 #[cfg(test)]

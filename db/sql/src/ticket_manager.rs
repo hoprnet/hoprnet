@@ -313,6 +313,7 @@ impl TicketManager {
 mod tests {
     use futures::StreamExt;
     use hex_literal::hex;
+    use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
     use hopr_db_api::info::DomainSeparator;
     use hopr_internal_types::prelude::*;
@@ -343,6 +344,7 @@ mod tests {
                     public_key: *peer_offchain.public(),
                     chain_addr: peer_onchain.public().to_address(),
                     entry_type: AccountType::NotAnnounced,
+                    published_at: 0,
                 },
             )
             .await?
@@ -370,7 +372,7 @@ mod tests {
         Ok(ticket.into_acknowledged(Response::from_half_keys(&hk1, &hk2)?))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_insert_ticket_properly_resolves_the_cached_value() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())

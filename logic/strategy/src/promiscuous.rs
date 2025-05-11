@@ -749,11 +749,12 @@ mod tests {
                     for (chain_key, peer_id) in PEERS.iter() {
                         db.insert_account(
                             Some(tx),
-                            AccountEntry::new(
-                                OffchainPublicKey::try_from(*peer_id).expect("should be valid PeerId"),
-                                *chain_key,
-                                AccountType::NotAnnounced,
-                            ),
+                            AccountEntry {
+                                public_key: OffchainPublicKey::try_from(*peer_id).expect("should be valid PeerId"),
+                                chain_addr: *chain_key,
+                                entry_type: AccountType::NotAnnounced,
+                                published_at: 1,
+                            },
                         )
                         .await?;
                     }
@@ -802,7 +803,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_promiscuous_strategy_tick_decisions() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
 
@@ -868,7 +869,7 @@ mod tests {
 
         let strat = PromiscuousStrategy::new(strat_cfg.clone(), db, actions);
 
-        async_std::task::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
         strat.on_tick().await?;
 
