@@ -516,11 +516,12 @@ where
         )
         .await;
 
-        // extract and flatten all multiaddr from the  known accounts
-
-        info!("Found {} addresses from the database", addresses.len());
-
-        // transport_layer.dial_nat_server(addresses);
+        if addresses.is_empty() {
+            warn!("No addresses found in the database, not dialing any NAT servers");
+        } else {
+            info!(num_addresses = addresses.len(), "Found addresses from the database");
+            transport_layer.dial_nat_server(addresses);
+        }
 
         let msg_proto_control =
             transport_layer.build_protocol_control(hopr_transport_protocol::msg::CURRENT_HOPR_MSG_PROTOCOL);
