@@ -292,15 +292,6 @@ hopr:
     # the sync process. Recommended for initial setup or when recovering
     # from a clean state.
     fast_sync: true
-# HOPRd Message Inbox configuration
-inbox:
-  # Capacity of messages in the Inbox, per message tag.
-  capacity: 512
-  # The maximum age of a message in Inbox in seconds
-  # Older messages are automatically purged
-  max_age: 900
-  # Tags which are not allowed into the Inbox
-  excluded_tags: [0]
 # Session Entry/Exit IP forwarding configuration for this node
 # This applies whenever the node is an Exit node of a Session.
 session_ip_forwarding:

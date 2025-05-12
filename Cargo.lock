@@ -5103,7 +5103,6 @@ dependencies = [
  "hopr-platform",
  "hoprd-api",
  "hoprd-db-api",
- "hoprd-inbox",
  "hoprd-keypair",
  "lazy_static",
  "opentelemetry",
@@ -5129,7 +5128,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.12.1"
+version = "3.14.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -5148,7 +5147,6 @@ dependencies = [
  "hopr-network-types",
  "hopr-transport-session",
  "hoprd-db-api",
- "hoprd-inbox",
  "lazy_static",
  "libp2p-identity",
  "oas3",
@@ -5215,24 +5213,6 @@ version = "0.1.0"
 dependencies = [
  "sea-orm-migration",
  "tokio",
-]
-
-[[package]]
-name = "hoprd-inbox"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "async-lock 3.4.0",
- "async-trait",
- "hopr-internal-types",
- "hopr-platform",
- "ringbuffer",
- "serde",
- "serde_with",
- "smart-default",
- "tokio",
- "tracing",
- "validator",
 ]
 
 [[package]]

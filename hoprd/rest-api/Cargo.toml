@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "3.12.1"
+version = "3.14.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "API enabling developers to interact with a hoprd node programatically through HTTP REST API."
@@ -65,7 +65,6 @@ hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-lib = { workspace = true, features = ["runtime-tokio", "session-client"] }
 hopr-db-api = { workspace = true }
 hoprd-db-api = { workspace = true }
-hoprd-inbox = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
 hopr-metrics = { workspace = true, optional = true }

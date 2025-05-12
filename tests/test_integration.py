@@ -172,8 +172,6 @@ class TestIntegrationWithSwarm:
         packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
         await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[], timeout=5)
 
-        # Remove all messages so they do not interfere with the later tests
-        await swarm7[dest].api.messages_pop_all(None)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -455,63 +453,6 @@ class TestIntegrationWithSwarm:
         )
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("tag", [random.randint(0, RESERVED_TAG_UPPER_BOUND) for _ in range(5)])
-    async def test_inbox_operations_with_reserved_application_tag_should_fail(self, tag: int, swarm7: dict[str, Node]):
-        id = random.choice(barebone_nodes())
-
-        assert await swarm7[id].api.messages_pop(tag) is None
-        assert await swarm7[id].api.messages_peek(tag) is None
-        assert await swarm7[id].api.messages_peek(tag) is None
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-    async def test_peeking_messages_with_timestamp(self, src: str, dest: str, swarm7: dict[str, Node]):
-        message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
-        split_index = int(message_count * 0.66)
-
-        random_tag = gen_random_tag()
-
-        src_peer = swarm7[src]
-        dest_peer = swarm7[dest]
-
-        packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
-        for packet in packets[:split_index]:
-            await src_peer.api.send_message(dest_peer.peer_id, packet, [], random_tag)
-
-        await asyncio.sleep(2)
-
-        for packet in packets[split_index:]:
-            await src_peer.api.send_message(dest_peer.peer_id, packet, [], random_tag)
-
-        await asyncio.wait_for(
-            check_received_packets_with_peek(dest_peer, packets, tag=random_tag, sort=True),
-            MULTIHOP_MESSAGE_SEND_TIMEOUT,
-        )
-
-        packets = await dest_peer.api.messages_peek_all(random_tag)
-        timestamps = sorted([message.received_at for message in packets])
-
-        # ts_for_query set right before (1ms before) the first message of the second batch.
-        # This is to ensure that the first message of the second batch will be returned by the query.
-        # It's a workaround, it should work properly without the -1, however randmly fails.
-        ts_for_query = timestamps[split_index] - 1
-
-        async def peek_the_messages():
-            packets = await dest_peer.api.messages_peek_all(random_tag, ts_for_query)
-            done = len(packets) == (message_count - split_index)
-
-            if not done:
-                logging.debug(f"Peeked {len(packets)} messages, expected {message_count - split_index}")
-                await asyncio.sleep(0.01)
-
-            return done
-
-        await asyncio.wait_for(peek_the_messages(), 5)
-
-        # Remove all messages so they do not interfere with the later tests
-        await dest_peer.api.messages_pop_all(random_tag)
-
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
     async def test_send_message_return_timestamp(self, src: str, dest: str, swarm7: dict[str, Node]):
         message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
@@ -525,9 +466,6 @@ class TestIntegrationWithSwarm:
         for packet in packets:
             res = await src_peer.api.send_message(dest_peer.peer_id, packet, [], random_tag)
             timestamps.append(res.timestamp)
-
-        # Remove all messages so they do not interfere with the later tests
-        await dest_peer.api.messages_pop_all(random_tag)
 
         assert len(timestamps) == message_count
         assert timestamps == sorted(timestamps)
@@ -547,9 +485,6 @@ class TestIntegrationWithSwarm:
                 random.choice([dest_peer.peer_id, dest_peer.address]), packet, [], random_tag
             )
             assert res is not None
-
-        # Remove all messages so they do not interfere with the later tests
-        await dest_peer.api.messages_pop_all(random_tag)
 
 
 @pytest.mark.asyncio
