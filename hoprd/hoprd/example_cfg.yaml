@@ -228,6 +228,8 @@ hopr:
     heartbeat:
       # Timeout in seconds
       timeout: 6
+    # port used for nat server functionality
+    autonat_port: 9191
   # Blockchain specific configuration
   chain:
     # Indicates whether node should announce itself on-chain

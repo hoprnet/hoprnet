@@ -366,10 +366,12 @@ where
 
         info!("Loading initial peers from the storage");
 
+        let mut addresses: Vec<Multiaddr> = Vec::new();
         let nodes = self.get_public_nodes().await?;
         for (peer, _address, multiaddresses) in nodes {
             if self.is_allowed_to_access_network(either::Left(&peer)).await? {
                 debug!(%peer, ?multiaddresses, "Using initial public node");
+                addresses.extend(multiaddresses.clone());
 
                 internal_discovery_update_tx
                     .send(PeerDiscovery::Allow(peer))
@@ -507,7 +509,7 @@ where
             (tx, rx)
         };
 
-        let transport_layer = HoprSwarm::new(
+        let mut transport_layer = HoprSwarm::new(
             (&self.me).into(),
             network_events_rx,
             discovery_updates,
@@ -516,6 +518,17 @@ where
             self.cfg.protocol,
         )
         .await;
+
+        if let Some(port) = self.cfg.protocol.autonat_port {
+            transport_layer.run_nat_server(port);
+        }
+
+        if addresses.is_empty() {
+            warn!("No addresses found in the database, not dialing any NAT servers");
+        } else {
+            info!(num_addresses = addresses.len(), "Found addresses from the database");
+            transport_layer.dial_nat_server(addresses);
+        }
 
         let msg_proto_control =
             transport_layer.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);

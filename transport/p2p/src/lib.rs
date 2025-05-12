@@ -30,7 +30,8 @@ pub mod swarm;
 mod behavior;
 
 use futures::{AsyncRead, AsyncWrite, Stream};
-use libp2p::{swarm::NetworkBehaviour, StreamProtocol};
+use libp2p::{autonat, swarm::NetworkBehaviour, StreamProtocol};
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -101,6 +102,8 @@ pub struct HoprNetworkBehavior {
     streams: libp2p_stream::Behaviour,
     heartbeat_generator: behavior::heartbeat::Behaviour,
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
+    pub autonat_client: autonat::v2::client::Behaviour,
+    pub autonat_server: autonat::v2::server::Behaviour,
     // WARNING: the order of struct members is important, `discovery` must be the last member,
     // because the request_response components remove the peer from its peer store after a failed
     // dial operation and the discovery mechanism is responsible for populating all peer stores.
@@ -138,6 +141,11 @@ impl HoprNetworkBehavior {
                 )],
                 libp2p::request_response::Config::default().with_request_timeout(hb_timeout),
             ),
+            autonat_client: autonat::v2::client::Behaviour::new(
+                OsRng,
+                autonat::v2::client::Config::default().with_probe_interval(std::time::Duration::from_secs(30)), // TODO (jean): make this configurable
+            ),
+            autonat_server: autonat::v2::server::Behaviour::new(OsRng),
         }
     }
 }
@@ -155,6 +163,8 @@ pub enum HoprNetworkBehaviorEvent {
         libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ),
     KeepAlive(void::Void),
+    AutonatClient(autonat::v2::client::Event),
+    AutonatServer(autonat::v2::server::Event),
 }
 
 // Unexpected libp2p_stream event
@@ -195,6 +205,18 @@ impl From<libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::r
         event: libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ) -> Self {
         Self::TicketAggregation(event)
+    }
+}
+
+impl From<autonat::v2::client::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: autonat::v2::client::Event) -> Self {
+        Self::AutonatClient(event)
+    }
+}
+
+impl From<autonat::v2::server::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: autonat::v2::server::Event) -> Self {
+        Self::AutonatServer(event)
     }
 }
 
