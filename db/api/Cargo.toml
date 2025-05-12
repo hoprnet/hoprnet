@@ -25,4 +25,3 @@ hopr-crypto-types = { workspace = true }
 hopr-network-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 hopr-internal-types = { workspace = true }
-
