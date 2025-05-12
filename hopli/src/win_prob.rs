@@ -27,6 +27,7 @@ use alloy::primitives::aliases::U56;
 use clap::Parser;
 use hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle;
 use hopr_internal_types::prelude::WinningProbability;
+use hopr_internal_types::tickets::EncodedWinProb;
 use tracing::{debug, info};
 
 /// CLI arguments for `hopli win-prob`
@@ -86,7 +87,7 @@ impl WinProbSubcommands {
         // );
 
         hopr_win_prob
-            .setWinProb(U56::from_be_slice(&winning_probability))
+            .setWinProb(U56::from_be_slice(&winning_probability.as_encoded()))
             .send()
             .await?
             .watch()

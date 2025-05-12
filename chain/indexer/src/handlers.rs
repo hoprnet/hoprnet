@@ -698,9 +698,9 @@ where
         METRIC_INDEXER_LOG_COUNTERS.increment(&["win_prob_oracle"]);
 
         match event {
-            HoprWinningProbabilityOracleEvents::WinProbUpdatedFilter(update) => {
-                let old_minimum_win_prob: WinningProbability = update.old_win_prob.into();
-                let new_minimum_win_prob: WinningProbability = update.new_win_prob.into();
+            HoprWinningProbabilityOracleEvents::WinProbUpdated(update) => {
+                let old_minimum_win_prob: WinningProbability = update.oldWinProb.to_be_bytes().into();
+                let new_minimum_win_prob: WinningProbability = update.newWinProb.to_be_bytes().into();
 
                 trace!(
                     %old_minimum_win_prob,

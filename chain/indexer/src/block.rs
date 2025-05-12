@@ -218,6 +218,10 @@ where
             let _first_log_block_number = log_block_numbers.first().copied().unwrap_or(0);
             let _head = chain_head.load(Ordering::Relaxed);
             for block_number in log_block_numbers {
+                debug!(
+                    "computing processed logs with ({} - {}) / ({} - {})",
+                    block_number, _first_log_block_number, _head, _first_log_block_number
+                );
                 // Do not pollute the logs with the fast-sync progress
                 Self::process_block_by_id(&db, &logs_handler, block_number).await?;
                 #[cfg(all(feature = "prometheus", not(test)))]
