@@ -43,7 +43,7 @@ def run_cast_cmd(cmd: str, params: list[str]):
         raise
 
 
-def faucet(private_key: str, hopr_amount: str, native_amount: str):
+def faucet(private_key: str, node_addr: str, hopr_amount: str, native_amount: str):
     custom_env = {
         "ETHERSCAN_API_KEY": "anykey",
         "IDENTITY_PASSWORD": PASSWORD,
@@ -55,10 +55,12 @@ def faucet(private_key: str, hopr_amount: str, native_amount: str):
         "faucet",
         "--network",
         NETWORK,
-        "--identity-prefix",
-        IDENTITY_PREFIX,
-        "--identity-directory",
-        MAIN_DIR,
+        "--address",
+        node_addr,
+        # "--identity-prefix",
+        # IDENTITY_PREFIX, # IDENTITY_PREFIX, NODE_NAME_PREFIX
+        # "--identity-directory",
+        # MAIN_DIR,
         "--contracts-root",
         CONTRACTS_DIR,
         "--hopr-amount",
@@ -356,7 +358,7 @@ class TestHopliWithSwarm:
         logging.debug(f"balance_before of {peer} / {swarm7[peer].address}: {balance_before}")
 
         # fund node with 1 HOPR token and 10 native token
-        faucet(private_key, "1.0", "10.0")
+        faucet(private_key, swarm7[peer].address, "1.0", "10.0")
 
         balance_after = await swarm7[peer].api.balances()
         logging.debug(f"balance_after of {peer} / {swarm7[peer].address}: {balance_after}")
