@@ -698,19 +698,13 @@ where
         METRIC_INDEXER_LOG_COUNTERS.increment(&["win_prob_oracle"]);
 
         match event {
-            HoprWinningProbabilityOracleEvents::WinProbUpdated(update) => {
-                let mut encoded_old: EncodedWinProb = Default::default();
-                // encoded_old.copy_from_slice(&update.oldWinProb.to_be_bytes()[1..]);
-                encoded_old.copy_from_slice(&update.oldWinProb.to_be_bytes::<7>());
-                let old_minimum_win_prob = win_prob_to_f64(&encoded_old);
-
-                let mut encoded_new: EncodedWinProb = Default::default();
-                encoded_new.copy_from_slice(&update.newWinProb.to_be_bytes::<7>());
-                let new_minimum_win_prob = win_prob_to_f64(&encoded_new);
+            HoprWinningProbabilityOracleEvents::WinProbUpdatedFilter(update) => {
+                let old_minimum_win_prob: WinningProbability = update.old_win_prob.into();
+                let new_minimum_win_prob: WinningProbability = update.new_win_prob.into();
 
                 trace!(
-                    old = old_minimum_win_prob,
-                    new = new_minimum_win_prob,
+                    %old_minimum_win_prob,
+                    %new_minimum_win_prob,
                     "on_ticket_minimum_win_prob_updated",
                 );
 
@@ -719,14 +713,14 @@ where
                     .await?;
 
                 info!(
-                    old = old_minimum_win_prob,
-                    new = new_minimum_win_prob,
+                    %old_minimum_win_prob,
+                    %new_minimum_win_prob,
                     "minimum ticket winning probability updated"
                 );
 
                 // If the old minimum was less strict, we need to mark of all the
                 // tickets below the new higher minimum as rejected
-                if old_minimum_win_prob < new_minimum_win_prob {
+                if old_minimum_win_prob.approx_cmp(&new_minimum_win_prob).is_lt() {
                     let mut selector: Option<TicketSelector> = None;
                     for channel in self.db.get_incoming_channels(tx.into()).await? {
                         selector = selector
@@ -737,7 +731,10 @@ where
                     if let Some(selector) = selector {
                         let num_rejected = self
                             .db
-                            .mark_tickets_as(selector.with_winning_probability(..encoded_new), TicketMarker::Rejected)
+                            .mark_tickets_as(
+                                selector.with_winning_probability(..new_minimum_win_prob),
+                                TicketMarker::Rejected,
+                            )
                             .await?;
                         info!(count = num_rejected, "unredeemed tickets were rejected, because the minimum winning probability has been increased");
                     }
@@ -2171,7 +2168,7 @@ mod tests {
             .amount(primitive_types::U256::from(PRICE_PER_PACKET).div_f64(win_prob)?)
             .index(index)
             .index_offset(1)
-            .win_prob(win_prob)
+            .win_prob(win_prob.try_into()?)
             .channel_epoch(1)
             .challenge(response.to_challenge().into())
             .build_signed(signer, &domain_separator)?
@@ -2747,23 +2744,16 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         let encoded_data = (
-            U256::from_be_slice(f64_to_win_prob(1.0)?.as_ref()),
-            U256::from_be_slice(f64_to_win_prob(0.5)?.as_ref()),
+            U256::from_be_slice(WinningProbability::ALWAYS.as_ref()),
+            U256::from_be_slice(WinningProbability::try_from_f64(0.5)?.as_ref()),
         )
             .abi_encode();
 
         let win_prob_change_log = SerializableLog {
             address: handlers.addresses.win_prob_oracle.into(),
             topics: vec![
-                hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::WinProbUpdated::SIGNATURE_HASH.into(),
-                // WinProbUpdatedFilter::signature().into()
-                ],
-            // topics: vec![WinProbUpdatedFilter::signature().into()],
+                hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::WinProbUpdated::SIGNATURE_HASH.into()],
             data: encoded_data
-            // data: encode(&[
-            //     Token::Uint(EthU256::from(f64_to_win_prob(1.0)?.as_ref())),
-            //     Token::Uint(EthU256::from(f64_to_win_prob(0.5)?.as_ref())),
-            // ])
             .into(),
             ..test_log()
         };
@@ -2794,7 +2784,7 @@ mod tests {
     #[tokio::test]
     async fn lowering_minimum_win_prob_update_should_reject_non_satisfying_unredeemed_tickets() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        db.set_minimum_incoming_ticket_win_prob(None, 0.1).await?;
+        db.set_minimum_incoming_ticket_win_prob(None, 0.1.try_into()?).await?;
 
         let new_minimum = 0.5;
         let ticket_win_probs = [0.1, 1.0, 0.3, 0.2];
@@ -2848,8 +2838,8 @@ mod tests {
         let handlers = init_handlers(db.clone());
 
         let encoded_data = (
-            U256::from_be_slice(f64_to_win_prob(0.1)?.as_ref()),
-            U256::from_be_slice(f64_to_win_prob(new_minimum)?.as_ref()),
+            U256::from_be_slice(WinningProbability::try_from(0.1)?.as_ref()),
+            U256::from_be_slice(WinningProbability::try_from(new_minimum)?.as_ref()),
         )
             .abi_encode();
 
@@ -2857,13 +2847,8 @@ mod tests {
             address: handlers.addresses.win_prob_oracle.into(),
             topics: vec![
                 hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::WinProbUpdated::SIGNATURE_HASH.into(),
-                // WinProbUpdatedFilter::signature().into()
             ],
             data: encoded_data
-            // data: encode(&[
-            //     Token::Uint(EthU256::from(f64_to_win_prob(0.1)?.as_ref())),
-            //     Token::Uint(EthU256::from(f64_to_win_prob(new_minimum)?.as_ref())),
-            // ])
             .into(),
             ..test_log()
         };

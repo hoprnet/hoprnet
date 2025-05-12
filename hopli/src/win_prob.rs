@@ -26,7 +26,7 @@ use crate::{
 use alloy::primitives::aliases::U56;
 use clap::Parser;
 use hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle;
-use hopr_internal_types::prelude::{f64_to_win_prob, win_prob_to_f64};
+use hopr_internal_types::prelude::WinningProbability;
 use tracing::{debug, info};
 
 /// CLI arguments for `hopli win-prob`
@@ -76,14 +76,9 @@ impl WinProbSubcommands {
         );
 
         // convert the winning probability to the format required by the contract
-        let winning_probability = f64_to_win_prob(winning_probability).map_err(|_| {
+        let winning_probability = WinningProbability::try_from(winning_probability).map_err(|_| {
             HelperErrors::ParseError("Failed to convert winning probability to the required format".into())
         })?;
-
-        // // convert the new winning probability
-        // let mut win_prob_param = [0u8; 8];
-        // win_prob_param[1..].copy_from_slice(&winning_probability);
-        // let win_prob_param = u64::from_be_bytes(win_prob_param);
 
         // info!(
         //     "Setting the global minimum winning probability to {:?} ({:?} in uint56 format)",
@@ -118,9 +113,10 @@ impl WinProbSubcommands {
             ._0;
 
         // convert into f64
-        let mut tmp = [0u8; 7];
+        let mut tmp: EncodedWinProb = Default::default();
         tmp.copy_from_slice(&current_win_prob.to_be_bytes::<7>());
-        let current_win_prob_f64 = win_prob_to_f64(&tmp);
+        let current_win_prob = WinningProbability::from(tmp);
+        let current_win_prob_f64 = current_win_prob.as_f64();
         info!(
             "Current global minimum winning probability is {:?} ({:?} in uint56 format)",
             current_win_prob_f64, current_win_prob

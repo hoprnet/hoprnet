@@ -18,7 +18,7 @@ pub trait HoprDbProtocolOperations {
     async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<()>;
 
     /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
-    async fn get_network_winning_probability(&self) -> Result<f64>;
+    async fn get_network_winning_probability(&self) -> Result<WinningProbability>;
 
     /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
     async fn get_network_ticket_price(&self) -> Result<Balance>;
@@ -31,7 +31,7 @@ pub trait HoprDbProtocolOperations {
         &self,
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<OutgoingPacket>;
 
@@ -42,7 +42,7 @@ pub trait HoprDbProtocolOperations {
         data: Box<[u8]>,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<Option<IncomingPacket>>;
 }

@@ -29,7 +29,7 @@ use validator::Validate;
 use hopr_bindings::hoprnodemanagementmodule::HoprNodeManagementModule::{self, HoprNodeManagementModuleInstance};
 use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-use hopr_internal_types::prelude::{win_prob_to_f64, EncodedWinProb};
+use hopr_internal_types::prelude::{EncodedWinProb, WinningProbability};
 use hopr_primitive_types::prelude::*;
 
 use SafeSingleton::SafeSingletonInstance;
@@ -256,12 +256,12 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         }
     }
 
-    async fn get_minimum_network_winning_probability(&self) -> Result<f64> {
+    async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability> {
         match self.contract_instances.win_prob_oracle.currentWinProb().call().await {
             Ok(encoded_win_prob) => {
                 let mut encoded: EncodedWinProb = Default::default();
                 encoded.copy_from_slice(&encoded_win_prob._0.to_be_bytes_vec());
-                Ok(win_prob_to_f64(&encoded))
+                Ok(encoded.into())
             }
             Err(e) => Err(e.into()),
         }

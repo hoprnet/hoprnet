@@ -30,6 +30,7 @@ use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::account::AccountEntry;
 pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::prelude::ChannelDirection;
+use hopr_internal_types::tickets::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
 use config::ChainNetworkConfig;
@@ -357,7 +358,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.rpc_operations.get_eligibility_status(self.me_onchain()).await?)
     }
 
-    pub async fn get_minimum_winning_probability(&self) -> errors::Result<f64> {
+    pub async fn get_minimum_winning_probability(&self) -> errors::Result<WinningProbability> {
         Ok(self.rpc_operations.get_minimum_network_winning_probability().await?)
     }
 
