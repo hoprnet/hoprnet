@@ -27,19 +27,14 @@ use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::account::AccountEntry;
 pub use hopr_internal_types::channels::ChannelEntry;
 use hopr_internal_types::prelude::ChannelDirection;
+use hopr_internal_types::tickets::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::{HoprChainError, Result};
 
-/// The default HTTP request engine
-///
-/// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
-#[cfg(feature = "runtime-async-std")]
-pub type DefaultHttpRequestor = hopr_chain_rpc::client::surf_client::SurfRequestor;
-
 // Both features could be enabled during testing; therefore, we only use tokio when its
 // exclusively enabled.
-#[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+#[cfg(feature = "runtime-tokio")]
 pub type DefaultHttpRequestor = hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
 
 /// The default JSON RPC provider client
@@ -350,7 +345,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.rpc_operations.get_eligibility_status(self.me_onchain()).await?)
     }
 
-    pub async fn get_minimum_winning_probability(&self) -> errors::Result<f64> {
+    pub async fn get_minimum_winning_probability(&self) -> errors::Result<WinningProbability> {
         Ok(self.rpc_operations.get_minimum_network_winning_probability().await?)
     }
 

@@ -12,7 +12,7 @@ pub fn validate_unacknowledged_ticket(
     ticket: Ticket,
     channel: &ChannelEntry,
     min_ticket_amount: Balance,
-    required_win_prob: f64,
+    required_win_prob: WinningProbability,
     unrealized_balance: Balance,
     domain_separator: &Hash,
 ) -> Result<VerifiedTicket, TicketValidationError> {
@@ -40,12 +40,7 @@ pub fn validate_unacknowledged_ticket(
     }
 
     // The ticket must have at least the required winning probability
-    if !f64_approx_eq(
-        verified_ticket.win_prob(),
-        required_win_prob,
-        LOWEST_POSSIBLE_WINNING_PROB,
-    ) && verified_ticket.win_prob() < required_win_prob
-    {
+    if verified_ticket.win_prob().approx_cmp(&required_win_prob).is_lt() {
         return Err(TicketValidationError {
             reason: format!(
                 "ticket winning probability {} is lower than required winning probability {required_win_prob}",
@@ -116,7 +111,7 @@ mod tests {
             .amount(1)
             .index(1)
             .index_offset(1)
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(1)
             .challenge(Default::default())
             .build_signed(&SENDER_PRIV_KEY, &Hash::default())?
@@ -134,7 +129,7 @@ mod tests {
         )
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_pass_if_ticket_ok() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let channel = create_channel_entry();
@@ -145,7 +140,7 @@ mod tests {
             ticket,
             &channel,
             Balance::new(1_u64, BalanceType::HOPR),
-            1.0f64,
+            1.0.try_into()?,
             more_than_ticket_balance,
             &Hash::default(),
         );
@@ -155,7 +150,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_fail_if_signer_not_sender() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let channel = create_channel_entry();
@@ -164,7 +159,7 @@ mod tests {
             ticket,
             &channel,
             Balance::new(1_u64, BalanceType::HOPR),
-            1.0f64,
+            1.0f64.try_into()?,
             Balance::zero(BalanceType::HOPR),
             &Hash::default(),
         );
@@ -174,7 +169,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_fail_if_ticket_amount_is_low() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let channel = create_channel_entry();
@@ -183,7 +178,7 @@ mod tests {
             ticket,
             &channel,
             Balance::new(2_u64, BalanceType::HOPR),
-            1.0f64,
+            1.0.try_into()?,
             Balance::zero(BalanceType::HOPR),
             &Hash::default(),
         );
@@ -193,10 +188,10 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_fail_if_ticket_chance_is_low() -> anyhow::Result<()> {
         let mut ticket = create_valid_ticket()?;
-        ticket.encoded_win_prob = f64_to_win_prob(0.5f64)?;
+        ticket.encoded_win_prob = WinningProbability::try_from(0.5f64)?.into();
         let ticket = ticket
             .sign(&SENDER_PRIV_KEY, &Hash::default())
             .verified_ticket()
@@ -208,7 +203,7 @@ mod tests {
             ticket,
             &channel,
             Balance::new(1_u64, BalanceType::HOPR),
-            1.0_f64,
+            1.0.try_into()?,
             Balance::zero(BalanceType::HOPR),
             &Hash::default(),
         );
@@ -218,7 +213,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_fail_if_channel_is_closed() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let mut channel = create_channel_entry();
@@ -228,7 +223,7 @@ mod tests {
             ticket,
             &channel,
             Balance::new(1_u64, BalanceType::HOPR),
-            1.0_f64,
+            1.0.try_into()?,
             Balance::zero(BalanceType::HOPR),
             &Hash::default(),
         );
@@ -238,7 +233,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_should_fail_if_ticket_epoch_does_not_match_2() -> anyhow::Result<()> {
         let mut ticket = create_valid_ticket()?;
         ticket.channel_epoch = 2u32;
@@ -253,7 +248,7 @@ mod tests {
             ticket,
             &channel,
             Balance::new(1_u64, BalanceType::HOPR),
-            1.0_f64,
+            1.0.try_into()?,
             Balance::zero(BalanceType::HOPR),
             &Hash::default(),
         );
@@ -263,7 +258,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_validation_fail_if_does_not_have_funds() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let mut channel = create_channel_entry();
@@ -274,7 +269,7 @@ mod tests {
             ticket,
             &channel,
             Balance::new(1_u64, BalanceType::HOPR),
-            1.0_f64,
+            1.0.try_into()?,
             Balance::zero(BalanceType::HOPR),
             &Hash::default(),
         );

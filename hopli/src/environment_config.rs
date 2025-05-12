@@ -26,19 +26,15 @@ use std::{
     sync::Arc,
 };
 
-use hopr_chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
-use hopr_chain_rpc::{
-    client::{surf_client::SurfRequestor as DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy},
-    errors::RpcError,
-    rpc::RpcOperationsConfig,
+use hopr_chain_api::{
+    config::{Addresses as ContractAddresses, EnvironmentType},
+    DefaultHttpRequestor, JsonRpcClient,
 };
+use hopr_chain_rpc::{client::SimpleJsonRpcRetryPolicy, errors::RpcError, rpc::RpcOperationsConfig};
 use hopr_crypto_types::keypairs::ChainKeypair;
 use hopr_crypto_types::keypairs::Keypair;
 
 use crate::utils::HelperErrors;
-
-pub type JsonRpcClient =
-    hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpPostRequestor, SimpleJsonRpcRetryPolicy>;
 
 // replace NetworkConfig with ProtocolConfig
 #[serde_as]
@@ -131,7 +127,7 @@ impl NetworkProviderArgs {
         // Build JSON RPC client
         let rpc_client = JsonRpcClient::new(
             self.provider_url.as_str(),
-            DefaultHttpPostRequestor::new(hopr_chain_rpc::HttpPostRequestorConfig {
+            DefaultHttpRequestor::new(hopr_chain_rpc::HttpPostRequestorConfig {
                 max_requests_per_sec: None,
                 ..Default::default()
             }),
@@ -163,7 +159,7 @@ impl NetworkProviderArgs {
         // Build JSON RPC client
         let rpc_client = JsonRpcClient::new(
             self.provider_url.as_str(),
-            DefaultHttpPostRequestor::new(hopr_chain_rpc::HttpPostRequestorConfig {
+            DefaultHttpRequestor::new(hopr_chain_rpc::HttpPostRequestorConfig {
                 max_requests_per_sec: None,
                 ..Default::default()
             }),
@@ -307,7 +303,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_network_provider_with_signer() -> anyhow::Result<()> {
         // create an identity
         let chain_key = ChainKeypair::random();
@@ -328,7 +324,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_default_contracts_root() -> anyhow::Result<()> {
         // create an identity
         let chain_key = ChainKeypair::random();

@@ -686,17 +686,12 @@ where
 
         match event {
             HoprWinningProbabilityOracleEvents::WinProbUpdatedFilter(update) => {
-                let mut encoded_old: EncodedWinProb = Default::default();
-                encoded_old.copy_from_slice(&update.old_win_prob.to_be_bytes()[1..]);
-                let old_minimum_win_prob = win_prob_to_f64(&encoded_old);
-
-                let mut encoded_new: EncodedWinProb = Default::default();
-                encoded_new.copy_from_slice(&update.new_win_prob.to_be_bytes()[1..]);
-                let new_minimum_win_prob = win_prob_to_f64(&encoded_new);
+                let old_minimum_win_prob: WinningProbability = update.old_win_prob.into();
+                let new_minimum_win_prob: WinningProbability = update.new_win_prob.into();
 
                 trace!(
-                    old = old_minimum_win_prob,
-                    new = new_minimum_win_prob,
+                    %old_minimum_win_prob,
+                    %new_minimum_win_prob,
                     "on_ticket_minimum_win_prob_updated",
                 );
 
@@ -705,14 +700,14 @@ where
                     .await?;
 
                 info!(
-                    old = old_minimum_win_prob,
-                    new = new_minimum_win_prob,
+                    %old_minimum_win_prob,
+                    %new_minimum_win_prob,
                     "minimum ticket winning probability updated"
                 );
 
                 // If the old minimum was less strict, we need to mark of all the
                 // tickets below the new higher minimum as rejected
-                if old_minimum_win_prob < new_minimum_win_prob {
+                if old_minimum_win_prob.approx_cmp(&new_minimum_win_prob).is_lt() {
                     let mut selector: Option<TicketSelector> = None;
                     for channel in self.db.get_incoming_channels(tx.into()).await? {
                         selector = selector
@@ -723,7 +718,10 @@ where
                     if let Some(selector) = selector {
                         let num_rejected = self
                             .db
-                            .mark_tickets_as(selector.with_winning_probability(..encoded_new), TicketMarker::Rejected)
+                            .mark_tickets_as(
+                                selector.with_winning_probability(..new_minimum_win_prob),
+                                TicketMarker::Rejected,
+                            )
                             .await?;
                         info!(count = num_rejected, "unredeemed tickets were rejected, because the minimum winning probability has been increased");
                     }
@@ -971,7 +969,7 @@ mod tests {
         SerializableLog { ..Default::default() }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn announce_keybinding() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1017,7 +1015,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn announce_address_announcement() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1193,7 +1191,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn announce_revoke() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let handlers = init_handlers(db.clone());
@@ -1250,7 +1248,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_token_transfer_to() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1285,7 +1283,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_token_transfer_from() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1319,7 +1317,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_token_approval_correct() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1383,7 +1381,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_registered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1424,7 +1422,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_registered_by_manager() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1465,7 +1463,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_deregistered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1509,7 +1507,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_deregistered_by_manager() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1553,7 +1551,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_enabled() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1581,7 +1579,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_disabled() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1611,7 +1609,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_set_eligible() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1644,7 +1642,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_set_not_eligible() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1679,7 +1677,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_event_balance_increased() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1729,7 +1727,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_event_domain_separator_updated() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1771,7 +1769,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_event_balance_decreased() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1821,7 +1819,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1879,7 +1877,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_foreign_channel_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1926,7 +1924,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_opened() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1973,7 +1971,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_reopened() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2030,7 +2028,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_should_not_reopen_when_not_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2088,14 +2086,14 @@ mod tests {
             .amount(U256::from(PRICE_PER_PACKET).div_f64(win_prob)?)
             .index(index)
             .index_offset(1)
-            .win_prob(win_prob)
+            .win_prob(win_prob.try_into()?)
             .channel_epoch(1)
             .challenge(response.to_challenge().into())
             .build_signed(signer, &domain_separator)?
             .into_acknowledged(response))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_incoming_channel() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
@@ -2198,7 +2196,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_incoming_channel_neglect_left_over_tickets() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
@@ -2304,7 +2302,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_outgoing_channel() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
@@ -2374,7 +2372,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_on_incoming_channel_with_non_existent_ticket_should_pass() -> anyhow::Result<()>
     {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
@@ -2429,7 +2427,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_on_foreign_channel_should_pass() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2481,7 +2479,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_closure_initiated() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2534,7 +2532,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_node_safe_registry_registered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2563,7 +2561,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_node_safe_registry_deregistered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2597,7 +2595,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn ticket_price_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2630,7 +2628,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn minimum_win_prob_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2640,8 +2638,8 @@ mod tests {
             address: handlers.addresses.win_prob_oracle.into(),
             topics: vec![WinProbUpdatedFilter::signature().into()],
             data: encode(&[
-                Token::Uint(EthU256::from(f64_to_win_prob(1.0)?.as_ref())),
-                Token::Uint(EthU256::from(f64_to_win_prob(0.5)?.as_ref())),
+                Token::Uint(EthU256::from(WinningProbability::ALWAYS.as_ref())),
+                Token::Uint(EthU256::from(WinningProbability::try_from_f64(0.5)?.as_ref())),
             ])
             .into(),
             ..test_log()
@@ -2670,10 +2668,10 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn lowering_minimum_win_prob_update_should_reject_non_satisfying_unredeemed_tickets() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        db.set_minimum_incoming_ticket_win_prob(None, 0.1).await?;
+        db.set_minimum_incoming_ticket_win_prob(None, 0.1.try_into()?).await?;
 
         let new_minimum = 0.5;
         let ticket_win_probs = [0.1, 1.0, 0.3, 0.2];
@@ -2730,8 +2728,8 @@ mod tests {
             address: handlers.addresses.win_prob_oracle.into(),
             topics: vec![WinProbUpdatedFilter::signature().into()],
             data: encode(&[
-                Token::Uint(EthU256::from(f64_to_win_prob(0.1)?.as_ref())),
-                Token::Uint(EthU256::from(f64_to_win_prob(new_minimum)?.as_ref())),
+                Token::Uint(EthU256::from(WinningProbability::try_from(0.1)?.as_ref())),
+                Token::Uint(EthU256::from(WinningProbability::try_from(new_minimum)?.as_ref())),
             ])
             .into(),
             ..test_log()
