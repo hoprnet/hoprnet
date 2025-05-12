@@ -468,7 +468,7 @@ deactivate
 With the environment activated, execute the tests locally:
 
 ```bash
-make smoke-tests
+just run-smoke-test integration
 ```
 
 ## Using Fast Sync

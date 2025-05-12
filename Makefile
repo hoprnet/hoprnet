@@ -63,10 +63,6 @@ clean: # Cleanup build directories
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
 	$(cargo) test --features runtime-tokio
 
-.PHONY: smoke-tests
-smoke-tests: ## run smoke tests
-	source .venv/bin/activate && python3 -m pytest tests/
-
 .PHONY: stress-test-local-swarm
 stress-test-local-swarm: ## run stress tests on a local node swarm
 	source .venv/bin/activate && \
