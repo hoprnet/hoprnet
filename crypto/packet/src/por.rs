@@ -106,7 +106,8 @@ impl SurbReceiverInfo {
         Self(ret)
     }
     pub fn proof_of_relay_values(&self) -> ProofOfRelayValues {
-        ProofOfRelayValues::try_from(&self.0[0..ProofOfRelayValues::SIZE]).expect("proof of relay values must be valid")
+        ProofOfRelayValues::try_from(&self.0[0..ProofOfRelayValues::SIZE])
+            .expect("SurbReceiverInfo always contains valid ProofOfRelayValues")
     }
 }
 

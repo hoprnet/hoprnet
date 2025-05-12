@@ -309,6 +309,7 @@ session_ip_forwarding:
   # to be targets of incoming Sessions.
   # This has an effect only if `use_target_allow_list` is `true`.
   # If left empty (default), the node will deny any Session target and will effectively not act as an Exit node.
+  # For Session targets using a DNS name, the DNS resolution is performed first before the list is matched.
   # Production configuration should always use this allowlist, e.g.: target_allow_list: ["127.0.0.1:8080"]
   target_allow_list: []
 #
