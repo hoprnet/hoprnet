@@ -122,16 +122,15 @@ pub fn frame_reconstructor_with_inspector(
 mod tests {
     use super::*;
 
-    use async_std::prelude::FutureExt;
     use futures::{StreamExt, TryStreamExt};
     use rand::prelude::*;
     use std::time::Duration;
-
+    use futures_time::future::FutureExt;
     use crate::prelude::errors::SessionError;
 
     const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
-    #[async_std::test]
+    #[tokio::test]
     async fn framed_reconstructor_should_reconstruct_frames() -> anyhow::Result<()> {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
@@ -155,7 +154,7 @@ mod tests {
 
         let actual = seq_stream
             .try_collect::<Vec<_>>()
-            .timeout(Duration::from_secs(5))
+            .timeout(futures_time::time::Duration::from_secs(5))
             .await??;
 
         assert_eq!(actual, expected);
@@ -164,7 +163,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn frame_reconstructor_should_discard_missing_segment() -> anyhow::Result<()> {
         let expected = (1u32..=10)
             .map(|frame_id| Frame {
@@ -187,7 +186,7 @@ mod tests {
 
         let jh = hopr_async_runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(r_sink));
 
-        let actual = seq_stream.collect::<Vec<_>>().timeout(Duration::from_secs(5)).await?;
+        let actual = seq_stream.collect::<Vec<_>>().timeout(futures_time::time::Duration::from_secs(5)).await?;
 
         assert_eq!(actual.len(), expected.len());
         for i in 0..expected.len() {

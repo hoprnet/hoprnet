@@ -194,7 +194,7 @@ mod tests {
 
     use anyhow::anyhow;
     use futures::{pin_mut, AsyncWriteExt, StreamExt};
-    use std::time::Duration;
+    use futures_time::future::FutureExt;
 
     #[tokio::test]
     async fn segmenter_should_not_segment_small_data_unless_flushed() -> anyhow::Result<()> {
@@ -204,7 +204,7 @@ mod tests {
         pin_mut!(segments);
         segments
             .next()
-            .timeout(Duration::from_millis(10))
+            .timeout(futures_time::time::Duration::from_millis(10))
             .await
             .expect_err("should time out");
 
@@ -337,7 +337,7 @@ mod tests {
 
         segments
             .next()
-            .timeout(Duration::from_millis(10))
+            .timeout(futures_time::time::Duration::from_millis(10))
             .await
             .expect_err("should time out");
 
@@ -376,7 +376,7 @@ mod tests {
 
         segments
             .next()
-            .timeout(Duration::from_millis(10))
+            .timeout(futures_time::time::Duration::from_millis(10))
             .await
             .expect_err("should time out");
 

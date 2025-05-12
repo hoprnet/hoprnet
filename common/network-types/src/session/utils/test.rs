@@ -82,7 +82,7 @@ pub async fn frames_send_and_recv<S>(
         }
     };
 
-    let alice_worker = async_std::task::spawn(socket_worker(
+    let alice_worker = tokio::task::spawn(socket_worker(
         alice,
         if alice_to_bob_only {
             Direction::Send
@@ -90,7 +90,7 @@ pub async fn frames_send_and_recv<S>(
             Direction::Both
         },
     ));
-    let bob_worker = async_std::task::spawn(socket_worker(
+    let bob_worker = tokio::task::spawn(socket_worker(
         bob,
         if alice_to_bob_only {
             Direction::Recv
@@ -100,7 +100,7 @@ pub async fn frames_send_and_recv<S>(
     ));
 
     let send_recv = futures::future::join(alice_worker, bob_worker);
-    let timeout = async_std::task::sleep(timeout);
+    let timeout = tokio::time::sleep(timeout);
 
     pin_mut!(send_recv);
     pin_mut!(timeout);
@@ -350,7 +350,7 @@ mod tests {
         let (mut recv, mut send) = channel.split();
 
         let len = data.len();
-        let read = async_std::task::spawn(async move {
+        let read = tokio::task::spawn(async move {
             let mut out = Vec::with_capacity(len);
             for _ in 0..len {
                 let mut bytes = [0u8; 1];
@@ -363,7 +363,7 @@ mod tests {
             out
         });
 
-        let written = async_std::task::spawn(async move {
+        let written = tokio::task::spawn(async move {
             let mut out = Vec::with_capacity(len);
             for byte in data {
                 send.write(&[byte]).await.unwrap();
@@ -376,7 +376,7 @@ mod tests {
         (read, written)
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn faulty_network_mixing() {
         const MIX_FACTOR: usize = 2;
         const COUNT: usize = 20;
@@ -400,7 +400,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn faulty_network_packet_drop() {
         const DROP: f64 = 0.3333;
         const COUNT: usize = 20;
@@ -420,7 +420,7 @@ mod tests {
         assert!(read.len() >= max_drop, "dropped more than {max_drop}: {}", read.len());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn faulty_network_reliable() {
         const COUNT: usize = 20;
 

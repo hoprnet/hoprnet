@@ -198,6 +198,7 @@ where
 mod tests {
     use super::*;
     use futures::{pin_mut, SinkExt, StreamExt, TryStreamExt};
+    use futures_time::future::FutureExt;
 
     #[test_log::test(tokio::test)]
     async fn sequencer_should_return_entries_in_order() -> anyhow::Result<()> {
@@ -212,11 +213,11 @@ mod tests {
 
         let jh = hopr_async_runtime::prelude::spawn(
             futures::stream::iter(expected.clone())
-                .then(|e| futures::future::ok(e).delay(Duration::from_millis(5)))
+                .then(|e| futures::future::ok(e).delay(futures_time::time::Duration::from_millis(5)))
                 .forward(seq_sink),
         );
 
-        let actual: Vec<u32> = seq_stream.try_collect().timeout(Duration::from_secs(5)).await??;
+        let actual: Vec<u32> = seq_stream.try_collect().timeout(futures_time::time::Duration::from_secs(5)).await??;
 
         expected.sort();
         assert_eq!(expected, actual);
@@ -246,7 +247,7 @@ mod tests {
             seq_sink.close().await
         });
 
-        let actual: Vec<u32> = seq_stream.try_collect().timeout(Duration::from_secs(5)).await??;
+        let actual: Vec<u32> = seq_stream.try_collect().timeout(futures_time::time::Duration::from_secs(5)).await??;
 
         expected.sort();
         assert_eq!(expected, actual);
@@ -293,7 +294,7 @@ mod tests {
         let input_clone = input.clone();
         let jh = hopr_async_runtime::prelude::spawn(async move {
             for v in input_clone {
-                seq_sink.feed(v).delay(Duration::from_millis(5)).await?;
+                seq_sink.feed(v).delay(futures_time::time::Duration::from_millis(5)).await?;
             }
             seq_sink.flush().await?;
             seq_sink.close().await
@@ -393,12 +394,12 @@ mod tests {
 
         // Full capacity is reached here, but SplitSink has
         // an extra slot, so the 4th will wait in the SplitSink's slot.
-        assert!(seq_sink.send(4u32).timeout(Duration::from_millis(50)).await.is_err());
+        assert!(seq_sink.send(4u32).timeout(futures_time::time::Duration::from_millis(50)).await.is_err());
 
         assert_eq!(Some(1), seq_stream.try_next().await?);
 
         // This inserts 4 into the sequencer and keeps 6 in the slot in the SplitSink
-        assert!(seq_sink.send(6u32).timeout(Duration::from_millis(50)).await.is_err());
+        assert!(seq_sink.send(6u32).timeout(futures_time::time::Duration::from_millis(50)).await.is_err());
 
         assert_eq!(Some(2), seq_stream.try_next().await?);
         assert_eq!(Some(3), seq_stream.try_next().await?);

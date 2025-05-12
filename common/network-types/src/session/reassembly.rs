@@ -230,6 +230,7 @@ mod tests {
     use super::*;
 
     use futures::{pin_mut, SinkExt, StreamExt, TryStreamExt};
+    use futures_time::future::FutureExt;
     use hex_literal::hex;
     use rand::prelude::SliceRandom;
     use rand::rngs::StdRng;
@@ -265,7 +266,7 @@ mod tests {
 
         let mut actual = r_stream
             .try_collect::<Vec<_>>()
-            .timeout(Duration::from_secs(5))
+            .timeout(futures_time::time::Duration::from_secs(5))
             .await??;
 
         assert_eq!(actual.len(), expected.len());
@@ -307,7 +308,7 @@ mod tests {
                         // Delay the very last segment,
                         // so the incomplete frame gets a chance to expire
                         if i == seg_count - 1 {
-                            futures::future::ok(s).delay(Duration::from_millis(55)).await
+                            futures::future::ok(s).delay(futures_time::time::Duration::from_millis(55)).await
                         } else {
                             Ok(s)
                         }
@@ -316,7 +317,7 @@ mod tests {
                 .forward(r_sink),
         );
 
-        let mut actual = r_stream.collect::<Vec<_>>().timeout(Duration::from_secs(5)).await?;
+        let mut actual = r_stream.collect::<Vec<_>>().timeout(futures_time::time::Duration::from_secs(5)).await?;
 
         assert_eq!(actual.len(), expected.len());
 
@@ -364,7 +365,7 @@ mod tests {
 
         let jh = hopr_async_runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(r_sink));
 
-        let mut actual = r_stream.collect::<Vec<_>>().timeout(Duration::from_secs(5)).await?;
+        let mut actual = r_stream.collect::<Vec<_>>().timeout(futures_time::time::Duration::from_secs(5)).await?;
 
         // Since `forward` closed the sink, even the incomplete Frame 5 should be yielded as error
         assert_eq!(actual.len(), expected.len());
@@ -425,7 +426,7 @@ mod tests {
         // Cannot insert more segments until some frames are yielded
         assert!(r_sink
             .send(segments[7].clone())
-            .timeout(Duration::from_millis(50))
+            .timeout(futures_time::time::Duration::from_millis(50))
             .await
             .is_err());
 
@@ -438,7 +439,7 @@ mod tests {
         // Cannot insert more segments until some frames are yielded
         assert!(r_sink
             .send(segments[8].clone())
-            .timeout(Duration::from_millis(50))
+            .timeout(futures_time::time::Duration::from_millis(50))
             .await
             .is_err());
 

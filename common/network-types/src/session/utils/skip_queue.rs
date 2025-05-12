@@ -329,7 +329,7 @@ mod tests {
 
     use futures::{pin_mut, SinkExt, StreamExt};
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_yield_items() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -345,7 +345,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_replace_and_yield_items() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -362,7 +362,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_yield_items_from_multiple_senders() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -386,7 +386,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_yielded_items_should_be_apart() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -407,7 +407,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_not_yield_cancelled_items() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -422,7 +422,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_yield_past_items_immediately() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -442,7 +442,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_not_yield_future_cancelled_items() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -460,7 +460,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_discard_duplicate_entries() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -476,7 +476,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_yield_items_in_order() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -493,7 +493,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_yield_fed_items_in_order() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -511,7 +511,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_not_send_items_when_closed() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
         pin_mut!(rx);
@@ -526,7 +526,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_continuously_yield_items() -> anyhow::Result<()> {
         let (mut tx, rx) = skip_delay_channel();
 
@@ -538,10 +538,10 @@ mod tests {
             .collect::<Vec<_>>();
 
         let timed_items_clone = timed_items.clone();
-        let jh = async_std::task::spawn(async move {
+        let jh = hopr_async_runtime::prelude::spawn(async move {
             for (n, time) in timed_items_clone {
                 tx.send((n, time).into()).await?;
-                async_std::task::sleep(Duration::from_millis(50)).await;
+                hopr_async_runtime::prelude::sleep(Duration::from_millis(50)).await;
             }
             tx.close().await?;
             Ok::<_, std::io::Error>(())
