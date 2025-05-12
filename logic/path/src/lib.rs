@@ -457,7 +457,8 @@ pub(crate) mod tests {
     }
 
     #[parameterized(hops = { 1, 2, 3 })]
-    fn validated_path_multi_hop_validation(hops: usize) -> anyhow::Result<()> {
+    #[parameterized_macro(tokio::test)]
+    async fn validated_path_multi_hop_validation(hops: usize) -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
 
         // path: 0 -> 1 -> 2 -> 3 -> 4
@@ -466,15 +467,8 @@ pub(crate) mod tests {
         assert_eq!(hops + 1, chain_path.num_hops(), "must be a {hops} hop path");
         ensure!(!chain_path.contains_cycle(), "must not be cyclic");
 
-        let runtime = tokio::runtime::Runtime::new().expect("runtime must exist");
-
-        let validated = runtime
-            .block_on(ValidatedPath::new(
-                ADDRESSES[0],
-                chain_path.clone(),
-                &cg,
-                PATH_ADDRS.deref(),
-            ))
+        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
+            .await
             .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(
@@ -503,30 +497,19 @@ pub(crate) mod tests {
     }
 
     #[parameterized(hops = { 1, 2, 3 })]
-    fn validated_path_revalidation_should_be_identity(hops: usize) -> anyhow::Result<()> {
+    #[parameterized_macro(tokio::test)]
+    async fn validated_path_revalidation_should_be_identity(hops: usize) -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
 
         // path: 0 -> 1 -> 2 -> 3 -> 4
         let chain_path = ChainPath::new(peers.iter().skip(1).take(hops + 1).map(|(_, a)| *a))?;
 
-        let runtime = tokio::runtime::Runtime::new().expect("runtime must exist");
-
-        let validated_1 = runtime
-            .block_on(ValidatedPath::new(
-                ADDRESSES[0],
-                chain_path.clone(),
-                &cg,
-                PATH_ADDRS.deref(),
-            ))
+        let validated_1 = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
+            .await
             .context(format!("must be valid {hops} hop path"))?;
 
-        let validated_2 = runtime
-            .block_on(ValidatedPath::new(
-                ADDRESSES[0],
-                validated_1.clone(),
-                &cg,
-                PATH_ADDRS.deref(),
-            ))
+        let validated_2 = ValidatedPath::new(ADDRESSES[0], validated_1.clone(), &cg, PATH_ADDRS.deref())
+            .await
             .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(validated_1, validated_2, "revalidation must be identity");
@@ -535,7 +518,8 @@ pub(crate) mod tests {
     }
 
     #[parameterized(hops = { 2, 3 })]
-    fn validated_path_must_allow_cyclic(hops: usize) -> anyhow::Result<()> {
+    #[parameterized_macro(tokio::test)]
+    async fn validated_path_must_allow_cyclic(hops: usize) -> anyhow::Result<()> {
         let (cg, peers) = create_graph_and_resolver_entries(ADDRESSES[0]);
 
         // path: 0 -> 1 -> 2 -> 3 -> 1
@@ -551,14 +535,8 @@ pub(crate) mod tests {
         assert_eq!(hops + 1, chain_path.num_hops(), "must be a {hops} hop path");
         assert!(chain_path.contains_cycle(), "must be cyclic");
 
-        let validated = tokio::runtime::Runtime::new()
-            .expect("runtime must exist")
-            .block_on(ValidatedPath::new(
-                ADDRESSES[0],
-                chain_path.clone(),
-                &cg,
-                PATH_ADDRS.deref(),
-            ))
+        let validated = ValidatedPath::new(ADDRESSES[0], chain_path.clone(), &cg, PATH_ADDRS.deref())
+            .await
             .context(format!("must be valid {hops} hop path"))?;
 
         assert_eq!(

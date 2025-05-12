@@ -25,28 +25,6 @@ pub trait PacketWrapping {
     async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<OutgoingPacket>;
 }
 
-pub struct SendPkt {
-    pub peer: PeerId,
-    pub data: Box<[u8]>,
-}
-
-pub struct SendAck {
-    pub peer: PeerId,
-    pub ack: Box<[u8]>,
-}
-
-pub enum RecvOperation {
-    Receive {
-        pseudonym: HoprPseudonym,
-        data: ApplicationData,
-        ack: SendAck,
-    },
-    Forward {
-        msg: SendPkt,
-        ack: SendAck,
-    },
-}
-
 #[async_trait::async_trait]
 pub trait PacketUnwrapping {
     type Packet;

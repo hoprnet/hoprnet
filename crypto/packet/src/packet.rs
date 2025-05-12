@@ -9,7 +9,9 @@ use std::fmt::{Display, Formatter};
 use crate::errors::PacketError::{PacketConstructionError, PacketDecodingError};
 use crate::por::{derive_ack_key_share, generate_proof_of_relay, pre_verify, SurbReceiverInfo};
 use crate::types::{HoprPacketMessage, HoprSenderId, HoprSurbId};
-use crate::{errors::Result, HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT};
+use crate::{
+    errors::Result, HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
+};
 
 /// Represents an outgoing packet that has been only partially instantiated.
 ///
@@ -24,7 +26,7 @@ use crate::{errors::Result, HoprPseudonym, HoprSphinxHeaderSpec, HoprSphinxSuite
 pub struct PartialHoprPacket {
     partial_packet: PartialPacket<HoprSphinxSuite, HoprSphinxHeaderSpec>,
     surbs: Vec<HoprSurb>,
-    openers: Vec<(HoprSurbId, ReplyOpener)>,
+    openers: Vec<HoprReplyOpener>,
     ticket: Ticket,
     next_hop: OffchainPublicKey,
     ack_challenge: HalfKeyChallenge,
@@ -153,7 +155,7 @@ impl PartialHoprPacket {
 
     /// Turns this partial HOPR packet into a full [`Outgoing`](HoprPacket::Outgoing) [`HoprPacket`] by
     /// attaching the given payload.
-    pub fn into_hopr_packet(self, msg: &[u8]) -> Result<(HoprPacket, Vec<(HoprSurbId, ReplyOpener)>)> {
+    pub fn into_hopr_packet(self, msg: &[u8]) -> Result<(HoprPacket, Vec<HoprReplyOpener>)> {
         let msg = HoprPacketMessage::from_parts(self.surbs, msg)?;
         Ok((
             HoprPacket::Outgoing(
@@ -264,7 +266,7 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P
     return_path: &P,
     recv_data: HoprSenderId,
     mapper: &M,
-) -> Result<(HoprSurb, (HoprSurbId, ReplyOpener))> {
+) -> Result<(HoprSurb, HoprReplyOpener)> {
     let shared_keys = HoprSphinxSuite::new_shared_keys(return_path)?;
     let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)?;
 
@@ -316,7 +318,7 @@ impl HoprPacket {
         ticket: TicketBuilder,
         mapper: &M,
         domain_separator: &Hash,
-    ) -> Result<(Self, Vec<(HoprSurbId, ReplyOpener)>)> {
+    ) -> Result<(Self, Vec<HoprReplyOpener>)> {
         PartialHoprPacket::new(pseudonym, routing, chain_keypair, ticket, mapper, domain_separator)?
             .into_hopr_packet(msg)
     }
@@ -511,7 +513,7 @@ mod tests {
         pseudonym: HoprPseudonym,
         return_hops: Vec<usize>,
         msg: &[u8],
-    ) -> anyhow::Result<(HoprPacket, Vec<(HoprSurbId, ReplyOpener)>)> {
+    ) -> anyhow::Result<(HoprPacket, Vec<HoprReplyOpener>)> {
         assert!((0..=3).contains(&forward_hops), "forward hops must be between 1 and 3");
         assert!(
             return_hops.iter().all(|h| (0..=3).contains(h)),

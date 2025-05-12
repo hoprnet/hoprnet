@@ -443,7 +443,7 @@ class HoprdAPI:
         service: bool = False,
         capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
         sealed_target: bool = False,
-        response_buffer: str = "4 MB",
+        response_buffer: str = "4MiB",
     ) -> Optional[Session]:
         """
         Creates a new client session returning the given session listening host & port over TCP or UDP.

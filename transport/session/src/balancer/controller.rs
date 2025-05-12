@@ -44,7 +44,7 @@ pub struct SurbBalancerConfig {
     /// Maximum outflow of non-organic surbs.
     ///
     /// The default is 2500 (which is 1250 packets/second currently)
-    #[default(2500)]
+    #[default(2_500)]
     pub max_surbs_per_sec: u64,
 }
 
@@ -74,6 +74,7 @@ pub struct SurbBalancer<I, O, F, S> {
 }
 
 // Default coefficients for the PID controller
+// This might be tweaked in the future.
 const DEFAULT_P_GAIN: f64 = 0.6;
 const DEFAULT_I_GAIN: f64 = 0.7;
 const DEFAULT_D_GAIN: f64 = 0.2;

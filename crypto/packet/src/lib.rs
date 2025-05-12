@@ -63,6 +63,9 @@ impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
 /// Single Use Reply Block representation for HOPR protocol.
 pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
+/// Type alias for identifiable [`ReplyOpener`].
+pub type HoprReplyOpener = (types::HoprSurbId, ReplyOpener);
+
 /// Size of the maximum packet payload.
 ///
 /// Adjust this value to change the maximum packet size.
@@ -107,5 +110,10 @@ mod tests {
         let surb_len = HoprSurb::SIZE;
         assert_eq!(surb_len, 395);
         assert!(HoprPacket::PAYLOAD_SIZE > surb_len * 2);
+    }
+
+    #[test]
+    fn max_surbs_per_packet_must_be_at_least_2() {
+        assert!(HoprPacket::MAX_SURBS_IN_PACKET >= 2);
     }
 }
