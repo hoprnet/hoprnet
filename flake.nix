@@ -607,6 +607,7 @@
               "ethereum/contracts/contracts-addresses.json"
               "ethereum/contracts/remappings.txt"
               "ethereum/contracts/src/static/*"
+              "ethereum/contracts/test/static/*"
               "hopr/hopr-lib/tests/snapshots/*"
               "hoprd/.dockerignore"
               "hoprd/rest-api/.cargo/config"
