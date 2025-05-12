@@ -3,7 +3,6 @@
 //! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
 //! [RpcOperations] type, which is the main API exposed by this crate.
 use alloy::{
-    eips::BlockId,
     network::EthereumWallet,
     providers::{
         fillers::{
@@ -244,7 +243,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                 let native = self
                     .provider
                     .get_balance(address.into())
-                    .block_id(BlockId::Number(self.get_block_number().await?.into()))
+                    // .number(self.get_block_number().await?)
                     .await?;
 
                 Ok(Balance::new(native.to_be_bytes(), BalanceType::Native))
