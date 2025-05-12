@@ -364,9 +364,12 @@ where
         info!("Loading initial peers from the storage");
 
         let nodes = self.get_public_nodes().await?;
+        let mut addresses: Vec<Multiaddr> = Vec::new();
+
         for (peer, _address, multiaddresses) in nodes {
             if self.is_allowed_to_access_network(either::Left(&peer)).await? {
                 debug!(%peer, ?multiaddresses, "Using initial public node");
+                addresses.extend(multiaddresses.clone());
 
                 internal_discovery_update_tx
                     .send(PeerDiscovery::Allow(peer))
@@ -513,7 +516,11 @@ where
         )
         .await;
 
-        transport_layer.dial_nat_server(Multiaddr::empty()); // TODO (jean): use correct multiaddr here
+        // extract and flatten all multiaddr from the  known accounts
+
+        info!("Found {} addresses from the database", addresses.len());
+
+        // transport_layer.dial_nat_server(addresses);
 
         let msg_proto_control =
             transport_layer.build_protocol_control(hopr_transport_protocol::msg::CURRENT_HOPR_MSG_PROTOCOL);

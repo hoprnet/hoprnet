@@ -219,10 +219,24 @@ impl HoprSwarm {
         }
     }
 
-    pub fn dial_nat_server(&mut self, address: Multiaddr) {
-        self.swarm
-            .dial(DialOpts::unknown_peer_id().address(address).build())
-            .expect("Failed to dial the server");
+    pub fn dial_nat_server(&mut self, addresses: Vec<Multiaddr>) {
+        info!("Dialing NAT server with {} addresses", addresses.len());
+
+        // let dial_opts = DialOpts::peer_id(PeerId::random())
+        //     .addresses(addresses)
+        //     .extend_addresses_through_behaviour()
+        //     .build();
+
+        let dial_opts = DialOpts::unknown_peer_id()
+            .address(addresses.first().unwrap().clone())
+            .build();
+
+        let res = self.swarm.dial(dial_opts);
+        if let Err(e) = res {
+            warn!(error = %e, "Failed to dial NAT server");
+        } else {
+            info!("Dialed NAT server");
+        }
     }
 }
 
@@ -452,6 +466,7 @@ impl HoprSwarmWithProcessors {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatServer(event)) => {
                         warn!(?event, "Autonat server event");
                     }
+
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::HeartbeatGenerator(event)) => {
                         let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior", behavior="heartbeat generator");
 
