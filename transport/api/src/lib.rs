@@ -529,7 +529,12 @@ where
         // initiate the msg-ack protocol stack over the wire transport
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: self.me.clone(),
-            outgoing_ticket_win_prob: self.cfg.protocol.outgoing_ticket_winning_prob,
+            outgoing_ticket_win_prob: self
+                .cfg
+                .protocol
+                .outgoing_ticket_winning_prob
+                .map(WinningProbability::try_from)
+                .transpose()?,
             outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
         };
 

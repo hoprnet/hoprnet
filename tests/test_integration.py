@@ -135,7 +135,8 @@ class TestIntegrationWithSwarm:
         response = await swarm7[src].api.ping(swarm7[dest].peer_id)
 
         assert response is not None
-        assert int(response.latency) > 0, f"Non-0 round trip time expected, actual: '{int(response.latency)}'"
+        # Zero-roundtrip (in ms precision) can happen on fast local setups
+        assert int(response.latency) >= 0
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))

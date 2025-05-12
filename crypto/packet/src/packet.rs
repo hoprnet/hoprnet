@@ -497,7 +497,7 @@ mod tests {
                 .amount(price_per_packet.div_f64(1.0)? * U256::from(path_len as u64 - 1))
                 .index(1)
                 .index_offset(1)
-                .win_prob(1.0)
+                .win_prob(WinningProbability::ALWAYS)
                 .channel_epoch(1)
                 .challenge(Default::default()))
         } else {

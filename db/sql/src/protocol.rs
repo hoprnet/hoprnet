@@ -52,7 +52,7 @@ impl HoprDb {
         &self,
         mut fwd: HoprForwardedPacket,
         me: &ChainKeypair,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> std::result::Result<HoprForwardedPacket, DbSqlError> {
         let previous_hop_addr = self.resolve_chain_key(&fwd.previous_hop).await?.ok_or_else(|| {
@@ -96,7 +96,7 @@ impl HoprDb {
             .mul(U256::from(fwd.path_pos));
 
         #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_INCOMING_WIN_PROB.observe(fwd.outgoing.ticket.win_prob());
+        METRIC_INCOMING_WIN_PROB.observe(fwd.outgoing.ticket.win_prob().as_f64());
 
         let remaining_balance = incoming_channel
             .balance
@@ -121,9 +121,9 @@ impl HoprDb {
         // We currently take the maximum of the win prob from the incoming ticket
         // and the one configured on this node.
         // Therefore, the winning probability can only increase along the path.
-        let outgoing_ticket_win_prob = outgoing_ticket_win_prob.max(verified_incoming_ticket.win_prob());
+        let outgoing_ticket_win_prob = outgoing_ticket_win_prob.max(&verified_incoming_ticket.win_prob());
 
-        // The ticket is now validated, let's place it into acknowledgement waiting queue
+        // The ticket is now validated, let's place it into the acknowledgement waiting queue
         self.caches
             .unacked_tickets
             .insert(
@@ -287,7 +287,7 @@ impl HoprDbProtocolOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_network_winning_probability(&self) -> Result<f64> {
+    async fn get_network_winning_probability(&self) -> Result<WinningProbability> {
         Ok(self
             .get_indexer_data(None)
             .await
@@ -382,7 +382,7 @@ impl HoprDbProtocolOperations for HoprDb {
         &self,
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<OutgoingPacket> {
         // Get necessary packet routing values
@@ -499,7 +499,7 @@ impl HoprDbProtocolOperations for HoprDb {
         data: Box<[u8]>,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<Option<IncomingPacket>> {
         let offchain_keypair = pkt_keypair.clone();
@@ -605,7 +605,7 @@ impl HoprDb {
         me_onchain: Address,
         destination: Address,
         current_path_pos: u8,
-        winning_prob: f64,
+        winning_prob: WinningProbability,
         ticket_price: Balance,
     ) -> crate::errors::Result<TicketBuilder> {
         // The next ticket is worth: price * remaining hop count / winning probability
@@ -613,7 +613,7 @@ impl HoprDb {
             ticket_price
                 .amount()
                 .mul(U256::from(current_path_pos - 1))
-                .div_f64(winning_prob)
+                .div_f64(winning_prob.into())
                 .map_err(|e| {
                     DbSqlError::LogicalError(format!(
                         "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
