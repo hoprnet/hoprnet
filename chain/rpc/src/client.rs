@@ -573,9 +573,9 @@ where
                 },
                 Err(err) => {
                     error!(error = ?err, "Error occurred while processing request");
-                    method_names.iter().for_each(|m| {
+                    method_names.iter().for_each(|_m| {
                         #[cfg(all(feature = "prometheus", not(test)))]
-                        METRIC_COUNT_RPC_CALLS.increment(&[m, "failure"]);
+                        METRIC_COUNT_RPC_CALLS.increment(&[_m, "failure"]);
                     });
                 }
             };
