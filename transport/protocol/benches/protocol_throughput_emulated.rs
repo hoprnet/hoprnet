@@ -63,7 +63,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
 
                         let cfg = PacketInteractionConfig {
                             packet_keypair: (&PEERS[TESTED_PEER_ID]).clone(),
-                            outgoing_ticket_win_prob: Some(1.0),
+                            outgoing_ticket_win_prob: Some(WinningProbability::ALWAYS),
                             outgoing_ticket_price: Some(Balance::new(1, BalanceType::HOPR)),
                         };
 

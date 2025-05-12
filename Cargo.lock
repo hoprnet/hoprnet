@@ -1189,15 +1189,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cbor4ii"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "189a2a2e5eec2f203b2bb8bc4c2db55c7253770d2c6bf3ae5f79ace5a15c305f"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "cc"
 version = "1.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4650,7 +4641,6 @@ dependencies = [
  "aquamarine",
  "bincode",
  "bloomfilter",
- "cbor4ii 1.0.0",
  "criterion",
  "hex",
  "hex-literal",
@@ -6289,7 +6279,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "548fe44a80ff275d400f1b26b090d441d83ef73efabbeb6415f4ce37e5aed865"
 dependencies = [
  "async-trait",
- "cbor4ii 0.3.2",
+ "cbor4ii",
  "futures",
  "futures-bounded",
  "libp2p-core",
