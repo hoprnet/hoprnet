@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-protocol"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -10,7 +10,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 prometheus = ["dep:hopr-metrics", "hopr-path/prometheus"]
 
@@ -53,12 +52,12 @@ hopr-transport-packet = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
+tokio = { workspace = true }
 async-channel = { workspace = true }
 async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
-criterion = { workspace = true, features = ["async_futures", "async_std"] }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 more-asserts = { workspace = true }
 serial_test = { workspace = true }
 tracing-test = { workspace = true }

@@ -20,6 +20,9 @@ pub enum CoreTypesError {
     #[error("packet acknowledgement could not be verified")]
     InvalidAcknowledgement,
 
+    #[error("invalid winning probability value")]
+    InvalidWinningProbability,
+
     #[error("cannot acknowledge self-signed tickets. Ticket sender and recipient must be different")]
     LoopbackTicket,
 

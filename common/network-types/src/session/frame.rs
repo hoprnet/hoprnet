@@ -746,7 +746,7 @@ pub(crate) mod tests {
         assert_eq!(segment, recovered);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_must_process_ordered_frames() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -766,7 +766,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_must_process_single_frame() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(10));
 
@@ -826,7 +826,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn pushing_segment_of_an_evicted_frame_into_reassembler_should_fail() -> anyhow::Result<()> {
         let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_millis(5));
 
@@ -835,7 +835,7 @@ pub(crate) mod tests {
 
         segments.into_iter().try_for_each(|s| fragmented.push_segment(s))?;
 
-        async_std::task::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
         assert_eq!(1, fragmented.evict()?);
 
         fragmented
@@ -845,7 +845,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_single_frame() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -866,7 +866,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_shuffled_randomized_frames() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -885,7 +885,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_shuffled_randomized_frames_in_parallel() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -907,7 +907,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_should_evict_expired_incomplete_frames() -> anyhow::Result<()> {
         let frames = vec![
             Frame {
@@ -935,7 +935,7 @@ pub(crate) mod tests {
         segments.into_iter().try_for_each(|b| fragmented.push_segment(b))?;
 
         let frames_cpy = frames.clone();
-        let jh = async_std::task::spawn(async move {
+        let jh: hopr_async_runtime::prelude::JoinHandle<Result<(), SessionError>> = tokio::task::spawn(async move {
             pin_mut!(reassembled);
 
             // Frame #1 should yield immediately
@@ -953,14 +953,16 @@ pub(crate) mod tests {
             Ok(())
         });
 
-        async_std::task::sleep(Duration::from_millis(20)).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         assert_eq!(2, fragmented.evict()?); // One expired, one complete
 
-        jh.await
+        jh.await??;
+
+        Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_should_evict_frame_that_never_arrived() -> anyhow::Result<()> {
         let frames = vec![
             Frame {
@@ -986,7 +988,7 @@ pub(crate) mod tests {
 
         let flushed_cpy = flushed.clone();
         let frames_cpy = frames.clone();
-        let jh = async_std::task::spawn(async move {
+        let jh: hopr_async_runtime::prelude::JoinHandle<Result<(), SessionError>> = tokio::task::spawn(async move {
             pin_mut!(reassembled);
 
             // The first frame should yield immediately
@@ -1003,16 +1005,18 @@ pub(crate) mod tests {
             Ok(())
         });
 
-        async_std::task::sleep(Duration::from_millis(20)).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         // Prune the expired entry, which is Frame 2 (that is missing a segment)
         flushed.store(true, Ordering::SeqCst);
         assert_eq!(2, fragmented.evict()?); // One expired, one complete
 
-        jh.await
+        jh.await??;
+
+        Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_randomized_delayed_frames_in_parallel() -> anyhow::Result<()> {
         let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
 
@@ -1026,12 +1030,13 @@ pub(crate) mod tests {
         futures::stream::iter(segments)
             .map(|segment| {
                 let delay = Duration::from_millis(thread_rng().gen_range(0..10u64));
-                async_std::task::spawn(async move {
-                    async_std::task::sleep(delay).await;
+                tokio::task::spawn(async move {
+                    tokio::time::sleep(delay).await;
                     Ok(segment)
                 })
             })
             .buffer_unordered(4)
+            .map(Result::unwrap) // Unwrap the Result to extract Segment
             .forward(fragmented)
             .await
             .unwrap();
@@ -1083,7 +1088,7 @@ pub(crate) mod tests {
         (segments, expected_frames, excluded_segments)
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_yields_correct_frames_when_also_corrupted_frames_are_present() -> anyhow::Result<()> {
         // Corrupt 30% of the frames, by removing a random segment from them
         let (segments, expected_frames, excluded) = corrupt_frames(FRAME_COUNT / 4, 0.3);
@@ -1105,7 +1110,7 @@ pub(crate) mod tests {
             hex::encode(RAND_SEED.clone())
         );*/
 
-        async_std::task::sleep(Duration::from_millis(25)).await;
+        tokio::time::sleep(Duration::from_millis(25)).await;
         drop(fragmented);
 
         let (reassembled_frames, discarded_frames) = reassembled
@@ -1142,7 +1147,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_yields_no_frames_when_all_corrupted() -> anyhow::Result<()> {
         // Corrupt each frame
         let (segments, expected_frames, _) = corrupt_frames(1000, 1.0);
@@ -1190,7 +1195,7 @@ pub(crate) mod tests {
                     let segment = segments.remove(sample_index(&mut distr, &mut rng, segments.len())).unwrap();
 
                     if !corrupted_segments.contains(&SegmentId(segment.frame_id, segment.seq_idx)) {
-                        async_std::task::sleep(max_latency.mul_f64(rng.gen())).await;
+                        tokio::time::sleep(max_latency.mul_f64(rng.gen())).await;
                         yield segment;
                     }
                 }
@@ -1202,7 +1207,7 @@ pub(crate) mod tests {
         )
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_yields_and_evicts_frames_on_unreliable_network() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(25));
         let fragmented = Arc::new(fragmented);
@@ -1210,9 +1215,9 @@ pub(crate) mod tests {
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
         let frag_clone = fragmented.clone();
-        let eviction_jh = async_std::task::spawn(async move {
+        let eviction_jh = tokio::task::spawn(async move {
             while !done_clone.load(Ordering::SeqCst) {
-                async_std::task::sleep(Duration::from_millis(25)).await;
+                tokio::time::sleep(Duration::from_millis(25)).await;
                 frag_clone.evict().unwrap();
             }
         });
@@ -1226,7 +1231,7 @@ pub(crate) mod tests {
             .await?;
 
         done.store(true, Ordering::SeqCst);
-        eviction_jh.await;
+        eviction_jh.await?;
         drop(fragmented);
 
         let reassembled_frames = reassembled

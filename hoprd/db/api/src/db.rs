@@ -73,7 +73,7 @@ mod tests {
     use crate::db::HoprdDb;
     use hoprd_migration::{MigratorMetadata, MigratorTrait};
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_basic_db_init() {
         let db = HoprdDb::new_in_memory().await;
 
