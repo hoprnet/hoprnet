@@ -116,15 +116,15 @@ impl IntoCondition for WrappedTicketSelector {
 
         // Win prob lower bound
         expr = match self.0.win_prob.0 {
-            Bound::Included(gte) => expr.and(ticket::Column::WinningProbability.gte(gte.to_vec())),
-            Bound::Excluded(gt) => expr.and(ticket::Column::WinningProbability.gt(gt.to_vec())),
+            Bound::Included(gte) => expr.and(ticket::Column::WinningProbability.gte(gte.as_encoded().to_vec())),
+            Bound::Excluded(gt) => expr.and(ticket::Column::WinningProbability.gt(gt.as_encoded().to_vec())),
             Bound::Unbounded => expr,
         };
 
         // Win prob upper bound
         expr = match self.0.win_prob.1 {
-            Bound::Included(lte) => expr.and(ticket::Column::WinningProbability.lte(lte.to_vec())),
-            Bound::Excluded(lt) => expr.and(ticket::Column::WinningProbability.lt(lt.to_vec())),
+            Bound::Included(lte) => expr.and(ticket::Column::WinningProbability.lte(lte.as_encoded().to_vec())),
+            Bound::Excluded(lt) => expr.and(ticket::Column::WinningProbability.lt(lt.as_encoded().to_vec())),
             Bound::Unbounded => expr,
         };
 
@@ -157,7 +157,7 @@ pub(crate) fn filter_satisfying_ticket_models(
     prerequisites: AggregationPrerequisites,
     models: Vec<ticket::Model>,
     channel_entry: &ChannelEntry,
-    min_win_prob: f64,
+    min_win_prob: WinningProbability,
 ) -> crate::errors::Result<Vec<ticket::Model>> {
     let channel_id = channel_entry.get_id();
 
@@ -165,16 +165,16 @@ pub(crate) fn filter_satisfying_ticket_models(
     let mut total_balance = BalanceType::HOPR.zero();
 
     for m in models {
-        let ticket_wp = win_prob_to_f64(
-            m.winning_probability
-                .as_slice()
-                .try_into()
-                .map_err(|_| DbSqlError::DecodingError)?,
-        );
-        if !f64_approx_eq(ticket_wp, min_win_prob, LOWEST_POSSIBLE_WINNING_PROB) && ticket_wp < min_win_prob {
+        let ticket_wp: WinningProbability = m
+            .winning_probability
+            .as_slice()
+            .try_into()
+            .map_err(|_| DbSqlError::DecodingError)?;
+
+        if ticket_wp.approx_cmp(&min_win_prob).is_lt() {
             warn!(
                 channel_id = %channel_entry.get_id(),
-                ticket_wp, min_win_prob, "encountered ticket with winning probability lower than the minimum threshold"
+                %ticket_wp, %min_win_prob, "encountered ticket with winning probability lower than the minimum threshold"
             );
             continue;
         }
@@ -1011,7 +1011,7 @@ impl HoprDbTicketOperations for HoprDb {
             })?;
 
         // Aggregated tickets always have 100% winning probability
-        if !f64_approx_eq(aggregated_ticket.win_prob(), 1.0, LOWEST_POSSIBLE_WINNING_PROB) {
+        if !aggregated_ticket.win_prob().approx_eq(&WinningProbability::ALWAYS) {
             return Err(DbSqlError::LogicalError("Aggregated tickets must have 100% win probability".into()).into());
         }
 
@@ -1187,11 +1187,11 @@ impl HoprDbTicketOperations for HoprDb {
                 return Err(DbSqlError::LogicalError("tickets with overlapping index intervals".into()).into());
             }
 
-            if !f64_approx_eq(
-                acked_ticket.verified_ticket().win_prob(),
-                min_win_prob,
-                LOWEST_POSSIBLE_WINNING_PROB,
-            ) && acked_ticket.verified_ticket().win_prob() < min_win_prob
+            if acked_ticket
+                .verified_ticket()
+                .win_prob()
+                .approx_cmp(&min_win_prob)
+                .is_lt()
             {
                 return Err(DbSqlError::LogicalError(
                     "cannot aggregate ticket with lower than minimum winning probability in network".into(),
@@ -1225,7 +1225,7 @@ impl HoprDbTicketOperations for HoprDb {
             .index_offset(
                 (last_acked_ticket.verified_ticket().index - first_acked_ticket.verified_ticket().index + 1) as u32,
             )
-            .win_prob(1.0) // Aggregated tickets have always 100% winning probability
+            .win_prob(WinningProbability::ALWAYS) // Aggregated tickets have always 100% winning probability
             .channel_epoch(channel_epoch)
             .challenge(first_acked_ticket.verified_ticket().challenge)
             .build_signed(me, &domain_separator)
@@ -1363,7 +1363,7 @@ mod tests {
             .amount(TICKET_VALUE)
             .index(index)
             .index_offset(index_offset)
-            .win_prob(win_prob)
+            .win_prob(win_prob.try_into()?)
             .channel_epoch(4)
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
             .build_signed(src, &Hash::default())?
@@ -1993,7 +1993,8 @@ mod tests {
 
         let dummy_tickets = vec![dummy_ticket_model(channel.get_id(), 1, 1, 1)];
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
         assert_eq!(
             dummy_tickets, filtered_tickets,
@@ -2020,7 +2021,8 @@ mod tests {
 
         let dummy_tickets = vec![dummy_ticket_model(channel.get_id(), 1, 1, 1)];
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0006)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0006.try_into()?)?;
 
         assert!(
             filtered_tickets.is_empty(),
@@ -2050,7 +2052,8 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
         assert_eq!(
             100,
@@ -2091,7 +2094,8 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
         assert!(
             filtered_tickets.is_empty(),
@@ -2124,7 +2128,8 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
         assert!(
             filtered_tickets.is_empty(),
@@ -2156,7 +2161,8 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
@@ -2186,7 +2192,8 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
@@ -2216,7 +2223,8 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
@@ -2246,7 +2254,8 @@ mod tests {
             .map(|i| dummy_ticket_model(channel.get_id(), i as u64, 1, 1))
             .collect();
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
         assert!(!filtered_tickets.is_empty(), "must not return empty");
         assert_eq!(dummy_tickets, filtered_tickets, "return all tickets");
@@ -2277,7 +2286,8 @@ mod tests {
             .collect();
         dummy_tickets[0].index_offset = 2; // Make this ticket aggregated
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
         assert_eq!(filtered_tickets.len(), TICKET_COUNT);
         Ok(())
@@ -2303,7 +2313,8 @@ mod tests {
         // Single aggregated ticket exceeding the min_unaggregated_ratio
         let dummy_tickets = vec![dummy_ticket_model(channel.get_id(), 1, 2, 110)];
 
-        let filtered_tickets = filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005)?;
+        let filtered_tickets =
+            filter_satisfying_ticket_models(prerequisites, dummy_tickets.clone(), &channel, 0.0005.try_into()?)?;
 
         assert!(filtered_tickets.is_empty(), "must return empty");
         Ok(())
@@ -2375,7 +2386,7 @@ mod tests {
             .await?
             .context("should have an active model")?
             .into_active_model();
-        ticket.winning_probability = Set(f64_to_win_prob(0.5)?.to_vec());
+        ticket.winning_probability = Set(WinningProbability::try_from_f64(0.5)?.as_ref().to_vec());
         ticket.save(&db.tickets_db).await?;
 
         let prepared_tickets = db
@@ -2712,7 +2723,7 @@ mod tests {
             .index_offset(
                 tickets.last().context("should contain tickets")?.ticket.index as u32 - first_ticket.index as u32 + 1,
             )
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(first_ticket.channel_epoch)
             .challenge(first_ticket.challenge)
             .build_signed(&BOB, &Hash::default())?;
@@ -2767,7 +2778,7 @@ mod tests {
             .index_offset(
                 tickets.last().context("should contain tickets")?.ticket.index as u32 - first_ticket.index as u32 + 1,
             )
-            .win_prob(1.0)
+            .win_prob(1.0.try_into()?)
             .channel_epoch(first_ticket.channel_epoch)
             .challenge(first_ticket.challenge)
             .build_signed(&BOB, &Hash::default())?;
@@ -2809,7 +2820,7 @@ mod tests {
             .index_offset(
                 tickets.last().context("should contain tickets")?.ticket.index as u32 - first_ticket.index as u32 + 1,
             )
-            .win_prob(0.5) // 50% winning prob
+            .win_prob(0.5.try_into()?) // 50% winning prob
             .channel_epoch(first_ticket.channel_epoch)
             .challenge(first_ticket.challenge)
             .build_signed(&BOB, &Hash::default())?;
@@ -3315,7 +3326,7 @@ mod tests {
         // Set the winning probability to zero and sign the ticket again
         let resp = Response::from_half_keys(&HalfKey::random(), &HalfKey::random())?;
         tickets[1] = TicketBuilder::from(tickets[1].ticket.clone())
-            .win_prob(0.0)
+            .win_prob(0.0.try_into()?)
             .challenge(resp.to_challenge().into())
             .build_signed(&BOB, &Hash::default())?
             .into_acknowledged(resp)
