@@ -4,7 +4,11 @@ ignore = [
   "RUSTSEC-2021-0059", # 'aesni' dependency in 'http-types'
   "RUSTSEC-2021-0060", # 'aes-soft' dependency in 'http-types'
   "RUSTSEC-2021-0064", # 'cpuid-bool' dependency in 'http-types'
-  "RUSTSEC-2024-0384", # 'instant' dependency in 'futures-lite'
+  "RUSTSEC-2024-0384", # 'instant' dependency in 'futures-lite' [unmaintained]
+  "RUSTSEC-2024-0436", # 'paste' dependency in 'libp2p' [unmaintained]
+  "RUSTSEC-2025-0009", # 'ring' dependency in 'ethers-rs'
+  "RUSTSEC-2025-0010", # 'ring' dependency in 'ethers-rs'
+  "RUSTSEC-2023-0071", # 'rsa' dependency in 'sqlx' [unfixed]
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"

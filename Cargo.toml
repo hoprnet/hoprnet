@@ -88,7 +88,7 @@ dashmap = "6.1.0"
 divan = "0.1.21"
 env_logger = "0.11.8"
 either = "1.15.0"
-ethers = { version = "2.0.14", default-features = false } # !!
+ethers = { version = "2.0.14", default-features = false }  # forced dependency 'ring' ignored in audit
 flume = "0.11.1"
 float-cmp = "0.10.0"
 futures = "0.3.31"
@@ -99,7 +99,7 @@ generic-array = "1.2.0"
 governor = { version = "0.10" }
 hex = "0.4.3"
 hex-literal = "1.0.0"
-hickory-resolver = "0.24.4" # # ignored in renovate, cannot be updated, until libp2p-dns is updated
+hickory-resolver = "0.24.4" # ignored in renovate, cannot be updated, until libp2p-dns is updated
 http-types = "2.12.0"
 k256 = { version = "0.13.4", features = [
   "arithmetic",
