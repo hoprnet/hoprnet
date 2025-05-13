@@ -37,8 +37,6 @@ from .response_objects import (
     Configuration,
     ConnectedPeer,
     Infos,
-    Message,
-    MessageSent,
     OpenedChannel,
     Ping,
     Session,
@@ -408,21 +406,6 @@ class HoprdAPI:
         """
         is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "tickets/statistics")
         return is_ok
-
-    async def send_message(
-        self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG
-    ) -> Optional[MessageSent]:
-        """
-        Sends a message to the given destination.
-        :param: destination: str
-        :param: message: str
-        :param: hops: list[str]
-        :param: tag: int = 0x0320
-        :return: bool
-        """
-        data = SendMessageBody(body=message, hops=None, path=hops, destination=destination, tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages", data=data)
-        return MessageSent(response) if is_ok else None
 
     async def session_list_clients(self, protocol: Protocol = Protocol.UDP) -> list[Session]:
         """

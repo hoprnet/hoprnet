@@ -421,6 +421,9 @@ pub(crate) struct SessionClientRequest {
     /// In other words, this size is recalculated to a number of SURBs delivered
     /// to the counterparty upfront and then maintained.
     /// The maintenance is dynamic, based on the number of responses we receive.
+    ///
+    /// All syntaxes like "2 MB", "128 kiB", "3MiB" are supported. The value must be
+    /// at least the size of 2 Session packet payloads.
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = String)]
     pub response_buffer: Option<bytesize::ByteSize>,
@@ -486,21 +489,31 @@ impl SessionClientRequest {
         "returnPath": { "Hops": 1 },
         "protocol": "tcp",
         "ip": "127.0.0.1",
-        "port": 5542
+        "port": 5542,
+        "mtu": 987
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientResponse {
+    /// Target of the Session.
     pub target: String,
+    /// Destination node (exit node) of the Session.
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     pub destination: PeerOrAddress,
+    /// Forward routing path.
     pub forward_path: RoutingOptions,
+    /// Return routing path.
     pub return_path: RoutingOptions,
+    /// IP protocol used by Session's listening socket.
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
     pub protocol: IpProtocol,
+    /// Listening IP address of the Session's socket.
     pub ip: String,
+    /// Listening port of the Session's socket.
     pub port: u16,
+    /// MTU used by the Session.
+    pub mtu: usize,
 }
 
 /// This function first tries to parse `requested` as the `ip:port` host pair.
@@ -730,6 +743,7 @@ pub(crate) async fn create_client(
                 destination: dst.into(),
                 forward_path: args.forward_path.clone(),
                 return_path: args.return_path.clone(),
+                mtu: SESSION_PAYLOAD_SIZE,
             }),
         )
             .into_response(),
@@ -773,6 +787,7 @@ pub(crate) async fn list_clients(
             forward_path: entry.forward_path.clone(),
             return_path: entry.return_path.clone(),
             destination: entry.destination.into(),
+            mtu: SESSION_PAYLOAD_SIZE,
         })
         .collect::<Vec<_>>();
 
@@ -1087,11 +1102,11 @@ mod tests {
         tokio::task::spawn(bind_session_to_stream(
             session,
             udp_listener,
-            hopr_lib::SESSION_USABLE_MTU_SIZE,
+            hopr_lib::USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
         ));
 
         let mut udp_stream = ConnectedUdpStream::builder()
-            .with_buffer_size(hopr_lib::SESSION_USABLE_MTU_SIZE)
+            .with_buffer_size(hopr_lib::USABLE_PAYLOAD_CAPACITY_FOR_SESSION)
             .with_queue_size(HOPR_UDP_QUEUE_SIZE)
             .with_counterparty(listen_addr)
             .build(("127.0.0.1", 0))

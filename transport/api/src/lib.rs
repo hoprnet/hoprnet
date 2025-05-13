@@ -104,7 +104,7 @@ pub use {
     hopr_transport_protocol::{execute_on_tick, PeerDiscovery},
     hopr_transport_session::{
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
-        SessionClientConfig, SessionId, SurbBalancerConfig, SESSION_PAYLOAD_SIZE, SESSION_USABLE_MTU_SIZE,
+        SessionClientConfig, SessionId, SurbBalancerConfig, SESSION_PAYLOAD_SIZE, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
     },
     hopr_transport_session::{ServiceId, SessionTarget},
 };

@@ -24,14 +24,13 @@ from .utils import (
     TICKET_AGGREGATION_THRESHOLD,
     check_all_tickets_redeemed,
     check_native_balance_below,
-    check_received_packets_with_peek,
     check_rejected_tickets_value,
     check_safe_balance,
     check_unredeemed_tickets_value,
     create_channel,
     gen_random_tag,
-    send_and_receive_packets_with_pop,
     shuffled,
+    session_send_and_receive_packets,
 )
 
 # used by nodes to get unique port assignments
@@ -169,21 +168,9 @@ class TestIntegrationWithSwarm:
     ):
         message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
 
-        packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
-        await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[], timeout=5)
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-    async def test_hoprd_should_fail_sending_a_message_that_is_too_large(
-        self, src: str, dest: str, swarm7: dict[str, Node]
-    ):
-        maximum_payload_size = 1000
-        random_tag = gen_random_tag()
-
-        packet = "0 hop message too large: " + "".join(
-            random.choices(string.ascii_uppercase + string.digits, k=maximum_payload_size)
+        await session_send_and_receive_packets(
+            message_count, src=swarm7[src], dest=swarm7[dest], fwd_path={"Hops": 0}, return_path={"Hops": 0}
         )
-        assert await swarm7[src].api.send_message(swarm7[dest].peer_id, packet, [], random_tag) is None
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -203,7 +190,7 @@ class TestIntegrationWithSwarm:
 
             channel_after = await swarm7[src].api.get_channel(channel.id)
 
-            # Updated channel balance is visible immediately
+            # The updated channel balance is visible immediately
             assert channel_after.balance - channel_before.balance == hopr_amount
 
             # Wait until the safe balance has decreased
@@ -246,7 +233,6 @@ class TestIntegrationWithSwarm:
         assert count_metrics(await swarm7[dest].api.metrics()) == 0
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")
     @pytest.mark.parametrize(
         "src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
@@ -324,7 +310,6 @@ class TestIntegrationWithSwarm:
             # we should see the last message as rejected
             await asyncio.wait_for(check_rejected_tickets_value(swarm7[dest], 1), 5.0)
 
-            await asyncio.sleep(10)  # wait for aggregation to finish
             assert await swarm7[dest].api.tickets_redeem()
             await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 30.0)
 
@@ -364,14 +349,17 @@ class TestIntegrationWithSwarm:
         dest = route[-1]
         channel_funding = ticket_count * TICKET_PRICE_PER_HOP
 
-        # create channel from src to mid, mid to dest does not need a channel
+        # Create a channel from src to mid, mid to dest does not need a channel
         async with create_channel(swarm7[src], swarm7[mid], funding=channel_funding):
             statistics_before = await swarm7[mid].api.get_tickets_statistics()
             assert statistics_before is not None
 
-            packets = [f"Ticket aggregation test: #{i:08d}" for i in range(ticket_count)]
-            await send_and_receive_packets_with_pop(
-                packets, src=swarm7[src], dest=swarm7[dest], path=[swarm7[mid].peer_id]
+            await session_send_and_receive_packets(
+                ticket_count,
+                src=swarm7[src],
+                dest=swarm7[mid],
+                fwd_path={"IntermediatePath": [swarm7[mid].peer_id]},
+                return_path={"IntermediatePath": [swarm7[mid].peer_id]},
             )
 
             # monitor that the node aggregates and redeems tickets until the aggregated value is reached
@@ -438,52 +426,6 @@ class TestIntegrationWithSwarm:
 
         assert isinstance(price.value, int)
         assert price.value > 0
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("tag", [random.randint(0, RESERVED_TAG_UPPER_BOUND) for _ in range(5)])
-    async def test_send_message_with_reserved_application_tag_should_fail(self, tag: int, swarm7: dict[str, Node]):
-        src, dest = random_distinct_pairs_from(barebone_nodes(), count=1)[0]
-
-        assert (
-            await swarm7[src].api.send_message(
-                swarm7[dest].peer_id, "This message should fail due to reserved tag", [], tag
-            )
-            is None
-        )
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-    async def test_send_message_return_timestamp(self, src: str, dest: str, swarm7: dict[str, Node]):
-        message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
-        random_tag = gen_random_tag()
-
-        src_peer = swarm7[src]
-        dest_peer = swarm7[dest]
-
-        packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
-        timestamps = []
-        for packet in packets:
-            res = await src_peer.api.send_message(dest_peer.peer_id, packet, [], random_tag)
-            timestamps.append(res.timestamp)
-
-        assert len(timestamps) == message_count
-        assert timestamps == sorted(timestamps)
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-    async def test_send_message_with_address_or_peer_id(self, src: str, dest: str, swarm7: dict[str, Node]):
-        message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
-        random_tag = gen_random_tag()
-
-        src_peer = swarm7[src]
-        dest_peer = swarm7[dest]
-
-        packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
-        for packet in packets:
-            res = await src_peer.api.send_message(
-                random.choice([dest_peer.peer_id, dest_peer.address]), packet, [], random_tag
-            )
-            assert res is not None
 
 
 @pytest.mark.asyncio

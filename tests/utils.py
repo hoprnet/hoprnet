@@ -1,8 +1,13 @@
 import asyncio
+import logging
 import random
-from contextlib import asynccontextmanager
+import re
+import socket
+from contextlib import asynccontextmanager, contextmanager
 
+from sdk.python.api import Protocol
 from sdk.python.api.channelstatus import ChannelStatus
+from sdk.python.api.request_objects import SessionCapabilitiesBody
 from sdk.python.localcluster.constants import TICKET_PRICE_PER_HOP
 from sdk.python.localcluster.node import Node
 
@@ -125,3 +130,129 @@ async def check_min_incoming_win_prob_eq(src: Node, value: float):
 async def check_all_tickets_redeemed(src: Node):
     while (await src.api.get_tickets_statistics()).unredeemed_value > 0:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
+
+
+class HoprSession:
+    def __init__(
+        self,
+        proto: Protocol,
+        src: Node,
+        dest: Node,
+        fwd_path: dict,
+        return_path: dict,
+        capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
+    ):
+        self.src = src
+        self.dest = dest
+        self.proto = proto
+        self.fwd_path = fwd_path
+        self.return_path = return_path
+        self.capabilities = capabilities
+        self.session = None
+        self.server_sock = None
+        self.target_port = 0
+
+    async def __aenter__(self):
+        if self.proto is Protocol.TCP:
+            self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        else:
+            self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        self.server_sock.bind(("127.0.0.1", 0))
+        self.target_port = self.server_sock.getsockname()[1]
+
+        if self.proto is Protocol.TCP:
+            self.server_sock.listen()
+
+        self.session = await self.src.api.session_client(
+            self.dest.peer_id,
+            forward_path=self.fwd_path,
+            return_path=self.return_path,
+            protocol=self.proto,
+            target=f"127.0.0.1:{self.target_port}",
+            capabilities=self.capabilities,
+        )
+        if self.session is None:
+            raise Exception(f"Failed to open session {self.src.peer_id} -> {self.dest.peer_id} on {self.proto.name}")
+
+        logging.debug(
+            f"Session opened {self.src.peer_id}:{self.session.port} -> {self.dest.peer_id}:{self.target_port} on {self.proto.name}"
+        )
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session is not None and await self.src.api.session_close_client(self.session) is True:
+            logging.debug(
+                f"Session closed {self.src.peer_id}:{self.session.port} -> {self.dest.peer_id}:{self.target_port} on {self.proto.name}"
+            )
+            self.session = None
+            self.target_port = 0
+            self.server_sock.close()
+        else:
+            logging.error("Failed to close session")
+
+    @contextmanager
+    def client_socket(self):
+        if self.session is None:
+            raise Exception("Session is not open")
+
+        if self.proto is Protocol.TCP:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect(("127.0.0.1", self.session.port))
+        else:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+        try:
+            yield s
+        finally:
+            s.close()
+
+    @property
+    def mtu(self):
+        if self.session is None:
+            raise Exception("Session is not open")
+        return self.session.mtu
+
+    @property
+    def server_socket(self):
+        if self.server_sock is None:
+            raise Exception("Session is not open")
+
+        return self.server_sock
+
+
+async def session_send_and_receive_packets(
+    msg_count: int,
+    src: Node,
+    dest: Node,
+    fwd_path: dict,
+    return_path: dict,
+):
+    async with HoprSession(
+        Protocol.UDP, src, dest, fwd_path, return_path, SessionCapabilitiesBody(no_delay=True, segmentation=True)
+    ) as session:
+        addr = ("127.0.0.1", session.target_port)
+
+        expected = [f"#{i}".ljust(session.mtu) for i in range(msg_count)]
+        actual = []
+
+        with session.client_socket() as s:
+            s.settimeout(20)
+            total_sent = 0
+            for message in expected:
+                total_sent = total_sent + s.sendto(message.encode(), addr)
+                # UDP has no flow-control, so we must insert an artificial gap
+                await asyncio.sleep(0.01)
+
+            while total_sent > 0:
+                chunk, _ = s.recvfrom(min(session.mtu, total_sent))
+                total_sent = total_sent - len(chunk)
+                # Adapt for situations when data arrive completely unordered (also within the buffer)
+                actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
+
+        expected = [msg.strip() for msg in expected]
+
+        actual.sort()
+        expected.sort()
+
+        assert "".join(expected) == "".join(actual)
