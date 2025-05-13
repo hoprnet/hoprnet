@@ -125,4 +125,3 @@ async def check_min_incoming_win_prob_eq(src: Node, value: float):
 async def check_all_tickets_redeemed(src: Node):
     while (await src.api.get_tickets_statistics()).unredeemed_value > 0:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
-

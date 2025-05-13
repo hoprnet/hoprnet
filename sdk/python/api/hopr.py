@@ -487,6 +487,7 @@ class HoprdAPI:
         )
 
         return is_ok
+
     async def readyz(self, timeout: int = 20) -> bool:
         """
         Checks if the node is ready. Return True if `readyz` returns 200 after max `timeout` seconds.

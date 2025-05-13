@@ -5,7 +5,6 @@ mod account;
 mod alias;
 mod channels;
 mod checks;
-mod messages;
 mod network;
 mod node;
 mod peers;
@@ -104,7 +103,6 @@ pub(crate) struct InternalState {
         checks::healthyz,
         checks::readyz,
         checks::startedz,
-        messages::send_message,
         network::price,
         network::probability,
         node::configuration,
@@ -133,7 +131,6 @@ pub(crate) struct InternalState {
             alias::PeerIdResponse, alias::AliasDestinationBodyRequest,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
-            messages::SendMessageResponse, messages::SendMessageBodyRequest,
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
@@ -149,7 +146,6 @@ pub(crate) struct InternalState {
         (name = "Alias", description = "HOPR node internal non-persistent alias endpoints"),
         (name = "Channels", description = "HOPR node chain channels manipulation endpoints"),
         (name = "Checks", description = "HOPR node functionality checks"),
-        (name = "Messages", description = "HOPR node message manipulation endpoints"),
         (name = "Node", description = "HOPR node information endpoints"),
         (name = "Peers", description = "HOPR node peer manipulation endpoints"),
         (name = "Tickets", description = "HOPR node ticket management endpoints"),
@@ -309,7 +305,6 @@ async fn build_api(
                 .route("/tickets/redeem", post(tickets::redeem_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
                 .route("/tickets/statistics", delete(tickets::reset_ticket_statistics))
-                .route("/messages", post(messages::send_message))
                 .route("/network/price", get(network::price))
                 .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
@@ -398,8 +393,6 @@ enum ApiErrorStatus {
     InvalidQuality,
     NotReady,
     ListenHostAlreadyUsed,
-    #[strum(serialize = "INVALID_PATH")]
-    InvalidPath(String),
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }

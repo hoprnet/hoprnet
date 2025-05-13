@@ -172,7 +172,6 @@ class TestIntegrationWithSwarm:
         packets = [f"0 hop message #{i:08d}" for i in range(message_count)]
         await send_and_receive_packets_with_pop(packets, src=swarm7[src], dest=swarm7[dest], path=[], timeout=5)
 
-
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
     async def test_hoprd_should_fail_sending_a_message_that_is_too_large(
