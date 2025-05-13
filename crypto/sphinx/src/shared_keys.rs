@@ -168,11 +168,8 @@ pub trait SphinxSuite {
     }
 
     /// Instantiates a new Pseudo-Random Permutation IV and key for reply data.
-    fn new_reply_prp_init<P: Pseudonym>(
-        secret: &SecretKey16,
-        pseudonym: &P,
-    ) -> hopr_crypto_types::errors::Result<IvKey<Self::PRP>> {
-        generate_key_iv(secret, HASH_KEY_REPLY_PRP, Some(pseudonym.as_ref()))
+    fn new_reply_prp_init(secret: &SecretKey16, salt: &[u8]) -> hopr_crypto_types::errors::Result<IvKey<Self::PRP>> {
+        generate_key_iv(secret, HASH_KEY_REPLY_PRP, Some(salt))
     }
 }
 

@@ -52,9 +52,6 @@ pub struct Chain {
     pub protocols: hopr_chain_api::config::ProtocolsConfig,
     #[serde(default = "just_true")]
     #[default = true]
-    pub check_unrealized_balance: bool,
-    #[serde(default = "just_true")]
-    #[default = true]
     pub keep_logs: bool,
     #[serde(default = "just_true")]
     #[default = true]

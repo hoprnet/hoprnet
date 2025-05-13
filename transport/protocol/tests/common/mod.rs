@@ -147,7 +147,7 @@ pub type WireChannels = (
 
 pub type LogicalChannels = (
     futures::channel::mpsc::UnboundedSender<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>,
-    futures::channel::mpsc::UnboundedReceiver<ApplicationData>,
+    futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationData)>,
 );
 
 pub type TicketChannel = futures::channel::mpsc::UnboundedReceiver<AcknowledgedTicket>;
@@ -192,7 +192,7 @@ pub async fn peer_setup_for(
 
         let (api_send_tx, api_send_rx) =
             futures::channel::mpsc::unbounded::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>();
-        let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
+        let (api_recv_tx, api_recv_rx) = futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
 
         let opk: &OffchainKeypair = &PEERS[i];
         let packet_cfg = PacketInteractionConfig {
@@ -333,7 +333,7 @@ pub async fn resolve_mock_path(
         last_addr = *addr;
     }
 
-    Ok(ValidatedPath::new(ChainPath::new(peers_onchain)?, &cg, &TestResolver(peers_addrs)).await?)
+    Ok(ValidatedPath::new(me, ChainPath::new(peers_onchain)?, &cg, &TestResolver(peers_addrs)).await?)
 }
 
 pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
@@ -377,11 +377,12 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     tokio::task::spawn(emulate_channel_communication(packet_count, wire_apis));
 
+    let pseudonym = HoprPseudonym::random();
     let mut sent_packet_count = 0;
     for i in 0..packet_count {
         let sender = MsgSender::new(apis[0].0.clone());
         let routing = ResolvedTransportRouting::Forward {
-            pseudonym: HoprPseudonym::random(),
+            pseudonym,
             forward_path: packet_path.clone(),
             return_paths: vec![],
         };
@@ -414,9 +415,9 @@ pub async fn send_relay_receive_channel_of_n_peers(
         assert_eq!(recv_packets.len(), test_msgs.len());
 
         test_msgs.sort_by(|a, b| a.plain_text.cmp(&b.plain_text));
-        recv_packets.sort_by(|a, b| a.plain_text.cmp(&b.plain_text));
+        recv_packets.sort_by(|(_, a), (_, b)| a.plain_text.cmp(&b.plain_text));
 
-        assert_eq!(recv_packets, test_msgs);
+        assert_eq!(recv_packets.into_iter().map(|(_, b)| b).collect::<Vec<_>>(), test_msgs);
     };
 
     let res = timeout(TIMEOUT_SECONDS, compare_packets).await;
