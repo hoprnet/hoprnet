@@ -16,6 +16,8 @@ from .utils import (
     create_channel,
     gen_random_tag,
     send_and_receive_packets_with_pop,
+    check_unredeemed_tickets_value,
+    check_winning_tickets_count,
 )
 
 ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
@@ -239,20 +241,22 @@ class TestWinProbWithSwarm:
                         path=[swarm7[relay_1].peer_id, swarm7[relay_2].peer_id],
                     )
 
+                    # since the first relay sends tickets with win probability = 1,
+                    # the second relay must get all the tickets as winning
+                    await asyncio.wait_for(
+                        check_winning_tickets_count(swarm7[relay_2], ticket_count),
+                        30.0,
+                    )
+                    ticket_statistics = await swarm7[relay_2].api.get_tickets_statistics()
+                    unredeemed_value_2 = ticket_statistics.unredeemed_value
+                    assert unredeemed_value_2 - unredeemed_value_before_2 > 0
+
                     # the value of redeemable tickets on the first relay should not go above the given threshold
                     ticket_statistics = await swarm7[relay_1].api.get_tickets_statistics()
                     unredeemed_value_1 = ticket_statistics.unredeemed_value
                     winning_count_1 = ticket_statistics.winning_count - statistics_before_1.winning_count
                     assert unredeemed_value_1 - unredeemed_value_before_1 > 0
                     assert abs(winning_count_1 - ticket_count * win_prob) <= win_ticket_tolerance * ticket_count
-
-                    # however, since the first relay sends tickets with win probability = 1,
-                    # the second relay must get all the tickets as winning
-                    ticket_statistics = await swarm7[relay_2].api.get_tickets_statistics()
-                    unredeemed_value_2 = ticket_statistics.unredeemed_value
-                    winning_count_2 = ticket_statistics.winning_count - statistics_before_2.winning_count
-                    assert unredeemed_value_2 - unredeemed_value_before_2 > 0
-                    assert winning_count_2 == ticket_count
         finally:
             # Always return winning probability to 1.0 even if the test failed
             set_minimum_winning_probability_in_network(private_key, 1.0)
@@ -299,10 +303,15 @@ class TestWinProbWithSwarm:
                 )
 
                 # in this case, the relay has tickets for all the packets, because the source sends them with win prob = 1
+                await asyncio.wait_for(
+                    check_unredeemed_tickets_value(
+                        swarm7[relay], unredeemed_value_before + TICKET_PRICE_PER_HOP * ticket_count
+                    ),
+                    30.0,
+                )
+
                 ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
-                unredeemed_value = ticket_statistics.unredeemed_value
                 rejected_value = ticket_statistics.rejected_value
-                assert unredeemed_value - unredeemed_value_before == TICKET_PRICE_PER_HOP * ticket_count
                 assert ticket_statistics.winning_count - statistics_before.winning_count == ticket_count
                 assert rejected_value - rejected_value_before == 0
 

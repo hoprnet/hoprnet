@@ -172,7 +172,7 @@ pub fn create_surb<S: SphinxSuite, H: SphinxHeaderSpec>(
     shared_keys: SharedKeys<S::E, S::G>,
     path: &[H::KeyId],
     additional_data_relayer: &[H::RelayerData],
-    pseudonym: &H::Pseudonym,
+    receiver_data: H::PacketReceiverData,
     additional_data_receiver: H::SurbReceiverData,
 ) -> hopr_crypto_types::errors::Result<(SURB<S, H>, ReplyOpener)>
 where
@@ -182,7 +182,7 @@ where
         path,
         &shared_keys.secrets,
         additional_data_relayer,
-        pseudonym,
+        &receiver_data,
         true,
         false,
     )?;
@@ -226,7 +226,7 @@ mod tests {
             shares,
             &pub_keys,
             &[Default::default(); 4],
-            &SimplePseudonym::random(),
+            SimplePseudonym::random(),
             Default::default(),
         )?)
     }
