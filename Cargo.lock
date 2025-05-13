@@ -7946,7 +7946,7 @@ dependencies = [
  "asynchronous-codec",
  "bytes",
  "quick-protobuf",
- "thiserror 1.0.69",
+ "thiserror 1.0.68",
  "unsigned-varint 0.8.0",
 ]
 
