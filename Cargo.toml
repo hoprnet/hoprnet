@@ -79,7 +79,7 @@ bytesize = { version = "2.0.1", features = ["serde"] }
 cbor4ii = { version = "1.0.0" }
 cfg-if = "1.0.0"
 chrono = { version = "0.4.41", default-features = false }
-clap = { version = "4.5.37", features = ["derive", "env", "string"] }
+clap = { version = "4.5.38", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.5.1", features = [
@@ -168,13 +168,12 @@ semver = "1.0.26"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_bytes = "0.11.17"
 serde_json = "1.0.140"
-serde_cbor = "0.11"
 serde_repr = "0.1.20"
 serde_with = { version = "3.12.0", features = ["base64"] }
 serde_yaml = { version = "0.9.34+deprecated" }
 serial_test = "3.2.0"
 sha3 = "0.10.8"
-signal-hook = "0.3.17"
+signal-hook = "0.3.18"
 smart-default = "0.7.1"
 socket2 = "0.5.9"
 sqlx = { version = "0.8.5", default-features = false, features = [
@@ -186,7 +185,7 @@ strum = { version = "0.27.1", features = ["derive"] }
 subtle = "2.6.1"
 surf = { version = "2.3.2" }
 surf-governor = { version = "0.2.0" }
-tempfile = "3.19.1"
+tempfile = "3.20.0"
 test-log = { version = "0.2.17", features = ["trace"] }
 thiserror = "2.0.12"
 tokio = { version = "1.45.0", features = [
