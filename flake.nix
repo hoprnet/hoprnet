@@ -475,7 +475,7 @@
               uv
               foundry-bin
               solcDefault
-              python312
+              python313
               hopli-dev
               hoprd-dev
             ];
