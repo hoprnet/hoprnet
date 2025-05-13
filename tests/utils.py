@@ -92,42 +92,6 @@ async def check_outgoing_channel_closed(src: Node, channel_id: str):
             await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_received_packets_with_pop(receiver: Node, expected_packets, tag=None, sort=True):
-    received = []
-
-    while len(received) != len(expected_packets):
-        packet = await receiver.api.messages_pop(tag)
-        if packet is not None:
-            received.append(packet.body)
-        else:
-            await asyncio.sleep(CHECK_RETRY_INTERVAL)
-
-    if sort:
-        expected_packets.sort()
-        received.sort()
-
-    assert received == expected_packets
-
-
-async def check_received_packets_with_peek(receiver: Node, expected_packets: list[str], tag=None, sort=True):
-    received = []
-
-    while len(received) != len(expected_packets):
-        packets = await receiver.api.messages_peek_all(tag)
-
-        if packets is None:
-            await asyncio.sleep(CHECK_RETRY_INTERVAL)
-            continue
-
-        received = [m.body for m in packets]
-
-    if sort:
-        expected_packets.sort()
-        received.sort()
-
-    assert received == expected_packets, f"Expected: {expected_packets}, got: {received}"
-
-
 async def check_rejected_tickets_value(src: Node, value: int):
     while (await src.api.get_tickets_statistics()).rejected_value < value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
@@ -162,26 +126,3 @@ async def check_all_tickets_redeemed(src: Node):
     while (await src.api.get_tickets_statistics()).unredeemed_value > 0:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
-
-async def send_and_receive_packets_with_pop(
-    packets, src: Node, dest: Node, path: list[str], timeout: float = MULTIHOP_MESSAGE_SEND_TIMEOUT
-):
-    random_tag = gen_random_tag()
-
-    for packet in packets:
-        assert await src.api.send_message(dest.peer_id, packet, path, random_tag)
-
-    await asyncio.wait_for(check_received_packets_with_pop(dest, packets, tag=random_tag, sort=True), timeout)
-
-
-async def send_and_receive_packets_with_peek(
-    packets, src: Node, dest: Node, path: list[str], timeout: float = MULTIHOP_MESSAGE_SEND_TIMEOUT
-):
-    random_tag = gen_random_tag()
-
-    for packet in packets:
-        assert await src.api.send_message(dest.peer_id, packet, path, random_tag)
-
-    await asyncio.wait_for(check_received_packets_with_peek(dest, packets, tag=random_tag, sort=True), timeout)
-
-    return random_tag

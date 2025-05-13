@@ -16,7 +16,6 @@ from .utils import (
     check_all_tickets_redeemed,
     check_unredeemed_tickets_value,
     create_channel,
-    send_and_receive_packets_with_pop,
     shuffled,
 )
 

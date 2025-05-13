@@ -487,54 +487,6 @@ class HoprdAPI:
         )
 
         return is_ok
-
-    async def messages_pop(self, tag: int = MESSAGE_TAG) -> Optional[Message]:
-        """
-        Pop next message from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-
-        data = GetMessagesBody(tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/pop", data)
-        return Message(response) if is_ok else None
-
-    async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> Optional[list[Message]]:
-        """
-        Pop all messages from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-        data = GetMessagesBody(tag=tag)
-
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/pop-all", data)
-        return [Message(entry) for entry in response["messages"]] if is_ok else None
-
-    async def messages_peek(self, tag: int = MESSAGE_TAG) -> Optional[Message]:
-        """
-        Peek next message from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-
-        data = GetMessagesBody(tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/peek", data)
-        return Message(response) if is_ok else None
-
-    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = 0) -> Optional[list[Message]]:
-        """
-        Peek all messages from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-        if not isinstance(timestamp, int):
-            data = PeekAllMessagesBody(tag=tag)
-        else:
-            data = PeekAllMessagesBody(tag=tag, timestamp=timestamp)
-
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/peek-all", data)
-        return [Message(entry) for entry in response["messages"]] if is_ok else None
-
     async def readyz(self, timeout: int = 20) -> bool:
         """
         Checks if the node is ready. Return True if `readyz` returns 200 after max `timeout` seconds.

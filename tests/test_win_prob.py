@@ -15,7 +15,6 @@ from .utils import (
     check_rejected_tickets_value,
     create_channel,
     gen_random_tag,
-    send_and_receive_packets_with_pop,
     check_unredeemed_tickets_value,
     check_winning_tickets_count,
 )
