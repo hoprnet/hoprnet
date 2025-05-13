@@ -253,7 +253,8 @@ class TestSessionWithSwarm:
 
             session = await src_peer.api.session_client(
                 dest_peer.peer_id,
-                path={"Hops": 0},
+                forward_path={"Hops": 0},
+                return_path={"Hops": 0},
                 protocol=Protocol.TCP,
                 target=f"localhost:{server.port}",
                 capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
@@ -287,18 +288,22 @@ class TestSessionWithSwarm:
     async def test_session_communication_over_n_hop_with_a_tcp_echo_server(self, route, swarm7: dict[str, Node]):
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
         expected = [f"{i}".ljust(STANDARD_MTU_SIZE) for i in range(packet_count)]
+        surb_pre_buffer = 6000
 
         assert [len(x) for x in expected] == packet_count * [STANDARD_MTU_SIZE]
 
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
-        path = [swarm7[node].peer_id for node in route[1:-1]]
+        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
+        ret_path = fwd_path[::-1]
 
         async with AsyncExitStack() as channels:
             channels_to = [
                 channels.enter_async_context(
                     create_channel(
-                        swarm7[route[i]], swarm7[route[i + 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP
+                        swarm7[route[i]],
+                        swarm7[route[i + 1]],
+                        funding=20 * (surb_pre_buffer + packet_count) * TICKET_PRICE_PER_HOP,
                     )
                 )
                 for i in range(len(route) - 1)
@@ -322,7 +327,8 @@ class TestSessionWithSwarm:
 
                 session = await src_peer.api.session_client(
                     dest_peer.peer_id,
-                    path={"IntermediatePath": path},
+                    forward_path={"IntermediatePath": fwd_path},
+                    return_path={"IntermediatePath": ret_path},
                     protocol=Protocol.TCP,
                     target=f"localhost:{server.port}",
                     capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
@@ -363,7 +369,11 @@ class TestSessionWithSwarm:
             await asyncio.sleep(1.0)
 
             session = await src_peer.api.session_client(
-                dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP, target=f"localhost:{server.port}"
+                dest_peer.peer_id,
+                forward_path={"Hops": 0},
+                return_path={"Hops": 0},
+                protocol=Protocol.UDP,
+                target=f"localhost:{server.port}",
             )
 
             assert session.port is not None, "Failed to open session"
@@ -411,7 +421,12 @@ class TestSessionWithSwarm:
         # Service 0 session will loop back all the data at Exit back to the Entry
         # Therefore, we do not need the Echo service here
         session: Session | None = await src_peer.api.session_client(
-            dest_peer.peer_id, path={"Hops": 0}, protocol=Protocol.UDP, target="0", service=True
+            dest_peer.peer_id,
+            forward_path={"Hops": 0},
+            return_path={"Hops": 0},
+            protocol=Protocol.UDP,
+            target="0",
+            service=True,
         )
 
         assert session.port is not None, "Failed to open session"
@@ -455,17 +470,23 @@ class TestSessionWithSwarm:
     async def test_session_communication_over_n_hop_with_a_udp_echo_server(self, route, swarm7: dict[str, Node]):
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
         expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
+        surb_pre_buffer = 6000
 
         assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
 
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
-        path = [swarm7[node].peer_id for node in route[1:-1]]
+        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
+        ret_path = fwd_path[::-1]
 
         async with AsyncExitStack() as channels:
             channels_to = [
                 channels.enter_async_context(
-                    create_channel(swarm7[route[i]], swarm7[route[i + 1]], funding=packet_count * TICKET_PRICE_PER_HOP)
+                    create_channel(
+                        swarm7[route[i]],
+                        swarm7[route[i + 1]],
+                        funding=(surb_pre_buffer + packet_count) * TICKET_PRICE_PER_HOP,
+                    )
                 )
                 for i in range(len(route) - 1)
             ]
@@ -484,7 +505,8 @@ class TestSessionWithSwarm:
 
                 session = await src_peer.api.session_client(
                     dest_peer.peer_id,
-                    path={"IntermediatePath": path},
+                    forward_path={"IntermediatePath": fwd_path},
+                    return_path={"IntermediatePath": ret_path},
                     protocol=Protocol.UDP,
                     target=f"localhost:{server.port}",
                 )
@@ -530,7 +552,8 @@ class TestSessionWithSwarm:
         with run_https_server(expected) as dst_sock_port:
             session = await src_peer.api.session_client(
                 dest_peer.peer_id,
-                path={"Hops": 0},
+                forward_path={"Hops": 0},
+                return_path={"Hops": 0},
                 protocol=Protocol.TCP,
                 target=f"localhost:{dst_sock_port}",
                 sealed_target=True,
@@ -556,13 +579,17 @@ class TestSessionWithSwarm:
     async def test_session_communication_over_n_hop_with_an_https_server(self, route, swarm7: dict[str, Node]):
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
-        path = [swarm7[node].peer_id for node in route[1:-1]]
+        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
+        ret_path = fwd_path[::-1]
+        surb_pre_buffer = 6000
 
         async with AsyncExitStack() as channels:
             channels_to = [
                 channels.enter_async_context(
                     create_channel(
-                        swarm7[route[i]], swarm7[route[i + 1]], funding=100 * DOWNLOAD_FILE_SIZE * TICKET_PRICE_PER_HOP
+                        swarm7[route[i]],
+                        swarm7[route[i + 1]],
+                        funding=100 * (surb_pre_buffer + DOWNLOAD_FILE_SIZE) * TICKET_PRICE_PER_HOP,
                     )
                 )
                 for i in range(len(route) - 1)
@@ -584,7 +611,8 @@ class TestSessionWithSwarm:
             with run_https_server(expected) as dst_sock_port:
                 session = await src_peer.api.session_client(
                     dest_peer.peer_id,
-                    path={"IntermediatePath": path},
+                    forward_path={"IntermediatePath": fwd_path},
+                    return_path={"IntermediatePath": ret_path},
                     protocol=Protocol.TCP,
                     target=f"localhost:{dst_sock_port}",
                     capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
@@ -616,7 +644,8 @@ class TestSessionWithSwarm:
 
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
-        path = [swarm7[node].peer_id for node in route[1:-1]]
+        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
+        ret_path = fwd_path[::-1]
 
         logging.info(f"Opening channels for route '{route}'")
 
@@ -647,11 +676,13 @@ class TestSessionWithSwarm:
 
             session = await src_peer.api.session_client(
                 dest_peer.peer_id,
-                path={"IntermediatePath": path},
+                forward_path={"IntermediatePath": fwd_path},
+                return_path={"IntermediatePath": ret_path},
                 protocol=Protocol.UDP,
                 target=wireguard_tunnel,
                 listen_on="127.0.0.1:60006",
                 capabilities=SessionCapabilitiesBody(segmentation=True),
+                response_buffer="5 MB",
             )
 
             assert session.port is not None, "Failed to open session"
