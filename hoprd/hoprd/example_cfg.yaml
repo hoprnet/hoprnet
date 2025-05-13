@@ -229,7 +229,7 @@ hopr:
       # Timeout in seconds
       timeout: 6
     # port used for nat server functionality
-    autonat_port: 9191
+    autonat_port: 
   # Blockchain specific configuration
   chain:
     # Indicates whether node should announce itself on-chain
