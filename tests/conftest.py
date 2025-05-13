@@ -77,12 +77,15 @@ def random_distinct_pairs_from(values: list, count: int):
 
 
 @pytest.fixture(scope="session")
-async def swarm7(request):
+async def base_port(request):
     base_port = find_available_port_block(12000, 13000, 20)
     if base_port is None:
         pytest.fail("No available base port found")
     logging.info(f"Using base port: {base_port}")
+    yield base_port
 
+@pytest.fixture(scope="session")
+async def swarm7(request, base_port):
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
     try:
         cluster, anvil = await localcluster.bringup(params_path, test_mode=True, fully_connected=False, use_nat=False, base_port=base_port)
