@@ -391,7 +391,7 @@ class HoprdAPI:
     async def metrics(self):
         is_ok, response = await self.__call_api(HTTPMethod.GET, "metrics", use_api_path=False)
 
-        return response["metrics"] if is_ok else None
+        return response if is_ok else None
 
     async def get_tickets_statistics(self) -> Optional[TicketStatistics]:
         """
