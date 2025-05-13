@@ -27,7 +27,7 @@ ethers = { workspace = true }
 futures = { workspace = true }
 futures-timer = { workspace = true }
 governor = { workspace = true, optional = true }
-http-types = { workspace = true }
+http = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 primitive-types = { workspace = true }
@@ -38,6 +38,7 @@ reqwest = { workspace = true, optional = true, features = [
   "json",
 ] }
 serde = { workspace = true }
+serde_with = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 smart-default = { workspace = true }
