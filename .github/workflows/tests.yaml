@@ -42,7 +42,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -87,7 +87,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -131,7 +131,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -148,22 +148,100 @@ jobs:
         env:
           HOPR_NETWORK: anvil-localhost
 
-  tests-smoke:
-    # FIXME: smoke tests currently cannot be executed on the bigger runners
+  tests-smoke-hopli:
     runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 60
+    timeout-minutes: 10
+    env:
+      needs_nix_setup: true
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup GCP
+        id: gcp
+        uses: hoprnet/hopr-workflows/actions/setup-gcp@72b6f30b6d0e2fa7298034156f503f2a2bd0f9c6 # master
+        with:
+          google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
+          login-artifact-registry: 'false'
+          install-sdk: 'true'
+
+      - name: Install Nix
+        if: env.needs_nix_setup == 'true'
+        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
+        if: env.needs_nix_setup == 'true'
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Download snapshot
+        id: download-snapshot
+        if: ${{ !env.ACT }}
+        run: |
+          mkdir -p /tmp/hopr-localcluster/snapshot
+          gcloud storage rsync gs://hoprnet-test-artifacts/snapshot /tmp/hopr-localcluster/snapshot --recursive
+        continue-on-error: true
+
+      - name: Check snapshot
+        run: ls -lR /tmp/hopr-localcluster/snapshot || echo "no snapshot found"
+
+      - name: Run smoke tests hopli
+        run: nix develop -L .#citest -c uv run -m pytest tests/test_hopli.py
+
+      - name: Upload snapshot
+        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
+        if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
+        with:
+          path: /tmp/hopr-localcluster/snapshot
+          destination: hoprnet-test-artifacts/
+          gzip: false
+
+      - name: Compress test logs
+        if: ${{ !env.ACT && always() }}
+        run: |
+          # Copy all the logs to a directory to avoid log file changes and simplify tar command
+          test_path=/tmp/test-smoke-hopli-${{ github.run_id }}-${{ github.run_number }}
+          mkdir -p ${test_path}
+          cp -r /tmp/hopr-smoke-test/test_hopli/*.log ${test_path} || echo "no files to copy"
+          cd ${test_path}
+          tar -czvf ${test_path}.tgz ${test_path}
+        working-directory: "/tmp"
+
+      - name: Upload test logs
+        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
+        if: ${{ !env.ACT && always() }}
+        with:
+          path: /tmp/
+          glob: "test-smoke-*"
+          parent: false
+          destination: hoprnet-test-logs/pr-${{ github.event.pull_request.number }}
+
+  tests-smoke:
+    runs-on: self-hosted-hoprnet-bigger
+    needs:
+      - tests-smoke-hopli
+    timeout-minutes: 30
     env:
       needs_nix_setup: true
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
-        # limit to run only a single smoke test at a time while we cannot
-        # choose different ports on our runners, this only minimizes the risk,
-        # does not prevent collisions with other workflow runs
         suite:
           - websocket_api
-          - hopli
           - rest_api
           - session
           - integration
@@ -192,7 +270,7 @@ jobs:
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -217,14 +295,6 @@ jobs:
 
       - name: Run smoke tests ${{ matrix.suite }}
         run: nix develop -L .#citest -c uv run --frozen -m pytest tests/test_${{ matrix.suite }}.py
-
-      - name: Upload snapshot
-        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
-        if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
-        with:
-          path: /tmp/hopr-localcluster/snapshot
-          destination: hoprnet-test-artifacts/
-          gzip: false
 
       - name: Compress test logs
         if: ${{ !env.ACT && always() }}

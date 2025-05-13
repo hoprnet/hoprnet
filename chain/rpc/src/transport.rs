@@ -95,8 +95,7 @@ impl HttpRequestor for ReqwestClient {
 
         if !status.is_success() {
             return Err(HttpRequestError::HttpError(
-                http_types::StatusCode::try_from(status.as_u16())
-                    .unwrap_or(http_types::StatusCode::InternalServerError),
+                http::StatusCode::try_from(status.as_u16()).unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR),
             ));
         }
 

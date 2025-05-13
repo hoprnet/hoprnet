@@ -2,6 +2,8 @@ use std::fmt::Formatter;
 use std::future::Future;
 use std::str::FromStr;
 
+use crate::types::{HoprIdentifier, PeerOrAddress};
+use crate::{ApiError, ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 use axum::extract::Path;
 use axum::Error;
 use axum::{
@@ -21,6 +23,7 @@ use hopr_db_api::prelude::HoprDbResolverOperations;
 use hopr_lib::errors::HoprLibError;
 use hopr_lib::{transfer_session, Address};
 use hopr_lib::{HoprSession, ServiceId, SessionClientConfig, SessionTarget};
+use hopr_lib::{SurbBalancerConfig, SESSION_PAYLOAD_SIZE};
 use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
@@ -30,9 +33,6 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info, trace};
-
-use crate::types::{HoprIdentifier, PeerOrAddress};
-use crate::{ApiError, ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -119,10 +119,14 @@ impl SessionTargetSpec {
 /// Entry stored in the session registry table.
 #[derive(Debug)]
 pub struct StoredSessionEntry {
+    /// Destination address of the Session counterparty.
+    pub destination: Address,
     /// Target of the Session.
     pub target: SessionTargetSpec,
-    /// Routing used for the Session.
-    pub path: RoutingOptions,
+    /// Forward path used for the Session.
+    pub forward_path: RoutingOptions,
+    /// Return path used for the Session.
+    pub return_path: RoutingOptions,
     /// The join handle for the Session processing.
     pub jh: hopr_async_runtime::prelude::JoinHandle<()>,
 }
@@ -186,7 +190,7 @@ impl SessionWebsocketClientQueryRequest {
     pub(crate) async fn into_protocol_session_config<R: HoprDbResolverOperations>(
         self,
         resolver: &R,
-    ) -> Result<SessionClientConfig, ApiErrorStatus> {
+    ) -> Result<(Address, SessionTarget, SessionClientConfig), ApiErrorStatus> {
         #[cfg(not(feature = "explicit-path"))]
         let path_options = hopr_lib::RoutingOptions::Hops((self.hops as u32).try_into()?);
 
@@ -208,12 +212,16 @@ impl SessionWebsocketClientQueryRequest {
 
         let ident = HoprIdentifier::new_with(self.destination.parse()?, resolver).await?;
 
-        Ok(SessionClientConfig {
-            peer: ident.address,
-            path_options,
-            target: self.target.into_target(self.protocol)?,
-            capabilities: self.capabilities.into_iter().map(SessionCapability::into).collect(),
-        })
+        Ok((
+            ident.address,
+            self.target.into_target(self.protocol)?,
+            SessionClientConfig {
+                forward_path_options: path_options.clone(),
+                return_path_options: path_options.clone(), // TODO: allow using separate return options
+                capabilities: self.capabilities.into_iter().map(SessionCapability::into).collect(),
+                ..Default::default()
+            },
+        ))
     }
 }
 
@@ -253,13 +261,13 @@ pub(crate) async fn websocket(
     Query(query): Query<SessionWebsocketClientQueryRequest>,
     State(state): State<Arc<InternalState>>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
-    let data = query
+    let (dst, target, data) = query
         .into_protocol_session_config(state.hopr.peer_resolver())
         .await
         .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e))?;
 
     let hopr = state.hopr.clone();
-    let session: HoprSession = hopr.connect_to(data).await.map_err(|e| {
+    let session: HoprSession = hopr.connect_to(dst, target, data).await.map_err(|e| {
         error!(error = %e, "Failed to establish session");
         (
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -353,45 +361,12 @@ pub enum RoutingOptions {
     Hops(usize),
 }
 
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(example = json!({
-        "destination": "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
-        "path": {
-            "Hops": 1
-        },
-        "target": {"Plain": "localhost:8080"},
-        "listenHost": "127.0.0.1:10000",
-        "capabilities": ["Retransmission", "Segmentation"]
-    }))]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct SessionClientRequest {
-    /// Peer ID of the Exit node.
-    #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
-    pub destination: PeerOrAddress,
-    pub path: RoutingOptions,
-    pub target: SessionTargetSpec,
-    /// Listen host (`ip:port`) for the Session socket at the Entry node.
-    ///
-    /// Supports also partial specification (only `ip` or only `:port`) with the
-    /// respective part replaced by the node's configured default.
-    pub listen_host: Option<String>,
-    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
-    /// Capabilities for the Session protocol.
-    ///
-    /// Defaults to `Segmentation` and `Retransmission` for TCP and nothing for UDP.
-    pub capabilities: Option<Vec<SessionCapability>>,
-}
-
-impl SessionClientRequest {
-    pub(crate) async fn into_protocol_session_config<R: HoprDbResolverOperations>(
+impl RoutingOptions {
+    pub(crate) async fn resolve<R: HoprDbResolverOperations>(
         self,
-        target_protocol: IpProtocol,
         resolver: &R,
-    ) -> Result<SessionClientConfig, ApiErrorStatus> {
-        let ident = HoprIdentifier::new_with(self.destination, resolver).await?;
-        let path_options = match self.path {
+    ) -> Result<hopr_lib::RoutingOptions, ApiErrorStatus> {
+        Ok(match self {
             #[cfg(feature = "explicit-path")]
             RoutingOptions::IntermediatePath(path) => hopr_lib::RoutingOptions::IntermediatePath(
                 path.into_iter()
@@ -403,31 +378,6 @@ impl SessionClientRequest {
                     .try_into()?,
             ),
             RoutingOptions::Hops(hops) => hopr_lib::RoutingOptions::Hops(hops.try_into()?),
-        };
-
-        Ok(SessionClientConfig {
-            peer: ident.address,
-            path_options,
-            target: self.target.into_target(target_protocol)?,
-            capabilities: self
-                .capabilities
-                .map(|vs| {
-                    vs.into_iter()
-                        .map(|v| {
-                            let cap: hopr_lib::SessionCapability = v.into();
-                            cap
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_else(|| match target_protocol {
-                    IpProtocol::TCP => {
-                        vec![
-                            hopr_lib::SessionCapability::Retransmission,
-                            hopr_lib::SessionCapability::Segmentation,
-                        ]
-                    }
-                    _ => vec![], // no default capabilities for UDP, etc.
-                }),
         })
     }
 }
@@ -435,20 +385,121 @@ impl SessionClientRequest {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
+        "destination": "0x1B482420Afa04aeC1Ef0e4a00C18451E84466c75",
+        "forwardPath": { "Hops": 1 },
+        "returnPath": { "Hops": 1 },
+        "target": {"Plain": "localhost:8080"},
+        "listenHost": "127.0.0.1:10000",
+        "capabilities": ["Retransmission", "Segmentation"],
+        "responseBuffer": "2 MB"
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SessionClientRequest {
+    /// Address of the Exit node.
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    pub destination: PeerOrAddress,
+    /// The forward path for the Session.
+    pub forward_path: RoutingOptions,
+    /// The return path for the Session.
+    pub return_path: RoutingOptions,
+    /// Target for the Session.
+    pub target: SessionTargetSpec,
+    /// Listen host (`ip:port`) for the Session socket at the Entry node.
+    ///
+    /// Supports also partial specification (only `ip` or only `:port`) with the
+    /// respective part replaced by the node's configured default.
+    pub listen_host: Option<String>,
+    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
+    /// Capabilities for the Session protocol.
+    ///
+    /// Defaults to `Segmentation` and `Retransmission` for TCP and nothing for UDP.
+    pub capabilities: Option<Vec<SessionCapability>>,
+    /// The amount of response data the Session counterparty can deliver back to us,
+    /// without us sending any SURBs to them.
+    ///
+    /// In other words, this size is recalculated to a number of SURBs delivered
+    /// to the counterparty upfront and then maintained.
+    /// The maintenance is dynamic, based on the number of responses we receive.
+    #[serde_as(as = "Option<DisplayFromStr>")]
+    #[schema(value_type = String)]
+    pub response_buffer: Option<bytesize::ByteSize>,
+}
+
+impl SessionClientRequest {
+    pub(crate) async fn into_protocol_session_config<R: HoprDbResolverOperations>(
+        self,
+        target_protocol: IpProtocol,
+        resolver: &R,
+    ) -> Result<(Address, SessionTarget, SessionClientConfig), ApiErrorStatus> {
+        let ident = HoprIdentifier::new_with(self.destination, resolver).await?;
+        Ok((
+            ident.address,
+            self.target.into_target(target_protocol)?,
+            SessionClientConfig {
+                forward_path_options: self.forward_path.resolve(resolver).await?,
+                return_path_options: self.return_path.resolve(resolver).await?,
+                capabilities: self
+                    .capabilities
+                    .map(|vs| {
+                        vs.into_iter()
+                            .map(|v| {
+                                let cap: hopr_lib::SessionCapability = v.into();
+                                cap
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_else(|| match target_protocol {
+                        IpProtocol::TCP => {
+                            vec![
+                                hopr_lib::SessionCapability::Retransmission,
+                                hopr_lib::SessionCapability::Segmentation,
+                            ]
+                        }
+                        _ => vec![], // no default capabilities for UDP, etc.
+                    }),
+                surb_management: match self.response_buffer {
+                    // Buffer worth at least 2 reply packets
+                    Some(buffer_size) if buffer_size.as_u64() >= 2 * SESSION_PAYLOAD_SIZE as u64 => {
+                        Some(SurbBalancerConfig {
+                            target_surb_buffer_size: buffer_size.as_u64() / SESSION_PAYLOAD_SIZE as u64,
+                            ..Default::default()
+                        })
+                    }
+                    // No SURBs are set up and maintained, useful for high-send low-reply sessions
+                    Some(_) => None,
+                    // Use defaults otherwise
+                    None => Some(SurbBalancerConfig::default()),
+                },
+                ..Default::default()
+            },
+        ))
+    }
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "destination": "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F",
         "target": "example.com:80",
+        "forwardPath": { "Hops": 1 },
+        "returnPath": { "Hops": 1 },
         "protocol": "tcp",
         "ip": "127.0.0.1",
-        "port": 5542,
-        "path": { "Hops": 1 }
+        "port": 5542
     }))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionClientResponse {
     pub target: String,
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
+    pub destination: PeerOrAddress,
+    pub forward_path: RoutingOptions,
+    pub return_path: RoutingOptions,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
     pub protocol: IpProtocol,
     pub ip: String,
-    pub path: RoutingOptions,
     pub port: u16,
 }
 
@@ -536,9 +587,9 @@ pub(crate) async fn create_client(
         return Err((StatusCode::CONFLICT, ApiErrorStatus::ListenHostAlreadyUsed));
     }
 
-    let target = args.target.clone();
-    let path = args.path.clone();
-    let data = args
+    let target_spec = args.target.clone();
+    let (dst, target, data) = args
+        .clone()
         .into_protocol_session_config(protocol, state.hopr.peer_resolver())
         .await
         .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e))?;
@@ -569,12 +620,13 @@ pub(crate) async fn create_client(
                     .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
                     .for_each_concurrent(None, move |accepted_client| {
                         let data = data.clone();
+                        let target = target.clone();
                         let hopr = hopr.clone();
                         async move {
                             match accepted_client {
                                 Ok((sock_addr, stream)) => {
                                     debug!(socket = ?sock_addr, "incoming TCP connection");
-                                    let session = match hopr.connect_to(data).await {
+                                    let session = match hopr.connect_to(dst, target, data).await {
                                         Ok(s) => s,
                                         Err(error) => {
                                             error!(%error, "failed to establish session");
@@ -605,8 +657,10 @@ pub(crate) async fn create_client(
             state.open_listeners.write().await.insert(
                 ListenerId(protocol.into(), bound_host),
                 StoredSessionEntry {
-                    target: target.clone(),
-                    path: path.clone(),
+                    destination: dst,
+                    target: target_spec.clone(),
+                    forward_path: args.forward_path.clone(),
+                    return_path: args.return_path.clone(),
                     jh,
                 },
             );
@@ -630,7 +684,7 @@ pub(crate) async fn create_client(
             let hopr = state.hopr.clone();
 
             // Create a single session for the UDP socket
-            let session = hopr.connect_to(data).await.map_err(|e| {
+            let session = hopr.connect_to(dst, target, data).await.map_err(|e| {
                 (
                     StatusCode::UNPROCESSABLE_ENTITY,
                     ApiErrorStatus::UnknownFailure(e.to_string()),
@@ -643,8 +697,10 @@ pub(crate) async fn create_client(
             state.open_listeners.write().await.insert(
                 listener_id,
                 StoredSessionEntry {
-                    target: target.clone(),
-                    path: path.clone(),
+                    destination: dst,
+                    target: target_spec.clone(),
+                    forward_path: args.forward_path.clone(),
+                    return_path: args.return_path.clone(),
                     jh: hopr_async_runtime::prelude::spawn(async move {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
@@ -668,10 +724,12 @@ pub(crate) async fn create_client(
             StatusCode::OK,
             Json(SessionClientResponse {
                 protocol,
-                path,
-                target: target.to_string(),
                 ip: bound_host.ip().to_string(),
                 port: bound_host.port(),
+                target: target_spec.to_string(),
+                destination: dst.into(),
+                forward_path: args.forward_path.clone(),
+                return_path: args.return_path.clone(),
             }),
         )
             .into_response(),
@@ -709,10 +767,12 @@ pub(crate) async fn list_clients(
         .filter(|(id, _)| id.0 == protocol.into())
         .map(|(id, entry)| SessionClientResponse {
             protocol,
-            target: entry.target.to_string(),
             ip: id.1.ip().to_string(),
             port: id.1.port(),
-            path: entry.path.clone(),
+            target: entry.target.to_string(),
+            forward_path: entry.forward_path.clone(),
+            return_path: entry.return_path.clone(),
+            destination: entry.destination.into(),
         })
         .collect::<Vec<_>>();
 
@@ -923,7 +983,8 @@ mod tests {
     use super::*;
     use anyhow::Context;
     use futures::channel::mpsc::UnboundedSender;
-    use hopr_lib::{ApplicationData, SendMsg};
+    use hopr_crypto_types::crypto_traits::Randomizable;
+    use hopr_lib::{ApplicationData, HoprPseudonym, SendMsg};
     use hopr_network_types::prelude::DestinationRouting;
     use hopr_transport_session::errors::TransportSessionError;
     use std::collections::HashSet;
@@ -947,11 +1008,9 @@ mod tests {
             data: ApplicationData,
             _: DestinationRouting,
         ) -> std::result::Result<(), TransportSessionError> {
-            let (_peer, data) = hopr_transport_session::unwrap_chain_address(&data.plain_text)?;
-
             self.tx
                 .clone()
-                .unbounded_send(data)
+                .unbounded_send(data.plain_text)
                 .map_err(|_| TransportSessionError::Closed)?;
 
             Ok(())
@@ -963,17 +1022,17 @@ mod tests {
     ) -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
+        let session_id = hopr_lib::HoprSessionId::new(4567, HoprPseudonym::random());
         let peer: hopr_lib::Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let session = hopr_lib::HoprSession::new(
-            hopr_lib::HoprSessionId::new(4567, peer),
-            peer,
+            session_id,
             hopr_lib::DestinationRouting::forward_only(
                 peer,
                 hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             ),
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
-            rx,
+            Box::pin(rx),
             None,
         );
 
@@ -1009,17 +1068,17 @@ mod tests {
     ) -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
+        let session_id = hopr_lib::HoprSessionId::new(4567, HoprPseudonym::random());
         let peer: hopr_lib::Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let session = hopr_lib::HoprSession::new(
-            hopr_lib::HoprSessionId::new(4567, peer),
-            peer,
+            session_id,
             hopr_lib::DestinationRouting::forward_only(
                 peer,
                 hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             ),
             HashSet::default(),
             Arc::new(SendMsgResender::new(tx)),
-            rx,
+            Box::pin(rx),
             None,
         );
 

@@ -27,10 +27,11 @@ pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
 
 /// Represents a ticket winning probability.
 ///
-/// It holds the modified IEEE-754, but behaves like a reduced precision float
+/// It holds the modified IEEE-754 but behaves like a reduced precision float
 /// when compared. It can also be fully ordered, because there cannot be NaNs or infinity.
 #[derive(Clone, Copy, Debug)]
-pub struct WinningProbability(EncodedWinProb);
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WinningProbability(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] EncodedWinProb);
 
 impl WinningProbability {
     /// 100% winning probability

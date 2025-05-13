@@ -24,6 +24,7 @@ use alloy::transports::layers::RetryPolicy;
 use alloy::transports::{HttpError, TransportError, TransportErrorKind, TransportFut, TransportResult};
 use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::Debug;
 use std::future::IntoFuture;
 use std::io::{BufWriter, Write};
@@ -103,6 +104,7 @@ lazy_static::lazy_static! {
 /// requests being retried has reached `max_retry_queue_size`.
 // #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 // #[derive(Debug, Clone)]
+#[serde_as]
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct DefaultRetryPolicy {
     /// Minimum number of retries of any error, regardless the error code.
@@ -159,10 +161,11 @@ pub struct DefaultRetryPolicy {
     /// List of HTTP errors that should be retried with backoff.
     ///
     /// Default is \[429, 504, 503\]
+    #[serde_as(as = "Vec<DisplayFromStr>")]
     #[default(
-        _code = "vec![http_types::StatusCode::TooManyRequests,http_types::StatusCode::GatewayTimeout,http_types::StatusCode::ServiceUnavailable]"
+        _code = "vec![http::StatusCode::TOO_MANY_REQUESTS,http::StatusCode::GATEWAY_TIMEOUT,http::StatusCode::SERVICE_UNAVAILABLE]"
     )]
-    pub retryable_http_errors: Vec<http_types::StatusCode>,
+    pub retryable_http_errors: Vec<http::StatusCode>,
     /// Maximum number of different requests that are being retried at the same time.
     ///
     /// If any additional request fails after this number is attained, it won't be retried.
@@ -179,7 +182,7 @@ impl DefaultRetryPolicy {
     }
 
     fn is_retryable_http_errors(&self, http_err: &HttpError) -> bool {
-        let status_code = match http_types::StatusCode::try_from(http_err.status) {
+        let status_code = match http::StatusCode::try_from(http_err.status) {
             Ok(status_code) => status_code,
             Err(_) => return false,
         };
@@ -794,7 +797,7 @@ where
                     if snapshot_requestor.fail_on_miss {
                         tracing::error!("{request_string} is missing in {}", &snapshot_requestor.file);
                         return Err(TransportErrorKind::http_error(
-                            http_types::StatusCode::NotFound.into(),
+                            http::StatusCode::NOT_FOUND.into(),
                             "".into(),
                         ));
                     }
@@ -1069,9 +1072,11 @@ mod tests {
     async fn test_client_should_retry_on_http_error() {
         let mut server = mockito::Server::new_async().await;
 
+        let too_many_requests: u16 = http::StatusCode::TOO_MANY_REQUESTS.as_u16();
+
         let m = server
             .mock("POST", "/")
-            .with_status(http_types::StatusCode::TooManyRequests as usize) // TODO: This value is not respected
+            .with_status(too_many_requests as usize)
             .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
             .with_body("{}")
             .expect(3)
@@ -1444,7 +1449,7 @@ mod tests {
 
         let m = server
             .mock("GET", "/gasapi.ashx?apikey=key&method=gasoracle")
-            .with_status(http_types::StatusCode::Accepted as usize)
+            .with_status(http::StatusCode::Accepted as usize)
             .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"39864926","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999968207972734"}}"#)
             .expect(0)
             .create();
@@ -1491,7 +1496,7 @@ mod tests {
 
         let m = server
             .mock("GET", "/gasapi.ashx?apikey=key&method=gasoracle")
-            .with_status(http_types::StatusCode::Accepted as usize)
+            .with_status(http::StatusCode::ACCEPTED.as_u16().into())
             .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"39864926","SafeGasPrice":"1.1","ProposeGasPrice":"3.5","FastGasPrice":"1.6","UsdPrice":"0.999968207972734"}}"#)
             .expect(1)
             .create();
