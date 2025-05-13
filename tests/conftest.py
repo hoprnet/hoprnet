@@ -71,13 +71,6 @@ def nodes_with_lower_outgoing_win_prob():
     """Nodes with outgoing ticket winning probability"""
     return ["6"]
 
-def attacking_nodes():
-    return ["1", "2"]
-
-def session_attack_nodes():
-    return ["1", "2", "3"]
-
-
 def random_distinct_pairs_from(values: list, count: int):
     return random.sample([(left, right) for left, right in itertools.product(values, repeat=2) if left != right], count)
 
@@ -98,7 +91,7 @@ def config_to_yaml(request):
 async def swarm3(request):
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
 
-    # load cache created by autouse xiture config_to_yaml
+    # load cache created by autouse fixture config_to_yaml
     extra_params = request.config.cache.get("yaml_config", None)
     if extra_params is not None:
         extra_params = yaml.safe_load(extra_params)
