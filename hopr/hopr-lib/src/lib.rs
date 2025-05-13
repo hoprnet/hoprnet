@@ -85,7 +85,8 @@ pub use {
         errors::{HoprTransportError, NetworkingError, ProtocolError},
         HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
         OffchainKeypair as HoprOffchainKeypair, PeerId, SendMsg, ServiceId, Session as HoprSession, SessionCapability,
-        SessionClientConfig, SessionId as HoprSessionId, SessionTarget, TicketStatistics, SESSION_USABLE_MTU_SIZE,
+        SessionClientConfig, SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig, TicketStatistics,
+        SESSION_PAYLOAD_SIZE, SESSION_USABLE_MTU_SIZE,
     },
 };
 
@@ -665,9 +666,9 @@ impl Hopr {
         let network_min_win_prob = self.hopr_chain_api.get_minimum_winning_probability().await?;
         let configured_win_prob = self.cfg.protocol.outgoing_ticket_winning_prob;
         if !std::env::var("HOPR_TEST_DISABLE_CHECKS").is_ok_and(|v| v.to_lowercase() == "true")
-            && configured_win_prob.is_some_and(|c| {
-                !f64_approx_eq(c, network_min_win_prob, LOWEST_POSSIBLE_WINNING_PROB) && c < network_min_win_prob
-            })
+            && configured_win_prob
+                .and_then(|c| WinningProbability::try_from(c).ok())
+                .is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
         {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
                 "configured outgoing ticket winning probability is lower than the network minimum winning probability: {configured_win_prob:?} < {network_min_win_prob}"
@@ -1060,7 +1061,12 @@ impl Hopr {
     /// Create a client session connection returning a session object that implements
     /// [`AsyncRead`] and [`AsyncWrite`] and can bu used as a read/write binary session.
     #[cfg(feature = "session-client")]
-    pub async fn connect_to(&self, cfg: SessionClientConfig) -> errors::Result<HoprSession> {
+    pub async fn connect_to(
+        &self,
+        destination: Address,
+        target: SessionTarget,
+        cfg: SessionClientConfig,
+    ) -> errors::Result<HoprSession> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let backoff = backon::ConstantBuilder::default()
@@ -1081,7 +1087,8 @@ impl Hopr {
 
         Ok((|| {
             let cfg = cfg.clone();
-            async { self.transport_api.new_session(cfg).await }
+            let target = target.clone();
+            async { self.transport_api.new_session(destination, target, cfg).await }
         })
         .retry(backoff)
         .sleep(Sleeper)
@@ -1233,7 +1240,7 @@ impl Hopr {
     }
 
     /// Get minimum incoming ticket winning probability
-    pub async fn get_minimum_incoming_ticket_win_probability(&self) -> errors::Result<f64> {
+    pub async fn get_minimum_incoming_ticket_win_probability(&self) -> errors::Result<WinningProbability> {
         Ok(self
             .db
             .get_indexer_data(None)

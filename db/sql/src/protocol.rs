@@ -1,24 +1,24 @@
+use crate::channels::HoprDbChannelOperations;
+use crate::db::HoprDb;
+use crate::errors::DbSqlError;
+use crate::info::HoprDbInfoOperations;
+use crate::prelude::HoprDbTicketOperations;
 use async_trait::async_trait;
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_types::crypto_traits::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::errors::Result;
+use hopr_db_api::prelude::DbError;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement};
 use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_parallelize::cpu::spawn_fifo_blocking;
 use hopr_path::errors::PathError;
 use hopr_path::{Path, PathAddressResolver, ValidatedPath};
 use hopr_primitive_types::prelude::*;
 use std::ops::{Mul, Sub};
 use tracing::{instrument, trace, warn};
-
-use crate::channels::HoprDbChannelOperations;
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::info::HoprDbInfoOperations;
-use crate::prelude::HoprDbTicketOperations;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
@@ -52,7 +52,7 @@ impl HoprDb {
         &self,
         mut fwd: HoprForwardedPacket,
         me: &ChainKeypair,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> std::result::Result<HoprForwardedPacket, DbSqlError> {
         let previous_hop_addr = self.resolve_chain_key(&fwd.previous_hop).await?.ok_or_else(|| {
@@ -96,7 +96,7 @@ impl HoprDb {
             .mul(U256::from(fwd.path_pos));
 
         #[cfg(all(feature = "prometheus", not(test)))]
-        METRIC_INCOMING_WIN_PROB.observe(fwd.outgoing.ticket.win_prob());
+        METRIC_INCOMING_WIN_PROB.observe(fwd.outgoing.ticket.win_prob().as_f64());
 
         let remaining_balance = incoming_channel
             .balance
@@ -121,9 +121,9 @@ impl HoprDb {
         // We currently take the maximum of the win prob from the incoming ticket
         // and the one configured on this node.
         // Therefore, the winning probability can only increase along the path.
-        let outgoing_ticket_win_prob = outgoing_ticket_win_prob.max(verified_incoming_ticket.win_prob());
+        let outgoing_ticket_win_prob = outgoing_ticket_win_prob.max(&verified_incoming_ticket.win_prob());
 
-        // The ticket is now validated, let's place it into acknowledgement waiting queue
+        // The ticket is now validated, let's place it into the acknowledgement waiting queue
         self.caches
             .unacked_tickets
             .insert(
@@ -287,7 +287,7 @@ impl HoprDbProtocolOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_network_winning_probability(&self) -> Result<f64> {
+    async fn get_network_winning_probability(&self) -> Result<WinningProbability> {
         Ok(self
             .get_indexer_data(None)
             .await
@@ -299,6 +299,29 @@ impl HoprDbProtocolOperations for HoprDb {
             data.ticket_price
                 .ok_or(DbSqlError::LogicalError("missing ticket price".into()))
         })?)
+    }
+
+    async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)> {
+        let pseudonym = matcher.pseudonym();
+        let surbs_for_pseudonym = self
+            .caches
+            .surbs_per_pseudonym
+            .get(&pseudonym)
+            .await
+            .ok_or(DbError::NoSurbAvailable("pseudonym not found".into()))?;
+
+        match matcher {
+            SurbMatcher::Pseudonym(_) => Ok(surbs_for_pseudonym
+                .pop_one()
+                .map(|(id, surb)| (HoprSenderId::from_pseudonym_and_id(&pseudonym, id), surb))?),
+            // The following code intentionally only checks the first SURB in the ring buffer
+            // and does not search the entire RB.
+            // This is because the exact match use-case is suited only for situations
+            // when there is a single SURB.
+            SurbMatcher::Exact(id) => Ok(surbs_for_pseudonym
+                .pop_one_if_has_id(&id.surb_id())
+                .map(|(id, surb)| (HoprSenderId::from_pseudonym_and_id(&pseudonym, id), surb))?),
+        }
     }
 
     #[tracing::instrument(level = "trace", skip(self, data))]
@@ -359,7 +382,7 @@ impl HoprDbProtocolOperations for HoprDb {
         &self,
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<OutgoingPacket> {
         // Get necessary packet routing values
@@ -377,16 +400,7 @@ impl HoprDbProtocolOperations for HoprDb {
                     return_paths,
                 },
             ),
-            ResolvedTransportRouting::Return(pseudonym) => {
-                // Try to retrieve the SURB from the pseudonym
-                let surb = self
-                    .caches
-                    .surbs_per_pseudonym
-                    .get(&pseudonym)
-                    .await
-                    .ok_or(DbSqlError::LogicalError("unknown pseudonym".into()))?
-                    .pop_one()?;
-
+            ResolvedTransportRouting::Return(sender_id, surb) => {
                 let next = self
                     .caches
                     .key_id_mapper
@@ -395,9 +409,9 @@ impl HoprDbProtocolOperations for HoprDb {
 
                 (
                     next,
-                    surb.additional_data_receiver.chain_length() as usize,
-                    pseudonym,
-                    PacketRouting::Surb(surb),
+                    surb.additional_data_receiver.proof_of_relay_values().chain_length() as usize,
+                    sender_id.pseudonym(),
+                    PacketRouting::Surb(sender_id.surb_id(), surb),
                 )
             }
         };
@@ -451,11 +465,13 @@ impl HoprDbProtocolOperations for HoprDb {
         })
         .await?;
 
-        // Store the reply openers under the given pseudonym
+        // Store the reply openers under the given SenderId
         // This is a no-op for reply packets
-        openers
-            .into_iter()
-            .for_each(|p| self.caches.pseudonym_openers.insert(pseudonym, p));
+        openers.into_iter().for_each(|(surb_id, opener)| {
+            self.caches
+                .pseudonym_openers
+                .insert(HoprSenderId::from_pseudonym_and_id(&pseudonym, surb_id), opener)
+        });
 
         if let Some(out) = packet.try_as_outgoing() {
             self.caches
@@ -483,7 +499,7 @@ impl HoprDbProtocolOperations for HoprDb {
         data: Box<[u8]>,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<Option<IncomingPacket>> {
         let offchain_keypair = pkt_keypair.clone();
@@ -503,10 +519,11 @@ impl HoprDbProtocolOperations for HoprDb {
                 if !incoming.surbs.is_empty() {
                     let num_surbs = incoming.surbs.len();
 
+                    // TODO: make the capacity of the SURB RB configurable
                     self.caches
                         .surbs_per_pseudonym
                         .entry_by_ref(&incoming.sender)
-                        .or_default() // Default SurbRingBuffer
+                        .or_default() // Default capacity SurbRingBuffer
                         .await
                         .value()
                         .push(incoming.surbs)?;
@@ -514,8 +531,16 @@ impl HoprDbProtocolOperations for HoprDb {
                     tracing::trace!(pseudonym = %incoming.sender, num_surbs, "stored incoming surbs for pseudonym");
                 }
 
-                // The contained payload represents an Acknowledgement
-                if incoming.ack_key.is_none() {
+                if let Some(ack_key) = incoming.ack_key {
+                    Ok(Some(IncomingPacket::Final {
+                        packet_tag: incoming.packet_tag,
+                        previous_hop: incoming.previous_hop,
+                        sender: incoming.sender,
+                        plain_text: incoming.plain_text,
+                        ack_key,
+                    }))
+                } else {
+                    // The contained payload represents an Acknowledgement
                     let ack: Acknowledgement = incoming.plain_text.as_ref().try_into().map_err(|error| {
                         tracing::error!(%error, "failed to decode the acknowledgement");
 
@@ -531,13 +556,6 @@ impl HoprDbProtocolOperations for HoprDb {
                     self.handle_acknowledgement(ack).await?;
 
                     Ok(None)
-                } else {
-                    Ok(Some(IncomingPacket::Final {
-                        packet_tag: incoming.packet_tag,
-                        previous_hop: incoming.previous_hop,
-                        plain_text: incoming.plain_text,
-                        ack_key: incoming.ack_key.expect("should have contained an ack key"),
-                    }))
                 }
             }
             HoprPacket::Forwarded(fwd) => {
@@ -587,7 +605,7 @@ impl HoprDb {
         me_onchain: Address,
         destination: Address,
         current_path_pos: u8,
-        winning_prob: f64,
+        winning_prob: WinningProbability,
         ticket_price: Balance,
     ) -> crate::errors::Result<TicketBuilder> {
         // The next ticket is worth: price * remaining hop count / winning probability
@@ -595,7 +613,7 @@ impl HoprDb {
             ticket_price
                 .amount()
                 .mul(U256::from(current_path_pos - 1))
-                .div_f64(winning_prob)
+                .div_f64(winning_prob.into())
                 .map_err(|e| {
                     DbSqlError::LogicalError(format!(
                         "winning probability outside of the allowed interval (0.0, 1.0]: {e}"

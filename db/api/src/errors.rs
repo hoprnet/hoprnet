@@ -22,6 +22,9 @@ pub enum DbError {
     #[error("channel not found: {0}")]
     ChannelNotFound(Hash),
 
+    #[error("cannot find a surb: {0}")]
+    NoSurbAvailable(String),
+
     #[error("ticket aggregation error: {0}")]
     TicketAggregationError(String),
 

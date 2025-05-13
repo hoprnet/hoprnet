@@ -1,8 +1,10 @@
 use crate::errors::DbSqlError;
 use dashmap::{DashMap, Entry};
+use hopr_crypto_packet::prelude::{HoprSenderId, HoprSurbId};
 use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::info::{IndexerData, SafeInfo};
+use hopr_db_api::prelude::DbError;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::{Address, Balance, KeyIdent, U256};
 use moka::future::Cache;
@@ -14,7 +16,7 @@ use std::time::Duration;
 
 /// Lists all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for the long term.
-#[derive(Debug, Clone, PartialEq, strum::EnumDiscriminants)]
+#[derive(Debug, Clone, strum::EnumDiscriminants)]
 #[strum_discriminants(derive(Hash))]
 pub enum CachedValue {
     /// Cached [IndexerData].
@@ -56,31 +58,52 @@ impl<K, V> Expiry<K, V> for ExpiryNever {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ChannelParties(pub(crate) Address, pub(crate) Address);
 
-#[derive(Debug, Clone)]
-pub(crate) struct SurbRingBuffer(Arc<Mutex<AllocRingBuffer<HoprSurb>>>);
+/// Ring buffer containing SURBs along with their IDs.
+/// All these SURBs usually belong to the same pseudonym.
+#[derive(Clone, Debug)]
+pub(crate) struct SurbRingBuffer(Arc<Mutex<AllocRingBuffer<(HoprSurbId, HoprSurb)>>>);
 
 impl Default for SurbRingBuffer {
     fn default() -> Self {
-        // TODO: make the RB capacity configurable in the future ?
         // With the current packet size, this is roughly for 7 MB of data budget in SURBs
-        Self(Arc::new(Mutex::new(AllocRingBuffer::new(10_000))))
+        Self::new(10_000)
     }
 }
 
 impl SurbRingBuffer {
-    pub fn push<I: IntoIterator<Item = HoprSurb>>(&self, surbs: I) -> Result<(), DbSqlError> {
+    pub fn new(capacity: usize) -> Self {
+        Self(Arc::new(Mutex::new(AllocRingBuffer::new(capacity))))
+    }
+
+    /// Push all SURBs with their IDs into the RB.
+    pub fn push<I: IntoIterator<Item = (HoprSurbId, HoprSurb)>>(&self, surbs: I) -> Result<(), DbError> {
         self.0
             .lock()
-            .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?
             .extend(surbs);
         Ok(())
     }
-    pub fn pop_one(&self) -> Result<HoprSurb, DbSqlError> {
+
+    /// Pop the latest SURB and its IDs from the RB.
+    pub fn pop_one(&self) -> Result<(HoprSurbId, HoprSurb), DbError> {
         self.0
             .lock()
-            .map_err(|_| DbSqlError::LogicalError("failed to lock surbs".into()))?
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?
             .dequeue()
-            .ok_or(DbSqlError::NoSurbAvailable)
+            .ok_or(DbError::NoSurbAvailable("no more surbs".into()))
+    }
+
+    /// Check if the next SURB has the given ID and pop it from the RB.
+    pub fn pop_one_if_has_id(&self, id: &HoprSurbId) -> Result<(HoprSurbId, HoprSurb), DbError> {
+        let mut rb = self
+            .0
+            .lock()
+            .map_err(|_| DbError::LogicalError("failed to lock surbs".into()))?;
+        if rb.peek().is_some_and(|(surb_id, _)| surb_id == id) {
+            rb.dequeue().ok_or(DbError::NoSurbAvailable("no more surbs".into()))
+        } else {
+            Err(DbError::NoSurbAvailable("surb does not match the given id".into()))
+        }
     }
 }
 
@@ -98,7 +121,7 @@ pub struct HoprDbCaches {
     pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
     // KeyIdMapper must be synchronous because it is used from a sync context.
     pub(crate) key_id_mapper: CacheKeyMapper,
-    pub(crate) pseudonym_openers: moka::sync::Cache<HoprPseudonym, ReplyOpener>,
+    pub(crate) pseudonym_openers: moka::sync::Cache<HoprSenderId, ReplyOpener>,
     pub(crate) surbs_per_pseudonym: Cache<HoprPseudonym, SurbRingBuffer>,
 }
 
@@ -130,14 +153,18 @@ impl Default for HoprDbCaches {
             .max_capacity(10_000)
             .build();
 
+        // SURB openers are indexed by entire Sender IDs (Pseudonym + SURB ID)
+        // and therefore, there's more but with a shorter lifetime
         let pseudonym_openers = moka::sync::Cache::builder()
             .time_to_live(Duration::from_secs(60))
             .max_capacity(100_000)
             .build();
 
+        // SURBs are indexed only by Pseudonyms, which have longer lifetimes.
+        // For each Pseudonym, there's an RB of SURBs and their IDs.
         let surbs_per_pseudonym = Cache::builder()
-            .time_to_idle(Duration::from_secs(60))
-            .max_capacity(100_000)
+            .time_to_idle(Duration::from_secs(600))
+            .max_capacity(10_000)
             .build();
 
         Self {
