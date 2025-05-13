@@ -20,8 +20,9 @@ GLOBAL_TIMEOUT = 90
 
 
 class Cluster:
-    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path,
-                 use_nat: bool, exposed: bool, base_port: int):
+    def __init__(
+        self, config: dict, anvil_config: Path, protocol_config: Path, use_nat: bool, exposed: bool, base_port: int
+    ):
         self.anvil_config = anvil_config
         self.protocol_config = protocol_config
         self.use_nat = use_nat

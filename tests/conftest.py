@@ -84,11 +84,14 @@ async def base_port(request):
     logging.info(f"Using base port: {base_port}")
     yield base_port
 
+
 @pytest.fixture(scope="session")
 async def swarm7(request, base_port):
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
     try:
-        cluster, anvil = await localcluster.bringup(params_path, test_mode=True, fully_connected=False, use_nat=False, base_port=base_port)
+        cluster, anvil = await localcluster.bringup(
+            params_path, test_mode=True, fully_connected=False, use_nat=False, base_port=base_port
+        )
 
         yield cluster.nodes
 
@@ -96,6 +99,7 @@ async def swarm7(request, base_port):
         anvil.kill()
     except RuntimeError:
         pytest.fail(f"Failed to bring up the cluster")
+
 
 @pytest.fixture(scope="function")
 async def swarm7_reset(swarm7: dict[str, Node]):
@@ -128,6 +132,7 @@ def run_hopli_cmd(cmd: list[str], custom_env):
     retcode = proc.wait()
     if retcode:
         raise CalledProcessError(retcode, cmd)
+
 
 def find_available_port_block(min_port=9000, max_port=9980, skip=20, block_size=None):
     """
@@ -183,7 +188,7 @@ def find_available_port_block(min_port=9000, max_port=9980, skip=20, block_size=
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 # connect_ex returns 0 if the connection succeeds,
                 # and a non-zero error code otherwise
-                if s.connect_ex(('127.0.0.1', port)) == 0:
+                if s.connect_ex(("127.0.0.1", port)) == 0:
                     # Port is in use
                     block_available = False
                     break

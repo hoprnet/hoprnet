@@ -20,6 +20,7 @@ from .utils import (
     check_winning_tickets_count,
 )
 
+
 def generate_anvil_endpoint(base_port: int) -> str:
     return f"http://127.0.0.1:{base_port}"
 
@@ -48,7 +49,9 @@ def set_minimum_winning_probability_in_network(private_key: str, win_prob: float
 class TestWinProbWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hoprd_check_min_incoming_ticket_win_prob_is_default(self, peer, swarm7: dict[str, Node], base_port: int):
+    async def test_hoprd_check_min_incoming_ticket_win_prob_is_default(
+        self, peer, swarm7: dict[str, Node], base_port: int
+    ):
         win_prob = await swarm7[peer].api.ticket_min_win_prob()
 
         assert win_prob is not None
@@ -276,7 +279,9 @@ class TestWinProbWithSwarm:
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
-    async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(self, route, swarm7: dict[str, Node], base_port: int):
+    async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(
+        self, route, swarm7: dict[str, Node], base_port: int
+    ):
         ticket_count = 10
         win_prob = 0.1
 
@@ -334,7 +339,9 @@ class TestWinProbWithSwarm:
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
-    async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(self, route, swarm7: dict[str, Node], base_port: int):
+    async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(
+        self, route, swarm7: dict[str, Node], base_port: int
+    ):
         ticket_count = 10
 
         src = route[0]

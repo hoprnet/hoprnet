@@ -246,7 +246,15 @@ class Node:
 
     @classmethod
     def fromConfig(
-        cls, index: int, alias: str, config: dict, defaults: dict, network: str, use_nat: bool, exposed: bool, base_port: int
+        cls,
+        index: int,
+        alias: str,
+        config: dict,
+        defaults: dict,
+        network: str,
+        use_nat: bool,
+        exposed: bool,
+        base_port: int,
     ):
         token = config.get("api_token", defaults.get("api_token"))
 
@@ -260,7 +268,7 @@ class Node:
             alias,
             api_addr="0.0.0.0" if exposed else None,
             use_nat=use_nat,
-            base_port=base_port
+            base_port=base_port,
         )
 
     async def alias_peers(self, aliases_dict: dict[str, str]):

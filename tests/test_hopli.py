@@ -395,7 +395,9 @@ class TestHopliWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(self, peer: str, swarm7: dict[str, Node], base_port: int):
+    async def test_hopli_should_be_able_to_deregister_nodes_and_register_it(
+        self, peer: str, swarm7: dict[str, Node], base_port: int
+    ):
         private_key = load_private_key(ANVIL_CONFIG_FILE)
 
         with open(CONTRACTS_ADDRESSES, "r") as file:
@@ -403,7 +405,9 @@ class TestHopliWithSwarm:
             network_registry_contract = address_data["networks"][NETWORK]["addresses"]["network_registry"]
 
         res_before = run_cast_cmd(
-            "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address], base_port
+            "call",
+            [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address],
+            base_port,
         )
 
         # check the returned value is address safe
@@ -415,7 +419,9 @@ class TestHopliWithSwarm:
         # Check if nodes are removed from the network
         run_cast_cmd("code", [network_registry_contract], base_port)
         res_after_deregster = run_cast_cmd(
-            "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address], base_port
+            "call",
+            [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address],
+            base_port,
         )
 
         # check the returned value is address zero
@@ -430,7 +436,9 @@ class TestHopliWithSwarm:
         # Check if nodes are removed from the network
         run_cast_cmd("code", [network_registry_contract], base_port)
         res_after_register = run_cast_cmd(
-            "call", [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address], base_port
+            "call",
+            [network_registry_contract, "nodeRegisterdToAccount(address)(address)", swarm7[peer].address],
+            base_port,
         )
 
         # check the returned value is address safe
@@ -438,7 +446,9 @@ class TestHopliWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hopli_should_be_able_to_sync_eligibility_for_all_nodes(self, peer: str, swarm7: dict[str, Node], base_port: int):
+    async def test_hopli_should_be_able_to_sync_eligibility_for_all_nodes(
+        self, peer: str, swarm7: dict[str, Node], base_port: int
+    ):
         private_key = load_private_key(ANVIL_CONFIG_FILE)
 
         # remove all the nodes from the network registry
