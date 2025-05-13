@@ -281,7 +281,6 @@ jobs:
     name: Notify in Zulip on pluto build failure
     if: failure()
     needs: build_pluto
-    runs_on: ubuntu_latest
     steps:
       - name: Notify failed build
         uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
