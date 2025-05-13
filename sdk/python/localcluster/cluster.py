@@ -11,7 +11,6 @@ from .constants import (
     NETWORK,
     NODE_NAME_PREFIX,
     PASSWORD,
-    PORT_BASE,
     PWD,
     logging,
 )
@@ -21,17 +20,19 @@ GLOBAL_TIMEOUT = 90
 
 
 class Cluster:
-    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path, use_nat: bool, exposed: bool):
+    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path,
+                 use_nat: bool, exposed: bool, base_port: int):
         self.anvil_config = anvil_config
         self.protocol_config = protocol_config
         self.use_nat = use_nat
+        self.base_port = base_port
         self.nodes: dict[str, Node] = {}
         index = 1
 
         for network_name, params in config["networks"].items():
             for alias, node in params["nodes"].items():
                 self.nodes[str(index)] = Node.fromConfig(
-                    index, alias, node, config["defaults"], network_name, use_nat, exposed
+                    index, alias, node, config["defaults"], network_name, use_nat, exposed, base_port
                 )
                 index += 1
 
@@ -65,7 +66,7 @@ class Cluster:
 
         if not skip_funding:
             self.fund_nodes()
-            return
+            # return
 
         # WAIT FOR NODES TO BE UP
         logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to be ready")
@@ -129,7 +130,7 @@ class Cluster:
                 "--native-amount",
                 "10.0",
                 "--provider-url",
-                f"http://127.0.0.1:{PORT_BASE}",
+                f"http://127.0.0.1:{self.base_port}",
             ],
             env=os.environ | custom_env,
             check=True,
