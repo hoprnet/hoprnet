@@ -248,7 +248,6 @@ impl HoprdConfig {
         // it means they have not been specified on the CLI and thus the
         // corresponding config value should be enabled.
 
-        cfg.hopr.chain.check_unrealized_balance = cli_args.no_check_unrealized_balance == 0;
         cfg.hopr.chain.fast_sync = cli_args.no_fast_sync == 0;
         cfg.hopr.chain.keep_logs = cli_args.no_keep_logs == 0;
 

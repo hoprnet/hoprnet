@@ -33,7 +33,6 @@ hopr-primitive-types = { workspace = true }
 anyhow = { workspace = true }
 bincode = { workspace = true }
 criterion = { workspace = true }
-cbor4ii = { workspace = true, features = ["serde1", "use_std"] }
 lazy_static = { workspace = true }
 
 [features]
