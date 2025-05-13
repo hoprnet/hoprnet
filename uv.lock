@@ -558,7 +558,7 @@ wheels = [
 
 [[package]]
 name = "sdk-api"
-version = "1.0.0"
+version = "1.0.1"
 source = { virtual = "sdk/python/api" }
 dependencies = [
     { name = "aiohttp" },
@@ -577,14 +577,15 @@ requires-dist = [
 
 [[package]]
 name = "sdk-localcluster"
-version = "1.0.0"
+version = "1.0.1"
 source = { virtual = "sdk/python/localcluster" }
 dependencies = [
+    { name = "click" },
     { name = "pyyaml" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pyyaml", specifier = ">=6.0.2" }]
+requires-dist = [{ name = "click", specifier = ">=8.1.8" }, { name = "pyyaml", specifier = ">=6.0.2" }]
 
 [[package]]
 name = "tests"
