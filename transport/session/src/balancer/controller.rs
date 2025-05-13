@@ -94,10 +94,29 @@ where
         cfg: SurbBalancerConfig,
     ) -> Self {
         // Initialize the PID controller with default tuned gains
-        let mut pid = Pid::new(cfg.target_surb_buffer_size as f64, cfg.max_surbs_per_sec as f64);
-        pid.p(DEFAULT_P_GAIN, cfg.max_surbs_per_sec as f64);
-        pid.i(DEFAULT_I_GAIN, cfg.max_surbs_per_sec as f64);
-        pid.d(DEFAULT_D_GAIN, cfg.max_surbs_per_sec as f64);
+        let max_surbs_per_sec = cfg.max_surbs_per_sec as f64;
+        let mut pid = Pid::new(cfg.target_surb_buffer_size as f64, max_surbs_per_sec);
+        pid.p(
+            std::env::var("HOPR_BALANCER_PID_P_GAIN")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(DEFAULT_P_GAIN),
+            max_surbs_per_sec,
+        );
+        pid.i(
+            std::env::var("HOPR_BALANCER_PID_I_GAIN")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(DEFAULT_I_GAIN),
+            max_surbs_per_sec,
+        );
+        pid.d(
+            std::env::var("HOPR_BALANCER_PID_D_GAIN")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(DEFAULT_D_GAIN),
+            max_surbs_per_sec,
+        );
 
         #[cfg(all(feature = "prometheus", not(test)))]
         {

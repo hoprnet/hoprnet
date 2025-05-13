@@ -13,6 +13,7 @@
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
 //! In particular, as soon as there is a way to represent `Ed448` PeerIDs, it would be straightforward to create e.g. `X448Suite`.
 //!
+//! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
 use hopr_crypto_sphinx::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -69,6 +70,8 @@ pub type HoprReplyOpener = (types::HoprSurbId, ReplyOpener);
 /// Size of the maximum packet payload.
 ///
 /// Adjust this value to change the maximum packet size.
+/// The calculation here is based on the fact that libp2p Stream over QUIC
+/// leaves space for 1460 bytes in the packet payload.
 ///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
 pub(crate) const PAYLOAD_SIZE_INT: usize = 1000;
