@@ -4,7 +4,7 @@ from enum import Enum, auto
 from pathlib import Path
 from subprocess import run
 
-from .constants import PORT_BASE, PWD, logging
+from .constants import PWD, logging
 
 
 class AnvilState(Enum):
@@ -13,10 +13,11 @@ class AnvilState(Enum):
 
 
 class Anvil:
-    def __init__(self, log_file: Path, cfg_file: Path, state_file: Path):
+    def __init__(self, log_file: Path, cfg_file: Path, state_file: Path, port: int):
         self.log_file = log_file
         self.cfg_file = cfg_file
         self.state_file = state_file
+        self.port = port
 
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
         self.cfg_file.parent.mkdir(parents=True, exist_ok=True)
@@ -30,7 +31,7 @@ class Anvil:
             {'-s ' if state is AnvilState.LOAD else ''}
             -l {self.log_file}
             -c {self.cfg_file}
-            -p {PORT_BASE}
+            -p {self.port}
             {'-ls' if state is AnvilState.LOAD else '-ds'} {self.state_file}
             """
 
@@ -63,7 +64,6 @@ class Anvil:
         with open(dest_file, "w") as file:
             json.dump(dest_data, file, sort_keys=True)
 
-    @classmethod
-    def kill(cls):
+    def kill(self):
         logging.info("Stopping all local anvil servers running")
-        run(f"make -s kill-anvil port={PORT_BASE}".split(), cwd=PWD, check=False)
+        run(f"make -s kill-anvil port={self.port}".split(), cwd=PWD, check=False)
