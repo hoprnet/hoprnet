@@ -14,7 +14,7 @@ from .constants import (
     CONTRACTS_ADDRESSES,
     MAIN_DIR,
     NETWORK,
-    PORT_BASE,
+    BASE_PORT,
     logging,
 )
 from .snapshot import Snapshot
@@ -24,7 +24,12 @@ random.seed(SEED)
 
 
 async def bringup(
-    config: str, test_mode: bool = False, fully_connected: bool = False, use_nat: bool = False, exposed: bool = False
+    config: str,
+    test_mode: bool = False,
+    fully_connected: bool = False,
+    use_nat: bool = False,
+    exposed: bool = False,
+    base_port: int = BASE_PORT,
 ) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 
@@ -35,10 +40,14 @@ async def bringup(
     with open(config, "r") as f:
         config = yaml.safe_load(f)
 
-    cluster = Cluster(config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed)
-    anvil = Anvil(ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"))
+    cluster = Cluster(
+        config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port
+    )
+    anvil = Anvil(
+        ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"), base_port
+    )
 
-    snapshot = Snapshot(PORT_BASE, MAIN_DIR, cluster)
+    snapshot = Snapshot(base_port, MAIN_DIR, cluster)
 
     # STOP OLD LOCAL ANVIL SERVER
     anvil.kill()
@@ -62,11 +71,13 @@ async def bringup(
         # wait before contract deployments are finalized
         await asyncio.sleep(2.5)
 
+        # FIXME: This breaks the random base port approach since nodes will make announcements using different port.
+        # Skipping for now until a better approach is found.
         # BRING UP NODES (with funding)
-        await cluster.shared_bringup(skip_funding=False)
+        # await cluster.shared_bringup(skip_funding=False)
 
         anvil.kill()
-        cluster.clean_up()
+        # cluster.clean_up()
 
         # delay to ensure anvil is stopped and state file closed
         await asyncio.sleep(1)
@@ -86,13 +97,14 @@ async def bringup(
 
     # BRING UP NODES (without funding)
     try:
-        await cluster.shared_bringup(skip_funding=True)
+        await cluster.shared_bringup(skip_funding=False)
     except asyncio.TimeoutError as e:
         logging.error(f"Timeout error: {e}")
         return cluster, anvil
     except RuntimeError as e:
-        logging.error(f"Runtime error: {e}")
-        return cluster, anvil
+        cluster.clean_up()
+        anvil.kill()
+        raise e
 
     if not test_mode:
         await cluster.alias_peers()

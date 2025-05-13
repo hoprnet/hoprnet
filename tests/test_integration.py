@@ -34,9 +34,6 @@ from .utils import (
     shuffled,
 )
 
-# used by nodes to get unique port assignments
-PORT_BASE = 19000
-
 
 @asynccontextmanager
 async def create_alias(alias, peer, api):
