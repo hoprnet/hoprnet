@@ -277,24 +277,6 @@ jobs:
       production: true
     secrets: inherit
 
-  notify_pluto_failure:
-    name: Notify in Zulip on pluto build failure
-    if: failure()
-    needs: build_pluto
-    steps:
-      - name: Notify failed build
-        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-        if: failure()
-        with:
-          api-key: ${{ secrets.ZULIP_API_KEY }}
-          email: ${{ secrets.ZULIP_EMAIL }}
-          organization-url: "https://hopr.zulipchat.com"
-          type: "stream"
-          to: "HOPRd"
-          topic: "Core"
-          content: |
-            The build for `hopr-pluto` after merging branch `${{ steps.vars.outputs.BRANCH_NAME }}` has failed.
-
   docs:
     name: Docs
     needs:
@@ -311,6 +293,25 @@ jobs:
     with:
       branch: ${{ github.event.pull_request.base.ref }}
       type: merge
+
+  notify_failure:
+    name: Notify in Zulip on merge pipeline failure
+    if: failure()
+    runs-on: ubuntu_latest
+    steps:
+      - name: Notify failed merge pipeline
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        if: failure()
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "HOPRd"
+          topic: "Core"
+          content: |
+            The merge pipeline on pull request [${{ github.event.pull_request.name }}](https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }})` has failed.
+
 
   notify:
     name: Notify Changes
