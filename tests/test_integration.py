@@ -33,9 +33,6 @@ from .utils import (
     session_send_and_receive_packets,
 )
 
-# used by nodes to get unique port assignments
-PORT_BASE = 19000
-
 
 @asynccontextmanager
 async def create_alias(alias, peer, api):

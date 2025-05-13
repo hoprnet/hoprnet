@@ -3,7 +3,7 @@ import random
 
 import pytest
 
-from sdk.python.localcluster.constants import ANVIL_CONFIG_FILE, NETWORK, PORT_BASE, TICKET_PRICE_PER_HOP, CONTRACTS_DIR
+from sdk.python.localcluster.constants import ANVIL_CONFIG_FILE, NETWORK, TICKET_PRICE_PER_HOP, CONTRACTS_DIR
 from sdk.python.localcluster.node import Node
 from sdk.python.localcluster.utils import load_private_key
 
@@ -19,10 +19,14 @@ from .utils import (
     check_winning_tickets_count,
 )
 
-ANVIL_ENDPOINT = f"http://127.0.0.1:{PORT_BASE}"
+
+def generate_anvil_endpoint(base_port: int) -> str:
+    return f"http://127.0.0.1:{base_port}"
 
 
-def set_minimum_winning_probability_in_network(private_key: str, win_prob: float):
+def set_minimum_winning_probability_in_network(private_key: str, win_prob: float, base_port: int):
+    anvil_endpoint = generate_anvil_endpoint(base_port)
+
     custom_env = {"PRIVATE_KEY": private_key}
     cmd = [
         "hopli",
@@ -35,7 +39,7 @@ def set_minimum_winning_probability_in_network(private_key: str, win_prob: float
         "--winning-probability",
         str(win_prob),
         "--provider-url",
-        ANVIL_ENDPOINT,
+        anvil_endpoint,
     ]
     run_hopli_cmd(cmd, custom_env)
 
@@ -44,7 +48,9 @@ def set_minimum_winning_probability_in_network(private_key: str, win_prob: float
 class TestWinProbWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hoprd_check_min_incoming_ticket_win_prob_is_default(self, peer, swarm7: dict[str, Node]):
+    async def test_hoprd_check_min_incoming_ticket_win_prob_is_default(
+        self, peer, swarm7: dict[str, Node], base_port: int
+    ):
         win_prob = await swarm7[peer].api.ticket_min_win_prob()
 
         assert win_prob is not None
@@ -53,13 +59,13 @@ class TestWinProbWithSwarm:
         private_key = load_private_key(ANVIL_CONFIG_FILE)
 
         new_win_prob = win_prob.value / 2
-        set_minimum_winning_probability_in_network(private_key, new_win_prob)
+        set_minimum_winning_probability_in_network(private_key, new_win_prob, base_port)
 
         try:
             await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[peer], new_win_prob), timeout=20.0)
         finally:
             # Restore the winning probability regardless of the outcome
-            set_minimum_winning_probability_in_network(private_key, win_prob.value)
+            set_minimum_winning_probability_in_network(private_key, win_prob.value, base_port)
 
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")
@@ -74,7 +80,7 @@ class TestWinProbWithSwarm:
         ],
     )
     async def test_hoprd_should_relay_packets_with_lower_win_prob_then_agg_and_redeem_them(
-        self, route, swarm7: dict[str, Node]
+        self, route, swarm7: dict[str, Node], base_port: int
     ):
         ticket_count = 100
         win_prob = 0.1
@@ -86,7 +92,7 @@ class TestWinProbWithSwarm:
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
 
-        set_minimum_winning_probability_in_network(private_key, win_prob)
+        set_minimum_winning_probability_in_network(private_key, win_prob, base_port)
         await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay], win_prob), 10.0)
 
         try:
@@ -121,7 +127,7 @@ class TestWinProbWithSwarm:
                 assert ticket_statistics.redeemed_value - statistics_before.redeemed_value == new_tickets_value
         finally:
             # Always return winning probability to 1.0 even if the test failed
-            set_minimum_winning_probability_in_network(private_key, 1.0)
+            set_minimum_winning_probability_in_network(private_key, 1.0, base_port)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -135,7 +141,7 @@ class TestWinProbWithSwarm:
         ],
     )
     async def test_hoprd_should_reject_unredeemed_tickets_with_lower_win_prob_when_min_bound_increases(
-        self, route, swarm7: dict[str, Node]
+        self, route, swarm7: dict[str, Node], base_port: int
     ):
         ticket_count = 100
         win_prob = 0.1
@@ -147,7 +153,7 @@ class TestWinProbWithSwarm:
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
 
-        set_minimum_winning_probability_in_network(private_key, win_prob)
+        set_minimum_winning_probability_in_network(private_key, win_prob, base_port)
         await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay], win_prob), 10.0)
 
         try:
@@ -177,7 +183,7 @@ class TestWinProbWithSwarm:
 
                 # Now if we increase the minimum winning probability, the relayer should
                 # reject all the unredeemed tickets
-                set_minimum_winning_probability_in_network(private_key, win_prob * 2)
+                set_minimum_winning_probability_in_network(private_key, win_prob * 2, base_port)
                 await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay], win_prob * 2), 10.0)
 
                 ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
@@ -188,7 +194,7 @@ class TestWinProbWithSwarm:
 
         finally:
             # Always return winning probability to 1.0 even if the test failed
-            set_minimum_winning_probability_in_network(private_key, 1.0)
+            set_minimum_winning_probability_in_network(private_key, 1.0, base_port)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -201,7 +207,7 @@ class TestWinProbWithSwarm:
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
-    async def test_hoprd_should_relay_with_increased_win_prob(self, route, swarm7: dict[str, Node]):
+    async def test_hoprd_should_relay_with_increased_win_prob(self, route, swarm7: dict[str, Node], base_port: int):
         ticket_count = 100
         win_prob = 0.1
         win_ticket_tolerance = 0.1
@@ -213,7 +219,7 @@ class TestWinProbWithSwarm:
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
 
-        set_minimum_winning_probability_in_network(private_key, win_prob)
+        set_minimum_winning_probability_in_network(private_key, win_prob, base_port)
         await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay_1], win_prob), 10.0)
 
         try:
@@ -258,7 +264,7 @@ class TestWinProbWithSwarm:
                     assert abs(winning_count_1 - ticket_count * win_prob) <= win_ticket_tolerance * ticket_count
         finally:
             # Always return winning probability to 1.0 even if the test failed
-            set_minimum_winning_probability_in_network(private_key, 1.0)
+            set_minimum_winning_probability_in_network(private_key, 1.0, base_port)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -272,7 +278,9 @@ class TestWinProbWithSwarm:
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
-    async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(self, route, swarm7: dict[str, Node]):
+    async def test_hoprd_should_relay_packets_with_higher_than_min_win_prob(
+        self, route, swarm7: dict[str, Node], base_port: int
+    ):
         ticket_count = 10
         win_prob = 0.1
 
@@ -282,7 +290,7 @@ class TestWinProbWithSwarm:
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
 
-        set_minimum_winning_probability_in_network(private_key, win_prob)
+        set_minimum_winning_probability_in_network(private_key, win_prob, base_port)
         await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay], win_prob), 10.0)
 
         try:
@@ -317,7 +325,7 @@ class TestWinProbWithSwarm:
                 # at this point the tickets become neglected, since the channel will be closed
         finally:
             # Always return winning probability to 1.0 even if the test failed
-            set_minimum_winning_probability_in_network(private_key, 1.0)
+            set_minimum_winning_probability_in_network(private_key, 1.0, base_port)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -330,7 +338,9 @@ class TestWinProbWithSwarm:
             for _ in range(PARAMETERIZED_SAMPLE_SIZE)
         ],
     )
-    async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(self, route, swarm7: dict[str, Node]):
+    async def test_hoprd_should_not_accept_tickets_with_lower_than_min_win_prob(
+        self, route, swarm7: dict[str, Node], base_port: int
+    ):
         ticket_count = 10
 
         src = route[0]
