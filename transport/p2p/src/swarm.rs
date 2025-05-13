@@ -402,7 +402,7 @@ impl HoprSwarm {
     }
 
     pub fn run_nat_server(&mut self, port: u16) {
-        info!("Starting NAT server on port {}", port);
+        info!(listen_on=port, "Starting NAT server");
 
         match self.swarm.listen_on(
             Multiaddr::empty()
