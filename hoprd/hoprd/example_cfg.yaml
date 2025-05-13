@@ -228,9 +228,9 @@ hopr:
     heartbeat:
       # Timeout in seconds
       timeout: 6
-  # Blockchain specific configuration
+  # Blockchain-specific configuration
   chain:
-    # Indicates whether node should announce itself on-chain
+    # Indicates whether a node should announce itself on-chain
     announce: true
     # Which blockchain network should be used by the node
     # Must be one of `protocols.networks`.
@@ -276,10 +276,6 @@ hopr:
           max_rpc_requests_per_sec: 100
           block_time: 5000
           tags: []
-    # Indicates whether node should check channel unrealized balance
-    # when validating acknowledged tickets.
-    # Strongly recommended to leave this enabled.
-    check_unrealized_balance: true
     # Configures whether the node will keep RPC logs after they were processed.
     # By default (enabled), the node will clean such logs. If enabled, the node
     # will keep logs which will require more disk space, however, it will allow
@@ -311,9 +307,9 @@ session_ip_forwarding:
   #
   # List of IP address and port tuples (written as e.g.: "127.0.0.1:8080") which are allowed
   # to be targets of incoming Sessions.
-  # This has effect only if `use_target_allow_list` is `true`.
+  # This has an effect only if `use_target_allow_list` is `true`.
   # If left empty (default), the node will deny any Session target and will effectively not act as an Exit node.
-  # For targets specifying a DNS name, the DNS resolution is performed first before the list is matched.
+  # For Session targets using a DNS name, the DNS resolution is performed first before the list is matched.
   # Production configuration should always use this allowlist, e.g.: target_allow_list: ["127.0.0.1:8080"]
   target_allow_list: []
 #

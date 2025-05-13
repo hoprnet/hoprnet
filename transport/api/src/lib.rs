@@ -103,7 +103,7 @@ pub use {
     hopr_transport_protocol::{execute_on_tick, PeerDiscovery},
     hopr_transport_session::{
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
-        SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
+        SessionClientConfig, SessionId, SurbBalancerConfig, SESSION_PAYLOAD_SIZE, SESSION_USABLE_MTU_SIZE,
     },
     hopr_transport_session::{ServiceId, SessionTarget},
 };
@@ -249,14 +249,12 @@ where
             db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
-            smgr: SessionManager::new(
-                me_chain_addr,
-                SessionManagerConfig {
-                    session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
-                    initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
-                    idle_timeout: cfg.session.idle_timeout,
-                },
-            ),
+            smgr: SessionManager::new(SessionManagerConfig {
+                session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
+                initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+                idle_timeout: cfg.session.idle_timeout,
+                balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+            }),
             cfg,
         }
     }
@@ -531,11 +529,16 @@ where
         // initiate the msg-ack protocol stack over the wire transport
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: self.me.clone(),
-            outgoing_ticket_win_prob: self.cfg.protocol.outgoing_ticket_winning_prob,
+            outgoing_ticket_win_prob: self
+                .cfg
+                .protocol
+                .outgoing_ticket_winning_prob
+                .map(WinningProbability::try_from)
+                .transpose()?,
             outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
         };
 
-        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<ApplicationData>();
+        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -565,10 +568,10 @@ where
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             spawn(async move {
-                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, |data| {
+                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {
-                        match smgr.dispatch_message(data).await {
+                        match smgr.dispatch_message(pseudonym, data).await {
                             Ok(DispatchResult::Processed) => {
                                 trace!("message dispatch completed");
                                 None
@@ -671,8 +674,13 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn new_session(&self, cfg: SessionClientConfig) -> errors::Result<Session> {
-        Ok(self.smgr.new_session(cfg).await?)
+    pub async fn new_session(
+        &self,
+        destination: Address,
+        target: SessionTarget,
+        cfg: SessionClientConfig,
+    ) -> errors::Result<Session> {
+        Ok(self.smgr.new_session(destination, target, cfg).await?)
     }
 
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]

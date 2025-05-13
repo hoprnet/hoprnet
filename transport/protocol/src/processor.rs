@@ -25,21 +25,6 @@ pub trait PacketWrapping {
     async fn send(&self, data: ApplicationData, routing: ResolvedTransportRouting) -> Result<OutgoingPacket>;
 }
 
-pub struct SendPkt {
-    pub peer: PeerId,
-    pub data: Box<[u8]>,
-}
-
-pub struct SendAck {
-    pub peer: PeerId,
-    pub ack: Box<[u8]>,
-}
-
-pub enum RecvOperation {
-    Receive { data: ApplicationData, ack: SendAck },
-    Forward { msg: SendPkt, ack: SendAck },
-}
-
 #[async_trait::async_trait]
 pub trait PacketUnwrapping {
     type Packet;
@@ -135,7 +120,7 @@ where
         Ok(self.cfg.outgoing_ticket_price.unwrap_or(network_ticket_price))
     }
 
-    async fn determine_actual_outgoing_win_prob(&self) -> f64 {
+    async fn determine_actual_outgoing_win_prob(&self) -> WinningProbability {
         // This operation hits the cache unless the new value is fetched for the first time
         let network_win_prob = self
             .db
@@ -151,7 +136,7 @@ where
         self.cfg
             .outgoing_ticket_win_prob
             .or(network_win_prob)
-            .unwrap_or(DEFAULT_OUTGOING_TICKET_WIN_PROB)
+            .unwrap_or_default() // Absolute default WinningProbability is 1.0
     }
 }
 
@@ -250,7 +235,7 @@ where
 #[derive(Clone, Debug)]
 pub struct PacketInteractionConfig {
     pub packet_keypair: OffchainKeypair,
-    pub outgoing_ticket_win_prob: Option<f64>,
+    pub outgoing_ticket_win_prob: Option<WinningProbability>,
     pub outgoing_ticket_price: Option<Balance>,
 }
 

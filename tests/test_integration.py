@@ -135,7 +135,8 @@ class TestIntegrationWithSwarm:
         response = await swarm7[src].api.ping(swarm7[dest].peer_id)
 
         assert response is not None
-        assert int(response.latency) > 0, f"Non-0 round trip time expected, actual: '{int(response.latency)}'"
+        # Zero-roundtrip (in ms precision) can happen on fast local setups
+        assert int(response.latency) >= 0
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
@@ -179,7 +180,7 @@ class TestIntegrationWithSwarm:
     async def test_hoprd_should_fail_sending_a_message_that_is_too_large(
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
-        maximum_payload_size = 800
+        maximum_payload_size = 1000
         random_tag = gen_random_tag()
 
         packet = "0 hop message too large: " + "".join(

@@ -290,7 +290,7 @@ mod tests {
             .amount(price_per_packet.div_f64(1.0f64)? * 5u32)
             .index(idx)
             .index_offset(1)
-            .win_prob(1.0)
+            .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(channel_epoch)
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
             .build_signed(counterparty, &Hash::default())?
