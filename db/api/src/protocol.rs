@@ -1,7 +1,9 @@
 use async_trait::async_trait;
+use hopr_crypto_packet::prelude::HoprSenderId;
+use hopr_crypto_packet::HoprSurb;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_primitive_types::prelude::Balance;
 
 use crate::errors::Result;
@@ -18,10 +20,13 @@ pub trait HoprDbProtocolOperations {
     async fn handle_acknowledgement(&self, ack: Acknowledgement) -> Result<()>;
 
     /// Loads (presumably cached) value of the network's minimum winning probability from the DB.
-    async fn get_network_winning_probability(&self) -> Result<f64>;
+    async fn get_network_winning_probability(&self) -> Result<WinningProbability>;
 
     /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
     async fn get_network_ticket_price(&self) -> Result<Balance>;
+
+    /// Attempts to find SURB and its ID given the [`SurbMatcher`].
+    async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)>;
 
     /// Process the data into an outgoing packet that is not going to be acknowledged.
     async fn to_send_no_ack(&self, data: Box<[u8]>, destination: OffchainPublicKey) -> Result<OutgoingPacket>;
@@ -31,7 +36,7 @@ pub trait HoprDbProtocolOperations {
         &self,
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<OutgoingPacket>;
 
@@ -42,7 +47,7 @@ pub trait HoprDbProtocolOperations {
         data: Box<[u8]>,
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
-        outgoing_ticket_win_prob: f64,
+        outgoing_ticket_win_prob: WinningProbability,
         outgoing_ticket_price: Balance,
     ) -> Result<Option<IncomingPacket>>;
 }
@@ -53,6 +58,7 @@ pub enum IncomingPacket {
     Final {
         packet_tag: PacketTag,
         previous_hop: OffchainPublicKey,
+        sender: HoprPseudonym,
         plain_text: Box<[u8]>,
         ack_key: HalfKey,
     },

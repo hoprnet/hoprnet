@@ -435,24 +435,28 @@ class HoprdAPI:
     async def session_client(
         self,
         destination: str,
-        path: dict,
+        forward_path: dict,
+        return_path: dict,
         protocol: Protocol,
         target: str,
         listen_on: str = "127.0.0.1:0",
         service: bool = False,
         capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
-        sealed_target=False,
+        sealed_target: bool = False,
+        response_buffer: str = "4MiB",
     ) -> Optional[Session]:
         """
         Creates a new client session returning the given session listening host & port over TCP or UDP.
-        :param: destination: PeerID of the recipient
-        :param path: Routing options for the session.
+        :param destination: PeerID of the recipient
+        :param forward_path: Forward routing options for the session.
+        :param return_path: Return routing options for the session.
         :param protocol: Protocol (UDP or TCP)
         :param target: Destination for the session packets.
         :param listen_on: The host to listen on for input packets (default: "127.0.0.1:0")
-        :param retransmit: Set if retransmission has to be done
-        :param segment: Set if segmentation has to be done
+        :param service: Indicates if the target is a service (default: False)
+        :param capabilities: Session capabilities (default: none)
         :param sealed_target: The target parameter will be encrypted (default: False)
+        :param response_buffer: The size of the response buffer to maintain at the counterparty (default: "3 MB")
         :return: Session
         """
         actual_target = (
@@ -464,11 +468,7 @@ class HoprdAPI:
         )
 
         data = CreateSessionBody(
-            capabilities.as_array,
-            destination,
-            listen_on,
-            path,
-            actual_target,
+            capabilities.as_array, destination, listen_on, forward_path, return_path, actual_target, response_buffer
         )
 
         is_ok, response = await self.__call_api(HTTPMethod.POST, f"session/{protocol.name.lower()}", data)
@@ -477,7 +477,7 @@ class HoprdAPI:
 
     async def session_close_client(self, session: Session) -> bool:
         """
-        Closes an existing Sessino listener for the given IP protocol, IP and port.
+        Closes an existing Session listener for the given IP protocol, IP and port.
         :param: session: Session
         """
 

@@ -15,7 +15,7 @@
 use async_trait::async_trait;
 use ethers::providers::{JsonRpcClient, JsonRpcError};
 use futures::StreamExt;
-use http_types::Method;
+use http::Method;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
@@ -82,6 +82,7 @@ lazy_static::lazy_static! {
 ///
 /// No more additional retries are allowed on new requests, if the maximum number of concurrent
 /// requests being retried has reached `max_retry_queue_size`.
+#[serde_with::serde_as]
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct SimpleJsonRpcRetryPolicy {
     /// Minimum number of retries of any error, regardless the error code.
@@ -136,10 +137,11 @@ pub struct SimpleJsonRpcRetryPolicy {
     /// List of HTTP errors that should be retried with backoff.
     ///
     /// Default is \[429, 504, 503\]
+    #[serde_as(as = "Vec<serde_with::TryFromInto<u16>>")]
     #[default(
-        _code = "vec![http_types::StatusCode::TooManyRequests,http_types::StatusCode::GatewayTimeout,http_types::StatusCode::ServiceUnavailable]"
+        _code = "vec![http::StatusCode::TOO_MANY_REQUESTS,http::StatusCode::GATEWAY_TIMEOUT,http::StatusCode::SERVICE_UNAVAILABLE]"
     )]
-    pub retryable_http_errors: Vec<http_types::StatusCode>,
+    pub retryable_http_errors: Vec<http::StatusCode>,
     /// Maximum number of different requests that are being retried at the same time.
     ///
     /// If any additional request fails after this number is attained, it won't be retried.
@@ -155,7 +157,7 @@ impl SimpleJsonRpcRetryPolicy {
         self.retryable_json_rpc_errors.contains(&err.code) || err.message.contains("rate limit")
     }
 
-    fn is_retryable_http_error(&self, status: &http_types::StatusCode) -> bool {
+    fn is_retryable_http_error(&self, status: &http::StatusCode) -> bool {
         self.retryable_http_errors.contains(status)
     }
 }
@@ -470,7 +472,7 @@ where
 #[cfg(any(test, feature = "runtime-tokio"))]
 pub mod reqwest_client {
     use async_trait::async_trait;
-    use http_types::StatusCode;
+    use http::StatusCode;
     use serde::Serialize;
     use std::sync::Arc;
     use std::time::Duration;
@@ -518,7 +520,7 @@ pub mod reqwest_client {
     impl HttpRequestor for ReqwestRequestor {
         async fn http_query<T>(
             &self,
-            method: http_types::Method,
+            method: http::Method,
             url: &str,
             data: Option<T>,
         ) -> Result<Box<[u8]>, HttpRequestError>
@@ -529,8 +531,8 @@ pub mod reqwest_client {
                 .map_err(|e| HttpRequestError::UnknownError(format!("url parse error: {e}")))?;
 
             let builder = match method {
-                http_types::Method::Get => self.client.get(url.clone()),
-                http_types::Method::Post => self.client.post(url.clone()).body(
+                http::Method::GET => self.client.get(url.clone()),
+                http::Method::POST => self.client.post(url.clone()).body(
                     serde_json::to_string(&data.ok_or(HttpRequestError::UnknownError("missing data".to_string()))?)
                         .map_err(|e| HttpRequestError::UnknownError(format!("serialize error: {e}")))?,
                 ),
@@ -572,7 +574,7 @@ pub mod reqwest_client {
                     .map(|b| Box::from(b.as_ref()))
                     .map_err(|e| HttpRequestError::UnknownError(format!("error retrieving body: {e}")))
             } else {
-                Err(HttpRequestError::HttpError(StatusCode::TooManyRequests))
+                Err(HttpRequestError::HttpError(StatusCode::TOO_MANY_REQUESTS))
             }
         }
     }
@@ -728,7 +730,7 @@ impl<R: HttpRequestor> SnapshotRequestor<R> {
             .or_try_insert_with(async {
                 if self.fail_on_miss {
                     tracing::error!("{request} is missing in {}", &self.file);
-                    return Err(HttpRequestError::HttpError(http_types::StatusCode::NotFound));
+                    return Err(HttpRequestError::HttpError(http::StatusCode::NOT_FOUND));
                 }
 
                 let response = self.inner.http_post(url, data).await?;
@@ -843,7 +845,7 @@ mod tests {
     use hopr_chain_types::{ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
-    use http_types::Method;
+    use http::Method;
     use serde::Serialize;
     use serde_json::json;
     use std::fmt::Debug;
@@ -964,9 +966,11 @@ mod tests {
     async fn test_client_should_retry_on_http_error() {
         let mut server = mockito::Server::new_async().await;
 
+        let too_many_requests: u16 = http::StatusCode::TOO_MANY_REQUESTS.as_u16();
+
         let m = server
             .mock("POST", "/")
-            .with_status(http_types::StatusCode::TooManyRequests as usize) // TODO: This value is not respected
+            .with_status(too_many_requests as usize)
             .match_body(mockito::Matcher::PartialJson(json!({"method": "eth_blockNumber"})))
             .with_body("{}")
             .expect(3)
@@ -977,7 +981,7 @@ mod tests {
             ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy {
                 max_retries: Some(2),
-                retryable_http_errors: vec![http_types::StatusCode::TooManyRequests],
+                retryable_http_errors: vec![http::StatusCode::TOO_MANY_REQUESTS],
                 initial_backoff: Duration::from_millis(10),
                 ..SimpleJsonRpcRetryPolicy::default()
             },

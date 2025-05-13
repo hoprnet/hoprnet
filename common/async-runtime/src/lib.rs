@@ -13,7 +13,7 @@ pub mod prelude {
     }
 }
 
-// Both features could be enabled during testing, therefore we only use tokio when its
+// Both features could be enabled during testing; therefore, we only use tokio when it's
 // exclusively enabled.
 #[cfg(feature = "runtime-tokio")]
 pub mod prelude {
