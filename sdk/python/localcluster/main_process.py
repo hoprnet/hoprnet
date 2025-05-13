@@ -90,6 +90,9 @@ async def bringup(
     except asyncio.TimeoutError as e:
         logging.error(f"Timeout error: {e}")
         return cluster, anvil
+    except RuntimeError as e:
+        logging.error(f"Runtime error: {e}")
+        return cluster, anvil
 
     if not test_mode:
         await cluster.alias_peers()
