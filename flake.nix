@@ -367,7 +367,7 @@
               jq
               lsof
               plutoSrc
-              python39
+              python313
               runtimeShellPackage
               solcDefault
               time
