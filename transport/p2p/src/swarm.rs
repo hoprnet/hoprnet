@@ -404,31 +404,37 @@ impl HoprSwarm {
     pub fn run_nat_server(&mut self, port: u16) {
         info!("Starting NAT server on port {}", port);
 
-        self.swarm
-            .listen_on(
-                Multiaddr::empty()
-                    .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
-                    .with(Protocol::Tcp(port)),
-            )
-            .expect("Failed to listen on unspecified address");
+        match self.swarm.listen_on(
+            Multiaddr::empty()
+                .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
+                .with(Protocol::Tcp(port)),
+        ) {
+            Ok(_) => {
+                info!("NAT server started");
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to listen on NAT server");
+            }
+        }
     }
     pub fn dial_nat_server(&mut self, addresses: Vec<Multiaddr>) {
-        info!("Dialing NAT server with {} addresses", addresses.len());
-
         // let dial_opts = DialOpts::peer_id(PeerId::random())
         //     .addresses(addresses)
         //     .extend_addresses_through_behaviour()
         //     .build();
+        info!(
+            num_addresses = addresses.len(),
+            "Dialing NAT servers with multiple candidate addresses"
+        );
 
-        let dial_opts = DialOpts::unknown_peer_id()
-            .address(addresses.first().unwrap().clone())
-            .build();
-
-        let res = self.swarm.dial(dial_opts);
-        if let Err(e) = res {
-            warn!(error = %e, "Failed to dial NAT server");
-        } else {
-            info!("Dialed NAT server");
+        for addr in addresses {
+            let dial_opts = DialOpts::unknown_peer_id().address(addr.clone()).build();
+            if let Err(e) = self.swarm.dial(dial_opts) {
+                warn!(%addr, %e, "Failed to dial NAT server address");
+            } else {
+                info!(%addr, "Dialed NAT server address");
+                break;
+            }
         }
     }
 }

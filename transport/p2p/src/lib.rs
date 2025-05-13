@@ -45,6 +45,7 @@ use hopr_transport_protocol::PeerDiscovery;
 use crate::constants::HOPR_HEARTBEAT_PROTOCOL_V_0_1_0;
 
 pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+pub const NAT_SERVER_PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// `Ping` protocol base type for the ping operation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -143,7 +144,7 @@ impl HoprNetworkBehavior {
             ),
             autonat_client: autonat::v2::client::Behaviour::new(
                 OsRng,
-                autonat::v2::client::Config::default().with_probe_interval(std::time::Duration::from_secs(30)), // TODO (jean): make this configurable
+                autonat::v2::client::Config::default().with_probe_interval(NAT_SERVER_PROBE_INTERVAL), // TODO (jean): make this configurable
             ),
             autonat_server: autonat::v2::server::Behaviour::new(OsRng),
         }

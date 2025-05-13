@@ -32,11 +32,11 @@ use futures::{
 };
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 use hopr_transport_mixer::MixerConfig;
-use std::time::Duration;
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
 };
+use std::{collections::HashSet, time::Duration};
 use tracing::{debug, error, info, trace, warn};
 
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
@@ -66,6 +66,7 @@ use hopr_transport_ticket_aggregation::{
     AwaitingAggregator, TicketAggregationActions, TicketAggregationError, TicketAggregationInteraction,
     TicketAggregatorTrait,
 };
+use rand::seq::SliceRandom;
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 
@@ -366,7 +367,7 @@ where
 
         info!("Loading initial peers from the storage");
 
-        let mut addresses: Vec<Multiaddr> = Vec::new();
+        let mut addresses: HashSet<Multiaddr> = HashSet::new();
         let nodes = self.get_public_nodes().await?;
         for (peer, _address, multiaddresses) in nodes {
             if self.is_allowed_to_access_network(either::Left(&peer)).await? {
@@ -527,7 +528,9 @@ where
             warn!("No addresses found in the database, not dialing any NAT servers");
         } else {
             info!(num_addresses = addresses.len(), "Found addresses from the database");
-            transport_layer.dial_nat_server(addresses);
+            let mut randomized_addresses: Vec<_> = addresses.into_iter().collect();
+            randomized_addresses.shuffle(&mut rand::thread_rng());
+            transport_layer.dial_nat_server(randomized_addresses);
         }
 
         let msg_proto_control =
