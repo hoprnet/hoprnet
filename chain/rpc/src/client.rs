@@ -1449,7 +1449,7 @@ mod tests {
 
         let m = server
             .mock("GET", "/gasapi.ashx?apikey=key&method=gasoracle")
-            .with_status(http::StatusCode::Accepted as usize)
+            .with_status(http::StatusCode::ACCEPTED.as_u16().into())
             .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"39864926","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999968207972734"}}"#)
             .expect(0)
             .create();
