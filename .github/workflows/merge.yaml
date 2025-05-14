@@ -296,12 +296,20 @@ jobs:
 
   notify_failure:
     name: Notify in Zulip on merge pipeline failure
-    if: failure()
-    runs-on: ubuntu_latest
+    needs:
+      - cleanup_actions
+      - build_docker
+      - cache_deps
+      - load_test
+      - build_dappnode
+      - build_pluto
+      - docs
+      - bencher
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
     steps:
       - name: Notify failed merge pipeline
         uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
-        if: failure()
         with:
           api-key: ${{ secrets.ZULIP_API_KEY }}
           email: ${{ secrets.ZULIP_EMAIL }}
@@ -310,7 +318,7 @@ jobs:
           to: "HOPRd"
           topic: "Core"
           content: |
-            The merge pipeline on pull request [${{ github.event.pull_request.name }}](https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }})` has failed.
+            The merge pipeline failed for pull request [#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}](https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }})
 
 
   notify:
