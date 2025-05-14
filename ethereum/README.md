@@ -1,41 +1,99 @@
 # HOPR Ethereum Package
 
-Draft readme, for rust migration.
-Appending node-staking management notes to the end.
+This directory contains the Ethereum smart contracts and their bindings for the [HOPR protocol](https://github.com/hoprnet/hoprnet).
+These contracts power HOPR's privacy-preserving incentive framework.
+
+Main contracts are
+
+```bash
+├── Channels.sol                 # Uni-directional payment channel contract
+├── Crypto.sol                   # Cryptographic utility functions and primitives
+├── MultiSig.sol                 # Multisig modifiers to enforce Safe-based node operations
+├── Announcements.sol            # Node announcement mechanism (independent of staking)
+├── Ledger.sol                   # Snapshot-based index for HOPR Channels
+├── NetworkRegistry.sol          # Network access gate (deprecated and slated for removal)
+├── TicketPriceOracle.sol        # Oracle to update HOPR ticket price across the network
+├── proxy                        # Adapters between the NetworkRegistry and staking modules
+│   ├── DummyProxyForNetworkRegistry.sol
+│   ├── SafeProxyForNetworkRegistry.sol
+│   └── StakingProxyForNetworkRegistry.sol
+├── interfaces                   # Solidity interfaces for contract interoperability
+│   ├── IAvatar.sol
+│   ├── INetworkRegistryRequirement.sol
+│   ├── INodeManagementModule.sol
+│   └── INodeSafeRegistry.sol
+├── node-stake                  # Node staking system built on Safe's Account-Abstraction design
+│   ├── NodeSafeRegistry.sol    # Registry mapping nodes to their Safe wallets
+│   ├── NodeStakeFactory.sol    # Factory contract to deploy and initialize node Safes
+│   └── permissioned-module     # Modules for Safe-based node management
+│       ├── CapabilityPermissions.sol    # Defines capability-based permission rules
+│       ├── NodeManagementModule.sol     # Main module to manage nodes via a Safe
+│       └── SimplifiedModule.sol         # Lightweight version of the Node Management Module
+├── utils                                # Shared utility libraries
+│   ├── EnumerableStringSet.sol       # Enumerable set for strings
+│   ├── EnumerableTargetSet.sol       # Enumerable set for targets (addresses with metadata)
+│   └── TargetUtils.sol               # Helper functions for managing targets
+└── static                            # Legacy contracts (archived and not actively maintained)
+    ├── EnumerableStringSet.sol
+    ├── ERC777
+    │   └── ERC777Snapshot.sol
+    ├── HoprDistributor.sol           # Contract for token distribution
+    ├── HoprForwarder.sol             # Minimal forwarder for meta-transactions
+    ├── HoprToken.sol                 # ERC20 token implementation for HOPR
+    ├── HoprWrapper.sol               # Legacy wrapper contract
+    ├── HoprWrapperProxy.sol          # Proxy for interacting with HoprWrapper
+    ├── openzeppelin-contracts
+    │   ├── ERC777.sol
+    │   └── README.md
+    └── stake                         # Legacy staking contracts by season
+        ├── HoprBoost.sol
+        ├── HoprStake.sol
+        ├── HoprStake2.sol
+        ├── HoprStakeBase.sol
+        ├── HoprStakeSeason3.sol
+        ├── HoprStakeSeason4.sol
+        ├── HoprStakeSeason5.sol
+        ├── HoprStakeSeason6.sol
+        ├── HoprStakeSeason7.sol
+        ├── HoprWhitehat.sol
+        └── IHoprBoost.sol
+```
 
 ## Installation
+
+Please use the [Nix environment](../README.md#develop) or install the following packages
 
 1. `rustup`
 2. `foundryup`
 3. `brew install lcov` (to install lcov for viewing coverage report)
 
-## Contracts
+If not using Nix, make sure to create a `foundry.toml` file based on `foundry.in.toml` and populate the solc version under "[profile.default]"
+
+Create a file for environment variables:
 
 ```
-cd contracts
+cp ./contracts/.env.example ./contracts/.env
 ```
 
-### Test
+and populate the necessary variables.
+
+## Test
+
+### Unit tests
 
 ```
-make sc-test
+cd contracts && make sc-test
 ```
 
-When developing staking contract, make sure to test against the forked gnosis chain, e.g.
+### Coverage
 
 ```
-forge test --fork-url "https://gnosis-provider.rpch.tech/" --match-path test/stake/HoprStakeSeason6.t.sol
+cd contracts && make sc-coverage
 ```
 
-### Run Coverage
+## Deployment and source-code verification
 
-```
-make sc-coverage
-```
-
-### Deployment and verfy deployed contracts
-
-#### Local
+### Local
 
 ```
 # run anvil as a daemon.
@@ -47,7 +105,7 @@ anvil & make anvil-deploy-all
 lsof -i :8545 -s TCP:LISTEN -t | xargs -I {} -n 1 kill {}
 ```
 
-#### Staging
+### Staging
 
 Staging environment is on the same chain as in production - Gnosis chain
 
@@ -74,7 +132,7 @@ FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast \
    script/DeployAll.s.sol:DeployAllContractsScript
 ```
 
-#### Production
+### Production
 
 use either of the command below
 
@@ -96,113 +154,12 @@ To check the verification result, use
 forge verify-check --chain-id <number> <GUID>
 ```
 
-#### Deploy new staking season contract
+## Deployment
 
-1. Create a new season contract from `HoprStakeBase.sol` and update the parameters (start, end timestamp) accordingly
-2. Change the `"stake_season":` to the number of the new season, for `rotsee`, `debug-staging` and the running production environment.
-3. Deploy for each network with
-   - `debug-staging`: `FOUNDRY_PROFILE=staging NETWORK=debug-staging forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
-   - `rotsee`: FOUNDRY_PROFILE=staging NETWORK=rotsee forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
-   - `monte_rosa`: _Temporarily update the `token_contract_address` to wxHOPR. Then run_ `FOUNDRY_PROFILE=production NETWORK=monte_rosa forge script --broadcast --verify --verifier etherscan --verifier-url "https://api.gnosisscan.io/api" --chain 100 script/DeployAll.s.sol:DeployAllContractsScript`
-4. Switch back `token_contract_address` for `monte_rosa`
-5. Commit contract changes and make a PR
-6. Transfer contract ownership to COMM multisig with `cast send <new_stake_season_contract> "transferOwnership(address)" 0xD9a00176Cf49dFB9cA3Ef61805a2850F45Cb1D05 --rpc-url https://gnosis-provider.rpch.tech/ --private-key $PRIVATE_KEY`
-7. Run `scripts/update-protocol-config.sh -e master`, `scripts/update-protocol-config.sh -e debug-staging` and `scripts/update-protocol-config.sh -e monte_rosa`
-8. Create a branch (e.g. `feature/staking-s7-contract-update`) from `master` which contains changes in `contracts-addresses.json` and `protocol-config.json` and make a PR
-9. Extend "hopr-stake-all-season" subgraph with the production stake season contract and deploy it
-10. Create an issue in `hoprnet/hopr-devrel` repo with actions to check:
-    > Only after Sx starts (time)
-    >
-    > - [ ] Merge Update staking Sx contract addresses <contract address update PR>, so that procotol-config.json is updated with latest addresses.
-    > - [ ] Important staking accounts (e.g. DevBank, CI, Operator) unstake from S6 and stake their NR NFTs to Sx
-    > - [ ] Owner of `NetworkRegistryProxy` update the stake contract (`updateStakeContract()`) with the new season contract address
+### Deploy legacy contracts
 
-### Note
-
-1. Three solc versions are needed
-
-- 0.4: Permittable token, implementation of xHOPR. The permittable token implementation is extracted from the deployed xHOPR token. The only alternative done on the contract is to keep `pragma solidity` with the least version
-- 0.6: Deployed Hoprtoken
-- 0.8: More recent contracts
-
-2. Dependencies are vendored directly into the repo. Some of them are locked to a specific version
-
-```
-forge install foundry-rs/forge-std \
-openzeppelin-contracts=OpenZeppelin/openzeppelin-contracts@v4.4.2 \
---no-git --no-commit
-```
-
-3. If `forge coverage` is not found in as a command, or error in using `writeJson`, update `foundryup` to the [latest nightly release](https://github.com/foundry-rs/foundry/releases) may solve the issue.
-   E.g.
-
-```
-foundryup --version nightly-64cbdd183e0aae99eb1be507196b6b5d640b3801
-```
-
-4. `forge coverage` may run into `Error: Function has no kind` when compiler has multiple versions. Opened an issue https://github.com/foundry-rs/foundry/issues/3519
-
-<!-- 5. To move faster on the migration of toolchain and to avoid constantly running into foundry's error during the compilation `Error: Discovered incompatible solidity versions in following`, the compiler version of the following contracts have be moved to `pragma solidity >=0.6.0 <0.9.0;`
-- src/HoprToken.sol (^0.6.0)
-- src/ERC777/ERC777Snapshot.sol (^0.6.0)
-- src/openzeppelin-contracts/ERC777.sol (>=0.6.0 <0.8.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/access/AccessControl.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/GSN/Context.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/introspection/IERC1820Registry.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/math/SafeMath.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/token/ERC20/IERC20.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/token/ERC777/IERC777.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/token/ERC777/IERC777Recipient.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/token/ERC777/IERC777Sender.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/utils/EnumerableSet.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/utils/Address.sol (^0.6.2) -->
-
-6. Remove "PermittableToken.sol" from source code as it prevents coverage engine from working. Possibly because its required compiler version is 0.4.x This contract is only used when testing "HoprWrapper" contract. TODO: use a different approach to test "HoprWrapper"
-7. Moved `src/mock` to `test/mock` folder, and adapt the relative path used in "HoprWhitehat.sol". Remove `ERC20Mock.sol`, `ERC721Mock.sol`, `ERC777SenderRecipientMock.sol` contracts
-8. To move faster on the rest of toolchain upgrade, only tests for "HoprToken" contract is fully migrated. Tests for "HoprChannels" is halfway through. TODO: complete tests for the following contracts:
-
-```
-|____stake
-| |____HoprStake.t.sol // <- skip this as this contract is archived
-| |____HoprStake2.t.sol // <- skip this as this contract is archived
-| |____HoprStakeSeason3.t.sol // <- skip this as this contract is archived
-| |____HoprStakeSeason4.t.sol // <- skip this as this contract is archived
-| |____HoprStakeSeason5.t.sol // <- skip this as this contract is archived
-| |____HoprWhitehat.t.sol // <- skip this as this contract is archived
-|____HoprForwarder.t.sol // <- skip this as this contract is deprecated. Multisig can register implementation to receive ERC777 tokens
-```
-
-Notes on Test cases:
-
-- `testFail_ExceedMaxMint` in `ethereum/contracts/test/HoprDistributor.t.sol` should have been `testRevert_ExceedMaxMint`. However, foundry has trouble catching uint128 overflow.
-- After the update of Permittable token, it's possible to wrap tokens with "transfer" (Regarding `test_CanAlsoWrapWithTransfer` case in `HoprWrapper.t.sol`)
-
-1. Temporarily skipped deployment scripts for
-
-- HoprDistributor
-- HoprWrapper
-
-6. <del>writeJson is next inline https://github.com/foundry-rs/foundry/pull/3595, to save deployed addressed used in function `writeNetwork()` in `contracts/script/utils/NetworkConfig.s.sol`</del> As `writeJson` got introduced in the foundry nightly release but its smart contract hasn't been introduced in `forge-std`. The current walk-around is to manually add `serialize*` functions [mentioned in the PR](https://github.com/foundry-rs/foundry/pull/3595) into the `Vm.sol` contract.
-   However, to fully unleash the power of `writeJson`, especially for nested arrays, compiler version needs to be bumped to `>=0.8.0`. Therefore, a few contracts bumped to `pragma solidity >=0.6.0 <0.9.0;`, such as
-
-- src/HoprToken.sol (^0.6.0)
-- src/HoprDistributor.sol (^0.6.0)
-- src/HoprWrapper.sol (^0.6.0)
-- src/ERC777/ERC777Snapshot.sol (^0.6.0)
-- src/openzeppelin-contracts/ERC777.sol (>=0.6.0 <0.8.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/access/AccessControl.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/GSN/Context.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/introspection/IERC1820Registry.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/math/SafeMath.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/token/ERC20/IERC20.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/token/ERC777/IERC777.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/token/ERC777/IERC777Recipient.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/token/ERC777/IERC777Sender.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/utils/EnumerableSet.sol (^0.6.0)
-- lib/openzeppelin-contracts-v3-0-1/contracts/utils/Address.sol (^0.6.2)
-  Subsequently, library `openzeppelin-contracts-v3-0-1` is also removed from the project
-
-7. Deployment dependencies graph is like the following:
+The following diagram illustrates the deployment order and dependencies among contracts in the `static/` folder.
+Contracts at the bottom depend on those above them:
 
 ```
               +-----------------+
@@ -242,41 +199,25 @@ Notes on Test cases:
                                   +---------------------+
 ```
 
-Note that deployment for `HoprDistributor` and `HoprWrapper` are skipped; ERC1820Registry is not deployed in production envirionment.
+Note that in local deployment, the deployment for `HoprDistributor` and `HoprWrapper` are skipped.
 
-8. The temporary `contract-address.json` has the following differences compared with `protocol-config.json`
+### Deployed contracts
 
-- It does not need "chains" attribute
-- In "network" attribute:
-  ```
-  - "chain": "goerli",
-  - "version_range": "*",
-  - "channel_contract_deploy_block": 0,
-  + "stake_season": 5,
-  + "indexer_start_block_number": <the minimum block number of transactions that deploys HoprChannels and HoprNetworkRegistry>,
-  ```
+The `./contracts/contracts-address.json` file defines contract deployments across multiple networks, including local, staging, and production environments.
+For each network, it specifies deployed contract addresses, the environment type, and the starting block number for indexers.
+It serves as a centralized reference for frontend, indexer, and integration scripts to locate on-chain components.
 
-9. Contract verification:
+This file is automatically populated with the latest deployment addresses.
 
-- Production (Gnosis Chain): Sourcify or Gnosisscan
-- Staging (Goerli): Etherscan. However it's been reported (in foundry support TG) that goerli etherscan verification doesn't work since roughly a week ago.
+## Note
 
-10. Script migration:
+1. Compared to the versions used in actual deployments (see list below), some contracts in this repository have updated solc versions. This is due to the limitation of Foundry's lack of multi-version Solidity compiler support.
 
-- `hardhat accounts` turns into `make get-account-balances network=<name of the network, e.g. "monte_rosa"> environment-type=<type of environment, from development, staging, to production> account=<address to check>`
+- Solc v0.4: Used for the PermittableToken, which is the base implementation of the deployed xHOPR token. The source code has been extracted from the deployed contract, with the only modification being the loosening of the pragma solidity directive to support compilation.
+- Solc v0.6: Used for the deployed HoprToken.
+- Solc v0.8: Used for all newer contracts.
 
-11. `ETHERSCAN_API_KEY` contains the value of "API key for Gnosisscan", as our production and staging environment is on Gnosis chain. The reason why it remains "ETHERSCAN" instead of "GNOSISSCAN" is that foundry reads `ETHERSCAN_API_KEY` as an environment vairable for both `forge verify-contract` and `forge script`, which can not be configured in the foundry.toml file
-
-## Node Management Smart Contracts
-
-The latest node-staking design uses Safe as a center-piece.
-Leveraging its Account-Abstraction design, HOPR node runners can secure node operation with an m-of-n Smart Account.
-
-### Developer Notes:
-
-1. Imported libraries:
-
-Dependencies are vendored directly into the repo. :
+2. Most of the libraries are locked to specific commit or version
 
 - Audited Safe contracts at commit [eb93dbb0f62e2dc1b308ac4c110038062df0a8c9](https://github.com/safe-global/safe-contracts/blob/main/docs/audit_1_4_0.md)
 - Audited Zodiac Modifier Roles v1 contracts at commit [454be9d3c26f90221ca717518df002d1eca1845f](https://github.com/gnosis/zodiac-modifier-roles-v1/tree/main) After importing the contracts, adjust the pragma for two contracts; and manually imported their imports from Gnosis Safe, e.g. Enum.sol
@@ -290,7 +231,7 @@ forge install safe-global/safe-contracts@eb93dbb0f62e2dc1b308ac4c110038062df0a8c
    --no-git --no-commit
 ```
 
-2. `SafeSuiteSetupScript` deploys basic Safe suites. We deploy all the contracts with `main-suite` tag, in a deterministic way
+3. `SafeSuiteSetupScript` deploys basic Safe suites. We deploy all the contracts with `main-suite` tag, in a deterministic way
 
 |                              | l2  | l2-suite | main-suite | accessors | factory | handlers | libraries | singleton |
 | ---------------------------- | --- | -------- | ---------- | --------- | ------- | -------- | --------- | --------- |
@@ -305,7 +246,7 @@ forge install safe-global/safe-contracts@eb93dbb0f62e2dc1b308ac4c110038062df0a8c
 | SafeL2                       | x   | x        |            |           |         |          |           |           |
 | Safe                         |     |          | x          |           |         |          |           | x         |
 
-3. deployment starts with a singleton contract. Singleton's deployment details are saved under https://github.com/safe-global/safe-singleton-factory/tree/main/artifacts
+4. Deployment starts with a singleton contract. Singleton's deployment details are saved under https://github.com/safe-global/safe-singleton-factory/tree/main/artifacts
    Specifically, for "anvil-deploy-safe-singleton" target, it follows instruction from [safe-global/safe-singleton-factory/artifacts/31337/deployment.json](https://github.com/safe-global/safe-singleton-factory/blob/6700a7c90ececc8cb9e1a4d97fd70fea1ee4670d/artifacts/31337/deployment.json)
 
-4. when running `make run-anvil`, it also deploys the SafeSingleton which is used as a deployer factory in deterministic deployment.
+   When running `make run-anvil`, it also deploys the SafeSingleton which is used as a deployer factory in deterministic deployment.
