@@ -422,7 +422,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::TicketAggregationProcessed;
-    use async_std::prelude::FutureExt;
     use futures::pin_mut;
     use futures::stream::StreamExt;
     use hex_literal::hex;
@@ -441,6 +440,7 @@ mod tests {
     use lazy_static::lazy_static;
     use std::ops::{Add, Mul};
     use std::time::Duration;
+    use tokio::time::timeout;
 
     lazy_static! {
         static ref PEERS: Vec<OffchainKeypair> = [
@@ -481,7 +481,7 @@ mod tests {
             .amount(price_per_packet.div_f64(ticket_win_prob)?)
             .index(index)
             .index_offset(1)
-            .win_prob(ticket_win_prob)
+            .win_prob(ticket_win_prob.try_into()?)
             .channel_epoch(1)
             .challenge(response.to_challenge().into())
             .build_signed(signer, &domain_separator)?
@@ -523,7 +523,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_aggregation() -> anyhow::Result<()> {
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await?;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await?;
@@ -581,7 +581,7 @@ mod tests {
             .aggregate_tickets(&channel_alice_bob.get_id(), Default::default())?;
 
         let mut finalizer = None;
-        match bob.next().timeout(Duration::from_secs(5)).await {
+        match timeout(Duration::from_secs(5), bob.next()).await {
             Ok(Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer))) => {
                 let _ = finalizer.insert(request_finalizer);
                 assert_eq!(
@@ -598,14 +598,14 @@ mod tests {
             _ => panic!("unexpected action happened while sending agg request by Bob"),
         };
 
-        match alice.next().timeout(Duration::from_secs(5)).await {
+        match timeout(Duration::from_secs(5), alice.next()).await {
             Ok(Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ()))) => {
                 bob.writer().receive_ticket(alice_packet_key, aggregated_ticket, ())?
             }
             _ => panic!("unexpected action happened while awaiting agg request at Alice"),
         };
 
-        match bob.next().timeout(Duration::from_secs(5)).await {
+        match timeout(Duration::from_secs(5), bob.next()).await {
             Ok(Some(TicketAggregationProcessed::Receive(_destination, _acked_tkt, ()))) => {
                 finalizer.take().expect("finalizer should be present").finalize()
             }
@@ -649,7 +649,7 @@ mod tests {
         Ok(awaiter.consume_and_wait(Duration::from_millis(2000)).await?)
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_aggregation_skip_lower_indices() -> anyhow::Result<()> {
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await?;
         let db_bob = HoprDb::new_in_memory(PEERS_CHAIN[1].clone()).await?;
@@ -703,7 +703,7 @@ mod tests {
             .aggregate_tickets(&channel_alice_bob.get_id(), Default::default())?;
 
         let mut finalizer = None;
-        match bob.next().timeout(Duration::from_secs(5)).await {
+        match timeout(Duration::from_secs(5), bob.next()).await {
             Ok(Some(TicketAggregationProcessed::Send(_, acked_tickets, request_finalizer))) => {
                 let _ = finalizer.insert(request_finalizer);
                 assert_eq!(
@@ -720,14 +720,14 @@ mod tests {
             _ => panic!("unexpected action happened while sending agg request by Bob"),
         };
 
-        match alice.next().timeout(Duration::from_secs(5)).await {
+        match timeout(Duration::from_secs(5), alice.next()).await {
             Ok(Some(TicketAggregationProcessed::Reply(_, aggregated_ticket, ()))) => {
                 bob.writer().receive_ticket(alice_packet_key, aggregated_ticket, ())?
             }
             _ => panic!("unexpected action happened while awaiting agg request at Alice"),
         };
 
-        match bob.next().timeout(Duration::from_secs(5)).await {
+        match timeout(Duration::from_secs(5), bob.next()).await {
             Ok(Some(TicketAggregationProcessed::Receive(_destination, _acked_tkt, ()))) => {
                 finalizer.take().expect("finalizer should be present").finalize()
             }

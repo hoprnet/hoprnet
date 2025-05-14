@@ -45,8 +45,10 @@ class Snapshot:
 
             db_target_dir.mkdir(parents=True, exist_ok=True)
 
-            for file in EXPECTED_FILES_FOR_SNAPSHOT:
-                shutil.copy(source_dir.joinpath(file), db_target_dir)
+            # FIXME: This breaks the random base port approach since nodes will make announcements using different port.
+            # Skipping for now until a better approach is found.
+            # for file in EXPECTED_FILES_FOR_SNAPSHOT:
+            #   shutil.copy(source_dir.joinpath(file), db_target_dir)
 
             shutil.copy(source_dir.joinpath("./hoprd.id"), target_dir)
             shutil.copy(source_dir.joinpath("./.env"), target_dir)
@@ -75,13 +77,16 @@ class Snapshot:
             self.sdir.joinpath("barebone.cfg.yaml"),
             self.sdir.joinpath("default.cfg.yaml"),
         ]
-        for i in range(self.cluster.size):
-            node_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
-            expected_files.extend([node_dir.joinpath(file) for file in EXPECTED_FILES_FOR_SNAPSHOT])
+
+        # FIXME: This breaks the random base port approach since nodes will make announcements using different port.
+        # Skipping for now until a better approach is found.
+        # for i in range(self.cluster.size):
+        #     node_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
+        #     expected_files.extend([node_dir.joinpath(file) for file in EXPECTED_FILES_FOR_SNAPSHOT])
 
         for f in expected_files:
             if not f.exists():
-                logging.info(f"Cannot find {f} in snapshot")
+                logging.warning(f"Cannot find {f} in snapshot")
                 return False
 
         return True

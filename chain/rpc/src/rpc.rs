@@ -23,7 +23,7 @@ use validator::Validate;
 use hopr_bindings::hopr_node_management_module::HoprNodeManagementModule;
 use hopr_chain_types::{utils::DIV_BY_ZERO, ContractAddresses, ContractInstances, NetworkRegistryProxy};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-use hopr_internal_types::prelude::{win_prob_to_f64, EncodedWinProb};
+use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::RpcError::ContractError;
@@ -203,13 +203,9 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprRpcOperations f
         }
     }
 
-    async fn get_minimum_network_winning_probability(&self) -> Result<f64> {
+    async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability> {
         match self.contract_instances.win_prob_oracle.current_win_prob().call().await {
-            Ok(encoded_win_prob) => {
-                let mut encoded: EncodedWinProb = Default::default();
-                encoded.copy_from_slice(&encoded_win_prob.to_be_bytes()[1..]);
-                Ok(win_prob_to_f64(&encoded))
-            }
+            Ok(encoded_win_prob) => Ok(encoded_win_prob.into()),
             Err(e) => Err(ContractError(
                 "WinProbOracle".to_string(),
                 "current_win_prob".to_string(),
@@ -472,7 +468,7 @@ mod tests {
     use hopr_primitive_types::prelude::*;
     use std::str::FromStr;
 
-    use crate::client::surf_client::SurfRequestor;
+    use crate::client::reqwest_client::ReqwestRequestor;
     use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
 
     lazy_static::lazy_static! {
@@ -512,7 +508,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_estimate_tx() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -520,12 +516,13 @@ mod tests {
         let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
-        let mut server = mockito::Server::new();
+        let mut server = mockito::Server::new_async().await;
         let gas_oracle_mock = server.mock("GET", "/gas_oracle")
             .with_header("content-type", "application/json")
             .with_status(200)
             .with_body(r#"{"status":"1","message":"OK","result":{"LastBlock":"38791478","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999985432689946"}}"#)
-            .create();
+            .create_async()
+            .await;
 
         let cfg = RpcOperationsConfig {
             chain_id: anvil.chain_id(),
@@ -538,14 +535,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         // call eth_gas_estimate
         let (_, estimated_max_priority_fee) = rpc.provider.estimate_eip1559_fees(None).await?;
@@ -565,7 +562,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_send_tx() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -584,14 +581,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -609,7 +606,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_send_consecutive_txs() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -628,14 +625,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -666,7 +663,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_balance_native() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -685,14 +682,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
@@ -710,7 +707,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_balance_token() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -720,7 +717,7 @@ mod tests {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
@@ -739,14 +736,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await?;
         assert_eq!(amount, balance.amount().as_u64(), "invalid balance");
@@ -754,7 +751,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_check_node_safe_module_status() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -764,7 +761,7 @@ mod tests {
 
         // Deploy contracts
         let (contract_instances, module, safe) = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
             let instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0).await?;
 
             // deploy MULTICALL contract to anvil
@@ -795,14 +792,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client.clone(), SurfRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(client.clone(), ReqwestRequestor::default(), &chain_key_0, cfg)?;
 
         let result_before_including_node = rpc.check_node_safe_module_status((&chain_key_0).into()).await?;
         // before including node to the safe and module, only the first chck is false, the others are true
@@ -847,7 +844,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_eligibility_status() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -858,7 +855,7 @@ mod tests {
 
         // Deploy contracts
         let (contract_instances, module, safe) = {
-            let client = create_rpc_client_to_anvil(SurfRequestor::default(), &anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
             let instances = ContractInstances::deploy_for_testing(client.clone(), &chain_key_0).await?;
 
             // deploy MULTICALL contract to anvil
@@ -889,14 +886,14 @@ mod tests {
 
         let client = JsonRpcProviderClient::new(
             &anvil.endpoint(),
-            SurfRequestor::default(),
+            ReqwestRequestor::default(),
             SimpleJsonRpcRetryPolicy::default(),
         );
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client.clone(), SurfRequestor::default(), &chain_key_0, cfg.clone())?;
+        let rpc = RpcOperations::new(client.clone(), ReqwestRequestor::default(), &chain_key_0, cfg.clone())?;
 
         // check the eligibility status (before registering in the NetworkRegistry contract)
         let result_before_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).await?;

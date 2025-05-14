@@ -452,7 +452,7 @@ mod tests {
 
     use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair};
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_store_single_log() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -478,7 +478,7 @@ mod tests {
         assert_eq!(logs[0], log);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_store_multiple_logs() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -527,7 +527,7 @@ mod tests {
         assert_eq!(log_2, log_2_retrieved);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_store_duplicate_log() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -555,7 +555,7 @@ mod tests {
         assert_eq!(logs.len(), 1);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_log_processed() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -587,7 +587,7 @@ mod tests {
         assert!(log_db_updated.processed_at.is_some());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_list_logs_ordered() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -650,7 +650,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_nonexistent_log() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -659,7 +659,7 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_logs_with_block_offset() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -703,7 +703,7 @@ mod tests {
         assert_eq!(logs[0], log_1);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_logs_unprocessed() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -732,7 +732,7 @@ mod tests {
         assert!(log_db.processed_at.is_none());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_logs_block_numbers() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -805,7 +805,7 @@ mod tests {
         assert_eq!(block_numbers_unprocessed_second[0], 2);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_update_logs_checksums() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -870,7 +870,7 @@ mod tests {
         assert_ne!(updated_log_1, updated_log_3);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_allow_inconsistent_logs_in_the_db() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
         let addr_1 = Address::new(b"my address 123456789");

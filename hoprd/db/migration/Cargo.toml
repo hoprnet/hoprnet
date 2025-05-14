@@ -13,5 +13,5 @@ name = "hoprd_migration"
 path = "src/lib.rs"
 
 [dependencies]
-async-std = { workspace = true, features = ["attributes", "tokio1"] }
+tokio = { workspace = true }
 sea-orm-migration = { workspace = true }

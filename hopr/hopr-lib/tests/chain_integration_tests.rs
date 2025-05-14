@@ -15,7 +15,7 @@ use hopr_chain_actions::redeem::TicketRedeemActions;
 use hopr_chain_actions::ChainActions;
 use hopr_chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
 use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use hopr_chain_rpc::client::surf_client::SurfRequestor;
+use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
 use hopr_chain_rpc::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor};
 use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
 use hopr_chain_types::chain_events::ChainEventType;
@@ -47,7 +47,7 @@ async fn generate_the_first_ack_ticket(
         .balance(price)
         .index(0)
         .index_offset(1)
-        .win_prob(1.0)
+        .win_prob(WinningProbability::ALWAYS)
         .channel_epoch(1)
         .challenge(Challenge::from(cp_sum).into())
         .build_signed(counterparty, &domain_separator)?
@@ -173,8 +173,8 @@ const SNAPSHOT_ALICE_RX: &str = "tests/snapshots/indexer_snapshot_alice_in";
 const SNAPSHOT_BOB_TX: &str = "tests/snapshots/indexer_snapshot_bob_out";
 const SNAPSHOT_BOB_RX: &str = "tests/snapshots/indexer_snapshot_bob_in";
 
-// only working for async-std atm
-#[cfg_attr(feature = "runtime-async-std", test_log::test(async_std::test))]
+// #[tracing_test::traced_test]
+#[tokio::test]
 async fn integration_test_indexer() -> anyhow::Result<()> {
     let block_time = Duration::from_secs(1);
     let anvil = create_anvil(Some(block_time));
@@ -193,26 +193,26 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         tracing::warn!("snapshot based tests require fixed RNG")
     }
 
-    let requestor_base = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BASE)
+    let requestor_base = SnapshotRequestor::new(ReqwestRequestor::default(), SNAPSHOT_BASE)
         .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
         .load(true)
         .await;
-    let requestor_alice_rx = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_ALICE_RX)
-        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
-        .with_aggresive_save()
-        .load(true)
-        .await;
-    let requestor_alice_tx = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_ALICE_TX)
+    let requestor_alice_rx = SnapshotRequestor::new(ReqwestRequestor::default(), SNAPSHOT_ALICE_RX)
         .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
         .with_aggresive_save()
         .load(true)
         .await;
-    let requestor_bob_rx = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BOB_RX)
+    let requestor_alice_tx = SnapshotRequestor::new(ReqwestRequestor::default(), SNAPSHOT_ALICE_TX)
         .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
         .with_aggresive_save()
         .load(true)
         .await;
-    let requestor_bob_tx = SnapshotRequestor::new(SurfRequestor::default(), SNAPSHOT_BOB_TX)
+    let requestor_bob_rx = SnapshotRequestor::new(ReqwestRequestor::default(), SNAPSHOT_BOB_RX)
+        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
+        .with_aggresive_save()
+        .load(true)
+        .await;
+    let requestor_bob_tx = SnapshotRequestor::new(ReqwestRequestor::default(), SNAPSHOT_BOB_TX)
         .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
         .with_aggresive_save()
         .load(true)

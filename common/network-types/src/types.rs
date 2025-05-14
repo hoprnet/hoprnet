@@ -1,6 +1,8 @@
 use crate::errors::NetworkTypeError;
 use hickory_resolver::name_server::ConnectionProvider;
 use hickory_resolver::AsyncResolver;
+use hopr_crypto_packet::prelude::HoprSenderId;
+use hopr_crypto_packet::HoprSurb;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_path::ValidatedPath;
@@ -73,30 +75,21 @@ impl IpOrHost {
     /// Tries to resolve the DNS name and returns all IP addresses found.
     /// If this enum is already an IP address and port, it will simply return it.
     ///
-    /// Uses `async-std` resolver.
-    #[cfg(all(not(test), feature = "runtime-async-std"))]
-    pub async fn resolve_async_std(self) -> std::io::Result<Vec<SocketAddr>> {
-        let resolver = async_std_resolver::resolver_from_system_conf().await?;
-        self.resolve(resolver).await
-    }
-
-    /// Tries to resolve the DNS name and returns all IP addresses found.
-    /// If this enum is already an IP address and port, it will simply return it.
-    ///
     /// Uses `tokio` resolver.
     #[cfg(feature = "runtime-tokio")]
     pub async fn resolve_tokio(self) -> std::io::Result<Vec<SocketAddr>> {
-        let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
-        self.resolve(resolver).await
-    }
+        cfg_if::cfg_if! {
+            if #[cfg(test)] {
+                // This resolver setup is used in the tests to be executed in a sandbox environment
+                // which prevents IO access to system-level files.
+                let config = hickory_resolver::config::ResolverConfig::new();
+                let options = hickory_resolver::config::ResolverOpts::default();
+                let resolver = hickory_resolver::AsyncResolver::tokio(config, options);
+            } else {
+                let resolver = hickory_resolver::AsyncResolver::tokio_from_system_conf()?;
+            }
+        };
 
-    // This resolver setup is used in our tests because these are executed in a sandbox environment
-    // which prevents IO access to system-level files.
-    #[cfg(all(test, feature = "runtime-async-std"))]
-    pub async fn resolve_async_std(self) -> std::io::Result<Vec<SocketAddr>> {
-        let config = async_std_resolver::config::ResolverConfig::new();
-        let opts = async_std_resolver::config::ResolverOpts::default();
-        let resolver = async_std_resolver::resolver(config, opts).await;
         self.resolve(resolver).await
     }
 
@@ -318,6 +311,26 @@ impl RoutingOptions {
     }
 }
 
+/// Allows finding saved SURBs based on different criteria.
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SurbMatcher {
+    /// Try to find a SURB that has the exact given [`HoprSenderId`].
+    Exact(HoprSenderId),
+    /// Find any SURB with the given pseudonym.
+    Pseudonym(HoprPseudonym),
+}
+
+impl SurbMatcher {
+    /// Get the pseudonym part of the match.
+    pub fn pseudonym(&self) -> HoprPseudonym {
+        match self {
+            SurbMatcher::Exact(id) => id.pseudonym(),
+            SurbMatcher::Pseudonym(p) => *p,
+        }
+    }
+}
+
 /// Routing information containing forward or return routing options.
 ///
 /// Information in this object represents the minimum required basis
@@ -334,7 +347,7 @@ pub enum DestinationRouting {
         destination: Address,
         /// Our pseudonym shown to the destination.
         ///
-        /// If not given, will be resolved as random.
+        /// If not given, it will be resolved as random.
         pseudonym: Option<HoprPseudonym>,
         /// The path to the destination.
         forward_options: RoutingOptions,
@@ -344,7 +357,7 @@ pub enum DestinationRouting {
     /// Return routing using a SURB with the given pseudonym.
     ///
     /// Will fail if no SURB for this pseudonym is found.
-    Return(HoprPseudonym),
+    Return(SurbMatcher),
 }
 
 impl DestinationRouting {
@@ -366,7 +379,7 @@ impl DestinationRouting {
 ///
 /// It contains the actual forward and return paths for forward packets,
 /// or an actual SURB for return (reply) packets.
-#[derive(Debug, Clone, strum::EnumIs)]
+#[derive(Clone, Debug, strum::EnumIs)]
 pub enum ResolvedTransportRouting {
     /// Concrete routing information for a forward packet.
     Forward {
@@ -377,8 +390,8 @@ pub enum ResolvedTransportRouting {
         /// Optional list of return paths.
         return_paths: Vec<ValidatedPath>,
     },
-    /// Pseudonym of a SURB to retrieve.
-    Return(HoprPseudonym),
+    /// Sender ID and the corresponding SURB.
+    Return(HoprSenderId, HoprSurb),
 }
 
 impl ResolvedTransportRouting {
@@ -399,35 +412,6 @@ mod tests {
     use hopr_crypto_types::prelude::{Keypair, OffchainKeypair};
     use std::net::SocketAddr;
 
-    #[cfg(feature = "runtime-async-std")]
-    #[async_std::test]
-    async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
-        match IpOrHost::Dns("localhost".to_string(), 1000)
-            .resolve_async_std()
-            .await?
-            .first()
-            .ok_or(anyhow!("must resolve"))?
-        {
-            SocketAddr::V4(addr) => assert_eq!(*addr, "127.0.0.1:1000".parse()?),
-            SocketAddr::V6(addr) => assert_eq!(*addr, "::1:1000".parse()?),
-        }
-        Ok(())
-    }
-
-    #[cfg(feature = "runtime-async-std")]
-    #[async_std::test]
-    async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
-        let actual = IpOrHost::Ip("127.0.0.1:1000".parse()?).resolve_async_std().await?;
-
-        let actual = actual.first().ok_or(anyhow!("must resolve"))?;
-
-        let expected: SocketAddr = "127.0.0.1:1000".parse()?;
-
-        assert_eq!(*actual, expected);
-        Ok(())
-    }
-
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     #[tokio::test]
     async fn ip_or_host_must_resolve_dns_name() -> anyhow::Result<()> {
         match IpOrHost::Dns("localhost".to_string(), 1000)
@@ -442,7 +426,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
     #[tokio::test]
     async fn ip_or_host_must_resolve_ip_address() -> anyhow::Result<()> {
         let actual = IpOrHost::Ip("127.0.0.1:1000".parse()?).resolve_tokio().await?;

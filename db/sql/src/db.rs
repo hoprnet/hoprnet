@@ -257,7 +257,7 @@ mod tests {
     use multiaddr::Multiaddr;
     use rand::{distributions::Alphanumeric, Rng}; // 0.8
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_basic_db_init() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -270,7 +270,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn peers_without_any_recent_updates_should_be_discarded_on_restarts() -> anyhow::Result<()> {
         let random_filename: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
@@ -308,7 +308,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn peers_with_a_recent_update_should_be_retained_in_the_database() -> anyhow::Result<()> {
         let random_filename: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)

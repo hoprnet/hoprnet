@@ -13,9 +13,8 @@ extern crate core;
 use async_trait::async_trait;
 pub use ethers::types::transaction::eip2718::TypedTransaction;
 use futures::{FutureExt, Stream};
-use http_types::convert::Deserialize;
 use primitive_types::H256;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
@@ -25,6 +24,7 @@ use std::pin::Pin;
 use std::time::Duration;
 
 use hopr_crypto_types::types::Hash;
+use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::RpcError::{ProviderError, TransactionDropped};
@@ -244,7 +244,7 @@ pub trait HttpRequestor: std::fmt::Debug + Send + Sync {
     /// and gets the JSON response.
     async fn http_query<T>(
         &self,
-        method: http_types::Method,
+        method: http::Method,
         url: &str,
         data: Option<T>,
     ) -> std::result::Result<Box<[u8]>, HttpRequestError>
@@ -257,13 +257,13 @@ pub trait HttpRequestor: std::fmt::Debug + Send + Sync {
     where
         T: Serialize + Send + Sync,
     {
-        self.http_query(http_types::Method::Post, url, Some(data)).await
+        self.http_query(http::Method::POST, url, Some(data)).await
     }
 
     /// Performs HTTP GET query to the given URL
     /// and gets the JSON response.
     async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError> {
-        self.http_query(http_types::Method::Get, url, Option::<()>::None).await
+        self.http_query(http::Method::GET, url, Option::<()>::None).await
     }
 }
 
@@ -397,7 +397,7 @@ pub trait HoprRpcOperations {
 
     /// Retrieves the minimum incoming ticket winning probability by directly
     /// calling the network's winning probability oracle.
-    async fn get_minimum_network_winning_probability(&self) -> Result<f64>;
+    async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability>;
 
     /// Retrieves the minimum ticket prices by directly calling the network's
     /// ticket price oracle.

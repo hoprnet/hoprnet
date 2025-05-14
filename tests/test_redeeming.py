@@ -20,9 +20,6 @@ from .utils import (
     shuffled,
 )
 
-# used by nodes to get unique port assignments
-PORT_BASE = 19000
-
 
 @pytest.mark.usefixtures("swarm7_reset")
 class TestRedeemingWithSwarm:

@@ -152,14 +152,6 @@ pub struct CliArgs {
     pub password: Option<String>,
 
     #[arg(
-        long = "disableUnrealizedBalanceCheck",
-        env = "HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK",
-        help = "Disables checking of unrealized balance before validating unacknowledged tickets.",
-        action = ArgAction::Count
-    )]
-    pub no_check_unrealized_balance: u8,
-
-    #[arg(
         long = "noKeepLogs",
         env = "HOPRD_INDEXER_DISABLE_KEEP_LOGS",
         help = "Disables keeping RPC logs in the logs database after they were processed.",

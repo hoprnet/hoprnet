@@ -138,6 +138,11 @@ async def check_unredeemed_tickets_value(src: Node, value: int):
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
+async def check_winning_tickets_count(src: Node, value: int):
+    while (await src.api.get_tickets_statistics()).winning_count < value:
+        await asyncio.sleep(CHECK_RETRY_INTERVAL)
+
+
 async def check_safe_balance(src: Node, value: int):
     while f"{(await src.api.balances()).safe_hopr:.0f}" >= f"{value:.0f}":
         await asyncio.sleep(CHECK_RETRY_INTERVAL)

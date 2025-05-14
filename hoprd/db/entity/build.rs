@@ -39,7 +39,8 @@ where
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cargo_manifest_dir = &env::var("CARGO_MANIFEST_DIR").expect("Points to a valid manifest dir");
     let db_migration_package_path = Path::new(&cargo_manifest_dir).parent().unwrap().join("migration");
 
@@ -62,7 +63,7 @@ fn main() {
 
     let _ = std::fs::remove_file(&tmp_db);
 
-    async_std::task::block_on(execute_sea_orm_cli_command([
+    execute_sea_orm_cli_command([
         "sea-orm-cli",
         "migrate",
         "refresh",
@@ -74,9 +75,10 @@ fn main() {
         .as_str(),
         "-d",
         db_migration_package_path.to_string_lossy().as_ref(),
-    ]));
+    ])
+    .await;
 
-    async_std::task::block_on(execute_sea_orm_cli_command([
+    execute_sea_orm_cli_command([
         "sea-orm-cli",
         "generate",
         "entity",
@@ -91,5 +93,6 @@ fn main() {
                 .expect("should contain valid temporary db path")
         )
         .as_str(),
-    ]));
+    ])
+    .await;
 }

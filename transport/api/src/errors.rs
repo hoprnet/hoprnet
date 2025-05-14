@@ -12,11 +12,11 @@ pub enum HoprTransportError {
     #[error("General error: {0}")]
     General(#[from] hopr_primitive_types::errors::GeneralError),
 
-    #[error("Db error: {0}")]
+    #[error("DB API error: {0}")]
     Db(#[from] hopr_db_sql::api::errors::DbError),
 
     // TODO(20250114): Unify all Databse API functionality in the db_api crate and remove this error.
-    #[error("Db error: {0}")]
+    #[error("DB SQL error: {0}")]
     Database(#[from] hopr_db_sql::errors::DbSqlError),
 
     #[error("Path error: {0}")]

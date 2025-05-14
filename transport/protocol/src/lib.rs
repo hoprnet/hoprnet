@@ -74,6 +74,7 @@ use tracing::error;
 
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
+use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_transport_identity::PeerId;
@@ -143,7 +144,7 @@ pub async fn run_msg_ack_protocol<Db>(
         impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
     ),
     api: (
-        impl futures::Sink<ApplicationData> + Send + Sync + 'static,
+        impl futures::Sink<(HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
         impl futures::Stream<Item = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
             + Send
             + Sync
@@ -316,6 +317,7 @@ where
                     match packet {
                         IncomingPacket::Final {
                             previous_hop,
+                            sender,
                             plain_text,
                             ack_key,
                             ..
@@ -337,7 +339,7 @@ where
                                             });
                                     }
 
-                                    Some(plain_text)
+                                    Some((sender, plain_text))
                                 }
                                 IncomingPacket::Forwarded {
                                     previous_hop,
@@ -376,8 +378,11 @@ where
                     }
                 }})
                 .filter_map(|maybe_data| async move {
-                    if let Some(data) = maybe_data {
-                        ApplicationData::from_bytes(data.as_ref()).inspect_err(|error| tracing::error!(error = %error, "Failed to decode application data")).ok()
+                    if let Some((sender, data)) = maybe_data {
+                        ApplicationData::from_bytes(data.as_ref())
+                            .inspect_err(|error| tracing::error!(error = %error, "Failed to decode application data"))
+                            .ok()
+                            .map(|data| (sender, data))
                     } else {
                         None
                     }

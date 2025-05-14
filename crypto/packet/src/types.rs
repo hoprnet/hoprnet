@@ -1,9 +1,90 @@
+use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
 use hopr_crypto_sphinx::errors::SphinxError;
 use hopr_crypto_sphinx::prelude::{PaddedPayload, SphinxHeaderSpec, SphinxSuite, SURB};
-use hopr_primitive_types::prelude::GeneralError;
+use hopr_crypto_types::prelude::Hash;
+use hopr_internal_types::prelude::HoprPseudonym;
+use hopr_primitive_types::prelude::{BytesRepresentable, GeneralError};
 use std::marker::PhantomData;
 
-use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
+pub const SURB_ID_SIZE: usize = 8;
+
+pub type HoprSurbId = [u8; SURB_ID_SIZE];
+
+/// Identifier of the packet sender.
+///
+/// This consists of two parts:
+/// - [`HoprSenderId::pseudonym`] of the sender
+/// - [`HoprSenderId::surb_id`] is an identifier a single SURB that routes the packet back to the sender.
+///
+/// The `surb_id` always identifies a single SURB. The instance can be turned into a pseudorandom
+/// sequence using [`HoprSenderId::into_sequence`] to create identifiers for more SURBs
+/// with the same pseudonym.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct HoprSenderId(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] [u8; Self::SIZE]);
+
+impl HoprSenderId {
+    pub fn new(pseudonym: &HoprPseudonym) -> Self {
+        let mut ret: [u8; Self::SIZE] = hopr_crypto_random::random_bytes();
+        ret[..HoprPseudonym::SIZE].copy_from_slice(pseudonym.as_ref());
+        Self(ret)
+    }
+
+    pub fn from_pseudonym_and_id(pseudonym: &HoprPseudonym, id: HoprSurbId) -> Self {
+        let mut ret = [0u8; Self::SIZE];
+        ret[..HoprPseudonym::SIZE].copy_from_slice(pseudonym.as_ref());
+        ret[HoprPseudonym::SIZE..HoprPseudonym::SIZE + SURB_ID_SIZE].copy_from_slice(&id);
+        Self(ret)
+    }
+
+    pub fn pseudonym(&self) -> HoprPseudonym {
+        HoprPseudonym::try_from(&self.0[..HoprPseudonym::SIZE]).expect("must have valid pseudonym")
+    }
+
+    pub fn surb_id(&self) -> HoprSurbId {
+        self.0[HoprPseudonym::SIZE..HoprPseudonym::SIZE + SURB_ID_SIZE]
+            .try_into()
+            .expect("must have valid nonce")
+    }
+
+    pub fn into_sequence(self) -> impl Iterator<Item = Self> {
+        std::iter::successors(Some((1u32, self)), |&(i, prev)| {
+            let hash = Hash::create(&[&i.to_be_bytes(), prev.as_ref()]);
+            Some((
+                i + 1,
+                Self::from_pseudonym_and_id(&prev.pseudonym(), hash.as_ref()[0..SURB_ID_SIZE].try_into().unwrap()),
+            ))
+        })
+        .map(|(_, v)| v)
+    }
+}
+
+impl AsRef<[u8]> for HoprSenderId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for HoprSenderId {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        value
+            .try_into()
+            .map(Self)
+            .map_err(|_| GeneralError::ParseError("HoprPacketReceiverData.size".into()))
+    }
+}
+
+impl BytesRepresentable for HoprSenderId {
+    const SIZE: usize = HoprPseudonym::SIZE + SURB_ID_SIZE;
+}
+
+impl hopr_crypto_random::Randomizable for HoprSenderId {
+    fn random() -> Self {
+        Self::new(&HoprPseudonym::random())
+    }
+}
 
 /// Additional encoding of a packet message that can be preceded by a number of [`SURBs`](SURB).
 pub struct PacketMessage<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize>(PaddedPayload<P>, PhantomData<(S, H)>);
@@ -97,8 +178,8 @@ mod tests {
     use hopr_primitive_types::prelude::*;
 
     use crate::packet::HoprPacket;
-    use crate::por::generate_proof_of_relay;
-    use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite};
+    use crate::por::{generate_proof_of_relay, SurbReceiverInfo};
+    use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb};
 
     lazy_static::lazy_static! {
         static ref PEERS: [(ChainKeypair, OffchainKeypair); 4] = [
@@ -123,6 +204,7 @@ mod tests {
                 .map(|v| v.ok_or(anyhow!("missing id")))
                 .collect::<Result<Vec<_>, _>>()?;
         let pseudonym = SimplePseudonym::random();
+        let recv_data = HoprSenderId::new(&pseudonym);
 
         Ok((0..count)
             .into_iter()
@@ -135,8 +217,8 @@ mod tests {
                     shared_keys,
                     &path_ids,
                     &por_strings,
-                    &pseudonym,
-                    por_values,
+                    recv_data,
+                    SurbReceiverInfo::new(por_values, [0u8; 32]),
                 )
                 .map(|(s, _)| s)
             })
@@ -170,7 +252,7 @@ mod tests {
 
     #[test]
     fn hopr_packet_message_surbs_and_msg() -> anyhow::Result<()> {
-        let test_msg = b"test message";
+        let test_msg = b"test msg";
         let surbs_1 = generate_surbs(2)?;
         let hopr_msg = HoprPacketMessage::from_parts(surbs_1.clone(), test_msg)?;
         let (surbs_2, msg) = hopr_msg.try_into_parts()?;
@@ -196,6 +278,15 @@ mod tests {
     fn hopr_packet_message_surbs_size_limit() -> anyhow::Result<()> {
         let surbs = generate_surbs(3)?;
         let res = HoprPacketMessage::from_parts(surbs, &[]);
+        assert!(res.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hopr_packet_size_msg_and_surb_size_limit() -> anyhow::Result<()> {
+        let test_msg = [0u8; HoprPacket::PAYLOAD_SIZE - 2 * HoprSurb::SIZE + 1];
+        let surbs = generate_surbs(2)?;
+        let res = HoprPacketMessage::from_parts(surbs, &test_msg);
         assert!(res.is_err());
         Ok(())
     }

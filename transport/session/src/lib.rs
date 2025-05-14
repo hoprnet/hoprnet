@@ -1,37 +1,36 @@
 //! [`Session`] object providing the session functionality over the HOPR transport
 //!
-//! The session proxies the user interactions with the transport in order to hide the
+//! The session proxies the user interactions with the transport to hide the
 //! advanced interactions and functionality.
-
+//!
+//! The [`SessionManager`] allows for automatic management of sessions via the Start protocol.
+//!
+//! This crate implements [RFC-0007](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0007-session-protocol).
+pub(crate) mod balancer;
 pub mod errors;
 mod initiation;
 mod manager;
 pub mod traits;
 mod types;
 
+pub use balancer::SurbBalancerConfig;
 pub use hopr_network_types::types::*;
-pub use manager::{DispatchResult, SessionManager, SessionManagerConfig};
-pub use types::{
-    unwrap_chain_address, wrap_with_chain_address, IncomingSession, ServiceId, Session, SessionId, SessionTarget,
-    SESSION_USABLE_MTU_SIZE,
-};
+pub use manager::{DispatchResult, SessionManager, SessionManagerConfig, MIN_BALANCER_SAMPLING_INTERVAL};
+pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, SESSION_USABLE_MTU_SIZE};
 
 #[cfg(feature = "runtime-tokio")]
 pub use types::transfer_session;
 
-use hopr_network_types::prelude::state::SessionFeature;
-use hopr_primitive_types::prelude::Address;
+use hopr_internal_types::prelude::HoprPseudonym;
+use hopr_network_types::prelude::state::{SessionFeature, SessionSocket};
 
-#[cfg(feature = "serde")]
-use {
-    serde::{Deserialize, Serialize},
-    serde_with::{As, DisplayFromStr},
-};
+/// Number of bytes that can be sent in a single session payload.
+pub const SESSION_PAYLOAD_SIZE: usize = SessionSocket::<SESSION_USABLE_MTU_SIZE>::PAYLOAD_CAPACITY;
 
 /// Capabilities of a session.
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::EnumIter, strum::Display, strum::EnumString)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Capability {
     /// Frame segmentation
     Segmentation,
@@ -68,20 +67,21 @@ impl IntoIterator for Capability {
 ///
 /// Relevant primarily for the client, since the server is only
 /// a reactive component in regard to the session concept.
-#[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, PartialEq, Clone, smart_default::SmartDefault)]
 pub struct SessionClientConfig {
-    /// The peer to which the session should be established.
-    #[cfg_attr(feature = "serde", serde(with = "As::<DisplayFromStr>"))]
-    pub peer: Address,
-
-    /// The fixed path options for the session.
-    pub path_options: RoutingOptions,
-
-    // TODO: add RP support
-    /// Contains target protocol and optionally encrypted target of the session.
-    pub target: SessionTarget,
-
+    /// The forward path options for the session.
+    #[default(RoutingOptions::Hops(hopr_primitive_types::bounded::BoundedSize::MIN))]
+    pub forward_path_options: RoutingOptions,
+    /// The return path options for the session.
+    #[default(RoutingOptions::Hops(hopr_primitive_types::bounded::BoundedSize::MIN))]
+    pub return_path_options: RoutingOptions,
     /// Capabilities offered by the session.
+    #[default(_code = "vec![Capability::Segmentation]")]
     pub capabilities: Vec<Capability>,
+    /// Optional pseudonym used for the session. Mostly useful for testing only.
+    #[default(None)]
+    pub pseudonym: Option<HoprPseudonym>,
+    /// Enable automatic SURB management for the Session.
+    #[default(Some(SurbBalancerConfig::default()))]
+    pub surb_management: Option<SurbBalancerConfig>,
 }

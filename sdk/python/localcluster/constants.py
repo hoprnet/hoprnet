@@ -14,7 +14,7 @@ NODE_NAME_PREFIX = f"{IDENTITY_PREFIX}-node"
 
 NETWORK = "anvil-localhost"
 PASSWORD = "e2e-test"
-PORT_BASE = 3000
+BASE_PORT = 3000
 
 SUITE_NAME = "hopr-localcluster"
 MAIN_DIR = Path("/tmp").joinpath(SUITE_NAME)

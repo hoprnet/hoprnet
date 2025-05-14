@@ -25,6 +25,9 @@ pub enum TransportSessionError {
     #[error("impossible transport path")]
     Path,
 
+    #[error("no surb available for sending reply data")]
+    OutOfSurbs,
+
     #[error("the other party rejected session initiation with error: {0}")]
     Rejected(StartErrorReason),
 
@@ -47,8 +50,6 @@ pub enum SessionManagerError {
     NotStarted,
     #[error("manager is already started")]
     AlreadyStarted,
-    #[error("no session backrouting information was given")]
-    NoBackRoutingInfo,
     #[error("all challenge slots are occupied")]
     NoChallengeSlots,
     #[error("non-specific session manager error: {0}")]

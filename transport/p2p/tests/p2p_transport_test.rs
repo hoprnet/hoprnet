@@ -115,25 +115,24 @@ impl SelfClosingJoinHandle {
     }
 }
 
-#[cfg(feature = "runtime-async-std")]
 impl Drop for SelfClosingJoinHandle {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            block_on(handle.cancel());
+            handle.abort();
         }
     }
 }
 
-#[cfg(feature = "runtime-async-std")]
-use async_std::{
-    future::timeout,
-    task::{block_on, sleep, spawn, JoinHandle},
+use more_asserts::assert_gt;
+use tokio::{
+    task::{spawn, JoinHandle},
+    time::{sleep, timeout},
 };
+
 use hopr_crypto_packet::prelude::HoprPacket;
 
 #[ignore]
-#[cfg_attr(feature = "runtime-async-std", async_std::test)]
-// #[cfg_attr(feature = "runtime-async-std", tracing_test::traced_test)]
+#[tokio::test]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
     let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
@@ -177,9 +176,13 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
 
     let speed_in_mbytes_s =
         (RANDOM_GIBBERISH.len() * packet_count) as f64 / (start.elapsed()?.as_millis() as f64 * 1000f64);
-    tracing::info!("The measured speed for data transfer is ~{speed_in_mbytes_s}MB/s",);
 
-    assert!(speed_in_mbytes_s > 10.0f64);
+    assert_gt!(
+        speed_in_mbytes_s,
+        100.0f64,
+        "The measured speed for data transfer is ~{}MB/s",
+        speed_in_mbytes_s
+    );
 
     Ok(())
 }

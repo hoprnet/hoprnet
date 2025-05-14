@@ -176,6 +176,7 @@ class Channels:
 
 class Session(ApiResponseObject):
     keys = {
+        "destination": "destination",
         "ip": "ip",
         "port": "port",
         "protocol": "protocol",
