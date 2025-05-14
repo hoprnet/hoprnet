@@ -55,8 +55,14 @@ jobs:
           USER: runner
 
       - name: Run unit tests
-        run: |
-          nix build -L .#hopr-test
+        run: nix build -L .#hopr-test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./result
+          fail_ci_if_error: true
 
   tests-unit-nightly:
     runs-on: self-hosted-hoprnet-bigger
@@ -100,8 +106,7 @@ jobs:
           USER: runner
 
       - name: Run unit tests nightly
-        run: |
-          nix build -L .#hopr-test-nightly
+        run: nix build -L .#hopr-test-nightly
 
   tests-smart-contracts:
     runs-on: self-hosted-hoprnet-bigger

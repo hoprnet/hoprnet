@@ -8,12 +8,13 @@ let
   shellHook = ''
     ${pre-commit-check.shellHook}
   '';
-  packages = [ ];
+  packages = with pkgs; [ cargo-llvm-cov ];
   shellPackages = packages ++ extraPackages;
   cleanArgs = removeAttrs args [
     "pre-commit-check"
   ];
 in
 import ./testShell.nix (cleanArgs // {
-  inherit shellHook shellPackages;
+  inherit shellHook;
+  extraPackages = shellPackages;
 })
