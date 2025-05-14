@@ -430,7 +430,7 @@ class HoprdAPI:
         :param: protocol: Protocol
         :return: list[Session]
         """
-        is_ok, response = await self.__call_api(HTTPMethod.GET, f"session/{protocol.name.lower()}")
+        is_ok, response = await self.__call_api(HTTPMethod.GET, f"session/{protocol.value.lower()}")
         return [Session(s) for s in response] if is_ok else None
 
     async def session_client(
@@ -472,7 +472,7 @@ class HoprdAPI:
             capabilities.as_array, destination, listen_on, forward_path, return_path, actual_target, response_buffer
         )
 
-        is_ok, response = await self.__call_api(HTTPMethod.POST, f"session/{protocol.name.lower()}", data)
+        is_ok, response = await self.__call_api(HTTPMethod.POST, f"session/{protocol.value.lower()}", data)
 
         return Session(response) if is_ok else None
 
