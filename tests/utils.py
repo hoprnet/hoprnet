@@ -141,6 +141,7 @@ class HoprSession:
         fwd_path: dict,
         return_path: dict,
         capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
+        no_response_buffer: bool = False,
     ):
         self.src = src
         self.dest = dest
@@ -151,6 +152,7 @@ class HoprSession:
         self.session = None
         self.server_sock = None
         self.target_port = 0
+        self.no_response_buffer = no_response_buffer
 
     async def __aenter__(self):
         if self.proto is Protocol.TCP:
@@ -160,9 +162,14 @@ class HoprSession:
 
         self.server_sock.bind(("127.0.0.1", 0))
         self.target_port = self.server_sock.getsockname()[1]
+        logging.debug(f"Bound listening socket 127.0.0.1:{self.target_port} on {self.proto.name} for future Session")
 
         if self.proto is Protocol.TCP:
             self.server_sock.listen()
+
+        resp_buffer = "1 MiB"
+        if self.no_response_buffer:
+            resp_buffer = "0 MiB"
 
         self.session = await self.src.api.session_client(
             self.dest.peer_id,
@@ -171,6 +178,7 @@ class HoprSession:
             protocol=self.proto,
             target=f"127.0.0.1:{self.target_port}",
             capabilities=self.capabilities,
+            response_buffer=resp_buffer,
         )
         if self.session is None:
             raise Exception(f"Failed to open session {self.src.peer_id} -> {self.dest.peer_id} on {self.proto.name}")
@@ -187,7 +195,8 @@ class HoprSession:
             )
             self.session = None
             self.target_port = 0
-            self.server_sock.close()
+            if self.server_sock is not None:
+                self.server_sock.close()
         else:
             logging.error("Failed to close session")
 
@@ -203,6 +212,7 @@ class HoprSession:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         try:
+            logging.debug(f"Connected session client to 127.0.0.1:{self.session.port} on {self.proto.name}")
             yield s
         finally:
             s.close()
@@ -214,11 +224,21 @@ class HoprSession:
         return self.session.mtu
 
     @property
+    def listen_port(self):
+        if self.session is None:
+            raise Exception("Session is not open")
+        return self.session.port
+
+    @contextmanager
     def server_socket(self):
         if self.server_sock is None:
             raise Exception("Session is not open")
 
-        return self.server_sock
+        try:
+            yield self.server_sock
+        finally:
+            self.server_sock.close()
+            self.server_sock = None
 
 
 async def session_send_and_receive_packets(
@@ -229,27 +249,38 @@ async def session_send_and_receive_packets(
     return_path: dict,
 ):
     async with HoprSession(
-        Protocol.UDP, src, dest, fwd_path, return_path, SessionCapabilitiesBody(no_delay=True, segmentation=True)
+        Protocol.UDP, src, dest, fwd_path, return_path, SessionCapabilitiesBody(no_delay=True, segmentation=True),
+        no_response_buffer=True
     ) as session:
-        addr = ("127.0.0.1", session.target_port)
+        addr = ("127.0.0.1", session.listen_port)
+        msg_len = int(session.mtu / 2)
 
-        expected = [f"#{i}".ljust(session.mtu) for i in range(msg_count)]
+        expected = [f"#{i}".ljust(msg_len) for i in range(msg_count)]
         actual = []
+        total_sent = 0
 
         with session.client_socket() as s:
-            s.settimeout(20)
-            total_sent = 0
+            s.settimeout(5)
+            logging.debug(f"Sending {msg_count} UDP messages to 127.0.0.1:{session.listen_port}")
             for message in expected:
                 total_sent = total_sent + s.sendto(message.encode(), addr)
                 # UDP has no flow-control, so we must insert an artificial gap
                 await asyncio.sleep(0.01)
 
+        logging.debug(f"Sent {total_sent} bytes")
+
+        logging.debug(f"Receiving {msg_count} UDP messages at 127.0.0.1:{session.target_port}")
+        with session.server_socket() as s:
+            s.settimeout(5)
             while total_sent > 0:
-                chunk, _ = s.recvfrom(min(session.mtu, total_sent))
+                chunk, _ = s.recvfrom(min(msg_len, total_sent))
+                logging.debug(f"Received {len(chunk)} bytes")
                 total_sent = total_sent - len(chunk)
+
                 # Adapt for situations when data arrive completely unordered (also within the buffer)
                 actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
 
+        logging.debug(f"All bytes received")
         expected = [msg.strip() for msg in expected]
 
         actual.sort()

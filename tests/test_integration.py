@@ -7,7 +7,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 import pytest
 
-from sdk.python.api import HoprdAPI
+from sdk.python.api import HoprdAPI, Protocol
 from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.localcluster.constants import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
@@ -30,7 +30,7 @@ from .utils import (
     create_channel,
     gen_random_tag,
     shuffled,
-    session_send_and_receive_packets,
+    session_send_and_receive_packets, HoprSession,
 )
 
 
@@ -204,9 +204,9 @@ class TestIntegrationWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+        "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
-    async def test_reset_ticket_statistics_from_metrics(self, src: Node, dest: Node, swarm7: dict[str, Node]):
+    async def test_reset_ticket_statistics_from_metrics(self, src: Node, mid: Node, dest: Node, swarm7: dict[str, Node]):
         def count_metrics(metrics: str):
             types = ["neglected", "redeemed", "rejected"]
             count = 0
@@ -218,97 +218,55 @@ class TestIntegrationWithSwarm:
                 )
             return count
 
-        async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP, close_from_dest=False):
-            await send_and_receive_packets_with_pop(
-                ["1 hop message to self"], src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id]
-            )
+        async with create_channel(swarm7[src], swarm7[mid], funding=3 * TICKET_PRICE_PER_HOP, close_from_dest=False):
+            async with create_channel(swarm7[dest], swarm7[mid], funding=2 * TICKET_PRICE_PER_HOP, close_from_dest=False):
+                await session_send_and_receive_packets(
+                    1,
+                    src = swarm7[src],
+                    dest = swarm7[dest],
+                    fwd_path = {"IntermediatePath": [swarm7[mid].peer_id]},
+                    return_path = {"IntermediatePath": [swarm7[mid].peer_id]})
 
-        assert count_metrics(await swarm7[dest].api.metrics()) != 0
+        assert count_metrics(await swarm7[mid].api.metrics()) != 0
 
-        await swarm7[dest].api.reset_tickets_statistics()
+        await swarm7[mid].api.reset_tickets_statistics()
 
-        assert count_metrics(await swarm7[dest].api.metrics()) == 0
+        assert count_metrics(await swarm7[mid].api.metrics()) == 0
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "src,dest", [tuple(shuffled(barebone_nodes())[:2]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+        "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
-    async def test_hoprd_should_fail_sending_a_message_when_the_channel_is_out_of_funding(
-        self, src: str, dest: str, swarm7: dict[str, Node]
+    async def test_hoprd_should_reject_relaying_a_message_when_the_channel_is_out_of_funding(
+        self, src: Node, mid: Node, dest: Node, swarm7: dict[str, Node]
     ):
-        """
-        # FIXME: The following part can be enabled once incoming channel closure is
-        # implemented.
-        #
-        # need to close the incoming side to not have to wait for the closure timeout
-        # api_close_channel "${second_node_id}" "${node_id}" "${second_node_api}" "${node_addr}" "incoming"
-
-        # only fund for 2 tickets
-        # channel_info=$(api_open_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "200")
-
-        # need to wait a little to allow the other side to index the channel open event
-        # sleep 10
-        # api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
-        # for i in `seq 1 ${generated_tickets}`; do
-        #   log "PendingBalance in channel: Node ${node_id} send 1 hop message to self via node ${second_node_id}"
-        #   api_send_message "${node_api}" "${msg_tag}" "${peer_id}" \
-        #       "pendingbalance: hello, world 1 self" "${second_peer_id}"
-        # done
-
-        # seems like there's slight delay needed for tickets endpoint to return up to date tickets, \
-        #       probably because of blockchain sync delay
-        # sleep 5
-
-        # ticket_amount=$(api_get_tickets_in_channel ${second_node_api} ${channel_id} | jq '. | length')
-        # if [[ "${ticket_amount}" != "${generated_tickets}" ]]; then
-        #   msg "PendingBalance: Ticket amount ${ticket_amount} is different than expected ${generated_tickets}"
-        #   exit 1
-        # fi
-
-        # api_redeem_tickets_in_channel ${second_node_api} ${channel_id}
-        # sleep 5
-        # api_get_tickets_in_channel ${second_node_api} ${channel_id} "TICKETS_NOT_FOUND"
-        # api_close_channel "${node_id}" "${second_node_id}" "${node_api}" "${second_node_addr}" "outgoing"
-        """
-
         message_count = 2
 
-        async with AsyncExitStack() as channels:
-            await asyncio.gather(
-                *[
-                    channels.enter_async_context(
-                        create_channel(
-                            swarm7[i[0]],
-                            swarm7[i[1]],
-                            funding=message_count * TICKET_PRICE_PER_HOP,
-                            close_from_dest=False,
-                        )
-                    )
-                    for i in [[src, dest]]
-                ]
-            )
+        # The forward channel has only funding for Session Establishment and 1 message
+        # The return channel has only funding for Session Establishment
+        async with create_channel(swarm7[src], swarm7[mid], funding=2 * TICKET_PRICE_PER_HOP, close_from_dest=False):
+            async with create_channel(swarm7[dest], swarm7[mid], funding=TICKET_PRICE_PER_HOP, close_from_dest=False):
+                async with HoprSession(Protocol.UDP, swarm7[src], swarm7[dest],
+                                 {"IntermediatePath": [swarm7[mid].peer_id]},
+                                 {"IntermediatePath": [swarm7[mid].peer_id]}) as session:
 
-            packets = [
-                f"Channel agg and redeem on 1-hop: {src} - {dest} - {src} #{i:08d}" for i in range(message_count)
-            ]
-            await send_and_receive_packets_with_pop(
-                packets, src=swarm7[src], dest=swarm7[src], path=[swarm7[dest].peer_id], timeout=1
-            )
+                    with session.client_socket() as s:
+                        s.settimeout(5)
+                        for i in range(message_count):
+                            message = f"#{i}".ljust(session.mtu)
+                            total_sent = total_sent + s.sendto(message.encode(), ("127.0.0.1", session.listen_port))
+                            # UDP has no flow-control, so we must insert an artificial gap
+                            await asyncio.sleep(0.01)
 
-            # this message has no funding in the channel, but it still should be sent
-            assert await swarm7[src].api.send_message(
-                swarm7[src].peer_id, "THIS MSG IS NOT COVERED", [swarm7[dest].peer_id]
-            )
+                await asyncio.wait_for(
+                    check_unredeemed_tickets_value(swarm7[mid], message_count * TICKET_PRICE_PER_HOP), 5.0
+                )
 
-            await asyncio.wait_for(
-                check_unredeemed_tickets_value(swarm7[dest], message_count * TICKET_PRICE_PER_HOP), 5.0
-            )
+                # we should see the last message as rejected
+                await asyncio.wait_for(check_rejected_tickets_value(swarm7[mid], 1), 5.0)
 
-            # we should see the last message as rejected
-            await asyncio.wait_for(check_rejected_tickets_value(swarm7[dest], 1), 5.0)
-
-            assert await swarm7[dest].api.tickets_redeem()
-            await asyncio.wait_for(check_all_tickets_redeemed(swarm7[dest]), 30.0)
+                assert await swarm7[mid].api.tickets_redeem()
+                await asyncio.wait_for(check_all_tickets_redeemed(swarm7[mid]), 30.0)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))

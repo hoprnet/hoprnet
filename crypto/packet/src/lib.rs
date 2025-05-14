@@ -91,7 +91,7 @@ mod tests {
         );
 
         assert!(
-            hopr_packet_len < 1492 - 32,
+            hopr_packet_len < 1492 - 32, // 32 bytes was measured as the libp2p QUIC overhead
             "HOPR packet {hopr_packet_len} must fit within a layer 4 packet with libp2p overhead"
         );
     }
