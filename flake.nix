@@ -43,7 +43,7 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports =
         [ inputs.treefmt-nix.flakeModule inputs.flake-root.flakeModule ];
-      perSystem = { config, lib, system, ... }:
+      perSystem = { config, lib, self', inputs', system, ... }:
         let
           rev = toString (self.shortRev or self.dirtyShortRev);
           fs = lib.fileset;
@@ -565,6 +565,14 @@
               '';
             };
           };
+          find-port-ci = flake-utils.lib.mkApp {
+            drv = pkgs.writeShellApplication {
+              name = "find-port";
+              text = ''
+                ${pkgs.python3}/bin/python ./tests/find_port.py --min-port 3000 --max-port 4000 --skip 30
+              '';
+            };
+          };
           update-github-labels = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "update-github-labels" ''
               set -eu
@@ -686,7 +694,7 @@
             inherit hopli-dev-docker-build-and-upload;
             inherit hopli-profile-docker-build-and-upload;
             inherit hopr-pluto-docker-build-and-upload;
-            inherit update-github-labels;
+            inherit update-github-labels find-port-ci;
             check = run-check;
             audit = run-audit;
           };

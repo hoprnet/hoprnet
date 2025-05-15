@@ -17,7 +17,7 @@ use hopr_transport_network::{network::NetworkTriggeredEvent, ping::PingQueryRepl
 use hopr_transport_protocol::{config::ProtocolConfig, PeerDiscovery};
 
 use crate::{constants, errors::Result, HoprNetworkBehavior};
-use crate::{HoprNetworkBehaviorEvent, Ping, Pong};
+use crate::{HoprNetworkBehaviorEvent, Ping, Pong, HOPR_HEARTBEAT_PROTOCOL_V_0_2_0};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -204,7 +204,7 @@ impl HoprSwarm {
             select! {
                 event = swarm.select_next_some() => match event {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(event)) => {
-                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm protocol", protocol = "/hopr/heartbeat/0.1.0");
+                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm protocol", protocol = HOPR_HEARTBEAT_PROTOCOL_V_0_2_0);
                         match event {
                             libp2p::request_response::Event::<Ping,Pong>::Message {
                                 peer,
