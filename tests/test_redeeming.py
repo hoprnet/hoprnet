@@ -98,7 +98,6 @@ class TestRedeemingWithSwarm:
 
             # ensure ticket stats are updated after messages are sent
             statistics_after = await swarm7[dest].api.get_tickets_statistics()
-            unredeemed_value = statistics_after.unredeemed_value - statistics_before.unredeemed_value
 
             assert statistics_after.redeemed_value == statistics_before.redeemed_value
 

@@ -2,8 +2,7 @@ import asyncio
 import logging
 import random
 import re
-import string
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import asynccontextmanager
 
 import pytest
 
@@ -346,9 +345,9 @@ class TestIntegrationWithSwarm:
             )
 
             # monitor that the node aggregates and redeems tickets until the aggregated value is reached
-            async def check_aggregate_and_redeem_tickets(api: HoprdAPI):
+            async def check_aggregate_and_redeem_tickets(node: Node):
                 while True:
-                    statistics_now = await api.get_tickets_statistics()
+                    statistics_now = await node.api.get_tickets_statistics()
                     assert statistics_now is not None
 
                     redeemed_value_diff = statistics_now.redeemed_value - statistics_before.redeemed_value
@@ -362,7 +361,7 @@ class TestIntegrationWithSwarm:
                     else:
                         await asyncio.sleep(0.1)
 
-            await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid].api), 60.0)
+            await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid]), 60.0)
 
     # FIXME: This test depends on side-effects and cannot be run on its own. It
     # should be redesigned.
