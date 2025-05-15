@@ -4842,7 +4842,6 @@ dependencies = [
  "criterion",
  "hex",
  "hex-literal",
- "hopr-bindings",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-primitive-types",

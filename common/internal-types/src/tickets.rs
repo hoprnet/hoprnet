@@ -1,10 +1,8 @@
-use alloy::sol_types::SolCall;
 use hex_literal::hex;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use tracing::{debug, error};
 
-use hopr_bindings::hoprchannels::HoprChannels::redeemTicketCall;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
@@ -21,6 +19,11 @@ const ENCODED_TICKET_LENGTH: usize = 64;
 /// Ethereum Virtual Machine (EVM). Chosen to be easily
 /// convertible to IEEE754 double-precision and vice versa
 const ENCODED_WIN_PROB_LENGTH: usize = 7;
+
+/// Define the selector for the redeemTicketCall to avoid importing
+/// the entire hopr-bindings crate for one single constant.
+/// This value should be updated with the function interface changes.
+const REDEEM_CALL_SELECTOR: [u8; 4] = [252, 183, 121, 111];
 
 /// Winning probability encoded in 7-byte representation
 pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
@@ -590,7 +593,7 @@ impl Ticket {
     /// must be equal to on-chain computation
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
         let ticket_hash = Hash::create(&[self.encode_without_signature().as_ref()]); // cannot fail
-        let hash_struct = Hash::create(&[&redeemTicketCall::SELECTOR, &[0u8; 28], ticket_hash.as_ref()]);
+        let hash_struct = Hash::create(&[&REDEEM_CALL_SELECTOR, &[0u8; 28], ticket_hash.as_ref()]);
         Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
 
