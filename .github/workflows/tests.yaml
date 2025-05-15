@@ -201,7 +201,7 @@ jobs:
         if: ${{ !env.ACT }}
         run: |
           mkdir -p "${{ steps.find_base_port.outputs.snapshot-dir }}"
-          gcloud storage rsync gs://hoprnet-test-artifacts/snapshot "${{ steps.find_base_port_outputs.snapshot-dir }}" --recursive
+          gcloud storage rsync gs://hoprnet-test-artifacts/snapshot "${{ steps.find_base_port.outputs.snapshot-dir }}" --recursive
         continue-on-error: true
 
       - name: Check ${{ steps.find_base_port.outputs.snapshot-name }}
