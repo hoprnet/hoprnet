@@ -192,6 +192,7 @@ jobs:
         id: find_base_port
         run: |
           base_port=$(nix run .#find-port-ci)
+          echo "Using base port ${base_port}"
           echo "output_base-port=${base_port}" >> "$GITHUB_OUTPUT"
           echo "output_snapshot-name="snapshot-${base_port}" >> "$GITHUB_OUTPUT"
           echo "output_snapshot-dir="/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
