@@ -464,12 +464,11 @@ where
                     .begin_channel_update(tx.into(), &closure_initiated.channelId.0.into())
                     .await?;
 
+                let closure_time: u32 = closure_initiated.closureTime.into();
                 if let Some(channel_edits) = maybe_channel {
-                    let new_status = ChannelStatus::PendingToClose(SystemTime::UNIX_EPOCH.add(Duration::from_secs(
-                        closure_initiated.closureTime.try_into().map_err(|_| {
-                            CoreEthereumIndexerError::ProcessError("closureTime does not fit into u64".to_owned())
-                        })?,
-                    )));
+                    let new_status = ChannelStatus::PendingToClose(
+                        SystemTime::UNIX_EPOCH.add(Duration::from_secs(closure_time.into())),
+                    );
 
                     let channel = self
                         .db
