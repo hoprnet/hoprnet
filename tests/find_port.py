@@ -20,8 +20,12 @@ def find_available_port_block(min_port, max_port, skip, block_size=None):
     Returns:
         int: The starting port number of an available block, or None if no suitable block found
     """
+    # Validate port range
+    if not (0 <= min_port < max_port <= 65535):
+        raise ValueError("Invalid port range. Ensure 0 <= min_port < max_port <= 65535")
     # Ensure skip is at least 0
-    skip = max(0, skip)
+    # Ensure skip is at least 1
+    skip = max(1, skip)
 
     # If block_size is not specified, use the same value as skip
     if block_size is None:
@@ -56,10 +60,15 @@ def find_available_port_block(min_port, max_port, skip, block_size=None):
                 break
 
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                # connect_ex returns 0 if the connection succeeds,
-                # and a non-zero error code otherwise
-                if s.connect_ex(("127.0.0.1", port)) == 0:
-                    # Port is in use
+                try:
+                    # connect_ex returns 0 if the connection succeeds,
+                    # and a non-zero error code otherwise
+                    if s.connect_ex(("127.0.0.1", port)) == 0:
+                        # Port is in use
+                        block_available = False
+                        break
+                except socket.error:
+                    # If we get a socket error, assume the port is unusable
                     block_available = False
                     break
 
