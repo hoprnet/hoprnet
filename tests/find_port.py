@@ -4,6 +4,7 @@ import random
 import sys
 import socket
 
+
 def find_available_port_block(min_port, max_port, skip, block_size=None):
     """
     Find a randomly selected available port on localhost within the specified range,
@@ -80,20 +81,18 @@ def find_available_port_block(min_port, max_port, skip, block_size=None):
     # Return the starting port of the available block, or None if not found
     return result
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Find an available port block.')
-    parser.add_argument('--min-port', type=int, default=8000, help='Minimum port number')
-    parser.add_argument('--max-port', type=int, default=9000, help='Maximum port number')
-    parser.add_argument('--skip', type=int, default=20, help='Port skip interval')
-    parser.add_argument('--block-size', type=int, help='Size of port block (defaults to skip value if not specified)')
+    parser = argparse.ArgumentParser(description="Find an available port block.")
+    parser.add_argument("--min-port", type=int, default=8000, help="Minimum port number")
+    parser.add_argument("--max-port", type=int, default=9000, help="Maximum port number")
+    parser.add_argument("--skip", type=int, default=20, help="Port skip interval")
+    parser.add_argument("--block-size", type=int, help="Size of port block (defaults to skip value if not specified)")
 
     args = parser.parse_args()
 
     result = find_available_port_block(
-        min_port=args.min_port,
-        max_port=args.max_port,
-        skip=args.skip,
-        block_size=args.block_size
+        min_port=args.min_port, max_port=args.max_port, skip=args.skip, block_size=args.block_size
     )
 
     if result is None:
