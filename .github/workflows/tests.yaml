@@ -197,7 +197,7 @@ jobs:
           echo "snapshot-name=snapshot-${base_port}" >> "$GITHUB_OUTPUT"
           echo "snapshot-dir=/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
 
-      - name: Download ${{ steps.find_base_port.outputs.snapshot-name }}
+      - name: Download snapshot
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
@@ -205,7 +205,7 @@ jobs:
           gcloud storage rsync gs://hoprnet-test-artifacts/${{ steps.find_base_port.outputs.snapshot-name }} ${{ steps.find_base_port.outputs.snapshot-dir }} --recursive
         continue-on-error: true
 
-      - name: Check ${{ steps.find_base_port.outputs.snapshot-name }}
+      - name: Check snapshot
         run: ls -lR ${{ steps.find_base_port.outputs.snapshot-dir }} || echo "no snapshot found"
 
       - name: Run smoke tests hopli
@@ -213,7 +213,7 @@ jobs:
         env:
           HOPR_SMOKETEST_BASE_PORT: ${{ steps.find_base_port.outputs.base-port }}
 
-      - name: Upload ${{ steps.find_base_port.outputs.snapshot-name }}
+      - name: Upload snapshot
         uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
@@ -302,7 +302,7 @@ jobs:
           echo "snapshot-name=snapshot-${base_port}" >> "$GITHUB_OUTPUT"
           echo "snapshot-dir=/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
 
-      - name: Download ${{ steps.find_base_port.outputs.snapshot-name }}
+      - name: Download snapshot
         id: download-snapshot
         if: ${{ !env.ACT }}
         run: |
@@ -310,7 +310,7 @@ jobs:
           gcloud storage rsync gs://hoprnet-test-artifacts/${{ steps.find_base_port.outputs.snapshot-name }} ${{ steps.find_base_port.outputs.snapshot-dir }} --recursive
         continue-on-error: true
 
-      - name: Check ${{ steps.find_base_port.outputs.snapshot-name }}
+      - name: Check snapshot
         run: ls -lR "${{ steps.find_base_port.outputs.snapshot-dir }}" || echo "no snapshot found"
 
       - name: Run smoke tests ${{ matrix.suite }}
@@ -318,7 +318,7 @@ jobs:
         env:
           HOPR_SMOKETEST_BASE_PORT: ${{ steps.find_base_port.outputs.base-port }}
 
-      - name: Upload ${{ steps.find_base_port.outputs.snapshot-name }}
+      - name: Upload snapshot
         uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
         if: ${{ !env.ACT && always() && steps.download-snapshot.outcome != 'success' }}
         with:
