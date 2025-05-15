@@ -9,6 +9,7 @@ import pytest
 
 from sdk.python.api import HoprdAPI, Protocol
 from sdk.python.api.channelstatus import ChannelStatus
+from sdk.python.api.request_objects import SessionCapabilitiesBody
 from sdk.python.localcluster.constants import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
     TICKET_PRICE_PER_HOP,
@@ -30,7 +31,7 @@ from .utils import (
     create_channel,
     gen_random_tag,
     shuffled,
-    session_send_and_receive_packets, HoprSession,
+    session_send_and_receive_packets, HoprSession, get_ticket_price,
 )
 
 
@@ -206,7 +207,7 @@ class TestIntegrationWithSwarm:
     @pytest.mark.parametrize(
         "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
-    async def test_reset_ticket_statistics_from_metrics(self, src: Node, mid: Node, dest: Node, swarm7: dict[str, Node]):
+    async def test_reset_ticket_statistics_from_metrics(self, src: str, mid: str, dest: str, swarm7: dict[str, Node]):
         def count_metrics(metrics: str):
             types = ["neglected", "redeemed", "rejected"]
             count = 0
@@ -238,28 +239,32 @@ class TestIntegrationWithSwarm:
         "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
     async def test_hoprd_should_reject_relaying_a_message_when_the_channel_is_out_of_funding(
-        self, src: Node, mid: Node, dest: Node, swarm7: dict[str, Node]
+        self, src: str, mid: str, dest: str, swarm7: dict[str, Node]
     ):
-        message_count = 2
+        ticket_price = await get_ticket_price(swarm7[src])
+
+        message_count = 4
 
         # The forward channel has only funding for Session Establishment and 1 message
         # The return channel has only funding for Session Establishment
-        async with create_channel(swarm7[src], swarm7[mid], funding=2 * TICKET_PRICE_PER_HOP, close_from_dest=False):
-            async with create_channel(swarm7[dest], swarm7[mid], funding=TICKET_PRICE_PER_HOP, close_from_dest=False):
+        async with create_channel(swarm7[src], swarm7[mid], funding=2 * ticket_price, close_from_dest=False):
+            async with create_channel(swarm7[dest], swarm7[mid], funding=ticket_price, close_from_dest=False):
                 async with HoprSession(Protocol.UDP, swarm7[src], swarm7[dest],
                                  {"IntermediatePath": [swarm7[mid].peer_id]},
-                                 {"IntermediatePath": [swarm7[mid].peer_id]}) as session:
+                                 {"IntermediatePath": [swarm7[mid].peer_id]},
+                                       capabilities=SessionCapabilitiesBody(segmentation=True, no_delay=True),
+                                       no_response_buffer=True) as session:
 
                     with session.client_socket() as s:
                         s.settimeout(5)
                         for i in range(message_count):
                             message = f"#{i}".ljust(session.mtu)
-                            total_sent = total_sent + s.sendto(message.encode(), ("127.0.0.1", session.listen_port))
-                            # UDP has no flow-control, so we must insert an artificial gap
-                            await asyncio.sleep(0.01)
+                            s.sendto(message.encode(), ("127.0.0.1", session.listen_port))
+                            # TODO: await unrealized balance increase
+                            await asyncio.sleep(2)
 
                 await asyncio.wait_for(
-                    check_unredeemed_tickets_value(swarm7[mid], message_count * TICKET_PRICE_PER_HOP), 5.0
+                    check_unredeemed_tickets_value(swarm7[mid], (message_count - 1) * ticket_price), 5.0
                 )
 
                 # we should see the last message as rejected

@@ -98,18 +98,27 @@ async def check_outgoing_channel_closed(src: Node, channel_id: str):
 
 
 async def check_rejected_tickets_value(src: Node, value: int):
-    while (await src.api.get_tickets_statistics()).rejected_value < value:
+    current = (await src.api.get_tickets_statistics()).rejected_value
+    while current  < value:
+        logging.debug(f"Rejected tickets value: {current}, wanted min: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
+        current = (await src.api.get_tickets_statistics()).rejected_value
 
 
 async def check_unredeemed_tickets_value(src: Node, value: int):
-    while (await src.api.get_tickets_statistics()).unredeemed_value < value:
+    current = (await src.api.get_tickets_statistics()).unredeemed_value
+    while current < value:
+        logging.debug(f"Unredeemed tickets value: {current}, wanted min: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
+        current = (await src.api.get_tickets_statistics()).unredeemed_value
 
 
 async def check_winning_tickets_count(src: Node, value: int):
-    while (await src.api.get_tickets_statistics()).winning_count < value:
+    current = (await src.api.get_tickets_statistics()).winning_count
+    while current < value:
+        logging.debug(f"Winning tickets count: {current}, wanted min: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
+        current = (await src.api.get_tickets_statistics()).winning_count
 
 
 async def check_safe_balance(src: Node, value: int):
@@ -128,9 +137,18 @@ async def check_min_incoming_win_prob_eq(src: Node, value: float):
 
 
 async def check_all_tickets_redeemed(src: Node):
-    while (await src.api.get_tickets_statistics()).unredeemed_value > 0:
+    current = (await src.api.get_tickets_statistics()).unredeemed_value
+    while current > 0:
+        logging.debug(f"Unredeemed tickets value: {current}, wanted max: 0")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
+        current = (await src.api.get_tickets_statistics()).unredeemed_value
 
+
+async def get_ticket_price(src: Node):
+    ticket_price = await src.api.ticket_price()
+    assert ticket_price is not None
+    logging.debug(f"Ticket price: {ticket_price}")
+    return ticket_price.value
 
 class HoprSession:
     def __init__(

@@ -16,7 +16,7 @@ pub fn validate_unacknowledged_ticket(
     unrealized_balance: Balance,
     domain_separator: &Hash,
 ) -> Result<VerifiedTicket, TicketValidationError> {
-    debug!(source = %channel.source, "validating unack ticket");
+    debug!(source = %channel.source, "validating unack {ticket}");
 
     // The ticket signer MUST be the sender
     let verified_ticket = ticket
@@ -71,7 +71,8 @@ pub fn validate_unacknowledged_ticket(
         });
     }
 
-    // Ensure that sender has enough funds
+    // Ensure that the sender has enough funds
+    debug!(%unrealized_balance, channel_id = %channel.get_id(), "checking if sender has enough funds");
     if inner_ticket.amount.gt(&unrealized_balance) {
         return Err(TicketValidationError {
             reason: format!(

@@ -546,8 +546,8 @@ impl Display for Ticket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ticket #{}, offset {}, epoch {} in channel {}",
-            self.index, self.index_offset, self.channel_epoch, self.channel_id
+            "ticket #{}, amount {}, offset {}, epoch {} in channel {}",
+            self.index, self.amount.to_formatted_string() , self.index_offset, self.channel_epoch, self.channel_id
         )
     }
 }
@@ -788,7 +788,7 @@ impl VerifiedTicket {
         self.0
     }
 
-    /// Creates new unacknowledged ticket from the [VerifiedTicket],
+    /// Creates a new unacknowledged ticket from the [VerifiedTicket],
     /// given our own part of the PoR challenge.
     pub fn into_unacknowledged(self, own_key: HalfKey) -> UnacknowledgedTicket {
         UnacknowledgedTicket { ticket: self, own_key }
@@ -845,7 +845,7 @@ impl UnacknowledgedTicket {
     /// the received acknowledgement of the forwarded packet.
     pub fn acknowledge(self, acknowledgement: &HalfKey) -> crate::errors::Result<AcknowledgedTicket> {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
-        debug!("acknowledging ticket using response {}", response.to_hex());
+        debug!("acknowledging {} using response {}", self.ticket, response.to_hex());
 
         if self.ticket.verified_ticket().challenge == response.to_challenge().into() {
             Ok(self.ticket.into_acknowledged(response))
@@ -956,7 +956,7 @@ impl Display for AcknowledgedTicket {
     }
 }
 
-/// Represents a winning ticket that can be successfully redeemed on chain.
+/// Represents a winning ticket that can be successfully redeemed on-chain.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RedeemableTicket {
