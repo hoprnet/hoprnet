@@ -71,18 +71,16 @@ async def bringup(
         # wait before contract deployments are finalized
         await asyncio.sleep(2.5)
 
-        # FIXME: This breaks the random base port approach since nodes will make announcements using different port.
-        # Skipping for now until a better approach is found.
         # BRING UP NODES (with funding)
-        # await cluster.shared_bringup(skip_funding=False)
+        await cluster.shared_bringup(skip_funding=False)
 
         anvil.kill()
-        # cluster.clean_up()
+        cluster.clean_up()
 
         # delay to ensure anvil is stopped and state file closed
         await asyncio.sleep(1)
 
-        snapshot.create(ANVIL_FOLDER.joinpath("anvil.state.json"))
+        snapshot.create()
 
     snapshot.reuse()
 
@@ -97,7 +95,7 @@ async def bringup(
 
     # BRING UP NODES (without funding)
     try:
-        await cluster.shared_bringup(skip_funding=False)
+        await cluster.shared_bringup(skip_funding=True)
     except asyncio.TimeoutError as e:
         logging.error(f"Timeout error: {e}")
         return cluster, anvil

@@ -67,7 +67,7 @@ class Cluster:
 
         if not skip_funding:
             self.fund_nodes()
-            # return
+            return
 
         # WAIT FOR NODES TO BE UP
         logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to be ready")

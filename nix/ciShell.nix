@@ -22,6 +22,7 @@ let
     dive
 
     uv
+    python313
   ];
   shellPackages = packages ++ extraPackages;
   cleanArgs = removeAttrs args [
