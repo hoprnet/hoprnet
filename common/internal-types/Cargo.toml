@@ -32,7 +32,7 @@ hopr-crypto-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-alloy = {workspace = true}
+alloy = { workspace = true }
 anyhow = { workspace = true }
 bincode = { workspace = true }
 criterion = { workspace = true }
