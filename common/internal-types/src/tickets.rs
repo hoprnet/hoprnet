@@ -1091,6 +1091,7 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use alloy::sol_types::SolCall;
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
@@ -1399,5 +1400,13 @@ pub mod tests {
         assert_eq!(redeemable_1, redeemable_2);
         assert_eq!(redeemable_1.vrf_params.V, redeemable_2.vrf_params.V);
         Ok(())
+    }
+
+    #[test]
+    fn test_redeem_ticket_selector_match_with_binding() {
+        assert_eq!(
+            REDEEM_CALL_SELECTOR,
+            hopr_bindings::hoprchannels::HoprChannels::redeemTicketCall::SELECTOR
+        );
     }
 }
