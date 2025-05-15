@@ -11,6 +11,7 @@ use alloy::{
     sol,
     sol_types::{SolCall, SolValue},
 };
+use hex_literal::hex;
 use std::str::FromStr;
 use tracing::debug;
 
@@ -40,6 +41,43 @@ sol!(
 
 lazy_static::lazy_static! {
     static ref MINTER_ROLE_VALUE: primitives::FixedBytes<32> = keccak256("MINTER_ROLE");
+}
+
+/// Struct to make a multisend transaction, mainly used by safe instances
+#[derive(Debug, Clone)]
+pub struct MultisendCallOnlyTransaction {
+    // data paylaod encoded with selector
+    pub encoded_data: Bytes,
+    // target address
+    pub to: alloy::primitives::Address,
+    // payable eth sending along the tx
+    pub value: U256,
+}
+
+/// Methods for Multisend transaction
+impl MultisendCallOnlyTransaction {
+    /// encode a multisend transaction
+    pub fn encode_packed(&self) -> Vec<u8> {
+        let tx_operation_bytes: [u8; 1] = hex!("00"); // call only
+
+        let value = (
+            tx_operation_bytes,                  // 1 bytes
+            self.to,                             // 20 bytes
+            U256::from(self.value),              // 32 bytes
+            U256::from(self.encoded_data.len()), // 32 bytes
+            self.encoded_data.clone(),           // bytes
+        );
+        value.abi_encode_packed()
+    }
+
+    /// build a multisend transaction data payload
+    pub fn build_multisend_tx(transactions: Vec<MultisendCallOnlyTransaction>) -> Vec<u8> {
+        let mut payload: Vec<u8> = Vec::new();
+        for transaction in transactions {
+            payload = [payload, transaction.encode_packed()].concat();
+        }
+        payload
+    }
 }
 
 /// Creates local Anvil instance.

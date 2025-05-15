@@ -13,6 +13,9 @@ pub const DIV_BY_ZERO: &str = "4e487b7100000000000000000000000000000000000000000
 /// ERC1820 deployer wallet
 pub const ERC_1820_DEPLOYER: Address = address!("a990077c3205cbDf861e17Fa532eeB069cE9fF96");
 
+/// MultisendCallOnly contract
+pub const MULTISEND_CALL_ONLY: Address = address!("9641d764fc13c8B624c04430C7356C1C7C8102e2");
+
 /// Amount of ETH to fund ERC_1820_DEPLOYER, to deployer ERC1820 registry
 /// ERC1820Registry contract is used by the HOPR token contract (ERC777 token)
 pub const ETH_VALUE_FOR_ERC1820_DEPLOYER: U256 = uint!(80_000_000_000_000_000_U256); // 0.08 (anvil) ETH
