@@ -16,7 +16,7 @@ pub fn validate_unacknowledged_ticket(
     unrealized_balance: Balance,
     domain_separator: &Hash,
 ) -> Result<VerifiedTicket, TicketValidationError> {
-    debug!(source = %channel.source, "validating unack {ticket}");
+    debug!(source = %channel.source, %ticket, "validating unacknowledged ticket");
 
     // The ticket signer MUST be the sender
     let verified_ticket = ticket

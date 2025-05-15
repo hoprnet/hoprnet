@@ -12,16 +12,12 @@ from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.api.request_objects import SessionCapabilitiesBody
 from sdk.python.localcluster.constants import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
-    TICKET_PRICE_PER_HOP,
 )
 from sdk.python.localcluster.node import Node
 
 from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
 from .utils import (
-    AGGREGATED_TICKET_PRICE,
-    MULTIHOP_MESSAGE_SEND_TIMEOUT,
     PARAMETERIZED_SAMPLE_SIZE,
-    RESERVED_TAG_UPPER_BOUND,
     TICKET_AGGREGATION_THRESHOLD,
     check_all_tickets_redeemed,
     check_native_balance_below,
@@ -29,7 +25,6 @@ from .utils import (
     check_safe_balance,
     check_unredeemed_tickets_value,
     create_channel,
-    gen_random_tag,
     shuffled,
     session_send_and_receive_packets, HoprSession, get_ticket_price,
 )
@@ -69,14 +64,6 @@ class TestIntegrationWithSwarm:
                 for k in barebone_nodes()
             ]
         )
-
-        ticket_price = await random.choice(list(swarm7.values())).api.ticket_price()
-        if ticket_price is not None:
-            global TICKET_PRICE_PER_HOP, AGGREGATED_TICKET_PRICE
-            TICKET_PRICE_PER_HOP = ticket_price.value
-            AGGREGATED_TICKET_PRICE = TICKET_AGGREGATION_THRESHOLD * TICKET_PRICE_PER_HOP
-        else:
-            print("Could not get ticket price from API, using default value")
 
     @pytest.mark.asyncio
     async def test_hoprd_protocol_check_balances_without_prior_tests(self, swarm7: dict[str, Node]):
@@ -179,8 +166,9 @@ class TestIntegrationWithSwarm:
     ):
         # convert HOPR to weiHOPR
         hopr_amount = OPEN_CHANNEL_FUNDING_VALUE_HOPR * 1e18
+        ticket_price = await get_ticket_price(swarm7[src])
 
-        async with create_channel(swarm7[src], swarm7[dest], funding=TICKET_PRICE_PER_HOP) as channel:
+        async with create_channel(swarm7[src], swarm7[dest], funding=ticket_price) as channel:
             balance_before = await swarm7[src].api.balances()
             channel_before = await swarm7[src].api.get_channel(channel.id)
 
@@ -219,8 +207,10 @@ class TestIntegrationWithSwarm:
                 )
             return count
 
-        async with create_channel(swarm7[src], swarm7[mid], funding=3 * TICKET_PRICE_PER_HOP, close_from_dest=False):
-            async with create_channel(swarm7[dest], swarm7[mid], funding=2 * TICKET_PRICE_PER_HOP, close_from_dest=False):
+        ticket_price = await get_ticket_price(swarm7[src])
+
+        async with create_channel(swarm7[src], swarm7[mid], funding=3 * ticket_price, close_from_dest=False):
+            async with create_channel(swarm7[dest], swarm7[mid], funding=2 * ticket_price, close_from_dest=False):
                 await session_send_and_receive_packets(
                     1,
                     src = swarm7[src],
@@ -242,12 +232,14 @@ class TestIntegrationWithSwarm:
         self, src: str, mid: str, dest: str, swarm7: dict[str, Node]
     ):
         ticket_price = await get_ticket_price(swarm7[src])
+        unredeemed_value_before = (await swarm7[mid].api.get_tickets_statistics()).unredeemed_value
+        rejected_value_before = (await swarm7[mid].api.get_tickets_statistics()).rejected_value
 
-        message_count = 4
+        message_count = 3
 
-        # The forward channel has only funding for Session Establishment and 1 message
-        # The return channel has only funding for Session Establishment
-        async with create_channel(swarm7[src], swarm7[mid], funding=2 * ticket_price, close_from_dest=False):
+        # The forward channel has funding for the Session establishment message and message_count more messages
+        async with create_channel(swarm7[src], swarm7[mid], funding=(message_count + 1)  * ticket_price, close_from_dest=False):
+            # The return channel has only funding for the Session Establishment message
             async with create_channel(swarm7[dest], swarm7[mid], funding=ticket_price, close_from_dest=False):
                 async with HoprSession(Protocol.UDP, swarm7[src], swarm7[dest],
                                  {"IntermediatePath": [swarm7[mid].peer_id]},
@@ -255,21 +247,33 @@ class TestIntegrationWithSwarm:
                                        capabilities=SessionCapabilitiesBody(segmentation=True, no_delay=True),
                                        no_response_buffer=True) as session:
 
+                    # Unredeemed value at the relay must be greater by 2 tickets (session establishment messages)
+                    await asyncio.wait_for(
+                        check_unredeemed_tickets_value(swarm7[mid], unredeemed_value_before + 2 * ticket_price), 5.0
+                    )
+                    unredeemed_value_before = (await swarm7[mid].api.get_tickets_statistics()).unredeemed_value
+                    logging.debug(f"Unredeemed value before the test: {unredeemed_value_before}")
+
                     with session.client_socket() as s:
                         s.settimeout(5)
+                        # These messages will pass through
                         for i in range(message_count):
                             message = f"#{i}".ljust(session.mtu)
                             s.sendto(message.encode(), ("127.0.0.1", session.listen_port))
-                            # TODO: await unrealized balance increase
-                            await asyncio.sleep(2)
 
-                await asyncio.wait_for(
-                    check_unredeemed_tickets_value(swarm7[mid], (message_count - 1) * ticket_price), 5.0
-                )
+                            # Each packet increases the unredeemed value
+                            await asyncio.wait_for(
+                                check_unredeemed_tickets_value(swarm7[mid], unredeemed_value_before + (i + 1) * ticket_price), 5.0
+                            )
+                            logging.debug(f"Message #{i + 1} accounted for")
 
-                # we should see the last message as rejected
-                await asyncio.wait_for(check_rejected_tickets_value(swarm7[mid], 1), 5.0)
+                        # This additional message is not covered
+                        s.sendto("This message is not covered".ljust(session.mtu).encode(), ("127.0.0.1", session.listen_port))
 
+                        # And it should be seen as rejected eventually
+                        await asyncio.wait_for(check_rejected_tickets_value(swarm7[mid], rejected_value_before + ticket_price), 5.0)
+
+                # Redeem all remaining tickets
                 assert await swarm7[mid].api.tickets_redeem()
                 await asyncio.wait_for(check_all_tickets_redeemed(swarm7[mid]), 30.0)
 
@@ -307,7 +311,9 @@ class TestIntegrationWithSwarm:
         src = route[0]
         mid = route[1]
         dest = route[-1]
-        channel_funding = ticket_count * TICKET_PRICE_PER_HOP
+        ticket_price = await get_ticket_price(swarm7[src])
+        aggregated_ticket_price = TICKET_AGGREGATION_THRESHOLD * ticket_price
+        channel_funding = ticket_count * ticket_price
 
         # Create a channel from src to mid, mid to dest does not need a channel
         async with create_channel(swarm7[src], swarm7[mid], funding=channel_funding):
@@ -317,7 +323,7 @@ class TestIntegrationWithSwarm:
             await session_send_and_receive_packets(
                 ticket_count,
                 src=swarm7[src],
-                dest=swarm7[mid],
+                dest=swarm7[dest],
                 fwd_path={"IntermediatePath": [swarm7[mid].peer_id]},
                 return_path={"IntermediatePath": [swarm7[mid].peer_id]},
             )
@@ -330,11 +336,11 @@ class TestIntegrationWithSwarm:
 
                     redeemed_value_diff = statistics_now.redeemed_value - statistics_before.redeemed_value
                     logging.debug(
-                        f"redeemed_value diff: {redeemed_value_diff} | before: {statistics_before.redeemed_value} | now: {statistics_now.redeemed_value} | target: {AGGREGATED_TICKET_PRICE}"
+                        f"redeemed_value diff: {redeemed_value_diff} | before: {statistics_before.redeemed_value} | now: {statistics_now.redeemed_value} | target: {aggregated_ticket_price}"
                     )
 
                     # break out of the loop if the aggregated value is reached
-                    if redeemed_value_diff >= AGGREGATED_TICKET_PRICE:
+                    if redeemed_value_diff >= aggregated_ticket_price:
                         break
                     else:
                         await asyncio.sleep(0.1)
