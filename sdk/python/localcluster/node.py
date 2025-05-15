@@ -74,6 +74,7 @@ class Node:
         self.api_port: int = 0
         self.p2p_port: int = 0
         self.anvil_port: int = 0
+        self.tokio_console_port: int = 0
 
         self.prepare()
 
@@ -85,8 +86,11 @@ class Node:
         self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")
         self.cfg_file_path = MAIN_DIR.joinpath(self.cfg_file)
         self.anvil_port = self.base_port
-        self.api_port = self.base_port + (self.id * 2)
+        self.api_port = self.base_port + (self.id * 3)
         self.p2p_port = self.api_port + 1
+        self.tokio_console_port = self.p2p_port + 1
+
+        logging.info(f"Node {self.id} ports: api {self.api_port}, p2p {self.p2p_port}, anvil {self.anvil_port}, tokio console {self.tokio_console_port}")
 
     def load_addresses(self):
         loaded_env = load_env_file(self.dir.joinpath(".env"))
@@ -179,7 +183,7 @@ class Node:
             "HOPR_TEST_DISABLE_CHECKS": "true",
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
-            "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}",
+            "TOKIO_CONSOLE_BIND": f"localhost:{self.tokio_console_port}",
             "HOPRD_NAT": "true" if self.use_nat else "false",
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
