@@ -220,7 +220,9 @@ where
             for block_number in log_block_numbers {
                 debug!(
                     block_number,
-                    _first_log_block_number, _head, _first_log_block_number, "computing processed logs"
+                    first_log_block_number = _first_log_block_number,
+                    head = _head,
+                    "computing processed logs"
                 );
                 // Do not pollute the logs with the fast-sync progress
                 Self::process_block_by_id(&db, &logs_handler, block_number).await?;
