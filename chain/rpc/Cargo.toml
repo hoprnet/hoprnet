@@ -31,7 +31,7 @@ http = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 primitive-types = { workspace = true }
-reqwest = { workspace = true, features = ["brotli", "zstd", "gzip", "json"] }
+reqwest = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 serde_json = { workspace = true }

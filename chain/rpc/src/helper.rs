@@ -1,6 +1,5 @@
 //! Private helper types for JSON RPC operation with an RPC endpoint.
 //!
-// FIXME: Replaced libs using ethers to alloy. Some of the structs may not be useful
 //! Most of these types were taken as-is from <https://github.com/gakonst/ethers-rs>, because
 //! they are not exposed as public from the `ethers` crate.
 use alloy::rpc::json_rpc::RpcError;

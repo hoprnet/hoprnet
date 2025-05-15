@@ -119,13 +119,7 @@ type ActionQueueType<T> = ActionQueue<
     IndexerActionTracker,
     EthereumTransactionExecutor<
         TransactionRequest,
-        // hopr_chain_rpc::TypedTransaction,
-        RpcEthereumClient<
-            RpcOperations<
-                DefaultHttpRequestor, // dyn HttpRequestor, // hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpRequestor, SimpleJsonRpcRetryPolicy>,
-                                      // DefaultHttpRequestor,
-            >,
-        >,
+        RpcEthereumClient<RpcOperations<DefaultHttpRequestor>>,
         SafePayloadGenerator,
     >,
 >;
@@ -170,12 +164,8 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             rpc_http_config.max_requests_per_sec = Some(max_rpc_req); // override the default if set
         }
 
-        // TODO: extract this from the global config type
+        // TODO: replace this DefaultRetryPolicy with a custom one that computes backoff with the number of retries
         let rpc_http_retry_policy = DefaultRetryPolicy::default();
-        // let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy {
-        //     min_retries: Some(2),
-        //     ..SimpleJsonRpcRetryPolicy::default()
-        // };
 
         // TODO: extract this from the global config type
         let rpc_cfg = RpcOperationsConfig {
@@ -205,14 +195,6 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             .transport(transport_client.clone(), transport_client.guess_local());
 
         let requestor = DefaultHttpRequestor::new();
-        // let requestor = DefaultHttpRequestor::new(rpc_http_config);
-
-        // // Build JSON RPC client
-        // let rpc_client = JsonRpcClient::new(
-        //     &chain_config.chain.default_provider,
-        //     requestor.clone(),
-        //     rpc_http_retry_policy,
-        // );
 
         // Build RPC operations
         let rpc_operations =

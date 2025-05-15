@@ -20,13 +20,12 @@ pub enum RpcError {
     MulticallFailure(usize, String),
 
     #[error(transparent)]
-    PendingTransactionError(#[from] PendingTransactionError), // #[error("error on backend interface: {0}")]
+    PendingTransactionError(#[from] PendingTransactionError),
+
     // InterfaceError(String),
     #[error("filter does not contain any criteria")]
     FilterIsEmpty,
 
-    // #[error("transaction {0} has not been included on-chain")]
-    // TransactionDropped(String),
     #[error("transaction submission to the RPC provider timed out")]
     Timeout,
 }

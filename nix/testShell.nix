@@ -24,6 +24,7 @@ let
   '' + shellHook;
   packages = with pkgs; [
     uv
+    python313
     solcDefault
     foundry-bin
   ];

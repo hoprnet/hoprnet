@@ -79,22 +79,6 @@ impl From<alloy::rpc::types::Log> for Log {
     }
 }
 
-// impl From<Log> for alloy::rpc::types::Log {
-//     fn from(value: Log) -> Self {
-//         alloy::rpc::types::Log {
-//             address: value.address.into(),
-//             topics: value.inner.topics().into_iter().map(|t| Hash::from(t.0)).collect(),
-//             data: Box::from(value.inner.data.data.as_ref()),
-//             transaction_index: Some(value.tx_index),
-//             block_number: value.block_number.expect("block id must be present"),
-//             block_hash: value.block_hash.expect("block hash must be present").0.into(),
-//             log_index: Some(Into::<u64>::into(value.log_index)),
-//             transaction_hash: Some(B256::from_slice(value.tx_hash.as_ref())),
-//             removed: value.removed,
-//         }
-//     }
-// }
-
 impl From<Log> for alloy::rpc::types::RawLog {
     fn from(value: Log) -> Self {
         alloy::rpc::types::RawLog {
@@ -247,48 +231,6 @@ pub trait RetryPolicy<E> {
         NoRetry
     }
 }
-
-// /// Performs no retries.
-// #[derive(Clone, Debug)]
-// pub struct ZeroRetryPolicy<E>(PhantomData<E>);
-
-// impl<E> Default for ZeroRetryPolicy<E> {
-//     fn default() -> Self {
-//         Self(PhantomData)
-//     }
-// }
-
-// impl<E> RetryPolicy<E> for ZeroRetryPolicy<E> {}
-
-// /// Abstraction for an HTTP client that performs HTTP POST with serializable request data.
-// #[async_trait]
-// pub trait HttpRequestor: std::fmt::Debug + Send + Sync {
-//     /// Performs HTTP request with optional JSON data to the given URL
-//     /// and gets the JSON response.
-//     async fn http_query<T>(
-//         &self,
-//         method: http_types::Method,
-//         url: &str,
-//         data: Option<T>,
-//     ) -> std::result::Result<Box<[u8]>, HttpRequestError>
-//     where
-//         T: Serialize + Send + Sync;
-
-//     /// Performs HTTP POST of JSON data to the given URL
-//     /// and gets the JSON response.
-//     async fn http_post<T>(&self, url: &str, data: T) -> std::result::Result<Box<[u8]>, HttpRequestError>
-//     where
-//         T: Serialize + Send + Sync,
-//     {
-//         self.http_query(http_types::Method::Post, url, Some(data)).await
-//     }
-
-//     /// Performs HTTP GET query to the given URL
-//     /// and gets the JSON response.
-//     async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError> {
-//         self.http_query(http_types::Method::Get, url, Option::<()>::None).await
-//     }
-// }
 
 /// Common configuration for all native `HttpPostRequestor`s
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, smart_default::SmartDefault)]

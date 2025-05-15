@@ -30,7 +30,6 @@ use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use crate::common::{
     create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node, NodeSafeConfig, TestChainEnv,
 };
-// use crate::common::{deploy_test_environment, onboard_node, NodeSafeConfig, Requestor, TestChainEnv};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket(
@@ -107,25 +106,9 @@ async fn start_node_chain_logic(
     let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_in.clone(), &chain_env.anvil);
     let rpc_ops_in = RpcOperations::new(json_rpc_client, http_requestor_in.clone(), chain_key, rpc_cfg.clone())?;
 
-    // let json_rpc_client = JsonRpcProviderClient::new(
-    //     &chain_env.anvil.endpoint(),
-    //     requestor_in.clone(),
-    //     SimpleJsonRpcRetryPolicy::default(),
-    // );
-
-    // let rpc_ops_in = RpcOperations::new(json_rpc_client, requestor_in, chain_key, rpc_cfg.clone())?;
-
     let http_requestor_out = DefaultHttpRequestor::new();
     let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_out.clone(), &chain_env.anvil);
     let rpc_ops_out = RpcOperations::new(json_rpc_client, http_requestor_out.clone(), chain_key, rpc_cfg.clone())?;
-
-    // let json_rpc_client = JsonRpcProviderClient::new(
-    //     &chain_env.anvil.endpoint(),
-    //     requestor_out.clone(),
-    //     SimpleJsonRpcRetryPolicy::default(),
-    // );
-
-    // let rpc_ops_out = RpcOperations::new(json_rpc_client, requestor_out.clone(), chain_key, rpc_cfg)?;
 
     // Transaction executor
     let eth_client = RpcEthereumClient::new(rpc_ops_out, RpcEthereumClientConfig::default());
@@ -599,12 +582,6 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .call()
         .await?
         .balance;
-    // let (on_chain_channel_bob_alice_balance, _, _, _, _) = chain_env
-    //     .contract_instances
-    //     .channels
-    //     .channels(channel_bob_alice.get_id().into())
-    //     .call()
-    //     .await?;
     let on_chain_channel_alice_bob_balance = chain_env
         .contract_instances
         .channels
@@ -612,12 +589,6 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .call()
         .await?
         .balance;
-    // let (on_chain_channel_alice_bob_balance, _, _, _, _) = chain_env
-    //     .contract_instances
-    //     .channels
-    //     .channels(channel_alice_bob.get_id().into())
-    //     .call()
-    //     .await?;
 
     assert_eq!(
         U256::from_be_bytes(channel_alice_bob.balance.amount().to_be_bytes()),
@@ -726,19 +697,6 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .call()
         .await?
         .balance;
-    // let (on_chain_channel_bob_alice_balance, _, _, _, _) = chain_env
-    //     .contract_instances
-    //     .channels
-    //     .channels(channel_bob_alice.get_id().into())
-    //     .call()
-    //     .await?;
-
-    // let (on_chain_channel_alice_bob_balance, _, _, _, _) = chain_env
-    //     .contract_instances
-    //     .channels
-    //     .channels(channel_alice_bob.get_id().into())
-    //     .call()
-    //     .await?;
 
     assert_eq!(
         U256::from_be_bytes(channel_alice_bob.balance.amount().to_be_bytes()),

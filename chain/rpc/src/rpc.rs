@@ -108,26 +108,6 @@ pub struct RpcOperationsConfig {
     pub gas_oracle_url: Option<Url>,
 }
 
-// pub(crate) type HoprMiddleware<P, R> =
-//     NonceManagerMiddleware<GasOracleMiddleware<SignerMiddleware<Provider<P>, Wallet<SigningKey>>, GnosisScan<R>>>;
-
-// pub(crate) type HoprProvider<R> = FillProvider<
-//     JoinFill<
-//         JoinFill<
-//             JoinFill<
-//                 JoinFill<
-//                     JoinFill<JoinFill<Identity, WalletFiller<EthereumWallet>>, ChainIdFiller>,
-//                     NonceFiller<CachedNonceManager>,
-//                 >,
-//                 GasOracleFiller<R>,
-//             >,
-//             GasFiller,
-//         >,
-//         BlobGasFiller,
-//     >,
-//     RootProvider,
-// >;
-
 pub(crate) type HoprProvider<R> = FillProvider<
     JoinFill<
         JoinFill<
@@ -155,27 +135,6 @@ pub struct RpcOperations<R: HttpRequestor + 'static + Clone> {
     node_module: HoprNodeManagementModuleInstance<(), HoprProvider<R>>,
     node_safe: SafeSingletonInstance<(), HoprProvider<R>>,
 }
-// pub struct RpcOperations<R: HttpRequestor + 'static + Clone> {
-//     pub(crate) provider: Arc<HoprProvider<R>>,
-//     pub(crate) cfg: RpcOperationsConfig,
-//     contract_instances: Arc<ContractInstances<HoprProvider<R>>>,
-//     node_module: HoprNodeManagementModuleInstance<(), HoprProvider<R>>,
-//     node_safe: SafeSingletonInstance<(), HoprProvider<R>>,
-// }
-
-// // Needs manual impl not to impose Clone requirements on P
-// // R does not need to be Clone as well, since it's always in an Arc
-// impl<R: HttpRequestor> Clone for RpcOperations<R> {
-//     fn clone(&self) -> Self {
-//         Self {
-//             provider: self.provider.clone(),
-//             cfg: self.cfg.clone(),
-//             contract_instances: self.contract_instances.clone(),
-//             node_module: HoprNodeManagementModule::new(self.cfg.module_address, self.provider.clone()),
-//             node_safe: SafeSingleton::new(self.cfg.safe_address, self.provider.clone()),
-//         }
-//     }
-// }
 
 impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
     pub fn new(
@@ -185,11 +144,6 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
         cfg: RpcOperationsConfig,
     ) -> Result<Self> {
         let wallet = PrivateKeySigner::from_slice(chain_key.secret().as_ref()).expect("failed to construct wallet");
-
-        // TODO: The rpc client MUST have retry backoff enabled
-        // let rpc_client = ClientBuilder::default()
-        //     .layer(RetryBackoffLayer::new(2, 100, 100))
-        //     .transport(transport_client.clone(), transport_client.is_local());
 
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()

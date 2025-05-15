@@ -38,7 +38,6 @@ use hopr_bindings::{
 use hopr_chain_types::constants::MULTISEND_CALL_ONLY;
 use hopr_chain_types::utils::MultisendCallOnlyTransaction;
 use hopr_chain_types::ContractAddresses;
-// use hopr_chain_types::{create_eip1559_transaction, TypedTransaction};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;

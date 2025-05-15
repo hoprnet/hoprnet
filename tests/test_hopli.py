@@ -62,10 +62,6 @@ def faucet(private_key: str, hopr_amount: str, native_amount: str, base_port: in
         NETWORK,
         "--address",
         node_addr,
-        # "--identity-prefix",
-        # IDENTITY_PREFIX, # IDENTITY_PREFIX, NODE_NAME_PREFIX
-        # "--identity-directory",
-        # MAIN_DIR,
         "--contracts-root",
         CONTRACTS_DIR,
         "--hopr-amount",
