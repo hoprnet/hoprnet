@@ -9,7 +9,7 @@ from subprocess import PIPE, STDOUT, CalledProcessError, Popen
 
 import pytest
 
-from utils import find_available_port_block
+from .find_port import find_available_port_block
 from sdk.python import localcluster
 from sdk.python.localcluster.constants import PWD
 from sdk.python.localcluster.node import Node

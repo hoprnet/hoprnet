@@ -90,7 +90,9 @@ class Node:
         self.p2p_port = self.api_port + 1
         self.tokio_console_port = self.p2p_port + 1
 
-        logging.info(f"Node {self.id} ports: api {self.api_port}, p2p {self.p2p_port}, anvil {self.anvil_port}, tokio console {self.tokio_console_port}")
+        logging.info(
+            f"Node {self.id} ports: api {self.api_port}, p2p {self.p2p_port}, anvil {self.anvil_port}, tokio console {self.tokio_console_port}"
+        )
 
     def load_addresses(self):
         loaded_env = load_env_file(self.dir.joinpath(".env"))

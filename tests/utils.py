@@ -1,6 +1,5 @@
 import asyncio
 import random
-import socket
 from contextlib import asynccontextmanager
 
 from sdk.python.api.channelstatus import ChannelStatus
@@ -186,70 +185,3 @@ async def send_and_receive_packets_with_peek(
     await asyncio.wait_for(check_received_packets_with_peek(dest, packets, tag=random_tag, sort=True), timeout)
 
     return random_tag
-
-def find_available_port_block(min_port=9000, max_port=9980, skip=20, block_size=None):
-    """
-    Find a randomly selected available port on localhost within the specified range,
-    checking only every nth port based on the skip parameter, and ensuring that
-    a contiguous block of ports following the found port are also available.
-
-    Args:
-        min_port (int): The minimum port number to check (inclusive)
-        max_port (int): The maximum port number to check (inclusive)
-        skip (int): Check only every nth port (e.g. skip=2 checks every second port)
-        block_size (int, optional): Number of consecutive ports that must be free.
-                                   If None, defaults to the same value as skip.
-
-    Returns:
-        int: The starting port number of an available block, or None if no suitable block found
-    """
-    # Ensure skip is at least 0
-    skip = max(0, skip)
-
-    # If block_size is not specified, use the same value as skip
-    if block_size is None:
-        block_size = skip
-
-    # Adjust max_port to ensure we can fit a block of ports at the end
-    adjusted_max = max_port - block_size + 1
-
-    # Create a list of potential starting ports in the specified range, applying the skip
-    potential_starts = list(range(min_port, adjusted_max + 1, skip))
-
-    # Randomize the port order
-    random.shuffle(potential_starts)
-
-    # Variable to store our result
-    result = None
-
-    for start_port in potential_starts:
-        # Check if all ports in the block are available
-        block_available = True
-
-        # Store open sockets temporarily to prevent others from taking the ports while we're checking
-        temp_sockets = []
-
-        # Check each port in the block
-        for offset in range(block_size):
-            port = start_port + offset
-
-            # Skip checking if port is beyond the max_port
-            if port > max_port:
-                block_available = False
-                break
-
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                # connect_ex returns 0 if the connection succeeds,
-                # and a non-zero error code otherwise
-                if s.connect_ex(("127.0.0.1", port)) == 0:
-                    # Port is in use
-                    block_available = False
-                    break
-
-        # If all ports in the block are available, set the result
-        if block_available:
-            result = start_port
-            break  # Exit the loop once we find a valid block
-
-    # Return the starting port of the available block, or None if not found
-    return result
