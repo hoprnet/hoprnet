@@ -35,6 +35,8 @@ use hopr_bindings::{
     hoprnodesaferegistry::HoprNodeSafeRegistry::{deregisterNodeBySafeCall, registerSafeByNodeCall},
     hoprtoken::HoprToken::{approveCall, transferCall},
 };
+use hopr_chain_types::constants::MULTISEND_CALL_ONLY;
+use hopr_chain_types::utils::MultisendCallOnlyTransaction;
 use hopr_chain_types::ContractAddresses;
 // use hopr_chain_types::{create_eip1559_transaction, TypedTransaction};
 use hopr_crypto_types::prelude::*;
@@ -50,7 +52,7 @@ use crate::errors::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Operation {
     Call = 0,
-    // Future use: DelegateCall = 1,
+    DelegateCall = 1,
 }
 
 /// Trait for various implementations of generators of common on-chain transaction payloads.
@@ -71,15 +73,24 @@ pub trait PayloadGenerator<T: Into<TransactionRequest>> {
     /// Creates the transaction payload to immediately close an incoming payment channel
     fn close_incoming_channel(&self, source: Address) -> Result<T>;
 
+    /// Creates the transaction payload to immediately close multiple incoming payment channels
+    fn close_multiple_incoming_channels(&self, sources: Vec<Address>) -> Result<T>;
+
     /// Creates the transaction payload that initiates the closure of a payment channel.
     /// Once the notice period is due, the funds can be withdrawn using a
     /// finalizeChannelClosure transaction.
     fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<T>;
 
+    /// Creates the transaction payload that initiates the closure of multiple payment channels.
+    fn initiate_multiple_outgoing_channels_closure(&self, destinations: Vec<Address>) -> Result<T>;
+
     /// Creates a transaction payload that withdraws funds from
     /// an outgoing payment channel. This will succeed once the closure
     /// notice period is due.
     fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<T>;
+
+    /// Creates the transaction payload that withdraws funds from multiple outgoing payment channels.
+    fn finalize_multiple_outgoing_channels_closure(&self, destinations: Vec<Address>) -> Result<T>;
 
     /// Used to create the payload to claim incentives for relaying a mixnet packet.
     fn redeem_ticket(&self, acked_ticket: RedeemableTicket) -> Result<T>;
@@ -99,6 +110,16 @@ fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
         value: U256::ZERO,
         data: call_data.into(),
         operation: Operation::Call as u8,
+    }
+    .abi_encode()
+}
+
+fn multisend_payload(call_data: Vec<u8>) -> Vec<u8> {
+    execTransactionFromModuleCall {
+        to: MULTISEND_CALL_ONLY.into(),
+        value: U256::ZERO,
+        data: call_data.into(),
+        operation: Operation::DelegateCall as u8,
     }
     .abi_encode()
 }
@@ -231,6 +252,31 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
         Ok(tx)
     }
 
+    fn close_multiple_incoming_channels(&self, sources: Vec<Address>) -> Result<TransactionRequest> {
+        // create multisend data payload
+        let multisend_txns = sources
+            .into_iter()
+            .filter(|source| source != &self.me) // filter the incoming channel from self
+            .map(|source| {
+                let encoded_data = closeIncomingChannelCall { source: source.into() }.abi_encode();
+
+                MultisendCallOnlyTransaction {
+                    encoded_data: encoded_data.into(),
+                    to: self.contract_addrs.channels.into(),
+                    value: U256::ZERO,
+                }
+            })
+            .collect();
+
+        let tx_payload = MultisendCallOnlyTransaction::build_multisend_tx(multisend_txns);
+
+        let tx = TransactionRequest::default()
+            .with_input(tx_payload)
+            .with_to(MULTISEND_CALL_ONLY)
+            .with_gas_limit(DEFAULT_TX_GAS);
+        Ok(tx)
+    }
+
     fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TransactionRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
@@ -249,6 +295,33 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
         Ok(tx)
     }
 
+    fn initiate_multiple_outgoing_channels_closure(&self, destinations: Vec<Address>) -> Result<TransactionRequest> {
+        // create multisend data payload
+        let multisend_txns = destinations
+            .into_iter()
+            .filter(|destination| destination != &self.me) // filter the outgoing channel to self
+            .map(|destination| {
+                let encoded_data = initiateOutgoingChannelClosureCall {
+                    destination: destination.into(),
+                }
+                .abi_encode();
+                MultisendCallOnlyTransaction {
+                    encoded_data: encoded_data.into(),
+                    to: self.contract_addrs.channels.into(),
+                    value: U256::ZERO,
+                }
+            })
+            .collect();
+
+        let tx_payload = MultisendCallOnlyTransaction::build_multisend_tx(multisend_txns);
+
+        let tx = TransactionRequest::default()
+            .with_input(tx_payload)
+            .with_to(MULTISEND_CALL_ONLY)
+            .with_gas_limit(DEFAULT_TX_GAS);
+        Ok(tx)
+    }
+
     fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TransactionRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
@@ -264,6 +337,33 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
                 .abi_encode(),
             )
             .with_to(self.contract_addrs.channels.into());
+        Ok(tx)
+    }
+
+    fn finalize_multiple_outgoing_channels_closure(&self, destinations: Vec<Address>) -> Result<TransactionRequest> {
+        // create multisend data payload
+        let multisend_txns = destinations
+            .into_iter()
+            .filter(|destination| destination != &self.me) // filter the outgoing channel to self
+            .map(|destination| {
+                let encoded_data = finalizeOutgoingChannelClosureCall {
+                    destination: destination.into(),
+                }
+                .abi_encode();
+                MultisendCallOnlyTransaction {
+                    encoded_data: encoded_data.into(),
+                    to: self.contract_addrs.channels.into(),
+                    value: U256::ZERO,
+                }
+            })
+            .collect();
+
+        let tx_payload = MultisendCallOnlyTransaction::build_multisend_tx(multisend_txns);
+
+        let tx = TransactionRequest::default()
+            .with_input(tx_payload)
+            .with_to(MULTISEND_CALL_ONLY)
+            .with_gas_limit(DEFAULT_TX_GAS);
         Ok(tx)
     }
 
@@ -423,6 +523,35 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
         Ok(tx)
     }
 
+    fn close_multiple_incoming_channels(&self, sources: Vec<Address>) -> Result<TransactionRequest> {
+        // create multisend data payload
+        let multisend_txns = sources
+            .into_iter()
+            .filter(|source| source != &self.me) // filter the incoming channel from self
+            .map(|source| {
+                let encoded_data = closeIncomingChannelSafeCall {
+                    selfAddress: self.me.into(),
+                    source: source.into(),
+                }
+                .abi_encode();
+
+                MultisendCallOnlyTransaction {
+                    encoded_data: encoded_data.into(),
+                    to: self.contract_addrs.channels.into(),
+                    value: U256::ZERO,
+                }
+            })
+            .collect();
+
+        let tx_payload = MultisendCallOnlyTransaction::build_multisend_tx(multisend_txns);
+
+        let tx = TransactionRequest::default()
+            .with_input(multisend_payload(tx_payload))
+            .with_to(self.module.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+        Ok(tx)
+    }
+
     fn initiate_outgoing_channel_closure(&self, destination: Address) -> Result<TransactionRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
@@ -444,6 +573,34 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
         Ok(tx)
     }
 
+    fn initiate_multiple_outgoing_channels_closure(&self, destinations: Vec<Address>) -> Result<TransactionRequest> {
+        // create multisend data payload
+        let multisend_txns = destinations
+            .into_iter()
+            .filter(|destination| destination != &self.me) // filter the outgoing channel to self
+            .map(|destination| {
+                let encoded_data = initiateOutgoingChannelClosureSafeCall {
+                    selfAddress: self.me.into(),
+                    destination: destination.into(),
+                }
+                .abi_encode();
+                MultisendCallOnlyTransaction {
+                    encoded_data: encoded_data.into(),
+                    to: self.contract_addrs.channels.into(),
+                    value: U256::ZERO,
+                }
+            })
+            .collect();
+
+        let tx_payload = MultisendCallOnlyTransaction::build_multisend_tx(multisend_txns);
+
+        let tx = TransactionRequest::default()
+            .with_input(multisend_payload(tx_payload))
+            .with_to(self.module.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
+        Ok(tx)
+    }
+
     fn finalize_outgoing_channel_closure(&self, destination: Address) -> Result<TransactionRequest> {
         if destination.eq(&self.me) {
             return Err(InvalidArguments(
@@ -462,6 +619,34 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
             .with_to(self.module.into())
             .with_gas_limit(DEFAULT_TX_GAS);
 
+        Ok(tx)
+    }
+
+    fn finalize_multiple_outgoing_channels_closure(&self, destinations: Vec<Address>) -> Result<TransactionRequest> {
+        // create multisend data payload
+        let multisend_txns = destinations
+            .into_iter()
+            .filter(|destination| destination != &self.me) // filter the outgoing channel to self
+            .map(|destination| {
+                let encoded_data = finalizeOutgoingChannelClosureSafeCall {
+                    selfAddress: self.me.into(),
+                    destination: destination.into(),
+                }
+                .abi_encode();
+                MultisendCallOnlyTransaction {
+                    encoded_data: encoded_data.into(),
+                    to: self.contract_addrs.channels.into(),
+                    value: U256::ZERO,
+                }
+            })
+            .collect();
+
+        let tx_payload = MultisendCallOnlyTransaction::build_multisend_tx(multisend_txns);
+
+        let tx = TransactionRequest::default()
+            .with_input(multisend_payload(tx_payload))
+            .with_to(self.module.into())
+            .with_gas_limit(DEFAULT_TX_GAS);
         Ok(tx)
     }
 
