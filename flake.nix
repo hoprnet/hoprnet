@@ -568,9 +568,8 @@
           find-port-ci = flake-utils.lib.mkApp {
             drv = pkgs.writeShellApplication {
               name = "find-port";
-              runtimeInputs = [ pkgs.python3 ];
               text = ''
-                ./tests/find_port.py --min-port 3000 --max-port 4000 --skip 30
+                ${pkgs.python3}/bin/python ./tests/find_port.py --min-port 3000 --max-port 4000 --skip 30
               '';
             };
           };
