@@ -207,10 +207,10 @@ mod tests {
 
     #[test]
     fn bounded_size_should_not_allow_bigger_numbers() {
-        // assert_eq!(0usize, BoundedSize::<10>::MIN.into());
-        assert_eq!(0usize, <BoundedSize<10> as Into<usize>>::into(BoundedSize::<10>::MIN));
-        // assert_eq!(10usize, BoundedSize::<10>::MAX.into());
-        assert_eq!(10usize, <BoundedSize<10> as Into<usize>>::into(BoundedSize::<10>::MAX));
+        let min_bounded_size: usize = BoundedSize::<10>::MIN.into();
+        assert_eq!(0usize, min_bounded_size);
+        let max_bounded_size: usize = BoundedSize::<10>::MAX.into();
+        assert_eq!(10usize, max_bounded_size);
 
         assert!(BoundedSize::<10>::try_from(5).is_ok_and(|b| u8::from(b) == 5));
         assert!(BoundedSize::<10>::try_from(11).is_err());

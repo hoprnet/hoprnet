@@ -19,7 +19,6 @@ use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
 use crate::rpc::RpcOperations;
 use crate::transport::HttpRequestor;
 use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
-// use crate::{BlockWithLogs, HoprIndexerRpcOperations, HttpRequestor, Log, LogFilter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -99,7 +98,6 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
 
 #[async_trait]
 impl<R: HttpRequestor + 'static + Clone> HoprIndexerRpcOperations for RpcOperations<R> {
-    // impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprIndexerRpcOperations for RpcOperations<P, R> {
     async fn block_number(&self) -> Result<u64> {
         self.get_block_number().await
     }
@@ -397,11 +395,6 @@ mod tests {
                     .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
                     .next()
                     .await,
-                // rpc.try_stream_logs(1, log_filter)?
-                //     .take(1)
-                //     .collect::<Vec<BlockWithLogs>>()
-                //     .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
-                //     .await,
             )
         });
 
@@ -563,8 +556,6 @@ mod tests {
 
         // The last block must contain all 2 events
         let last_block_logs = retrieved_logs
-            // .expect("there is no retrieved logs at first place")
-            // .into_iter()
             .first()
             .context("a value should be present")?
             .clone()

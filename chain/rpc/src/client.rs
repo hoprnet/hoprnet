@@ -114,15 +114,6 @@ pub struct DefaultRetryPolicy {
     #[default(Some(0))]
     pub min_retries: Option<u32>,
 
-    // TODO: This property is on the outter layer
-    // /// Maximum number of retries.
-    // ///
-    // /// If `None` is given, will keep retrying indefinitely.
-    // ///
-    // /// Default is 12.
-    // #[validate(range(min = 1))]
-    // #[default(Some(12))]
-    // pub max_retries: Option<u32>,
     /// Initial wait before retries.
     ///
     /// NOTE: Transport and connection errors (such as connection timeouts) are retried at
@@ -166,6 +157,7 @@ pub struct DefaultRetryPolicy {
         _code = "vec![http::StatusCode::TOO_MANY_REQUESTS,http::StatusCode::GATEWAY_TIMEOUT,http::StatusCode::SERVICE_UNAVAILABLE]"
     )]
     pub retryable_http_errors: Vec<http::StatusCode>,
+
     /// Maximum number of different requests that are being retried at the same time.
     ///
     /// If any additional request fails after this number is attained, it won't be retried.
@@ -191,13 +183,7 @@ impl DefaultRetryPolicy {
 }
 
 impl RetryPolicy for DefaultRetryPolicy {
-    // TODO: original implementation requires input param of `num_retries`
     fn should_retry(&self, err: &TransportError) -> bool {
-        // // Retry if a global minimum of number of retries was given and wasn't yet attained
-        // if self.min_retries.is_some_and(|min| num_retries <= min) {
-        //     debug!(num_retries, min_retries = ?self.min_retries,  "retrying because minimum number of retries not yet reached");
-        //     return true;
-        // }
         match err {
             // There was a transport-level error. This is either a non-retryable error,
             // or a server error that should be retried.
@@ -533,13 +519,6 @@ where
         // metrics after calling
         Box::pin(async move {
             let res = future.await;
-            // .error_for_status() // needed to turn 4xx and 5xx errors into reqwest::Error
-            // .map_err(|e| {
-            //     HttpRequestError::HttpError(
-            //         StatusCode::try_from(e.status().map(|s| s.as_u16()).unwrap_or(500))
-            //             .expect("status code must be compatible"), // cannot happen
-            //     )
-            // })?;
 
             let req_duration = start.elapsed();
             method_names.iter().for_each(|method| {

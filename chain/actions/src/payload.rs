@@ -36,7 +36,6 @@ use hopr_bindings::{
     hoprtoken::HoprToken::{approveCall, transferCall},
 };
 use hopr_chain_types::ContractAddresses;
-// use hopr_chain_types::{create_eip1559_transaction, TypedTransaction};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;

@@ -77,17 +77,18 @@ impl WinProbSubcommands {
         );
 
         // convert the winning probability to the format required by the contract
-        let winning_probability = WinningProbability::try_from(winning_probability).map_err(|_| {
+        let winning_probability_val = WinningProbability::try_from(winning_probability).map_err(|_| {
             HelperErrors::ParseError("Failed to convert winning probability to the required format".into())
         })?;
 
-        // info!(
-        //     "Setting the global minimum winning probability to {:?} ({:?} in uint56 format)",
-        //     winning_probability, win_prob_param
-        // );
+        info!(
+            winning_probability = %winning_probability_val,
+            win_prob_uint56 = %winning_probability,
+            "Setting the global minimum winning probability"
+        );
 
         hopr_win_prob
-            .setWinProb(U56::from_be_slice(&winning_probability.as_encoded()))
+            .setWinProb(U56::from_be_slice(&winning_probability_val.as_encoded()))
             .send()
             .await?
             .watch()
@@ -119,8 +120,9 @@ impl WinProbSubcommands {
         let current_win_prob = WinningProbability::from(tmp);
         let current_win_prob_f64 = current_win_prob.as_f64();
         info!(
-            "Current global minimum winning probability is {:?} ({:?} in uint56 format)",
-            current_win_prob_f64, current_win_prob
+            current_win_prob_f64 = %current_win_prob_f64,
+            current_win_prob_uint56 = %current_win_prob,
+            "Current global minimum winning probability"
         );
         Ok(current_win_prob_f64)
     }
