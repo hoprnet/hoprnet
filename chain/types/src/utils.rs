@@ -24,7 +24,11 @@ use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use SafeContract::SafeContractInstance;
 
-use crate::{constants, errors::Result as ChainTypesResult, ContractInstances};
+use crate::{
+    constants,
+    errors::{ChainTypesError, Result as ChainTypesResult},
+    ContractInstances,
+};
 
 // define basic safe abi
 sol!(
@@ -259,7 +263,7 @@ pub async fn include_node_to_module_by_safe<T, P, N>(
     module_address: Address,
     node_address: Address,
     deployer: &ChainKeypair, // also node address
-) -> ContractResult<()>
+) -> Result<(), ChainTypesError>
 where
     T: alloy::contract::private::Transport + Clone,
     P: alloy::contract::private::Provider<T, N> + Clone,
@@ -280,11 +284,15 @@ where
 
     let safe_contract = SafeContract::new(safe_address.into(), provider.clone());
     let wallet = PrivateKeySigner::from_slice(deployer.secret().as_ref()).expect("failed to construct wallet");
-    let safe_tx = get_safe_tx(safe_contract, module_address, inner_tx_data.into(), wallet)
-        .await
-        .unwrap();
+    let safe_tx = get_safe_tx(safe_contract, module_address, inner_tx_data.into(), wallet).await?;
 
-    provider.send_transaction(safe_tx).await?.watch().await?;
+    provider
+        .send_transaction(safe_tx)
+        .await
+        .map_err(|e| ChainTypesError::ContractError(e.into()))?
+        .watch()
+        .await
+        .map_err(|e| ChainTypesError::ContractError(e.into()))?;
 
     Ok(())
 }

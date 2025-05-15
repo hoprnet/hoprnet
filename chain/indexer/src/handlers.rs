@@ -465,9 +465,11 @@ where
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
-                    let new_status = ChannelStatus::PendingToClose(
-                        SystemTime::UNIX_EPOCH.add(Duration::from_secs(closure_initiated.closureTime as u64)),
-                    );
+                    let new_status = ChannelStatus::PendingToClose(SystemTime::UNIX_EPOCH.add(Duration::from_secs(
+                        closure_initiated.closureTime.try_into().map_err(|_| {
+                            CoreEthereumIndexerError::ProcessError("closureTime does not fit into u64".to_owned())
+                        })?,
+                    )));
 
                     let channel = self
                         .db
@@ -784,10 +786,12 @@ where
 
         let primitive_log = alloy::primitives::Log::new(
             slog.address.into(),
-            slog.topics.into_iter().map(|h| B256::from_slice(h.as_ref())).collect(),
-            slog.data.into(),
+            slog.topics.iter().map(|h| B256::from_slice(h.as_ref())).collect(),
+            slog.data.clone().into(),
         )
-        .expect("failed to parse SerializableLog to alloy::primitives::Log");
+        .ok_or_else(|| {
+            CoreEthereumIndexerError::ProcessError(format!("failed to convert log to primitive log: {slog:?}"))
+        })?;
 
         if log.address.eq(&self.addresses.announcements) {
             let bn = log.block_number as u32;

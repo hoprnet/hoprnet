@@ -12,10 +12,6 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
-alloy = { workspace = true, default-features = false, features = [
-  "contract",
-  "k256",
-] }
 aquamarine = { workspace = true }
 bloomfilter = { workspace = true, features = ["serde"] }
 bincode = { workspace = true }

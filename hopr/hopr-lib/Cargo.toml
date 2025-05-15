@@ -59,7 +59,6 @@ serde_json = { workspace = true }
 strum = { workspace = true }
 smart-default = { workspace = true }
 thiserror = { workspace = true }
-url = { workspace = true }
 validator = { workspace = true }
 
 hopr-async-runtime = { workspace = true }
@@ -87,6 +86,7 @@ serde_yaml = { workspace = true }
 tracing-test = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+url = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }

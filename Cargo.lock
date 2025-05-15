@@ -4479,11 +4479,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-bindings"
-version = "0.2.1"
+version = "0.2.0"
 dependencies = [
  "alloy",
  "anyhow",
- "glob",
  "serde",
 ]
 
@@ -4834,7 +4833,6 @@ dependencies = [
 name = "hopr-internal-types"
 version = "0.8.0"
 dependencies = [
- "alloy",
  "anyhow",
  "aquamarine",
  "bincode",
@@ -8207,7 +8205,6 @@ version = "0.12.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d19c46a6fdd48bc4dab94b6103fccc55d34c67cc0ad04653aad4ea2a07cd7bbb"
 dependencies = [
- "async-compression",
  "base64 0.22.1",
  "bytes",
  "encoding_rs",
@@ -8238,7 +8235,6 @@ dependencies = [
  "system-configuration",
  "tokio",
  "tokio-native-tls",
- "tokio-util",
  "tower 0.5.2",
  "tower-service",
  "url",
