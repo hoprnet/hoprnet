@@ -193,9 +193,9 @@ jobs:
         run: |
           base_port=$(nix run .#find-port-ci)
           echo "Using base port ${base_port}"
-          echo "output_base-port=${base_port}" >> "$GITHUB_OUTPUT"
-          echo "output_snapshot-name="snapshot-${base_port}" >> "$GITHUB_OUTPUT"
-          echo "output_snapshot-dir="/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
+          echo "base-port=${base_port}" >> "$GITHUB_OUTPUT"
+          echo "snapshot-name="snapshot-${base_port}" >> "$GITHUB_OUTPUT"
+          echo "snapshot-dir="/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
 
       - name: Download ${{ steps.find_base_port.outputs.snapshot-name }}
         id: download-snapshot
@@ -298,9 +298,9 @@ jobs:
         run: |
           base_port=$(./tests/find_port.py --min-port 3000 --max-port 4000 --skip 30)
           echo "Using base port ${base_port}"
-          echo "output_base-port=${base_port}" >> "$GITHUB_OUTPUT"
-          echo "output_snapshot-name="snapshot-${base_port}" >> "$GITHUB_OUTPUT"
-          echo "output_snapshot-dir="/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
+          echo "base-port=${base_port}" >> "$GITHUB_OUTPUT"
+          echo "snapshot-name="snapshot-${base_port}" >> "$GITHUB_OUTPUT"
+          echo "snapshot-dir="/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
 
       - name: Download ${{ steps.find_base_port.outputs.snapshot-name }}
         id: download-snapshot
