@@ -31,7 +31,13 @@ from sdk.python.localcluster.constants import MAIN_DIR, TICKET_PRICE_PER_HOP
 from sdk.python.localcluster.node import Node
 
 from .conftest import barebone_nodes, random_distinct_pairs_from
-from .utils import PARAMETERIZED_SAMPLE_SIZE, create_channel, shuffled
+from .utils import (
+    PARAMETERIZED_SAMPLE_SIZE,
+    create_channel,
+    shuffled,
+    create_bidirectional_channels_for_route,
+    get_ticket_price,
+)
 
 HOPR_SESSION_MAX_PAYLOAD_SIZE = 762
 STANDARD_MTU_SIZE = 1500
@@ -286,6 +292,7 @@ class TestSessionWithSwarm:
         # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     )
     async def test_session_communication_over_n_hop_with_a_tcp_echo_server(self, route, swarm7: dict[str, Node]):
+        ticket_price = await get_ticket_price(swarm7[route[0]])
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
         expected = [f"{i}".ljust(STANDARD_MTU_SIZE) for i in range(packet_count)]
         surb_pre_buffer = 6000
@@ -297,28 +304,11 @@ class TestSessionWithSwarm:
         fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
         ret_path = fwd_path[::-1]
 
-        async with AsyncExitStack() as channels:
-            channels_to = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]],
-                        swarm7[route[i + 1]],
-                        funding=20 * (surb_pre_buffer + packet_count) * TICKET_PRICE_PER_HOP,
-                    )
-                )
-                for i in range(len(route) - 1)
-            ]
-            channels_back = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]], swarm7[route[i - 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP
-                    )
-                )
-                for i in reversed(range(1, len(route)))
-            ]
-
-            await asyncio.gather(*(channels_to + channels_back))
-
+        async with create_bidirectional_channels_for_route(
+            [swarm7[hop] for hop in route],
+            20 * (surb_pre_buffer + packet_count) * ticket_price,
+            20 * packet_count * ticket_price,
+        ):
             actual = ""
             with EchoServer(SocketType.TCP, STANDARD_MTU_SIZE) as server:
                 # socket.listen does not listen immediately and needs some time to be working
@@ -468,6 +458,7 @@ class TestSessionWithSwarm:
         # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     )
     async def test_session_communication_over_n_hop_with_a_udp_echo_server(self, route, swarm7: dict[str, Node]):
+        ticket_price = await get_ticket_price(swarm7[route[0]])
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
         expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
         surb_pre_buffer = 6000
@@ -479,26 +470,9 @@ class TestSessionWithSwarm:
         fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
         ret_path = fwd_path[::-1]
 
-        async with AsyncExitStack() as channels:
-            channels_to = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]],
-                        swarm7[route[i + 1]],
-                        funding=(surb_pre_buffer + packet_count) * TICKET_PRICE_PER_HOP,
-                    )
-                )
-                for i in range(len(route) - 1)
-            ]
-            channels_back = [
-                channels.enter_async_context(
-                    create_channel(swarm7[route[i]], swarm7[route[i - 1]], funding=packet_count * TICKET_PRICE_PER_HOP)
-                )
-                for i in reversed(range(1, len(route)))
-            ]
-
-            await asyncio.gather(*(channels_to + channels_back))
-
+        async with create_bidirectional_channels_for_route(
+            [swarm7[hop] for hop in route], (surb_pre_buffer + packet_count) * ticket_price, packet_count * ticket_price
+        ):
             actual = []
             with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE) as server:
                 await asyncio.sleep(1.0)
@@ -577,34 +551,18 @@ class TestSessionWithSwarm:
         # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     )
     async def test_session_communication_over_n_hop_with_an_https_server(self, route, swarm7: dict[str, Node]):
+        ticket_price = await get_ticket_price(swarm7[route[0]])
         src_peer = swarm7[route[0]]
         dest_peer = swarm7[route[-1]]
         fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
         ret_path = fwd_path[::-1]
         surb_pre_buffer = 6000
 
-        async with AsyncExitStack() as channels:
-            channels_to = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]],
-                        swarm7[route[i + 1]],
-                        funding=100 * (surb_pre_buffer + DOWNLOAD_FILE_SIZE) * TICKET_PRICE_PER_HOP,
-                    )
-                )
-                for i in range(len(route) - 1)
-            ]
-            channels_back = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]], swarm7[route[i - 1]], funding=100 * DOWNLOAD_FILE_SIZE * TICKET_PRICE_PER_HOP
-                    )
-                )
-                for i in reversed(range(1, len(route)))
-            ]
-
-            await asyncio.gather(*(channels_to + channels_back))
-
+        async with create_bidirectional_channels_for_route(
+            [swarm7[hop] for hop in route],
+            100 * (surb_pre_buffer + DOWNLOAD_FILE_SIZE) * ticket_price,
+            100 * DOWNLOAD_FILE_SIZE * ticket_price,
+        ):
             # Generate random text content to be served
             expected = "".join(random.choices(string.ascii_letters + string.digits, k=DOWNLOAD_FILE_SIZE))
 
@@ -639,6 +597,7 @@ class TestSessionWithSwarm:
         # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
     )
     async def test_session_with_wireguard_tunnel(self, route, swarm7: dict[str, Node]):
+        ticket_price = await get_ticket_price(swarm7[route[0]])
         packet_count = 10_000_000
         wireguard_tunnel = os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL")
 
@@ -649,26 +608,9 @@ class TestSessionWithSwarm:
 
         logging.info(f"Opening channels for route '{route}'")
 
-        async with AsyncExitStack() as channels:
-            channels_to = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]], swarm7[route[i + 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP
-                    )
-                )
-                for i in range(len(route) - 1)
-            ]
-            channels_back = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]], swarm7[route[i - 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP
-                    )
-                )
-                for i in reversed(range(1, len(route)))
-            ]
-
-            await asyncio.gather(*(channels_to + channels_back))
-
+        async with create_bidirectional_channels_for_route(
+            [swarm7[hop] for hop in route], packet_count * ticket_price, packet_count * ticket_price
+        ):
             # sleep to wait for the socket to be active
             await asyncio.sleep(1.0)
 

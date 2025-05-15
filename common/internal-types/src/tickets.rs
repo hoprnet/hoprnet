@@ -548,7 +548,11 @@ impl Display for Ticket {
         write!(
             f,
             "ticket #{}, amount {}, offset {}, epoch {} in channel {}",
-            self.index, self.amount.to_formatted_string() , self.index_offset, self.channel_epoch, self.channel_id
+            self.index,
+            self.amount.to_formatted_string(),
+            self.index_offset,
+            self.channel_epoch,
+            self.channel_id
         )
     }
 }

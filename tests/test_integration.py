@@ -26,7 +26,11 @@ from .utils import (
     check_unredeemed_tickets_value,
     create_channel,
     shuffled,
-    session_send_and_receive_packets, HoprSession, get_ticket_price,
+    session_send_and_receive_packets,
+    HoprSession,
+    get_ticket_price,
+    create_bidirectional_channels_for_route,
+    session_send_and_receive_packets_over_single_route,
 )
 
 
@@ -209,14 +213,15 @@ class TestIntegrationWithSwarm:
 
         ticket_price = await get_ticket_price(swarm7[src])
 
-        async with create_channel(swarm7[src], swarm7[mid], funding=3 * ticket_price, close_from_dest=False):
-            async with create_channel(swarm7[dest], swarm7[mid], funding=2 * ticket_price, close_from_dest=False):
-                await session_send_and_receive_packets(
-                    1,
-                    src = swarm7[src],
-                    dest = swarm7[dest],
-                    fwd_path = {"IntermediatePath": [swarm7[mid].peer_id]},
-                    return_path = {"IntermediatePath": [swarm7[mid].peer_id]})
+        async with create_bidirectional_channels_for_route(
+            [swarm7[src], swarm7[mid], swarm7[dest]],
+            3 * ticket_price,
+            2 * ticket_price,
+        ):
+            await session_send_and_receive_packets_over_single_route(
+                1,
+                [swarm7[src], swarm7[mid], swarm7[dest]],
+            )
 
         assert count_metrics(await swarm7[mid].api.metrics()) != 0
 
@@ -237,41 +242,55 @@ class TestIntegrationWithSwarm:
 
         message_count = 3
 
-        # The forward channel has funding for the Session establishment message and message_count more messages
-        async with create_channel(swarm7[src], swarm7[mid], funding=(message_count + 1)  * ticket_price, close_from_dest=False):
-            # The return channel has only funding for the Session Establishment message
-            async with create_channel(swarm7[dest], swarm7[mid], funding=ticket_price, close_from_dest=False):
-                async with HoprSession(Protocol.UDP, swarm7[src], swarm7[dest],
-                                 {"IntermediatePath": [swarm7[mid].peer_id]},
-                                 {"IntermediatePath": [swarm7[mid].peer_id]},
-                                       capabilities=SessionCapabilitiesBody(segmentation=True, no_delay=True),
-                                       no_response_buffer=True) as session:
+        # The forward channel has funding for the Session establishment message, and message_count more messages
+        # The return channel has only funding for the Session Establishment message
+        async with create_bidirectional_channels_for_route(
+            [swarm7[src], swarm7[mid], swarm7[dest]],
+            (message_count + 1) * ticket_price,
+            ticket_price,
+        ):
+            async with HoprSession(
+                Protocol.UDP,
+                swarm7[src],
+                swarm7[dest],
+                {"IntermediatePath": [swarm7[mid].peer_id]},
+                {"IntermediatePath": [swarm7[mid].peer_id]},
+                capabilities=SessionCapabilitiesBody(segmentation=True, no_delay=True),
+                no_response_buffer=True,
+            ) as session:
+                # Unredeemed value at the relay must be greater by 2 tickets (session establishment messages)
+                await asyncio.wait_for(
+                    check_unredeemed_tickets_value(swarm7[mid], unredeemed_value_before + 2 * ticket_price), 5.0
+                )
+                unredeemed_value_before = (await swarm7[mid].api.get_tickets_statistics()).unredeemed_value
+                logging.debug(f"Unredeemed value before the test: {unredeemed_value_before}")
 
-                    # Unredeemed value at the relay must be greater by 2 tickets (session establishment messages)
-                    await asyncio.wait_for(
-                        check_unredeemed_tickets_value(swarm7[mid], unredeemed_value_before + 2 * ticket_price), 5.0
+                with session.client_socket() as s:
+                    s.settimeout(5)
+                    # These messages will pass through
+                    for i in range(message_count):
+                        message = f"#{i}".ljust(session.mtu)
+                        s.sendto(message.encode(), ("127.0.0.1", session.listen_port))
+
+                        # Each packet increases the unredeemed value
+                        await asyncio.wait_for(
+                            check_unredeemed_tickets_value(
+                                swarm7[mid], unredeemed_value_before + (i + 1) * ticket_price
+                            ),
+                            5.0,
+                        )
+                        logging.debug(f"Message #{i + 1} accounted for")
+
+                    # This additional message is not covered
+                    s.sendto(
+                        "This message is not covered".ljust(session.mtu).encode(),
+                        ("127.0.0.1", session.listen_port),
                     )
-                    unredeemed_value_before = (await swarm7[mid].api.get_tickets_statistics()).unredeemed_value
-                    logging.debug(f"Unredeemed value before the test: {unredeemed_value_before}")
 
-                    with session.client_socket() as s:
-                        s.settimeout(5)
-                        # These messages will pass through
-                        for i in range(message_count):
-                            message = f"#{i}".ljust(session.mtu)
-                            s.sendto(message.encode(), ("127.0.0.1", session.listen_port))
-
-                            # Each packet increases the unredeemed value
-                            await asyncio.wait_for(
-                                check_unredeemed_tickets_value(swarm7[mid], unredeemed_value_before + (i + 1) * ticket_price), 5.0
-                            )
-                            logging.debug(f"Message #{i + 1} accounted for")
-
-                        # This additional message is not covered
-                        s.sendto("This message is not covered".ljust(session.mtu).encode(), ("127.0.0.1", session.listen_port))
-
-                        # And it should be seen as rejected eventually
-                        await asyncio.wait_for(check_rejected_tickets_value(swarm7[mid], rejected_value_before + ticket_price), 5.0)
+                    # And it should be seen as rejected eventually
+                    await asyncio.wait_for(
+                        check_rejected_tickets_value(swarm7[mid], rejected_value_before + ticket_price), 5.0
+                    )
 
                 # Redeem all remaining tickets
                 assert await swarm7[mid].api.tickets_redeem()
@@ -313,19 +332,17 @@ class TestIntegrationWithSwarm:
         dest = route[-1]
         ticket_price = await get_ticket_price(swarm7[src])
         aggregated_ticket_price = TICKET_AGGREGATION_THRESHOLD * ticket_price
-        channel_funding = ticket_count * ticket_price
 
         # Create a channel from src to mid, mid to dest does not need a channel
-        async with create_channel(swarm7[src], swarm7[mid], funding=channel_funding):
+        async with create_bidirectional_channels_for_route(
+            [swarm7[src], swarm7[mid], swarm7[dest]], ticket_count * ticket_price, ticket_price
+        ):
             statistics_before = await swarm7[mid].api.get_tickets_statistics()
             assert statistics_before is not None
 
-            await session_send_and_receive_packets(
+            await session_send_and_receive_packets_over_single_route(
                 ticket_count,
-                src=swarm7[src],
-                dest=swarm7[dest],
-                fwd_path={"IntermediatePath": [swarm7[mid].peer_id]},
-                return_path={"IntermediatePath": [swarm7[mid].peer_id]},
+                [swarm7[src], swarm7[mid], swarm7[dest]],
             )
 
             # monitor that the node aggregates and redeems tickets until the aggregated value is reached

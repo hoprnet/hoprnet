@@ -99,7 +99,7 @@ async def check_outgoing_channel_closed(src: Node, channel_id: str):
 
 async def check_rejected_tickets_value(src: Node, value: int):
     current = (await src.api.get_tickets_statistics()).rejected_value
-    while current  < value:
+    while current < value:
         logging.debug(f"Rejected tickets value: {current}, wanted min: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
         current = (await src.api.get_tickets_statistics()).rejected_value
@@ -149,6 +149,62 @@ async def get_ticket_price(src: Node):
     assert ticket_price is not None
     logging.debug(f"Ticket price: {ticket_price}")
     return ticket_price.value
+
+
+from contextlib import AsyncExitStack
+
+
+class RouteBidirectionalChannels:
+    def __init__(self, route: list[Node], funding_fwd: int, funding_return: int):
+        self.channels = []
+        self.route = route
+        self.funding_fwd = funding_fwd
+        self.funding_return = funding_return
+        self.exit_stack = AsyncExitStack()  # We'll use this for channel management
+
+    async def __aenter__(self):
+        # Enter AsyncExitStack to manage channels
+        await self.exit_stack.__aenter__()
+        channels_to = [
+            self.exit_stack.enter_async_context(
+                create_channel(
+                    self.route[i],
+                    self.route[i + 1],
+                    funding=self.funding_fwd,
+                )
+            )
+            for i in range(len(self.route) - 1)
+        ]
+        channels_back = [
+            self.exit_stack.enter_async_context(
+                create_channel(
+                    self.route[i],
+                    self.route[i - 1],
+                    funding=self.funding_return,
+                )
+            )
+            for i in reversed(range(1, len(self.route)))
+        ]
+
+        self.channels = await asyncio.gather(*(channels_to + channels_back))
+        return self  # Return the context so it can be used in the block
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        # Delegate exit handling to the exit stack
+        await self.exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+
+    @property
+    def fwd_channels(self):
+        return self.channels[: len(self.route) - 1]
+
+    @property
+    def return_channels(self):
+        return self.channels[len(self.route) - 1 :]
+
+
+def create_bidirectional_channels_for_route(route: list[Node], funding_fwd: int, funding_return: int):
+    return RouteBidirectionalChannels(route, funding_fwd, funding_return)
+
 
 class HoprSession:
     def __init__(
@@ -267,8 +323,13 @@ async def session_send_and_receive_packets(
     return_path: dict,
 ):
     async with HoprSession(
-        Protocol.UDP, src, dest, fwd_path, return_path, SessionCapabilitiesBody(no_delay=True, segmentation=True),
-        no_response_buffer=True
+        Protocol.UDP,
+        src,
+        dest,
+        fwd_path,
+        return_path,
+        SessionCapabilitiesBody(no_delay=True, segmentation=True),
+        no_response_buffer=True,
     ) as session:
         addr = ("127.0.0.1", session.listen_port)
         msg_len = int(session.mtu / 2)
@@ -305,3 +366,13 @@ async def session_send_and_receive_packets(
         expected.sort()
 
         assert "".join(expected) == "".join(actual)
+
+
+async def session_send_and_receive_packets_over_single_route(msg_count: int, route: list[Node]):
+    await session_send_and_receive_packets(
+        msg_count,
+        src=route[0],
+        dest=route[-1],
+        fwd_path={"IntermediatePath": [n.peer_id for n in route[1:-1]]},
+        return_path={"IntermediatePath": [n.peer_id for n in route[-1:1]]},
+    )
