@@ -102,8 +102,6 @@ lazy_static::lazy_static! {
 ///
 /// No more additional retries are allowed on new requests, if the maximum number of concurrent
 /// requests being retried has reached `max_retry_queue_size`.
-// #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
-// #[derive(Debug, Clone)]
 #[serde_as]
 #[derive(Clone, Debug, PartialEq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
 pub struct DefaultRetryPolicy {
