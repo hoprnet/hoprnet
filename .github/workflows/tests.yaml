@@ -191,7 +191,7 @@ jobs:
       - name: Find base port
         id: find_base_port
         run: |
-          base_port=$(./../../tests/find_port.py --min-port 3000 --max-port 4000 --skip 30)
+          base_port=$(./tests/find_port.py --min-port 3000 --max-port 4000 --skip 30)
           echo "output_base-port=${base_port}" >> "$GITHUB_OUTPUT"
           echo "output_snapshot-name="snapshot-${base_port}" >> "$GITHUB_OUTPUT"
           echo "output_snapshot-dir="/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
@@ -295,7 +295,7 @@ jobs:
       - name: Find base port
         id: find_base_port
         run: |
-          base_port=$(./../../tests/find_port.py --min-port 3000 --max-port 4000 --skip 30)
+          base_port=$(./tests/find_port.py --min-port 3000 --max-port 4000 --skip 30)
           echo "output_base-port=${base_port}" >> "$GITHUB_OUTPUT"
           echo "output_snapshot-name="snapshot-${base_port}" >> "$GITHUB_OUTPUT"
           echo "output_snapshot-dir="/tmp/hopr-localcluster/snapshot-${base_port}" >> "$GITHUB_OUTPUT"
