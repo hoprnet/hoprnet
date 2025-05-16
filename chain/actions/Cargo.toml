@@ -55,6 +55,7 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+env_logger = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
 tokio = { workspace = true }

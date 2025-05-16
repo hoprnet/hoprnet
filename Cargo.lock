@@ -4495,6 +4495,7 @@ dependencies = [
  "async-channel 2.3.1",
  "async-lock 3.4.0",
  "async-trait",
+ "env_logger",
  "futures",
  "futures-timer",
  "hex-literal",
@@ -4521,7 +4522,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-api"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "alloy",
  "async-channel 2.3.1",
