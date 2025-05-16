@@ -17,6 +17,9 @@ pub enum RpcError {
     MulticallError(#[from] MulticallError),
 
     #[error(transparent)]
+    LogConversionError(#[from] LogConversionError),
+
+    #[error(transparent)]
     SignerError(#[from] alloy::signers::Error),
 
     #[error("multicall inner failure at {0}: {1}")]
@@ -49,4 +52,18 @@ pub enum HttpRequestError {
 
     #[error("unrecognized error: {0}")]
     UnknownError(String),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum LogConversionError {
+    #[error("Missing transaction index")]
+    MissingTransactionIndex,
+    #[error("Missing block number")]
+    MissingBlockNumber,
+    #[error("Missing block hash")]
+    MissingBlockHash,
+    #[error("Missing log index")]
+    MissingLogIndex,
+    #[error("Missing transaction hash")]
+    MissingTransactionHash,
 }

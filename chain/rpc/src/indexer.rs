@@ -88,7 +88,7 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
             })
             .flat_map(|result| {
                 futures::stream::iter(match result {
-                    Ok(logs) => logs.into_iter().map(|log| Ok(Log::from(log))).collect::<Vec<_>>(),
+                    Ok(logs) => logs.into_iter().map(|log| Ok(Log::try_from(log)?)).collect::<Vec<_>>(),
                     Err(e) => vec![Err(RpcError::from(e))],
                 })
             })

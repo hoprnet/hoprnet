@@ -298,7 +298,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                 // therefore the eligibility check should be ignored
                 // In EVM it returns `Panic(0x12)` error, where `0x4e487b71` is the function selector
                 // https://docs.soliditylang.org/en/v0.8.12/control-structures.html#panic-via-assert-and-error-via-require
-                if e.return_data.len() >= 1
+                if !e.return_data.is_empty()
                     && e.return_data.starts_with(&[0x4e, 0x48, 0x7b, 0x71])
                     && e.return_data[e.return_data.len() - 1] == 0x12
                 {
