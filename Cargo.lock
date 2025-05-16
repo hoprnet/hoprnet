@@ -4833,7 +4833,6 @@ dependencies = [
 name = "hopr-internal-types"
 version = "0.8.0"
 dependencies = [
- "alloy",
  "anyhow",
  "aquamarine",
  "bincode",
@@ -4841,7 +4840,6 @@ dependencies = [
  "criterion",
  "hex",
  "hex-literal",
- "hopr-bindings",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-primitive-types",
