@@ -14,10 +14,8 @@ crate-type = ["rlib"]
 [dependencies]
 aquamarine = { workspace = true }
 bloomfilter = { workspace = true, features = ["serde"] }
-bincode = { workspace = true }
 hex-literal = { workspace = true }
 hex = { workspace = true }
-k256 = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = { workspace = true }
 serde = { workspace = true, optional = true }

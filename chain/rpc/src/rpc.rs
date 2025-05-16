@@ -127,7 +127,6 @@ pub(crate) type HoprProvider<R> = FillProvider<
 
 /// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `alloy`
 #[derive(Debug, Clone)]
-// pub struct RpcOperations<T: TransportConnect + Clone, R: HttpRequestor + 'static + Clone> {
 pub struct RpcOperations<R: HttpRequestor + 'static + Clone> {
     pub(crate) provider: Arc<HoprProvider<R>>,
     pub(crate) cfg: RpcOperationsConfig,
@@ -143,7 +142,8 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
         chain_key: &ChainKeypair,
         cfg: RpcOperationsConfig,
     ) -> Result<Self> {
-        let wallet = PrivateKeySigner::from_slice(chain_key.secret().as_ref()).expect("failed to construct wallet");
+        let wallet =
+            PrivateKeySigner::from_slice(chain_key.secret().as_ref()).map_err(|e| RpcError::SignerError(e.into()))?;
 
         let provider = ProviderBuilder::new()
             .disable_recommended_fillers()
@@ -298,7 +298,8 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                 // therefore the eligibility check should be ignored
                 // In EVM it returns `Panic(0x12)` error, where `0x4e487b71` is the function selector
                 // https://docs.soliditylang.org/en/v0.8.12/control-structures.html#panic-via-assert-and-error-via-require
-                if e.return_data.starts_with(&[0x4e, 0x48, 0x7b, 0x71])
+                if e.return_data.len() >= 1
+                    && e.return_data.starts_with(&[0x4e, 0x48, 0x7b, 0x71])
                     && e.return_data[e.return_data.len() - 1] == 0x12
                 {
                     // when receiving division by zero error, if the staking threshold is zero

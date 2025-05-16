@@ -4842,7 +4842,6 @@ dependencies = [
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-primitive-types",
- "k256",
  "lazy_static",
  "multiaddr",
  "num_enum",

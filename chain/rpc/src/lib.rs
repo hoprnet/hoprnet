@@ -66,9 +66,9 @@ pub struct Log {
 impl From<alloy::rpc::types::Log> for Log {
     fn from(value: alloy::rpc::types::Log) -> Self {
         Self {
-            address: value.inner.address.into(),
-            topics: value.inner.topics().iter().map(|t| Hash::from(t.0)).collect(),
-            data: Box::from(value.inner.data.data.as_ref()),
+            address: value.address().into(),
+            topics: value.topics().iter().map(|t| Hash::from(t.0)).collect(),
+            data: Box::from(value.data().data.as_ref()),
             tx_index: value.transaction_index.expect("tx index must be present"),
             block_number: value.block_number.expect("block id must be present"),
             block_hash: value.block_hash.expect("block hash must be present").0.into(),

@@ -104,7 +104,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
 }
 
 fn build_transport_client(url: &str) -> Http<ReqwestClient> {
-    let parsed_url = url::Url::parse(url).unwrap();
+    let parsed_url = url::Url::parse(url).expect(format!("failed to parse URL: {}", url).as_str());
     ReqwestTransport::new(parsed_url)
 }
 

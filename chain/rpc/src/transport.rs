@@ -8,7 +8,7 @@ use crate::errors::HttpRequestError;
 
 /// Abstraction for an HTTP client that performs HTTP GET with serializable request data.
 #[async_trait]
-pub trait HttpRequestor: std::fmt::Debug + Send + Sync + Clone {
+pub trait HttpRequestor: std::fmt::Debug + Send + Sync {
     /// Performs HTTP GET query to the given URL and gets the JSON response.
     async fn http_get(&self, url: &str) -> std::result::Result<Box<[u8]>, HttpRequestError>;
 }

@@ -16,6 +16,9 @@ pub enum RpcError {
     #[error(transparent)]
     MulticallError(#[from] MulticallError),
 
+    #[error(transparent)]
+    SignerError(#[from] alloy::signers::Error),
+
     #[error("multicall inner failure at {0}: {1}")]
     MulticallFailure(usize, String),
 
