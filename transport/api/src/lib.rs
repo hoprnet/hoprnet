@@ -508,9 +508,7 @@ where
             (&self.me).into(),
             network_events_rx,
             discovery_updates,
-            ping_rx,
             self.my_multiaddresses.clone(),
-            self.cfg.protocol,
         )
         .await;
 
@@ -536,7 +534,7 @@ where
         let _mixing_process_before_sending_out =
             hopr_async_runtime::prelude::spawn(mixing_channel_rx.map(Ok).forward(wire_msg_tx));
 
-        processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
+        processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run()));
 
         // initiate the msg-ack protocol stack over the wire transport
         let packet_cfg = PacketInteractionConfig {
