@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_APPLICATION_TAG","DEFAULT_MAXIMUM_INCOMING_TICKET_WIN_PROB","DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB","INTERMEDIATE_HOPS"],"enum":["PendingAcknowledgement"],"struct":["Acknowledgement","ApplicationData","TagBloomFilter"],"type":["HoprPseudonym","Tag"]};
