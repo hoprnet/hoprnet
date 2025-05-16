@@ -4593,7 +4593,6 @@ dependencies = [
  "env_logger",
  "futures",
  "futures-timer",
- "governor",
  "hex-literal",
  "hopr-async-runtime",
  "hopr-bindings",

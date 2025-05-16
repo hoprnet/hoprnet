@@ -14,7 +14,7 @@ crate-type = ["rlib"]
 [features]
 default = []
 prometheus = ["dep:hopr-metrics"]
-runtime-tokio = ["hopr-async-runtime/runtime-tokio", "dep:governor"]
+runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = [
@@ -26,7 +26,6 @@ async-trait = { workspace = true }
 async-stream = { workspace = true }
 futures = { workspace = true }
 futures-timer = { workspace = true }
-governor = { workspace = true, optional = true }
 http = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
@@ -54,7 +53,6 @@ hopr-async-runtime = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 reqwest = { workspace = true }
-governor = { workspace = true }
 env_logger = { workspace = true }
 mockall = { workspace = true }
 mockito = { workspace = true }
