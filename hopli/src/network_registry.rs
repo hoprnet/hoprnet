@@ -192,9 +192,9 @@ impl NetworkRegistrySubcommands {
             safe_eth_addresses.extend(
                 addresses
                     .split(',')
-                    .map(|addr| Address::from_str(addr))
+                    .map(Address::from_str)
                     .collect::<Result<Vec<Address>, _>>()
-                    .map_err(|e| HelperErrors::FromHexError(e))?,
+                    .map_err(HelperErrors::FromHexError)?,
             );
         }
 
@@ -299,9 +299,9 @@ impl NetworkRegistrySubcommands {
             safe_eth_addresses.extend(
                 addresses
                     .split(',')
-                    .map(|addr| Address::from_str(addr))
+                    .map(Address::from_str)
                     .collect::<Result<Vec<_>, _>>()
-                    .map_err(|e| HelperErrors::FromHexError(e))?,
+                    .map_err(HelperErrors::FromHexError)?,
             );
         }
 
