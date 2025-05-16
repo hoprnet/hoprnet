@@ -86,7 +86,7 @@ impl TryFrom<alloy::rpc::types::Log> for Log {
     fn try_from(value: alloy::rpc::types::Log) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             address: value.address().into(),
-            topics: value.topics().into_iter().map(|t| Hash::from(t.0)).collect(),
+            topics: value.topics().iter().map(|t| Hash::from(t.0)).collect(),
             data: Box::from(value.data().data.as_ref()),
             tx_index: value
                 .transaction_index
