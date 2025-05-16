@@ -1,3 +1,5 @@
+from typing import Optional
+
 import asyncio
 import logging
 import random
@@ -216,6 +218,7 @@ class HoprSession:
         return_path: dict,
         capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
         no_response_buffer: bool = False,
+        server_sock_binding_port: Optional[int] = 0,
     ):
         self.src = src
         self.dest = dest
@@ -227,19 +230,21 @@ class HoprSession:
         self.server_sock = None
         self.target_port = 0
         self.no_response_buffer = no_response_buffer
+        self.server_sock_binding_port = server_sock_binding_port
 
     async def __aenter__(self):
-        if self.proto is Protocol.TCP:
-            self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        else:
-            self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if self.server_sock_binding_port is not None:
+            if self.proto is Protocol.TCP:
+                self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            else:
+                self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-        self.server_sock.bind(("127.0.0.1", 0))
-        self.target_port = self.server_sock.getsockname()[1]
-        logging.debug(f"Bound listening socket 127.0.0.1:{self.target_port} on {self.proto.name} for future Session")
+            self.server_sock.bind(("127.0.0.1", self.server_sock_binding_port))
+            self.target_port = self.server_sock.getsockname()[1]
+            logging.debug(f"Bound listening socket 127.0.0.1:{self.target_port} on {self.proto.name} for future Session")
 
-        if self.proto is Protocol.TCP:
-            self.server_sock.listen()
+            if self.proto is Protocol.TCP:
+                self.server_sock.listen()
 
         resp_buffer = "1 MiB"
         if self.no_response_buffer:
@@ -305,8 +310,10 @@ class HoprSession:
 
     @contextmanager
     def server_socket(self):
-        if self.server_sock is None:
+        if self.session is None:
             raise Exception("Session is not open")
+        if self.server_sock is None:
+            raise Exception("Server socket not configured")
 
         try:
             yield self.server_sock
