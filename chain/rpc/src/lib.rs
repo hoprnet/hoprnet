@@ -14,6 +14,7 @@ use alloy::primitives::B256;
 use alloy::providers::PendingTransaction;
 use alloy::rpc::types::TransactionRequest;
 use async_trait::async_trait;
+use errors::LogConversionError;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -63,19 +64,43 @@ pub struct Log {
     pub removed: bool,
 }
 
-impl From<alloy::rpc::types::Log> for Log {
-    fn from(value: alloy::rpc::types::Log) -> Self {
-        Self {
-            address: value.inner.address.into(),
-            topics: value.inner.topics().iter().map(|t| Hash::from(t.0)).collect(),
-            data: Box::from(value.inner.data.data.as_ref()),
-            tx_index: value.transaction_index.expect("tx index must be present"),
-            block_number: value.block_number.expect("block id must be present"),
-            block_hash: value.block_hash.expect("block hash must be present").0.into(),
-            log_index: value.log_index.expect("log index must be present").into(),
-            tx_hash: value.transaction_hash.expect("tx hash must be present").0.into(),
+// impl From<alloy::rpc::types::Log> for Log {
+//     fn from(value: alloy::rpc::types::Log) -> Self {
+//         Self {
+//             address: value.address().into(),
+//             topics: value.topics().iter().map(|t| Hash::from(t.0)).collect(),
+//             data: Box::from(value.data().data.as_ref()),
+//             tx_index: value.transaction_index.expect("tx index must be present"),
+//             block_number: value.block_number.expect("block id must be present"),
+//             block_hash: value.block_hash.expect("block hash must be present").0.into(),
+//             log_index: value.log_index.expect("log index must be present").into(),
+//             tx_hash: value.transaction_hash.expect("tx hash must be present").0.into(),
+//             removed: value.removed,
+//         }
+//     }
+// }
+
+impl TryFrom<alloy::rpc::types::Log> for Log {
+    type Error = LogConversionError;
+
+    fn try_from(value: alloy::rpc::types::Log) -> std::result::Result<Self, Self::Error> {
+        Ok(Self {
+            address: value.address().into(),
+            topics: value.topics().iter().map(|t| Hash::from(t.0)).collect(),
+            data: Box::from(value.data().data.as_ref()),
+            tx_index: value
+                .transaction_index
+                .ok_or(LogConversionError::MissingTransactionIndex)?,
+            block_number: value.block_number.ok_or(LogConversionError::MissingBlockNumber)?,
+            block_hash: value.block_hash.ok_or(LogConversionError::MissingBlockHash)?.0.into(),
+            log_index: value.log_index.ok_or(LogConversionError::MissingLogIndex)?.into(),
+            tx_hash: value
+                .transaction_hash
+                .ok_or(LogConversionError::MissingTransactionHash)?
+                .0
+                .into(),
             removed: value.removed,
-        }
+        })
     }
 }
 

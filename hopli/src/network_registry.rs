@@ -189,7 +189,13 @@ impl NetworkRegistrySubcommands {
         // read all the safe addresses
         let mut safe_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = safe_address {
-            safe_eth_addresses.extend(addresses.split(',').map(|addr| Address::from_str(addr).unwrap()));
+            safe_eth_addresses.extend(
+                addresses
+                    .split(',')
+                    .map(Address::from_str)
+                    .collect::<Result<Vec<Address>, _>>()
+                    .map_err(HelperErrors::FromHexError)?,
+            );
         }
 
         // Read the private key from arguments or the "MANAGER_PRIVATE_KEY" environment variable
@@ -290,7 +296,13 @@ impl NetworkRegistrySubcommands {
         // read all the safe addresses
         let mut safe_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = safe_address {
-            safe_eth_addresses.extend(addresses.split(',').map(|addr| Address::from_str(addr).unwrap()));
+            safe_eth_addresses.extend(
+                addresses
+                    .split(',')
+                    .map(Address::from_str)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(HelperErrors::FromHexError)?,
+            );
         }
 
         info!(

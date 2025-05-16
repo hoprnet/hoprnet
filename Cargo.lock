@@ -4594,7 +4594,6 @@ dependencies = [
  "env_logger",
  "futures",
  "futures-timer",
- "governor",
  "hex-literal",
  "hopr-async-runtime",
  "hopr-bindings",
@@ -4834,7 +4833,6 @@ dependencies = [
 name = "hopr-internal-types"
 version = "0.8.0"
 dependencies = [
- "alloy",
  "anyhow",
  "aquamarine",
  "bincode",
@@ -4842,11 +4840,9 @@ dependencies = [
  "criterion",
  "hex",
  "hex-literal",
- "hopr-bindings",
  "hopr-crypto-random",
  "hopr-crypto-types",
  "hopr-primitive-types",
- "k256",
  "lazy_static",
  "multiaddr",
  "num_enum",

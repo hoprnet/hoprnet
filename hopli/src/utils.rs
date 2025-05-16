@@ -1,6 +1,7 @@
 //! This module contains errors produced in this crate
 use alloy::{
     contract::Error as ContractError,
+    hex::FromHexError,
     primitives::{keccak256, Address},
     providers::{MulticallError, PendingTransactionError},
 };
@@ -15,6 +16,10 @@ pub trait Cmd: clap::Parser + Sized {
 /// Enumerates different errors produced by this crate.
 #[derive(Error, Debug)]
 pub enum HelperErrors {
+    /// Error of contract error
+    #[error(transparent)]
+    FromHexError(#[from] FromHexError),
+
     /// Error of contract error
     #[error(transparent)]
     ContractError(#[from] ContractError),

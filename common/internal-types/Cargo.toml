@@ -14,10 +14,8 @@ crate-type = ["rlib"]
 [dependencies]
 aquamarine = { workspace = true }
 bloomfilter = { workspace = true, features = ["serde"] }
-bincode = { workspace = true }
 hex-literal = { workspace = true }
 hex = { workspace = true }
-k256 = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = { workspace = true }
 serde = { workspace = true, optional = true }
@@ -32,12 +30,10 @@ hopr-crypto-types = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
-alloy = { workspace = true }
 anyhow = { workspace = true }
 bincode = { workspace = true }
 criterion = { workspace = true }
 lazy_static = { workspace = true }
-hopr-bindings = { workspace = true }
 
 [features]
 default = []

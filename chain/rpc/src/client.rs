@@ -364,7 +364,7 @@ where
 
         Ok(GasOracleFillable::Legacy {
             gas_limit,
-            gas_price: gas_price_in_128,
+            gas_price: tx.gas_price().unwrap_or(gas_price_in_128),
         })
     }
 

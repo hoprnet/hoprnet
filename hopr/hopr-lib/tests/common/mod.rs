@@ -17,11 +17,6 @@ use hopr_chain_types::{ContractAddresses, ContractInstances};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 
-fn build_transport_client(url: &str) -> Http<ReqwestClient> {
-    let parsed_url = url::Url::parse(url).unwrap();
-    ReqwestTransport::new(parsed_url).into()
-}
-
 /// Used for testing. Creates RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil_with_snapshot(
@@ -31,7 +26,7 @@ pub fn create_rpc_client_to_anvil_with_snapshot(
     use alloy::rpc::client::ClientBuilder;
     use hopr_chain_rpc::client::SnapshotRequestorLayer;
 
-    let transport_client = build_transport_client(anvil.endpoint_url().as_str());
+    let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
     let rpc_client = ClientBuilder::default()
         .layer(SnapshotRequestorLayer::from_requestor(snapshot_requestor))
