@@ -37,12 +37,8 @@ use std::fmt::Debug;
 
 use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;
-use hopr_transport_network::messaging::ControlMessage;
-use hopr_transport_network::network::NetworkTriggeredEvent;
-use hopr_transport_network::ping::PingQueryReplier;
+use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent};
 use hopr_transport_protocol::PeerDiscovery;
-
-use crate::constants::HOPR_HEARTBEAT_PROTOCOL_V_0_2_0;
 
 pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 pub const NAT_SERVER_PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
@@ -101,14 +97,9 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamP
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
     streams: libp2p_stream::Behaviour,
-    heartbeat_generator: behavior::heartbeat::Behaviour,
-    pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
+    discovery: behavior::discovery::Behaviour,
     pub autonat_client: autonat::v2::client::Behaviour,
     pub autonat_server: autonat::v2::server::Behaviour,
-    // WARNING: the order of struct members is important, `discovery` must be the last member,
-    // because the request_response components remove the peer from its peer store after a failed
-    // dial operation and the discovery mechanism is responsible for populating all peer stores.
-    discovery: behavior::discovery::Behaviour,
 }
 
 impl Debug for HoprNetworkBehavior {
@@ -119,29 +110,14 @@ impl Debug for HoprNetworkBehavior {
 
 impl HoprNetworkBehavior {
     #[allow(clippy::too_many_arguments)]
-    pub fn new<T, U, V>(
-        me: PeerId,
-        network_events: T,
-        onchain_events: U,
-        heartbeat_requests: V,
-        hb_timeout: std::time::Duration,
-    ) -> Self
+    pub fn new<T, U>(me: PeerId, network_events: T, onchain_events: U) -> Self
     where
         T: Stream<Item = NetworkTriggeredEvent> + Send + 'static,
         U: Stream<Item = PeerDiscovery> + Send + 'static,
-        V: Stream<Item = (PeerId, PingQueryReplier)> + Send + 'static,
     {
         Self {
             streams: libp2p_stream::Behaviour::new(),
             discovery: behavior::discovery::Behaviour::new(me, network_events, onchain_events),
-            heartbeat_generator: behavior::heartbeat::Behaviour::new(heartbeat_requests),
-            heartbeat: libp2p::request_response::cbor::Behaviour::<Ping, Pong>::new(
-                [(
-                    StreamProtocol::new(HOPR_HEARTBEAT_PROTOCOL_V_0_2_0),
-                    libp2p::request_response::ProtocolSupport::Full,
-                )],
-                libp2p::request_response::Config::default().with_request_timeout(hb_timeout),
-            ),
             autonat_client: autonat::v2::client::Behaviour::new(
                 OsRng,
                 autonat::v2::client::Config::default().with_probe_interval(NAT_SERVER_PROBE_INTERVAL), // TODO (jean): make this configurable
@@ -158,8 +134,6 @@ impl HoprNetworkBehavior {
 #[derive(Debug)]
 pub enum HoprNetworkBehaviorEvent {
     Discovery(behavior::discovery::Event),
-    HeartbeatGenerator(behavior::heartbeat::Event),
-    Heartbeat(libp2p::request_response::Event<Ping, Pong>),
     TicketAggregation(
         libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ),
@@ -184,18 +158,6 @@ impl From<void::Void> for HoprNetworkBehaviorEvent {
 impl From<behavior::discovery::Event> for HoprNetworkBehaviorEvent {
     fn from(event: behavior::discovery::Event) -> Self {
         Self::Discovery(event)
-    }
-}
-
-impl From<behavior::heartbeat::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: behavior::heartbeat::Event) -> Self {
-        Self::HeartbeatGenerator(event)
-    }
-}
-
-impl From<libp2p::request_response::Event<Ping, Pong>> for HoprNetworkBehaviorEvent {
-    fn from(event: libp2p::request_response::Event<Ping, Pong>) -> Self {
-        Self::Heartbeat(event)
     }
 }
 
