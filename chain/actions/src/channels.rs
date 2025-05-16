@@ -247,17 +247,16 @@ where
 
         debug!(?direction, %status, "found channels to close");
 
-        // Filter out channels that are in pending to close state but not ready to be finalized
+        // For outgoing channels, filter out channels that are in pending to close state but not ready to be finalized
         let channels = channels
             .into_iter()
-            .filter(|channel| {
-                if let ChannelStatus::PendingToClose(closure_time) = channel.status {
+            .filter(|channel| match channel.status {
+                ChannelStatus::PendingToClose(closure_time) if channel.source == self.self_address() => {
                     let remaining_closure_time = channel.remaining_closure_time(closure_time);
                     info!(%channel, ?remaining_closure_time, "remaining closure time update for a channel");
                     remaining_closure_time == Some(Duration::ZERO)
-                } else {
-                    true
                 }
+                _ => true,
             })
             .collect::<Vec<_>>();
 
@@ -273,11 +272,11 @@ where
         if redeem_before_close {
             // TODO: trigger aggregation
             // Do not await the redemption, just submit it to the queue
-            // join_all(channels.iter().map(|channel| async {
-            //     // Do not await the redemption, just submit it to the queue
-            //     self.redeem_tickets_in_channel(channel, false).await
-            // }))
-            // .await;
+            join_all(channels.iter().map(|channel| async {
+                // Do not await the redemption, just submit it to the queue
+                self.redeem_tickets_in_channel(channel, false).await
+            }))
+            .await;
         }
 
         info!(?channels, ?direction, "sending channel closure requests");
@@ -1258,7 +1257,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_close_multiple_outgoing_channels_at_once() -> anyhow::Result<()> {
-        let _ = env_logger::builder().is_test(true).try_init();
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
@@ -1298,15 +1296,18 @@ mod tests {
             .withf(move |dsts| vec![*BOB, *EVE].eq(dsts))
             .returning(move |_| Ok(random_hash));
 
-        // tx_exec
-        //     .expect_finalize_multiple_outgoing_channels_closure()
-        //     .times(1)
-        //     .in_sequence(&mut seq)
-        //     .withf(move |dsts| vec![*BOB, *EVE].eq(dsts))
-        //     .returning(move |_| Ok(random_hash));
+        tx_exec
+            .expect_finalize_multiple_outgoing_channels_closure()
+            .times(1)
+            .in_sequence(&mut seq)
+            .withf(move |dsts| vec![*BOB, *EVE].eq(dsts))
+            .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = Sequence::new();
+
+        // Due to the limitation in register_expectation,
+        // currently cannot register multiple expectations for the same TX hash
         indexer_action_tracker
             .expect_register_expectation()
             .once()
@@ -1319,41 +1320,19 @@ mod tests {
                 .boxed())
             });
 
-        // indexer_action_tracker
-        //     .expect_register_expectation()
-        //     .once()
-        //     .in_sequence(&mut seq2)
-        //     .returning(move |_| {
-        //         Ok(futures::future::ok(SignificantChainEvent {
-        //             tx_hash: random_hash,
-        //             event_type: ChainEventType::ChannelClosureInitiated(channel_alice_eve),
-        //         })
-        //         .boxed())
-        //     });
-
-        // indexer_action_tracker
-        //     .expect_register_expectation()
-        //     .once()
-        //     .in_sequence(&mut seq2)
-        //     .returning(move |_| {
-        //         Ok(futures::future::ok(SignificantChainEvent {
-        //             tx_hash: random_hash,
-        //             event_type: ChainEventType::ChannelClosed(channel_alice_bob),
-        //         })
-        //         .boxed())
-        //     });
-
-        // indexer_action_tracker
-        //     .expect_register_expectation()
-        //     .once()
-        //     .in_sequence(&mut seq2)
-        //     .returning(move |_| {
-        //         Ok(futures::future::ok(SignificantChainEvent {
-        //             tx_hash: random_hash,
-        //             event_type: ChainEventType::ChannelClosed(channel_alice_eve),
-        //         })
-        //         .boxed())
-        //     });
+        // Due to the limitation in register_expectation,
+        // currently cannot register multiple expectations for the same TX hash
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel_alice_bob),
+                })
+                .boxed())
+            });
 
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
@@ -1379,30 +1358,125 @@ mod tests {
         );
 
         // // Transition the channel to the PendingToClose state with the closure time already elapsed
-        // channel_alice_bob.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
-        // channel_alice_eve.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
+        channel_alice_bob.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
+        channel_alice_eve.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
 
-        // db.upsert_channel(None, channel_alice_bob).await?;
-        // db.upsert_channel(None, channel_alice_eve).await?;
+        db.upsert_channel(None, channel_alice_bob).await?;
+        db.upsert_channel(None, channel_alice_eve).await?;
 
-        // let tx_res = actions
-        //     .close_multiple_channels(
-        //         ChannelDirection::Outgoing,
-        //         ChannelStatus::PendingToClose(SystemTime::now()),
-        //         false,
-        //     )
-        //     .await?
-        //     .await?;
+        let tx_res = actions
+            .close_multiple_channels(
+                ChannelDirection::Outgoing,
+                ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10))),
+                false,
+            )
+            .await?
+            .await?;
 
-        // assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
-        // assert!(
-        //     matches!(tx_res.action, Action::CloseChannels(_, _, _)),
-        //     "must be close channel action"
-        // );
-        // assert!(
-        //     matches!(tx_res.event, Some(ChainEventType::ChannelClosed(_))),
-        //     "must correspond to channel chain event"
-        // );
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::CloseChannels(_, _, _)),
+            "must be close channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelClosed(_))),
+            "must correspond to channel chain event"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_close_multiple_incoming_channels_at_once() -> anyhow::Result<()> {
+        let stake = Balance::new(10_u32, BalanceType::HOPR);
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
+
+        let channel_bob_alice = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let channel_eve_alice = ChannelEntry::new(*EVE, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+
+        let db: HoprDb = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        let db_clone = db.clone();
+        db.begin_transaction()
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone
+                        .set_safe_hopr_allowance(Some(tx), Balance::new(1_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone
+                        .set_safe_hopr_balance(Some(tx), Balance::new(5_000_000_u64, BalanceType::HOPR))
+                        .await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+                    db_clone.upsert_channel(Some(tx), channel_bob_alice).await?;
+                    db_clone.upsert_channel(Some(tx), channel_eve_alice).await
+                })
+            })
+            .await?;
+
+        let mut tx_exec = MockTransactionExecutor::new();
+        let mut seq = Sequence::new();
+        tx_exec
+            .expect_close_multiple_incoming_channels()
+            .times(1)
+            .in_sequence(&mut seq)
+            .withf(move |dsts| vec![*BOB, *EVE].eq(dsts))
+            .returning(move |_| Ok(random_hash));
+
+        let mut indexer_action_tracker = MockActionState::new();
+        let mut seq2 = Sequence::new();
+
+        // Due to the limitation in register_expectation,
+        // currently cannot register multiple expectations for the same TX hash
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel_bob_alice),
+                })
+                .boxed())
+            });
+
+        // Due to the limitation in register_expectation,
+        // currently cannot register multiple expectations for the same TX hash
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel_bob_alice),
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_sender = tx_queue.new_sender();
+        tokio::task::spawn(async move {
+            tx_queue.start().await;
+        });
+
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+
+        let tx_res = actions
+            .close_multiple_channels(ChannelDirection::Incoming, ChannelStatus::Open, false)
+            .await?
+            .await?;
+
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::CloseChannels(_, _, _)),
+            "must be close channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelClosed(_))),
+            "must correspond to channel chain event"
+        );
         Ok(())
     }
 }
