@@ -1,3 +1,4 @@
+---
 name: Check Contract Bindings
 
 on:
@@ -45,6 +46,7 @@ jobs:
         run: |
           TMP_BINDINGS=$(mktemp -d)
           echo "Generating bindings to $TMP_BINDINGS"
+          echo "TMP_BINDINGS=$TMP_BINDINGS" >> $GITHUB_ENV
 
           nix develop -L .#citest -c bash -c '
             TMP_BINDINGS=$(mktemp -d)
@@ -56,13 +58,10 @@ jobs:
           echo "Generated files:"
           find "$TMP_BINDINGS"
 
-          # Sync structure so that diff can compare it correctly
-          rsync -a --delete "$TMP_BINDINGS/" ./ethereum/bindings/src/codegen-new/
-
       - name: Check for diff
         run: |
-          echo "Checking for changes between current and newly generated bindings"
-          diff_output=$(diff -r ./ethereum/bindings/src/codegen ./ethereum/bindings/src/codegen-new || true)
+          echo "Checking for changes between current and newly generated bindings at $TMP_BINDINGS"
+          diff_output=$(diff -r ./ethereum/bindings/src/codegen "$TMP_BINDINGS" || true)
 
           if [[ -n "$diff_output" ]]; then
             echo "::error::Generated bindings are outdated. Please run the binding generation and commit the result."
@@ -74,6 +73,6 @@ jobs:
 
       - name: Cleanup
         run: |
-          echo "Cleaning up temporary bindings directory"
-          rm -rf ./ethereum/bindings/src/codegen-new/
+          echo "Cleaning up temporary bindings directory: $TMP_BINDINGS "
+          rm -rf "$TMP_BINDINGS"
           echo "Cleanup complete"
