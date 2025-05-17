@@ -1,3 +1,5 @@
+import logging
+
 import asyncio
 
 import pytest
@@ -41,7 +43,7 @@ class TestRedeemingWithSwarm:
             [swarm7[hop] for hop in route], message_count * ticket_price, ticket_price
         ) as channels:
             relay = swarm7[random.choice(route[1:-1])]
-            unredeemed_tickets_before = await relay.api.get_tickets_statistics().unredeemed_tickets
+            unredeemed_tickets_before = (await relay.api.get_tickets_statistics()).unredeemed_value
 
             await basic_send_and_receive_packets_over_single_route(
                 message_count,
@@ -49,7 +51,7 @@ class TestRedeemingWithSwarm:
             )
 
             await asyncio.wait_for(
-                check_unredeemed_tickets_value(relay, unredeemed_tickets_before + message_count * ticket_price),
+                check_unredeemed_tickets_value(relay, unredeemed_tickets_before + (message_count + 2) * ticket_price),
                 30.0,
             )
 
@@ -60,7 +62,11 @@ class TestRedeemingWithSwarm:
                     else:
                         await asyncio.sleep(0.5)
 
+            logging.debug(f"redeeming all tickets in channel {channels.fwd_channels[0].id}")
             await asyncio.wait_for(channel_redeem_tickets(relay.api, channels.fwd_channels[0].id), 20.0)
+
+            logging.debug(f"redeeming all tickets in channel {channels.return_channels[0].id}")
+            await asyncio.wait_for(channel_redeem_tickets(relay.api, channels.return_channels[0].id), 20.0)
 
             await asyncio.wait_for(check_all_tickets_redeemed(relay), 120.0)
 
@@ -97,6 +103,7 @@ class TestRedeemingWithSwarm:
             assert statistics_after.redeemed_value == statistics_before.redeemed_value
 
             assert await relay.api.channel_redeem_tickets(channels.fwd_channels[0].id)
+            assert await relay.api.channel_redeem_tickets(channels.return_channels[0].id)
 
             await asyncio.wait_for(check_all_tickets_redeemed(relay), 120.0)
 
@@ -129,14 +136,14 @@ class TestRedeemingWithSwarm:
                 30.0,
             )
 
-            first_channel_id = channels.fwd_channels[0].id
-
             # Ticket aggregation does not change unredeemed value
-            # await asyncio.wait_for(relay.api.channels_aggregate_tickets(first_channel_id), 20.0)
+            # await asyncio.wait_for(relay.api.channels_aggregate_tickets(channels.fwd_channels[0].id), 20.0)
+            # await asyncio.wait_for(relay.api.channels_aggregate_tickets(channels.return_channels[0].id), 20.0)
             # ticket_statistics = await relay.api.get_tickets_statistics()
             # assert ticket_statistics.unredeemed_value == unredeemed_value_after
 
-            assert await relay.api.channel_redeem_tickets(first_channel_id)
+            assert await relay.api.channel_redeem_tickets(channels.fwd_channels[0].id)
+            assert await relay.api.channel_redeem_tickets(channels.return_channels[0].id)
 
             await asyncio.wait_for(check_all_tickets_redeemed(relay), 120.0)
 

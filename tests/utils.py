@@ -391,10 +391,11 @@ async def basic_send_and_receive_packets(
 
 
 async def basic_send_and_receive_packets_over_single_route(msg_count: int, route: list[Node]):
+    assert len(route) >= 2
     await basic_send_and_receive_packets(
         msg_count,
         src=route[0],
         dest=route[-1],
         fwd_path={"IntermediatePath": [n.peer_id for n in route[1:-1]]},
-        return_path={"IntermediatePath": [n.peer_id for n in route[-1:1]]},
+        return_path={"IntermediatePath": [n.peer_id for n in route[-2:0:-1]]},
     )
