@@ -64,22 +64,6 @@ pub struct Log {
     pub removed: bool,
 }
 
-// impl From<alloy::rpc::types::Log> for Log {
-//     fn from(value: alloy::rpc::types::Log) -> Self {
-//         Self {
-//             address: value.address().into(),
-//             topics: value.topics().iter().map(|t| Hash::from(t.0)).collect(),
-//             data: Box::from(value.data().data.as_ref()),
-//             tx_index: value.transaction_index.expect("tx index must be present"),
-//             block_number: value.block_number.expect("block id must be present"),
-//             block_hash: value.block_hash.expect("block hash must be present").0.into(),
-//             log_index: value.log_index.expect("log index must be present").into(),
-//             tx_hash: value.transaction_hash.expect("tx hash must be present").0.into(),
-//             removed: value.removed,
-//         }
-//     }
-// }
-
 impl TryFrom<alloy::rpc::types::Log> for Log {
     type Error = LogConversionError;
 

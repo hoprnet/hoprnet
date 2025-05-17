@@ -103,9 +103,9 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     Err(HoprChainError::Api("timeout waiting for funds".into()))
 }
 
-fn build_transport_client(url: &str) -> Http<ReqwestClient> {
+fn build_transport_client(url: &str) -> Result<Http<ReqwestClient>> {
     let parsed_url = url::Url::parse(url).unwrap_or_else(|_| panic!("failed to parse URL: {}", url));
-    ReqwestTransport::new(parsed_url)
+    Ok(ReqwestTransport::new(parsed_url))
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -157,14 +157,14 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         safe_address: Address,
         indexer_cfg: IndexerConfig,
         indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
-    ) -> Self {
+    ) -> Result<Self> {
         // TODO: extract this from the global config type
         let mut rpc_http_config = hopr_chain_rpc::HttpPostRequestorConfig::default();
         if let Some(max_rpc_req) = chain_config.max_requests_per_sec {
             rpc_http_config.max_requests_per_sec = Some(max_rpc_req); // override the default if set
         }
 
-        // TODO: replace this DefaultRetryPolicy with a custom one that computes backoff with the number of retries
+        // TODO(#7140): replace this DefaultRetryPolicy with a custom one that computes backoff with the number of retries
         let rpc_http_retry_policy = DefaultRetryPolicy::default();
 
         // TODO: extract this from the global config type
@@ -188,7 +188,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
         // --- Configs done ---
 
-        let transport_client = build_transport_client(&chain_config.chain.default_provider);
+        let transport_client = build_transport_client(&chain_config.chain.default_provider)?;
 
         let rpc_client = ClientBuilder::default()
             .layer(RetryBackoffLayer::new_with_policy(2, 100, 100, rpc_http_retry_policy))
@@ -220,7 +220,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         // Instantiate Chain Actions
         let hopr_chain_actions = ChainActions::new(&me_onchain, db.clone(), action_sender);
 
-        Self {
+        Ok(Self {
             me_onchain,
             safe_address,
             contract_addresses,
@@ -231,7 +231,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             action_queue,
             action_state,
             rpc_operations,
-        }
+        })
     }
 
     /// Execute all processes of the [`HoprChain`] object.
@@ -320,7 +320,6 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 
     pub fn rpc(&self) -> &RpcOperations<DefaultHttpRequestor> {
-        // pub fn rpc(&self) -> &RpcOperations<JsonRpcClient, DefaultHttpRequestor> {
         &self.rpc_operations
     }
 
