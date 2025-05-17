@@ -226,7 +226,7 @@ impl RetryPolicy for DefaultRetryPolicy {
         }
     }
 
-    // TODO: original implementation requires input param of `num_retries`
+    // TODO(#7140): original implementation requires input param of `num_retries`
     // next_backoff = initial_backoff * (1 + backoff_coefficient)^(num_retries - 1)
     fn backoff_hint(&self, _error: &alloy::transports::TransportError) -> Option<std::time::Duration> {
         None

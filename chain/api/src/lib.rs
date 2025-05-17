@@ -164,7 +164,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             rpc_http_config.max_requests_per_sec = Some(max_rpc_req); // override the default if set
         }
 
-        // TODO: replace this DefaultRetryPolicy with a custom one that computes backoff with the number of retries
+        // TODO(#7140): replace this DefaultRetryPolicy with a custom one that computes backoff with the number of retries
         let rpc_http_retry_policy = DefaultRetryPolicy::default();
 
         // TODO: extract this from the global config type
@@ -320,7 +320,6 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 
     pub fn rpc(&self) -> &RpcOperations<DefaultHttpRequestor> {
-        // pub fn rpc(&self) -> &RpcOperations<JsonRpcClient, DefaultHttpRequestor> {
         &self.rpc_operations
     }
 
