@@ -124,6 +124,17 @@ impl FromStr for Address {
     }
 }
 
+impl From<alloy::primitives::Address> for Address {
+    fn from(a: alloy::primitives::Address) -> Self {
+        Address::from(a.0 .0)
+    }
+}
+impl From<Address> for alloy::primitives::Address {
+    fn from(a: Address) -> Self {
+        alloy::primitives::Address::from_slice(a.as_ref())
+    }
+}
+
 /// Represents a type of the balance: native or HOPR tokens.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString)]
 pub enum BalanceType {

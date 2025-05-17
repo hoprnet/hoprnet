@@ -2,7 +2,7 @@
 //!
 //! Most of these types were taken as-is from <https://github.com/gakonst/ethers-rs>, because
 //! they are not exposed as public from the `ethers` crate.
-use ethers::providers::JsonRpcError;
+use alloy::rpc::json_rpc::RpcError;
 use serde::de::{MapAccess, Unexpected, Visitor};
 use serde::{de, Deserialize, Serialize};
 use serde_json::value::RawValue;
@@ -24,7 +24,7 @@ pub struct Request<'a, T> {
 
 impl<'a, T> Request<'a, T> {
     /// Creates a new JSON RPC request
-    pub fn new(id: u64, method: &'a str, params: T) -> Self {
+    pub fn _new(id: u64, method: &'a str, params: T) -> Self {
         Self {
             id,
             jsonrpc: "2.0",
@@ -39,7 +39,7 @@ impl<'a, T> Request<'a, T> {
 #[allow(dead_code)] // not dead code, conforming to the trait
 pub enum Response<'a> {
     Success { id: u64, result: &'a RawValue },
-    Error { id: u64, error: JsonRpcError },
+    Error { id: u64, error: RpcError<()> },
     Notification { method: &'a str, params: Params<'a> },
 }
 
@@ -47,7 +47,7 @@ pub enum Response<'a> {
 #[derive(Deserialize, Debug)]
 #[allow(dead_code)] // not dead code, conforming to the trait
 pub struct Params<'a> {
-    pub subscription: ethers::types::U256,
+    pub subscription: alloy::primitives::U256,
     #[serde(borrow)]
     pub result: &'a RawValue,
 }
@@ -119,7 +119,7 @@ impl<'de: 'a, 'a> Deserialize<'de> for Response<'a> {
                                 return Err(de::Error::duplicate_field("error"));
                             }
 
-                            let value: JsonRpcError = map.next_value()?;
+                            let value: RpcError<()> = RpcError::ErrorResp(map.next_value()?);
                             error = Some(value);
                         }
                         "method" => {

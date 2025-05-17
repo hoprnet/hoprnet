@@ -475,7 +475,7 @@ impl Hopr {
                 fast_sync: cfg.chain.fast_sync,
             },
             tx_indexer_events,
-        );
+        )?;
 
         let multi_strategy = Arc::new(MultiStrategy::new(
             cfg.strategy.clone(),

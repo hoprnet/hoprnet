@@ -14,7 +14,7 @@
         "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
       },
       "environment_type": "local",
-      "indexer_start_block_number": 5
+      "indexer_start_block_number": 1
     },
     "anvil-localhost2": {
       "addresses": {
@@ -27,10 +27,10 @@
         "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
         "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
         "token": "0x9A676e781A523b5d0C0e43731313A708CB607508",
-        "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
+        "winning_probability_oracle": "0x09635f643e140090a9a8dcd712ed6285858cebef"
       },
       "environment_type": "local",
-      "indexer_start_block_number": 5
+      "indexer_start_block_number": 1
     },
     "rotsee": {
       "environment_type": "staging",
@@ -45,7 +45,7 @@
         "node_stake_v2_factory": "0x791d190b2c95397F4BcE7bD8032FD67dCEA7a5F2",
         "token": "0xD4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1",
         "ticket_price_oracle": "0x442df1d946303fB088C9377eefdaeA84146DA0A6",
-        "winning_probability_oracle": "0xC15675d4CCa538D91a91a8D3EcFBB8499C3B0471"
+        "winning_probability_oracle": "0x09635f643e140090a9a8dcd712ed6285858cebef"
       }
     },
     "debug-staging": {

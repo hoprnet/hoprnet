@@ -134,7 +134,7 @@ where
             if !contract_topics.is_empty() {
                 addresses.push(*address);
                 for topic in contract_topics {
-                    address_topics.push((*address, Hash::from(topic)));
+                    address_topics.push((*address, Hash::from(topic.0)));
                     topics.push(topic);
                 }
             }
@@ -146,7 +146,7 @@ where
 
         let log_filter = LogFilter {
             address: addresses,
-            topics: topics.into_iter().map(Hash::from).collect(),
+            topics: topics.into_iter().map(|t| Hash::from(t.0)).collect(),
         };
 
         let is_synced = Arc::new(AtomicBool::new(false));
@@ -218,6 +218,12 @@ where
             let _first_log_block_number = log_block_numbers.first().copied().unwrap_or(0);
             let _head = chain_head.load(Ordering::Relaxed);
             for block_number in log_block_numbers {
+                debug!(
+                    block_number,
+                    first_log_block_number = _first_log_block_number,
+                    head = _head,
+                    "computing processed logs"
+                );
                 // Do not pollute the logs with the fast-sync progress
                 Self::process_block_by_id(&db, &logs_handler, block_number).await?;
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -566,11 +572,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloy::dyn_abi::DynSolValue;
+    use alloy::primitives::{Address as AlloyAddress, B256};
+    use alloy::sol_types::SolEvent;
     use async_trait::async_trait;
-    use ethers::{
-        abi::{encode, Token},
-        contract::EthEvent,
-    };
     use futures::{join, Stream};
     use hex_literal::hex;
     use mockall::mock;
@@ -578,7 +583,6 @@ mod tests {
     use std::collections::BTreeSet;
     use std::pin::Pin;
 
-    use hopr_bindings::hopr_announcements::AddressAnnouncementFilter;
     use hopr_chain_rpc::BlockWithLogs;
     use hopr_chain_types::chain_events::ChainEventType;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
@@ -621,11 +625,12 @@ mod tests {
             logs.push(SerializableLog {
                 address,
                 block_hash: block_hash.into(),
-                topics: vec![AddressAnnouncementFilter::signature().into()],
-                data: encode(&[
-                    Token::Address(ethers::abi::Address::from_slice(address.as_ref())),
-                    Token::String(test_multiaddr.to_string()),
+                topics: vec![hopr_bindings::hoprannouncementsevents::HoprAnnouncementsEvents::AddressAnnouncement::SIGNATURE_HASH.into()],
+                data: DynSolValue::Tuple(vec![
+                    DynSolValue::Address(AlloyAddress::from_slice(address.as_ref())),
+                    DynSolValue::String(test_multiaddr.to_string()),
                 ])
+                .abi_encode()
                 .into(),
                 tx_hash: Hash::create(&[format!("my tx hash {i}").as_bytes()]).into(),
                 tx_index: 0,
@@ -668,7 +673,7 @@ mod tests {
         handlers
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
-            .return_const(vec![topic.into()]);
+            .return_const(vec![B256::from_slice(topic.as_ref())]);
 
         let head_block = 1000;
         rpc.expect_block_number().return_once(move || Ok(head_block));
@@ -712,7 +717,7 @@ mod tests {
         handlers
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
-            .return_const(vec![topic.into()]);
+            .return_const(vec![B256::from_slice(topic.as_ref())]);
         db.ensure_logs_origin(vec![(addr, topic)]).await?;
 
         rpc.expect_block_number().return_once(move || Ok(head_block));
@@ -775,7 +780,7 @@ mod tests {
         handlers
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
-            .return_const(vec![Hash::create(&[b"my topic"]).into()]);
+            .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -855,7 +860,7 @@ mod tests {
             handlers
                 .expect_contract_address_topics()
                 .withf(move |x| x == &addr)
-                .return_const(vec![topic.into()]);
+                .return_const(vec![B256::from_slice(topic.as_ref())]);
             handlers
                 .expect_collect_block_events()
                 .times(2)
@@ -935,7 +940,7 @@ mod tests {
             handlers
                 .expect_contract_address_topics()
                 .withf(move |x| x == &addr)
-                .return_const(vec![topic.into()]);
+                .return_const(vec![B256::from_slice(topic.as_ref())]);
 
             handlers
                 .expect_collect_block_events()
@@ -975,7 +980,7 @@ mod tests {
         handlers
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
-            .return_const(vec![Hash::create(&[b"my topic"]).into()]);
+            .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         // Expected to be called once starting at 0 and yield the respective blocks
@@ -1088,7 +1093,7 @@ mod tests {
         handlers
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
-            .return_const(vec![topic.into()]);
+            .return_const(vec![B256::from_slice(topic.as_ref())]);
 
         let indexer_cfg = IndexerConfig {
             start_block_number: 0,

@@ -1,5 +1,10 @@
 //! This module contains errors produced in this crate
-// use ethers::providers::{Http, JsonRpcClient, ProviderError};
+use alloy::{
+    contract::Error as ContractError,
+    hex::FromHexError,
+    primitives::{keccak256, Address},
+    providers::{MulticallError, PendingTransactionError},
+};
 use hoprd_keypair::errors::KeyPairError;
 use thiserror::Error;
 
@@ -11,6 +16,18 @@ pub trait Cmd: clap::Parser + Sized {
 /// Enumerates different errors produced by this crate.
 #[derive(Error, Debug)]
 pub enum HelperErrors {
+    /// Error of contract error
+    #[error(transparent)]
+    FromHexError(#[from] FromHexError),
+
+    /// Error of contract error
+    #[error(transparent)]
+    ContractError(#[from] ContractError),
+
+    /// Error propagated by pending transctions
+    #[error(transparent)]
+    PendingTransactionError(#[from] PendingTransactionError),
+
     /// Error propagated by IO operations
     #[error(transparent)]
     UnableToReadFromPath(#[from] std::io::Error),
@@ -90,13 +107,9 @@ pub enum HelperErrors {
     #[error(transparent)]
     RpcError(#[from] hopr_chain_rpc::errors::RpcError),
 
-    /// Error with signer wallet error
-    #[error(transparent)]
-    WalletError(#[from] ethers::signers::WalletError),
-
     /// Fail to make a multicall
-    #[error("multicall Error: {0}")]
-    MulticallError(String),
+    #[error(transparent)]
+    MulticallError(#[from] MulticallError),
 
     /// Fail to make a multisend call
     #[error("internal transaction failure in multisend")]
@@ -113,10 +126,6 @@ pub enum HelperErrors {
     /// A required smart contract (Safe or module proxy instance) is not deployed
     #[error("contract not deployed: {0}")]
     ContractNotDeployed(String),
-
-    // encode packed error
-    #[error(transparent)]
-    EncodePackedError(#[from] ethers::abi::EncodePackedError),
 
     // error of parsing addresses
     #[error("Cannot parse address: {0}")]
@@ -208,3 +217,25 @@ pub const DOMAIN_SEPARATOR_TYPEHASH: &str = "47e79534a245952e8b16893a336b85a3d9e
 
 /// Topic hash for `ExecutionSuccess` event, as in <https://github.com/safe-global/safe-smart-account/blob/2278f7ccd502878feb5cec21dd6255b82df374b5/contracts/interfaces/ISafe.sol#L18>
 pub const SAFE_EXECUTION_SUCCESS: &str = "0x442e715f626346e8c54381002da614f62bee8d27386535b2521ec8540898556e";
+
+/// Implement ethers-rs `get_create2_address` function
+/// Returns the CREATE2 address of a smart contract as specified in
+/// [EIP1014](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-1014.md)
+///
+/// keccak256( 0xff ++ senderAddress ++ salt ++ keccak256(init_code))[12..]
+pub fn get_create2_address(from: Address, salt: impl AsRef<[u8]>, init_code: impl AsRef<[u8]>) -> Address {
+    let salt = salt.as_ref();
+    let init_code_hash = keccak256(init_code.as_ref());
+
+    let mut bytes = Vec::with_capacity(1 + 20 + salt.len() + init_code_hash.len());
+    bytes.push(0xff);
+    bytes.extend_from_slice(from.as_slice());
+    bytes.extend_from_slice(salt);
+    bytes.extend_from_slice(&init_code_hash.0);
+
+    let hash = keccak256(bytes);
+
+    let mut bytes = [0u8; 20];
+    bytes.copy_from_slice(&hash[12..]);
+    Address::from(bytes)
+}
