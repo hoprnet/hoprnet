@@ -1227,11 +1227,17 @@ impl Eq for Signature {}
 pub trait Pseudonym: BytesRepresentable + hash::Hash + Eq + Display + Randomizable {}
 
 /// Represents a simple UUID-like pseudonym consisting of 10 bytes.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SimplePseudonym(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] pub [u8; Self::SIZE]);
 
 impl Display for SimplePseudonym {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl Debug for SimplePseudonym {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_hex())
     }

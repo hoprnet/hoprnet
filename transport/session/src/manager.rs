@@ -625,25 +625,35 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     )
                 };
 
-                // Insert the Session object, forcibly overwrite any other session with the same ID
-                self.sessions
-                    .insert(
-                        session_id,
-                        CachedSession {
-                            session_tx: Arc::new(tx),
-                            routing_opts: forward_routing,
-                            abort_handles,
-                        },
-                    )
-                    .await;
-
-                #[cfg(all(feature = "prometheus", not(test)))]
+                // We currently do not support loopback Sessions on ourselves.
+                if let moka::ops::compute::CompResult::Inserted(_) = self
+                    .sessions
+                    .entry(session_id)
+                    .and_compute_with(|entry| {
+                        futures::future::ready(if entry.is_none() {
+                            moka::ops::compute::Op::Put(CachedSession {
+                                session_tx: Arc::new(tx),
+                                routing_opts: forward_routing,
+                                abort_handles,
+                            })
+                        } else {
+                            moka::ops::compute::Op::Nop
+                        })
+                    })
+                    .await
                 {
-                    METRIC_NUM_INITIATED_SESSIONS.increment();
-                    METRIC_ACTIVE_SESSIONS.increment(1.0);
-                }
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        METRIC_NUM_INITIATED_SESSIONS.increment();
+                        METRIC_ACTIVE_SESSIONS.increment(1.0);
+                    }
 
-                Ok(session)
+                    Ok(session)
+                } else {
+                    // Session already exists; it means it is most likely a loopback attempt
+                    error!(%session_id, "session already exists - loopback attempt");
+                    Err(SessionManagerError::Loopback.into())
+                }
             }
             Either::Left((Ok(None), _)) => Err(SessionManagerError::Other(
                 "internal error: sender has been closed without completing the session establishment".into(),
@@ -1409,6 +1419,94 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    async fn session_manager_should_not_allow_loopback_sessions() -> anyhow::Result<()> {
+        let alice_pseudonym = HoprPseudonym::random();
+        let bob_peer: Address = (&ChainKeypair::random()).into();
+
+        let alice_mgr = SessionManager::new(Default::default());
+
+        let mut sequence = mockall::Sequence::new();
+        let mut alice_transport = MockMsgSender::new();
+
+        // Alice sends the StartSession message
+        let alice_mgr_clone = alice_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |data, peer| {
+                msg_type(data, StartProtocolDiscriminants::StartSession)
+                    && matches!(peer, DestinationRouting::Forward { destination, .. } if destination == &bob_peer)
+            })
+            .returning(move |data, _| {
+                // But the message is again processed by Alice due to Loopback
+                let alice_mgr_clone = alice_mgr_clone.clone();
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
+            });
+
+        // Alice clones transport for Session (as Bob)
+        alice_transport
+            .expect_clone()
+            .once()
+            .in_sequence(&mut sequence)
+            .return_once(|| MockMsgSender::new());
+
+        // Alice sends the SessionEstablished message (as Bob)
+        let alice_mgr_clone = alice_mgr.clone();
+        alice_transport
+            .expect_send_message()
+            .once()
+            .in_sequence(&mut sequence)
+            .withf(move |data, peer| {
+                msg_type(data, StartProtocolDiscriminants::SessionEstablished)
+                    && matches!(peer, DestinationRouting::Return(SurbMatcher::Pseudonym(p)) if p == &alice_pseudonym)
+            })
+            .returning(move |data, _| {
+                let alice_mgr_clone = alice_mgr_clone.clone();
+
+                Box::pin(async move {
+                    alice_mgr_clone.dispatch_message(alice_pseudonym, data).await?;
+                    Ok(())
+                })
+            });
+
+        // Alice clones transport for Session
+        alice_transport
+            .expect_clone()
+            .once()
+            .in_sequence(&mut sequence)
+            .return_once(|| MockMsgSender::new());
+
+        // Start Alice
+        let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
+        alice_mgr.start(alice_transport, new_session_tx_alice)?;
+
+        let alice_session = alice_mgr
+            .new_session(
+                bob_peer,
+                SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
+                SessionClientConfig {
+                    capabilities: vec![],
+                    pseudonym: alice_pseudonym.into(),
+                    surb_management: None,
+                    ..Default::default()
+                },
+            )
+            .await;
+
+        println!("{:?}", alice_session);
+        assert!(matches!(
+            alice_session,
+            Err(TransportSessionError::Manager(SessionManagerError::Loopback))
+        ));
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
     async fn session_manager_should_timeout_new_session_attempt_when_no_response() -> anyhow::Result<()> {
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
@@ -1435,15 +1533,13 @@ mod tests {
             })
             .returning(|_, _| Box::pin(async { Ok(()) }));
 
-        let mut jhs = Vec::new();
-
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
-        jhs.extend(alice_mgr.start(alice_transport, new_session_tx_alice)?);
+        alice_mgr.start(alice_transport, new_session_tx_alice)?;
 
         // Start Bob
         let (new_session_tx_bob, _) = futures::channel::mpsc::unbounded();
-        jhs.extend(bob_mgr.start(bob_transport, new_session_tx_bob)?);
+        bob_mgr.start(bob_transport, new_session_tx_bob)?;
 
         let result = alice_mgr
             .new_session(
