@@ -63,9 +63,7 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
         identity,
         network_events_rx,
         transport_updates_rx,
-        heartbeat_requests_rx,
         vec![multiaddress.clone()],
-        ProtocolConfig::default(),
     )
     .await;
 
@@ -137,8 +135,8 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
     let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
 
-    let _sjh1 = SelfClosingJoinHandle::new(swarm1.run("1.0.0".into()));
-    let _sjh2 = SelfClosingJoinHandle::new(swarm2.run("1.0.0".into()));
+    let _sjh1 = SelfClosingJoinHandle::new(swarm1.run());
+    let _sjh2 = SelfClosingJoinHandle::new(swarm2.run());
 
     // Announce nodes to each other
     api1.update_from_announcements
