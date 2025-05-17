@@ -86,7 +86,7 @@ pub use {
         HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
         OffchainKeypair as HoprOffchainKeypair, PeerId, SendMsg, ServiceId, Session as HoprSession, SessionCapability,
         SessionClientConfig, SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig, TicketStatistics,
-        SESSION_PAYLOAD_SIZE, SESSION_USABLE_MTU_SIZE,
+        SESSION_PAYLOAD_SIZE, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
     },
 };
 
@@ -955,7 +955,7 @@ impl Hopr {
             ))),
         );
 
-        // NOTE: after the chain is synched we can reset tickets which are considered
+        // NOTE: after the chain is synced, we can reset tickets which are considered
         // redeemed but on-chain state does not align with that. This implies there was a problem
         // right when the transaction was sent on-chain. In such cases we simply let it retry and
         // handle errors appropriately.

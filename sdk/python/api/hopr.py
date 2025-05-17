@@ -37,8 +37,6 @@ from .response_objects import (
     Configuration,
     ConnectedPeer,
     Infos,
-    Message,
-    MessageSent,
     OpenedChannel,
     Ping,
     Session,
@@ -409,21 +407,6 @@ class HoprdAPI:
         is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "tickets/statistics")
         return is_ok
 
-    async def send_message(
-        self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG
-    ) -> Optional[MessageSent]:
-        """
-        Sends a message to the given destination.
-        :param: destination: str
-        :param: message: str
-        :param: hops: list[str]
-        :param: tag: int = 0x0320
-        :return: bool
-        """
-        data = SendMessageBody(body=message, hops=None, path=hops, destination=destination, tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages", data=data)
-        return MessageSent(response) if is_ok else None
-
     async def session_list_clients(self, protocol: Protocol = Protocol.UDP) -> list[Session]:
         """
         Lists existing Session listeners for the given IP protocol
@@ -488,53 +471,6 @@ class HoprdAPI:
         )
 
         return is_ok
-
-    async def messages_pop(self, tag: int = MESSAGE_TAG) -> Optional[Message]:
-        """
-        Pop next message from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-
-        data = GetMessagesBody(tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/pop", data)
-        return Message(response) if is_ok else None
-
-    async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> Optional[list[Message]]:
-        """
-        Pop all messages from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-        data = GetMessagesBody(tag=tag)
-
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/pop-all", data)
-        return [Message(entry) for entry in response["messages"]] if is_ok else None
-
-    async def messages_peek(self, tag: int = MESSAGE_TAG) -> Optional[Message]:
-        """
-        Peek next message from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-
-        data = GetMessagesBody(tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/peek", data)
-        return Message(response) if is_ok else None
-
-    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = 0) -> Optional[list[Message]]:
-        """
-        Peek all messages from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-        if not isinstance(timestamp, int):
-            data = PeekAllMessagesBody(tag=tag)
-        else:
-            data = PeekAllMessagesBody(tag=tag, timestamp=timestamp)
-
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/peek-all", data)
-        return [Message(entry) for entry in response["messages"]] if is_ok else None
 
     async def readyz(self, timeout: int = 20) -> bool:
         """
