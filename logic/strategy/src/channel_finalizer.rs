@@ -176,6 +176,12 @@ mod tests {
                 direction: ChannelDirection,
                 redeem_before_close: bool,
             ) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn close_multiple_channels(
+                &self,
+                direction: ChannelDirection,
+                status: ChannelStatus,
+                redeem_before_close: bool,
+            ) -> hopr_chain_actions::errors::Result<PendingAction>;
         }
     }
 

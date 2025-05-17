@@ -464,6 +464,83 @@ pub(super) async fn close_channel(
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
+        "receipt": "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118",
+        "channelStatus": "PendingToClose"
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CloseMultipleResponse {
+    /// Receipt for the channel close transaction.
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    receipt: Hash,
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "direction": "outgoing",
+        "status": "Open"
+    }))]
+pub(crate) struct CloseMultipleBodyRequest {
+    /// Direction of the channels to close.
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    direction: hopr_lib::ChannelDirection,
+
+    /// Status of the channels to close.
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    status: hopr_lib::ChannelStatus,
+}
+
+/// Closes multiple channels in a single call.
+#[utoipa::path(
+        delete,
+        path = const_format::formatcp!("{BASE_PATH}/channels"),
+        request_body(
+            content = CloseMultipleBodyRequest,
+            description = "Specifies the direction and status of the channels to close.",
+            content_type = "application/json",
+        ),
+        responses(
+            (status = 200, description = "Channels closed successfully", body = String),
+            (status = 401, description = "Invalid authorization token.", body = ApiError),
+            (status = 412, description = "The node is not ready."),
+            (status = 422, description = "Unknown failure", body = ApiError)
+        ),
+        security(
+            ("api_token" = []),
+            ("bearer_token" = [])
+        ),
+        tag = "Channels",
+    )]
+pub(super) async fn close_multiple_channels(
+    State(state): State<Arc<InternalState>>,
+    Json(req_body): Json<CloseMultipleBodyRequest>,
+) -> impl IntoResponse {
+    let hopr = state.hopr.clone();
+
+    let direction = req_body.direction;
+    let status = req_body.status;
+
+    match hopr.close_multiple_channels(direction, status, false).await {
+        Ok(receipt) => (
+            StatusCode::OK,
+            Json(CloseMultipleResponse {
+                receipt: receipt.tx_hash,
+            }),
+        )
+            .into_response(),
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
+        }
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
+    }
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
         "hash": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
 }))]
 #[serde(rename_all = "camelCase")]

@@ -2,7 +2,6 @@ from typing import Any
 
 from .channelstatus import ChannelStatus
 
-
 def _convert(value: Any):
     if value is None:
         return None

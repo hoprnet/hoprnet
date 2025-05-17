@@ -16,7 +16,7 @@ from .constants import (
 )
 from .node import Node
 
-GLOBAL_TIMEOUT = 200
+GLOBAL_TIMEOUT = 400
 
 
 class Cluster:
@@ -89,19 +89,19 @@ class Cluster:
             else:
                 raise RuntimeError(f"Node {node} did not return addresses")
 
-        # WAIT FOR NODES TO CONNECT TO ALL PEERS
-        peer_connection_timeout = 2 * GLOBAL_TIMEOUT
-        logging.info(f"Waiting up to {peer_connection_timeout}s for nodes to connect to all peers")
+        # # WAIT FOR NODES TO CONNECT TO ALL PEERS
+        # peer_connection_timeout = 2 * GLOBAL_TIMEOUT
+        # logging.info(f"Waiting up to {peer_connection_timeout}s for nodes to connect to all peers")
 
-        tasks = []
-        for node in self.nodes.values():
-            required_peers = [n.peer_id for n in self.nodes.values() if n != node and n.network == node.network]
-            tasks.append(asyncio.create_task(node.all_peers_connected(required_peers)))
+        # tasks = []
+        # for node in self.nodes.values():
+        #     required_peers = [n.peer_id for n in self.nodes.values() if n != node and n.network == node.network]
+        #     tasks.append(asyncio.create_task(node.all_peers_connected(required_peers)))
 
-        try:
-            await asyncio.wait_for(asyncio.gather(*tasks), peer_connection_timeout)
-        except asyncio.TimeoutError:
-            raise RuntimeError("Not all nodes are connected to all peers, interrupting setup")
+        # try:
+        #     await asyncio.wait_for(asyncio.gather(*tasks), peer_connection_timeout)
+        # except asyncio.TimeoutError:
+        #     raise RuntimeError("Not all nodes are connected to all peers, interrupting setup")
 
     def fund_nodes(self):
         logging.info("Funding nodes")

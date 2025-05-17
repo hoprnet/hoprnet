@@ -1,6 +1,7 @@
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 use std::time::{Duration, SystemTime};
 
 /// Describes status of a channel
@@ -46,6 +47,19 @@ impl PartialEq for ChannelStatus {
     }
 }
 impl Eq for ChannelStatus {}
+
+impl FromStr for ChannelStatus {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Closed" => Ok(ChannelStatus::Closed),
+            "Open" => Ok(ChannelStatus::Open),
+            "PendingToClose" => Ok(ChannelStatus::PendingToClose(SystemTime::now())),
+            _ => Err(GeneralError::InvalidInput),
+        }
+    }
+}
 
 /// Describes a direction of node's own channel.
 /// The direction of a channel that is not own is undefined.
@@ -324,6 +338,16 @@ mod tests {
         assert_eq!(
             Duration::ZERO,
             ce.remaining_closure_time(current_time).expect("must have closure time")
+        );
+    }
+
+    #[test]
+    fn channel_type_from_str() {
+        assert_eq!(ChannelStatus::Closed, ChannelStatus::from_str("Closed").unwrap());
+        assert_eq!(ChannelStatus::Open, ChannelStatus::from_str("Open").unwrap());
+        assert_eq!(
+            ChannelStatus::PendingToClose(SystemTime::now()),
+            ChannelStatus::from_str("PendingToClose").unwrap()
         );
     }
 }

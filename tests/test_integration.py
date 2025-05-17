@@ -8,7 +8,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 import pytest
 
 from sdk.python.api import HoprdAPI
-from sdk.python.api.channelstatus import ChannelStatus
+from sdk.python.api.channelstatus import ChannelStatus, ChannelDirection
 from sdk.python.localcluster.constants import (
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
     TICKET_PRICE_PER_HOP,
@@ -340,6 +340,51 @@ class TestIntegrationWithSwarm:
         async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR, use_peer_id=True):
             # the context manager handles opening and closing of the channel with verification using counter-party peerID
             assert True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "route",
+        [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
+    )
+    async def test_close_multiple_channels_at_once(self, route, swarm7: dict[str, Node]):
+        src = swarm7[route[0]]
+
+        logging.info(f"Opening channels between {route[0]} -> {route[1]}")
+        logging.info(f"Opening channels between {route[0]} -> {route[2]}")
+        async with AsyncExitStack() as channels:
+            await asyncio.gather(
+                *[
+                    channels.enter_async_context(
+                        create_channel(
+                            swarm7[route[0]], swarm7[route[i + 1]], OPEN_CHANNEL_FUNDING_VALUE_HOPR, close_from_dest=False
+                        )
+                    )
+                    for i in range(len(route) - 1)
+                ]
+            )
+
+            logging.info(f"Channels opened")
+            assert len((await src.api.all_channels(include_closed=False)).all) == 2
+
+            logging.info(f"Checked 2 channels are opened")
+            # turn all Open channels to PendingToClose
+            assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
+            logging.info(f"Closed open channels")
+
+
+            channels = (await src.api.all_channels(include_closed=False)).all
+            logging.info(f"Still 2 channels are opened")
+
+            assert all(c.status == ChannelStatus.PendingToClose for c in channels)
+            logging.info(f"Two channels are in PendingToClose state")
+
+            # turn all PendingToClose channels to Closed
+            assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
+            logging.info(f"Closed PendingToClose channels")
+
+            channels = (await src.api.all_channels(include_closed=False)).all
+            logging.info(f"Now there are {len(channels)} channels opened")
+            assert len(channels) == 0
 
     # generate a 1-hop route with a node using strategies in the middle
     @pytest.mark.asyncio
