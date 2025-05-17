@@ -14,13 +14,11 @@ from .utils import (
     check_all_tickets_redeemed,
     check_min_incoming_win_prob_eq,
     check_rejected_tickets_value,
-    create_channel,
-    gen_random_tag,
     check_unredeemed_tickets_value,
     check_winning_tickets_count,
     create_bidirectional_channels_for_route,
     get_ticket_price,
-    session_send_and_receive_packets_over_single_route,
+    basic_send_and_receive_packets_over_single_route,
     HoprSession,
 )
 
@@ -109,7 +107,7 @@ class TestWinProbWithSwarm:
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
 
                 # the destination should receive all the packets
-                await session_send_and_receive_packets_over_single_route(
+                await basic_send_and_receive_packets_over_single_route(
                     ticket_count,
                     [swarm7[hop] for hop in route],
                 )
@@ -170,7 +168,7 @@ class TestWinProbWithSwarm:
                 rejected_value_before = statistics_before.rejected_value
 
                 # the destination should receive all the packets
-                await session_send_and_receive_packets_over_single_route(
+                await basic_send_and_receive_packets_over_single_route(
                     ticket_count,
                     [swarm7[hop] for hop in route],
                 )
@@ -237,7 +235,7 @@ class TestWinProbWithSwarm:
                 unredeemed_value_before_2 = statistics_before_2.unredeemed_value
 
                 # the destination should receive all the packets
-                await session_send_and_receive_packets_over_single_route(
+                await basic_send_and_receive_packets_over_single_route(
                     ticket_count,
                     [swarm7[hop] for hop in route],
                 )
@@ -299,7 +297,7 @@ class TestWinProbWithSwarm:
                 rejected_value_before = statistics_before.rejected_value
 
                 # the destination should receive all the packets
-                await session_send_and_receive_packets_over_single_route(
+                await basic_send_and_receive_packets_over_single_route(
                     ticket_count,
                     [swarm7[hop] for hop in route],
                 )
@@ -360,7 +358,7 @@ class TestWinProbWithSwarm:
                     dest,
                     fwd_path={"IntermediatePath": swarm7[relay].peer_id},
                     return_path={"IntermediatePath": swarm7[relay].peer_id},
-                    no_response_buffer=True,
+                    use_response_buffer=None,
                 ):
                     was_active = True
             except:

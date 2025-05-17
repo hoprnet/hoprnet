@@ -28,8 +28,8 @@ def shuffled(coll):
     return coll
 
 
-def gen_random_tag():
-    return random.randint(APPLICATION_TAG_THRESHOLD_FOR_SESSIONS, 65530)
+def make_routes(routes_with_hops: list[int], nodes: list[Node]):
+    return [shuffled(nodes)[: (hop + 2)] for hop in routes_with_hops]
 
 
 @asynccontextmanager
@@ -217,112 +217,127 @@ class HoprSession:
         fwd_path: dict,
         return_path: dict,
         capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
-        no_response_buffer: bool = False,
-        server_sock_binding_port: Optional[int] = 0,
+        use_response_buffer: Optional[str] = "1 MiB",
+        dummy_server_listen_port: Optional[int] = 0,
+        loopback: bool = False,
     ):
-        self.src = src
-        self.dest = dest
-        self.proto = proto
-        self.fwd_path = fwd_path
-        self.return_path = return_path
-        self.capabilities = capabilities
-        self.session = None
-        self.server_sock = None
-        self.target_port = 0
-        self.no_response_buffer = no_response_buffer
-        self.server_sock_binding_port = server_sock_binding_port
+        self._src = src
+        self._dest = dest
+        self._proto = proto
+        self._fwd_path = fwd_path
+        self._return_path = return_path
+        self._capabilities = capabilities
+        self._session = None
+        self._dummy_server_sock = None
+        self._target_port = 0
+        self._use_response_buffer = use_response_buffer
+        self._dummy_server_binding_port = dummy_server_listen_port
+        self._loopback = loopback
 
     async def __aenter__(self):
-        if self.server_sock_binding_port is not None:
-            if self.proto is Protocol.TCP:
-                self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if self._dummy_server_binding_port is not None and self._loopback is False:
+            if self._proto is Protocol.TCP:
+                self._dummy_server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             else:
-                self.server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self._dummy_server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-            self.server_sock.bind(("127.0.0.1", self.server_sock_binding_port))
-            self.target_port = self.server_sock.getsockname()[1]
-            logging.debug(f"Bound listening socket 127.0.0.1:{self.target_port} on {self.proto.name} for future Session")
+            self._dummy_server_sock.bind(("127.0.0.1", self._dummy_server_binding_port))
+            self._target_port = self._dummy_server_sock.getsockname()[1]
+            logging.debug(
+                f"Bound listening socket 127.0.0.1:{self._target_port} on {self._proto.name} for future Session"
+            )
 
-            if self.proto is Protocol.TCP:
-                self.server_sock.listen()
+            if self._proto is Protocol.TCP:
+                self._dummy_server_sock.listen()
 
-        resp_buffer = "1 MiB"
-        if self.no_response_buffer:
-            resp_buffer = "0 MiB"
+        target = f"127.0.0.1:{self._target_port}"
+        if self._loopback is True:
+            target = "0"
 
-        self.session = await self.src.api.session_client(
-            self.dest.peer_id,
-            forward_path=self.fwd_path,
-            return_path=self.return_path,
-            protocol=self.proto,
-            target=f"127.0.0.1:{self.target_port}",
-            capabilities=self.capabilities,
+        resp_buffer = "0 MiB"
+        if self._use_response_buffer is not None:
+            resp_buffer = self._use_response_buffer
+
+        self._session = await self._src.api.session_client(
+            self._dest.peer_id,
+            forward_path=self._fwd_path,
+            return_path=self._return_path,
+            protocol=self._proto,
+            target=target,
+            capabilities=self._capabilities,
             response_buffer=resp_buffer,
+            service=self._loopback,
         )
-        if self.session is None:
-            raise Exception(f"Failed to open session {self.src.peer_id} -> {self.dest.peer_id} on {self.proto.name}")
+        if self._session is None:
+            raise Exception(f"Failed to open session {self._src.peer_id} -> {self._dest.peer_id} on {self._proto.name}")
 
         logging.debug(
-            f"Session opened {self.src.peer_id}:{self.session.port} -> {self.dest.peer_id}:{self.target_port} on {self.proto.name}"
+            f"Session opened {self._src.peer_id}:{self._session.port} -> {self._dest.peer_id}:{self._target_port} on {self._proto.name}"
         )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session is not None and await self.src.api.session_close_client(self.session) is True:
+        if self._session is not None and await self._src.api.session_close_client(self._session) is True:
             logging.debug(
-                f"Session closed {self.src.peer_id}:{self.session.port} -> {self.dest.peer_id}:{self.target_port} on {self.proto.name}"
+                f"Session closed {self._src.peer_id}:{self._session.port} -> {self._dest.peer_id}:{self._target_port} on {self._proto.name}"
             )
-            self.session = None
-            self.target_port = 0
-            if self.server_sock is not None:
-                self.server_sock.close()
+            self._session = None
+            self._target_port = 0
+            if self._dummy_server_sock is not None:
+                self._dummy_server_sock.close()
         else:
             logging.error("Failed to close session")
 
     @contextmanager
     def client_socket(self):
-        if self.session is None:
+        if self._session is None:
             raise Exception("Session is not open")
 
-        if self.proto is Protocol.TCP:
+        if self._proto is Protocol.TCP:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect(("127.0.0.1", self.session.port))
+            s.connect(("127.0.0.1", self._session.port))
         else:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         try:
-            logging.debug(f"Connected session client to 127.0.0.1:{self.session.port} on {self.proto.name}")
+            logging.debug(f"Connected session client to 127.0.0.1:{self._session.port} on {self._proto.name}")
             yield s
         finally:
             s.close()
 
     @property
     def mtu(self):
-        if self.session is None:
+        if self._session is None:
             raise Exception("Session is not open")
-        return self.session.mtu
+        return self._session.mtu
 
     @property
     def listen_port(self):
-        if self.session is None:
+        if self._session is None:
             raise Exception("Session is not open")
-        return self.session.port
+        return self._session.port
+
+    @property
+    def target_port(self):
+        if self._session is None:
+            raise Exception("Session is not open")
+        return self._target_port
 
     @contextmanager
     def server_socket(self):
-        if self.session is None:
+        if self._session is None:
             raise Exception("Session is not open")
-        if self.server_sock is None:
+        if self._dummy_server_sock is None:
             raise Exception("Server socket not configured")
 
         try:
-            yield self.server_sock
+            yield self._dummy_server_sock
         finally:
-            self.server_sock.close()
-            self.server_sock = None
+            self._dummy_server_sock.close()
+            self._dummy_server_sock = None
 
 
-async def session_send_and_receive_packets(
+async def basic_send_and_receive_packets(
     msg_count: int,
     src: Node,
     dest: Node,
@@ -336,10 +351,10 @@ async def session_send_and_receive_packets(
         fwd_path,
         return_path,
         SessionCapabilitiesBody(no_delay=True, segmentation=True),
-        no_response_buffer=True,
+        use_response_buffer=None,
     ) as session:
         addr = ("127.0.0.1", session.listen_port)
-        msg_len = int(session.mtu / 2)
+        msg_len = int(session.mtu / 2)  # Allow space for SURBs, since no response buffer is used
 
         expected = [f"#{i}".ljust(msg_len) for i in range(msg_count)]
         actual = []
@@ -375,8 +390,8 @@ async def session_send_and_receive_packets(
         assert "".join(expected) == "".join(actual)
 
 
-async def session_send_and_receive_packets_over_single_route(msg_count: int, route: list[Node]):
-    await session_send_and_receive_packets(
+async def basic_send_and_receive_packets_over_single_route(msg_count: int, route: list[Node]):
+    await basic_send_and_receive_packets(
         msg_count,
         src=route[0],
         dest=route[-1],

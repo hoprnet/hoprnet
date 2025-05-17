@@ -25,11 +25,11 @@ from .utils import (
     check_unredeemed_tickets_value,
     create_channel,
     shuffled,
-    session_send_and_receive_packets,
+    basic_send_and_receive_packets,
     HoprSession,
     get_ticket_price,
     create_bidirectional_channels_for_route,
-    session_send_and_receive_packets_over_single_route,
+    basic_send_and_receive_packets_over_single_route,
 )
 
 
@@ -156,7 +156,7 @@ class TestIntegrationWithSwarm:
     ):
         message_count = int(TICKET_AGGREGATION_THRESHOLD / 10)
 
-        await session_send_and_receive_packets(
+        await basic_send_and_receive_packets(
             message_count, src=swarm7[src], dest=swarm7[dest], fwd_path={"Hops": 0}, return_path={"Hops": 0}
         )
 
@@ -217,7 +217,7 @@ class TestIntegrationWithSwarm:
             3 * ticket_price,
             2 * ticket_price,
         ):
-            await session_send_and_receive_packets_over_single_route(
+            await basic_send_and_receive_packets_over_single_route(
                 1,
                 [swarm7[src], swarm7[mid], swarm7[dest]],
             )
@@ -255,7 +255,7 @@ class TestIntegrationWithSwarm:
                 {"IntermediatePath": [swarm7[mid].peer_id]},
                 {"IntermediatePath": [swarm7[mid].peer_id]},
                 capabilities=SessionCapabilitiesBody(segmentation=True, no_delay=True),
-                no_response_buffer=True,
+                use_response_buffer=None,
             ) as session:
                 # Unredeemed value at the relay must be greater by 2 tickets (session establishment messages)
                 await asyncio.wait_for(
@@ -339,7 +339,7 @@ class TestIntegrationWithSwarm:
             statistics_before = await swarm7[mid].api.get_tickets_statistics()
             assert statistics_before is not None
 
-            await session_send_and_receive_packets_over_single_route(
+            await basic_send_and_receive_packets_over_single_route(
                 ticket_count,
                 [swarm7[src], swarm7[mid], swarm7[dest]],
             )
@@ -408,33 +408,3 @@ class TestIntegrationWithSwarm:
 
         assert isinstance(price.value, int)
         assert price.value > 0
-
-
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="Test not yet implemented")
-async def test_hoprd_strategy():
-    """
-    ## NOTE: strategy testing will require separate setup so commented out for now until moved
-    # test_strategy_setting() {
-    #   local node_api="${1}"
-
-    #   settings=$(get_settings ${node_api})
-    #   strategy=$(echo ${settings} | jq -r .strategy)
-    #   [[ "${strategy}" != "passive" ]] && { msg "Default strategy should be passive, got: ${strategy}"; exit 1; }
-
-    #   channels_count_pre=$(get_all_channels ${node_api} false | jq '.incoming | length')
-
-    #   set_setting ${node_api} "strategy" "promiscuous"
-
-    #   log "Waiting 100 seconds for the node to make connections to other nodes"
-    #   sleep 100
-
-    #   channels_count_post=$(get_all_channels ${node_api} false | jq '.incoming | length')
-    #   [[ "${channels_count_pre}" -ge "${channels_count_post}" ]] && { msg "Node didn't open any connections by \
-    #    itself even when strategy was set to promiscuous: ${channels_count_pre} !>= ${channels_count_post}"; exit 1; }
-    #   echo "Strategy setting successfull"
-    # }
-
-    # test_strategy_setting ${api4}
-    """
-    assert True
