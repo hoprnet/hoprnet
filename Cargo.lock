@@ -5261,7 +5261,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "aquamarine",
