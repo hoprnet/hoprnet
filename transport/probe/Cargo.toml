@@ -1,0 +1,21 @@
+[package]
+name = "hopr-transport-probe"
+version = "0.1.0"
+authors = ["HOPR Association <tech@hoprnet.org>"]
+edition = "2021"
+description = "Probing mechanism of the discovered network topology"
+homepage = "https://hoprnet.org/"
+repository = "https://github.com/hoprnet/hoprnet"
+license = "GPL-3.0-only"
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+
+[dependencies]
+
+
+[dev-dependencies]
+anyhow = { workspace = true }
