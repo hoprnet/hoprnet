@@ -37,6 +37,7 @@ members = [
   "transport/network",
   "transport/packet",
   "transport/p2p",
+  "transport/probe",
   "transport/protocol",
   "transport/session",
   "transport/ticket-aggregation",
@@ -239,6 +240,7 @@ hopr-transport = { path = "transport/api" }
 hopr-transport-identity = { path = "transport/identity" }
 hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
+hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-packet = { path = "transport/packet" }
 hopr-transport-p2p = { path = "transport/p2p" }

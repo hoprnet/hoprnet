@@ -5212,6 +5212,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-transport-probe"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+]
+
+[[package]]
 name = "hopr-transport-protocol"
 version = "0.6.2"
 dependencies = [
