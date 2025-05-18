@@ -11,7 +11,7 @@ on:
 
 jobs:
   smart-contract-bindings:
-    runs-on: self-hosted-hoprnet-small
+    runs-on: self-hosted-hoprnet-big
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
     env:
