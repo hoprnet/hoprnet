@@ -349,14 +349,17 @@ class TestIntegrationWithSwarm:
     async def test_close_multiple_channels_at_once(self, route, swarm7: dict[str, Node]):
         src = swarm7[route[0]]
 
-        logging.info(f"Opening channels between {route[0]} -> {route[1]}")
-        logging.info(f"Opening channels between {route[0]} -> {route[2]}")
+        logging.info(f"Opening channels between {src.peer_id} -> {swarm7[route[1]].peer_id}")
+        logging.info(f"Opening channels between {src.peer_id} -> {swarm7[route[2]].peer_id}")
         async with AsyncExitStack() as channels:
             await asyncio.gather(
                 *[
                     channels.enter_async_context(
                         create_channel(
-                            swarm7[route[0]], swarm7[route[i + 1]], OPEN_CHANNEL_FUNDING_VALUE_HOPR, close_from_dest=False
+                            src,
+                            swarm7[route[i + 1]],
+                            OPEN_CHANNEL_FUNDING_VALUE_HOPR,
+                            close_from_dest=False,
                         )
                     )
                     for i in range(len(route) - 1)
@@ -370,7 +373,6 @@ class TestIntegrationWithSwarm:
             # turn all Open channels to PendingToClose
             assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
             logging.info(f"Closed open channels")
-
 
             channels = (await src.api.all_channels(include_closed=False)).all
             logging.info(f"Still 2 channels are opened")

@@ -115,7 +115,7 @@ fn channels_payload(hopr_channels: Address, call_data: Vec<u8>) -> Vec<u8> {
 
 fn multisend_payload(call_data: Vec<u8>) -> Vec<u8> {
     execTransactionFromModuleCall {
-        to: MULTISEND_CALL_ONLY.into(),
+        to: MULTISEND_CALL_ONLY,
         value: U256::ZERO,
         data: call_data.into(),
         operation: Operation::DelegateCall as u8,
