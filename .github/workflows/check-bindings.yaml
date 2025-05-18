@@ -56,9 +56,8 @@ jobs:
         run: |
           echo "Checking if generated bindings introduced changes..."
 
-          git diff --cached --exit-code || {
+          git diff --exit-code || {
             echo "::error::Generated bindings are outdated. Please run the binding generation and commit the changes."
             exit 1
           }
-
           echo "Bindings are up to date."
