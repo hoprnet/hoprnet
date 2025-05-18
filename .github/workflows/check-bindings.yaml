@@ -1,5 +1,5 @@
 ---
-name: Check Contract Bindings
+name: Check
 
 on:
   merge_group:
@@ -10,8 +10,8 @@ on:
       - ready_for_review
 
 jobs:
-  check-bindings:
-    runs-on: self-hosted-hoprnet-bigger
+  smart-contract-bindings:
+    runs-on: self-hosted-hoprnet-small
     timeout-minutes: 60
     if: github.event.pull_request.draft == false
     env:
@@ -44,35 +44,22 @@ jobs:
 
       - name: Generate bindings
         run: |
-          TMP_BINDINGS=$(mktemp -d)
-          echo "Generating bindings to $TMP_BINDINGS"
-          echo "TMP_BINDINGS=$TMP_BINDINGS" >> $GITHUB_ENV
+          echo "Generating bindings into tracked source directory..."
 
           nix develop -L .#citest -c bash -c '
             TMP_BINDINGS=$(mktemp -d)
-            forge bind --offline --bindings-path "$TMP_BINDINGS" \
+            forge bind --offline --bindings-path ./ethereum/bindings/src/codegen \
               --module --alloy --overwrite --skip-extra-derives \
               --select "^(HoprAnnouncements|HoprAnnouncementsEvents|HoprCapabilityPermissions|HoprChannels|HoprChannelsEvents|HoprCrypto|HoprDummyProxyForNetworkRegistry|HoprBoost|HoprToken|HoprLedger|HoprLedgerevents|HoprMultisig|HoprNetworkRegistry|HoprNetworkRegistryEvents|HoprNodeManagementModule|HoprNodeSafeRegistry|HoprNodeSafeRegistryEvents|HoprNodeStakeFactory|HoprNodeStakeFactoryEvents|HoprSafeProxyForNetworkRegistry|HoprStakingProxyForNetworkRegistry|HoprTicketPriceOracle|HoprTicketPriceOracleEvents|HoprWinningProbabilityOracle|HoprWinningProbabilityOracleEvents)$"
           '
 
-          echo "Generated files:"
-          find "$TMP_BINDINGS"
-
       - name: Check for diff
         run: |
-          echo "Checking for changes between current and newly generated bindings at $TMP_BINDINGS"
-          diff_output=$(diff -r ./ethereum/bindings/src/codegen "$TMP_BINDINGS" || true)
+          echo "Checking if generated bindings introduced changes..."
 
-          if [[ -n "$diff_output" ]]; then
-            echo "::error::Generated bindings are outdated. Please run the binding generation and commit the result."
-            echo "$diff_output"
+          git diff --cached --exit-code || {
+            echo "::error::Generated bindings are outdated. Please run the binding generation and commit the changes."
             exit 1
-          else
-            echo "Bindings are up to date."
-          fi
+          }
 
-      - name: Cleanup
-        run: |
-          echo "Cleaning up temporary bindings directory: $TMP_BINDINGS "
-          rm -rf "$TMP_BINDINGS"
-          echo "Cleanup complete"
+          echo "Bindings are up to date."
