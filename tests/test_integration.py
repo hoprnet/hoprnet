@@ -367,14 +367,14 @@ class TestIntegrationWithSwarm:
             )
 
             logging.info(f"Channels opened")
-            assert len((await src.api.all_channels(include_closed=False)).all) == 2
+            assert len((await src.api.outgoing_channels(include_closed=False)).all) == 2
 
             logging.info(f"Checked 2 channels are opened")
             # turn all Open channels to PendingToClose
             assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
             logging.info(f"Closed open channels")
 
-            channels = (await src.api.all_channels(include_closed=False)).all
+            channels = (await src.api.outgoing_channels(include_closed=False)).all
             logging.info(f"Still 2 channels are opened")
 
             assert all(c.status == ChannelStatus.PendingToClose for c in channels)
@@ -384,7 +384,7 @@ class TestIntegrationWithSwarm:
             assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
             logging.info(f"Closed PendingToClose channels")
 
-            channels = (await src.api.all_channels(include_closed=False)).all
+            channels = (await src.api.outgoing_channels(include_closed=False)).all
             logging.info(f"Now there are {len(channels)} channels opened")
             assert len(channels) == 0
 
