@@ -307,7 +307,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
 
                 // Each public key identifier must have an equal length
                 let key_ident = path[inverted_idx + 1].as_ref();
-                if key_ident.len() != H::KEY_ID_SIZE.into() {
+                if key_ident.len() != H::KEY_ID_SIZE.get() {
                     return Err(CryptoError::InvalidParameterSize {
                         name: "path[..]",
                         expected: H::KEY_ID_SIZE.into(),

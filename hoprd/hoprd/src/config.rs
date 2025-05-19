@@ -420,8 +420,8 @@ mod tests {
                               "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
                               "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
                               "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
-                              "winning_probability_oracle": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
-                              "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+                              "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+                              "announcements": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
                               "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
                             },
                             "confirmations": 2,

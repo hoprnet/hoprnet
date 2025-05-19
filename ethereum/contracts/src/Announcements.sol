@@ -49,15 +49,15 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
     }
 
     function bindKeysSafe(
-        address self,
+        address selfAddress,
         bytes32 ed25519_sig_0,
         bytes32 ed25519_sig_1,
         bytes32 ed25519_pub_key
     )
         external
-        HoprMultiSig.onlySafe(self)
+        HoprMultiSig.onlySafe(selfAddress)
     {
-        _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+        _bindKeysInternal(selfAddress, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
     }
 
     function bindKeys(
@@ -72,17 +72,17 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
     }
 
     function bindKeysAnnounceSafe(
-        address self,
+        address selfAddress,
         bytes32 ed25519_sig_0,
         bytes32 ed25519_sig_1,
         bytes32 ed25519_pub_key,
         string calldata baseMultiaddr
     )
         external
-        HoprMultiSig.onlySafe(self)
+        HoprMultiSig.onlySafe(selfAddress)
     {
-        _bindKeysInternal(self, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
-        _announceInternal(self, baseMultiaddr);
+        _bindKeysInternal(selfAddress, ed25519_sig_0, ed25519_sig_1, ed25519_pub_key);
+        _announceInternal(selfAddress, baseMultiaddr);
     }
 
     /**
@@ -101,16 +101,22 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
         _announceInternal(msg.sender, baseMultiaddr);
     }
 
-    function announceSafe(address self, string calldata baseMultiaddr) external HoprMultiSig.onlySafe(self) {
-        _announceInternal(self, baseMultiaddr);
+    function announceSafe(
+        address selfAddress,
+        string calldata baseMultiaddr
+    )
+        external
+        HoprMultiSig.onlySafe(selfAddress)
+    {
+        _announceInternal(selfAddress, baseMultiaddr);
     }
 
     function announce(string calldata baseMultiaddr) external HoprMultiSig.noSafeSet() {
         _announceInternal(msg.sender, baseMultiaddr);
     }
 
-    function revokeSafe(address self) external HoprMultiSig.onlySafe(self) {
-        _revokeInternal(self);
+    function revokeSafe(address selfAddress) external HoprMultiSig.onlySafe(selfAddress) {
+        _revokeInternal(selfAddress);
     }
 
     function revoke() external HoprMultiSig.noSafeSet() {
@@ -134,14 +140,14 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
      * @param ed25519_pub_key EdDSA public key
      */
     function _bindKeysInternal(
-        address self,
+        address selfAddress,
         bytes32 ed25519_sig_0,
         bytes32 ed25519_sig_1,
         bytes32 ed25519_pub_key
     )
         internal
     {
-        emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, self);
+        emit KeyBinding(ed25519_sig_0, ed25519_sig_1, ed25519_pub_key, selfAddress);
     }
 
     /**
@@ -151,14 +157,14 @@ contract HoprAnnouncements is Multicall, HoprMultiSig, HoprAnnouncementsEvents {
      *
      * @param baseMultiaddr base multiaddress of the node
      */
-    function _announceInternal(address self, string calldata baseMultiaddr) internal {
-        emit AddressAnnouncement(self, baseMultiaddr);
+    function _announceInternal(address selfAddress, string calldata baseMultiaddr) internal {
+        emit AddressAnnouncement(selfAddress, baseMultiaddr);
     }
 
     /**
      * Opts out from acting as a public relay node (PRN)
      */
-    function _revokeInternal(address self) internal {
-        emit RevokeAnnouncement(self);
+    function _revokeInternal(address selfAddress) internal {
+        emit RevokeAnnouncement(selfAddress);
     }
 }

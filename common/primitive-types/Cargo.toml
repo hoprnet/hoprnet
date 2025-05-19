@@ -1,6 +1,6 @@
 [package]
 name = "hopr-primitive-types"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Generic types used through the entire code base"
@@ -12,6 +12,7 @@ license = "GPL-3.0-only"
 crate-type = ["rlib"]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = ["std"] }
 float-cmp = { workspace = true }
 hex = { workspace = true }
 primitive-types = { workspace = true }
