@@ -294,13 +294,19 @@ class TestSessionWithSwarm:
     @pytest.mark.parametrize("route", make_routes([0, 1], barebone_nodes()))
     async def test_session_communication_over_n_hop_with_a_udp_echo_server(self, route, swarm7: dict[str, Node]):
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
+        ticket_price = await get_ticket_price(swarm7[route[0]])
 
         assert await swarm7[route[0]].api.session_list_clients(Protocol.UDP) == []
 
-        await basic_send_and_receive_packets_over_single_route(
-            packet_count,
+        async with create_bidirectional_channels_for_route(
             [swarm7[hop] for hop in route],
-        )
+            (packet_count + 2) * ticket_price,
+            (packet_count + 2) * ticket_price,
+        ):
+            await basic_send_and_receive_packets_over_single_route(
+                packet_count,
+                [swarm7[hop] for hop in route],
+            )
 
         assert await swarm7[route[0]].api.session_list_clients(Protocol.UDP) == []
 

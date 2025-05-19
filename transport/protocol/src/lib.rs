@@ -304,7 +304,7 @@ where
                             }
                         }
                     } else {
-                        debug!("received empty packet");
+                        trace!("received empty packet");
                         None
                     }
                 }

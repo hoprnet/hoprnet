@@ -153,55 +153,96 @@ async def get_ticket_price(src: Node):
     return ticket_price.value
 
 
-from contextlib import AsyncExitStack
-
-
 class RouteBidirectionalChannels:
     def __init__(self, route: list[Node], funding_fwd: int, funding_return: int):
-        self.channels = []
-        self.route = route
-        self.funding_fwd = funding_fwd
-        self.funding_return = funding_return
-        self.exit_stack = AsyncExitStack()  # We'll use this for channel management
+        assert len(route) >= 2
+        self._fwd_channels = []
+        self._ret_channels = []
+        self._route = route
+        self._funding_fwd = funding_fwd
+        self._funding_return = funding_return
 
     async def __aenter__(self):
-        # Enter AsyncExitStack to manage channels
-        await self.exit_stack.__aenter__()
-        channels_to = [
-            self.exit_stack.enter_async_context(
-                create_channel(
-                    self.route[i],
-                    self.route[i + 1],
-                    funding=self.funding_fwd,
-                )
-            )
-            for i in range(len(self.route) - 1)
-        ]
-        channels_back = [
-            self.exit_stack.enter_async_context(
-                create_channel(
-                    self.route[i],
-                    self.route[i - 1],
-                    funding=self.funding_return,
-                )
-            )
-            for i in reversed(range(1, len(self.route)))
-        ]
+        for i in range(len(self._route) - 2):
+            logging.debug(f"open channel {self._route[i].address} -> {self._route[i+1].address}")
+            fwd_channel = await self._route[i].api.open_channel(self._route[i + 1].address, str(int(self._funding_fwd)))
+            assert fwd_channel is not None
 
-        self.channels = await asyncio.gather(*(channels_to + channels_back))
-        return self  # Return the context so it can be used in the block
+            ri = len(self._route) - i - 1
+            logging.debug(f"open channel {self._route[ri].address} -> {self._route[ri-1].address}")
+            ret_channel = await self._route[ri].api.open_channel(
+                self._route[ri - 1].address, str(int(self._funding_return))
+            )
+            assert ret_channel is not None
+
+            await asyncio.wait_for(
+                check_channel_status(self._route[i], self._route[i + 1], status=ChannelStatus.Open), 10.0
+            )
+            logging.debug(f"opened channel {fwd_channel.id}: {self._route[i].address} -> {self._route[i+1].address}")
+            self._fwd_channels.append(fwd_channel)
+
+            await asyncio.wait_for(
+                check_channel_status(self._route[ri], self._route[ri - 1], status=ChannelStatus.Open), 10.0
+            )
+            logging.debug(f"opened channel {ret_channel.id}: {self._route[ri].address} -> {self._route[ri-1].address}")
+            self._ret_channels.append(ret_channel)
+
+        return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        # Delegate exit handling to the exit stack
-        await self.exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+        logging.debug(f"closing channels for route {self._route}")
+        for i in range(len(self._route) - 2):
+            logging.debug(
+                f"close channel {self._fwd_channels[i].id}: {self._route[i].address} -> {self._route[i+1].address}"
+            )
+            assert await self._route[i].api.close_channel(self._fwd_channels[i].id)
+
+            ri = len(self._route) - i - 1
+            logging.debug(
+                f"close channel {self._ret_channels[i].id}: {self._route[ri].address} -> {self._route[ri-1].address}"
+            )
+            assert await self._route[ri].api.close_channel(self._ret_channels[i].id)
+
+            await asyncio.wait_for(
+                check_channel_status(self._route[i], self._route[i + 1], status=ChannelStatus.PendingToClose), 10.0
+            )
+            logging.debug(
+                f"pending to close channel {self._fwd_channels[i].id}: {self._route[i].address} -> {self._route[i+1].address}"
+            )
+
+            await asyncio.wait_for(
+                check_channel_status(self._route[ri], self._route[ri - 1], status=ChannelStatus.PendingToClose), 10.0
+            )
+            logging.debug(
+                f"pending to close channel {self._ret_channels[i].id}: {self._route[ri].address} -> {self._route[ri-1].address}"
+            )
+
+            await asyncio.sleep(15)
+
+            assert await self._route[i].api.close_channel(self._fwd_channels[i].id)
+            assert await self._route[ri].api.close_channel(self._ret_channels[i].id)
+
+            await asyncio.wait_for(
+                check_channel_status(self._route[i], self._route[i + 1], status=ChannelStatus.Closed), 10.0
+            )
+            logging.debug(
+                f"closed channel {self._fwd_channels[i].id}: {self._route[i].address} -> {self._route[i+1].address}"
+            )
+
+            await asyncio.wait_for(
+                check_channel_status(self._route[ri], self._route[ri - 1], status=ChannelStatus.Closed), 10.0
+            )
+            logging.debug(
+                f"closed channel {self._ret_channels[i].id}: {self._route[ri].address} -> {self._route[ri-1].address}"
+            )
 
     @property
     def fwd_channels(self):
-        return self.channels[: len(self.route) - 1]
+        return self._fwd_channels
 
     @property
     def return_channels(self):
-        return self.channels[len(self.route) - 1 :]
+        return self._ret_channels
 
 
 def create_bidirectional_channels_for_route(route: list[Node], funding_fwd: int, funding_return: int):
@@ -234,7 +275,6 @@ class HoprSession:
         self._loopback = loopback
 
     async def __aenter__(self):
-        target = ""
         if self._loopback is False:
             if self._target_port is None:
                 if self._proto is Protocol.TCP:
@@ -250,7 +290,7 @@ class HoprSession:
 
                 if self._proto is Protocol.TCP:
                     self._dummy_server_sock.listen()
-                    
+
             target = f"127.0.0.1:{self._target_port}"
         else:
             self._target_port = 0
