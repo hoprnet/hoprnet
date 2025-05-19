@@ -234,6 +234,7 @@ class HoprSession:
         self._loopback = loopback
 
     async def __aenter__(self):
+        target = ""
         if self._loopback is False:
             if self._target_port is None:
                 if self._proto is Protocol.TCP:
@@ -249,10 +250,11 @@ class HoprSession:
 
                 if self._proto is Protocol.TCP:
                     self._dummy_server_sock.listen()
+                    
+            target = f"127.0.0.1:{self._target_port}"
         else:
             self._target_port = 0
-
-        target = f"127.0.0.1:{self._target_port}"
+            target = "0"
 
         resp_buffer = "0 MiB"
         if self._use_response_buffer is not None:
