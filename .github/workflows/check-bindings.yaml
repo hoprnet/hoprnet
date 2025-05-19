@@ -46,8 +46,9 @@ jobs:
         run: |
           echo "Generating bindings into tracked source directory..."
 
-          nix develop -c \
-            rm -rf ./ethereum/bindings/src/codegen && cd ./ethereum/contracts && forge bind --offline --bindings-path ./../bindings/src/codegen \
+          rm -rf ./ethereum/bindings/src/codegen && cd ./ethereum/contracts && \
+            nix develop -c \
+            forge bind --offline --bindings-path ./../bindings/src/codegen \
             --module --alloy --overwrite --skip-extra-derives \
             --select "^(HoprAnnouncements|HoprAnnouncementsEvents|HoprCapabilityPermissions|HoprChannels|HoprChannelsEvents|HoprCrypto|HoprDummyProxyForNetworkRegistry|HoprBoost|HoprToken|HoprLedger|HoprLedgerevents|HoprMultisig|HoprNetworkRegistry|HoprNetworkRegistryEvents|HoprNodeManagementModule|HoprNodeSafeRegistry|HoprNodeSafeRegistryEvents|HoprNodeStakeFactory|HoprNodeStakeFactoryEvents|HoprSafeProxyForNetworkRegistry|HoprStakingProxyForNetworkRegistry|HoprTicketPriceOracle|HoprTicketPriceOracleEvents|HoprWinningProbabilityOracle|HoprWinningProbabilityOracleEvents)$"
 
