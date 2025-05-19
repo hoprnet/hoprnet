@@ -9,7 +9,7 @@
     crane.url = "github:ipetkov/crane/v0.20.1";
     # pin it to a version which we are compatible with
     foundry.url =
-      "github:shazow/foundry.nix/e4c79767b4d2e51179d1975a9f0553ef30d82711";
+      "github:shazow/foundry.nix/e50e7787af1b79b44680f309c94df4a71d529514";
     # use change to add solc 0.8.24
     solc.url = "github:hoprnet/solc.nix/tb/20240129-solc-0.8.24";
     pre-commit.url = "github:cachix/pre-commit-hooks.nix";
@@ -527,7 +527,7 @@
               unset SOURCE_DATE_EPOCH
             '';
             checkPhase = ''
-              uv run -m pytest tests/
+              uv run --frozen -m pytest tests/
             '';
             doCheck = true;
           };
@@ -634,6 +634,7 @@
               "ethereum/contracts/contracts-addresses.json"
               "ethereum/contracts/remappings.txt"
               "ethereum/contracts/src/static/*"
+              "ethereum/contracts/test/static/*"
               "hopr/hopr-lib/tests/snapshots/*"
               "hoprd/.dockerignore"
               "hoprd/rest-api/.cargo/config"
