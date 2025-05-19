@@ -99,7 +99,7 @@ let
 
   buildInputs =
     if isStatic then
-      with pkgs.pkgsMusl; [ openssl cacert ]
+      with pkgs.pkgsStatic; [ openssl cacert ]
     else
       with pkgs; [ openssl cacert ];
 
@@ -198,11 +198,12 @@ builder (args // {
       ethereum/contracts/foundry.toml
   '';
 
-  preFixup = lib.optionalString (isCross && targetInterpreter != "") ''
-    for f in `find $out/bin/ -type f`; do
-      echo "patching interpreter for $f to ${targetInterpreter}"
-      patchelf --set-interpreter ${targetInterpreter} --output $f.patched $f
-      mv $f.patched $f
-    done
-  '';
+  preFixup =
+    lib.optionalString (isCross && targetInterpreter != "" && !isStatic) ''
+      for f in `find $out/bin/ -type f`; do
+        echo "patching interpreter for $f to ${targetInterpreter}"
+        patchelf --set-interpreter ${targetInterpreter} --output $f.patched $f
+        mv $f.patched $f
+      done
+    '';
 })
