@@ -114,8 +114,9 @@
 
           rust-builder-aarch64-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
-            crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform;
+            crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform-musl;
             isCross = true;
+            isStatic = true;
           };
 
           rust-builder-aarch64-darwin = import ./nix/rust-builder.nix {
@@ -138,9 +139,14 @@
 
           hoprd = rust-builder-local.callPackage ./nix/rust-package.nix
             hoprdBuildArgs;
+          # also used for Docker image
           hoprd-x86_64-linux =
             rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
               hoprdBuildArgs;
+          # also used for Docker image
+          hoprd-x86_64-linux-dev =
+            rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
+              (hoprdBuildArgs // { CARGO_PROFILE = "dev"; });
           hoprd-aarch64-linux =
             rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix
               hoprdBuildArgs;
@@ -170,9 +176,14 @@
             (hoprdBuildArgs // { runClippy = true; });
           hoprd-dev = rust-builder-local.callPackage ./nix/rust-package.nix
             (hoprdBuildArgs // { CARGO_PROFILE = "dev"; });
+          # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
           hoprd-candidate =
-            rust-builder-local.callPackage ./nix/rust-package.nix
-              (hoprdBuildArgs // { CARGO_PROFILE = "candidate"; });
+            if localSystem.isLinux && localSystem.isx86_64 then
+              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
+                (hoprdBuildArgs // { CARGO_PROFILE = "candidate"; })
+            else
+              rust-builder-local.callPackage ./nix/rust-package.nix
+                (hoprdBuildArgs // { CARGO_PROFILE = "candidate"; });
           hoprd-bench = rust-builder-local.callPackage ./nix/rust-package.nix
             (hoprdBuildArgs // { runBench = true; });
 
@@ -187,9 +198,14 @@
 
           hopli = rust-builder-local.callPackage ./nix/rust-package.nix
             hopliBuildArgs;
+          # also used for Docker image
           hopli-x86_64-linux =
             rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
               hopliBuildArgs;
+          # also used for Docker image
+          hopli-x86_64-linux-dev =
+            rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
+              (hopliBuildArgs // { CARGO_PROFILE = "dev"; });
           hopli-aarch64-linux =
             rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix
               hopliBuildArgs;
@@ -209,9 +225,14 @@
             (hopliBuildArgs // { runClippy = true; });
           hopli-dev = rust-builder-local.callPackage ./nix/rust-package.nix
             (hopliBuildArgs // { CARGO_PROFILE = "dev"; });
+          # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
           hopli-candidate =
-            rust-builder-local.callPackage ./nix/rust-package.nix
-              (hopliBuildArgs // { CARGO_PROFILE = "candidate"; });
+            if localSystem.isLinux && localSystem.isx86_64 then
+              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
+                (hopliBuildArgs // { CARGO_PROFILE = "candidate"; })
+            else
+              rust-builder-local.callPackage ./nix/rust-package.nix
+                (hopliBuildArgs // { CARGO_PROFILE = "candidate"; });
 
           profileDeps = with pkgs; [
             gdb
@@ -264,12 +285,12 @@
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
           };
-          hoprd-docker =
-            import ./nix/docker-builder.nix (hoprdDockerArgs hoprd [ ]);
-          hoprd-dev-docker =
-            import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-dev [ ]);
-          hoprd-profile-docker =
-            import ./nix/docker-builder.nix (hoprdDockerArgs hoprd profileDeps);
+          hoprd-docker = import ./nix/docker-builder.nix
+            (hoprdDockerArgs hoprd-x86_64-linux [ ]);
+          hoprd-dev-docker = import ./nix/docker-builder.nix
+            (hoprdDockerArgs hoprd-x86_64-linux-dev [ ]);
+          hoprd-profile-docker = import ./nix/docker-builder.nix
+            (hoprdDockerArgs hoprd-x86_64-linux profileDeps);
 
           hopliDockerArgs = package: deps: {
             inherit pkgs;
@@ -281,12 +302,12 @@
               "HOPLI_CONTRACTS_ROOT=${package}/ethereum/contracts"
             ];
           };
-          hopli-docker =
-            import ./nix/docker-builder.nix (hopliDockerArgs hopli [ ]);
-          hopli-dev-docker =
-            import ./nix/docker-builder.nix (hopliDockerArgs hopli-dev [ ]);
-          hopli-profile-docker =
-            import ./nix/docker-builder.nix (hopliDockerArgs hopli profileDeps);
+          hopli-docker = import ./nix/docker-builder.nix
+            (hopliDockerArgs hopli-x86_64-linux [ ]);
+          hopli-dev-docker = import ./nix/docker-builder.nix
+            (hopliDockerArgs hopli-x86_64-linux-dev [ ]);
+          hopli-profile-docker = import ./nix/docker-builder.nix
+            (hopliDockerArgs hopli-x86_64-linux profileDeps);
 
           anvilSrc = fs.toSource {
             root = ./.;

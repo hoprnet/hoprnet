@@ -3,10 +3,8 @@
 , cargoExtraArgs ? ""
 , cargoToml
 , craneLib
-, curl
 , depsSrc
 , foundryBin
-, git
 , html-tidy
 , isCross ? false
 , isStatic ? false
@@ -28,7 +26,7 @@
 , stdenv
 }:
 let
-  # `hostPlatform` is the cross-compilation output platform;
+  # `hostPlatform` is the cross-compilation output platform
   # `buildPlatform` is the platform we are compiling on
   buildPlatform = stdenv.buildPlatform;
   hostPlatform = stdenv.hostPlatform;
