@@ -1,5 +1,14 @@
-{ crane, crossSystem ? localSystem, foundry, isCross ? false, isStatic ? false
-, localSystem, nixpkgs, rust-overlay, solc, useRustNightly ? false }@args:
+{ crane
+, crossSystem ? localSystem
+, foundry
+, isCross ? false
+, isStatic ? false
+, localSystem
+, nixpkgs
+, rust-overlay
+, solc
+, useRustNightly ? false
+}@args:
 let crossSystem0 = crossSystem;
 in let
   # the foundry overlay uses the hostPlatform, so we need to use a
@@ -10,12 +19,13 @@ in let
   };
 
   localSystem = pkgsLocal.lib.systems.elaborate args.localSystem;
-  crossSystem = let system = pkgsLocal.lib.systems.elaborate crossSystem0;
-  in if crossSystem0 == null
-  || pkgsLocal.lib.systems.equals system localSystem then
-    localSystem
-  else
-    system;
+  crossSystem =
+    let system = pkgsLocal.lib.systems.elaborate crossSystem0;
+    in if crossSystem0 == null
+      || pkgsLocal.lib.systems.equals system localSystem then
+      localSystem
+    else
+      system;
 
   pkgs = import nixpkgs {
     inherit localSystem crossSystem;
@@ -31,21 +41,23 @@ in let
 
   envCase = triple:
     pkgsLocal.lib.strings.toUpper
-    (builtins.replaceStrings [ "-" ] [ "_" ] triple);
+      (builtins.replaceStrings [ "-" ] [ "_" ] triple);
 
   solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_19;
 
-  cargoTarget = if hostPlatform.config == "armv7l-unknown-linux-gnueabihf" then
-    "armv7-unknown-linux-gnueabihf"
-  else
-    hostPlatform.config;
+  cargoTarget =
+    if hostPlatform.config == "armv7l-unknown-linux-gnueabihf" then
+      "armv7-unknown-linux-gnueabihf"
+    else
+      hostPlatform.config;
 
-  rustToolchainFun = if useRustNightly then
-    p: p.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)
-  else
-    p:
-    (p.pkgsBuildHost.rust-bin.fromRustupToolchainFile
-      ../rust-toolchain.toml).override { targets = [ cargoTarget ]; };
+  rustToolchainFun =
+    if useRustNightly then
+      p: p.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)
+    else
+      p:
+      (p.pkgsBuildHost.rust-bin.fromRustupToolchainFile
+        ../rust-toolchain.toml).override { targets = [ cargoTarget ]; };
 
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchainFun;
 
@@ -59,14 +71,16 @@ in let
     HOST_CC = "${pkgs.stdenv.cc.nativePrefix}cc";
     CARGO_BUILD_RUSTFLAGS = "-C link-arg=-fuse-ld=${linker}";
   };
-  buildEnvStatic = if isStatic then {
-    CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
-  } else
-    { };
+  buildEnvStatic =
+    if isStatic then {
+      CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
+    } else
+      { };
 
   buildEnv = buildEnvBase // buildEnvStatic;
 
-in {
+in
+{
   # inherit rustToolchain;
 
   callPackage = (package: args:
@@ -74,12 +88,14 @@ in {
       crate = pkgs.callPackage package
         (args // { inherit foundryBin solcDefault craneLib isCross isStatic; });
       # Override the derivation to add cross-compilation environment variables.
-    in crate.overrideAttrs (previous:
+    in
+    crate.overrideAttrs (previous:
       buildEnv // {
         # We also have to override the `cargoArtifacts` derivation with the same changes.
-        cargoArtifacts = if previous.cargoArtifacts != null then
-          previous.cargoArtifacts.overrideAttrs (previous: buildEnv)
-        else
-          null;
+        cargoArtifacts =
+          if previous.cargoArtifacts != null then
+            previous.cargoArtifacts.overrideAttrs (previous: buildEnv)
+          else
+            null;
       }));
 }
