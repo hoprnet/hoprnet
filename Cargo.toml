@@ -83,9 +83,8 @@ chrono = { version = "0.4.41", default-features = false }
 clap = { version = "4.5.38", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
-criterion = { version = "0.5.1", features = [
+criterion = { version = "0.6.0", features = [
   "async_tokio",
-  "async-std",
   "html_reports",
 ] }
 crossbeam-queue = "0.3.12"
