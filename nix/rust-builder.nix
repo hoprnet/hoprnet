@@ -73,7 +73,8 @@ in let
   };
   buildEnvStatic =
     if isStatic then {
-      CARGO_BUILD_RUSTFLAGS = "-C target-feature=+crt-static";
+      CARGO_BUILD_RUSTFLAGS =
+        "${buildEnvBase.CARGO_BUILD_RUSTFLAGS} -C target-feature=+crt-static";
     } else
       { };
 

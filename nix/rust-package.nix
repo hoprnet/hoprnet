@@ -107,16 +107,9 @@ let
 
     # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
     # this dependency
-    nativeBuildInputs = [
-      llvmPackages.bintools
-      mold
-      solcDefault
-      foundryBin
-      pkg-config
-      pkgs.pkgsBuildHost.openssl
-      pkgs.cacert
-      libiconv
-    ] ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
+    nativeBuildInputs =
+      [ llvmPackages.bintools mold solcDefault foundryBin pkg-config libiconv ]
+      ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
     buildInputs = buildInputs ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
