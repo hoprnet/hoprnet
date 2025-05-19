@@ -105,8 +105,6 @@ let
     inherit pname pnameSuffix version;
     CARGO_PROFILE = actualCargoProfile;
 
-    # FIXME: some dev dependencies depend on OpenSSL, would be nice to remove
-    # this dependency
     nativeBuildInputs =
       [ llvmPackages.bintools mold solcDefault foundryBin pkg-config libiconv ]
       ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;

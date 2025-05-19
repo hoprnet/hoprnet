@@ -31,25 +31,24 @@
     , nixpkgs
     , flake-utils
     , flake-parts
-    , flake-root
     , rust-overlay
     , crane
     , foundry
     , solc
     , pre-commit
-    , treefmt-nix
     , ...
     }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports =
         [ inputs.treefmt-nix.flakeModule inputs.flake-root.flakeModule ];
-      perSystem = { config, lib, self', inputs', system, ... }:
+      perSystem = { config, lib, system, ... }:
         let
           rev = toString (self.shortRev or self.dirtyShortRev);
           fs = lib.fileset;
           localSystem = system;
           overlays = [ (import rust-overlay) foundry.overlay solc.overlay ];
           pkgs = import nixpkgs { inherit localSystem overlays; };
+          buildPlatform = pkgs.stdenv.buildPlatform;
           solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
           craneLib = (crane.mkLib pkgs).overrideToolchain
             (p: p.rust-bin.stable.latest.default);
@@ -178,7 +177,7 @@
             (hoprdBuildArgs // { CARGO_PROFILE = "dev"; });
           # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
           hoprd-candidate =
-            if localSystem.isLinux && localSystem.isx86_64 then
+            if buildPlatform.isLinux && buildPlatform.isx86_64 then
               rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
                 (hoprdBuildArgs // { CARGO_PROFILE = "candidate"; })
             else
@@ -227,7 +226,7 @@
             (hopliBuildArgs // { CARGO_PROFILE = "dev"; });
           # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
           hopli-candidate =
-            if localSystem.isLinux && localSystem.isx86_64 then
+            if buildPlatform.isLinux && buildPlatform.isx86_64 then
               rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
                 (hopliBuildArgs // { CARGO_PROFILE = "candidate"; })
             else
