@@ -4480,7 +4480,6 @@ version = "0.2.0"
 dependencies = [
  "alloy",
  "anyhow",
- "serde",
 ]
 
 [[package]]
@@ -5190,7 +5189,6 @@ dependencies = [
  "lazy_static",
  "libp2p",
  "libp2p-stream",
- "moka",
  "more-asserts",
  "rand 0.8.5",
  "serde",
