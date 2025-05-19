@@ -24,6 +24,10 @@ pub use types::transfer_session;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::state::{SessionFeature, SessionSocket};
 
+// TODO: resolve this in #7145
+#[cfg(not(feature = "serde"))]
+compile_error!("The `serde` feature currently must be enabled, see #7145");
+
 /// Number of bytes that can be sent in a single Session protocol payload.
 pub const SESSION_PAYLOAD_SIZE: usize = SessionSocket::<USABLE_PAYLOAD_CAPACITY_FOR_SESSION>::PAYLOAD_CAPACITY;
 
