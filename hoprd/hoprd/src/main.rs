@@ -37,7 +37,6 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
             .add_directive("libp2p_dns=info".parse()?)
             .add_directive("multistream_select=info".parse()?)
             .add_directive("isahc=error".parse()?)
-            .add_directive("surf::middleware::logger::native=error".parse()?)
             .add_directive("sea_orm=warn".parse()?)
             .add_directive("sqlx=warn".parse()?)
             .add_directive("hyper_util=warn".parse()?),
