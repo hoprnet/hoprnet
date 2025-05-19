@@ -270,10 +270,11 @@ class TestSessionWithSwarm:
                     fwd_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[1:-1]]},
                     return_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[-2:0:-1]]},
                     capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
-                    dummy_server_listen_port=server.port,
+                    target_port=server.port,
                 ) as session:
                     assert len(await swarm7[route[0]].api.session_list_clients(Protocol.TCP)) == 1
 
+                    logging.debug(f"Session opened - sending {len(expected)} packets")
                     with session.client_socket() as sock:
                         sock.settimeout(20)
                         total_sent = 0
@@ -284,53 +285,10 @@ class TestSessionWithSwarm:
                             chunk = sock.recv(min(STANDARD_MTU_SIZE, total_sent))
                             total_sent = total_sent - len(chunk)
                             actual = actual + chunk.decode()
+                        logging.debug(f"received: {len(actual)}")
 
-            assert await swarm7[route[0]].api.session_list_clients(Protocol.TCP) == []
-            assert "".join(expected) == actual
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("route", make_routes([0], barebone_nodes()))
-    async def test_session_communication_with_udp_loopback_service(self, route, swarm7: dict[str, Node]):
-        packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-
-        expected = [f"{i}".ljust(STANDARD_MTU_SIZE) for i in range(packet_count)]
-        actual = []
-        async with HoprSession(
-            Protocol.UDP,
-            src=swarm7[route[0]],
-            dest=swarm7[route[-1]],
-            fwd_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[1:-1]]},
-            return_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[-2:0:-1]]},
-            capabilities=SessionCapabilitiesBody(retransmission=False, segmentation=True),
-            loopback=True,
-            use_response_buffer=None,
-        ) as session:
-            assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
-
-            async with session.client_socket() as sock:
-                sock.settimeout(20)
-                total_sent = 0
-                for message in expected:
-                    total_sent = total_sent + sock.sendto(message.encode(), ("127.0.0.1", session.listen_port))
-                    # UDP has no flow-control, so we must insert an artificial gap
-                    await asyncio.sleep(0.01)
-
-                logging.debug(f"total sent: {total_sent}")
-                while total_sent > 0:
-                    chunk, _ = sock.recvfrom(min(STANDARD_MTU_SIZE, total_sent))
-                    total_sent = total_sent - len(chunk)
-                    logging.debug(f"received: {len(chunk)}, remaining: {total_sent}")
-
-                    # Adapt for situations when data arrive completely unordered (also within the buffer)
-                    actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
-
-        expected = [msg.strip() for msg in expected]
-
-        actual.sort()
-        expected.sort()
-
-        assert await swarm7[route[0]].api.session_list_clients(Protocol.UDP) == []
-        assert actual == expected
+                assert await swarm7[route[0]].api.session_list_clients(Protocol.TCP) == []
+                assert "".join(expected) == actual
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("route", make_routes([0, 1], barebone_nodes()))
@@ -347,6 +305,53 @@ class TestSessionWithSwarm:
         assert await swarm7[route[0]].api.session_list_clients(Protocol.UDP) == []
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("route", make_routes([0], barebone_nodes()))
+    async def test_session_communication_with_udp_loopback_service(self, route, swarm7: dict[str, Node]):
+        packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
+
+        async with HoprSession(
+            Protocol.UDP,
+            src=swarm7[route[0]],
+            dest=swarm7[route[-1]],
+            fwd_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[1:-1]]},
+            return_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[-2:0:-1]]},
+            loopback=True,
+            use_response_buffer=None,
+        ) as session:
+            assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
+
+            # Leave some space for SURBs in the packet, because no response buffer is used
+            packet_len = int(session.mtu / 2)
+            expected = [f"{i}".ljust(packet_len) for i in range(packet_count)]
+            actual = []
+            with session.client_socket() as sock:
+                sock.settimeout(20)
+                total_sent = 0
+                for message in expected:
+                    total_sent = total_sent + sock.sendto(message.encode(), ("127.0.0.1", session.listen_port))
+                    # UDP has no flow-control, so we must insert an artificial gap
+                    await asyncio.sleep(0.01)
+
+                logging.debug(f"total sent: {total_sent}")
+
+                # Receiving data on the same socket, because it is a loopback
+                while total_sent > 0:
+                    chunk, _ = sock.recvfrom(min(packet_len, total_sent))
+                    total_sent = total_sent - len(chunk)
+                    logging.debug(f"received: {len(chunk)}, remaining: {total_sent}")
+
+                    # Adapt for situations when data arrive completely unordered (also within the buffer)
+                    actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
+
+                expected = [msg.strip() for msg in expected]
+
+            actual.sort()
+            expected.sort()
+            assert actual == expected
+
+        assert await swarm7[route[0]].api.session_list_clients(Protocol.UDP) == []
+
+    @pytest.mark.asyncio
     @pytest.mark.parametrize("route", make_routes([0, 1], barebone_nodes()))
     async def test_session_communication_over_n_hop_with_an_https_server(self, route, swarm7: dict[str, Node]):
         ticket_price = await get_ticket_price(swarm7[route[0]])
@@ -359,8 +364,8 @@ class TestSessionWithSwarm:
         ):
             # Generate random text content to be served
             expected = "".join(random.choices(string.ascii_letters + string.digits, k=DOWNLOAD_FILE_SIZE))
-            response = ""
 
+            # Session uses Response buffer
             with run_https_server(expected) as dst_sock_port:
                 async with HoprSession(
                     Protocol.TCP,
@@ -369,33 +374,31 @@ class TestSessionWithSwarm:
                     fwd_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[1:-1]]},
                     return_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[-2:0:-1]]},
                     capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
-                    dummy_server_listen_port=None,
+                    target_port=dst_sock_port,
                 ) as session:
                     assert len(await swarm7[route[0]].api.session_list_clients(Protocol.TCP)) == 1
-                    response = fetch_data(f"https://localhost:{session.port}/random.txt")
+                    response = fetch_data(f"https://localhost:{session.listen_port}/random.txt")
+                    assert response is not None
+                    assert response.text == expected
 
             assert await swarm7[route[0]].api.session_list_clients(Protocol.TCP) == []
-            assert response is not None
-            assert response.text == expected
 
     @pytest.mark.skipif(
-        os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL") is None, reason="Wireguard tunnel with for hoprnet running"
+        os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL_SERVER_PORT") is None,
+        reason="Wireguard tunnel with for hoprnet running",
     )
     @pytest.mark.asyncio
     @pytest.mark.parametrize("route", make_routes([1], barebone_nodes()))
     async def test_session_with_wireguard_tunnel(self, route, swarm7: dict[str, Node]):
         ticket_price = await get_ticket_price(swarm7[route[0]])
         packet_count = 10_000_000
-        wireguard_tunnel = os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL")
+        wireguard_tunnel_port = os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL_SERVER_PORT")
 
         logging.info(f"Opening channels for route '{route}'")
 
         async with create_bidirectional_channels_for_route(
             [swarm7[hop] for hop in route], packet_count * ticket_price, packet_count * ticket_price
         ):
-            # sleep to wait for the socket to be active
-            await asyncio.sleep(1.0)
-
             logging.info(f"Opening session for route '{route}'")
             async with HoprSession(
                 Protocol.UDP,
@@ -405,11 +408,11 @@ class TestSessionWithSwarm:
                 return_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[-2:0:-1]]},
                 capabilities=SessionCapabilitiesBody(segmentation=True),
                 use_response_buffer="5 MiB",
-                dummy_server_listen_port=None,
-            ):
+                target_port=int(wireguard_tunnel_port),
+            ) as session:
                 assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
 
-                logging.info("Test ready for execution")
+                logging.info(f"Test ready for execution @ listen port {session.listen_port}")
 
                 # TODO: Placeholder for actual test
                 await asyncio.sleep(3600)

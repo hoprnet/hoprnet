@@ -218,7 +218,7 @@ class HoprSession:
         return_path: dict,
         capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
         use_response_buffer: Optional[str] = "1 MiB",
-        dummy_server_listen_port: Optional[int] = 0,
+        target_port: Optional[int] = None,
         loopback: bool = False,
     ):
         self._src = src
@@ -229,30 +229,30 @@ class HoprSession:
         self._capabilities = capabilities
         self._session = None
         self._dummy_server_sock = None
-        self._target_port = 0
+        self._target_port = target_port
         self._use_response_buffer = use_response_buffer
-        self._dummy_server_binding_port = dummy_server_listen_port
         self._loopback = loopback
 
     async def __aenter__(self):
-        if self._dummy_server_binding_port is not None and self._loopback is False:
-            if self._proto is Protocol.TCP:
-                self._dummy_server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            else:
-                self._dummy_server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        if self._loopback is False:
+            if self._target_port is None:
+                if self._proto is Protocol.TCP:
+                    self._dummy_server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                else:
+                    self._dummy_server_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-            self._dummy_server_sock.bind(("127.0.0.1", self._dummy_server_binding_port))
-            self._target_port = self._dummy_server_sock.getsockname()[1]
-            logging.debug(
-                f"Bound listening socket 127.0.0.1:{self._target_port} on {self._proto.name} for future Session"
-            )
+                self._dummy_server_sock.bind(("127.0.0.1", 0))
+                self._target_port = self._dummy_server_sock.getsockname()[1]
+                logging.debug(
+                    f"Bound listening socket 127.0.0.1:{self._target_port} on {self._proto.name} for future Session"
+                )
 
-            if self._proto is Protocol.TCP:
-                self._dummy_server_sock.listen()
+                if self._proto is Protocol.TCP:
+                    self._dummy_server_sock.listen()
+        else:
+            self._target_port = 0
 
         target = f"127.0.0.1:{self._target_port}"
-        if self._loopback is True:
-            target = "0"
 
         resp_buffer = "0 MiB"
         if self._use_response_buffer is not None:
