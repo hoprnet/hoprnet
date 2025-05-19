@@ -26,20 +26,8 @@
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs =
-    { self
-    , nixpkgs
-    , flake-utils
-    , flake-parts
-    , flake-root
-    , rust-overlay
-    , crane
-    , foundry
-    , solc
-    , pre-commit
-    , treefmt-nix
-    , ...
-    }@inputs:
+  outputs = { self, nixpkgs, flake-utils, flake-parts, flake-root, rust-overlay
+    , crane, foundry, solc, pre-commit, treefmt-nix, ... }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports =
         [ inputs.treefmt-nix.flakeModule inputs.flake-root.flakeModule ];
@@ -101,8 +89,9 @@
 
           rust-builder-x86_64-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
-            crossSystem = pkgs.lib.systems.examples.gnu64;
+            crossSystem = pkgs.lib.systems.examples.musl64;
             isCross = true;
+            isStatic = true;
           };
 
           rust-builder-x86_64-darwin = import ./nix/rust-builder.nix {
@@ -139,31 +128,31 @@
             hoprdBuildArgs;
           hoprd-x86_64-linux =
             rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
-              hoprdBuildArgs;
+            hoprdBuildArgs;
           hoprd-aarch64-linux =
             rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix
-              hoprdBuildArgs;
+            hoprdBuildArgs;
           hoprd-armv7l-linux =
             rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix
-              hoprdBuildArgs;
+            hoprdBuildArgs;
           # CAVEAT: must be built from a darwin system
           hoprd-x86_64-darwin =
             rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix
-              hoprdBuildArgs;
+            hoprdBuildArgs;
           # CAVEAT: must be built from a darwin system
           hoprd-aarch64-darwin =
             rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix
-              hoprdBuildArgs;
+            hoprdBuildArgs;
 
           hopr-test = rust-builder-local.callPackage ./nix/rust-package.nix
             (hoprdBuildArgs // { runTests = true; });
 
           hopr-test-nightly =
             rust-builder-local-nightly.callPackage ./nix/rust-package.nix
-              (hoprdBuildArgs // {
-                runTests = true;
-                cargoExtraArgs = "-Z panic-abort-tests";
-              });
+            (hoprdBuildArgs // {
+              runTests = true;
+              cargoExtraArgs = "-Z panic-abort-tests";
+            });
 
           hoprd-clippy = rust-builder-local.callPackage ./nix/rust-package.nix
             (hoprdBuildArgs // { runClippy = true; });
@@ -171,7 +160,7 @@
             (hoprdBuildArgs // { CARGO_PROFILE = "dev"; });
           hoprd-candidate =
             rust-builder-local.callPackage ./nix/rust-package.nix
-              (hoprdBuildArgs // { CARGO_PROFILE = "candidate"; });
+            (hoprdBuildArgs // { CARGO_PROFILE = "candidate"; });
           hoprd-bench = rust-builder-local.callPackage ./nix/rust-package.nix
             (hoprdBuildArgs // { runBench = true; });
 
@@ -188,21 +177,21 @@
             hopliBuildArgs;
           hopli-x86_64-linux =
             rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
-              hopliBuildArgs;
+            hopliBuildArgs;
           hopli-aarch64-linux =
             rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix
-              hopliBuildArgs;
+            hopliBuildArgs;
           hopli-armv7l-linux =
             rust-builder-armv7l-linux.callPackage ./nix/rust-package.nix
-              hopliBuildArgs;
+            hopliBuildArgs;
           # CAVEAT: must be built from a darwin system
           hopli-x86_64-darwin =
             rust-builder-x86_64-darwin.callPackage ./nix/rust-package.nix
-              hopliBuildArgs;
+            hopliBuildArgs;
           # CAVEAT: must be built from a darwin system
           hopli-aarch64-darwin =
             rust-builder-aarch64-darwin.callPackage ./nix/rust-package.nix
-              hopliBuildArgs;
+            hopliBuildArgs;
 
           hopli-clippy = rust-builder-local.callPackage ./nix/rust-package.nix
             (hopliBuildArgs // { runClippy = true; });
@@ -210,7 +199,7 @@
             (hopliBuildArgs // { CARGO_PROFILE = "dev"; });
           hopli-candidate =
             rust-builder-local.callPackage ./nix/rust-package.nix
-              (hopliBuildArgs // { CARGO_PROFILE = "candidate"; });
+            (hopliBuildArgs // { CARGO_PROFILE = "candidate"; });
 
           profileDeps = with pkgs; [
             gdb
@@ -359,7 +348,6 @@
               ExposedPorts = { "8545/tcp" = { }; };
             };
           };
-
           plutoSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
@@ -588,8 +576,7 @@
               mv labeler.yml.new .github/labeler.yml
             '';
           };
-        in
-        {
+        in {
           treefmt = {
             inherit (config.flake-root) projectRootFile;
 
