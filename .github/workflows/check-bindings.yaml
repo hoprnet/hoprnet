@@ -46,7 +46,7 @@ jobs:
         run: |
           echo "Generating bindings into tracked source directory..."
 
-          rm -rf ./ethereum/bindings/src/codegen && cd ./ethereum/contracts && \
+          cd ./ethereum/contracts && \
             nix develop -c \
             forge bind --offline --bindings-path ./../bindings/src/codegen \
             --module --alloy --overwrite --skip-extra-derives \
