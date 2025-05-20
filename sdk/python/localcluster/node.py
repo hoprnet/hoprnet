@@ -89,11 +89,11 @@ class Node:
         self.tokio_console_port = self.p2p_port + 1
 
         logging.info(
-            f"Node {self.id} ports: " + 
-            f"api {self.api_port}, "+
-            f"p2p {self.p2p_port}, "+
-            f"tokio console {self.tokio_console_port}, "+
-            f"anvil {self.anvil_port}"
+            f"Node {self.id} ports: "
+            + f"api {self.api_port}, "
+            + f"p2p {self.p2p_port}, "
+            + f"tokio console {self.tokio_console_port}, "
+            + f"anvil {self.anvil_port}"
         )
 
     def load_addresses(self):
