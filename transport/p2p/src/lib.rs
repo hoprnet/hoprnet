@@ -38,22 +38,13 @@ use std::fmt::Debug;
 use futures::{AsyncRead, AsyncWrite, Stream};
 use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;
-use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent};
+use hopr_transport_network::network::NetworkTriggeredEvent;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{StreamProtocol, autonat, swarm::NetworkBehaviour};
 use rand::rngs::OsRng;
-use serde::{Deserialize, Serialize};
 
 pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 pub const NAT_SERVER_PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
-
-/// `Ping` protocol base type for the ping operation
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Ping(pub ControlMessage);
-
-/// `Pong` protocol base type for the pong operation
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Pong(pub ControlMessage, pub String);
 
 // Control object for the streams over the HOPR protocols
 #[derive(Clone)]

@@ -63,14 +63,16 @@ use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId};
 use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus};
-use hopr_transport_network::{
-    heartbeat::Heartbeat,
-    ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
-};
 use hopr_transport_p2p::{
     HoprSwarm,
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
 };
+use hopr_transport_probe::{
+    HoprProbeProcess,
+    heartbeat::{Heartbeat, HeartbeatExternalInteractions},
+    ping::{PingConfig, Pinger, Pinging},
+};
+pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
 pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
 use hopr_transport_protocol::{
     errors::ProtocolError,
@@ -124,8 +126,8 @@ pub enum HoprTransportProcess {
     Protocol(hopr_transport_protocol::ProtocolProcesses),
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
-    #[strum(to_string = "protocol [HOPR [heartbeat]]")]
-    Heartbeat,
+    #[strum(to_string = "network probing sub-process: {0}")]
+    Probing(hopr_transport_probe::HoprProbeProcess),
 }
 
 #[derive(Debug, Clone)]
@@ -435,7 +437,7 @@ where
                 .get()
                 .expect("Ping should be initialized at this point")
                 .clone(),
-            hopr_transport_network::heartbeat::HeartbeatExternalInteractions::new(self.network.clone()),
+            HeartbeatExternalInteractions::new(self.network.clone()),
             Box::new(|dur| Box::pin(sleep(dur))),
         );
 
@@ -606,7 +608,7 @@ where
         // initiate the network telemetry
         let half_the_hearbeat_interval = self.cfg.heartbeat.interval / 4;
         processes.insert(
-            HoprTransportProcess::Heartbeat,
+            HoprTransportProcess::Probing(HoprProbeProcess::Heartbeat),
             spawn(async move {
                 // present to make sure that the heartbeat does not start immediately
                 hopr_async_runtime::prelude::sleep(half_the_hearbeat_interval).await;
@@ -661,7 +663,7 @@ where
             Either::Right((v, _)) => {
                 match v
                     .into_iter()
-                    .map(|r| r.map_err(HoprTransportError::NetworkError))
+                    .map(|r| r.map_err(HoprTransportError::Probe))
                     .collect::<errors::Result<Vec<Duration>>>()
                 {
                     Ok(d) => info!(%peer, rtt = ?d, "Manual ping succeeded"),
@@ -673,8 +675,8 @@ where
             }
         };
 
-        let peer_status = self.network.get(peer).await?.ok_or(HoprTransportError::NetworkError(
-            errors::NetworkingError::NonExistingPeer,
+        let peer_status = self.network.get(peer).await?.ok_or(HoprTransportError::Probe(
+            hopr_transport_probe::errors::ProbeError::NonExistingPeer,
         ))?;
 
         Ok((

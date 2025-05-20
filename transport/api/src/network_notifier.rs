@@ -8,8 +8,8 @@ use hopr_path::channel_graph::ChannelGraph;
 use hopr_transport_network::{
     HoprDbPeersOperations, PeerId,
     network::{Network, NetworkTriggeredEvent},
-    ping::PingExternalAPI,
 };
+use hopr_transport_probe::ping::PingExternalAPI;
 use tracing::{debug, error};
 
 /// Implementor of the ping external API.
@@ -60,7 +60,7 @@ where
     async fn on_finished_ping(
         &self,
         peer: &PeerId,
-        result: &hopr_transport_network::errors::Result<std::time::Duration>,
+        result: &hopr_transport_probe::errors::Result<std::time::Duration>,
         version: String,
     ) {
         let result = match &result {
