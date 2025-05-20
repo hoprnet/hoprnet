@@ -107,6 +107,14 @@ async def check_rejected_tickets_value(src: Node, value: int):
         current = (await src.api.get_tickets_statistics()).rejected_value
 
 
+async def check_unredeemed_tickets_value_max(src: Node, value: int):
+    current = (await src.api.get_tickets_statistics()).unredeemed_value
+    while current > value:
+        logging.debug(f"Unredeemed tickets value: {current}, wanted max: {value}")
+        await asyncio.sleep(CHECK_RETRY_INTERVAL)
+        current = (await src.api.get_tickets_statistics()).unredeemed_value
+
+
 async def check_unredeemed_tickets_value(src: Node, value: int):
     current = (await src.api.get_tickets_statistics()).unredeemed_value
     while current < value:
