@@ -384,34 +384,6 @@ where
 
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
 
-        // network event processing channel
-        let (network_events_tx, network_events_rx) =
-            mpsc::channel::<NetworkTriggeredEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
-
-        // manual ping
-        let (ping_tx, ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
-
-        let ping_cfg = PingConfig {
-            timeout: self.cfg.protocol.heartbeat.timeout,
-            max_parallel_pings: self.cfg.heartbeat.max_parallel_probes,
-        };
-
-        let ping: Pinger<network_notifier::PingExternalInteractions<T>> = Pinger::new(
-            ping_cfg,
-            ping_tx.clone(),
-            network_notifier::PingExternalInteractions::new(
-                self.network.clone(),
-                self.db.clone(),
-                self.path_planner.channel_graph(),
-                network_events_tx,
-            ),
-        );
-
-        self.ping
-            .clone()
-            .set(ping)
-            .expect("must set the ping executor only once");
-
         let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), me_onchain);
         let tkt_agg_writer = ticket_agg_proc.writer();
 
@@ -430,46 +402,9 @@ where
             .set(tkt_agg_writer.clone())
             .expect("must set the ticket aggregation writer only once");
 
-        // heartbeat
-        let mut heartbeat = Heartbeat::new(
-            self.cfg.heartbeat,
-            self.ping
-                .get()
-                .expect("Ping should be initialized at this point")
-                .clone(),
-            HeartbeatExternalInteractions::new(self.network.clone()),
-            Box::new(|dur| Box::pin(sleep(dur))),
-        );
+        // -- transport medium
+        let mixer_cfg = build_mixer_cfg_from_env();
 
-        // initiate the transport layer
-        let mixer_cfg = MixerConfig {
-            min_delay: std::time::Duration::from_millis(
-                std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
-                    .map(|v| {
-                        v.trim()
-                            .parse::<u64>()
-                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-                    })
-                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
-            ),
-            delay_range: std::time::Duration::from_millis(
-                std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
-                    .map(|v| {
-                        v.trim()
-                            .parse::<u64>()
-                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
-                    })
-                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
-            ),
-            capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-                .map(|v| {
-                    v.trim()
-                        .parse::<usize>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
-                })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
-            ..MixerConfig::default()
-        };
         #[cfg(feature = "mixer-channel")]
         let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
 
@@ -506,6 +441,9 @@ where
             (tx, rx)
         };
 
+        let (network_events_tx, network_events_rx) =
+            mpsc::channel::<NetworkTriggeredEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
+
         let mut transport_layer = HoprSwarm::new(
             (&self.me).into(),
             network_events_rx,
@@ -538,7 +476,7 @@ where
 
         processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run()));
 
-        // initiate the msg-ack protocol stack over the wire transport
+        // -- msg-ack protocol over the wire transport
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: self.me.clone(),
             outgoing_ticket_win_prob: self
@@ -564,8 +502,58 @@ where
             processes.insert(HoprTransportProcess::Protocol(k), v);
         }
 
+        // -- network probing
+        // TODO: add probing here
+        let (tx_from_probing, rx_from_probing) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
 
+        // manual ping
+        let (ping_tx, ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+
+        let ping_cfg = PingConfig {
+            timeout: self.cfg.protocol.heartbeat.timeout,
+            max_parallel_pings: self.cfg.heartbeat.max_parallel_probes,
+        };
+
+        let ping: Pinger<network_notifier::PingExternalInteractions<T>> = Pinger::new(
+            ping_cfg,
+            ping_tx.clone(),
+            network_notifier::PingExternalInteractions::new(
+                self.network.clone(),
+                self.db.clone(),
+                self.path_planner.channel_graph(),
+                network_events_tx,
+            ),
+        );
+
+        self.ping
+            .clone()
+            .set(ping)
+            .expect("must set the ping executor only once");
+
+        // heartbeat
+        let mut heartbeat = Heartbeat::new(
+            self.cfg.heartbeat,
+            self.ping
+                .get()
+                .expect("Ping should be initialized at this point")
+                .clone(),
+            HeartbeatExternalInteractions::new(self.network.clone()),
+            Box::new(|dur| Box::pin(sleep(dur))),
+        );
+
+        let half_the_hearbeat_interval = self.cfg.heartbeat.interval / 4;
+        processes.insert(
+            HoprTransportProcess::Probing(HoprProbeProcess::Heartbeat),
+            spawn(async move {
+                // present to make sure that the heartbeat does not start immediately
+                hopr_async_runtime::prelude::sleep(half_the_hearbeat_interval).await;
+                heartbeat.heartbeat_loop().await
+            }),
+        );
+
+        // -- session management
+        let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
         self.smgr
             .start(msg_sender, on_incoming_session)
             .expect("failed to start session manager")
@@ -580,7 +568,7 @@ where
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             spawn(async move {
-                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, |(pseudonym, data)| {
+                let _the_process_should_not_end = StreamExt::filter_map(rx_from_probing, |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {
                         match smgr.dispatch_message(pseudonym, data).await {
@@ -602,17 +590,6 @@ where
                 .map(Ok)
                 .forward(on_incoming_data)
                 .await;
-            }),
-        );
-
-        // initiate the network telemetry
-        let half_the_hearbeat_interval = self.cfg.heartbeat.interval / 4;
-        processes.insert(
-            HoprTransportProcess::Probing(HoprProbeProcess::Heartbeat),
-            spawn(async move {
-                // present to make sure that the heartbeat does not start immediately
-                hopr_async_runtime::prelude::sleep(half_the_hearbeat_interval).await;
-                heartbeat.heartbeat_loop().await
             }),
         );
 
@@ -944,4 +921,38 @@ where
             .map(|v| v.ticket.leak())
             .collect())
     }
+}
+
+fn build_mixer_cfg_from_env() -> MixerConfig {
+    let mixer_cfg = MixerConfig {
+        min_delay: std::time::Duration::from_millis(
+            std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
+                .map(|v| {
+                    v.trim()
+                        .parse::<u64>()
+                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
+                })
+                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
+        ),
+        delay_range: std::time::Duration::from_millis(
+            std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
+                .map(|v| {
+                    v.trim()
+                        .parse::<u64>()
+                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
+                })
+                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
+        ),
+        capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
+            .map(|v| {
+                v.trim()
+                    .parse::<usize>()
+                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
+            })
+            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
+        ..MixerConfig::default()
+    };
+    debug!(?mixer_cfg, "Mixer configuration");
+
+    mixer_cfg
 }
