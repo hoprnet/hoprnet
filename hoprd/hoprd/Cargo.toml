@@ -51,6 +51,7 @@ prof = [
 anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 home = "0.5.11"
