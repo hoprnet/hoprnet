@@ -70,7 +70,7 @@ pub use timer::execute_on_tick;
 use futures::{SinkExt, StreamExt};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
-use tracing::{debug, error, trace, warn};
+use tracing::{error, trace, warn};
 
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};

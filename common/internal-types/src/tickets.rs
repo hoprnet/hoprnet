@@ -855,7 +855,7 @@ impl UnacknowledgedTicket {
     /// the received acknowledgement of the forwarded packet.
     pub fn acknowledge(self, acknowledgement: &HalfKey) -> crate::errors::Result<AcknowledgedTicket> {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
-        debug!("acknowledging {} using response {}", self.ticket, response.to_hex());
+        debug!(ticket = %self.ticket, response = response.to_hex(), "acknowledging ticket using response");
 
         if self.ticket.verified_ticket().challenge == response.to_challenge().into() {
             Ok(self.ticket.into_acknowledged(response))
