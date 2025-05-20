@@ -77,7 +77,17 @@ pub(crate) struct ChannelIdParams {
             ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         responses(
-            (status = 200, description = "Fetched all tickets for the given channel ID", body = [ChannelTicket]),
+            (status = 200, description = "Fetched all tickets for the given channel ID", body = [ChannelTicket], example = json!([
+                {
+                    "amount": "100",
+                    "channelEpoch": 1,
+                    "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+                    "index": 0,
+                    "indexOffset": 1,
+                    "signature": "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891",
+                    "winProb": "1"
+                }
+            ])),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
@@ -110,19 +120,29 @@ pub(super) async fn show_channel_tickets(
 
 /// Endpoint is deprecated and will be removed in the future. Returns an empty array.
 #[utoipa::path(
-        get,
-        path = const_format::formatcp!("{BASE_PATH}/tickets"),
-        description = "(deprecated) Returns an empty array.",
-        responses(
-            (status = 200, description = "Fetched all tickets in all the channels", body = [ChannelTicket]),
-            (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)
-        ),
-        security(
-            ("api_token" = []),
-            ("bearer_token" = [])
-        ),
-        tag = "Tickets"
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/tickets"),
+    description = "(deprecated) Returns an empty array.",
+    responses(
+        (status = 200, description = "Fetched all tickets in all the channels", body = [ChannelTicket], example = json!([
+        {
+            "amount": "100",
+            "channelEpoch": 1,
+            "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+            "index": 0,
+            "indexOffset": 1,
+            "signature": "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891",
+            "winProb": "1"
+        }
+        ])),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+        (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Tickets"
     )]
 pub(super) async fn show_all_tickets() -> impl IntoResponse {
     let tickets: Vec<ChannelTicket> = vec![];

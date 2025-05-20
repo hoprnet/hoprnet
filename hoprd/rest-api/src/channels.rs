@@ -494,6 +494,7 @@ pub(super) async fn close_channel(
         "hash": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
 }))]
 #[serde(rename_all = "camelCase")]
+/// Response body for funding a channel.
 pub(crate) struct FundChannelResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]

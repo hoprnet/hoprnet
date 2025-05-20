@@ -54,18 +54,24 @@ pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl Int
 
 /// Get the configuration of the running node.
 #[utoipa::path(
-        get,
-        path = const_format::formatcp!("{BASE_PATH}/node/configuration"),
-        description = "Get the configuration of the running node",
-        responses(
-            (status = 200, description = "Fetched node configuration", body = HashMap<String, String>),
-            (status = 401, description = "Invalid authorization token.", body = ApiError),
-        ),
-        security(
-            ("api_token" = []),
-            ("bearer_token" = [])
-        ),
-        tag = "Configuration"
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/node/configuration"),
+    description = "Get the configuration of the running node",
+    responses(
+        (status = 200, description = "Fetched node configuration", body = HashMap<String, String>, example = json!({
+        "network": "anvil-localhost",
+        "provider": "http://127.0.0.1:8545",
+        "hoprToken": "0x9a676e781a523b5d0c0e43731313a708cb607508",
+        "hoprChannels": "0x9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
+        "...": "..."
+        })),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Configuration"
     )]
 pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     (StatusCode::OK, Json(state.hoprd_cfg.clone())).into_response()
@@ -170,13 +176,27 @@ pub(crate) struct AnnouncedPeer {
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(example = json!({
-        "connected": [{}],
-        "announced": [{
-            "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
-            "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
-            "multiaddr": "/ip4/178.12.1.9/tcp/19092"
-        }]
-    }))]
+    "connected": [{
+        "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
+        "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+        "multiaddr": "/ip4/178.12.1.9/tcp/19092",
+        "heartbeats": {
+            "sent": 10,
+            "success": 10
+        },
+        "lastSeen": 1690000000,
+        "lastSeenLatency": 100,
+        "quality": 0.7,
+        "backoff": 0.5,
+        "isNew": true,
+        "reportedVersion": "2.1.0"
+    }],
+    "announced": [{
+        "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
+        "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+        "multiaddr": "/ip4/178.12.1.9/tcp/19092"
+    }]
+}))]
 /// All connected and announced peers.
 pub(crate) struct NodePeersResponse {
     #[schema(example = json!([{
@@ -388,6 +408,7 @@ impl From<GraphExportQuery> for GraphExportConfig {
         ...",
     }))]
 #[serde(rename_all = "camelCase")]
+/// Response body for the channel graph export.
 pub(crate) struct NodeGraphResponse {
     graph: String,
 }

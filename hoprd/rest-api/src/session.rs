@@ -53,7 +53,11 @@ lazy_static::lazy_static! {
 }
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(example = 0)]
+#[schema(
+    example = json!({"Plain": "example.com:80"}),
+    example = json!({"Sealed": "SGVsbG9Xb3JsZA"}), // base64 for "HelloWorld"
+    example = json!({"Service": 0})
+)]
 /// Session target specification.
 pub enum SessionTargetSpec {
     Plain(String),
@@ -359,13 +363,10 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
 
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[schema(example = json!({ "Hops": 1 }))]
 /// Routing options for the Session.
 pub enum RoutingOptions {
     #[cfg(feature = "explicit-path")]
-    #[schema(example = json!([
-        "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33",
-        "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
-    ]))]
     IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<PeerOrAddress>),
     Hops(usize),
 }
@@ -403,6 +404,7 @@ impl RoutingOptions {
         "responseBuffer": "2 MB"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Request body for creating a new client session.
 pub(crate) struct SessionClientRequest {
     /// Address of the Exit node.
     #[serde_as(as = "DisplayFromStr")]
@@ -756,17 +758,27 @@ pub(crate) async fn create_client(
     path = const_format::formatcp!("{BASE_PATH}/session/{{protocol}}"),
     description = "Lists existing Session listeners for the given IP protocol.",
     params(
-            ("protocol" = String, Path, description = "IP transport protocol", example = "tcp"),
+        ("protocol" = String, Path, description = "IP transport protocol", example = "tcp"),
     ),
     responses(
-            (status = 200, description = "Opened session listeners for the given IP protocol.", body = Vec<SessionClientResponse>),
-            (status = 400, description = "Invalid IP protocol.", body = ApiError),
-            (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)
+        (status = 200, description = "Opened session listeners for the given IP protocol.", body = Vec<SessionClientResponse>, example = json!([
+            {
+                "target": "example.com:80",
+                "destination": "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F",
+                "forwardPath": { "Hops": 1 },
+                "returnPath": { "Hops": 1 },
+                "protocol": "tcp",
+                "ip": "127.0.0.1",
+                "port": 5542
+            }
+        ])),
+        (status = 400, description = "Invalid IP protocol.", body = ApiError),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+        (status = 422, description = "Unknown failure", body = ApiError)
     ),
     security(
-            ("api_token" = []),
-            ("bearer_token" = [])
+        ("api_token" = []),
+        ("bearer_token" = [])
     ),
     tag = "Session",
 )]
