@@ -7,10 +7,10 @@ env:
 on:
   workflow_dispatch: # allows manual triggering
   schedule:
-    - cron: '0 0 * * 0' # runs weekly on Sunday at 00:00
+    - cron: "0 0 * * 0" # runs weekly on Sunday at 00:00
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: write
 
