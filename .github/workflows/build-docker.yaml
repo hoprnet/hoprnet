@@ -100,15 +100,16 @@ jobs:
           base_branch=${{ github.event.pull_request.base.ref }}
           if [ "${base_branch}" == "master" ]; then
             docker_release_latest_tag=${{ vars.BRANCH_MASTER_RELEASE_NAME }}-latest
-          else
+            echo "DOCKER_RELEASE_LATEST_TAG=${docker_release_latest_tag}" >> $GITHUB_OUTPUT
+          elif [[ "${base_branch}" =~ ^release/ ]]; then
             docker_release_latest_tag=${{ vars.BRANCH_RELEASE_RELEASE_NAME }}-latest
+            echo "DOCKER_RELEASE_LATEST_TAG=${docker_release_latest_tag}" >> $GITHUB_OUTPUT
           fi
           if ${{ inputs.production }}; then
             echo "HOPRD_CLUSTER_NAME=core-node" >> $GITHUB_OUTPUT
           else
             echo "HOPRD_CLUSTER_NAME=hoprd-node-${docker_tag_pr//./-}" >> $GITHUB_OUTPUT
           fi
-          echo "DOCKER_RELEASE_LATEST_TAG=${docker_release_latest_tag}" >> $GITHUB_OUTPUT
         env:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
 
@@ -133,7 +134,7 @@ jobs:
 
       - name: Build and push ${{ inputs.package }} docker image - release-latest
         run: nix run -L .#${{ steps.options.outputs.NIX_BUILD_TARGET }}
-        if: inputs.production
+        if: inputs.production && steps.options.outputs.DOCKER_RELEASE_LATEST_TAG != ''
         env:
           GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
           IMAGE_TARGET: ${{ vars.DOCKER_IMAGE_REGISTRY }}/${{ inputs.package }}:${{ steps.options.outputs.DOCKER_RELEASE_LATEST_TAG }}
