@@ -138,7 +138,8 @@ async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
             if let Some(msg) =
                 SessionMessage::<{ hopr_transport_session::USABLE_PAYLOAD_CAPACITY_FOR_SESSION }>::try_from(
                     read.as_ref(),
-                )?.try_as_segment()
+                )?
+                .try_as_segment()
             {
                 recv_buf.extend_from_slice(&msg.data);
             }
