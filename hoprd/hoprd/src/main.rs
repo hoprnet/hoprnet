@@ -18,11 +18,9 @@ use tracing_subscriber::prelude::*;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
 use hopr_lib::{HoprLibProcesses, ToHex};
-use hopr_platform::file::native::join;
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
 use hoprd_api::{serve_api, ListenerJoinHandles, RestApiParameters};
-use hoprd_db_api::aliases::{HoprdDbAliasesOperations, ME_AS_ALIAS};
 use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 
 use hoprd::exit::HoprServerIpForwardingReactor;
@@ -202,36 +200,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &hopr_keys.chain_key,
     )?);
 
-    // Create the metadata database
-    let db_path: String = join(&[&cfg.hopr.db.data, "db"]).expect("Could not create a db storage path");
-
-    let hoprd_db = match hoprd_db_api::db::HoprdDb::new(db_path.clone()).await {
-        Ok(db) => {
-            info!("Metadata database created successfully");
-            Arc::new(db)
-        }
-        Err(e) => {
-            error!(error = %e, "Failed to create the metadata database");
-            return Err(e.into());
-        }
-    };
-
-    // Ensures that "OWN_ALIAS" is set as alias
-    match hoprd_db
-        .set_alias(node.me_peer_id().to_string(), ME_AS_ALIAS.to_string())
-        .await
-    {
-        Ok(_) => {
-            info!("Own alias set successfully");
-        }
-        Err(hoprd_db_api::errors::DbError::ReAliasingSelfNotAllowed) => {
-            info!("Own alias already set");
-        }
-        Err(e) => {
-            error!(error = %e, "Failed to set the alias for the node");
-        }
-    }
-
     let node_clone = node.clone();
 
     let mut processes: Vec<HoprdProcesses> = Vec::new();
@@ -261,7 +229,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 hoprd_cfg: node_cfg_str,
                 cfg: api_cfg,
                 hopr: node_clone,
-                hoprd_db,
                 session_listener_sockets,
                 default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
             })

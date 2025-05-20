@@ -40,14 +40,12 @@ class Node:
         network: str,
         identity_path: str,
         cfg_file: str,
-        alias: str,
         base_port: int,
         api_addr: str = None,
         use_nat: bool = False,
     ):
         # initialized
         self.id = id
-        self.alias = alias
         self.host_addr: str = host_addr
         self.api_token: str = api_token
         self.network: str = network
@@ -91,7 +89,11 @@ class Node:
         self.tokio_console_port = self.p2p_port + 1
 
         logging.info(
-            f"Node {self.id} ports: api {self.api_port}, p2p {self.p2p_port}, anvil {self.anvil_port}, tokio console {self.tokio_console_port}"
+            f"Node {self.id} ports: "
+            + f"api {self.api_port}, "
+            + f"p2p {self.p2p_port}, "
+            + f"tokio console {self.tokio_console_port}, "
+            + f"anvil {self.anvil_port}"
         )
 
     def load_addresses(self):
@@ -254,7 +256,6 @@ class Node:
     def fromConfig(
         cls,
         index: int,
-        alias: str,
         config: dict,
         defaults: dict,
         network: str,
@@ -271,17 +272,10 @@ class Node:
             network,
             config["identity_path"],
             config["config_file"],
-            alias,
             api_addr="0.0.0.0" if exposed else None,
             use_nat=use_nat,
             base_port=base_port,
         )
-
-    async def alias_peers(self, aliases_dict: dict[str, str]):
-        for peer_id, alias in aliases_dict.items():
-            if peer_id == self.peer_id:
-                continue
-            await self.api.aliases_set_alias(alias, peer_id)
 
     async def connect_peers(self, peer_ids: list[str]):
         tasks = []
@@ -315,4 +309,4 @@ class Node:
         return self.peer_id == other.peer_id
 
     def __str__(self):
-        return f"{self.alias} @ {self.api_addr}:{self.api_port}"
+        return f"node @ {self.api_addr}:{self.api_port}"

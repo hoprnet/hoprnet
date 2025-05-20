@@ -1,5 +1,4 @@
 import asyncio
-import socket
 import itertools
 import logging
 import os
@@ -105,7 +104,7 @@ async def swarm7(request, base_port):
         cluster.clean_up()
         anvil.kill()
     except RuntimeError:
-        pytest.fail(f"Failed to bring up the cluster")
+        pytest.fail("Failed to bring up the cluster")
 
 
 @pytest.fixture(scope="function")
