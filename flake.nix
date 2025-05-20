@@ -31,25 +31,24 @@
     , nixpkgs
     , flake-utils
     , flake-parts
-    , flake-root
     , rust-overlay
     , crane
     , foundry
     , solc
     , pre-commit
-    , treefmt-nix
     , ...
     }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports =
         [ inputs.treefmt-nix.flakeModule inputs.flake-root.flakeModule ];
-      perSystem = { config, lib, self', inputs', system, ... }:
+      perSystem = { config, lib, system, ... }:
         let
           rev = toString (self.shortRev or self.dirtyShortRev);
           fs = lib.fileset;
           localSystem = system;
           overlays = [ (import rust-overlay) foundry.overlay solc.overlay ];
           pkgs = import nixpkgs { inherit localSystem overlays; };
+          buildPlatform = pkgs.stdenv.buildPlatform;
           solcDefault = solc.mkDefault pkgs pkgs.solc_0_8_19;
           craneLib = (crane.mkLib pkgs).overrideToolchain
             (p: p.rust-bin.stable.latest.default);
@@ -101,8 +100,9 @@
 
           rust-builder-x86_64-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
-            crossSystem = pkgs.lib.systems.examples.gnu64;
+            crossSystem = pkgs.lib.systems.examples.musl64;
             isCross = true;
+            isStatic = true;
           };
 
           rust-builder-x86_64-darwin = import ./nix/rust-builder.nix {
@@ -113,8 +113,9 @@
 
           rust-builder-aarch64-linux = import ./nix/rust-builder.nix {
             inherit nixpkgs rust-overlay crane foundry solc localSystem;
-            crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform;
+            crossSystem = pkgs.lib.systems.examples.aarch64-multiplatform-musl;
             isCross = true;
+            isStatic = true;
           };
 
           rust-builder-aarch64-darwin = import ./nix/rust-builder.nix {
@@ -137,9 +138,14 @@
 
           hoprd = rust-builder-local.callPackage ./nix/rust-package.nix
             hoprdBuildArgs;
+          # also used for Docker image
           hoprd-x86_64-linux =
             rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
               hoprdBuildArgs;
+          # also used for Docker image
+          hoprd-x86_64-linux-dev =
+            rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
+              (hoprdBuildArgs // { CARGO_PROFILE = "dev"; });
           hoprd-aarch64-linux =
             rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix
               hoprdBuildArgs;
@@ -169,9 +175,14 @@
             (hoprdBuildArgs // { runClippy = true; });
           hoprd-dev = rust-builder-local.callPackage ./nix/rust-package.nix
             (hoprdBuildArgs // { CARGO_PROFILE = "dev"; });
+          # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
           hoprd-candidate =
-            rust-builder-local.callPackage ./nix/rust-package.nix
-              (hoprdBuildArgs // { CARGO_PROFILE = "candidate"; });
+            if buildPlatform.isLinux && buildPlatform.isx86_64 then
+              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
+                (hoprdBuildArgs // { CARGO_PROFILE = "candidate"; })
+            else
+              rust-builder-local.callPackage ./nix/rust-package.nix
+                (hoprdBuildArgs // { CARGO_PROFILE = "candidate"; });
           hoprd-bench = rust-builder-local.callPackage ./nix/rust-package.nix
             (hoprdBuildArgs // { runBench = true; });
 
@@ -186,9 +197,14 @@
 
           hopli = rust-builder-local.callPackage ./nix/rust-package.nix
             hopliBuildArgs;
+          # also used for Docker image
           hopli-x86_64-linux =
             rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
               hopliBuildArgs;
+          # also used for Docker image
+          hopli-x86_64-linux-dev =
+            rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
+              (hopliBuildArgs // { CARGO_PROFILE = "dev"; });
           hopli-aarch64-linux =
             rust-builder-aarch64-linux.callPackage ./nix/rust-package.nix
               hopliBuildArgs;
@@ -208,9 +224,14 @@
             (hopliBuildArgs // { runClippy = true; });
           hopli-dev = rust-builder-local.callPackage ./nix/rust-package.nix
             (hopliBuildArgs // { CARGO_PROFILE = "dev"; });
+          # build candidate binary as static on Linux amd64 to get more test exposure specifically via smoke tests
           hopli-candidate =
-            rust-builder-local.callPackage ./nix/rust-package.nix
-              (hopliBuildArgs // { CARGO_PROFILE = "candidate"; });
+            if buildPlatform.isLinux && buildPlatform.isx86_64 then
+              rust-builder-x86_64-linux.callPackage ./nix/rust-package.nix
+                (hopliBuildArgs // { CARGO_PROFILE = "candidate"; })
+            else
+              rust-builder-local.callPackage ./nix/rust-package.nix
+                (hopliBuildArgs // { CARGO_PROFILE = "candidate"; });
 
           profileDeps = with pkgs; [
             gdb
@@ -263,12 +284,12 @@
             Entrypoint = [ "/bin/docker-entrypoint.sh" ];
             Cmd = [ "hoprd" ];
           };
-          hoprd-docker =
-            import ./nix/docker-builder.nix (hoprdDockerArgs hoprd [ ]);
-          hoprd-dev-docker =
-            import ./nix/docker-builder.nix (hoprdDockerArgs hoprd-dev [ ]);
-          hoprd-profile-docker =
-            import ./nix/docker-builder.nix (hoprdDockerArgs hoprd profileDeps);
+          hoprd-docker = import ./nix/docker-builder.nix
+            (hoprdDockerArgs hoprd-x86_64-linux [ ]);
+          hoprd-dev-docker = import ./nix/docker-builder.nix
+            (hoprdDockerArgs hoprd-x86_64-linux-dev [ ]);
+          hoprd-profile-docker = import ./nix/docker-builder.nix
+            (hoprdDockerArgs hoprd-x86_64-linux profileDeps);
 
           hopliDockerArgs = package: deps: {
             inherit pkgs;
@@ -280,12 +301,12 @@
               "HOPLI_CONTRACTS_ROOT=${package}/ethereum/contracts"
             ];
           };
-          hopli-docker =
-            import ./nix/docker-builder.nix (hopliDockerArgs hopli [ ]);
-          hopli-dev-docker =
-            import ./nix/docker-builder.nix (hopliDockerArgs hopli-dev [ ]);
-          hopli-profile-docker =
-            import ./nix/docker-builder.nix (hopliDockerArgs hopli profileDeps);
+          hopli-docker = import ./nix/docker-builder.nix
+            (hopliDockerArgs hopli-x86_64-linux [ ]);
+          hopli-dev-docker = import ./nix/docker-builder.nix
+            (hopliDockerArgs hopli-x86_64-linux-dev [ ]);
+          hopli-profile-docker = import ./nix/docker-builder.nix
+            (hopliDockerArgs hopli-x86_64-linux profileDeps);
 
           anvilSrc = fs.toSource {
             root = ./.;
@@ -359,7 +380,6 @@
               ExposedPorts = { "8545/tcp" = { }; };
             };
           };
-
           plutoSrc = fs.toSource {
             root = ./.;
             fileset = fs.unions [
@@ -372,7 +392,8 @@
               ./scripts/run-local-cluster.sh
               ./scripts/utils.sh
               (fs.fileFilter (file: true) ./sdk)
-              ./tests/requirements.txt
+              ./pyproject.toml
+              ./tests/pyproject.toml
               ./Makefile
               (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
               (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
@@ -402,6 +423,7 @@
               solcDefault
               time
               tini
+              uv
               which
             ];
             enableFakechroot = true;
@@ -499,6 +521,7 @@
               uv
               foundry-bin
               solcDefault
+              python313
               hopli-dev
               hoprd-dev
             ];
@@ -621,7 +644,6 @@
               "nix/setup-hook-darwin.sh"
               "target/*"
               "tests/pytest.ini"
-              "tests/requirements.txt"
               "vendor/*"
             ];
 
