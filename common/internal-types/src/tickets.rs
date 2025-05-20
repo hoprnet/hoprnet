@@ -30,8 +30,9 @@ pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
 
 /// Represents a ticket winning probability.
 ///
-/// It holds the modified IEEE-754 but behaves like a reduced precision float
-/// when compared. It can also be fully ordered, because there cannot be NaNs or infinity.
+/// It holds the modified IEEE-754 but behaves like a reduced precision float.
+/// It intentionally does not implement `Ord` or `Eq`, as
+/// it can be only [approximately compared](WinningProbability::approx_cmp).
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WinningProbability(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] EncodedWinProb);
@@ -44,7 +45,7 @@ impl WinningProbability {
 
     // This value can no longer be represented with the winning probability encoding
     // and is equal to 0
-    const EPSILON: f64 = 0.00000001;
+    pub const EPSILON: f64 = 0.00000001;
 
     /// Converts winning probability to an unsigned integer (luck).
     pub fn as_luck(&self) -> u64 {
@@ -108,7 +109,7 @@ impl WinningProbability {
         Ok(Self(res))
     }
 
-    /// Performs approximate comparison.
+    /// Performs approximate comparison up to [`Self::EPSILON`].
     pub fn approx_cmp(&self, other: &Self) -> Ordering {
         let a = self.as_f64();
         let b = other.as_f64();
@@ -119,12 +120,12 @@ impl WinningProbability {
         }
     }
 
-    /// Performs approximate equality check.
+    /// Performs approximate equality comparison up to [`Self::EPSILON`].
     pub fn approx_eq(&self, other: &Self) -> bool {
         self.approx_cmp(other) == Ordering::Equal
     }
 
-    /// Gets the mininum of two winning probabilities.
+    /// Gets the minimum of two winning probabilities.
     pub fn min(&self, other: &Self) -> Self {
         if self.approx_cmp(other) == Ordering::Less {
             *self
@@ -552,8 +553,12 @@ impl Display for Ticket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ticket #{}, offset {}, epoch {} in channel {}",
-            self.index, self.index_offset, self.channel_epoch, self.channel_id
+            "ticket #{}, amount {}, offset {}, epoch {} in channel {}",
+            self.index,
+            self.amount.to_formatted_string(),
+            self.index_offset,
+            self.channel_epoch,
+            self.channel_id
         )
     }
 }
@@ -793,7 +798,7 @@ impl VerifiedTicket {
         self.0
     }
 
-    /// Creates new unacknowledged ticket from the [VerifiedTicket],
+    /// Creates a new unacknowledged ticket from the [VerifiedTicket],
     /// given our own part of the PoR challenge.
     pub fn into_unacknowledged(self, own_key: HalfKey) -> UnacknowledgedTicket {
         UnacknowledgedTicket { ticket: self, own_key }
@@ -850,7 +855,7 @@ impl UnacknowledgedTicket {
     /// the received acknowledgement of the forwarded packet.
     pub fn acknowledge(self, acknowledgement: &HalfKey) -> crate::errors::Result<AcknowledgedTicket> {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
-        debug!("acknowledging ticket using response {}", response.to_hex());
+        debug!(ticket = %self.ticket, response = response.to_hex(), "acknowledging ticket using response");
 
         if self.ticket.verified_ticket().challenge == response.to_challenge().into() {
             Ok(self.ticket.into_acknowledged(response))
@@ -961,7 +966,7 @@ impl Display for AcknowledgedTicket {
     }
 }
 
-/// Represents a winning ticket that can be successfully redeemed on chain.
+/// Represents a winning ticket that can be successfully redeemed on-chain.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RedeemableTicket {

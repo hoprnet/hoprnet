@@ -1,11 +1,10 @@
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
-use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::fmt::Formatter;
 use std::str::FromStr;
-use std::{sync::Arc, time::SystemTime};
+use std::sync::Arc;
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
@@ -14,11 +13,11 @@ use {
 };
 
 use signal_hook::low_level;
-use tracing::{error, info, trace, warn};
+use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
 
 use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
-use hopr_lib::{AsUnixTimestamp, HoprLibProcesses, ToHex};
+use hopr_lib::{HoprLibProcesses, ToHex};
 use hopr_platform::file::native::join;
 use hoprd::cli::CliArgs;
 use hoprd::errors::HoprdError;
@@ -117,7 +116,6 @@ fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
 
 enum HoprdProcesses {
     HoprLib(HoprLibProcesses, JoinHandle<()>),
-    Inbox(JoinHandle<()>),
     ListenerSockets(ListenerJoinHandles),
     RestApi(JoinHandle<()>),
 }
@@ -127,7 +125,6 @@ impl std::fmt::Display for HoprdProcesses {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             HoprdProcesses::HoprLib(p, _) => write!(f, "HoprLib process: {p}"),
-            HoprdProcesses::Inbox(_) => write!(f, "Inbox"),
             HoprdProcesses::ListenerSockets(_) => write!(f, "SessionListenerSockets"),
             HoprdProcesses::RestApi(_) => write!(f, "RestApi"),
         }
@@ -205,13 +202,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &hopr_keys.chain_key,
     )?);
 
-    // Create the message inbox
-    let inbox: Arc<RwLock<hoprd_inbox::Inbox>> = Arc::new(RwLock::new(
-        hoprd_inbox::inbox::MessageInbox::new_with_time(cfg.inbox.clone(), || {
-            hopr_platform::time::native::current_time().as_unix_timestamp()
-        }),
-    ));
-
     // Create the metadata database
     let db_path: String = join(&[&cfg.hopr.db.data, "db"]).expect("Could not create a db storage path");
 
@@ -241,8 +231,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             error!(error = %e, "Failed to set the alias for the node");
         }
     }
-
-    let inbox_clone = inbox.clone();
 
     let node_clone = node.clone();
 
@@ -274,7 +262,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cfg: api_cfg,
                 hopr: node_clone,
                 hoprd_db,
-                inbox,
                 session_listener_sockets,
                 default_session_listen_host: cfg.session_ip_forwarding.default_entry_listen_host,
             })
@@ -285,30 +272,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })));
     }
 
-    let (hopr_socket, hopr_processes) = node
+    let (_hopr_socket, hopr_processes) = node
         .run(HoprServerIpForwardingReactor::new(
             hopr_keys.packet_key.clone(),
             cfg.session_ip_forwarding,
         ))
         .await?;
-
-    // process extracting the received data from the socket
-    let mut ingress = hopr_socket.reader();
-    processes.push(HoprdProcesses::Inbox(spawn(async move {
-        while let Some(data) = ingress.next().await {
-            let tag = data.application_tag;
-
-            trace!(
-                ?tag,
-                receiged_at = DateTime::<Utc>::from(SystemTime::now()).to_rfc3339(),
-                "received message"
-            );
-
-            if !inbox_clone.write().await.push(data).await {
-                warn!(?tag, "Received a message with an ignored Inbox tag",)
-            }
-        }
-    })));
 
     processes.extend(hopr_processes.into_iter().map(|(k, v)| HoprdProcesses::HoprLib(k, v)));
 
@@ -325,9 +294,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let mut join_handles: Vec<JoinHandle<()>> = Vec::new();
                         info!("Stopping process '{process}'");
                         match process {
-                            HoprdProcesses::HoprLib(_, jh)
-                            | HoprdProcesses::Inbox(jh)
-                            | HoprdProcesses::RestApi(jh) => join_handles.push(jh),
+                            HoprdProcesses::HoprLib(_, jh) | HoprdProcesses::RestApi(jh) => join_handles.push(jh),
                             HoprdProcesses::ListenerSockets(jhs) => {
                                 join_handles.extend(jhs.write().await.drain().map(|(_, entry)| entry.jh));
                             }

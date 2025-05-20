@@ -5334,7 +5334,6 @@ dependencies = [
  "hopr-platform",
  "hoprd-api",
  "hoprd-db-api",
- "hoprd-inbox",
  "hoprd-keypair",
  "lazy_static",
  "opentelemetry",
@@ -5360,7 +5359,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.13.1"
+version = "3.14.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
@@ -5380,7 +5379,6 @@ dependencies = [
  "hopr-network-types",
  "hopr-transport-session",
  "hoprd-db-api",
- "hoprd-inbox",
  "lazy_static",
  "libp2p-identity",
  "oas3",
@@ -5447,24 +5445,6 @@ version = "0.1.0"
 dependencies = [
  "sea-orm-migration",
  "tokio",
-]
-
-[[package]]
-name = "hoprd-inbox"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "async-lock 3.4.0",
- "async-trait",
- "hopr-internal-types",
- "hopr-platform",
- "ringbuffer",
- "serde",
- "serde_with",
- "smart-default",
- "tokio",
- "tracing",
- "validator",
 ]
 
 [[package]]
@@ -8232,9 +8212,9 @@ dependencies = [
 
 [[package]]
 name = "resolv-conf"
-version = "0.7.4"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95325155c684b1c89f7765e30bc1c42e4a6da51ca513615660cb8a62ef9a88e3"
+checksum = "fc7c8f7f733062b66dc1c63f9db168ac0b97a9210e247fa90fdc9ad08f51b302"
 
 [[package]]
 name = "rfc6979"

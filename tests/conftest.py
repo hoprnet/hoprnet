@@ -118,11 +118,6 @@ async def swarm7_reset(swarm7: dict[str, Node]):
     except Exception as e:
         logging.error(f"Error resetting tickets statistics in teardown: {e}")
 
-    try:
-        await asyncio.gather(*[node.api.messages_pop_all(None) for node in swarm7.values()])
-    except Exception as e:
-        logging.error(f"Error popping all messages in teardown: {e}")
-
 
 def to_ws_url(host, port, args: list[tuple[str, str]]):
     return f"ws://{host}:{port}/api/v3/session/websocket?" + "&".join(f"{a[0]}={a[1]}" for a in args)

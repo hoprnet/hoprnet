@@ -235,7 +235,10 @@ where
             .map_err(|_| TransportSessionError::Closed)?
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
             .await
-            .map_err(|_e| TransportSessionError::Timeout)?;
+            .map_err(|error| {
+                tracing::error!(%error, "packet send error");
+                TransportSessionError::Timeout
+            })?;
 
         trace!("packet sent to the outgoing queue");
 

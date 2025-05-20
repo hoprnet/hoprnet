@@ -234,6 +234,24 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn start_protocol_message_start_session_message_should_allow_for_at_least_one_surb() -> anyhow::Result<()> {
+        let msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:1234".parse()?)),
+            capabilities: Default::default(),
+        });
+
+        let len = msg.encode()?.1.len();
+        assert!(
+            HoprPacket::max_surbs_with_message(len) >= 1,
+            "KeepAlive message size ({}) must allow for at least 1 SURBs in packet",
+            len,
+        );
+
+        Ok(())
+    }
+
     #[cfg(feature = "serde")]
     #[test]
     fn start_protocol_session_established_message_should_encode_and_decode() -> anyhow::Result<()> {

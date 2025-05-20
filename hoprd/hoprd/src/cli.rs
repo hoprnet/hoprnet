@@ -219,15 +219,6 @@ pub struct CliArgs {
     pub private_key: Option<String>,
 
     #[arg(
-        long = "inbox-capacity",
-        value_parser = clap::value_parser ! (u32).range(1..),
-        value_name = "INBOX_CAPACITY",
-        help = "Set maximum capacity of the HOPRd inbox",
-        env = "HOPRD_INBOX_CAPACITY"
-    )]
-    pub inbox_capacity: Option<u32>,
-
-    #[arg(
         long = "testAnnounceLocalAddresses",
         env = "HOPRD_TEST_ANNOUNCE_LOCAL_ADDRESSES",
         help = "For testing local testnets. Announce local addresses",
