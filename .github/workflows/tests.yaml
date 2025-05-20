@@ -225,10 +225,15 @@ jobs:
         working-directory: "/tmp"
         run: |
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
-          test_name=test-smoke-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_number }}
+          test_name=test-smoke-hopli-${{ github.run_id }}-${{ github.run_number }}
           mkdir -p ${test_name}
-          cp hopr-localcluster/hopr-node_*/*.log ${test_name}/ || echo "no files to copy"
-          cp hopr-localcluster/anvil/*.log ${test_name}/ || echo "no files to copy"
+
+          # Copy files, delete all but the log files
+          cp -r hopr-localcluster/hopr-node_* ${test_name}/ || echo "no files to copy"
+          find ${test_name}/ -type f ! -name "hoprd.log" -delete
+          cp hopr-localcluster/anvil/anvil.log ${test_name}/ || echo "no files to copy"
+
+          # Create tarball and upload to GCP
           tar -czvf ${test_name}.tgz ${test_name}/
           gcloud storage cp ${test_name}.tgz gs://hoprnet-test-logs/pr-${{ github.event.pull_request.number }}/
 
@@ -324,7 +329,12 @@ jobs:
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
           test_name=test-smoke-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_number }}
           mkdir -p ${test_name}
-          cp hopr-localcluster/hopr-node_*/*.log ${test_name}/ || echo "no files to copy"
-          cp hopr-localcluster/anvil/*.log ${test_name}/ || echo "no files to copy"
+
+          # Copy files, delete all but the log files
+          cp -r hopr-localcluster/hopr-node_* ${test_name}/ || echo "no files to copy"
+          find ${test_name}/ -type f ! -name "hoprd.log" -delete
+          cp hopr-localcluster/anvil/anvil.log ${test_name}/ || echo "no files to copy"
+
+          # Create tarball and upload to GCP
           tar -czvf ${test_name}.tgz ${test_name}/
           gcloud storage cp ${test_name}.tgz gs://hoprnet-test-logs/pr-${{ github.event.pull_request.number }}/
