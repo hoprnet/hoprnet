@@ -16,6 +16,10 @@ use hopr_lib::{Address, GeneralError};
 use crate::ApiErrorStatus;
 
 #[derive(Debug, Clone, Copy, Eq, Hash, Ord, Serialize, Deserialize, PartialEq, PartialOrd, ToSchema)]
+/// Unified type for PeerId and Address
+///
+/// This enum can be used to represent either a PeerId or an Address.
+/// It is used in the API to accept both types of input.
 pub enum PeerOrAddress {
     #[schema(value_type = String)]
     PeerId(PeerId),

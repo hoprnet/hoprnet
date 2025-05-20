@@ -145,9 +145,12 @@ pub(crate) struct InternalState {
         (name = "Account", description = "HOPR node account endpoints"),
         (name = "Alias", description = "HOPR node internal non-persistent alias endpoints"),
         (name = "Channels", description = "HOPR node chain channels manipulation endpoints"),
+        (name = "Configuration", description = "HOPR node configuration endpoints"),
         (name = "Checks", description = "HOPR node functionality checks"),
+        (name = "Network", description = "HOPR node network endpoints"),
         (name = "Node", description = "HOPR node information endpoints"),
         (name = "Peers", description = "HOPR node peer manipulation endpoints"),
+        (name = "Session", description = "HOPR node session management endpoints"),
         (name = "Tickets", description = "HOPR node ticket management endpoints"),
     )
 )]
@@ -161,18 +164,23 @@ impl Modify for SecurityAddon {
             .components
             .as_mut()
             .expect("components should be registered at this point");
+
         components.add_security_scheme(
             "bearer_token",
             SecurityScheme::Http(
                 HttpBuilder::new()
                     .scheme(HttpAuthScheme::Bearer)
                     .bearer_format("token")
+                    .description(Some("Bearer token authentication".to_string()))
                     .build(),
             ),
         );
         components.add_security_scheme(
             "api_token",
-            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Auth-Token"))),
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::with_description(
+                "X-Auth-Token",
+                "API Token",
+            ))),
         );
     }
 }
@@ -277,11 +285,11 @@ async fn build_api(
             BASE_PATH,
             Router::new()
                 .route("/aliases", get(alias::aliases))
-                .route("/aliases_addresses", get(alias::aliases_addresses))
+                .route("/aliases-addresses", get(alias::aliases_addresses))
                 .route("/aliases", post(alias::set_alias))
                 .route("/aliases", delete(alias::clear_aliases))
                 .route("/aliases/{alias}", get(alias::get_alias))
-                .route("/aliases_addresses/{alias}", get(alias::get_alias_address))
+                .route("/aliases-addresses/{alias}", get(alias::get_alias_address))
                 .route("/aliases/{alias}", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
@@ -311,7 +319,7 @@ async fn build_api(
                 .route("/node/configuration", get(node::configuration))
                 .route("/node/info", get(node::info))
                 .route("/node/peers", get(node::peers))
-                .route("/node/entryNodes", get(node::entry_nodes))
+                .route("/node/entry-nodes", get(node::entry_nodes))
                 .route("/node/graph", get(node::channel_graph))
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/websocket", get(session::websocket))
@@ -362,9 +370,12 @@ fn option_checksum_address_serializer<S: serde::Serializer>(a: &Option<Address>,
     "status": "INVALID_INPUT",
     "error": "Invalid value passed in parameter 'XYZ'"
 }))]
+/// Standardized error response for the API
 pub(crate) struct ApiError {
+    #[schema(example = "INVALID_INPUT")]
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "Invalid value passed in parameter 'XYZ'")]
     pub error: Option<String>,
 }
 

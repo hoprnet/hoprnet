@@ -22,9 +22,10 @@ use crate::{
         "peerId": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
     }))]
 #[serde(rename_all = "camelCase")]
+/// (deprecated, will be removed in v3.0) Contains the node's PeerId (from an alias).
 pub(crate) struct PeerIdResponse {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA")]
     pub peer_id: String,
 }
 
@@ -34,9 +35,10 @@ pub(crate) struct PeerIdResponse {
         "address": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
     }))]
 #[serde(rename_all = "camelCase")]
+/// (deprecated, will be removed in v3.0) Contains the node's ETH address (from an alias).
 pub(crate) struct AddressResponse {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6")]
     pub address: Address,
 }
 
@@ -47,10 +49,12 @@ pub(crate) struct AddressResponse {
         "destination": "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"
     }))]
 #[serde(rename_all = "camelCase")]
+/// (deprecated, will be removed in v3.0) Contains the alias and the PeerId to be aliased.
 pub(crate) struct AliasDestinationBodyRequest {
+    #[schema(example = "Alice")]
     pub alias: String,
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "12D3KooWRWeTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA")]
     pub destination: PeerOrAddress,
 }
 
@@ -58,6 +62,7 @@ pub(crate) struct AliasDestinationBodyRequest {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
+        description = "Get each previously set alias and its corresponding PeerId as a hashmap",
         responses(
             (status = 200, description = "Each alias with its corresponding PeerId", body = HashMap<String, String>, example = json!({
                     "alice": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
@@ -88,10 +93,11 @@ pub(super) async fn aliases(State(state): State<Arc<InternalState>>) -> impl Int
     }
 }
 
-// TODO(deprecated, will be removed in v3.0) Get each previously set alias and its corresponding ETH address as a hashmap.
+/// (deprecated, will be removed in v3.0) Get each previously set alias and its corresponding ETH address as a hashmap.
 #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/aliases_addresses"),
+        path = const_format::formatcp!("{BASE_PATH}/aliases-addresses"),
+        description = "Get each previously set alias and its corresponding ETH address as a hashmap",
         responses(
             (status = 200, description = "Each alias with its corresponding Address", body = HashMap<String, String>, example = json!({
                     "alice": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
@@ -147,6 +153,7 @@ pub(super) async fn aliases_addresses(State(state): State<Arc<InternalState>>) -
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
+        description = "Set alias for a peer with a specific PeerId.",
         request_body(
             content = AliasDestinationBodyRequest,
             description = "Alias name along with the PeerId to be aliased",
@@ -207,8 +214,9 @@ pub(crate) struct GetAliasRequest {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
+        description = "Get PeerId for an alias",
         params(
-            ("alias" = String, Path, description = "Alias to be shown"),
+            ("alias" = String, Path, description = "Alias to be shown", example = "Alice"),
         ),
         responses(
             (status = 200, description = "Get PeerId for an alias", body = PeerIdResponse),
@@ -240,12 +248,13 @@ pub(super) async fn get_alias(
     }
 }
 
-// TODO(deprecated, will be removed in v3.0) Get alias for the address (ETH address) that have this alias assigned to it.
+/// (deprecated, will be removed in v3.0) Get alias for the address (ETH address) that have this alias assigned to it.
 #[utoipa::path(
         get,
-        path = const_format::formatcp!("{BASE_PATH}/aliases_addresses/{{alias}}"),
+        path = const_format::formatcp!("{BASE_PATH}/aliases-addresses/{{alias}}"),
+        description = "Get alias for the address (ETH address) that have this alias assigned to it",
         params(
-            ("alias" = String, Path, description = "Alias to be shown"),
+            ("alias" = String, Path, description = "Alias to be shown", example = "Alice"),
         ),
         responses(
             (status = 200, description = "Get ETH address for an alias", body = AddressResponse),
@@ -308,8 +317,9 @@ pub(crate) struct DeleteAliasRequest {
 #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/aliases/{{alias}}"),
+        description = "Delete an alias",
         params(
-            ("alias" = String, Path, description = "Alias to be shown"),
+            ("alias" = String, Path, description = "Alias to be shown", example = "Alice"),
         ),
         responses(
             (status = 204, description = "Alias removed successfully"),
@@ -344,6 +354,7 @@ pub(super) async fn delete_alias(
 #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/aliases"),
+        description = "Clear all aliases",
         responses(
             (status = 204, description = "All aliases removed successfully"),
             (status = 401, description = "Invalid authorization token.", body = ApiError),

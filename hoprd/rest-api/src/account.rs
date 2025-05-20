@@ -16,12 +16,15 @@ use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
-        "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
-    }))]
+    "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
+    "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
+}))]
 #[serde(rename_all = "camelCase")]
+/// Contains the node's HOPR and native addresses.
 pub(crate) struct AccountAddressesResponse {
+    #[schema(example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6")]
     native: String,
+    #[schema(example = "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS")]
     hopr: String,
 }
 
@@ -60,11 +63,17 @@ pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl I
         "safeNative": "10000000000000000000"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Contains all node's and safe's related balances.
 pub(crate) struct AccountBalancesResponse {
+    #[schema(example = "10000000000000000000")]
     safe_native: String,
+    #[schema(example = "9999563581204904000")]
     native: String,
+    #[schema(example = "2000000000000000000000")]
     safe_hopr: String,
+    #[schema(example = "2000000000000000000000")]
     hopr: String,
+    #[schema(example = "115792089237316195423570985008687907853269984665640564039457584007913129639935")]
     safe_hopr_allowance: String,
 }
 
@@ -155,16 +164,17 @@ where
         "currency": "HOPR"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Request body for the withdraw endpoint.
 pub(crate) struct WithdrawBodyRequest {
     // #[serde_as(as = "DisplayFromStr")]
     #[serde(deserialize_with = "deserialize_balance_type")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "HOPR")]
     currency: BalanceType,
     #[serde(deserialize_with = "deserialize_u256_value_from_str")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example= "20000")]
     amount: U256,
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example= "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
     address: Address,
 }
 
@@ -173,7 +183,9 @@ pub(crate) struct WithdrawBodyRequest {
         "receipt": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     }))]
 #[serde(rename_all = "camelCase")]
+/// Response body for the withdraw endpoint.
 pub(crate) struct WithdrawResponse {
+    #[schema(example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
     receipt: String,
 }
 
@@ -183,9 +195,12 @@ pub(crate) struct WithdrawResponse {
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/account/withdraw"),
+        description = "Withdraw funds from this node to the ethereum wallet address",
         request_body(
             content = WithdrawBodyRequest,
-            content_type = "application/json"),
+            content_type = "application/json",
+            description = "Request body for the withdraw endpoint",
+        ),
         responses(
             (status = 200, description = "The node's funds have been withdrawn", body = WithdrawResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),

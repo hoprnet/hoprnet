@@ -73,4 +73,4 @@ hopr-metrics = { workspace = true, optional = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 hopr-transport-session = { workspace = true }
-oas3 = "0.13.1"
+oas3 = "0.16.0"

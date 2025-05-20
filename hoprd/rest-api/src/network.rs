@@ -12,8 +12,10 @@ use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
     "price": "30000000000000000"
 }))]
 #[serde(rename_all = "camelCase")]
+/// Contains the ticket price in HOPR tokens.
 pub(crate) struct TicketPriceResponse {
     /// Price of the ticket in HOPR tokens.
+    #[schema(example = "30000000000000000")]
     price: String,
 }
 
@@ -21,6 +23,7 @@ pub(crate) struct TicketPriceResponse {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/network/price"),
+        description = "Get the current ticket price",
         responses(
             (status = 200, description = "Current ticket price", body = TicketPriceResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -57,7 +60,9 @@ pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoR
     "probability": 0.5
 }))]
 #[serde(rename_all = "camelCase")]
+/// Contains the winning probability of a ticket.
 pub(crate) struct TicketProbabilityResponse {
+    #[schema(example = 0.5)]
     /// Winning probability of a ticket.
     probability: f64,
 }
@@ -66,6 +71,7 @@ pub(crate) struct TicketProbabilityResponse {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/network/probability"),
+        description = "Get the current minimum incoming ticket winning probability defined by the network",
         responses(
             (status = 200, description = "Minimum incoming ticket winning probability defined by the network", body = TicketProbabilityResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
