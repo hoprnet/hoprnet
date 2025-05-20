@@ -83,7 +83,7 @@ impl SessionId {
         }
     }
 
-    pub fn tag(&self) -> u16 {
+    pub fn tag(&self) -> Tag {
         self.tag
     }
 

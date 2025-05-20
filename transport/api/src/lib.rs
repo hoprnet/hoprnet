@@ -503,7 +503,6 @@ where
         }
 
         // -- network probing
-        // TODO: add probing here
         let (tx_from_probing, rx_from_probing) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
 

@@ -130,9 +130,7 @@ tracing-opentelemetry = { version = "0.30.0" }
 temp-env = "0.3.6"
 parameterized = "2.0.0"
 petgraph = { version = "0.8.1", features = ["serde-1"] }
-primitive-types = { version = "0.13.1", features = [
-  "serde",
-] }
+primitive-types = { version = "0.13.1", features = ["serde"] }
 proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
 rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference old ones

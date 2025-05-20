@@ -80,14 +80,13 @@ use hopr_transport::{
 };
 pub use hopr_transport::{
     HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-    OffchainKeypair as HoprOffchainKeypair, PeerId, SESSION_PAYLOAD_SIZE, SendMsg, ServiceId, Session as HoprSession,
-    SessionCapability, SessionClientConfig, SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig,
-    TicketStatistics, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
+    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_PAYLOAD_SIZE, SendMsg,
+    ServiceId, Session as HoprSession, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
+    SessionTarget, SurbBalancerConfig, TicketStatistics, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
     config::{HostConfig, HostType, looks_like_domain},
     constants::RESERVED_TAG_UPPER_LIMIT,
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
-pub use hopr_transport::{PingQueryReplier, ProbeError};
 use tracing::{debug, error, info, trace, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {

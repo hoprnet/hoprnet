@@ -133,18 +133,22 @@ pub async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()
     Ok(())
 }
 
+#[allow(dead_code)]
 pub type WireChannels = (
     futures::channel::mpsc::UnboundedSender<(PeerId, Box<[u8]>)>,
     hopr_transport_mixer::channel::Receiver<(PeerId, Box<[u8]>)>,
 );
 
+#[allow(dead_code)]
 pub type LogicalChannels = (
     futures::channel::mpsc::UnboundedSender<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>,
     futures::channel::mpsc::UnboundedReceiver<(HoprPseudonym, ApplicationData)>,
 );
 
+#[allow(dead_code)]
 pub type TicketChannel = futures::channel::mpsc::UnboundedReceiver<AcknowledgedTicket>;
 
+#[allow(dead_code)]
 pub async fn peer_setup_for(
     count: usize,
 ) -> anyhow::Result<(Vec<WireChannels>, Vec<LogicalChannels>, Vec<TicketChannel>)> {
@@ -262,7 +266,6 @@ pub async fn emulate_channel_communication(pending_packet_count: usize, mut comp
         }
     }
 
-    // TODO: let it live for a while
     futures::future::pending::<()>().await;
 }
 
@@ -342,6 +345,7 @@ pub fn random_packets_of_count(size: usize) -> Vec<ApplicationData> {
         .collect::<Vec<_>>()
 }
 
+#[allow(dead_code)]
 pub async fn send_relay_receive_channel_of_n_peers(
     peer_count: usize,
     mut test_msgs: Vec<ApplicationData>,

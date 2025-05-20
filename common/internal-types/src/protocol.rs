@@ -21,11 +21,10 @@ pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0;
 /// due to privacy.
 pub const DEFAULT_MAXIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0; // TODO: change this in 3.0
 
-/// Tags are currently 16-bit unsigned integers
-pub type Tag = u16; // TODO: change this to u32
-
-/// Represent a default application tag if none is specified in `send_packet`.
-pub const DEFAULT_APPLICATION_TAG: Tag = 0;
+/// Tags are represented as 4 bytes.
+///
+/// 2^32 should provide enough range for all usecases.
+pub type Tag = u32;
 
 /// Alias for the [`Pseudonym`](`hopr_crypto_types::types::Pseudonym`) used in the HOPR protocol.
 pub type HoprPseudonym = SimplePseudonym;
