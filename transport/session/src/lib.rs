@@ -16,7 +16,7 @@ mod types;
 pub use balancer::SurbBalancerConfig;
 pub use hopr_network_types::types::*;
 pub use manager::{DispatchResult, SessionManager, SessionManagerConfig, MIN_BALANCER_SAMPLING_INTERVAL};
-pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, SESSION_USABLE_MTU_SIZE};
+pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, USABLE_PAYLOAD_CAPACITY_FOR_SESSION};
 
 #[cfg(feature = "runtime-tokio")]
 pub use types::transfer_session;
@@ -28,8 +28,8 @@ use hopr_network_types::prelude::state::{SessionFeature, SessionSocket};
 #[cfg(not(feature = "serde"))]
 compile_error!("The `serde` feature currently must be enabled, see #7145");
 
-/// Number of bytes that can be sent in a single session payload.
-pub const SESSION_PAYLOAD_SIZE: usize = SessionSocket::<SESSION_USABLE_MTU_SIZE>::PAYLOAD_CAPACITY;
+/// Number of bytes that can be sent in a single Session protocol payload.
+pub const SESSION_PAYLOAD_SIZE: usize = SessionSocket::<USABLE_PAYLOAD_CAPACITY_FOR_SESSION>::PAYLOAD_CAPACITY;
 
 /// Capabilities of a session.
 #[repr(u8)]

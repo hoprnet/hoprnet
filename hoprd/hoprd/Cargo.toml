@@ -90,7 +90,6 @@ hopr-lib = { workspace = true, features = [
 ] }
 hoprd-db-api = { workspace = true }
 hoprd-api = { workspace = true }
-hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }

@@ -5,7 +5,6 @@ mod account;
 mod alias;
 mod channels;
 mod checks;
-mod messages;
 mod network;
 mod node;
 mod peers;
@@ -76,7 +75,6 @@ pub(crate) struct InternalState {
     pub hoprd_cfg: String,
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
-    pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub websocket_active_count: Arc<AtomicU16>,
     pub open_listeners: ListenerJoinHandles,
@@ -105,13 +103,6 @@ pub(crate) struct InternalState {
         checks::healthyz,
         checks::readyz,
         checks::startedz,
-        messages::delete_messages,
-        messages::peek,
-        messages::peek_all,
-        messages::pop,
-        messages::pop_all,
-        messages::send_message,
-        messages::size,
         network::price,
         network::probability,
         node::configuration,
@@ -140,8 +131,6 @@ pub(crate) struct InternalState {
             alias::PeerIdResponse, alias::AliasDestinationBodyRequest,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse, channels::FundChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
-            messages::MessageInboxAllResponse,
-            messages::MessageInboxResponse, messages::SendMessageResponse, messages::SendMessageBodyRequest, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageBodyRequest,
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
@@ -158,8 +147,6 @@ pub(crate) struct InternalState {
         (name = "Channels", description = "HOPR node chain channels manipulation endpoints"),
         (name = "Configuration", description = "HOPR node configuration endpoints"),
         (name = "Checks", description = "HOPR node functionality checks"),
-        (name = "Messages", description = "HOPR node message manipulation endpoints"),
-        (name = "Network", description = "HOPR node network information endpoints"),
         (name = "Node", description = "HOPR node information endpoints"),
         (name = "Peers", description = "HOPR node peer manipulation endpoints"),
         (name = "Session", description = "HOPR node session management endpoints"),
@@ -204,7 +191,6 @@ pub struct RestApiParameters {
     pub cfg: crate::config::Api,
     pub hopr: Arc<hopr_lib::Hopr>,
     pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
-    pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub session_listener_sockets: ListenerJoinHandles,
     pub default_session_listen_host: std::net::SocketAddr,
 }
@@ -217,7 +203,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         cfg,
         hopr,
         hoprd_db,
-        inbox,
         session_listener_sockets,
         default_session_listen_host,
     } = params;
@@ -226,7 +211,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         hoprd_cfg,
         cfg,
         hopr,
-        inbox,
         hoprd_db,
         session_listener_sockets,
         default_session_listen_host,
@@ -240,7 +224,6 @@ async fn build_api(
     hoprd_cfg: String,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
-    inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     open_listeners: ListenerJoinHandles,
     default_listen_host: std::net::SocketAddr,
@@ -250,7 +233,6 @@ async fn build_api(
         auth: Arc::new(cfg.auth.clone()),
         hoprd_cfg,
         hopr: state.hopr.clone(),
-        inbox,
         hoprd_db,
         open_listeners,
         default_listen_host,
@@ -330,13 +312,6 @@ async fn build_api(
                 .route("/tickets/redeem", post(tickets::redeem_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
                 .route("/tickets/statistics", delete(tickets::reset_ticket_statistics))
-                .route("/messages", delete(messages::delete_messages))
-                .route("/messages", post(messages::send_message))
-                .route("/messages/pop", post(messages::pop))
-                .route("/messages/pop-all", post(messages::pop_all))
-                .route("/messages/peek", post(messages::peek))
-                .route("/messages/peek-all", post(messages::peek_all))
-                .route("/messages/size", get(messages::size))
                 .route("/network/price", get(network::price))
                 .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
@@ -409,8 +384,6 @@ pub(crate) struct ApiError {
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiErrorStatus {
     InvalidInput,
-    /// An invalid application tag from the reserved range was provided.
-    InvalidApplicationTag,
     InvalidChannelId,
     PeerNotFound,
     ChannelNotFound,
@@ -430,8 +403,6 @@ enum ApiErrorStatus {
     InvalidQuality,
     NotReady,
     ListenHostAlreadyUsed,
-    #[strum(serialize = "INVALID_PATH")]
-    InvalidPath(String),
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }

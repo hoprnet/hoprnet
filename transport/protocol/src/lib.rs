@@ -70,7 +70,7 @@ pub use timer::execute_on_tick;
 use futures::{SinkExt, StreamExt};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use std::collections::HashMap;
-use tracing::error;
+use tracing::{error, trace, warn};
 
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
@@ -290,9 +290,10 @@ where
                     async move {
                     if let Some(packet) = maybe_packet {
                         match packet {
-                            IncomingPacket::Final { packet_tag, .. }
-                            | IncomingPacket::Forwarded { packet_tag, .. } => {
+                            IncomingPacket::Final { packet_tag, previous_hop,.. }
+                            | IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
                                 if tbf.is_tag_replay(&packet_tag).await {
+                                    warn!("replayed packet received from {previous_hop}");
                                     #[cfg(all(feature = "prometheus", not(test)))]
                                     METRIC_REPLAYED_PACKET_COUNT.increment();
 
@@ -303,6 +304,7 @@ where
                             }
                         }
                     } else {
+                        trace!("received empty packet");
                         None
                     }
                 }
@@ -322,57 +324,59 @@ where
                             ack_key,
                             ..
                         } => {
-                                let ack = Acknowledgement::new(ack_key, &me);
-                                if let Ok(ack_packet) = db
-                                    .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
-                                    .await
-                                    .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a received message"))
-                                    {
-                                        msg_to_send_tx
-                                            .send((
-                                                ack_packet.next_hop.into(),
-                                                ack_packet.data,
-                                            ))
-                                            .await
-                                            .unwrap_or_else(|_e| {
-                                                error!("Failed to send an acknowledgement for a received packet to the transport layer");
-                                            });
-                                    }
-
-                                    Some((sender, plain_text))
-                                }
-                                IncomingPacket::Forwarded {
-                                    previous_hop,
-                                    next_hop,
-                                    data,
-                                    ack,
-                                    ..
-                                } => {
+                            trace!("acknowledging final packet to {previous_hop}");
+                            let ack = Acknowledgement::new(ack_key, &me);
+                            if let Ok(ack_packet) = db
+                                .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
+                                .await
+                                .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a received message"))
+                                {
                                     msg_to_send_tx
                                         .send((
-                                            next_hop.into(),
-                                            data,
+                                            ack_packet.next_hop.into(),
+                                            ack_packet.data,
                                         ))
                                         .await
                                         .unwrap_or_else(|_e| {
-                                            error!("Failed to forward a packet to the transport layer");
+                                            error!("Failed to send an acknowledgement for a received packet to the transport layer");
                                         });
+                                }
 
-                                    if let Ok(ack_packet) = db
-                                        .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
-                                        .await
-                                        .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a relayed message"))
-                                    {
-                                        msg_to_send_tx
-                                            .send((
-                                                ack_packet.next_hop.into(),
-                                                ack_packet.data,
-                                            ))
-                                            .await
-                                            .unwrap_or_else(|_e| {
-                                                error!("Failed to send an acknowledgement for a relayed packet to the transport layer");
-                                            });
-                                    }
+                                Some((sender, plain_text))
+                        }
+                        IncomingPacket::Forwarded {
+                            previous_hop,
+                            next_hop,
+                            data,
+                            ack,
+                            ..
+                        } => {
+                            trace!("acknowledging forwarded packet {previous_hop}->{next_hop}");
+                            msg_to_send_tx
+                                .send((
+                                    next_hop.into(),
+                                    data,
+                                ))
+                                .await
+                                .unwrap_or_else(|_e| {
+                                    error!("Failed to forward a packet to the transport layer");
+                                });
+
+                            if let Ok(ack_packet) = db
+                                .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
+                                .await
+                                .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a relayed message"))
+                            {
+                                msg_to_send_tx
+                                    .send((
+                                        ack_packet.next_hop.into(),
+                                        ack_packet.data,
+                                    ))
+                                    .await
+                                    .unwrap_or_else(|_e| {
+                                        error!("Failed to send an acknowledgement for a relayed packet to the transport layer");
+                                    });
+                            }
                             None
                         }
                     }

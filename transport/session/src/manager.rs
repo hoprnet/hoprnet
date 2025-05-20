@@ -493,7 +493,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         };
 
         // Send the Session initiation message
-        trace!(challenge, %pseudonym, "sending new session request");
+        info!(challenge, %pseudonym, %destination, "new session request");
         msg_sender
             .send_message(start_session_msg.try_into()?, forward_routing.clone())
             .await?;

@@ -12,7 +12,6 @@ use validator::{Validate, ValidationError};
 use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
 use hopr_platform::file::native::read_to_string;
 use hoprd_api::config::{Api, Auth};
-use hoprd_inbox::config::MessageInboxConfiguration;
 
 use crate::errors::HoprdError;
 
@@ -105,10 +104,6 @@ pub struct HoprdConfig {
     #[validate(nested)]
     #[serde(default)]
     pub identity: Identity,
-    /// Configuration of the underlying database engine
-    #[validate(nested)]
-    #[serde(default)]
-    pub inbox: MessageInboxConfiguration,
     /// Configuration relevant for the API of the node
     #[validate(nested)]
     #[serde(default)]
@@ -169,11 +164,6 @@ impl HoprdConfig {
         }
         if cli_args.force_init > 0 {
             cfg.hopr.db.force_initialize = true;
-        }
-
-        // inbox
-        if let Some(x) = cli_args.inbox_capacity {
-            cfg.inbox.capacity = x;
         }
 
         // api
