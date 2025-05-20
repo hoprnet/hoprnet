@@ -1,10 +1,8 @@
-use std::collections::hash_set::HashSet;
-use std::time::{Duration, SystemTime};
-
 use futures::StreamExt;
 use libp2p_identity::PeerId;
-
 use multiaddr::Multiaddr;
+use std::collections::hash_set::HashSet;
+use std::time::{Duration, SystemTime};
 use tracing::debug;
 
 pub use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
@@ -206,7 +204,15 @@ where
         Ok(())
     }
 
-    /// Update the peer record with the observation
+    /// Updates a peer's record with the result of a heartbeat ping.
+    ///
+    /// Adjusts the peer's quality, backoff, and ignore status based on the ping outcome. If the peer's quality drops below configured thresholds, may trigger a connection close or quality update event. Returns an error if called on the local peer.
+    ///
+    /// # Returns
+    /// - `Ok(Some(NetworkTriggeredEvent))` if the peer's status changed and an event should be triggered.
+    /// - `Ok(None)` if the peer is unknown.
+    /// - `Err(NetworkingError)` if the operation is disallowed or a database error occurs.
+    ///
     pub async fn update(
         &self,
         peer: &PeerId,
@@ -229,10 +235,13 @@ where
                 entry.last_seen = current_time();
                 entry.last_seen_latency = latency;
                 entry.heartbeats_succeeded += 1;
+                // reset backoff in case of a successful ping
                 entry.backoff = self.cfg.backoff_min;
                 entry.update_quality(1.0_f64.min(entry.get_quality() + self.cfg.quality_step));
             } else {
-                entry.backoff = self.cfg.backoff_max.max(entry.backoff.powf(self.cfg.backoff_exponent));
+                // increase backoff in case of a failed ping, but cap it at the max backoff to
+                // prevent entries from being shut out
+                entry.backoff = self.cfg.backoff_max.min(entry.backoff.powf(self.cfg.backoff_exponent));
                 entry.update_quality(0.0_f64.max(entry.get_quality() - self.cfg.quality_step));
 
                 let q = entry.get_quality();
@@ -306,6 +315,16 @@ where
         Ok(stream.filter_map(filter).collect().await)
     }
 
+    /// Returns a list of peer IDs eligible for pinging based on last seen time, ignore status, and backoff delay.
+    ///
+    /// Peers are filtered to exclude self, those currently within their ignore timeframe, and those whose backoff-adjusted delay has not yet elapsed. The resulting peers are sorted by last seen time in ascending order.
+    ///
+    /// # Parameters
+    /// - `threshold`: The cutoff `SystemTime`; only peers whose next ping is due before this time are considered.
+    ///
+    /// # Returns
+    /// A vector of peer IDs that should be pinged.
+    ///
     pub async fn find_peers_to_ping(&self, threshold: SystemTime) -> crate::errors::Result<Vec<PeerId>> {
         let stream = self
             .db
@@ -354,14 +373,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::network::{Health, Network, NetworkConfig, NetworkTriggeredEvent, PeerOrigin};
     use anyhow::Context;
+    use libp2p_identity::PeerId;
+    use more_asserts::*;
+    use std::ops::Add;
+    use std::time::Duration;
+
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
-    use libp2p_identity::PeerId;
-    use std::ops::Add;
-    use std::time::Duration;
+
+    use crate::network::{Health, Network, NetworkConfig, NetworkTriggeredEvent, PeerOrigin};
 
     #[test]
     fn test_network_health_should_serialize_to_a_proper_string() {
@@ -600,7 +622,42 @@ mod tests {
         let actual = peers.get(&peer).await?.expect("the peer record should be present");
 
         assert_eq!(actual.heartbeats_succeeded, 3);
-        assert_eq!(actual.backoff, 300f64);
+        assert_lt!(actual.backoff, 3f64);
+        assert_gt!(actual.backoff, 2f64);
+
+        Ok(())
+    }
+
+    #[async_std::test]
+    async fn test_network_should_not_overflow_max_backoff() -> anyhow::Result<()> {
+        let peer: PeerId = OffchainKeypair::random().public().into();
+        let me: PeerId = OffchainKeypair::random().public().into();
+
+        let peers = basic_network(&me).await?;
+
+        peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
+
+        for latency in [123_u64, 200_u64, 200_u64] {
+            peers
+                .update(&peer, Ok(std::time::Duration::from_millis(latency)), None)
+                .await?;
+        }
+
+        // iterate until max backoff is reached
+        loop {
+            let updated_peer = peers.get(&peer).await?.expect("the peer record should be present");
+            if updated_peer.backoff == peers.cfg.backoff_max {
+                break;
+            }
+
+            peers.update(&peer, Err(()), None).await?;
+        }
+
+        // perform one more failing heartbeat update and ensure max backoff is not exceeded
+        peers.update(&peer, Err(()), None).await?;
+        let actual = peers.get(&peer).await?.expect("the peer record should be present");
+
+        assert_eq!(actual.backoff, peers.cfg.backoff_max);
 
         Ok(())
     }

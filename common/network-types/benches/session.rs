@@ -1,3 +1,7 @@
+#[allow(unused)]
+#[path = "../src/session/utils.rs"]
+mod utils;
+
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::{AsyncReadExt, AsyncWriteExt};
 use hopr_network_types::prelude::state::{SessionConfig, SessionSocket};
@@ -5,10 +9,7 @@ use hopr_network_types::utils::DuplexIO;
 use rand::{thread_rng, Rng};
 use std::collections::HashSet;
 
-#[cfg(not(feature = "testing"))]
-compile_error!("Must specify the 'testing' feature");
-
-use hopr_network_types::prelude::{FaultyNetwork, FaultyNetworkConfig};
+use utils::{FaultyNetwork, FaultyNetworkConfig};
 
 /// This MTU is based on the current MTU size in HOPR 2.2
 const MTU: usize = 466;
