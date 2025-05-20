@@ -56,8 +56,6 @@ pub mod config;
 /// Errors produced by the crate.
 pub mod errors;
 
-/// Bloom filter for the transport layer.
-pub mod bloom;
 // protocols
 /// `heartbeat` p2p protocol
 pub mod heartbeat;
@@ -79,6 +77,7 @@ use hopr_internal_types::{
     protocol::{Acknowledgement, ApplicationData},
 };
 use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
 pub use processor::DEFAULT_PRICE_PER_PACKET;
 use processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
@@ -176,7 +175,7 @@ where
     }
 
     let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
-        let tbf = bloom::WrappedTagBloomFilter::new(bloom_filter_persistent_path);
+        let tbf = WrappedTagBloomFilter::new(bloom_filter_persistent_path);
         let tbf_2 = tbf.clone();
         processes.insert(
             ProtocolProcesses::BloomPersist,
@@ -192,7 +191,7 @@ where
         );
         tbf
     } else {
-        bloom::WrappedTagBloomFilter::new("no_tbf".into())
+        WrappedTagBloomFilter::new("no_tbf".into())
     };
 
     let msg_processor_read = processor::PacketProcessor::new(db.clone(), packet_cfg);

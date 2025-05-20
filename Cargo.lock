@@ -4833,7 +4833,6 @@ dependencies = [
  "anyhow",
  "aquamarine",
  "bincode",
- "bloomfilter",
  "criterion",
  "hex",
  "hex-literal",
@@ -5108,6 +5107,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "hopr-transport-bloom"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-lock 3.4.0",
+ "bincode",
+ "bloomfilter",
+ "criterion",
+ "hopr-crypto-random",
+ "hopr-crypto-types",
+ "hopr-platform",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "hopr-transport-identity"
 version = "0.1.0"
 dependencies = [
@@ -5242,10 +5258,8 @@ version = "0.6.2"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
- "async-lock 3.4.0",
  "async-trait",
  "async_channel_io",
- "bincode",
  "bytesize",
  "criterion",
  "futures",
@@ -5262,6 +5276,7 @@ dependencies = [
  "hopr-path",
  "hopr-platform",
  "hopr-primitive-types",
+ "hopr-transport-bloom",
  "hopr-transport-identity",
  "hopr-transport-mixer",
  "hopr-transport-packet",

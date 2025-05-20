@@ -32,6 +32,7 @@ members = [
   "misc/metrics",
   "misc/platform",
   "transport/api",
+  "transport/bloom",
   "transport/identity",
   "transport/mixer",
   "transport/network",
@@ -235,6 +236,7 @@ hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 hopr-strategy = { path = "logic/strategy", default-features = false }
 hopr-transport = { path = "transport/api" }
+hopr-transport-bloom = { path = "transport/bloom" }
 hopr-transport-identity = { path = "transport/identity" }
 hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
