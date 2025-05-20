@@ -24,7 +24,6 @@ gh run list -w "$WORKFLOW_FILE" --json databaseId,createdAt,conclusion,status --
 waiting_times=()
 duration_times=()
 success_count=0
-job_count=0
 total_count=0
 
 # Iterate over each workflow run
