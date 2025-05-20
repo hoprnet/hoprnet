@@ -55,8 +55,7 @@ jobs:
           USER: runner
 
       - name: Run unit tests
-        run: |
-          nix build -L .#hopr-test
+        run: nix build -L .#hopr-test
 
   tests-unit-nightly:
     runs-on: self-hosted-hoprnet-bigger
@@ -232,6 +231,12 @@ jobs:
           tar -czvf ${test_path}.tgz ${test_path}
         working-directory: "/tmp"
 
+      - name: Find tmp folder path
+        id: find-tmp-path
+        run: |
+          tmp_path=$(realpath --relative-to="$(pwd)" "/tmp")
+          echo "tmp-path=${tmp_path}" >> "$GITHUB_OUTPUT"
+
       - name: Upload test logs
         uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
         if: ${{ !env.ACT && always() }}
@@ -337,11 +342,17 @@ jobs:
           tar -czvf ${test_path}.tgz ${test_path}
         working-directory: "/tmp"
 
+      - name: Find tmp folder path
+        id: find-tmp-path
+        run: |
+          tmp_path=$(realpath --relative-to="$(pwd)" "/tmp")
+          echo "tmp-path=${tmp_path}" >> "$GITHUB_OUTPUT"
+
       - name: Upload test logs
         uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
         if: ${{ !env.ACT && always() }}
         with:
-          path: /tmp/
+          path: ${{ steps.find-tmp-path.outputs.tmp-path }}
           glob: "test-smoke-*"
           parent: false
           destination: hoprnet-test-logs/pr-${{ github.event.pull_request.number }}
