@@ -151,14 +151,6 @@ class Ping(ApiResponseObject):
     keys = {"latency": "latency", "version": "reportedVersion"}
 
 
-class Message(ApiResponseObject):
-    keys = {"body": "body", "received_at": "receivedAt", "tag": "tag"}
-
-
-class MessageSent(ApiResponseObject):
-    keys = {"timestamp": "timestamp"}
-
-
 class Channels:
     def __init__(self, data: dict, category: str = "all"):
         self.all = []
@@ -176,8 +168,12 @@ class Channels:
 
 class Session(ApiResponseObject):
     keys = {
+        "destination": "destination",
         "ip": "ip",
         "port": "port",
         "protocol": "protocol",
         "target": "target",
+        "forward_path": "forwardPath",
+        "return_path": "returnPath",
+        "mtu": "mtu",
     }

@@ -18,7 +18,7 @@ pub struct ProtocolConfig {
     /// `heartbeat` protocol config
     #[serde(default)]
     pub heartbeat: crate::heartbeat::config::HeartbeatProtocolConfig,
-    /// `ticket_aggregation` protocol config
+    /// auto-nat server port
     #[serde(default)]
-    pub ticket_aggregation: crate::ticket_aggregation::config::TicketAggregationProtocolConfig,
+    pub autonat_port: Option<u16>,
 }

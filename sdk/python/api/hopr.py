@@ -37,8 +37,6 @@ from .response_objects import (
     Configuration,
     ConnectedPeer,
     Infos,
-    Message,
-    MessageSent,
     OpenedChannel,
     Ping,
     Session,
@@ -350,7 +348,7 @@ class HoprdAPI:
         """
         is_ok, response = await self.__call_api(HTTPMethod.GET, "node/configuration")
 
-        return Configuration(response) if is_ok else None
+        return Configuration(response["config"]) if is_ok else None
 
     async def node_info(self) -> Optional[Infos]:
         """
@@ -389,8 +387,9 @@ class HoprdAPI:
         return is_ok
 
     async def metrics(self):
-        _, response = await self.__call_api(HTTPMethod.GET, "metrics", use_api_path=False)
-        return response
+        is_ok, response = await self.__call_api(HTTPMethod.GET, "metrics", use_api_path=False)
+
+        return response if is_ok else None
 
     async def get_tickets_statistics(self) -> Optional[TicketStatistics]:
         """
@@ -408,21 +407,6 @@ class HoprdAPI:
         is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "tickets/statistics")
         return is_ok
 
-    async def send_message(
-        self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG
-    ) -> Optional[MessageSent]:
-        """
-        Sends a message to the given destination.
-        :param: destination: str
-        :param: message: str
-        :param: hops: list[str]
-        :param: tag: int = 0x0320
-        :return: bool
-        """
-        data = SendMessageBody(body=message, hops=None, path=hops, destination=destination, tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages", data=data)
-        return MessageSent(response) if is_ok else None
-
     async def session_list_clients(self, protocol: Protocol = Protocol.UDP) -> list[Session]:
         """
         Lists existing Session listeners for the given IP protocol
@@ -435,24 +419,28 @@ class HoprdAPI:
     async def session_client(
         self,
         destination: str,
-        path: dict,
+        forward_path: dict,
+        return_path: dict,
         protocol: Protocol,
         target: str,
         listen_on: str = "127.0.0.1:0",
         service: bool = False,
         capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
-        sealed_target=False,
+        sealed_target: bool = False,
+        response_buffer: str = "4MiB",
     ) -> Optional[Session]:
         """
         Creates a new client session returning the given session listening host & port over TCP or UDP.
-        :param: destination: PeerID of the recipient
-        :param path: Routing options for the session.
+        :param destination: PeerID of the recipient
+        :param forward_path: Forward routing options for the session.
+        :param return_path: Return routing options for the session.
         :param protocol: Protocol (UDP or TCP)
         :param target: Destination for the session packets.
         :param listen_on: The host to listen on for input packets (default: "127.0.0.1:0")
-        :param retransmit: Set if retransmission has to be done
-        :param segment: Set if segmentation has to be done
+        :param service: Indicates if the target is a service (default: False)
+        :param capabilities: Session capabilities (default: none)
         :param sealed_target: The target parameter will be encrypted (default: False)
+        :param response_buffer: The size of the response buffer to maintain at the counterparty (default: "3 MB")
         :return: Session
         """
         actual_target = (
@@ -464,11 +452,7 @@ class HoprdAPI:
         )
 
         data = CreateSessionBody(
-            capabilities.as_array,
-            destination,
-            listen_on,
-            path,
-            actual_target,
+            capabilities.as_array, destination, listen_on, forward_path, return_path, actual_target, response_buffer
         )
 
         is_ok, response = await self.__call_api(HTTPMethod.POST, f"session/{protocol.name.lower()}", data)
@@ -477,7 +461,7 @@ class HoprdAPI:
 
     async def session_close_client(self, session: Session) -> bool:
         """
-        Closes an existing Sessino listener for the given IP protocol, IP and port.
+        Closes an existing Session listener for the given IP protocol, IP and port.
         :param: session: Session
         """
 
@@ -487,53 +471,6 @@ class HoprdAPI:
         )
 
         return is_ok
-
-    async def messages_pop(self, tag: int = MESSAGE_TAG) -> Optional[Message]:
-        """
-        Pop next message from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-
-        data = GetMessagesBody(tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/pop", data)
-        return Message(response) if is_ok else None
-
-    async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> Optional[list[Message]]:
-        """
-        Pop all messages from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-        data = GetMessagesBody(tag=tag)
-
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/pop-all", data)
-        return [Message(entry) for entry in response["messages"]] if is_ok else None
-
-    async def messages_peek(self, tag: int = MESSAGE_TAG) -> Optional[Message]:
-        """
-        Peek next message from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-
-        data = GetMessagesBody(tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/peek", data)
-        return Message(response) if is_ok else None
-
-    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = 0) -> Optional[list[Message]]:
-        """
-        Peek all messages from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-        if not isinstance(timestamp, int):
-            data = PeekAllMessagesBody(tag=tag)
-        else:
-            data = PeekAllMessagesBody(tag=tag, timestamp=timestamp)
-
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/peek-all", data)
-        return [Message(entry) for entry in response["messages"]] if is_ok else None
 
     async def readyz(self, timeout: int = 20) -> bool:
         """

@@ -30,7 +30,8 @@ pub mod swarm;
 mod behavior;
 
 use futures::{AsyncRead, AsyncWrite, Stream};
-use libp2p::{swarm::NetworkBehaviour, StreamProtocol};
+use libp2p::{autonat, swarm::NetworkBehaviour, StreamProtocol};
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -41,9 +42,10 @@ use hopr_transport_network::network::NetworkTriggeredEvent;
 use hopr_transport_network::ping::PingQueryReplier;
 use hopr_transport_protocol::PeerDiscovery;
 
-use crate::constants::{HOPR_HEARTBEAT_PROTOCOL_V_0_1_0, HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0};
+use crate::constants::HOPR_HEARTBEAT_PROTOCOL_V_0_2_0;
 
 pub const MSG_ACK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+pub const NAT_SERVER_PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// `Ping` protocol base type for the ping operation
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,10 +102,9 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamP
 pub struct HoprNetworkBehavior {
     streams: libp2p_stream::Behaviour,
     heartbeat_generator: behavior::heartbeat::Behaviour,
-    ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour,
     pub heartbeat: libp2p::request_response::cbor::Behaviour<Ping, Pong>,
-    pub ticket_aggregation:
-        libp2p::request_response::cbor::Behaviour<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
+    pub autonat_client: autonat::v2::client::Behaviour,
+    pub autonat_server: autonat::v2::server::Behaviour,
     // WARNING: the order of struct members is important, `discovery` must be the last member,
     // because the request_response components remove the peer from its peer store after a failed
     // dial operation and the discovery mechanism is responsible for populating all peer stores.
@@ -118,45 +119,34 @@ impl Debug for HoprNetworkBehavior {
 
 impl HoprNetworkBehavior {
     #[allow(clippy::too_many_arguments)]
-    pub fn new<T, U, V, W>(
+    pub fn new<T, U, V>(
         me: PeerId,
         network_events: T,
         onchain_events: U,
         heartbeat_requests: V,
-        ticket_aggregation_processed_events: W,
         hb_timeout: std::time::Duration,
-        ticket_aggregation_timeout: std::time::Duration,
     ) -> Self
     where
         T: Stream<Item = NetworkTriggeredEvent> + Send + 'static,
         U: Stream<Item = PeerDiscovery> + Send + 'static,
         V: Stream<Item = (PeerId, PingQueryReplier)> + Send + 'static,
-        W: Stream<Item = behavior::ticket_aggregation::Event> + Send + 'static,
     {
         Self {
             streams: libp2p_stream::Behaviour::new(),
             discovery: behavior::discovery::Behaviour::new(me, network_events, onchain_events),
             heartbeat_generator: behavior::heartbeat::Behaviour::new(heartbeat_requests),
-            ticket_aggregation_behavior: behavior::ticket_aggregation::Behaviour::new(
-                ticket_aggregation_processed_events,
-            ),
             heartbeat: libp2p::request_response::cbor::Behaviour::<Ping, Pong>::new(
                 [(
-                    StreamProtocol::new(HOPR_HEARTBEAT_PROTOCOL_V_0_1_0),
+                    StreamProtocol::new(HOPR_HEARTBEAT_PROTOCOL_V_0_2_0),
                     libp2p::request_response::ProtocolSupport::Full,
                 )],
                 libp2p::request_response::Config::default().with_request_timeout(hb_timeout),
             ),
-            ticket_aggregation: libp2p::request_response::cbor::Behaviour::<
-                Vec<TransferableWinningTicket>,
-                std::result::Result<Ticket, String>,
-            >::new(
-                [(
-                    StreamProtocol::new(HOPR_TICKET_AGGREGATION_PROTOCOL_V_0_1_0),
-                    libp2p::request_response::ProtocolSupport::Full,
-                )],
-                libp2p::request_response::Config::default().with_request_timeout(ticket_aggregation_timeout),
+            autonat_client: autonat::v2::client::Behaviour::new(
+                OsRng,
+                autonat::v2::client::Config::default().with_probe_interval(NAT_SERVER_PROBE_INTERVAL), // TODO (jean): make this configurable
             ),
+            autonat_server: autonat::v2::server::Behaviour::new(OsRng),
         }
     }
 }
@@ -169,12 +159,13 @@ impl HoprNetworkBehavior {
 pub enum HoprNetworkBehaviorEvent {
     Discovery(behavior::discovery::Event),
     HeartbeatGenerator(behavior::heartbeat::Event),
-    TicketAggregationBehavior(behavior::ticket_aggregation::Event),
     Heartbeat(libp2p::request_response::Event<Ping, Pong>),
     TicketAggregation(
         libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ),
     KeepAlive(void::Void),
+    AutonatClient(autonat::v2::client::Event),
+    AutonatServer(autonat::v2::server::Event),
 }
 
 // Unexpected libp2p_stream event
@@ -202,12 +193,6 @@ impl From<behavior::heartbeat::Event> for HoprNetworkBehaviorEvent {
     }
 }
 
-impl From<behavior::ticket_aggregation::Event> for HoprNetworkBehaviorEvent {
-    fn from(event: behavior::ticket_aggregation::Event) -> Self {
-        Self::TicketAggregationBehavior(event)
-    }
-}
-
 impl From<libp2p::request_response::Event<Ping, Pong>> for HoprNetworkBehaviorEvent {
     fn from(event: libp2p::request_response::Event<Ping, Pong>) -> Self {
         Self::Heartbeat(event)
@@ -221,6 +206,18 @@ impl From<libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::r
         event: libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ) -> Self {
         Self::TicketAggregation(event)
+    }
+}
+
+impl From<autonat::v2::client::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: autonat::v2::client::Event) -> Self {
+        Self::AutonatClient(event)
+    }
+}
+
+impl From<autonat::v2::server::Event> for HoprNetworkBehaviorEvent {
+    fn from(event: autonat::v2::server::Event) -> Self {
+        Self::AutonatServer(event)
     }
 }
 

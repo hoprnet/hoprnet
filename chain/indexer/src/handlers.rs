@@ -1,6 +1,6 @@
+use alloy::primitives::B256;
+use alloy::sol_types::SolEventInterface;
 use async_trait::async_trait;
-use ethers::contract::EthLogDecode;
-use ethers::types::H256;
 use std::cmp::Ordering;
 use std::fmt::Formatter;
 use std::ops::{Add, Sub};
@@ -9,10 +9,12 @@ use std::time::{Duration, SystemTime};
 use tracing::{debug, error, info, trace, warn};
 
 use hopr_bindings::{
-    hopr_announcements::HoprAnnouncementsEvents, hopr_channels::HoprChannelsEvents,
-    hopr_network_registry::HoprNetworkRegistryEvents, hopr_node_management_module::HoprNodeManagementModuleEvents,
-    hopr_node_safe_registry::HoprNodeSafeRegistryEvents, hopr_ticket_price_oracle::HoprTicketPriceOracleEvents,
-    hopr_token::HoprTokenEvents, hopr_winning_probability_oracle::HoprWinningProbabilityOracleEvents,
+    hoprannouncements::HoprAnnouncements::HoprAnnouncementsEvents, hoprchannels::HoprChannels::HoprChannelsEvents,
+    hoprnetworkregistry::HoprNetworkRegistry::HoprNetworkRegistryEvents,
+    hoprnodemanagementmodule::HoprNodeManagementModule::HoprNodeManagementModuleEvents,
+    hoprnodesaferegistry::HoprNodeSafeRegistry::HoprNodeSafeRegistryEvents,
+    hoprticketpriceoracle::HoprTicketPriceOracle::HoprTicketPriceOracleEvents, hoprtoken::HoprToken::HoprTokenEvents,
+    hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::HoprWinningProbabilityOracleEvents,
 };
 use hopr_chain_rpc::{BlockWithLogs, Log};
 use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
@@ -91,14 +93,14 @@ where
         METRIC_INDEXER_LOG_COUNTERS.increment(&["announcements"]);
 
         match event {
-            HoprAnnouncementsEvents::AddressAnnouncementFilter(address_announcement) => {
+            HoprAnnouncementsEvents::AddressAnnouncement(address_announcement) => {
                 trace!(
-                    multiaddress = &address_announcement.base_multiaddr,
+                    multiaddress = &address_announcement.baseMultiaddr,
                     address = &address_announcement.node.to_string(),
                     "on_announcement_event",
                 );
                 // safeguard against empty multiaddrs, skip
-                if address_announcement.base_multiaddr.is_empty() {
+                if address_announcement.baseMultiaddr.is_empty() {
                     warn!(
                         address = ?address_announcement.node,
                         "encountered empty multiaddress announcement",
@@ -112,7 +114,7 @@ where
                     .insert_announcement(
                         Some(tx),
                         node_address,
-                        address_announcement.base_multiaddr.parse()?,
+                        address_announcement.baseMultiaddr.parse()?,
                         block_number,
                     )
                     .await
@@ -126,11 +128,11 @@ where
                     Err(e) => Err(e.into()),
                 };
             }
-            HoprAnnouncementsEvents::KeyBindingFilter(key_binding) => {
+            HoprAnnouncementsEvents::KeyBinding(key_binding) => {
                 match KeyBinding::from_parts(
                     key_binding.chain_key.into(),
-                    key_binding.ed_25519_pub_key.try_into()?,
-                    OffchainSignature::try_from((key_binding.ed_25519_sig_0, key_binding.ed_25519_sig_1))?,
+                    key_binding.ed25519_pub_key.0.try_into()?,
+                    OffchainSignature::try_from((key_binding.ed25519_sig_0.0, key_binding.ed25519_sig_1.0))?,
                 ) {
                     Ok(binding) => {
                         self.db
@@ -155,7 +157,7 @@ where
                     }
                 }
             }
-            HoprAnnouncementsEvents::RevokeAnnouncementFilter(revocation) => {
+            HoprAnnouncementsEvents::RevokeAnnouncement(revocation) => {
                 let node_address: Address = revocation.node.into();
                 match self.db.delete_all_announcements(Some(tx), node_address).await {
                     Err(DbSqlError::MissingAccount) => {
@@ -179,14 +181,17 @@ where
         METRIC_INDEXER_LOG_COUNTERS.increment(&["channels"]);
 
         match event {
-            HoprChannelsEvents::ChannelBalanceDecreasedFilter(balance_decreased) => {
+            HoprChannelsEvents::ChannelBalanceDecreased(balance_decreased) => {
                 let maybe_channel = self
                     .db
-                    .begin_channel_update(tx.into(), &balance_decreased.channel_id.into())
+                    .begin_channel_update(tx.into(), &balance_decreased.channelId.0.into())
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
-                    let new_balance = Balance::new(balance_decreased.new_balance, BalanceType::HOPR);
+                    let new_balance = Balance::new(
+                        U256::from_be_bytes(balance_decreased.newBalance.to_be_bytes::<12>()),
+                        BalanceType::HOPR,
+                    );
                     let diff = channel_edits.entry().balance.sub(&new_balance);
 
                     let updated_channel = self
@@ -196,18 +201,21 @@ where
 
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(updated_channel, diff)))
                 } else {
-                    error!(channel_id = %Hash::from(balance_decreased.channel_id), "observed balance decreased event for a channel that does not exist");
+                    error!(channel_id = %Hash::from(balance_decreased.channelId.0), "observed balance decreased event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
-            HoprChannelsEvents::ChannelBalanceIncreasedFilter(balance_increased) => {
+            HoprChannelsEvents::ChannelBalanceIncreased(balance_increased) => {
                 let maybe_channel = self
                     .db
-                    .begin_channel_update(tx.into(), &balance_increased.channel_id.into())
+                    .begin_channel_update(tx.into(), &balance_increased.channelId.0.into())
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
-                    let new_balance = Balance::new(balance_increased.new_balance, BalanceType::HOPR);
+                    let new_balance = Balance::new(
+                        U256::from_be_bytes(balance_increased.newBalance.to_be_bytes::<12>()),
+                        BalanceType::HOPR,
+                    );
                     let diff = new_balance.sub(&channel_edits.entry().balance);
 
                     let updated_channel = self
@@ -217,19 +225,19 @@ where
 
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(updated_channel, diff)))
                 } else {
-                    error!(channel_id = %Hash::from(balance_increased.channel_id), "observed balance increased event for a channel that does not exist");
+                    error!(channel_id = %Hash::from(balance_increased.channelId.0), "observed balance increased event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
-            HoprChannelsEvents::ChannelClosedFilter(channel_closed) => {
+            HoprChannelsEvents::ChannelClosed(channel_closed) => {
                 let maybe_channel = self
                     .db
-                    .begin_channel_update(tx.into(), &channel_closed.channel_id.into())
+                    .begin_channel_update(tx.into(), &channel_closed.channelId.0.into())
                     .await?;
 
                 trace!(
                     "on_channel_closed_event - channel_id: {:?} - channel known: {:?}",
-                    channel_closed.channel_id,
+                    channel_closed.channelId.0,
                     maybe_channel.is_some()
                 );
 
@@ -272,11 +280,11 @@ where
 
                     Ok(Some(ChainEventType::ChannelClosed(updated_channel)))
                 } else {
-                    error!(channel_id = %Hash::from(channel_closed.channel_id), "observed closure finalization event for a channel that does not exist");
+                    error!(channel_id = %Hash::from(channel_closed.channelId.0), "observed closure finalization event for a channel that does not exist");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
-            HoprChannelsEvents::ChannelOpenedFilter(channel_opened) => {
+            HoprChannelsEvents::ChannelOpened(channel_opened) => {
                 let source: Address = channel_opened.source.into();
                 let destination: Address = channel_opened.destination.into();
                 let channel_id = generate_channel_id(&source, &destination);
@@ -336,10 +344,10 @@ where
 
                 Ok(Some(ChainEventType::ChannelOpened(channel)))
             }
-            HoprChannelsEvents::TicketRedeemedFilter(ticket_redeemed) => {
+            HoprChannelsEvents::TicketRedeemed(ticket_redeemed) => {
                 let maybe_channel = self
                     .db
-                    .begin_channel_update(tx.into(), &ticket_redeemed.channel_id.into())
+                    .begin_channel_update(tx.into(), &ticket_redeemed.channelId.0.into())
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
@@ -362,7 +370,7 @@ where
                                     let ticket_idx = ticket.verified_ticket().index;
                                     let ticket_off = ticket.verified_ticket().index_offset as u64;
 
-                                    ticket_idx + ticket_off == ticket_redeemed.new_ticket_index
+                                    ticket_idx + ticket_off == ticket_redeemed.newTicketIndex.to::<u64>()
                                 })
                                 .collect::<Vec<_>>();
 
@@ -378,7 +386,7 @@ where
                                 }
                                 Ordering::Less => {
                                     error!(
-                                        idx = %ticket_redeemed.new_ticket_index - 1,
+                                        idx = %ticket_redeemed.newTicketIndex.to::<u64>() - 1,
                                         entry = %channel_edits.entry(),
                                         "could not find acknowledged 'BeingRedeemed' ticket",
                                     );
@@ -389,13 +397,13 @@ where
                                 Ordering::Greater => {
                                     error!(
                                         count = matching_tickets.len(),
-                                        index = %ticket_redeemed.new_ticket_index - 1,
+                                        index = %ticket_redeemed.newTicketIndex.to::<u64>() - 1,
                                         entry = %channel_edits.entry(),
                                         "found tickets matching 'BeingRedeemed'",
                                     );
                                     return Err(CoreEthereumIndexerError::ProcessError(format!(
                                         "multiple tickets matching idx {} found in {}",
-                                        ticket_redeemed.new_ticket_index - 1,
+                                        ticket_redeemed.newTicketIndex.to::<u64>() - 1,
                                         channel_edits.entry()
                                     )));
                                 }
@@ -411,7 +419,7 @@ where
                             self.db
                                 .compare_and_set_outgoing_ticket_index(
                                     channel_edits.entry().get_id(),
-                                    ticket_redeemed.new_ticket_index,
+                                    ticket_redeemed.newTicketIndex.to::<u64>(),
                                 )
                                 .await?;
                             None
@@ -429,34 +437,37 @@ where
                         .db
                         .finish_channel_update(
                             tx.into(),
-                            channel_edits.change_ticket_index(ticket_redeemed.new_ticket_index),
+                            channel_edits.change_ticket_index(U256::from_be_bytes(
+                                ticket_redeemed.newTicketIndex.to_be_bytes::<6>(),
+                            )),
                         )
                         .await?;
-
                     // Neglect all the tickets in this channel
                     // which have a lower ticket index than `ticket_redeemed.new_ticket_index`
                     self.db
                         .mark_tickets_as(
-                            TicketSelector::from(&channel).with_index_range(..ticket_redeemed.new_ticket_index),
+                            TicketSelector::from(&channel)
+                                .with_index_range(..ticket_redeemed.newTicketIndex.to::<u64>()),
                             TicketMarker::Neglected,
                         )
                         .await?;
 
                     Ok(Some(ChainEventType::TicketRedeemed(channel, ack_ticket)))
                 } else {
-                    error!(channel_id = %Hash::from(ticket_redeemed.channel_id), "observed ticket redeem on a channel that we don't have in the DB");
+                    error!(channel_id = %Hash::from(ticket_redeemed.channelId.0), "observed ticket redeem on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
-            HoprChannelsEvents::OutgoingChannelClosureInitiatedFilter(closure_initiated) => {
+            HoprChannelsEvents::OutgoingChannelClosureInitiated(closure_initiated) => {
                 let maybe_channel = self
                     .db
-                    .begin_channel_update(tx.into(), &closure_initiated.channel_id.into())
+                    .begin_channel_update(tx.into(), &closure_initiated.channelId.0.into())
                     .await?;
 
+                let closure_time: u32 = closure_initiated.closureTime;
                 if let Some(channel_edits) = maybe_channel {
                     let new_status = ChannelStatus::PendingToClose(
-                        SystemTime::UNIX_EPOCH.add(Duration::from_secs(closure_initiated.closure_time as u64)),
+                        SystemTime::UNIX_EPOCH.add(Duration::from_secs(closure_time.into())),
                     );
 
                     let channel = self
@@ -465,27 +476,27 @@ where
                         .await?;
                     Ok(Some(ChainEventType::ChannelClosureInitiated(channel)))
                 } else {
-                    error!(channel_id = %Hash::from(closure_initiated.channel_id), "observed channel closure initiation on a channel that we don't have in the DB");
+                    error!(channel_id = %Hash::from(closure_initiated.channelId.0), "observed channel closure initiation on a channel that we don't have in the DB");
                     Err(CoreEthereumIndexerError::ChannelDoesNotExist)
                 }
             }
-            HoprChannelsEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
+            HoprChannelsEvents::DomainSeparatorUpdated(domain_separator_updated) => {
                 self.db
                     .set_domain_separator(
                         Some(tx),
                         DomainSeparator::Channel,
-                        domain_separator_updated.domain_separator.into(),
+                        domain_separator_updated.domainSeparator.0.into(),
                     )
                     .await?;
 
                 Ok(None)
             }
-            HoprChannelsEvents::LedgerDomainSeparatorUpdatedFilter(ledger_domain_separator_updated) => {
+            HoprChannelsEvents::LedgerDomainSeparatorUpdated(ledger_domain_separator_updated) => {
                 self.db
                     .set_domain_separator(
                         Some(tx),
                         DomainSeparator::Ledger,
-                        ledger_domain_separator_updated.ledger_domain_separator.into(),
+                        ledger_domain_separator_updated.ledgerDomainSeparator.0.into(),
                     )
                     .await?;
 
@@ -499,7 +510,7 @@ where
         METRIC_INDEXER_LOG_COUNTERS.increment(&["token"]);
 
         match event {
-            HoprTokenEvents::TransferFilter(transferred) => {
+            HoprTokenEvents::Transfer(transferred) => {
                 let from: Address = transferred.from.into();
                 let to: Address = transferred.to.into();
 
@@ -509,7 +520,7 @@ where
                 );
 
                 let mut current_balance = self.db.get_safe_hopr_balance(Some(tx)).await?;
-                let transferred_value = transferred.value;
+                let transferred_value = Balance::new(transferred.value.to_be_bytes(), BalanceType::HOPR);
 
                 if to.ne(&self.safe_address) && from.ne(&self.safe_address) {
                     return Ok(None);
@@ -525,7 +536,7 @@ where
 
                 self.db.set_safe_hopr_balance(Some(tx), current_balance).await?;
             }
-            HoprTokenEvents::ApprovalFilter(approved) => {
+            HoprTokenEvents::Approval(approved) => {
                 let owner: Address = approved.owner.into();
                 let spender: Address = approved.spender.into();
 
@@ -538,7 +549,10 @@ where
                 // if approval is for tokens on Safe contract to be spent by HoprChannels
                 if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
                     self.db
-                        .set_safe_hopr_allowance(Some(tx), BalanceType::HOPR.balance(approved.value))
+                        .set_safe_hopr_allowance(
+                            Some(tx),
+                            Balance::new(approved.value.to_be_bytes(), BalanceType::HOPR),
+                        )
                         .await?;
                 } else {
                     return Ok(None);
@@ -559,8 +573,8 @@ where
         METRIC_INDEXER_LOG_COUNTERS.increment(&["network_registry"]);
 
         match event {
-            HoprNetworkRegistryEvents::DeregisteredByManagerFilter(deregistered) => {
-                let node_address: Address = deregistered.node_address.into();
+            HoprNetworkRegistryEvents::DeregisteredByManager(deregistered) => {
+                let node_address: Address = deregistered.nodeAddress.into();
                 self.db
                     .set_access_in_network_registry(Some(tx), node_address, false)
                     .await?;
@@ -570,8 +584,8 @@ where
                     NetworkRegistryStatus::Denied,
                 )));
             }
-            HoprNetworkRegistryEvents::DeregisteredFilter(deregistered) => {
-                let node_address: Address = deregistered.node_address.into();
+            HoprNetworkRegistryEvents::Deregistered(deregistered) => {
+                let node_address: Address = deregistered.nodeAddress.into();
                 self.db
                     .set_access_in_network_registry(Some(tx), node_address, false)
                     .await?;
@@ -581,8 +595,8 @@ where
                     NetworkRegistryStatus::Denied,
                 )));
             }
-            HoprNetworkRegistryEvents::RegisteredByManagerFilter(registered) => {
-                let node_address: Address = registered.node_address.into();
+            HoprNetworkRegistryEvents::RegisteredByManager(registered) => {
+                let node_address: Address = registered.nodeAddress.into();
                 self.db
                     .set_access_in_network_registry(Some(tx), node_address, true)
                     .await?;
@@ -596,8 +610,8 @@ where
                     NetworkRegistryStatus::Allowed,
                 )));
             }
-            HoprNetworkRegistryEvents::RegisteredFilter(registered) => {
-                let node_address: Address = registered.node_address.into();
+            HoprNetworkRegistryEvents::Registered(registered) => {
+                let node_address: Address = registered.nodeAddress.into();
                 self.db
                     .set_access_in_network_registry(Some(tx), node_address, true)
                     .await?;
@@ -611,15 +625,15 @@ where
                     NetworkRegistryStatus::Allowed,
                 )));
             }
-            HoprNetworkRegistryEvents::EligibilityUpdatedFilter(eligibility_updated) => {
-                let account: Address = eligibility_updated.staking_account.into();
+            HoprNetworkRegistryEvents::EligibilityUpdated(eligibility_updated) => {
+                let account: Address = eligibility_updated.stakingAccount.into();
                 self.db
                     .set_safe_eligibility(Some(tx), account, eligibility_updated.eligibility)
                     .await?;
             }
-            HoprNetworkRegistryEvents::NetworkRegistryStatusUpdatedFilter(enabled) => {
+            HoprNetworkRegistryEvents::NetworkRegistryStatusUpdated(enabled) => {
                 self.db
-                    .set_network_registry_enabled(Some(tx), enabled.is_enabled)
+                    .set_network_registry_enabled(Some(tx), enabled.isEnabled)
                     .await?;
             }
             _ => {} // Not important to at the moment
@@ -637,25 +651,25 @@ where
         METRIC_INDEXER_LOG_COUNTERS.increment(&["safe_registry"]);
 
         match event {
-            HoprNodeSafeRegistryEvents::RegisteredNodeSafeFilter(registered) => {
-                if self.chain_key.public().to_address() == registered.node_address.into() {
-                    info!(safe_address = %registered.safe_address, "Node safe registered", );
+            HoprNodeSafeRegistryEvents::RegisteredNodeSafe(registered) => {
+                if self.chain_key.public().to_address() == registered.nodeAddress.into() {
+                    info!(safe_address = %registered.safeAddress, "Node safe registered", );
                     // NOTE: we don't store this state in the DB
-                    return Ok(Some(ChainEventType::NodeSafeRegistered(registered.safe_address.into())));
+                    return Ok(Some(ChainEventType::NodeSafeRegistered(registered.safeAddress.into())));
                 }
             }
-            HoprNodeSafeRegistryEvents::DergisteredNodeSafeFilter(deregistered) => {
-                if self.chain_key.public().to_address() == deregistered.node_address.into() {
+            HoprNodeSafeRegistryEvents::DergisteredNodeSafe(deregistered) => {
+                if self.chain_key.public().to_address() == deregistered.nodeAddress.into() {
                     info!("Node safe unregistered");
                     // NOTE: we don't store this state in the DB
                 }
             }
-            HoprNodeSafeRegistryEvents::DomainSeparatorUpdatedFilter(domain_separator_updated) => {
+            HoprNodeSafeRegistryEvents::DomainSeparatorUpdated(domain_separator_updated) => {
                 self.db
                     .set_domain_separator(
                         Some(tx),
                         DomainSeparator::SafeRegistry,
-                        domain_separator_updated.domain_separator.into(),
+                        domain_separator_updated.domainSeparator.0.into(),
                     )
                     .await?;
             }
@@ -685,18 +699,13 @@ where
         METRIC_INDEXER_LOG_COUNTERS.increment(&["win_prob_oracle"]);
 
         match event {
-            HoprWinningProbabilityOracleEvents::WinProbUpdatedFilter(update) => {
-                let mut encoded_old: EncodedWinProb = Default::default();
-                encoded_old.copy_from_slice(&update.old_win_prob.to_be_bytes()[1..]);
-                let old_minimum_win_prob = win_prob_to_f64(&encoded_old);
-
-                let mut encoded_new: EncodedWinProb = Default::default();
-                encoded_new.copy_from_slice(&update.new_win_prob.to_be_bytes()[1..]);
-                let new_minimum_win_prob = win_prob_to_f64(&encoded_new);
+            HoprWinningProbabilityOracleEvents::WinProbUpdated(update) => {
+                let old_minimum_win_prob: WinningProbability = update.oldWinProb.to_be_bytes().into();
+                let new_minimum_win_prob: WinningProbability = update.newWinProb.to_be_bytes().into();
 
                 trace!(
-                    old = old_minimum_win_prob,
-                    new = new_minimum_win_prob,
+                    %old_minimum_win_prob,
+                    %new_minimum_win_prob,
                     "on_ticket_minimum_win_prob_updated",
                 );
 
@@ -705,14 +714,14 @@ where
                     .await?;
 
                 info!(
-                    old = old_minimum_win_prob,
-                    new = new_minimum_win_prob,
+                    %old_minimum_win_prob,
+                    %new_minimum_win_prob,
                     "minimum ticket winning probability updated"
                 );
 
                 // If the old minimum was less strict, we need to mark of all the
                 // tickets below the new higher minimum as rejected
-                if old_minimum_win_prob < new_minimum_win_prob {
+                if old_minimum_win_prob.approx_cmp(&new_minimum_win_prob).is_lt() {
                     let mut selector: Option<TicketSelector> = None;
                     for channel in self.db.get_incoming_channels(tx.into()).await? {
                         selector = selector
@@ -723,7 +732,10 @@ where
                     if let Some(selector) = selector {
                         let num_rejected = self
                             .db
-                            .mark_tickets_as(selector.with_winning_probability(..encoded_new), TicketMarker::Rejected)
+                            .mark_tickets_as(
+                                selector.with_winning_probability(..new_minimum_win_prob),
+                                TicketMarker::Rejected,
+                            )
                             .await?;
                         info!(count = num_rejected, "unredeemed tickets were rejected, because the minimum winning probability has been increased");
                     }
@@ -745,20 +757,20 @@ where
         METRIC_INDEXER_LOG_COUNTERS.increment(&["price_oracle"]);
 
         match event {
-            HoprTicketPriceOracleEvents::TicketPriceUpdatedFilter(update) => {
+            HoprTicketPriceOracleEvents::TicketPriceUpdated(update) => {
                 trace!(
-                    old = update.0.to_string(),
-                    new = update.1.to_string(),
+                    old = update._0.to_string(),
+                    new = update._1.to_string(),
                     "on_ticket_price_updated",
                 );
 
                 self.db
-                    .update_ticket_price(Some(tx), BalanceType::HOPR.balance(update.1))
+                    .update_ticket_price(Some(tx), Balance::new(update._1.to_be_bytes(), BalanceType::HOPR))
                     .await?;
 
-                info!(price = %update.1, "ticket price updated");
+                info!(price = %update._1, "ticket price updated");
             }
-            HoprTicketPriceOracleEvents::OwnershipTransferredFilter(_event) => {
+            HoprTicketPriceOracleEvents::OwnershipTransferred(_event) => {
                 // ignore ownership transfer event
             }
         }
@@ -768,33 +780,43 @@ where
     #[tracing::instrument(level = "debug", skip(self))]
     async fn process_log_event(&self, tx: &OpenTransaction, slog: SerializableLog) -> Result<Option<ChainEventType>> {
         trace!(log = %slog, "log content");
-        let log = Log::from(slog);
+
+        let log = Log::from(slog.clone());
+
+        let primitive_log = alloy::primitives::Log::new(
+            slog.address.into(),
+            slog.topics.iter().map(|h| B256::from_slice(h.as_ref())).collect(),
+            slog.data.clone().into(),
+        )
+        .ok_or_else(|| {
+            CoreEthereumIndexerError::ProcessError(format!("failed to convert log to primitive log: {slog:?}"))
+        })?;
 
         if log.address.eq(&self.addresses.announcements) {
             let bn = log.block_number as u32;
-            let event = HoprAnnouncementsEvents::decode_log(&log.into())?;
-            self.on_announcement_event(tx, event, bn).await
+            let event = HoprAnnouncementsEvents::decode_log(&primitive_log, true)?;
+            self.on_announcement_event(tx, event.data, bn).await
         } else if log.address.eq(&self.addresses.channels) {
-            let event = HoprChannelsEvents::decode_log(&log.into())?;
-            self.on_channel_event(tx, event).await
+            let event = HoprChannelsEvents::decode_log(&primitive_log, true)?;
+            self.on_channel_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.network_registry) {
-            let event = HoprNetworkRegistryEvents::decode_log(&log.into())?;
-            self.on_network_registry_event(tx, event).await
+            let event = HoprNetworkRegistryEvents::decode_log(&primitive_log, true)?;
+            self.on_network_registry_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.token) {
-            let event = HoprTokenEvents::decode_log(&log.into())?;
-            self.on_token_event(tx, event).await
+            let event = HoprTokenEvents::decode_log(&primitive_log, true)?;
+            self.on_token_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.safe_registry) {
-            let event = HoprNodeSafeRegistryEvents::decode_log(&log.into())?;
-            self.on_node_safe_registry_event(tx, event).await
+            let event = HoprNodeSafeRegistryEvents::decode_log(&primitive_log, true)?;
+            self.on_node_safe_registry_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.module_implementation) {
-            let event = HoprNodeManagementModuleEvents::decode_log(&log.into())?;
-            self.on_node_management_module_event(tx, event).await
+            let event = HoprNodeManagementModuleEvents::decode_log(&primitive_log, true)?;
+            self.on_node_management_module_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.price_oracle) {
-            let event = HoprTicketPriceOracleEvents::decode_log(&log.into())?;
-            self.on_ticket_price_oracle_event(tx, event).await
+            let event = HoprTicketPriceOracleEvents::decode_log(&primitive_log, true)?;
+            self.on_ticket_price_oracle_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.win_prob_oracle) {
-            let event = HoprWinningProbabilityOracleEvents::decode_log(&log.into())?;
-            self.on_ticket_winning_probability_oracle_event(tx, event).await
+            let event = HoprWinningProbabilityOracleEvents::decode_log(&primitive_log, true)?;
+            self.on_ticket_winning_probability_oracle_event(tx, event.data).await
         } else {
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);
@@ -826,7 +848,7 @@ where
         ]
     }
 
-    fn contract_address_topics(&self, contract: Address) -> Vec<H256> {
+    fn contract_address_topics(&self, contract: Address) -> Vec<B256> {
         if contract.eq(&self.addresses.announcements) {
             crate::constants::topics::announcement()
         } else if contract.eq(&self.addresses.channels) {
@@ -887,12 +909,10 @@ where
 mod tests {
     use super::ContractEventHandlers;
 
+    use alloy::dyn_abi::DynSolValue;
+    use alloy::primitives::{Address as AlloyAddress, U256};
+    use alloy::sol_types::{SolEvent, SolValue};
     use anyhow::{anyhow, Context};
-    use ethers::contract::EthEvent;
-    use ethers::{
-        abi::{encode, Address as EthereumAddress, Token},
-        types::U256 as EthU256,
-    };
     use hex_literal::hex;
     use multiaddr::Multiaddr;
     use primitive_types::H256;
@@ -900,21 +920,6 @@ mod tests {
     use std::sync::Arc;
     use std::time::SystemTime;
 
-    use hopr_bindings::hopr_winning_probability_oracle_events::WinProbUpdatedFilter;
-    use hopr_bindings::{
-        hopr_announcements::{AddressAnnouncementFilter, KeyBindingFilter, RevokeAnnouncementFilter},
-        hopr_channels::{
-            ChannelBalanceDecreasedFilter, ChannelBalanceIncreasedFilter, ChannelClosedFilter, ChannelOpenedFilter,
-            DomainSeparatorUpdatedFilter, OutgoingChannelClosureInitiatedFilter, TicketRedeemedFilter,
-        },
-        hopr_network_registry::{
-            DeregisteredByManagerFilter, DeregisteredFilter, EligibilityUpdatedFilter,
-            NetworkRegistryStatusUpdatedFilter, RegisteredByManagerFilter, RegisteredFilter,
-        },
-        hopr_node_safe_registry::{DergisteredNodeSafeFilter, RegisteredNodeSafeFilter},
-        hopr_ticket_price_oracle::TicketPriceUpdatedFilter,
-        hopr_token::{ApprovalFilter, TransferFilter},
-    };
     use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
     use hopr_chain_types::ContractAddresses;
     use hopr_crypto_types::prelude::*;
@@ -971,7 +976,7 @@ mod tests {
         SerializableLog { ..Default::default() }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn announce_keybinding() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -981,14 +986,18 @@ mod tests {
 
         let keybinding_log = SerializableLog {
             address: handlers.addresses.announcements.into(),
-            topics: vec![KeyBindingFilter::signature().into()],
-            data: encode(&[
-                Token::FixedBytes(keybinding.signature.as_ref().to_vec()),
-                Token::FixedBytes(keybinding.packet_key.as_ref().to_vec()),
-                Token::Address(EthereumAddress::from_slice(
-                    &SELF_CHAIN_KEY.public().to_address().as_ref(),
-                )),
+            topics: vec![
+                hopr_bindings::hoprannouncementsevents::HoprAnnouncementsEvents::KeyBinding::SIGNATURE_HASH.into(),
+            ],
+            data: DynSolValue::Tuple(vec![
+                DynSolValue::Bytes(keybinding.signature.as_ref().to_vec()),
+                DynSolValue::Bytes(keybinding.packet_key.as_ref().to_vec()),
+                DynSolValue::FixedBytes(
+                    AlloyAddress::from_slice(SELF_CHAIN_KEY.public().to_address().as_ref()).into_word(),
+                    32,
+                ),
             ])
+            .abi_encode_packed()
             .into(),
             ..test_log()
         };
@@ -1017,7 +1026,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn announce_address_announcement() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1034,14 +1043,19 @@ mod tests {
 
         let test_multiaddr_empty: Multiaddr = "".parse()?;
 
+        let address_announcement_empty_log_encoded_data = DynSolValue::Tuple(vec![
+            DynSolValue::Address(AlloyAddress::from_slice(SELF_CHAIN_ADDRESS.as_ref())),
+            DynSolValue::String(test_multiaddr_empty.to_string()),
+        ])
+        .abi_encode();
+
         let address_announcement_empty_log = SerializableLog {
             address: handlers.addresses.announcements.into(),
-            topics: vec![AddressAnnouncementFilter::signature().into()],
-            data: encode(&[
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
-                Token::String(test_multiaddr_empty.to_string()),
-            ])
-            .into(),
+            topics: vec![
+                hopr_bindings::hoprannouncementsevents::HoprAnnouncementsEvents::AddressAnnouncement::SIGNATURE_HASH
+                    .into(),
+            ],
+            data: address_announcement_empty_log_encoded_data[32..].into(),
             ..test_log()
         };
 
@@ -1072,15 +1086,20 @@ mod tests {
 
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse()?;
 
+        let address_announcement_log_encoded_data = DynSolValue::Tuple(vec![
+            DynSolValue::Address(AlloyAddress::from_slice(SELF_CHAIN_ADDRESS.as_ref())),
+            DynSolValue::String(test_multiaddr.to_string()),
+        ])
+        .abi_encode();
+
         let address_announcement_log = SerializableLog {
             address: handlers.addresses.announcements.into(),
             block_number: 1,
-            topics: vec![AddressAnnouncementFilter::signature().into()],
-            data: encode(&[
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
-                Token::String(test_multiaddr.to_string()),
-            ])
-            .into(),
+            topics: vec![
+                hopr_bindings::hoprannouncementsevents::HoprAnnouncementsEvents::AddressAnnouncement::SIGNATURE_HASH
+                    .into(),
+            ],
+            data: address_announcement_log_encoded_data[32..].into(),
             ..test_log()
         };
 
@@ -1133,15 +1152,20 @@ mod tests {
 
         let test_multiaddr_dns: Multiaddr = "/dns4/useful.domain/tcp/56".parse()?;
 
+        let address_announcement_dns_log_encoded_data = DynSolValue::Tuple(vec![
+            DynSolValue::Address(AlloyAddress::from_slice(SELF_CHAIN_ADDRESS.as_ref())),
+            DynSolValue::String(test_multiaddr_dns.to_string()),
+        ])
+        .abi_encode();
+
         let address_announcement_dns_log = SerializableLog {
             address: handlers.addresses.announcements.into(),
             block_number: 2,
-            topics: vec![AddressAnnouncementFilter::signature().into()],
-            data: encode(&[
-                Token::Address(EthereumAddress::from_slice(&SELF_CHAIN_ADDRESS.as_ref())),
-                Token::String(test_multiaddr_dns.to_string()),
-            ])
-            .into(),
+            topics: vec![
+                hopr_bindings::hoprannouncementsevents::HoprAnnouncementsEvents::AddressAnnouncement::SIGNATURE_HASH
+                    .into(),
+            ],
+            data: address_announcement_dns_log_encoded_data[32..].into(),
             ..test_log()
         };
 
@@ -1193,7 +1217,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn announce_revoke() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let handlers = init_handlers(db.clone());
@@ -1213,13 +1237,15 @@ mod tests {
 
         db.insert_account(None, announced_account_entry).await?;
 
+        let encoded_data = (AlloyAddress::from_slice(SELF_CHAIN_ADDRESS.as_ref()),).abi_encode();
+
         let revoke_announcement_log = SerializableLog {
             address: handlers.addresses.announcements.into(),
-            topics: vec![RevokeAnnouncementFilter::signature().into()],
-            data: encode(&[Token::Address(EthereumAddress::from_slice(
-                &SELF_CHAIN_ADDRESS.as_ref(),
-            ))])
-            .into(),
+            topics: vec![
+                hopr_bindings::hoprannouncementsevents::HoprAnnouncementsEvents::RevokeAnnouncement::SIGNATURE_HASH
+                    .into(),
+            ],
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1250,22 +1276,24 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_token_transfer_to() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
-        let value = U256::max_value();
+        let value = U256::MAX;
+
+        let encoded_data = (value).abi_encode();
 
         let transferred_log = SerializableLog {
             address: handlers.addresses.token.into(),
             topics: vec![
-                TransferFilter::signature().into(),
+                hopr_bindings::hoprtoken::HoprToken::Transfer::SIGNATURE_HASH.into(),
                 H256::from_slice(&Address::default().to_bytes32()).into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
-            data: encode(&[Token::Uint(value)]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1279,30 +1307,33 @@ mod tests {
 
         assert_eq!(
             db.get_safe_hopr_balance(None).await?,
-            Balance::new(value, BalanceType::HOPR)
+            Balance::new(value.to_be_bytes(), BalanceType::HOPR)
         );
 
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_token_transfer_from() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
-        let value = U256::max_value();
+        let value = U256::MAX;
 
-        db.set_safe_hopr_balance(None, BalanceType::HOPR.balance(value)).await?;
+        let encoded_data = (value).abi_encode();
+
+        db.set_safe_hopr_balance(None, Balance::new(value.to_be_bytes(), BalanceType::HOPR))
+            .await?;
 
         let transferred_log = SerializableLog {
             address: handlers.addresses.token.into(),
             topics: vec![
-                TransferFilter::signature().into(),
+                hopr_bindings::hoprtoken::HoprToken::Transfer::SIGNATURE_HASH.into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
                 H256::from_slice(&Address::default().to_bytes32()).into(),
             ],
-            data: encode(&[Token::Uint(value)]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1319,27 +1350,26 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_token_approval_correct() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
+        let encoded_data = (U256::from(1000u64)).abi_encode();
+
         let approval_log = SerializableLog {
             address: handlers.addresses.token.into(),
             topics: vec![
-                ApprovalFilter::signature().into(),
+                hopr_bindings::hoprtoken::HoprToken::Approval::SIGNATURE_HASH.into(),
                 H256::from_slice(&handlers.safe_address.to_bytes32()).into(),
                 H256::from_slice(&handlers.addresses.channels.to_bytes32()).into(),
             ],
-            data: encode(&[Token::Uint(EthU256::from(1000u64))]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
-        assert_eq!(
-            db.get_safe_hopr_allowance(None).await?,
-            Balance::new(U256::from(0u64), BalanceType::HOPR)
-        );
+        assert_eq!(db.get_safe_hopr_allowance(None).await?, BalanceType::HOPR.zero());
 
         let approval_log_clone = approval_log.clone();
         let handlers_clone = handlers.clone();
@@ -1355,16 +1385,16 @@ mod tests {
 
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            Balance::new(U256::from(1000u64), BalanceType::HOPR)
+            Balance::new(U256::from(1000u64).to_be_bytes(), BalanceType::HOPR)
         );
 
         // reduce allowance manually to verify a second time
         let _ = db
-            .set_safe_hopr_allowance(None, Balance::new(U256::from(10u64), BalanceType::HOPR))
+            .set_safe_hopr_allowance(None, Balance::new(U256::from(10u64).to_be_bytes(), BalanceType::HOPR))
             .await;
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            Balance::new(U256::from(10u64), BalanceType::HOPR)
+            Balance::new(U256::from(10u64).to_be_bytes(), BalanceType::HOPR)
         );
 
         let handlers_clone = handlers.clone();
@@ -1378,25 +1408,28 @@ mod tests {
 
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            Balance::new(U256::from(1000u64), BalanceType::HOPR)
+            Balance::new(U256::from(1000u64).to_be_bytes(), BalanceType::HOPR)
         );
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_registered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
+        let encoded_data = ().abi_encode();
+
         let registered_log = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                RegisteredFilter::signature().into(),
+                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::Registered::SIGNATURE_HASH.into(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
+            // data: encode(&[]).into(),
             ..test_log()
         };
 
@@ -1424,7 +1457,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_registered_by_manager() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1433,11 +1466,13 @@ mod tests {
         let registered_log = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                RegisteredByManagerFilter::signature().into(),
+                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::RegisteredByManager::SIGNATURE_HASH.into(),
+                // RegisteredByManagerFilter::signature().into(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
-            data: encode(&[]).into(),
+            data: ().abi_encode().into(),
+            // data: encode(&[]).into(),
             ..test_log()
         };
 
@@ -1465,7 +1500,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_deregistered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1474,14 +1509,16 @@ mod tests {
         db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
             .await?;
 
+        let encoded_data = ().abi_encode();
+
         let registered_log = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                DeregisteredFilter::signature().into(),
+                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::Deregistered::SIGNATURE_HASH.into(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1509,7 +1546,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_deregistered_by_manager() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1518,14 +1555,17 @@ mod tests {
         db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
             .await?;
 
+        let encoded_data = ().abi_encode();
+
         let registered_log = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                DeregisteredByManagerFilter::signature().into(),
+                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::DeregisteredByManager::SIGNATURE_HASH.into(),
+                // DeregisteredByManagerFilter::signature().into(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1553,19 +1593,23 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_enabled() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
+        let encoded_data = ().abi_encode();
+
         let nr_enabled = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                NetworkRegistryStatusUpdatedFilter::signature().into(),
+                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::NetworkRegistryStatusUpdated::SIGNATURE_HASH
+                    .into(),
+                // NetworkRegistryStatusUpdatedFilter::signature().into(),
                 H256::from_low_u64_be(1).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1581,7 +1625,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_event_disabled() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1589,13 +1633,17 @@ mod tests {
 
         db.set_network_registry_enabled(None, true).await?;
 
+        let encoded_data = ().abi_encode();
+
         let nr_disabled = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                NetworkRegistryStatusUpdatedFilter::signature().into(),
+                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::NetworkRegistryStatusUpdated::SIGNATURE_HASH
+                    .into(),
+                // NetworkRegistryStatusUpdatedFilter::signature().into(),
                 H256::from_low_u64_be(0).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1611,20 +1659,23 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_set_eligible() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
+        let encoded_data = ().abi_encode();
+
         let set_eligible = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                EligibilityUpdatedFilter::signature().into(),
+                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::EligibilityUpdated::SIGNATURE_HASH.into(),
+                // EligibilityUpdatedFilter::signature().into(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
                 H256::from_low_u64_be(1).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1644,7 +1695,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_network_registry_set_not_eligible() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1652,14 +1703,17 @@ mod tests {
 
         db.set_safe_eligibility(None, *STAKE_ADDRESS, false).await?;
 
+        let encoded_data = ().abi_encode();
+
         let set_eligible = SerializableLog {
             address: handlers.addresses.network_registry.into(),
             topics: vec![
-                EligibilityUpdatedFilter::signature().into(),
+                hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry::EligibilityUpdated::SIGNATURE_HASH.into(),
+                // EligibilityUpdatedFilter::signature().into(),
                 H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
                 H256::from_low_u64_be(0).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1679,7 +1733,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_event_balance_increased() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1688,24 +1742,27 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::new(U256::zero(), BalanceType::HOPR),
-            U256::zero(),
+            Balance::new(0, BalanceType::HOPR),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
         db.upsert_channel(None, channel).await?;
 
-        let solidity_balance = BalanceType::HOPR.balance(U256::from((1u128 << 96) - 1));
+        let solidity_balance = BalanceType::HOPR.balance(U256::from((1u128 << 96) - 1).to_be_bytes());
         let diff = solidity_balance - channel.balance;
+
+        let encoded_data = (solidity_balance.amount().to_be_bytes()).abi_encode();
 
         let balance_increased_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelBalanceIncreasedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::ChannelBalanceIncreased::SIGNATURE_HASH.into(),
+                // ChannelBalanceIncreasedFilter::signature().into(),
                 H256::from_slice(channel.get_id().as_ref()).into(),
             ],
-            data: Vec::from(solidity_balance.amount().to_be_bytes()).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1729,7 +1786,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_event_domain_separator_updated() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1737,13 +1794,16 @@ mod tests {
 
         let separator = Hash::from(hopr_crypto_random::random_bytes());
 
+        let encoded_data = ().abi_encode();
+
         let channels_dst_updated = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                DomainSeparatorUpdatedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::DomainSeparatorUpdated::SIGNATURE_HASH.into(),
+                // DomainSeparatorUpdatedFilter::signature().into(),
                 H256::from_slice(separator.as_ref()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1771,7 +1831,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_event_balance_decreased() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1780,24 +1840,32 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
-            U256::zero(),
+            Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
         db.upsert_channel(None, channel).await?;
 
-        let solidity_balance = U256::from((1u128 << 96) - 2);
+        let solidity_balance = Balance::new(primitive_types::U256::from((1u128 << 96) - 2), BalanceType::HOPR);
         let diff = channel.balance - solidity_balance;
+
+        // let encoded_data = (solidity_balance).abi_encode();
+        let encoded_data = DynSolValue::Tuple(vec![DynSolValue::Uint(
+            U256::from_be_slice(&solidity_balance.amount().to_be_bytes()),
+            256,
+        )])
+        .abi_encode();
 
         let balance_decreased_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelBalanceDecreasedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::ChannelBalanceDecreased::SIGNATURE_HASH.into(),
+                // ChannelBalanceDecreasedFilter::signature().into(),
                 H256::from_slice(channel.get_id().as_ref()).into(),
             ],
-            data: Vec::from(solidity_balance.to_be_bytes()).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1817,36 +1885,39 @@ mod tests {
             "must return updated channel entry and balance diff"
         );
 
-        assert_eq!(solidity_balance, channel.balance.amount(), "balance must be updated");
+        assert_eq!(solidity_balance, channel.balance, "balance must be updated");
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
-        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR);
+        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
             starting_balance,
-            U256::zero(),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
         db.upsert_channel(None, channel).await?;
 
+        let encoded_data = ().abi_encode();
+
         let channel_closed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelClosedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::ChannelClosed::SIGNATURE_HASH.into(),
+                // ChannelClosedFilter::signature().into(),
                 H256::from_slice(channel.get_id().as_ref()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1875,36 +1946,39 @@ mod tests {
                 .load(Ordering::Relaxed)
         );
 
-        assert!(closed_channel.balance.amount().eq(&U256::zero()));
+        assert!(closed_channel.balance.amount().eq(&primitive_types::U256::zero()));
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_foreign_channel_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
-        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR);
+        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
             Address::new(&hex!("B7397C218766eBe6A1A634df523A1a7e412e67eA")),
             Address::new(&hex!("D4fdec44DB9D44B8f2b6d529620f9C0C7066A2c1")),
             starting_balance,
-            U256::zero(),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
         db.upsert_channel(None, channel).await?;
 
+        let encoded_data = ().abi_encode();
+
         let channel_closed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelClosedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::ChannelClosed::SIGNATURE_HASH.into(),
+                // ChannelClosedFilter::signature().into(),
                 H256::from_slice(channel.get_id().as_ref()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1926,7 +2000,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_opened() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1934,14 +2008,17 @@ mod tests {
 
         let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
+        let encoded_data = ().abi_encode();
+
         let channel_opened_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelOpenedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::ChannelOpened::SIGNATURE_HASH.into(),
+                // ChannelOpenedFilter::signature().into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
                 H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -1973,7 +2050,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_reopened() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1983,21 +2060,24 @@ mod tests {
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
             Balance::zero(BalanceType::HOPR),
-            U256::zero(),
+            primitive_types::U256::zero(),
             ChannelStatus::Closed,
             3.into(),
         );
 
         db.upsert_channel(None, channel).await?;
 
+        let encoded_data = ().abi_encode();
+
         let channel_opened_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelOpenedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::ChannelOpened::SIGNATURE_HASH.into(),
+                // ChannelOpenedFilter::signature().into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
                 H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -2030,7 +2110,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_should_not_reopen_when_not_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2040,21 +2120,24 @@ mod tests {
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
             Balance::zero(BalanceType::HOPR),
-            U256::zero(),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
             3.into(),
         );
 
         db.upsert_channel(None, channel).await?;
 
+        let encoded_data = ().abi_encode();
+
         let channel_opened_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                ChannelOpenedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::ChannelOpened::SIGNATURE_HASH.into(),
+                // ChannelOpenedFilter::signature().into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
                 H256::from_slice(&COUNTERPARTY_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -2085,17 +2168,17 @@ mod tests {
 
         Ok(TicketBuilder::default()
             .direction(&signer.into(), &destination.into())
-            .amount(U256::from(PRICE_PER_PACKET).div_f64(win_prob)?)
+            .amount(primitive_types::U256::from(PRICE_PER_PACKET).div_f64(win_prob)?)
             .index(index)
             .index_offset(1)
-            .win_prob(win_prob)
+            .win_prob(win_prob.try_into()?)
             .channel_epoch(1)
             .challenge(response.to_challenge().into())
             .build_signed(signer, &domain_separator)?
             .into_acknowledged(response))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_incoming_channel() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
@@ -2106,13 +2189,13 @@ mod tests {
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
             *SELF_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
-            U256::zero(),
+            Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
-        let ticket_index = U256::from((1u128 << 48) - 1);
+        let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
         let next_ticket_index = ticket_index + 1;
 
         let mut ticket =
@@ -2127,10 +2210,16 @@ mod tests {
         let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                TicketRedeemedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::TicketRedeemed::SIGNATURE_HASH.into(),
+                // TicketRedeemedFilter::signature().into(),
                 H256::from_slice(channel.get_id().as_ref()).into(),
             ],
-            data: Vec::from(next_ticket_index.to_be_bytes()).into(),
+            data: DynSolValue::Tuple(vec![DynSolValue::Uint(
+                U256::from_be_bytes(next_ticket_index.to_be_bytes()),
+                48,
+            )])
+            .abi_encode()
+            .into(),
             ..test_log()
         };
 
@@ -2183,6 +2272,7 @@ mod tests {
         );
 
         let tickets = db.get_tickets((&channel).into()).await?;
+
         assert!(tickets.is_empty(), "there should not be any tickets left");
 
         let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
@@ -2198,7 +2288,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_incoming_channel_neglect_left_over_tickets() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
@@ -2209,13 +2299,13 @@ mod tests {
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
             *SELF_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
-            U256::zero(),
+            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
-        let ticket_index = U256::from((1u128 << 48) - 1);
+        let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
         let next_ticket_index = ticket_index + 1;
 
         let mut ticket =
@@ -2234,7 +2324,8 @@ mod tests {
         let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                TicketRedeemedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::TicketRedeemed::SIGNATURE_HASH.into(),
+                // TicketRedeemedFilter::signature().into(),
                 H256::from_slice(&channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(next_ticket_index.to_be_bytes()).into(),
@@ -2304,7 +2395,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_outgoing_channel() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
@@ -2315,13 +2406,13 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
-            U256::zero(),
+            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
-        let ticket_index = U256::from((1u128 << 48) - 1);
+        let ticket_index = primitive_types::U256::from((1u128 << 48) - 2);
         let next_ticket_index = ticket_index + 1;
 
         db.upsert_channel(None, channel).await?;
@@ -2329,7 +2420,8 @@ mod tests {
         let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                TicketRedeemedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::TicketRedeemed::SIGNATURE_HASH.into(),
+                // TicketRedeemedFilter::signature().into(),
                 H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(next_ticket_index.to_be_bytes()).into(),
@@ -2374,7 +2466,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_on_incoming_channel_with_non_existent_ticket_should_pass() -> anyhow::Result<()>
     {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
@@ -2386,20 +2478,21 @@ mod tests {
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
             *SELF_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
-            U256::zero(),
+            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
         db.upsert_channel(None, channel).await?;
 
-        let next_ticket_index = U256::from((1u128 << 48) - 1);
+        let next_ticket_index = primitive_types::U256::from((1u128 << 48) - 1);
 
         let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                TicketRedeemedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::TicketRedeemed::SIGNATURE_HASH.into(),
+                // TicketRedeemedFilter::signature().into(),
                 H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(next_ticket_index.to_be_bytes()).into(),
@@ -2429,7 +2522,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_ticket_redeemed_on_foreign_channel_should_pass() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2438,20 +2531,21 @@ mod tests {
         let channel = ChannelEntry::new(
             Address::from(hopr_crypto_random::random_bytes()),
             Address::from(hopr_crypto_random::random_bytes()),
-            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
-            U256::zero(),
+            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
         db.upsert_channel(None, channel).await?;
 
-        let next_ticket_index = U256::from((1u128 << 48) - 1);
+        let next_ticket_index = primitive_types::U256::from((1u128 << 48) - 1);
 
         let ticket_redeemed_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                TicketRedeemedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::TicketRedeemed::SIGNATURE_HASH.into(),
+                // TicketRedeemedFilter::signature().into(),
                 H256::from_slice(channel.get_id().as_ref()).into(),
             ],
             data: Vec::from(next_ticket_index.to_be_bytes()).into(),
@@ -2481,7 +2575,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_channel_closure_initiated() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2490,23 +2584,27 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
-            U256::zero(),
+            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::zero(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
         db.upsert_channel(None, channel).await?;
 
         let timestamp = SystemTime::now();
 
+        let encoded_data = (U256::from(timestamp.as_unix_timestamp().as_secs())).abi_encode();
+
         let closure_initiated_log = SerializableLog {
             address: handlers.addresses.channels.into(),
             topics: vec![
-                OutgoingChannelClosureInitiatedFilter::signature().into(),
+                hopr_bindings::hoprchannels::HoprChannels::OutgoingChannelClosureInitiated::SIGNATURE_HASH.into(),
+                // OutgoingChannelClosureInitiatedFilter::signature().into(),
                 H256::from_slice(channel.get_id().as_ref()).into(),
             ],
-            data: Vec::from(U256::from(timestamp.as_unix_timestamp().as_secs()).to_be_bytes()).into(),
+            data: encoded_data.into(),
+            // data: Vec::from(U256::from(timestamp.as_unix_timestamp().as_secs()).to_be_bytes()).into(),
             ..test_log()
         };
 
@@ -2534,20 +2632,23 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_node_safe_registry_registered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
+        let encoded_data = ().abi_encode();
+
         let safe_registered_log = SerializableLog {
             address: handlers.addresses.safe_registry.into(),
             topics: vec![
-                RegisteredNodeSafeFilter::signature().into(),
+                hopr_bindings::hoprnodesaferegistry::HoprNodeSafeRegistry::RegisteredNodeSafe::SIGNATURE_HASH.into(),
+                // RegisteredNodeSafeFilter::signature().into(),
                 H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32()).into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -2563,7 +2664,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn on_node_safe_registry_deregistered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -2571,14 +2672,17 @@ mod tests {
 
         // Nothing to write to the DB here, since we do not track this
 
+        let encoded_data = ().abi_encode();
+
         let safe_registered_log = SerializableLog {
             address: handlers.addresses.safe_registry.into(),
             topics: vec![
-                DergisteredNodeSafeFilter::signature().into(),
+                hopr_bindings::hoprnodesaferegistry::HoprNodeSafeRegistry::DergisteredNodeSafe::SIGNATURE_HASH.into(),
+                // DergisteredNodeSafeFilter::signature().into(),
                 H256::from_slice(&SAFE_INSTANCE_ADDR.to_bytes32()).into(),
                 H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
             ],
-            data: encode(&[]).into(),
+            data: encoded_data.into(),
             ..test_log()
         };
 
@@ -2597,16 +2701,22 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn ticket_price_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
+        let encoded_data = (U256::from(1u64), U256::from(123u64)).abi_encode();
+
         let price_change_log = SerializableLog {
             address: handlers.addresses.price_oracle.into(),
-            topics: vec![TicketPriceUpdatedFilter::signature().into()],
-            data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]).into(),
+            topics: vec![
+                hopr_bindings::hoprticketpriceoracle::HoprTicketPriceOracle::TicketPriceUpdated::SIGNATURE_HASH.into(),
+                // TicketPriceUpdatedFilter::signature().into()
+            ],
+            data: encoded_data.into(),
+            // data: encode(&[Token::Uint(EthU256::from(1u64)), Token::Uint(EthU256::from(123u64))]).into(),
             ..test_log()
         };
 
@@ -2625,24 +2735,28 @@ mod tests {
 
         assert_eq!(
             db.get_indexer_data(None).await?.ticket_price.map(|p| p.amount()),
-            Some(U256::from(123u64))
+            Some(primitive_types::U256::from(123u64))
         );
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn minimum_win_prob_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
         let handlers = init_handlers(db.clone());
 
+        let encoded_data = (
+            U256::from_be_slice(WinningProbability::ALWAYS.as_ref()),
+            U256::from_be_slice(WinningProbability::try_from_f64(0.5)?.as_ref()),
+        )
+            .abi_encode();
+
         let win_prob_change_log = SerializableLog {
             address: handlers.addresses.win_prob_oracle.into(),
-            topics: vec![WinProbUpdatedFilter::signature().into()],
-            data: encode(&[
-                Token::Uint(EthU256::from(f64_to_win_prob(1.0)?.as_ref())),
-                Token::Uint(EthU256::from(f64_to_win_prob(0.5)?.as_ref())),
-            ])
+            topics: vec![
+                hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::WinProbUpdated::SIGNATURE_HASH.into()],
+            data: encoded_data
             .into(),
             ..test_log()
         };
@@ -2670,10 +2784,10 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn lowering_minimum_win_prob_update_should_reject_non_satisfying_unredeemed_tickets() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        db.set_minimum_incoming_ticket_win_prob(None, 0.1).await?;
+        db.set_minimum_incoming_ticket_win_prob(None, 0.1.try_into()?).await?;
 
         let new_minimum = 0.5;
         let ticket_win_probs = [0.1, 1.0, 0.3, 0.2];
@@ -2681,10 +2795,10 @@ mod tests {
         let channel_1 = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
             *SELF_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
             3_u32.into(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
         db.upsert_channel(None, channel_1.clone()).await?;
@@ -2704,10 +2818,10 @@ mod tests {
         let channel_2 = ChannelEntry::new(
             other_counterparty.public().to_address(),
             *SELF_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
             3_u32.into(),
             ChannelStatus::Open,
-            U256::one(),
+            primitive_types::U256::one(),
         );
 
         db.upsert_channel(None, channel_2.clone()).await?;
@@ -2726,13 +2840,18 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
+        let encoded_data = (
+            U256::from_be_slice(WinningProbability::try_from(0.1)?.as_ref()),
+            U256::from_be_slice(WinningProbability::try_from(new_minimum)?.as_ref()),
+        )
+            .abi_encode();
+
         let win_prob_change_log = SerializableLog {
             address: handlers.addresses.win_prob_oracle.into(),
-            topics: vec![WinProbUpdatedFilter::signature().into()],
-            data: encode(&[
-                Token::Uint(EthU256::from(f64_to_win_prob(0.1)?.as_ref())),
-                Token::Uint(EthU256::from(f64_to_win_prob(new_minimum)?.as_ref())),
-            ])
+            topics: vec![
+                hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::WinProbUpdated::SIGNATURE_HASH.into(),
+            ],
+            data: encoded_data
             .into(),
             ..test_log()
         };
@@ -2760,10 +2879,14 @@ mod tests {
         assert_eq!(tickets.len(), 0);
 
         let stats = db.get_ticket_statistics(None).await?;
-        let rejected_value: U256 = ticket_win_probs
+        let rejected_value: primitive_types::U256 = ticket_win_probs
             .iter()
             .filter(|p| **p < new_minimum)
-            .map(|p| U256::from(PRICE_PER_PACKET).div_f64(*p).expect("must divide"))
+            .map(|p| {
+                primitive_types::U256::from(PRICE_PER_PACKET)
+                    .div_f64(*p)
+                    .expect("must divide")
+            })
             .reduce(|a, b| a + b)
             .ok_or(anyhow!("must sum"))?;
 

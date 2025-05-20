@@ -54,6 +54,13 @@ pub const SQL_DB_LOGS_FILE_NAME: &str = "hopr_logs.db";
 
 impl HoprDb {
     pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprDbConfig) -> Result<Self> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            lazy_static::initialize(&crate::protocol::METRIC_RECEIVED_ACKS);
+            lazy_static::initialize(&crate::protocol::METRIC_SENT_ACKS);
+            lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
+        }
+
         std::fs::create_dir_all(directory).map_err(|_e| {
             crate::errors::DbSqlError::Construction(format!("cannot create main database directory {directory:?}"))
         })?;
@@ -250,7 +257,7 @@ mod tests {
     use multiaddr::Multiaddr;
     use rand::{distributions::Alphanumeric, Rng}; // 0.8
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_basic_db_init() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -263,7 +270,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn peers_without_any_recent_updates_should_be_discarded_on_restarts() -> anyhow::Result<()> {
         let random_filename: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
@@ -301,7 +308,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn peers_with_a_recent_update_should_be_retained_in_the_database() -> anyhow::Result<()> {
         let random_filename: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)

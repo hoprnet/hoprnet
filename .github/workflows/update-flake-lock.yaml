@@ -7,10 +7,10 @@ env:
 on:
   workflow_dispatch: # allows manual triggering
   schedule:
-    - cron: '0 0 * * 0' # runs weekly on Sunday at 00:00
+    - cron: "0 0 * * 0" # runs weekly on Sunday at 00:00
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: write
 
@@ -19,14 +19,14 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
         with:
           disable-sudo: false
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -49,7 +49,7 @@ jobs:
           persist-credentials: false
 
       - name: Update flake.lock
-        uses: DeterminateSystems/update-flake-lock@a2bbe0274e3a0c4194390a1e445f734c597ebc37 # v24
+        uses: DeterminateSystems/update-flake-lock@428c2b58a4b7414dabd372acb6a03dba1084d3ab # v25
         id: update
         with:
           pr-title: "chore(nix): update flake.lock"

@@ -13,9 +13,11 @@ pub enum TransportSessionError {
     #[error("incorrect data size")]
     PayloadSize,
 
+    #[cfg(feature = "serde")]
     #[error("serializer encoding error: {0}")]
     SerializerEncoding(#[from] bincode::error::EncodeError),
 
+    #[cfg(feature = "serde")]
     #[error("serializer decoding error: {0}")]
     SerializerDecoding(#[from] bincode::error::DecodeError),
 
@@ -24,6 +26,9 @@ pub enum TransportSessionError {
 
     #[error("impossible transport path")]
     Path,
+
+    #[error("no surb available for sending reply data")]
+    OutOfSurbs,
 
     #[error("the other party rejected session initiation with error: {0}")]
     Rejected(StartErrorReason),
@@ -47,10 +52,10 @@ pub enum SessionManagerError {
     NotStarted,
     #[error("manager is already started")]
     AlreadyStarted,
-    #[error("no session backrouting information was given")]
-    NoBackRoutingInfo,
     #[error("all challenge slots are occupied")]
     NoChallengeSlots,
+    #[error("loopback sessions are not allowed")]
+    Loopback,
     #[error("non-specific session manager error: {0}")]
     Other(String),
 }

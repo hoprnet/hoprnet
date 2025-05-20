@@ -32,7 +32,14 @@ pub trait SphinxHeaderSpec {
     /// Type representing additional data for relayers.
     type RelayerData: BytesRepresentable;
 
-    /// Type representing additional data delivered with each SURB to its receiver.
+    /// Type representing additional data delivered to the packet receiver.
+    ///
+    /// It is delivered on both forward and return paths.
+    type PacketReceiverData: BytesRepresentable;
+
+    /// Type representing additional data delivered with each SURB to the packet receiver.
+    ///
+    /// It is delivered only on the forward path.
     type SurbReceiverData: BytesRepresentable;
 
     /// Pseudo-Random Generator function used to encrypt and decrypt the Sphinx header.
@@ -46,6 +53,9 @@ pub trait SphinxHeaderSpec {
 
     /// Size of the additional data included in SURBs.
     const SURB_RECEIVER_DATA_SIZE: usize = Self::SurbReceiverData::SIZE;
+
+    /// Size of the additional data for the packet receiver.
+    const RECEIVER_DATA_SIZE: usize = Self::PacketReceiverData::SIZE;
 
     /// Size of the public key identifier
     const KEY_ID_SIZE: NonZeroUsize = NonZeroUsize::new(Self::KeyId::SIZE).unwrap();
@@ -63,13 +73,13 @@ pub trait SphinxHeaderSpec {
     ///
     /// **The value shall not be overridden**.
     const HEADER_LEN: usize =
-        HeaderPrefix::SIZE + Self::Pseudonym::SIZE + (Self::MAX_HOPS.get() - 1) * Self::ROUTING_INFO_LEN;
+        HeaderPrefix::SIZE + Self::RECEIVER_DATA_SIZE + (Self::MAX_HOPS.get() - 1) * Self::ROUTING_INFO_LEN;
 
     /// Extended header size used for computations.
     ///
     /// **The value shall not be overridden**.
     const EXT_HEADER_LEN: usize =
-        HeaderPrefix::SIZE + Self::Pseudonym::SIZE + Self::MAX_HOPS.get() * Self::ROUTING_INFO_LEN;
+        HeaderPrefix::SIZE + Self::RECEIVER_DATA_SIZE + Self::MAX_HOPS.get() * Self::ROUTING_INFO_LEN;
 
     fn generate_filler(secrets: &[SharedSecret]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
         if secrets.len() < 2 {
@@ -226,14 +236,14 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
     /// * `path` IDs of the nodes along the path (usually its public key or public key identifier).
     /// * `secrets` shared secrets with the nodes along the path
     /// * `additional_data_relayer` additional data for each relayer
-    /// * `pseudonym` pseudonym of the sender
+    /// * `receiver_data` data for the packet receiver (this usually contains also `H::Pseudonym`).
     /// * `is_reply` flag indicating whether this is a reply packet
     /// * `no_ack` special flag used for acknowledgement signaling to the recipient
     pub fn new(
         path: &[H::KeyId],
         secrets: &[SharedSecret],
         additional_data_relayer: &[H::RelayerData],
-        pseudonym: &H::Pseudonym,
+        receiver_data: &H::PacketReceiverData,
         is_reply: bool,
         no_ack: bool,
     ) -> hopr_crypto_types::errors::Result<Self> {
@@ -264,25 +274,27 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
                 extended_header[0] = prefix.into();
 
                 // Last hop additional data
-                extended_header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::Pseudonym::SIZE]
-                    .copy_from_slice(pseudonym.as_ref());
+                extended_header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::PacketReceiverData::SIZE]
+                    .copy_from_slice(receiver_data.as_ref());
 
                 // Random padding for the rest of the extended header
                 let padding_len = (H::MAX_HOPS.get() - secrets.len()) * H::ROUTING_INFO_LEN;
                 if padding_len > 0 {
                     random_fill(
-                        &mut extended_header[HeaderPrefix::SIZE + H::Pseudonym::SIZE
-                            ..HeaderPrefix::SIZE + H::Pseudonym::SIZE + padding_len],
+                        &mut extended_header[HeaderPrefix::SIZE + H::PacketReceiverData::SIZE
+                            ..HeaderPrefix::SIZE + H::PacketReceiverData::SIZE + padding_len],
                     );
                 }
 
                 // Encrypt last hop data and padding
-                prg.apply_keystream(&mut extended_header[0..HeaderPrefix::SIZE + H::Pseudonym::SIZE + padding_len]);
+                prg.apply_keystream(
+                    &mut extended_header[0..HeaderPrefix::SIZE + H::PacketReceiverData::SIZE + padding_len],
+                );
 
                 if secrets.len() > 1 {
                     let filler = H::generate_filler(secrets)?;
-                    extended_header[HeaderPrefix::SIZE + H::Pseudonym::SIZE + padding_len
-                        ..HeaderPrefix::SIZE + H::Pseudonym::SIZE + padding_len + filler.len()]
+                    extended_header[HeaderPrefix::SIZE + H::PacketReceiverData::SIZE + padding_len
+                        ..HeaderPrefix::SIZE + H::PacketReceiverData::SIZE + padding_len + filler.len()]
                         .copy_from_slice(&filler);
                 }
             } else {
@@ -295,7 +307,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
 
                 // Each public key identifier must have an equal length
                 let key_ident = path[inverted_idx + 1].as_ref();
-                if key_ident.len() != H::KEY_ID_SIZE.into() {
+                if key_ident.len() != H::KEY_ID_SIZE.get() {
                     return Err(CryptoError::InvalidParameterSize {
                         name: "path[..]",
                         expected: H::KEY_ID_SIZE.into(),
@@ -370,8 +382,9 @@ pub enum ForwardedHeader<H: SphinxHeaderSpec> {
 
     /// The packet is at its final destination
     Final {
-        /// Pseudonym of the sender
-        sender: H::Pseudonym,
+        /// Data from the sender to the packet receiver.
+        /// This usually contains also `H::Pseudonym`.
+        receiver_data: H::PacketReceiverData,
         /// Indicates whether this message is a reply and a [`ReplyOpener`](crate::surb::ReplyOpener)
         /// should be used to further decrypt the message.
         is_reply: bool,
@@ -382,10 +395,10 @@ pub enum ForwardedHeader<H: SphinxHeaderSpec> {
 
 /// Applies the forward transformation to the header.
 /// If the packet is destined for this node, it returns the additional data
-/// for the final destination (`FinalNode`).
+/// for the final destination ([`ForwardedHeader::Final`]).
 /// Otherwise, it returns the transformed header, the
 /// next authentication tag, the public key of the next node, and the additional data
-/// for the relayer (`RelayNode`).
+/// for the relayer ([`ForwardedHeader::Relayed`]).
 ///
 /// # Arguments
 /// * `secret` - the shared secret with the creator of the packet
@@ -433,7 +446,7 @@ pub fn forward_header<H: SphinxHeaderSpec>(
             .try_into()
             .map_err(|_| CryptoError::InvalidInputValue("additional_relayer_data"))?;
 
-        // Shift the entire header to the left, to discard the data we just read
+        // Shift the entire header to the left to discard the data we just read
         header.copy_within(H::ROUTING_INFO_LEN..H::HEADER_LEN, 0);
 
         // Erase the read data from the header to apply the raw key-stream
@@ -451,9 +464,9 @@ pub fn forward_header<H: SphinxHeaderSpec>(
         })
     } else {
         Ok(ForwardedHeader::Final {
-            sender: (&header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::Pseudonym::SIZE])
+            receiver_data: (&header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::PacketReceiverData::SIZE])
                 .try_into()
-                .map_err(|_| CryptoError::InvalidInputValue("last_data_last_hop"))?,
+                .map_err(|_| CryptoError::InvalidInputValue("receiver_data"))?,
             is_reply: prefix.is_reply(),
             no_ack: prefix.is_no_ack(),
         })
@@ -558,12 +571,12 @@ pub(crate) mod tests {
                     );
                 }
                 ForwardedHeader::Final {
-                    sender,
+                    receiver_data,
                     is_reply,
                     no_ack,
                 } => {
                     assert_eq!(shares.secrets.len() - 1, i, "cannot be a final node");
-                    assert_eq!(pseudonym, sender, "invalid pseudonym");
+                    assert_eq!(pseudonym, receiver_data, "invalid pseudonym");
                     assert_eq!(is_reply, reply, "invalid reply flag");
                     assert_eq!(no_ack, no_ack_flag, "invalid no_ack flag");
                 }

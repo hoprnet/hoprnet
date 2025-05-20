@@ -224,7 +224,7 @@ mod tests {
             .amount(PRICE_PER_PACKET.div_f64(1.0f64)? * worth_packets)
             .index(index)
             .index_offset(idx_offset)
-            .win_prob(1.0)
+            .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(4)
             .challenge(Challenge::from(cp_sum).into())
             .build_signed(&BOB, &Hash::default())?
@@ -270,7 +270,7 @@ mod tests {
         })
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
@@ -300,7 +300,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem_agg_only() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
@@ -334,7 +334,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_auto_redeeming_strategy_redeem_minimum_ticket_amount() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
@@ -368,7 +368,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_auto_redeeming_strategy_should_redeem_singular_ticket_on_close() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())
@@ -420,7 +420,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_auto_redeeming_strategy_should_not_redeem_singular_ticket_worth_less_on_close() -> anyhow::Result<()>
     {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
@@ -465,7 +465,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_auto_redeeming_strategy_should_not_redeem_unworthy_tickets_on_close() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())

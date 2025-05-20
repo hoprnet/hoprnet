@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport"
-version = "0.9.2"
+version = "0.10.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Implements the main HOPR transport interface for the core library"
 edition = "2021"
@@ -12,15 +12,6 @@ crate-type = ["rlib"]
 [features]
 default = ["mixer-stream"]
 transport-quic = []
-runtime-async-std = [
-  "hopr-transport-network/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-  "hopr-db-sql/runtime-async-std",
-  "hopr-transport-p2p/runtime-async-std",
-  "hopr-transport-protocol/runtime-async-std",
-  "hopr-transport-session/runtime-async-std",
-  "hopr-network-types/runtime-async-std",
-]
 runtime-tokio = [
   "hopr-transport-network/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
@@ -28,6 +19,7 @@ runtime-tokio = [
   "hopr-transport-p2p/runtime-tokio",
   "hopr-transport-protocol/runtime-tokio",
   "hopr-transport-session/runtime-tokio",
+  "hopr-transport-ticket-aggregation/runtime-tokio",
   "hopr-network-types/runtime-tokio",
 ]
 prometheus = [
@@ -40,6 +32,7 @@ prometheus = [
   "hopr-transport-p2p/prometheus",
   "hopr-transport-protocol/prometheus",
   "hopr-transport-session/prometheus",
+  "hopr-transport-ticket-aggregation/prometheus",
 ]
 mixer-stream = []
 mixer-channel = []
@@ -54,6 +47,7 @@ futures-concurrency = { workspace = true }
 lazy_static = { workspace = true }
 proc-macro-regex = { workspace = true }
 rust-stream-ext-concurrent = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
 smart-default = { workspace = true }
@@ -80,11 +74,16 @@ hopr-transport-network = { workspace = true }
 hopr-transport-p2p = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 hopr-transport-session = { workspace = true }
+hopr-transport-ticket-aggregation = { workspace = true }
 
 [dev-dependencies]
 temp-env = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
-hopr-transport-network = { workspace = true, features = ["runtime-async-std"] }
+
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
+hopr-transport-network = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-mixer = { workspace = true }
-hopr-transport-protocol = { workspace = true, features = ["runtime-async-std"] }
-hopr-transport-p2p = { workspace = true, features = ["runtime-async-std"] }
+hopr-transport-protocol = { workspace = true, features = ["runtime-tokio"] }
+hopr-transport-p2p = { workspace = true, features = ["runtime-tokio"] }
+hopr-transport-ticket-aggregation = { workspace = true, features = [
+  "runtime-tokio",
+] }

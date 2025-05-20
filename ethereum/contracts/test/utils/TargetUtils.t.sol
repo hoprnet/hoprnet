@@ -87,6 +87,7 @@ contract TargetUtilsTest is Test {
         );
     }
 
+    /// forge-config: default.allow_internal_expect_revert = true
     function testRevert_IsTargetType(uint256 targetVal) public {
         targetUtilsMock.setTarget(targetVal);
         bytes32 maskedTargetType = bytes32(targetVal) & TARGET_TYPE_MASK;
@@ -324,6 +325,7 @@ contract TargetUtilsTest is Test {
         }
     }
 
+    /// forge-config: default.allow_internal_expect_revert = true
     function testFuzz_ConvertFunctionToTargetPermissions(uint8 functionPermissionVal) public {
         functionPermissionVal = uint8(
             bound(
@@ -337,16 +339,19 @@ contract TargetUtilsTest is Test {
         assertEq(uint8(targetPermission), functionPermissionVal - 1);
     }
 
-    function testRevert_ConvertFunctionToTargetPermissions(uint8 functionPermissionVal) public {
-        if (functionPermissionVal > uint8(type(CapabilityPermission).max)) {
-            vm.expectRevert(stdError.enumConversionError);
-            targetUtilsMock.convertFunctionToTargetPermission(CapabilityPermission(functionPermissionVal));
-        }
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testRevert_ConvertFunctionToTargetPermissionsWithHighPermissionVal(uint8 functionPermissionVal) public {
+        // CapabilityPermission is a uint8 with allowed value of 0 - 4
+        vm.assume(functionPermissionVal > 4);
+        vm.expectRevert();
+        targetUtilsMock.convertFunctionToTargetPermission(CapabilityPermission(functionPermissionVal));
+    }
 
-        if (functionPermissionVal == 0) {
-            vm.expectRevert(PermissionNotFound.selector);
-            targetUtilsMock.convertFunctionToTargetPermission(CapabilityPermission(functionPermissionVal));
-        }
+    function testRevert_ConvertFunctionToTargetPermissionsWithLowPermissionVal(uint8 functionPermissionVal) public {
+        // CapabilityPermission is a uint8 with allowed value of 0 - 4
+        vm.assume(functionPermissionVal == 0);
+        vm.expectRevert(PermissionNotFound.selector);
+        targetUtilsMock.convertFunctionToTargetPermission(CapabilityPermission(functionPermissionVal));
     }
 
     function _helperCreateValidTarget(

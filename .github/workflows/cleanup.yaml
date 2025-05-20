@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
         with:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
@@ -40,22 +40,27 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
         with:
           disable-sudo: false
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Setup GCP
         id: gcp
         uses: hoprnet/hopr-workflows/actions/setup-gcp@72b6f30b6d0e2fa7298034156f503f2a2bd0f9c6 # master
         with:
           google-credentials: ${{ secrets.GOOGLE_HOPRASSOCIATION_CREDENTIALS_REGISTRY }}
-          login-artifact-registry: 'true'
-          install-sdk: 'true'
+          login-artifact-registry: "true"
+          install-sdk: "true"
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@d1ca217b388ee87b2507a9a93bf01368bde7cec2 # v31
+        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -68,7 +73,7 @@ jobs:
           USER: runner
 
       - name: Cleanup Docker images
-        run: nix develop -c ./scripts/clean-docker-images.py "${{ vars.DOCKER_IMAGE_REGISTRY }}"
+        run: nix develop -L .#ci -c ./scripts/clean-docker-images.py "${{ vars.DOCKER_IMAGE_REGISTRY }}"
 
   # cleanup-git:
   #   name: Cleanup Git

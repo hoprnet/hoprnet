@@ -228,13 +228,11 @@ hopr:
     heartbeat:
       # Timeout in seconds
       timeout: 6
-    # Message sub-protocol configuration
-    ticket_aggregation:
-      # Timeout in seconds
-      timeout: 15
-  # Blockchain specific configuration
+    # port used for nat server functionality
+    autonat_port:
+  # Blockchain-specific configuration
   chain:
-    # Indicates whether node should announce itself on-chain
+    # Indicates whether a node should announce itself on-chain
     announce: true
     # Which blockchain network should be used by the node
     # Must be one of `protocols.networks`.
@@ -259,8 +257,8 @@ hopr:
             module_implementation: 0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0
             node_safe_registry: 0x0dcd1bf9a1b36ce34237eeafef220932846bcd82
             ticket_price_oracle: 0x7a2088a1bfc9d81c55368ae168c2c02570cb814f
-            winning_probability_oracle: 0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1
-            announcements: 0x09635f643e140090a9a8dcd712ed6285858cebef
+            winning_probability_oracle: 0x09635f643e140090a9a8dcd712ed6285858cebef
+            announcements: 0xc5a5C42992dECbae36851359345FE25997F5C42d
             node_stake_v2_factory: 0xb7f8bc63bbcad18155201308c8f3540b07f84f5e
           confirmations: 2
           tx_polling_interval: 1000
@@ -280,10 +278,6 @@ hopr:
           max_rpc_requests_per_sec: 100
           block_time: 5000
           tags: []
-    # Indicates whether node should check channel unrealized balance
-    # when validating acknowledged tickets.
-    # Strongly recommended to leave this enabled.
-    check_unrealized_balance: true
     # Configures whether the node will keep RPC logs after they were processed.
     # By default (enabled), the node will clean such logs. If enabled, the node
     # will keep logs which will require more disk space, however, it will allow
@@ -296,15 +290,6 @@ hopr:
     # the sync process. Recommended for initial setup or when recovering
     # from a clean state.
     fast_sync: true
-# HOPRd Message Inbox configuration
-inbox:
-  # Capacity of messages in the Inbox, per message tag.
-  capacity: 512
-  # The maximum age of a message in Inbox in seconds
-  # Older messages are automatically purged
-  max_age: 900
-  # Tags which are not allowed into the Inbox
-  excluded_tags: [0]
 # Session Entry/Exit IP forwarding configuration for this node
 # This applies whenever the node is an Exit node of a Session.
 session_ip_forwarding:
@@ -315,9 +300,9 @@ session_ip_forwarding:
   #
   # List of IP address and port tuples (written as e.g.: "127.0.0.1:8080") which are allowed
   # to be targets of incoming Sessions.
-  # This has effect only if `use_target_allow_list` is `true`.
+  # This has an effect only if `use_target_allow_list` is `true`.
   # If left empty (default), the node will deny any Session target and will effectively not act as an Exit node.
-  # For targets specifying a DNS name, the DNS resolution is performed first before the list is matched.
+  # For Session targets using a DNS name, the DNS resolution is performed first before the list is matched.
   # Production configuration should always use this allowlist, e.g.: target_allow_list: ["127.0.0.1:8080"]
   target_allow_list: []
 #

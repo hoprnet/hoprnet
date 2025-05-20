@@ -197,7 +197,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn split_codec_should_always_produce_correct_data() -> anyhow::Result<()> {
         let stream = AsyncBinaryStreamChannel::new();
         let codec = tokio_util::codec::BytesCodec::new();
