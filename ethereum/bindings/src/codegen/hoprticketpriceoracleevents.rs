@@ -61,6 +61,8 @@ pub mod HoprTicketPriceOracleEvents {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `TicketPriceUpdated(uint256,uint256)` and selector `0xd4c5e06b1ae097ba02372652a7adaa6e4a8e00be527497a3ad0ebc3f761ef3fb`.
 ```solidity
 event TicketPriceUpdated(uint256, uint256);
@@ -173,6 +175,8 @@ event TicketPriceUpdated(uint256, uint256);
         }
     };
     ///Container for all the [`HoprTicketPriceOracleEvents`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprTicketPriceOracleEventsEvents {
         #[allow(missing_docs)]
         TicketPriceUpdated(TicketPriceUpdated),

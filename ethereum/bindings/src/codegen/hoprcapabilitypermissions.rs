@@ -416,6 +416,8 @@ pub mod HoprCapabilityPermissions {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"s\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x000\x14`\x80`@R`\x046\x10`~W`\x005`\xE0\x1C\x80czuq\x15\x11`_W\x80czuq\x15\x14`\xC7W\x80c\x81g\xB6~\x14`\xD4W\x80c\xA0\x86X9\x14`\xE1W\x80c\xB6w\xA4\x0F\x14`\xEEW`\0\x80\xFD[\x80cQ\xD2aK\x14`\x83W\x80c]\xAA\x9E$\x14`\xADW\x80cg\x8A^\xFB\x14`\xBAW[`\0\x80\xFD[`\x90c\x06lF\xB9`\xE1\x1B\x81V[`@Q`\x01`\x01`\xE0\x1B\x03\x19\x90\x91\x16\x81R` \x01`@Q\x80\x91\x03\x90\xF3[`\x90c\xBD\xA6_E`\xE0\x1B\x81V[`\x90cT\xA2\xED\xF5`\xE0\x1B\x81V[`\x90cM\xEC\xDD\xE3`\xE1\x1B\x81V[`\x90ce\x15\x14\xBF`\xE0\x1B\x81V[`\x90c\t^\xA7\xB3`\xE0\x1B\x81V[`\x90c\n\xBE\xC5\x8F`\xE0\x1B\x81V\xFE\xA2dipfsX\"\x12 \xC6&\x98m\xD6\xF3\x03\xC5Q\xE2g\xF4\x1C\xED\x8A<~\xFF\xD4\x9AC j\x04\x8A\x13/\xC6\x88e\xF8LdsolcC\0\x08\x13\x003",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct GranularPermission(u8);
@@ -540,6 +542,8 @@ pub mod HoprCapabilityPermissions {
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct Target(alloy::sol_types::private::primitives::aliases::U256);
@@ -669,6 +673,8 @@ pub mod HoprCapabilityPermissions {
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `AddressIsZero()` and selector `0x867915ab`.
 ```solidity
 error AddressIsZero();
@@ -733,6 +739,8 @@ error AddressIsZero();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `ArrayTooLong()` and selector `0xbd26cc38`.
 ```solidity
 error ArrayTooLong();
@@ -797,6 +805,8 @@ error ArrayTooLong();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `ArraysDifferentLength()` and selector `0x74f4d537`.
 ```solidity
 error ArraysDifferentLength();
@@ -861,6 +871,8 @@ error ArraysDifferentLength();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `CalldataOutOfBounds()` and selector `0x742638b4`.
 ```solidity
 error CalldataOutOfBounds();
@@ -925,6 +937,8 @@ error CalldataOutOfBounds();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `DefaultPermissionRejected()` and selector `0x58723037`.
 ```solidity
 error DefaultPermissionRejected();
@@ -991,6 +1005,8 @@ error DefaultPermissionRejected();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `DelegateCallNotAllowed()` and selector `0x0d89438e`.
 ```solidity
 error DelegateCallNotAllowed();
@@ -1055,6 +1071,8 @@ error DelegateCallNotAllowed();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `FunctionSignatureTooShort()` and selector `0x4684c122`.
 ```solidity
 error FunctionSignatureTooShort();
@@ -1121,6 +1139,8 @@ error FunctionSignatureTooShort();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `GranularPermissionRejected()` and selector `0x864dd1e7`.
 ```solidity
 error GranularPermissionRejected();
@@ -1187,6 +1207,8 @@ error GranularPermissionRejected();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `NoMembership()` and selector `0xfd8e9f28`.
 ```solidity
 error NoMembership();
@@ -1251,6 +1273,8 @@ error NoMembership();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `NodePermissionRejected()` and selector `0x6eb0315f`.
 ```solidity
 error NodePermissionRejected();
@@ -1315,6 +1339,8 @@ error NodePermissionRejected();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `ParameterNotAllowed()` and selector `0x31e98246`.
 ```solidity
 error ParameterNotAllowed();
@@ -1379,6 +1405,8 @@ error ParameterNotAllowed();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `PermissionNotConfigured()` and selector `0x46ad4588`.
 ```solidity
 error PermissionNotConfigured();
@@ -1443,6 +1471,8 @@ error PermissionNotConfigured();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `SendNotAllowed()` and selector `0x09e9cd49`.
 ```solidity
 error SendNotAllowed();
@@ -1507,6 +1537,8 @@ error SendNotAllowed();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `TargetAddressNotAllowed()` and selector `0xef3440ac`.
 ```solidity
 error TargetAddressNotAllowed();
@@ -1571,6 +1603,8 @@ error TargetAddressNotAllowed();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `TargetIsNotScoped()` and selector `0x4a890321`.
 ```solidity
 error TargetIsNotScoped();
@@ -1635,6 +1669,8 @@ error TargetIsNotScoped();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `TargetIsScoped()` and selector `0xe8c07d2a`.
 ```solidity
 error TargetIsScoped();
@@ -1699,6 +1735,8 @@ error TargetIsScoped();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `UnacceptableMultiSendOffset()` and selector `0x7ed11137`.
 ```solidity
 error UnacceptableMultiSendOffset();
@@ -1765,6 +1803,8 @@ error UnacceptableMultiSendOffset();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RevokedTarget(address)` and selector `0x0dfce1ea4ba1eeba891ffb2a066790fbc293a9e517fe61d49d156a30165f93f3`.
 ```solidity
 event RevokedTarget(address indexed targetAddress);
@@ -1870,6 +1910,8 @@ event RevokedTarget(address indexed targetAddress);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedGranularChannelCapability(address,bytes32,bytes4,uint8)` and selector `0xf2ffd4f09d58d06824188033d3318d06eb957bfb1a8ffed9af78e1f19168b904`.
 ```solidity
 event ScopedGranularChannelCapability(address indexed targetAddress, bytes32 indexed channelId, bytes4 selector, GranularPermission permission);
@@ -2007,6 +2049,8 @@ event ScopedGranularChannelCapability(address indexed targetAddress, bytes32 ind
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedGranularSendCapability(address,address,uint8)` and selector `0x7487530ddff120799505e52b1b19b6933f85a9eeae9220c80a7ad7c429b612ae`.
 ```solidity
 event ScopedGranularSendCapability(address indexed nodeAddress, address indexed recipientAddress, GranularPermission permission);
@@ -2134,6 +2178,8 @@ event ScopedGranularSendCapability(address indexed nodeAddress, address indexed 
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedGranularTokenCapability(address,address,address,bytes4,uint8)` and selector `0xa3df710420b01cc30ff300309abbc7fadd4630d4ab385b0f5a126fb4babe762b`.
 ```solidity
 event ScopedGranularTokenCapability(address indexed nodeAddress, address indexed targetAddress, address indexed recipientAddress, bytes4 selector, GranularPermission permission);
@@ -2278,6 +2324,8 @@ event ScopedGranularTokenCapability(address indexed nodeAddress, address indexed
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedTargetChannels(address,uint256)` and selector `0x5ffb06b0b0e8ad6a8f3c5831d499dfa612d9c9d4dc107bbd66f18f61a6492e71`.
 ```solidity
 event ScopedTargetChannels(address indexed targetAddress, Target target);
@@ -2388,6 +2436,8 @@ event ScopedTargetChannels(address indexed targetAddress, Target target);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedTargetSend(address,uint256)` and selector `0x1ee2791f2caf0e92a9dc32a37a9ea53ab6ac7a6fb8f2d090e53a067d3a43f6ac`.
 ```solidity
 event ScopedTargetSend(address indexed targetAddress, Target target);
@@ -2498,6 +2548,8 @@ event ScopedTargetSend(address indexed targetAddress, Target target);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedTargetToken(address,uint256)` and selector `0xaaf26bb12aa89ee96bbe19667a6a055727b75d3f6ed7b8b611ef6519180209d6`.
 ```solidity
 event ScopedTargetToken(address indexed targetAddress, Target target);
@@ -2608,6 +2660,8 @@ event ScopedTargetToken(address indexed targetAddress, Target target);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `APPROVE_SELECTOR()` and selector `0xa0865839`.
 ```solidity
 function APPROVE_SELECTOR() external view returns (bytes4);
@@ -2615,6 +2669,8 @@ function APPROVE_SELECTOR() external view returns (bytes4);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct APPROVE_SELECTORCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`APPROVE_SELECTOR()`](APPROVE_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2731,6 +2787,8 @@ function APPROVE_SELECTOR() external view returns (bytes4);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `CLOSE_INCOMING_CHANNEL_SELECTOR()` and selector `0x678a5efb`.
 ```solidity
 function CLOSE_INCOMING_CHANNEL_SELECTOR() external view returns (bytes4);
@@ -2738,6 +2796,8 @@ function CLOSE_INCOMING_CHANNEL_SELECTOR() external view returns (bytes4);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct CLOSE_INCOMING_CHANNEL_SELECTORCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`CLOSE_INCOMING_CHANNEL_SELECTOR()`](CLOSE_INCOMING_CHANNEL_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2854,6 +2914,8 @@ function CLOSE_INCOMING_CHANNEL_SELECTOR() external view returns (bytes4);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()` and selector `0x8167b67e`.
 ```solidity
 function FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (bytes4);
@@ -2861,6 +2923,8 @@ function FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (byt
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()`](FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2980,6 +3044,8 @@ function FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (byt
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `FUND_CHANNEL_SELECTOR()` and selector `0xb677a40f`.
 ```solidity
 function FUND_CHANNEL_SELECTOR() external view returns (bytes4);
@@ -2987,6 +3053,8 @@ function FUND_CHANNEL_SELECTOR() external view returns (bytes4);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct FUND_CHANNEL_SELECTORCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`FUND_CHANNEL_SELECTOR()`](FUND_CHANNEL_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3103,6 +3171,8 @@ function FUND_CHANNEL_SELECTOR() external view returns (bytes4);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()` and selector `0x5daa9e24`.
 ```solidity
 function INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (bytes4);
@@ -3110,6 +3180,8 @@ function INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (byt
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()`](INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3229,6 +3301,8 @@ function INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (byt
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `REDEEM_TICKET_SELECTOR()` and selector `0x51d2614b`.
 ```solidity
 function REDEEM_TICKET_SELECTOR() external view returns (bytes4);
@@ -3236,6 +3310,8 @@ function REDEEM_TICKET_SELECTOR() external view returns (bytes4);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct REDEEM_TICKET_SELECTORCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`REDEEM_TICKET_SELECTOR()`](REDEEM_TICKET_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3352,6 +3428,8 @@ function REDEEM_TICKET_SELECTOR() external view returns (bytes4);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `SEND_SELECTOR()` and selector `0x7a757115`.
 ```solidity
 function SEND_SELECTOR() external view returns (bytes4);
@@ -3359,6 +3437,8 @@ function SEND_SELECTOR() external view returns (bytes4);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct SEND_SELECTORCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`SEND_SELECTOR()`](SEND_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3472,6 +3552,8 @@ function SEND_SELECTOR() external view returns (bytes4);
         }
     };
     ///Container for all the [`HoprCapabilityPermissions`](self) function calls.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive()]
     pub enum HoprCapabilityPermissionsCalls {
         #[allow(missing_docs)]
         APPROVE_SELECTOR(APPROVE_SELECTORCall),
@@ -3757,6 +3839,8 @@ function SEND_SELECTOR() external view returns (bytes4);
         }
     }
     ///Container for all the [`HoprCapabilityPermissions`](self) custom errors.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprCapabilityPermissionsErrors {
         #[allow(missing_docs)]
         AddressIsZero(AddressIsZero),
@@ -4338,6 +4422,8 @@ function SEND_SELECTOR() external view returns (bytes4);
         }
     }
     ///Container for all the [`HoprCapabilityPermissions`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprCapabilityPermissionsEvents {
         #[allow(missing_docs)]
         RevokedTarget(RevokedTarget),

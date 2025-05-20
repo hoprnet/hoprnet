@@ -75,6 +75,8 @@ pub mod HoprNodeStakeFactoryEvents {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `NewHoprNodeStakeModule(address,address)` and selector `0x813d391dc490d6c1dae7d3fdd555f337533d1da2c908c6efd36d4cf557a63206`.
 ```solidity
 event NewHoprNodeStakeModule(address indexed moduleImplementation, address instance);
@@ -189,6 +191,8 @@ event NewHoprNodeStakeModule(address indexed moduleImplementation, address insta
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `NewHoprNodeStakeSafe(address)` and selector `0x8231d169f416b666ae7fa43faa24a18899738075a53f32c97617d173b189e386`.
 ```solidity
 event NewHoprNodeStakeSafe(address instance);
@@ -294,6 +298,8 @@ event NewHoprNodeStakeSafe(address instance);
         }
     };
     ///Container for all the [`HoprNodeStakeFactoryEvents`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprNodeStakeFactoryEventsEvents {
         #[allow(missing_docs)]
         NewHoprNodeStakeModule(NewHoprNodeStakeModule),

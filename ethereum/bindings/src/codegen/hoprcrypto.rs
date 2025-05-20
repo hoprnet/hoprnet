@@ -59,6 +59,8 @@ pub mod HoprCrypto {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `InvalidCurvePoint()` and selector `0x72454a82`.
 ```solidity
 error InvalidCurvePoint();
@@ -123,6 +125,8 @@ error InvalidCurvePoint();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `InvalidFieldElement()` and selector `0x3ae4ed6b`.
 ```solidity
 error InvalidFieldElement();
@@ -187,6 +191,8 @@ error InvalidFieldElement();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `InvalidPointWitness()` and selector `0xedfdcd98`.
 ```solidity
 error InvalidPointWitness();
@@ -252,6 +258,8 @@ error InvalidPointWitness();
         }
     };
     ///Container for all the [`HoprCrypto`](self) custom errors.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprCryptoErrors {
         #[allow(missing_docs)]
         InvalidCurvePoint(InvalidCurvePoint),

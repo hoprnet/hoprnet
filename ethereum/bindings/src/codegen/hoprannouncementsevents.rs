@@ -107,6 +107,8 @@ pub mod HoprAnnouncementsEvents {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `AddressAnnouncement(address,string)` and selector `0xc4df5ba16814838ab2618829d68f8623bb897302f24dbdba2279dbe45adb3d14`.
 ```solidity
 event AddressAnnouncement(address node, string baseMultiaddr);
@@ -221,6 +223,8 @@ event AddressAnnouncement(address node, string baseMultiaddr);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `KeyBinding(bytes32,bytes32,bytes32,address)` and selector `0xbf49ccd41a4118c7e1e72143bad844e5f6ed12bf60caa642d88d19ca10244c36`.
 ```solidity
 event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key, address chain_key);
@@ -349,6 +353,8 @@ event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_p
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RevokeAnnouncement(address)` and selector `0xa4de30a528becadf82649d1395c0e30dd18ae35b5a96ce71e9295bb14bc9f3bc`.
 ```solidity
 event RevokeAnnouncement(address node);
@@ -453,6 +459,8 @@ event RevokeAnnouncement(address node);
         }
     };
     ///Container for all the [`HoprAnnouncementsEvents`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprAnnouncementsEventsEvents {
         #[allow(missing_docs)]
         AddressAnnouncement(AddressAnnouncement),

@@ -177,6 +177,8 @@ pub mod HoprTicketPriceOracle {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"`\x80`@R4\x80\x15a\0\x10W`\0\x80\xFD[P`\x046\x10a\0WW`\x005`\xE0\x1C\x80c\x15\x98\x16P\x14a\0\\W\x80cqP\x18\xA6\x14a\0qW\x80c\x8D\xA5\xCB[\x14a\0yW\x80c\xE0\x15\x91\x06\x14a\0\x99W\x80c\xF2\xFD\xE3\x8B\x14a\0\xB0W[`\0\x80\xFD[a\0oa\0j6`\x04a\x02\x98V[a\0\xC3V[\0[a\0oa\0\xD7V[`\0T`@Q`\x01`\x01`\xA0\x1B\x03\x90\x91\x16\x81R` \x01[`@Q\x80\x91\x03\x90\xF3[a\0\xA2`\x01T\x81V[`@Q\x90\x81R` \x01a\0\x90V[a\0oa\0\xBE6`\x04a\x02\xB1V[a\0\xEBV[a\0\xCBa\x01fV[a\0\xD4\x81a\x01\xC0V[PV[a\0\xDFa\x01fV[a\0\xE9`\0a\x02HV[V[a\0\xF3a\x01fV[`\x01`\x01`\xA0\x1B\x03\x81\x16a\x01]W`@QbF\x1B\xCD`\xE5\x1B\x81R` `\x04\x82\x01R`&`$\x82\x01R\x7FOwnable: new owner is the zero a`D\x82\x01Reddress`\xD0\x1B`d\x82\x01R`\x84\x01[`@Q\x80\x91\x03\x90\xFD[a\0\xD4\x81a\x02HV[`\0T`\x01`\x01`\xA0\x1B\x03\x163\x14a\0\xE9W`@QbF\x1B\xCD`\xE5\x1B\x81R` `\x04\x82\x01\x81\x90R`$\x82\x01R\x7FOwnable: caller is not the owner`D\x82\x01R`d\x01a\x01TV[\x80`\0\x03a\x01\xE1W`@QcE\xB2W\xEF`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`\x01T\x81\x03a\x02\x03W`@Qc\x9B$\xE99`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`\x01\x80T\x90\x82\x90U`@\x80Q\x82\x81R` \x81\x01\x84\x90R\x7F\xD4\xC5\xE0k\x1A\xE0\x97\xBA\x027&R\xA7\xAD\xAAnJ\x8E\0\xBERt\x97\xA3\xAD\x0E\xBC?v\x1E\xF3\xFB\x91\x01`@Q\x80\x91\x03\x90\xA1PPV[`\0\x80T`\x01`\x01`\xA0\x1B\x03\x83\x81\x16`\x01`\x01`\xA0\x1B\x03\x19\x83\x16\x81\x17\x84U`@Q\x91\x90\x92\x16\x92\x83\x91\x7F\x8B\xE0\x07\x9CS\x16Y\x14\x13D\xCD\x1F\xD0\xA4\xF2\x84\x19I\x7F\x97\"\xA3\xDA\xAF\xE3\xB4\x18okdW\xE0\x91\x90\xA3PPV[`\0` \x82\x84\x03\x12\x15a\x02\xAAW`\0\x80\xFD[P5\x91\x90PV[`\0` \x82\x84\x03\x12\x15a\x02\xC3W`\0\x80\xFD[\x815`\x01`\x01`\xA0\x1B\x03\x81\x16\x81\x14a\x02\xDAW`\0\x80\xFD[\x93\x92PPPV\xFE\xA2dipfsX\"\x12 \x80\xF8'\xDE\x88>\xA1\xD8\x0B\xBC^\x1C\xC1\xD9F\xF4\xCB\xCE\xF3\x86{j\xC3\x16\x12\xEE\x17[\xF2$\xD5bdsolcC\0\x08\x13\x003",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `TicketPriceMustNotBeSame()` and selector `0x9b24e939`.
 ```solidity
 error TicketPriceMustNotBeSame();
@@ -243,6 +245,8 @@ error TicketPriceMustNotBeSame();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `TicketPriceMustNotBeZero()` and selector `0x45b257ef`.
 ```solidity
 error TicketPriceMustNotBeZero();
@@ -309,6 +313,8 @@ error TicketPriceMustNotBeZero();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `OwnershipTransferred(address,address)` and selector `0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0`.
 ```solidity
 event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -427,6 +433,8 @@ event OwnershipTransferred(address indexed previousOwner, address indexed newOwn
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `TicketPriceUpdated(uint256,uint256)` and selector `0xd4c5e06b1ae097ba02372652a7adaa6e4a8e00be527497a3ad0ebc3f761ef3fb`.
 ```solidity
 event TicketPriceUpdated(uint256, uint256);
@@ -620,6 +628,8 @@ constructor(address _newOwner, uint256 _initialTicketPrice);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `currentTicketPrice()` and selector `0xe0159106`.
 ```solidity
 function currentTicketPrice() external view returns (uint256);
@@ -627,6 +637,8 @@ function currentTicketPrice() external view returns (uint256);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct currentTicketPriceCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`currentTicketPrice()`](currentTicketPriceCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -745,6 +757,8 @@ function currentTicketPrice() external view returns (uint256);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `owner()` and selector `0x8da5cb5b`.
 ```solidity
 function owner() external view returns (address);
@@ -752,6 +766,8 @@ function owner() external view returns (address);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct ownerCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`owner()`](ownerCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -864,6 +880,8 @@ function owner() external view returns (address);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `renounceOwnership()` and selector `0x715018a6`.
 ```solidity
 function renounceOwnership() external;
@@ -984,6 +1002,8 @@ function renounceOwnership() external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `setTicketPrice(uint256)` and selector `0x15981650`.
 ```solidity
 function setTicketPrice(uint256 _newTicketPrice) external;
@@ -1111,6 +1131,8 @@ function setTicketPrice(uint256 _newTicketPrice) external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `transferOwnership(address)` and selector `0xf2fde38b`.
 ```solidity
 function transferOwnership(address newOwner) external;
@@ -1239,6 +1261,8 @@ function transferOwnership(address newOwner) external;
         }
     };
     ///Container for all the [`HoprTicketPriceOracle`](self) function calls.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive()]
     pub enum HoprTicketPriceOracleCalls {
         #[allow(missing_docs)]
         currentTicketPrice(currentTicketPriceCall),
@@ -1447,6 +1471,8 @@ function transferOwnership(address newOwner) external;
         }
     }
     ///Container for all the [`HoprTicketPriceOracle`](self) custom errors.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprTicketPriceOracleErrors {
         #[allow(missing_docs)]
         TicketPriceMustNotBeSame(TicketPriceMustNotBeSame),
@@ -1572,6 +1598,8 @@ function transferOwnership(address newOwner) external;
         }
     }
     ///Container for all the [`HoprTicketPriceOracle`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprTicketPriceOracleEvents {
         #[allow(missing_docs)]
         OwnershipTransferred(OwnershipTransferred),

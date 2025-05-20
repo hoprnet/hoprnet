@@ -169,6 +169,8 @@ pub mod HoprNetworkRegistryEvents {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `Deregistered(address,address)` and selector `0x159a8ae948fcc6e7f8b5495c0d73e91598440af8a62817246c09edc2c28dba8a`.
 ```solidity
 event Deregistered(address indexed stakingAccount, address indexed nodeAddress);
@@ -287,6 +289,8 @@ event Deregistered(address indexed stakingAccount, address indexed nodeAddress);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `DeregisteredByManager(address,address)` and selector `0x91760a1001f531ec2bee8602be55ad2b1159465edff5bbcd41d20703742a4d42`.
 ```solidity
 event DeregisteredByManager(address indexed stakingAccount, address indexed nodeAddress);
@@ -405,6 +409,8 @@ event DeregisteredByManager(address indexed stakingAccount, address indexed node
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `EligibilityUpdated(address,bool)` and selector `0xe2994f8d6f600ad473dba82c0a890ab7affacb860d3365f474baa3dc04a2e557`.
 ```solidity
 event EligibilityUpdated(address indexed stakingAccount, bool indexed eligibility);
@@ -523,6 +529,8 @@ event EligibilityUpdated(address indexed stakingAccount, bool indexed eligibilit
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `NetworkRegistryStatusUpdated(bool)` and selector `0x8bc85f25e3e933978f099408b3bb3eb7630b76f7455f2e205bcbc0a780e17e72`.
 ```solidity
 event NetworkRegistryStatusUpdated(bool indexed isEnabled);
@@ -630,6 +638,8 @@ event NetworkRegistryStatusUpdated(bool indexed isEnabled);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `Registered(address,address)` and selector `0x0a31ee9d46a828884b81003c8498156ea6aa15b9b54bdd0ef0b533d9eba57e55`.
 ```solidity
 event Registered(address indexed stakingAccount, address indexed nodeAddress);
@@ -748,6 +758,8 @@ event Registered(address indexed stakingAccount, address indexed nodeAddress);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RegisteredByManager(address,address)` and selector `0x04e1eaa4da18f7e742a4edbbe9ede36cdf75f793bb03ab2158c0877f1caf2b93`.
 ```solidity
 event RegisteredByManager(address indexed stakingAccount, address indexed nodeAddress);
@@ -866,6 +878,8 @@ event RegisteredByManager(address indexed stakingAccount, address indexed nodeAd
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RequirementUpdated(address)` and selector `0x8ac4b2eb7749f75c5b99b898e547fd615dd7a424e68356ea196b7dae742d6c32`.
 ```solidity
 event RequirementUpdated(address indexed requirementImplementation);
@@ -974,6 +988,8 @@ event RequirementUpdated(address indexed requirementImplementation);
         }
     };
     ///Container for all the [`HoprNetworkRegistryEvents`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprNetworkRegistryEventsEvents {
         #[allow(missing_docs)]
         Deregistered(Deregistered),

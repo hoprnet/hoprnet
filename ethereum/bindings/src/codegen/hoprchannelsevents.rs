@@ -18,6 +18,8 @@ library HoprChannels {
 pub mod HoprChannels {
     use super::*;
     use alloy::sol_types as alloy_sol_types;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct Balance(alloy::sol_types::private::primitives::aliases::U96);
@@ -147,6 +149,8 @@ pub mod HoprChannels {
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct TicketIndex(alloy::sol_types::private::primitives::aliases::U48);
@@ -276,6 +280,8 @@ pub mod HoprChannels {
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct Timestamp(u32);
@@ -705,6 +711,8 @@ pub mod HoprChannelsEvents {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ChannelBalanceDecreased(bytes32,uint96)` and selector `0x22e2a422a8860656a3a33cfa1daf771e76798ce5649747957235025de12e0b24`.
 ```solidity
 event ChannelBalanceDecreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
@@ -821,6 +829,8 @@ event ChannelBalanceDecreased(bytes32 indexed channelId, HoprChannels.Balance ne
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ChannelBalanceIncreased(bytes32,uint96)` and selector `0x5fa17246d3a5d68d42baa94cde33042180b783a399c02bf63ac2076e0f708738`.
 ```solidity
 event ChannelBalanceIncreased(bytes32 indexed channelId, HoprChannels.Balance newBalance);
@@ -937,6 +947,8 @@ event ChannelBalanceIncreased(bytes32 indexed channelId, HoprChannels.Balance ne
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ChannelClosed(bytes32)` and selector `0xceeab2eef998c17fe96f30f83fbf3c55fc5047f6e40c55a0cf72d236e9d2ba72`.
 ```solidity
 event ChannelClosed(bytes32 indexed channelId);
@@ -1042,6 +1054,8 @@ event ChannelClosed(bytes32 indexed channelId);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ChannelOpened(address,address)` and selector `0xdd90f938230335e59dc925c57ecb0e27a28c2d87356e31f00cd5554abd6c1b2d`.
 ```solidity
 event ChannelOpened(address indexed source, address indexed destination);
@@ -1160,6 +1174,8 @@ event ChannelOpened(address indexed source, address indexed destination);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `DomainSeparatorUpdated(bytes32)` and selector `0x771f5240ae5fd8a7640d3fb82fa70aab2fb1dbf35f2ef464f8509946717664c5`.
 ```solidity
 event DomainSeparatorUpdated(bytes32 indexed domainSeparator);
@@ -1265,6 +1281,8 @@ event DomainSeparatorUpdated(bytes32 indexed domainSeparator);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `OutgoingChannelClosureInitiated(bytes32,uint32)` and selector `0x07b5c950597fc3bed92e2ad37fa84f701655acb372982e486f5fad3607f04a5c`.
 ```solidity
 event OutgoingChannelClosureInitiated(bytes32 indexed channelId, HoprChannels.Timestamp closureTime);
@@ -1382,6 +1400,8 @@ event OutgoingChannelClosureInitiated(bytes32 indexed channelId, HoprChannels.Ti
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `TicketRedeemed(bytes32,uint48)` and selector `0x7165e2ebc7ce35cc98cb7666f9945b3617f3f36326b76d18937ba5fecf18739a`.
 ```solidity
 event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTicketIndex);
@@ -1497,6 +1517,8 @@ event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTick
         }
     };
     ///Container for all the [`HoprChannelsEvents`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprChannelsEventsEvents {
         #[allow(missing_docs)]
         ChannelBalanceDecreased(ChannelBalanceDecreased),

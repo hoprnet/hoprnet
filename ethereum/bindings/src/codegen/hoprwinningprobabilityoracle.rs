@@ -215,6 +215,8 @@ pub mod HoprWinningProbabilityOracle {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"`\x80`@R4\x80\x15a\0\x10W`\0\x80\xFD[P`\x046\x10a\0}W`\x005`\xE0\x1C\x80c\x8D\xA5\xCB[\x11a\0[W\x80c\x8D\xA5\xCB[\x14a\0\xCBW\x80c\xE3\x0C9x\x14a\0\xF0W\x80c\xF2\xFD\xE3\x8B\x14a\x01\x01W\x80c\xFD\xE4o\xF8\x14a\x01\x14W`\0\x80\xFD[\x80c\x16\x8E\x91`\x14a\0\x82W\x80cqP\x18\xA6\x14a\0\xB9W\x80cy\xBAP\x97\x14a\0\xC3W[`\0\x80\xFD[`\x01Ta\0\x9C\x90`\x01`\xA0\x1B\x90\x04f\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x16\x81V[`@Qf\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x90\x91\x16\x81R` \x01[`@Q\x80\x91\x03\x90\xF3[a\0\xC1a\x01'V[\0[a\0\xC1a\x01;V[`\0T`\x01`\x01`\xA0\x1B\x03\x16[`@Q`\x01`\x01`\xA0\x1B\x03\x90\x91\x16\x81R` \x01a\0\xB0V[`\x01T`\x01`\x01`\xA0\x1B\x03\x16a\0\xD8V[a\0\xC1a\x01\x0F6`\x04a\x03\xA7V[a\x01\xBAV[a\0\xC1a\x01\"6`\x04a\x03\xD7V[a\x02+V[a\x01/a\x02qV[a\x019`\0a\x02\xCBV[V[`\x01T3\x90`\x01`\x01`\xA0\x1B\x03\x16\x81\x14a\x01\xAEW`@QbF\x1B\xCD`\xE5\x1B\x81R` `\x04\x82\x01R`)`$\x82\x01R\x7FOwnable2Step: caller is not the `D\x82\x01Rh72\xBB\x907\xBB\xB72\xB9`\xB9\x1B`d\x82\x01R`\x84\x01[`@Q\x80\x91\x03\x90\xFD[a\x01\xB7\x81a\x02\xCBV[PV[a\x01\xC2a\x02qV[`\x01\x80T`\x01`\x01`\xA0\x1B\x03\x83\x16`\x01`\x01`\xA0\x1B\x03\x19\x90\x91\x16\x81\x17\x90\x91Ua\x01\xF3`\0T`\x01`\x01`\xA0\x1B\x03\x16\x90V[`\x01`\x01`\xA0\x1B\x03\x16\x7F8\xD1k\x8C\xAC\"\xD9\x9F\xC7\xC1$\xB9\xCD\r\xE2\xD3\xFA\x1F\xAE\xF4 \xBF\xE7\x91\xD8\xC3b\xD7e\xE2'\0`@Q`@Q\x80\x91\x03\x90\xA3PV[a\x023a\x02qV[`\x01Tf\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x80\x83\x16`\x01`\xA0\x1B\x90\x92\x04\x16\x03a\x02hW`@Qc6\xBF\x1F\xCD`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[a\x01\xB7\x81a\x02\xE4V[`\0T`\x01`\x01`\xA0\x1B\x03\x163\x14a\x019W`@QbF\x1B\xCD`\xE5\x1B\x81R` `\x04\x82\x01\x81\x90R`$\x82\x01R\x7FOwnable: caller is not the owner`D\x82\x01R`d\x01a\x01\xA5V[`\x01\x80T`\x01`\x01`\xA0\x1B\x03\x19\x16\x90Ua\x01\xB7\x81a\x03WV[`\x01\x80Tf\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x83\x81\x16`\x01`\xA0\x1B\x90\x81\x02f\xFF\xFF\xFF\xFF\xFF\xFF\xFF`\xA0\x1B\x19\x84\x16\x17\x93\x84\x90U`@\x80Q\x93\x82\x90\x04\x83\x16\x80\x85R\x91\x90\x94\x04\x90\x91\x16` \x83\x01R\x91\x7F\x02r\x8CJ\x807?GeU\x9D\xC3\xA0F\xED\xEA\x88\x18d$\x82r8\xBBF$Vh1]8\0\x91\x01`@Q\x80\x91\x03\x90\xA1PPV[`\0\x80T`\x01`\x01`\xA0\x1B\x03\x83\x81\x16`\x01`\x01`\xA0\x1B\x03\x19\x83\x16\x81\x17\x84U`@Q\x91\x90\x92\x16\x92\x83\x91\x7F\x8B\xE0\x07\x9CS\x16Y\x14\x13D\xCD\x1F\xD0\xA4\xF2\x84\x19I\x7F\x97\"\xA3\xDA\xAF\xE3\xB4\x18okdW\xE0\x91\x90\xA3PPV[`\0` \x82\x84\x03\x12\x15a\x03\xB9W`\0\x80\xFD[\x815`\x01`\x01`\xA0\x1B\x03\x81\x16\x81\x14a\x03\xD0W`\0\x80\xFD[\x93\x92PPPV[`\0` \x82\x84\x03\x12\x15a\x03\xE9W`\0\x80\xFD[\x815f\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x81\x16\x81\x14a\x03\xD0W`\0\x80\xFD\xFE\xA2dipfsX\"\x12 \xEB\xC7->e\xDC:\x08\x1F\xE6\xE8I(\x162\x931\x8D\t\x86\rG\x1C\xE1\xC1\x80v\xE7\xA6aH*dsolcC\0\x08\x13\x003",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct WinProb(alloy::sol_types::private::primitives::aliases::U56);
@@ -344,6 +346,8 @@ pub mod HoprWinningProbabilityOracle {
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `WinProbMustNotBeSame()` and selector `0x36bf1fcd`.
 ```solidity
 error WinProbMustNotBeSame();
@@ -408,6 +412,8 @@ error WinProbMustNotBeSame();
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `OwnershipTransferStarted(address,address)` and selector `0x38d16b8cac22d99fc7c124b9cd0de2d3fa1faef420bfe791d8c362d765e22700`.
 ```solidity
 event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
@@ -528,6 +534,8 @@ event OwnershipTransferStarted(address indexed previousOwner, address indexed ne
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `OwnershipTransferred(address,address)` and selector `0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0`.
 ```solidity
 event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -646,6 +654,8 @@ event OwnershipTransferred(address indexed previousOwner, address indexed newOwn
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `WinProbUpdated(uint56,uint56)` and selector `0x02728c4a80373f4765559dc3a046edea88186424827238bb46245668315d3800`.
 ```solidity
 event WinProbUpdated(WinProb oldWinProb, WinProb newWinProb);
@@ -829,6 +839,8 @@ constructor(address _newOwner, WinProb _initialWinProb);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `acceptOwnership()` and selector `0x79ba5097`.
 ```solidity
 function acceptOwnership() external;
@@ -947,6 +959,8 @@ function acceptOwnership() external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `currentWinProb()` and selector `0x168e9160`.
 ```solidity
 function currentWinProb() external view returns (WinProb);
@@ -954,6 +968,8 @@ function currentWinProb() external view returns (WinProb);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct currentWinProbCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`currentWinProb()`](currentWinProbCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -1070,6 +1086,8 @@ function currentWinProb() external view returns (WinProb);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `owner()` and selector `0x8da5cb5b`.
 ```solidity
 function owner() external view returns (address);
@@ -1077,6 +1095,8 @@ function owner() external view returns (address);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct ownerCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`owner()`](ownerCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -1189,6 +1209,8 @@ function owner() external view returns (address);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `pendingOwner()` and selector `0xe30c3978`.
 ```solidity
 function pendingOwner() external view returns (address);
@@ -1196,6 +1218,8 @@ function pendingOwner() external view returns (address);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct pendingOwnerCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`pendingOwner()`](pendingOwnerCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -1308,6 +1332,8 @@ function pendingOwner() external view returns (address);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `renounceOwnership()` and selector `0x715018a6`.
 ```solidity
 function renounceOwnership() external;
@@ -1428,6 +1454,8 @@ function renounceOwnership() external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `setWinProb(uint56)` and selector `0xfde46ff8`.
 ```solidity
 function setWinProb(WinProb _newWinProb) external;
@@ -1549,6 +1577,8 @@ function setWinProb(WinProb _newWinProb) external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `transferOwnership(address)` and selector `0xf2fde38b`.
 ```solidity
 function transferOwnership(address newOwner) external;
@@ -1677,6 +1707,8 @@ function transferOwnership(address newOwner) external;
         }
     };
     ///Container for all the [`HoprWinningProbabilityOracle`](self) function calls.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive()]
     pub enum HoprWinningProbabilityOracleCalls {
         #[allow(missing_docs)]
         acceptOwnership(acceptOwnershipCall),
@@ -1943,6 +1975,8 @@ function transferOwnership(address newOwner) external;
         }
     }
     ///Container for all the [`HoprWinningProbabilityOracle`](self) custom errors.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprWinningProbabilityOracleErrors {
         #[allow(missing_docs)]
         WinProbMustNotBeSame(WinProbMustNotBeSame),
@@ -2038,6 +2072,8 @@ function transferOwnership(address newOwner) external;
         }
     }
     ///Container for all the [`HoprWinningProbabilityOracle`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprWinningProbabilityOracleEvents {
         #[allow(missing_docs)]
         OwnershipTransferStarted(OwnershipTransferStarted),

@@ -63,6 +63,8 @@ pub mod HoprWinningProbabilityOracleEvents {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct WinProb(alloy::sol_types::private::primitives::aliases::U56);
@@ -192,6 +194,8 @@ pub mod HoprWinningProbabilityOracleEvents {
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `WinProbUpdated(uint56,uint56)` and selector `0x02728c4a80373f4765559dc3a046edea88186424827238bb46245668315d3800`.
 ```solidity
 event WinProbUpdated(WinProb oldWinProb, WinProb newWinProb);
@@ -300,6 +304,8 @@ event WinProbUpdated(WinProb oldWinProb, WinProb newWinProb);
         }
     };
     ///Container for all the [`HoprWinningProbabilityOracleEvents`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprWinningProbabilityOracleEventsEvents {
         #[allow(missing_docs)]
         WinProbUpdated(WinProbUpdated),

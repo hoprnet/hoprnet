@@ -95,6 +95,8 @@ pub mod HoprNodeSafeRegistryEvents {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `DergisteredNodeSafe(address,address)` and selector `0xe837f339639296bec9f4bc986154f5ff76bbbefc3149a512920e1311414e3da1`.
 ```solidity
 event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
@@ -213,6 +215,8 @@ event DergisteredNodeSafe(address indexed safeAddress, address indexed nodeAddre
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `DomainSeparatorUpdated(bytes32)` and selector `0x771f5240ae5fd8a7640d3fb82fa70aab2fb1dbf35f2ef464f8509946717664c5`.
 ```solidity
 event DomainSeparatorUpdated(bytes32 indexed domainSeparator);
@@ -318,6 +322,8 @@ event DomainSeparatorUpdated(bytes32 indexed domainSeparator);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RegisteredNodeSafe(address,address)` and selector `0x776da40cbf2c223552661bd48502ceb72409b3362bb0c66d8989bd7e20e4497d`.
 ```solidity
 event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddress);
@@ -437,6 +443,8 @@ event RegisteredNodeSafe(address indexed safeAddress, address indexed nodeAddres
         }
     };
     ///Container for all the [`HoprNodeSafeRegistryEvents`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprNodeSafeRegistryEventsEvents {
         #[allow(missing_docs)]
         DergisteredNodeSafe(DergisteredNodeSafe),

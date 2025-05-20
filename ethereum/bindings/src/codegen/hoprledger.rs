@@ -92,6 +92,8 @@ pub mod HoprLedger {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `LedgerDomainSeparatorUpdated(bytes32)` and selector `0xa43fad83920fd09445855e854e73c9c532e17402c9ceb09993a2392843a5bdb9`.
 ```solidity
 event LedgerDomainSeparatorUpdated(bytes32 indexed ledgerDomainSeparator);
@@ -203,6 +205,8 @@ event LedgerDomainSeparatorUpdated(bytes32 indexed ledgerDomainSeparator);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `LEDGER_VERSION()` and selector `0xddad1902`.
 ```solidity
 function LEDGER_VERSION() external view returns (string memory);
@@ -210,6 +214,8 @@ function LEDGER_VERSION() external view returns (string memory);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct LEDGER_VERSIONCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`LEDGER_VERSION()`](LEDGER_VERSIONCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -324,6 +330,8 @@ function LEDGER_VERSION() external view returns (string memory);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `ledgerDomainSeparator()` and selector `0xc966c4fe`.
 ```solidity
 function ledgerDomainSeparator() external view returns (bytes32);
@@ -331,6 +339,8 @@ function ledgerDomainSeparator() external view returns (bytes32);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct ledgerDomainSeparatorCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`ledgerDomainSeparator()`](ledgerDomainSeparatorCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -447,6 +457,8 @@ function ledgerDomainSeparator() external view returns (bytes32);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `updateLedgerDomainSeparator()` and selector `0xdc96fd50`.
 ```solidity
 function updateLedgerDomainSeparator() external;
@@ -568,6 +580,8 @@ function updateLedgerDomainSeparator() external;
         }
     };
     ///Container for all the [`HoprLedger`](self) function calls.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive()]
     pub enum HoprLedgerCalls {
         #[allow(missing_docs)]
         LEDGER_VERSION(LEDGER_VERSIONCall),
@@ -723,6 +737,8 @@ function updateLedgerDomainSeparator() external;
         }
     }
     ///Container for all the [`HoprLedger`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprLedgerEvents {
         #[allow(missing_docs)]
         LedgerDomainSeparatorUpdated(LedgerDomainSeparatorUpdated),

@@ -296,6 +296,8 @@ pub mod HoprDummyProxyForNetworkRegistry {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"`\x80`@R4\x80\x15a\0\x10W`\0\x80\xFD[P`\x046\x10a\0\xB4W`\x005`\xE0\x1C\x80c\xA7\x1B\x1Bt\x11a\0qW\x80c\xA7\x1B\x1Bt\x14a\x01/W\x80c\xB3TN\x82\x14a\x01BW\x80c\xD8Z\xD0D\x14a\x01cW\x80c\xF2\xFD\xE3\x8B\x14a\x01\x89W\x80c\xF4l\x84\xB8\x14a\x01\x9CW\x80c\xF6\x7F^o\x14a\x01\xA5W`\0\x80\xFD[\x80c\x08\x9F\xFAG\x14a\0\xB9W\x80c@Q\xF2W\x14a\0\xCEW\x80cHcT\xE2\x14a\0\xE1W\x80c\\Tq\xE7\x14a\0\xF4W\x80cqP\x18\xA6\x14a\x01\x07W\x80c\x8D\xA5\xCB[\x14a\x01\x0FW[`\0\x80\xFD[a\0\xCCa\0\xC76`\x04a\x05:V[a\x01\xB2V[\0[a\0\xCCa\0\xDC6`\x04a\x05zV[a\x02\x12V[a\0\xCCa\0\xEF6`\x04a\x05\x95V[a\x02#V[a\0\xCCa\x01\x026`\x04a\x05\x95V[a\x02|V[a\0\xCCa\x02\xD0V[`\0T`@Q`\x01`\x01`\xA0\x1B\x03\x90\x91\x16\x81R` \x01[`@Q\x80\x91\x03\x90\xF3[a\0\xCCa\x01=6`\x04a\x05zV[a\x02\xE4V[a\x01Ua\x01P6`\x04a\x05zV[a\x02\xF5V[`@Q\x90\x81R` \x01a\x01&V[a\x01ya\x01q6`\x04a\x06\nV[`\x01\x92\x91PPV[`@Q\x90\x15\x15\x81R` \x01a\x01&V[a\0\xCCa\x01\x976`\x04a\x05zV[a\x03<V[a\x01U`\0\x19\x81V[`\x02Ta\x01y\x90`\xFF\x16\x81V[a\x01\xBAa\x03\xB7V[`\x02T`\xFF\x16\x15\x15\x81\x15\x15\x14a\x02\x0FW`\x02\x80T`\xFF\x19\x16\x82\x15\x15\x90\x81\x17\x90\x91U`@Q\x90\x81R\x7F\xAF\xAB#\xA4\xBC\x8CI%\x0B\xA3~\xEB\x06%\xB0\xA9\xB2q\xF5]\x15\x01\x83\x8D$\xF5E\x08\xC3\xB1sB\x90` \x01`@Q\x80\x91\x03\x90\xA1[PV[a\x02\x1Aa\x03\xB7V[a\x02\x0F\x81a\x04\x11V[a\x02+a\x03\xB7V[`\0[\x81\x81\x10\x15a\x02wWa\x02e\x83\x83\x83\x81\x81\x10a\x02KWa\x02Ka\x06=V[\x90P` \x02\x01` \x81\x01\x90a\x02`\x91\x90a\x05zV[a\x04{V[\x80a\x02o\x81a\x06SV[\x91PPa\x02.V[PPPV[a\x02\x84a\x03\xB7V[`\0[\x81\x81\x10\x15a\x02wWa\x02\xBE\x83\x83\x83\x81\x81\x10a\x02\xA4Wa\x02\xA4a\x06=V[\x90P` \x02\x01` \x81\x01\x90a\x02\xB9\x91\x90a\x05zV[a\x04\x11V[\x80a\x02\xC8\x81a\x06SV[\x91PPa\x02\x87V[a\x02\xD8a\x03\xB7V[a\x02\xE2`\0a\x04\xEAV[V[a\x02\xECa\x03\xB7V[a\x02\x0F\x81a\x04{V[`\x02T`\0\x90`\xFF\x16\x80a\x03!WP`\x01`\x01`\xA0\x1B\x03\x82\x16`\0\x90\x81R`\x01` R`@\x90 T`\xFF\x16[\x15a\x03/WP`\0\x19\x91\x90PV[P`\0\x91\x90PV[\x91\x90PV[a\x03Da\x03\xB7V[`\x01`\x01`\xA0\x1B\x03\x81\x16a\x03\xAEW`@QbF\x1B\xCD`\xE5\x1B\x81R` `\x04\x82\x01R`&`$\x82\x01R\x7FOwnable: new owner is the zero a`D\x82\x01Reddress`\xD0\x1B`d\x82\x01R`\x84\x01[`@Q\x80\x91\x03\x90\xFD[a\x02\x0F\x81a\x04\xEAV[`\0T`\x01`\x01`\xA0\x1B\x03\x163\x14a\x02\xE2W`@QbF\x1B\xCD`\xE5\x1B\x81R` `\x04\x82\x01\x81\x90R`$\x82\x01R\x7FOwnable: caller is not the owner`D\x82\x01R`d\x01a\x03\xA5V[`\x01`\x01`\xA0\x1B\x03\x81\x16`\0\x90\x81R`\x01` R`@\x90 T`\xFF\x16\x15a\x02\x0FW`\x01`\x01`\xA0\x1B\x03\x81\x16`\0\x81\x81R`\x01` R`@\x80\x82 \x80T`\xFF\x19\x16\x90UQ\x7F\x0Ec\xD6)\xAF\xE3K<\xA5\x10|\x10\xF9\n\xBF\xF5\t\x1B1U\x1B7\x17X\xBDP\xAFv\x83M\xC0t\x91\x90\xA2PV[`\x01`\x01`\xA0\x1B\x03\x81\x16`\0\x90\x81R`\x01` R`@\x90 T`\xFF\x16a\x02\x0FW`\x01`\x01`\xA0\x1B\x03\x81\x16`\0\x81\x81R`\x01` \x81\x90R`@\x80\x83 \x80T`\xFF\x19\x16\x90\x92\x17\x90\x91UQ\x7F\xCD\x82-\xC9h\x8E \xAC\xEAhrJ/\xBC\xFEO>Rm \xEC\xAA7\xB1\x8F\xE3\x04z\xB3w\xD6\xA5\x91\x90\xA2PV[`\0\x80T`\x01`\x01`\xA0\x1B\x03\x83\x81\x16`\x01`\x01`\xA0\x1B\x03\x19\x83\x16\x81\x17\x84U`@Q\x91\x90\x92\x16\x92\x83\x91\x7F\x8B\xE0\x07\x9CS\x16Y\x14\x13D\xCD\x1F\xD0\xA4\xF2\x84\x19I\x7F\x97\"\xA3\xDA\xAF\xE3\xB4\x18okdW\xE0\x91\x90\xA3PPV[`\0` \x82\x84\x03\x12\x15a\x05LW`\0\x80\xFD[\x815\x80\x15\x15\x81\x14a\x05\\W`\0\x80\xFD[\x93\x92PPPV[\x805`\x01`\x01`\xA0\x1B\x03\x81\x16\x81\x14a\x037W`\0\x80\xFD[`\0` \x82\x84\x03\x12\x15a\x05\x8CW`\0\x80\xFD[a\x05\\\x82a\x05cV[`\0\x80` \x83\x85\x03\x12\x15a\x05\xA8W`\0\x80\xFD[\x825g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x80\x82\x11\x15a\x05\xC0W`\0\x80\xFD[\x81\x85\x01\x91P\x85`\x1F\x83\x01\x12a\x05\xD4W`\0\x80\xFD[\x815\x81\x81\x11\x15a\x05\xE3W`\0\x80\xFD[\x86` \x82`\x05\x1B\x85\x01\x01\x11\x15a\x05\xF8W`\0\x80\xFD[` \x92\x90\x92\x01\x96\x91\x95P\x90\x93PPPPV[`\0\x80`@\x83\x85\x03\x12\x15a\x06\x1DW`\0\x80\xFD[a\x06&\x83a\x05cV[\x91Pa\x064` \x84\x01a\x05cV[\x90P\x92P\x92\x90PV[cNH{q`\xE0\x1B`\0R`2`\x04R`$`\0\xFD[`\0`\x01\x82\x01a\x06sWcNH{q`\xE0\x1B`\0R`\x11`\x04R`$`\0\xFD[P`\x01\x01\x90V\xFE\xA2dipfsX\"\x12 \x17\xF8\x85\xC4\xB1\x04C\"\xC6\xEB\r\xB8\x81\xF1\xDA\xE8L\xDB\x938\x95(\x1A\x13}\xF6\x7FF\xE2T\rldsolcC\0\x08\x13\x003",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `AccountDeregistered(address)` and selector `0x0e63d629afe34b3ca5107c10f90abff5091b31551b371758bd50af76834dc074`.
 ```solidity
 event AccountDeregistered(address indexed account);
@@ -401,6 +403,8 @@ event AccountDeregistered(address indexed account);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `AccountRegistered(address)` and selector `0xcd822dc9688e20acea68724a2fbcfe4f3e526d20ecaa37b18fe3047ab377d6a5`.
 ```solidity
 event AccountRegistered(address indexed account);
@@ -506,6 +510,8 @@ event AccountRegistered(address indexed account);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `AllowAllAccountsEligible(bool)` and selector `0xafab23a4bc8c49250ba37eeb0625b0a9b271f55d1501838d24f54508c3b17342`.
 ```solidity
 event AllowAllAccountsEligible(bool isAllowed);
@@ -611,6 +617,8 @@ event AllowAllAccountsEligible(bool isAllowed);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `OwnershipTransferred(address,address)` and selector `0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0`.
 ```solidity
 event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -794,6 +802,8 @@ constructor(address newOwner);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `MAX_REGISTRATION_PER_ACCOUNT()` and selector `0xf46c84b8`.
 ```solidity
 function MAX_REGISTRATION_PER_ACCOUNT() external view returns (uint256);
@@ -801,6 +811,8 @@ function MAX_REGISTRATION_PER_ACCOUNT() external view returns (uint256);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct MAX_REGISTRATION_PER_ACCOUNTCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`MAX_REGISTRATION_PER_ACCOUNT()`](MAX_REGISTRATION_PER_ACCOUNTCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -919,6 +931,8 @@ function MAX_REGISTRATION_PER_ACCOUNT() external view returns (uint256);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `canOperateFor(address,address)` and selector `0xd85ad044`.
 ```solidity
 function canOperateFor(address, address) external pure returns (bool eligiblity);
@@ -931,6 +945,8 @@ function canOperateFor(address, address) external pure returns (bool eligiblity)
         #[allow(missing_docs)]
         pub _1: alloy::sol_types::private::Address,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`canOperateFor(address,address)`](canOperateForCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -1059,6 +1075,8 @@ function canOperateFor(address, address) external pure returns (bool eligiblity)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `isAllAllowed()` and selector `0xf67f5e6f`.
 ```solidity
 function isAllAllowed() external view returns (bool);
@@ -1066,6 +1084,8 @@ function isAllAllowed() external view returns (bool);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct isAllAllowedCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`isAllAllowed()`](isAllAllowedCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -1178,6 +1198,8 @@ function isAllAllowed() external view returns (bool);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `maxAllowedRegistrations(address)` and selector `0xb3544e82`.
 ```solidity
 function maxAllowedRegistrations(address account) external view returns (uint256);
@@ -1188,6 +1210,8 @@ function maxAllowedRegistrations(address account) external view returns (uint256
         #[allow(missing_docs)]
         pub account: alloy::sol_types::private::Address,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`maxAllowedRegistrations(address)`](maxAllowedRegistrationsCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -1310,6 +1334,8 @@ function maxAllowedRegistrations(address account) external view returns (uint256
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `owner()` and selector `0x8da5cb5b`.
 ```solidity
 function owner() external view returns (address);
@@ -1317,6 +1343,8 @@ function owner() external view returns (address);
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct ownerCall {}
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`owner()`](ownerCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -1429,6 +1457,8 @@ function owner() external view returns (address);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `ownerAddAccount(address)` and selector `0xa71b1b74`.
 ```solidity
 function ownerAddAccount(address account) external;
@@ -1554,6 +1584,8 @@ function ownerAddAccount(address account) external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `ownerBatchAddAccounts(address[])` and selector `0x486354e2`.
 ```solidity
 function ownerBatchAddAccounts(address[] memory accounts) external;
@@ -1687,6 +1719,8 @@ function ownerBatchAddAccounts(address[] memory accounts) external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `ownerBatchRemoveAccounts(address[])` and selector `0x5c5471e7`.
 ```solidity
 function ownerBatchRemoveAccounts(address[] memory accounts) external;
@@ -1820,6 +1854,8 @@ function ownerBatchRemoveAccounts(address[] memory accounts) external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `ownerRemoveAccount(address)` and selector `0x4051f257`.
 ```solidity
 function ownerRemoveAccount(address account) external;
@@ -1947,6 +1983,8 @@ function ownerRemoveAccount(address account) external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `renounceOwnership()` and selector `0x715018a6`.
 ```solidity
 function renounceOwnership() external;
@@ -2067,6 +2105,8 @@ function renounceOwnership() external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `transferOwnership(address)` and selector `0xf2fde38b`.
 ```solidity
 function transferOwnership(address newOwner) external;
@@ -2194,6 +2234,8 @@ function transferOwnership(address newOwner) external;
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `updateAllowAll(bool)` and selector `0x089ffa47`.
 ```solidity
 function updateAllowAll(bool _updatedAllow) external;
@@ -2320,6 +2362,8 @@ function updateAllowAll(bool _updatedAllow) external;
         }
     };
     ///Container for all the [`HoprDummyProxyForNetworkRegistry`](self) function calls.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive()]
     pub enum HoprDummyProxyForNetworkRegistryCalls {
         #[allow(missing_docs)]
         MAX_REGISTRATION_PER_ACCOUNT(MAX_REGISTRATION_PER_ACCOUNTCall),
@@ -2752,6 +2796,8 @@ function updateAllowAll(bool _updatedAllow) external;
         }
     }
     ///Container for all the [`HoprDummyProxyForNetworkRegistry`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprDummyProxyForNetworkRegistryEvents {
         #[allow(missing_docs)]
         AccountDeregistered(AccountDeregistered),
