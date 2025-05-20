@@ -172,27 +172,39 @@ class RouteBidirectionalChannels:
 
     async def __aenter__(self):
         for i in range(len(self._route) - 2):
-            logging.debug(f"open channel {self._route[i].address} -> {self._route[i+1].address}")
-            fwd_channel = await self._route[i].api.open_channel(self._route[i + 1].address, str(int(self._funding_fwd)))
+            remaining = len(self._route) - 2 - i
+
+            logging.debug(
+                f"open forward channel {self._route[i].address} -> {self._route[i+1].address} with {self._funding_fwd * remaining} HOPR"
+            )
+            fwd_channel = await self._route[i].api.open_channel(
+                self._route[i + 1].address, str(int(self._funding_fwd * remaining))
+            )
             assert fwd_channel is not None
 
             ri = len(self._route) - i - 1
-            logging.debug(f"open channel {self._route[ri].address} -> {self._route[ri-1].address}")
+            logging.debug(
+                f"open return channel {self._route[ri].address} -> {self._route[ri-1].address} with {self._funding_return * remaining} HOPR"
+            )
             ret_channel = await self._route[ri].api.open_channel(
-                self._route[ri - 1].address, str(int(self._funding_return))
+                self._route[ri - 1].address, str(int(self._funding_return * remaining))
             )
             assert ret_channel is not None
 
             await asyncio.wait_for(
                 check_channel_status(self._route[i], self._route[i + 1], status=ChannelStatus.Open), 10.0
             )
-            logging.debug(f"opened channel {fwd_channel.id}: {self._route[i].address} -> {self._route[i+1].address}")
+            logging.debug(
+                f"opened forward channel {fwd_channel.id}: {self._route[i].address} -> {self._route[i+1].address}"
+            )
             self._fwd_channels.append(fwd_channel)
 
             await asyncio.wait_for(
                 check_channel_status(self._route[ri], self._route[ri - 1], status=ChannelStatus.Open), 10.0
             )
-            logging.debug(f"opened channel {ret_channel.id}: {self._route[ri].address} -> {self._route[ri-1].address}")
+            logging.debug(
+                f"opened return channel {ret_channel.id}: {self._route[ri].address} -> {self._route[ri-1].address}"
+            )
             self._ret_channels.append(ret_channel)
 
         return self

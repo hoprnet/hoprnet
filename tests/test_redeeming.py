@@ -112,6 +112,8 @@ class TestRedeemingWithSwarm:
         ticket_price = await get_ticket_price(swarm7[route[0]])
         message_count = 5
 
+        # Note that there are always +1 of messages in both directions due to the Session establishment
+
         async with create_bidirectional_channels_for_route(
             [swarm7[hop] for hop in route], (message_count + 1) * ticket_price, ticket_price
         ):
@@ -127,10 +129,17 @@ class TestRedeemingWithSwarm:
             )
 
             # Wait for tickets to be acknowledged and start redeeming them on relays
+            route_len = len(route) - 2
             for i, relay in enumerate(swarm7[hop] for hop in route[1:-1]):
+                # Each hop must have the unredeemed value also proportional to its position in the route
+                # The economic effect of session establishment and initiation messages cancels out,
+                # because they come once from each side
                 await asyncio.wait_for(
                     check_unredeemed_tickets_value(
-                        relay, unredeemed_values_before[i] + (message_count + 2) * ticket_price
+                        relay,
+                        unredeemed_values_before[i]
+                        + (message_count + 1) * ticket_price * (route_len - i)
+                        + ticket_price * (i + 1),
                     ),
                     30.0,
                 )
