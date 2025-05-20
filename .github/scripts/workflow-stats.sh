@@ -78,11 +78,11 @@ for workflow_id in $(jq -r '.[] | .databaseId' "$WORKFLOW_DATA"); do
   fi
 
   # Increment total count
-#echo "Workflow ${workflow_id} conclusion: $workflow_conclusion"
-# Increment total count for success and failure
-if [[ "$workflow_conclusion" == "failure" ]] || [[ "$workflow_conclusion" == "success" ]]; then
-  total_count=$((total_count + 1))
-fi
+  #echo "Workflow ${workflow_id} conclusion: $workflow_conclusion"
+  # Increment total count for success and failure
+  if [[ "$workflow_conclusion" == "failure" ]] || [[ "$workflow_conclusion" == "success" ]]; then
+    total_count=$((total_count + 1))
+  fi
 done
 
 # Function to calculate statistics with pruning
