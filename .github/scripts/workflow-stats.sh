@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -euo pipefail
 # Check if the required parameters are provided
 if [ "$#" -ne 3 ]; then
   echo "Usage: $0 <workflow_file_name> <job_name> <workflow_runs>"
