@@ -18,7 +18,7 @@ WORKFLOW_DATA="workflow_data.json"
 
 # Fetch the first N workflow runs for the specified workflow file
 echo "Fetching workflow runs for $WORKFLOW_FILE..."
-gh run list -w "$WORKFLOW_FILE" --json databaseId,createdAt,conclusion,status --limit "$WORKFLOW_RUNS" > "$WORKFLOW_DATA"
+gh run list -w "$WORKFLOW_FILE" --json databaseId,createdAt,conclusion,status --limit "$WORKFLOW_RUNS" >"$WORKFLOW_DATA"
 
 # Initialize arrays to store waiting times and duration times
 waiting_times=()
@@ -41,13 +41,13 @@ for workflow_id in $(jq -r '.[] | .databaseId' "$WORKFLOW_DATA"); do
   else
     # Fetch detailed information for the workflow run and save it to the cache
     WORKFLOW_DETAILS=$(gh run view "$workflow_id" --json jobs,createdAt)
-    echo "$WORKFLOW_DETAILS" > "$CACHE_FILE"
+    echo "$WORKFLOW_DETAILS" >"$CACHE_FILE"
     echo "Fetched and cached data for Workflow ID: $workflow_id"
   fi
 
   # Extract the workflow-level createdAt timestamp
   workflow_created_at=$(echo "$WORKFLOW_DETAILS" | jq -r '.createdAt | fromdateiso8601 // empty')
-  workflow_conclusion=$(echo "$WORKFLOW_DETAILS" | jq  -r --arg JOB_NAME "$JOB_NAME" '.jobs[] | select(.name == $JOB_NAME) | .conclusion // empty')
+  workflow_conclusion=$(echo "$WORKFLOW_DETAILS" | jq -r --arg JOB_NAME "$JOB_NAME" '.jobs[] | select(.name == $JOB_NAME) | .conclusion // empty')
 
   # Check if the specified job exists and succeeded
   JOB=$(echo "$WORKFLOW_DETAILS" | jq -r --arg JOB_NAME "$JOB_NAME" '.jobs[] | select(.name == $JOB_NAME and .conclusion == "success")')
