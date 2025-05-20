@@ -521,11 +521,10 @@ pub(crate) struct SessionClientResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(example = "tcp")]
     pub protocol: IpProtocol,
+    /// Listening IP address of the Session's socket.
     #[schema(example = "127.0.0.1")]
     pub ip: String,
     #[schema(example = 5542)]
-    /// Listening IP address of the Session's socket.
-    pub ip: String,
     /// Listening port of the Session's socket.
     pub port: u16,
     /// MTU used by the Session.
@@ -784,7 +783,8 @@ pub(crate) async fn create_client(
                 "returnPath": { "Hops": 1 },
                 "protocol": "tcp",
                 "ip": "127.0.0.1",
-                "port": 5542
+                "port": 5542,
+                "mtu": 987
             }
         ])),
         (status = 400, description = "Invalid IP protocol.", body = ApiError),

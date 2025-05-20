@@ -147,6 +147,7 @@ pub(crate) struct InternalState {
         (name = "Channels", description = "HOPR node chain channels manipulation endpoints"),
         (name = "Configuration", description = "HOPR node configuration endpoints"),
         (name = "Checks", description = "HOPR node functionality checks"),
+        (name = "Network", description = "HOPR node network endpoints"),
         (name = "Node", description = "HOPR node information endpoints"),
         (name = "Peers", description = "HOPR node peer manipulation endpoints"),
         (name = "Session", description = "HOPR node session management endpoints"),
