@@ -289,7 +289,7 @@ pub(crate) struct OpenChannelBodyRequest {
 pub(crate) struct OpenChannelResponse {
     /// ID of the new channel.
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String, example =" 0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
+    #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
     channel_id: Hash,
     /// Receipt of the channel open transaction.
     #[serde_as(as = "DisplayFromStr")]

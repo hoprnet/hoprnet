@@ -108,7 +108,6 @@ pub(crate) struct PingResponse {
     description = "Directly ping the given peer",
     params(
         ("destination" = String, Path, description = "PeerID or address of the requested peer", example = "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"),
-        ("timeout" = u64, Query, description = "Timeout in milliseconds", example = 2000)
     ),
     responses(
         (status = 200, description = "Ping successful", body = PingResponse),
