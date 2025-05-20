@@ -12,6 +12,8 @@ import nacl.signing  # Ensure nacl.signing is imported correctly
 import nacl.utils
 from nacl.public import SealedBox  # Import SealedBox explicitly
 
+
+from .channelstatus import ChannelDirection, ChannelStatus
 from .http_method import HTTPMethod
 from .protocol import Protocol
 from .request_objects import (
@@ -21,6 +23,7 @@ from .request_objects import (
     GetChannelsBody,
     GetMessagesBody,
     OpenChannelBody,
+    CloseChannelsBody,
     PeekAllMessagesBody,
     SendMessageBody,
     SessionCapabilitiesBody,
@@ -232,6 +235,14 @@ class HoprdAPI:
         :return: bool
         """
         is_ok, _ = await self.__call_api(HTTPMethod.DELETE, f"channels/{channel_id}")
+        return is_ok
+
+    async def close_channels(self, direction: ChannelDirection, status: ChannelStatus) -> bool:
+        """
+        Closes multiple channels at once.
+        """
+        data = CloseChannelsBody(direction.value, status.value)
+        is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "channels", data=data)
         return is_ok
 
     async def channel_redeem_tickets(self, channel_id: str) -> bool:

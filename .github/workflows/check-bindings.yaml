@@ -45,7 +45,6 @@ jobs:
       - name: Generate bindings
         run: |
           echo "Generating bindings into tracked source directory..."
-
           cd ./ethereum/contracts && \
             nix develop -c \
             forge bind --offline --bindings-path ./../bindings/src/codegen \

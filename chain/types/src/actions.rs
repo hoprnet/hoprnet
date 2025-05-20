@@ -31,6 +31,9 @@ pub enum Action {
     /// Close channel with the given source and destination
     CloseChannel(ChannelEntry, ChannelDirection),
 
+    /// Close multiple channels in the same direction at once
+    CloseChannels(Vec<ChannelEntry>, ChannelDirection, ChannelStatus),
+
     /// Withdraw given balance to the given address
     Withdraw(Address, Balance),
 
@@ -55,6 +58,13 @@ impl Display for Action {
                 f,
                 "closure action of {} channel from {} to {}",
                 direction, channel.source, channel.destination
+            ),
+            Action::CloseChannels(channels, direction, status) => write!(
+                f,
+                "closure action of {} {} {} channels",
+                channels.len(),
+                direction,
+                status
             ),
             Action::Withdraw(destination, amount) => write!(f, "withdraw action of {amount} to {destination}"),
             Action::Announce(data) => write!(f, "announce action of {}", data.multiaddress()),

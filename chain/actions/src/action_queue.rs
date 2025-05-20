@@ -56,11 +56,20 @@ pub trait TransactionExecutor {
     /// Initiates closure of an outgoing channel.
     async fn initiate_outgoing_channel_closure(&self, dst: Address) -> Result<Hash>;
 
+    /// Initiates closure of multiple outgoing channels.
+    async fn initiate_multiple_outgoing_channels_closure(&self, destinations: Vec<Address>) -> Result<Hash>;
+
     /// Finalizes closure of an outgoing channel.
     async fn finalize_outgoing_channel_closure(&self, dst: Address) -> Result<Hash>;
 
+    /// Finalizes closure of multiple outgoing channels.
+    async fn finalize_multiple_outgoing_channels_closure(&self, destinations: Vec<Address>) -> Result<Hash>;
+
     /// Closes incoming channel.
     async fn close_incoming_channel(&self, src: Address) -> Result<Hash>;
+
+    /// Closes multiple incoming channels.
+    async fn close_multiple_incoming_channels(&self, src: Vec<Address>) -> Result<Hash>;
 
     /// Performs withdrawal of a certain amount from an address.
     /// Note that this transaction is typically awaited via polling and is not tracked
@@ -242,6 +251,68 @@ where
                         return Err(ChannelAlreadyClosed);
                     }
                 },
+            },
+
+            Action::CloseChannels(channels, direction, status) => match direction {
+                ChannelDirection::Incoming => {
+                    debug!(?channels, "closing incoming channels");
+                    // ignore closed channels
+                    let to_close = channels
+                        .iter()
+                        .filter(|channel| channel.status != ChannelStatus::Closed)
+                        .map(|channel| channel.source)
+                        .collect::<Vec<_>>();
+
+                    let tx_hash = self.tx_exec.close_multiple_incoming_channels(to_close.clone()).await?;
+
+                    debug!(?tx_hash, "closing incoming channels at hash");
+
+                    IndexerExpectation::new(
+                        tx_hash,
+                        move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channels[0].get_id()),
+                    )
+                }
+                ChannelDirection::Outgoing => {
+                    let to_close = channels
+                        .clone()
+                        .iter()
+                        .filter(|channel| channel.status == status)
+                        .map(|channel| channel.destination)
+                        .collect::<Vec<_>>();
+
+                    match status {
+                        ChannelStatus::Open => {
+                            debug!(?channels, "initiating channels closure");
+                            let tx_hash = self
+                                .tx_exec
+                                .initiate_multiple_outgoing_channels_closure(to_close.clone())
+                                .await?;
+
+                            debug!(?tx_hash, "initiating channels closure at hash");
+                            IndexerExpectation::new(
+                                tx_hash,
+                                move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channels[0].get_id()),
+                            )
+                        }
+                        ChannelStatus::PendingToClose(_) => {
+                            debug!(?channels, "finalizing channel closure");
+                            let tx_hash = self
+                                .tx_exec
+                                .finalize_multiple_outgoing_channels_closure(to_close.clone())
+                                .await?;
+
+                            debug!(?tx_hash, "finalizing channels closure at hash");
+                            IndexerExpectation::new(
+                                tx_hash,
+                                move |event| matches!(event, ChainEventType::ChannelClosed(r_channel)  if r_channel.get_id() == channels[0].get_id()),
+                            )
+                        }
+                        ChannelStatus::Closed => {
+                            warn!("cannot close already closed channels");
+                            return Err(ChannelAlreadyClosed);
+                        }
+                    }
+                }
             },
 
             Action::Withdraw(recipient, amount) => {

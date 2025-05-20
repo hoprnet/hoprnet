@@ -2899,6 +2899,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "fastrlp"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "139834ddba373bbdd213dffe02c8d110508dcf1726c2be27e8d1f7d7e1856418"
+dependencies = [
+ "arrayvec",
+ "auto_impl",
+ "bytes",
+]
+
+[[package]]
+name = "fastrlp"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce8dba4714ef14b8274c371879b175aa55b16b30f269663f19d576f380018dc4"
+dependencies = [
+ "arrayvec",
+ "auto_impl",
+ "bytes",
+]
+
+[[package]]
 name = "ff"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4478,13 +4500,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-actions"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "alloy",
  "anyhow",
  "async-channel 2.3.1",
  "async-lock 3.4.0",
  "async-trait",
+ "env_logger",
  "futures",
  "futures-timer",
  "hex-literal",
@@ -4511,7 +4534,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-api"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "alloy",
  "async-channel 2.3.1",
@@ -4616,7 +4639,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-types"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "alloy",
  "hex",
@@ -4820,7 +4843,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5360,7 +5383,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.13.1"
+version = "3.14.0"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",

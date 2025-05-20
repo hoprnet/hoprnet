@@ -306,6 +306,7 @@ async fn build_api(
                 .route("/peers/{destination}", get(peers::show_peer_info))
                 .route("/channels", get(channels::list_channels))
                 .route("/channels", post(channels::open_channel))
+                .route("/channels", delete(channels::close_multiple_channels))
                 .route("/channels/{channelId}", get(channels::show_channel))
                 .route("/channels/{channelId}/tickets", get(tickets::show_channel_tickets))
                 .route("/channels/{channelId}", delete(channels::close_channel))
