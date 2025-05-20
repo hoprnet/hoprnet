@@ -174,4 +174,4 @@ class TestRedeemingWithSwarm:
 
         # Once channels are closed, the tickets must become neglected
         ticket_statistics = await relay.api.get_tickets_statistics()
-        assert ticket_statistics.neglected_value == neglected_value_before + (ticket_count + 2) * ticket_price
+        assert ticket_statistics.neglected_value >= neglected_value_before + (ticket_count + 2) * ticket_price

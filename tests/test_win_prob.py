@@ -189,6 +189,11 @@ class TestWinProbWithSwarm:
                     [swarm7[hop] for hop in route],
                 )
 
+                # Wait until the tickets are acknowledged,
+                # we cannot do it here using wait_for(check_unredeemed_tickets_value(x)), because the
+                # winning probability would make the awaited value non-deterministic
+                await asyncio.sleep(5)
+
                 # the value of redeemable tickets on the relay should not go above the given threshold
                 ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
                 unredeemed_value_1 = ticket_statistics.unredeemed_value
