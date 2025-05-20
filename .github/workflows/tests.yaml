@@ -55,8 +55,7 @@ jobs:
           USER: runner
 
       - name: Run unit tests
-        run: |
-          nix build -L .#hopr-test
+        run: nix build -L .#hopr-test
 
   tests-unit-nightly:
     runs-on: self-hosted-hoprnet-bigger
@@ -221,25 +220,22 @@ jobs:
           destination: hoprnet-test-artifacts/
           gzip: false
 
-      - name: Compress test logs
+      - name: Compress and upload test logs
         if: ${{ !env.ACT && always() }}
+        working-directory: "/tmp"
         run: |
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
-          test_path=/tmp/test-smoke-hopli-${{ github.run_id }}-${{ github.run_number }}
-          mkdir -p ${test_path}
-          cp -r /tmp/hopr-smoke-test/test_hopli/*.log ${test_path} || echo "no files to copy"
-          cd ${test_path}
-          tar -czvf ${test_path}.tgz ${test_path}
-        working-directory: "/tmp"
+          test_name=test-smoke-hopli-${{ github.run_id }}-${{ github.run_number }}
+          mkdir -p ${test_name}
 
-      - name: Upload test logs
-        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
-        if: ${{ !env.ACT && always() }}
-        with:
-          path: /tmp/
-          glob: "test-smoke-*"
-          parent: false
-          destination: hoprnet-test-logs/pr-${{ github.event.pull_request.number }}
+          # Copy files, delete all but the log files
+          cp -r hopr-localcluster/hopr-node_* ${test_name}/ || echo "no files to copy"
+          find ${test_name}/ -type f ! -name "hoprd.log" -delete
+          cp hopr-localcluster/anvil/anvil.log ${test_name}/ || echo "no files to copy"
+
+          # Create tarball and upload to GCP
+          tar -czvf ${test_name}.tgz ${test_name}/
+          gcloud storage cp ${test_name}.tgz gs://hoprnet-test-logs/pr-${{ github.event.pull_request.number }}/
 
   tests-smoke:
     runs-on: self-hosted-hoprnet-bigger
@@ -326,22 +322,19 @@ jobs:
           destination: hoprnet-test-artifacts/
           gzip: false
 
-      - name: Compress test logs
+      - name: Compress and upload test logs
         if: ${{ !env.ACT && always() }}
+        working-directory: "/tmp"
         run: |
           # Copy all the logs to a directory to avoid log file changes and simplify tar command
-          test_path=/tmp/test-smoke-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_number }}
-          mkdir -p ${test_path}
-          cp -r /tmp/hopr-smoke-test/test_${{ matrix.suite }}/*.log ${test_path} || echo "no files to copy"
-          cd ${test_path}
-          tar -czvf ${test_path}.tgz ${test_path}
-        working-directory: "/tmp"
+          test_name=test-smoke-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_number }}
+          mkdir -p ${test_name}
 
-      - name: Upload test logs
-        uses: google-github-actions/upload-cloud-storage@7c6e11cb7291594c5dfe0bc1dd9cd905e31e600c # v2.2.2
-        if: ${{ !env.ACT && always() }}
-        with:
-          path: /tmp/
-          glob: "test-smoke-*"
-          parent: false
-          destination: hoprnet-test-logs/pr-${{ github.event.pull_request.number }}
+          # Copy files, delete all but the log files
+          cp -r hopr-localcluster/hopr-node_* ${test_name}/ || echo "no files to copy"
+          find ${test_name}/ -type f ! -name "hoprd.log" -delete
+          cp hopr-localcluster/anvil/anvil.log ${test_name}/ || echo "no files to copy"
+
+          # Create tarball and upload to GCP
+          tar -czvf ${test_name}.tgz ${test_name}/
+          gcloud storage cp ${test_name}.tgz gs://hoprnet-test-logs/pr-${{ github.event.pull_request.number }}/
