@@ -527,7 +527,10 @@ where
                 );
 
                 let mut current_balance = self.db.get_safe_hopr_balance(Some(tx)).await?;
-                let transferred_value = Balance::new(transferred.value.to_be_bytes(), BalanceType::HOPR);
+                let transferred_value = Balance::new(
+                    U256::from_big_endian(transferred.value.to_be_bytes_vec().as_slice()),
+                    BalanceType::HOPR,
+                );
 
                 if to.ne(&self.safe_address) && from.ne(&self.safe_address) {
                     return Ok(None);
@@ -558,7 +561,10 @@ where
                     self.db
                         .set_safe_hopr_allowance(
                             Some(tx),
-                            Balance::new(approved.value.to_be_bytes(), BalanceType::HOPR),
+                            Balance::new(
+                                U256::from_big_endian(approved.value.to_be_bytes_vec().as_slice()),
+                                BalanceType::HOPR,
+                            ),
                         )
                         .await?;
                 } else {
@@ -776,7 +782,13 @@ where
                 );
 
                 self.db
-                    .update_ticket_price(Some(tx), Balance::new(update._1.to_be_bytes(), BalanceType::HOPR))
+                    .update_ticket_price(
+                        Some(tx),
+                        Balance::new(
+                            U256::from_big_endian(update._1.to_be_bytes_vec().as_slice()),
+                            BalanceType::HOPR,
+                        ),
+                    )
                     .await?;
 
                 info!(price = %update._1, "ticket price updated");
@@ -1325,7 +1337,10 @@ mod tests {
 
         assert_eq!(
             db.get_safe_hopr_balance(None).await?,
-            Balance::new(value.to_be_bytes(), BalanceType::HOPR)
+            Balance::new(
+                primitive_types::U256::from_big_endian(value.to_be_bytes_vec().as_slice()),
+                BalanceType::HOPR
+            )
         );
 
         Ok(())
@@ -1341,8 +1356,14 @@ mod tests {
 
         let encoded_data = (value).abi_encode();
 
-        db.set_safe_hopr_balance(None, Balance::new(value.to_be_bytes(), BalanceType::HOPR))
-            .await?;
+        db.set_safe_hopr_balance(
+            None,
+            Balance::new(
+                primitive_types::U256::from_big_endian(value.to_be_bytes_vec().as_slice()),
+                BalanceType::HOPR,
+            ),
+        )
+        .await?;
 
         let transferred_log = SerializableLog {
             address: handlers.addresses.token.into(),
@@ -1403,16 +1424,19 @@ mod tests {
 
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            Balance::new(U256::from(1000u64).to_be_bytes(), BalanceType::HOPR)
+            Balance::new(primitive_types::U256::from(1000u64), BalanceType::HOPR)
         );
 
         // reduce allowance manually to verify a second time
         let _ = db
-            .set_safe_hopr_allowance(None, Balance::new(U256::from(10u64).to_be_bytes(), BalanceType::HOPR))
+            .set_safe_hopr_allowance(
+                None,
+                Balance::new(primitive_types::U256::from(10u64), BalanceType::HOPR),
+            )
             .await;
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            Balance::new(U256::from(10u64).to_be_bytes(), BalanceType::HOPR)
+            Balance::new(primitive_types::U256::from(10u64), BalanceType::HOPR)
         );
 
         let handlers_clone = handlers.clone();
@@ -1426,7 +1450,7 @@ mod tests {
 
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            Balance::new(U256::from(1000u64).to_be_bytes(), BalanceType::HOPR)
+            Balance::new(primitive_types::U256::from(1000u64), BalanceType::HOPR)
         );
         Ok(())
     }
@@ -1768,7 +1792,7 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let solidity_balance = BalanceType::HOPR.balance(U256::from((1u128 << 96) - 1).to_be_bytes());
+        let solidity_balance = BalanceType::HOPR.balance(primitive_types::U256::from((1u128 << 96) - 1));
         let diff = solidity_balance - channel.balance;
 
         let encoded_data = (solidity_balance.amount().to_be_bytes()).abi_encode();
@@ -1858,7 +1882,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR),
+            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -1913,7 +1937,7 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR);
+        let starting_balance = Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -1974,7 +1998,7 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR);
+        let starting_balance = Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR);
 
         let channel = ChannelEntry::new(
             Address::new(&hex!("B7397C218766eBe6A1A634df523A1a7e412e67eA")),
@@ -2207,7 +2231,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
             *SELF_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR),
+            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),

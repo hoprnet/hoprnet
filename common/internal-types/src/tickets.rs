@@ -702,7 +702,7 @@ impl TryFrom<&[u8]> for Ticket {
             // Validate the boundaries of the parsed values
             TicketBuilder::default()
                 .channel_id(channel_id)
-                .amount(amount)
+                .amount(U256::from_big_endian(&amount))
                 .index(u64::from_be_bytes(index))
                 .index_offset(u32::from_be_bytes(index_offset))
                 .channel_epoch(u32::from_be_bytes(channel_epoch))

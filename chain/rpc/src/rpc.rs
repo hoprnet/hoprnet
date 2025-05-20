@@ -200,10 +200,16 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                     // .number(self.get_block_number().await?)
                     .await?;
 
-                Ok(Balance::new(native.to_be_bytes(), BalanceType::Native))
+                Ok(Balance::new(
+                    U256::from_big_endian(native.to_be_bytes_vec().as_slice()),
+                    BalanceType::Native,
+                ))
             }
             BalanceType::HOPR => match self.contract_instances.token.balanceOf(address.into()).call().await {
-                Ok(token_balance) => Ok(Balance::new(token_balance._0.to_be_bytes(), BalanceType::HOPR)),
+                Ok(token_balance) => Ok(Balance::new(
+                    U256::from_big_endian(token_balance._0.to_be_bytes_vec().as_slice()),
+                    BalanceType::HOPR,
+                )),
                 Err(e) => Err(e.into()),
             },
         }
@@ -222,7 +228,9 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
 
     async fn get_minimum_network_ticket_price(&self) -> Result<Balance> {
         match self.contract_instances.price_oracle.currentTicketPrice().call().await {
-            Ok(ticket_price) => Ok(BalanceType::HOPR.balance(ticket_price._0.to_be_bytes_vec().as_slice())),
+            Ok(ticket_price) => {
+                Ok(BalanceType::HOPR.balance(U256::from_big_endian(ticket_price._0.to_be_bytes_vec().as_slice())))
+            }
             Err(e) => Err(e.into()),
         }
     }
@@ -314,7 +322,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         match self.node_module.tryGetTarget(target.into()).call().await {
             Ok(returned_result) => Ok(returned_result
                 ._0
-                .then_some(returned_result._1.to_be_bytes_vec().as_slice().into())),
+                .then_some(U256::from_big_endian(returned_result._1.to_be_bytes_vec().as_slice()))),
             Err(e) => Err(e.into()),
         }
     }
