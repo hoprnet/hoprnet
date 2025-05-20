@@ -5357,7 +5357,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "3.14.0"
+version = "3.14.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
