@@ -4472,7 +4472,6 @@ version = "0.2.0"
 dependencies = [
  "alloy",
  "anyhow",
- "serde",
 ]
 
 [[package]]
@@ -5228,7 +5227,6 @@ dependencies = [
  "hopr-primitive-types",
  "hopr-transport-identity",
  "hopr-transport-mixer",
- "hopr-transport-packet",
  "lazy_static",
  "libp2p",
  "moka",
@@ -5320,7 +5318,6 @@ dependencies = [
  "anyhow",
  "async-lock 3.4.0",
  "async-signal",
- "chrono",
  "clap",
  "console-subscriber",
  "futures",
