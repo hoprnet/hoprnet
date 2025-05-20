@@ -11,7 +11,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = ["hopr-async-runtime/runtime-async-std"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 prometheus = ["dep:hopr-metrics"]
 
@@ -35,13 +34,14 @@ hopr-transport-identity = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
+tokio = { workspace = true }
 async-channel = { workspace = true }
 async_channel_io = { version = "0.3.0" }
 bytesize = { workspace = true }
-criterion = { workspace = true, features = ["async_futures", "async_std"] }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
+criterion = { workspace = true, features = ["async_futures", "async_tokio"] }
 more-asserts = { workspace = true }
 serial_test = { workspace = true }
 tracing-test = { workspace = true }
+
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
 hopr-transport-mixer = { workspace = true }

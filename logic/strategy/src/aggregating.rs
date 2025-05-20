@@ -298,7 +298,6 @@ mod tests {
     use crate::aggregating::{default_aggregation_threshold, MAX_AGGREGATABLE_TICKET_COUNT};
     use crate::strategy::SingularStrategy;
     use anyhow::Context;
-    use async_std::prelude::FutureExt as AsyncStdFutureExt;
     use futures::{pin_mut, FutureExt, StreamExt};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
@@ -319,6 +318,7 @@ mod tests {
     use std::pin::pin;
     use std::sync::Arc;
     use std::time::Duration;
+    use tokio::time::timeout;
     use tracing::{debug, error};
 
     #[test]
@@ -368,7 +368,7 @@ mod tests {
             .amount(price_per_packet.div_f64(ticket_win_prob)?)
             .index(index)
             .index_offset(index_offset)
-            .win_prob(ticket_win_prob)
+            .win_prob(ticket_win_prob.try_into()?)
             .channel_epoch(1)
             .challenge(response.to_challenge().into())
             .build_signed(signer, &domain_separator)?
@@ -466,7 +466,7 @@ mod tests {
         let (tx, awaiter) = futures::channel::oneshot::channel::<()>();
         let bob_aggregator = bob.writer();
 
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             let mut finalizer = None;
 
             match bob.next().await {
@@ -514,7 +514,7 @@ mod tests {
         ))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_strategy_aggregation_on_tick() -> anyhow::Result<()> {
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
@@ -548,7 +548,7 @@ mod tests {
 
         // Wait until aggregation has finished
         let f1 = pin!(awaiter);
-        let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)).fuse());
+        let f2 = pin!(tokio::time::sleep(Duration::from_secs(5)).fuse());
         let _ = futures::future::select(f1, f2).await;
 
         pin_mut!(bob_notify_rx);
@@ -561,7 +561,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_strategy_aggregation_on_tick_when_unrealized_balance_exceeded() -> anyhow::Result<()> {
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
@@ -595,7 +595,7 @@ mod tests {
 
         // Wait until aggregation has finished
         let f1 = pin!(awaiter);
-        let f2 = pin!(async_std::task::sleep(Duration::from_secs(5)));
+        let f2 = pin!(tokio::time::sleep(Duration::from_secs(5)));
         let _ = futures::future::select(f1, f2).await;
 
         pin_mut!(bob_notify_rx);
@@ -608,7 +608,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_strategy_aggregation_on_tick_should_not_agg_when_unrealized_balance_exceeded_via_aggregated_tickets(
     ) -> anyhow::Result<()> {
         // db_0: Alice (channel source)
@@ -659,7 +659,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_strategy_aggregation_on_channel_close() -> anyhow::Result<()> {
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
@@ -702,7 +702,7 @@ mod tests {
             .await?;
 
         // Wait until aggregation has finished
-        awaiter.timeout(Duration::from_secs(5)).await.context("Timeout")??;
+        timeout(Duration::from_secs(5), awaiter).await.context("Timeout")??;
 
         pin_mut!(bob_notify_rx);
         let notified_ticket = bob_notify_rx.next().await.expect("should have a ticket");
@@ -714,7 +714,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_strategy_aggregation_on_tick_should_not_agg_on_channel_close_if_only_single_ticket(
     ) -> anyhow::Result<()> {
         // db_0: Alice (channel source)
@@ -758,8 +758,7 @@ mod tests {
             )
             .await?;
 
-        awaiter
-            .timeout(Duration::from_millis(500))
+        timeout(Duration::from_millis(500), awaiter)
             .await
             .expect_err("should timeout");
 

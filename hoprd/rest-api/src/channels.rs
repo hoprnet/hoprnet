@@ -488,6 +488,18 @@ pub(super) async fn close_channel(
     }
 }
 
+#[serde_as]
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "hash": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+}))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FundChannelResponse {
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String)]
+    hash: Hash,
+}
+
 /// Specifies the amount of HOPR tokens to fund a channel with.
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[schema(example = json!({
@@ -513,7 +525,7 @@ pub(crate) struct FundBodyRequest {
             content_type = "application/json",
         ),
         responses(
-            (status = 200, description = "Channel funded successfully", body = String),
+            (status = 200, description = "Channel funded successfully", body = FundChannelResponse),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 403, description = "Failed to fund the channel because of insufficient HOPR balance or allowance.", body = ApiError),
@@ -538,7 +550,7 @@ pub(super) async fn fund_channel(
 
     match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.fund_channel(&channel_id, &amount).await {
-            Ok(hash) => (StatusCode::OK, Json(hash.to_hex())).into_response(),
+            Ok(hash) => (StatusCode::OK, Json(FundChannelResponse { hash })).into_response(),
             Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)) => {
                 (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response()
             }

@@ -58,7 +58,7 @@ pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl Int
         path = const_format::formatcp!("{BASE_PATH}/node/configuration"),
         description = "Get the configuration of the running node",
         responses(
-            (status = 200, description = "Fetched node configuration", body = String),
+            (status = 200, description = "Fetched node configuration", body = HashMap<String, String>),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
         ),
         security(
@@ -68,7 +68,7 @@ pub(super) async fn version(State(state): State<Arc<InternalState>>) -> impl Int
         tag = "Configuration"
     )]
 pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
-    (StatusCode::OK, state.hoprd_cfg.clone()).into_response()
+    (StatusCode::OK, Json(state.hoprd_cfg.clone())).into_response()
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
@@ -380,6 +380,18 @@ impl From<GraphExportQuery> for GraphExportConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+#[schema(example = json!({
+        "graph": "
+        ...
+        242 -> 381 [ label = 'Open channel 0x82a72e271cdedd56c29e970ced3517ba93b679869c729112b5a56fa08698df8f; stake=100000000000000000 HOPR; score=None; status=open;' ]
+        ...",
+    }))]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NodeGraphResponse {
+    graph: String,
+}
+
 /// Retrieve node's channel graph in DOT or JSON format.
 #[utoipa::path(
     get,
@@ -387,7 +399,7 @@ impl From<GraphExportQuery> for GraphExportConfig {
     description = "Retrieve node's channel graph in DOT or JSON format",
     params(GraphExportQuery),
     responses(
-            (status = 200, description = "Fetched channel graph", body = String),
+            (status = 200, description = "Fetched channel graph", body = NodeGraphResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
     ),
     security(
@@ -402,7 +414,7 @@ pub(super) async fn channel_graph(
 ) -> impl IntoResponse {
     if args.raw_graph {
         match state.hopr.export_raw_channel_graph().await {
-            Ok(raw_graph) => (StatusCode::OK, raw_graph).into_response(),
+            Ok(raw_graph) => (StatusCode::OK, Json(NodeGraphResponse { graph: raw_graph })).into_response(),
             Err(error) => (
                 StatusCode::UNPROCESSABLE_ENTITY,
                 ApiErrorStatus::UnknownFailure(error.to_string()),

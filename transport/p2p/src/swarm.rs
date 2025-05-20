@@ -1,8 +1,10 @@
 use futures::{select, Stream, StreamExt};
-use libp2p::{
-    request_response::{OutboundRequestId, ResponseChannel},
-    swarm::{NetworkInfo, SwarmEvent},
-};
+use hopr_transport_network::messaging::ControlMessage;
+use libp2p::autonat;
+use libp2p::swarm::SwarmEvent;
+use libp2p::swarm::{dial_opts::DialOpts, NetworkInfo};
+use libp2p::{multiaddr::Protocol, request_response::OutboundRequestId, request_response::ResponseChannel};
+use std::net::Ipv4Addr;
 use std::num::NonZeroU8;
 use tracing::{debug, error, info, trace, warn};
 
@@ -11,10 +13,11 @@ use hopr_transport_identity::{
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
     Multiaddr, PeerId,
 };
-use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
+use hopr_transport_network::{network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_transport_protocol::{config::ProtocolConfig, PeerDiscovery};
 
-use crate::{constants, errors::Result, HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong};
+use crate::{constants, errors::Result, HoprNetworkBehavior};
+use crate::{HoprNetworkBehaviorEvent, Ping, Pong, HOPR_HEARTBEAT_PROTOCOL_V_0_2_0};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
@@ -42,23 +45,9 @@ where
 {
     let me_peerid: PeerId = me.public().into();
 
-    #[cfg(feature = "runtime-async-std")]
-    let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
-        .with_async_std()
-        .with_tcp(
-            libp2p::tcp::Config::default().nodelay(true),
-            libp2p::noise::Config::new,
-            // use default yamux configuration to enable auto-tuning
-            // see https://github.com/libp2p/rust-libp2p/pull/4970
-            libp2p::yamux::Config::default,
-        )
-        .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_quic()
-        .with_dns();
-
     // Both features could be enabled during testing, therefore we only use tokio when its
     // exclusively enabled.
-    #[cfg(all(feature = "runtime-tokio", not(feature = "runtime-async-std")))]
+    #[cfg(feature = "runtime-tokio")]
     let swarm = libp2p::SwarmBuilder::with_existing_identity(me)
         .with_tokio()
         .with_tcp(
@@ -215,7 +204,7 @@ impl HoprSwarm {
             select! {
                 event = swarm.select_next_some() => match event {
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Heartbeat(event)) => {
-                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm protocol", protocol = "/hopr/heartbeat/0.1.0");
+                        let _span = tracing::span!(tracing::Level::DEBUG, "swarm protocol", protocol = HOPR_HEARTBEAT_PROTOCOL_V_0_2_0);
                         match event {
                             libp2p::request_response::Event::<Ping,Pong>::Message {
                                 peer,
@@ -270,6 +259,25 @@ impl HoprSwarm {
                     }
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::KeepAlive(_)) => {}
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::Discovery(_)) => {}
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatClient(autonat::v2::client::Event {
+                        server,
+                        tested_addr,
+                        bytes_sent,
+                        result,
+                    })) => {
+                        match result {
+                            Ok(_) => {
+                                debug!(%server, %tested_addr, %bytes_sent, "Autonat server successfully tested");
+                            }
+                            Err(e) => {
+                                warn!(%server, %tested_addr, %bytes_sent, %e, "Autonat server test failed");
+                            }
+                        }
+                    }
+                    SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::AutonatServer(event)) => {
+                        warn!(?event, "Autonat server event");
+                    }
+
                     SwarmEvent::Behaviour(HoprNetworkBehaviorEvent::HeartbeatGenerator(event)) => {
                         let _span = tracing::span!(tracing::Level::DEBUG, "swarm behavior", behavior="heartbeat generator");
 
@@ -376,9 +384,9 @@ impl HoprSwarm {
                     SwarmEvent::NewExternalAddrCandidate {
                         ..  // address: Multiaddr
                     } => {}
-                    SwarmEvent::ExternalAddrConfirmed {
-                        ..  // address: Multiaddr
-                    } => {}
+                    SwarmEvent::ExternalAddrConfirmed { address } => {
+                        info!(%address, "Detected external address")
+                    }
                     SwarmEvent::ExternalAddrExpired {
                         ..  // address: Multiaddr
                     } => {}
@@ -389,6 +397,43 @@ impl HoprSwarm {
                     },
                     _ => trace!(transport="libp2p", "Unsupported enum option detected")
                 }
+            }
+        }
+    }
+
+    pub fn run_nat_server(&mut self, port: u16) {
+        info!(listen_on = port, "Starting NAT server");
+
+        match self.swarm.listen_on(
+            Multiaddr::empty()
+                .with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED))
+                .with(Protocol::Tcp(port)),
+        ) {
+            Ok(_) => {
+                info!("NAT server started");
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to listen on NAT server");
+            }
+        }
+    }
+    pub fn dial_nat_server(&mut self, addresses: Vec<Multiaddr>) {
+        // let dial_opts = DialOpts::peer_id(PeerId::random())
+        //     .addresses(addresses)
+        //     .extend_addresses_through_behaviour()
+        //     .build();
+        info!(
+            num_addresses = addresses.len(),
+            "Dialing NAT servers with multiple candidate addresses"
+        );
+
+        for addr in addresses {
+            let dial_opts = DialOpts::unknown_peer_id().address(addr.clone()).build();
+            if let Err(e) = self.swarm.dial(dial_opts) {
+                warn!(%addr, %e, "Failed to dial NAT server address");
+            } else {
+                info!(%addr, "Dialed NAT server address");
+                break;
             }
         }
     }

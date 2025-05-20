@@ -46,13 +46,13 @@ pub(crate) struct SizeResponse {
 #[derive(Debug, Clone, PartialEq, Deserialize, validator::Validate, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(example = json!({
-        "body": "Test message",
-        "path": [
-            "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
-        ],
-        "destination": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
-        "tag": 2000
-    }))]
+    "body": "Test message",
+    "path": [
+        "12D3KooWR4uwjKCDCAY1xsEFB4esuWLF9Q5ijYvCjz5PNkTbnu33"
+    ],
+    "destination": "12D3KooWEDc1vGJevww48trVDDf6pr1f6N3F86sGJfQrKCyc8kJ1",
+    "tag": 2000
+}))]
 #[schema(example = json!({
     "body": "Test message",
     "hops": 1,

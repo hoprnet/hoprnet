@@ -1,17 +1,18 @@
 use futures::StreamExt;
+use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
+use hopr_lib::SendMsg;
+use hopr_network_types::prelude::protocol::SessionMessage;
 use hopr_network_types::prelude::*;
+use hopr_primitive_types::prelude::Address;
+use hopr_transport::{Session, SessionId, TransportSessionError};
+use hopr_transport_session::transfer_session;
+use hopr_transport_session::Capability;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::UdpSocket;
-
-use hopr_lib::SendMsg;
-use hopr_network_types::prelude::protocol::SessionMessage;
-use hopr_transport::{Session, SessionId, TransportSessionError};
-use hopr_transport_session::Capability;
-use hopr_transport_session::{transfer_session, unwrap_chain_address};
 
 struct BufferingMsgSender {
     buffer: futures::channel::mpsc::UnboundedSender<Box<[u8]>>,
@@ -20,29 +21,29 @@ struct BufferingMsgSender {
 #[async_trait::async_trait]
 impl SendMsg for BufferingMsgSender {
     async fn send_message(&self, data: ApplicationData, _: DestinationRouting) -> Result<(), TransportSessionError> {
-        let (_, data) = unwrap_chain_address(&data.plain_text)?;
-
         let len = data.len();
-        self.buffer.unbounded_send(data).expect("buffer unbounded error");
+        self.buffer
+            .unbounded_send(data.plain_text)
+            .expect("buffer unbounded error");
 
         tracing::debug!("wrote {len} bytes");
         Ok(())
     }
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
 async fn udp_session_bridging() -> anyhow::Result<()> {
-    let id = SessionId::new(1, (&ChainKeypair::random()).into());
+    let dst: Address = (&ChainKeypair::random()).into();
+    let id = SessionId::new(1, HoprPseudonym::random());
     let (_tx, rx) = futures::channel::mpsc::unbounded();
     let (buffer_tx, mut buffer_rx) = futures::channel::mpsc::unbounded();
 
     let mut session = Session::new(
         id,
-        (&ChainKeypair::random()).into(),
-        DestinationRouting::forward_only(*id.peer(), RoutingOptions::Hops(0_u32.try_into()?)),
+        DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
         HashSet::new(),
         Arc::new(BufferingMsgSender { buffer: buffer_tx }),
-        rx,
+        Box::pin(rx),
         None,
     );
 
@@ -88,19 +89,19 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test_log::test(tokio::test)]
+#[tokio::test]
 async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
-    let id = SessionId::new(1, (&ChainKeypair::random()).into());
+    let dst: Address = (&ChainKeypair::random()).into();
+    let id = SessionId::new(1, HoprPseudonym::random());
     let (_tx, rx) = futures::channel::mpsc::unbounded();
     let (buffer_tx, mut buffer_rx) = futures::channel::mpsc::unbounded();
 
     let mut session = Session::new(
         id,
-        (&ChainKeypair::random()).into(),
-        DestinationRouting::forward_only(*id.peer(), RoutingOptions::Hops(0_u32.try_into()?)),
+        DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
         HashSet::from_iter([Capability::Segmentation]),
         Arc::new(BufferingMsgSender { buffer: buffer_tx }),
-        rx,
+        Box::pin(rx),
         None,
     );
 

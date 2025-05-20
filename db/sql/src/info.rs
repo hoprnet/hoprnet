@@ -12,6 +12,7 @@ use hopr_db_entity::prelude::{
     Account, Announcement, ChainInfo, Channel, NetworkEligibility, NetworkRegistry, NodeInfo,
 };
 use hopr_db_entity::{chain_info, global_settings, node_info};
+use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
 
 use crate::cache::{CachedValue, CachedValueDiscriminants};
@@ -92,7 +93,11 @@ pub trait HoprDbInfoOperations {
 
     /// Sets the minimum required winning probability for incoming tickets.
     /// The value must be between zero and 1.
-    async fn set_minimum_incoming_ticket_win_prob<'a>(&'a self, tx: OptTx<'a>, win_prob: f64) -> Result<()>;
+    async fn set_minimum_incoming_ticket_win_prob<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        win_prob: WinningProbability,
+    ) -> Result<()>;
 
     /// Updates the ticket price.
     /// To retrieve the stored ticket price, use [`HoprDbInfoOperations::get_indexer_data`],
@@ -353,7 +358,8 @@ impl HoprDbInfoOperations for HoprDb {
                                     safe_registry_dst,
                                     channels_dst,
                                     ticket_price: model.ticket_price.map(|p| BalanceType::HOPR.balance_bytes(p)),
-                                    minimum_incoming_ticket_winning_prob: model.min_incoming_ticket_win_prob as f64,
+                                    minimum_incoming_ticket_winning_prob: (model.min_incoming_ticket_win_prob as f64)
+                                        .try_into()?,
                                     nr_enabled: model.network_registry_enabled,
                                 }))
                             })
@@ -402,20 +408,18 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn set_minimum_incoming_ticket_win_prob<'a>(&'a self, tx: OptTx<'a>, win_prob: f64) -> Result<()> {
-        if !(0.0..=1.0).contains(&win_prob) {
-            return Err(DbSqlError::LogicalError(
-                "winning probability must be between 0 and 1".into(),
-            ));
-        }
-
+    async fn set_minimum_incoming_ticket_win_prob<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        win_prob: WinningProbability,
+    ) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     chain_info::ActiveModel {
                         id: Set(SINGULAR_TABLE_FIXED_ID),
-                        min_incoming_ticket_win_prob: Set(win_prob as f32),
+                        min_incoming_ticket_win_prob: Set(win_prob.as_f64() as f32),
                         ..Default::default()
                     }
                     .update(tx.as_ref())
@@ -595,7 +599,7 @@ mod tests {
         static ref ADDR_2: Address = Address::from(hex!("4c8bbd047c2130e702badb23b6b97a88b6562324"));
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_balance() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -616,7 +620,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_allowance() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -638,7 +642,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_indexer_data() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -648,7 +652,7 @@ mod tests {
         let price = BalanceType::HOPR.balance(10);
         db.update_ticket_price(None, price).await?;
 
-        db.set_minimum_incoming_ticket_win_prob(None, 0.5).await?;
+        db.set_minimum_incoming_ticket_win_prob(None, 0.5.try_into()?).await?;
 
         let data = db.get_indexer_data(None).await?;
 
@@ -657,7 +661,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_safe_info_with_cache() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -674,7 +678,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_safe_info() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -692,7 +696,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_get_global_setting() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 

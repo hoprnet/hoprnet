@@ -32,11 +32,11 @@ use futures::{
 };
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 use hopr_transport_mixer::MixerConfig;
-use std::time::Duration;
 use std::{
     collections::HashMap,
     sync::{Arc, OnceLock},
 };
+use std::{collections::HashSet, time::Duration};
 use tracing::{debug, error, info, trace, warn};
 
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
@@ -66,6 +66,7 @@ use hopr_transport_ticket_aggregation::{
     AwaitingAggregator, TicketAggregationActions, TicketAggregationError, TicketAggregationInteraction,
     TicketAggregatorTrait,
 };
+use rand::seq::SliceRandom;
 
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 
@@ -103,7 +104,7 @@ pub use {
     hopr_transport_protocol::{execute_on_tick, PeerDiscovery},
     hopr_transport_session::{
         errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
-        SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
+        SessionClientConfig, SessionId, SurbBalancerConfig, SESSION_PAYLOAD_SIZE, SESSION_USABLE_MTU_SIZE,
     },
     hopr_transport_session::{ServiceId, SessionTarget},
 };
@@ -249,14 +250,12 @@ where
             db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
-            smgr: SessionManager::new(
-                me_chain_addr,
-                SessionManagerConfig {
-                    session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
-                    initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
-                    idle_timeout: cfg.session.idle_timeout,
-                },
-            ),
+            smgr: SessionManager::new(SessionManagerConfig {
+                session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
+                initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+                idle_timeout: cfg.session.idle_timeout,
+                balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+            }),
             cfg,
         }
     }
@@ -366,10 +365,12 @@ where
 
         info!("Loading initial peers from the storage");
 
+        let mut addresses: HashSet<Multiaddr> = HashSet::new();
         let nodes = self.get_public_nodes().await?;
         for (peer, _address, multiaddresses) in nodes {
             if self.is_allowed_to_access_network(either::Left(&peer)).await? {
                 debug!(%peer, ?multiaddresses, "Using initial public node");
+                addresses.extend(multiaddresses.clone());
 
                 internal_discovery_update_tx
                     .send(PeerDiscovery::Allow(peer))
@@ -507,7 +508,7 @@ where
             (tx, rx)
         };
 
-        let transport_layer = HoprSwarm::new(
+        let mut transport_layer = HoprSwarm::new(
             (&self.me).into(),
             network_events_rx,
             discovery_updates,
@@ -516,6 +517,19 @@ where
             self.cfg.protocol,
         )
         .await;
+
+        if let Some(port) = self.cfg.protocol.autonat_port {
+            transport_layer.run_nat_server(port);
+        }
+
+        if addresses.is_empty() {
+            warn!("No addresses found in the database, not dialing any NAT servers");
+        } else {
+            info!(num_addresses = addresses.len(), "Found addresses from the database");
+            let mut randomized_addresses: Vec<_> = addresses.into_iter().collect();
+            randomized_addresses.shuffle(&mut rand::thread_rng());
+            transport_layer.dial_nat_server(randomized_addresses);
+        }
 
         let msg_proto_control =
             transport_layer.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
@@ -531,11 +545,16 @@ where
         // initiate the msg-ack protocol stack over the wire transport
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: self.me.clone(),
-            outgoing_ticket_win_prob: self.cfg.protocol.outgoing_ticket_winning_prob,
+            outgoing_ticket_win_prob: self
+                .cfg
+                .protocol
+                .outgoing_ticket_winning_prob
+                .map(WinningProbability::try_from)
+                .transpose()?,
             outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
         };
 
-        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<ApplicationData>();
+        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -565,10 +584,10 @@ where
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             spawn(async move {
-                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, |data| {
+                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {
-                        match smgr.dispatch_message(data).await {
+                        match smgr.dispatch_message(pseudonym, data).await {
                             Ok(DispatchResult::Processed) => {
                                 trace!("message dispatch completed");
                                 None
@@ -671,8 +690,13 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn new_session(&self, cfg: SessionClientConfig) -> errors::Result<Session> {
-        Ok(self.smgr.new_session(cfg).await?)
+    pub async fn new_session(
+        &self,
+        destination: Address,
+        target: SessionTarget,
+        cfg: SessionClientConfig,
+    ) -> errors::Result<Session> {
+        Ok(self.smgr.new_session(destination, target, cfg).await?)
     }
 
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]
