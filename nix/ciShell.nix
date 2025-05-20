@@ -1,6 +1,7 @@
-{ pkgs
-, extraPackages ? [ ]
-, ...
+{
+  pkgs,
+  extraPackages ? [ ],
+  ...
 }@args:
 let
   mkShell = import ./mkShell.nix { };
@@ -29,6 +30,9 @@ let
     "extraPackages"
   ];
 in
-mkShell (cleanArgs // {
-  inherit shellPackages;
-})
+mkShell (
+  cleanArgs
+  // {
+    inherit shellPackages;
+  }
+)

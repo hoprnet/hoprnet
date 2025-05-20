@@ -1,29 +1,30 @@
-{ buildDocs ? false
-, CARGO_PROFILE ? "release"
-, cargoExtraArgs ? ""
-, cargoToml
-, craneLib
-, depsSrc
-, foundryBin
-, html-tidy
-, isCross ? false
-, isStatic ? false
-, lib
-, libiconv
-, makeSetupHook
-, mold
-, llvmPackages
-, pandoc
-, pkg-config
-, pkgs
-, postInstall ? null
-, rev
-, runClippy ? false
-, runTests ? false
-, runBench ? false
-, solcDefault
-, src
-, stdenv
+{
+  buildDocs ? false,
+  CARGO_PROFILE ? "release",
+  cargoExtraArgs ? "",
+  cargoToml,
+  craneLib,
+  depsSrc,
+  foundryBin,
+  html-tidy,
+  isCross ? false,
+  isStatic ? false,
+  lib,
+  libiconv,
+  makeSetupHook,
+  mold,
+  llvmPackages,
+  pandoc,
+  pkg-config,
+  pkgs,
+  postInstall ? null,
+  rev,
+  runClippy ? false,
+  runTests ? false,
+  runBench ? false,
+  solcDefault,
+  src,
+  stdenv,
 }:
 let
   # `hostPlatform` is the cross-compilation output platform
@@ -44,15 +45,12 @@ let
 
   # The hook is used when building on darwin for non-darwin, where the flags
   # need to be cleaned up.
-  darwinSuffixSalt =
-    builtins.replaceStrings [ "-" "." ] [ "_" "_" ] buildPlatform.config;
-  targetSuffixSalt =
-    builtins.replaceStrings [ "-" "." ] [ "_" "_" ] hostPlatform.config;
-  setupHookDarwin = makeSetupHook
-    {
-      name = "darwin-hopr-gcc-hook";
-      substitutions = { inherit darwinSuffixSalt targetSuffixSalt; };
-    } ./setup-hook-darwin.sh;
+  darwinSuffixSalt = builtins.replaceStrings [ "-" "." ] [ "_" "_" ] buildPlatform.config;
+  targetSuffixSalt = builtins.replaceStrings [ "-" "." ] [ "_" "_" ] hostPlatform.config;
+  setupHookDarwin = makeSetupHook {
+    name = "darwin-hopr-gcc-hook";
+    substitutions = { inherit darwinSuffixSalt targetSuffixSalt; };
+  } ./setup-hook-darwin.sh;
 
   crateInfo = craneLib.crateNameFromCargoToml { inherit cargoToml; };
   pname = crateInfo.pname;
@@ -65,23 +63,20 @@ let
       "dev"
     else
       CARGO_PROFILE;
-  pnameSuffix =
-    if actualCargoProfile == "release" then "" else "-${actualCargoProfile}";
-  pnameDeps =
-    if actualCargoProfile == "release" then
-      pname
-    else
-      "${pname}-${actualCargoProfile}";
+  pnameSuffix = if actualCargoProfile == "release" then "" else "-${actualCargoProfile}";
+  pnameDeps = if actualCargoProfile == "release" then pname else "${pname}-${actualCargoProfile}";
 
-  version = lib.strings.concatStringsSep "."
-    (lib.lists.take 3 (builtins.splitVersion crateInfo.version));
+  version = lib.strings.concatStringsSep "." (
+    lib.lists.take 3 (builtins.splitVersion crateInfo.version)
+  );
 
   isDarwinForDarwin = buildPlatform.isDarwin && hostPlatform.isDarwin;
   isDarwinForNonDarwin = buildPlatform.isDarwin && !hostPlatform.isDarwin;
 
   darwinBuildInputs =
     if isDarwinForDarwin || isDarwinForNonDarwin then
-      with pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks; [
+      with pkgs.pkgsBuildHost.darwin.apple_sdk.frameworks;
+      [
         CoreFoundation
         CoreServices
         Security
@@ -90,24 +85,37 @@ let
     else
       [ ];
   darwinNativeBuildInputs =
-    if !isDarwinForDarwin && isDarwinForNonDarwin then
-      [ setupHookDarwin ]
-    else
-      [ ];
+    if !isDarwinForDarwin && isDarwinForNonDarwin then [ setupHookDarwin ] else [ ];
 
   buildInputs =
     if isStatic then
-      with pkgs.pkgsStatic; [ openssl cacert ]
+      with pkgs.pkgsStatic;
+      [
+        openssl
+        cacert
+      ]
     else
-      with pkgs; [ openssl cacert ];
+      with pkgs;
+      [
+        openssl
+        cacert
+      ];
 
   sharedArgsBase = {
     inherit pname pnameSuffix version;
     CARGO_PROFILE = actualCargoProfile;
 
     nativeBuildInputs =
-      [ llvmPackages.bintools mold solcDefault foundryBin pkg-config libiconv ]
-      ++ stdenv.extraNativeBuildInputs ++ darwinNativeBuildInputs;
+      [
+        llvmPackages.bintools
+        mold
+        solcDefault
+        foundryBin
+        pkg-config
+        libiconv
+      ]
+      ++ stdenv.extraNativeBuildInputs
+      ++ darwinNativeBuildInputs;
     buildInputs = buildInputs ++ stdenv.extraBuildInputs ++ darwinBuildInputs;
 
     cargoExtraArgs = "-p ${pname} ${cargoExtraArgs}";
@@ -122,7 +130,8 @@ let
 
   sharedArgs =
     if runTests then
-      sharedArgsBase // {
+      sharedArgsBase
+      // {
         cargoTestExtraArgs = "--workspace -F runtime-tokio";
         doCheck = true;
         LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
@@ -151,14 +160,16 @@ let
   };
 
   defaultArgs = {
-    cargoArtifacts = craneLib.buildDepsOnly (sharedArgs // {
-      pname = pnameDeps;
-      src = depsSrc;
-    });
+    cargoArtifacts = craneLib.buildDepsOnly (
+      sharedArgs
+      // {
+        pname = pnameDeps;
+        src = depsSrc;
+      }
+    );
   };
 
-  args =
-    if buildDocs then sharedArgs // docsArgs else sharedArgs // defaultArgs;
+  args = if buildDocs then sharedArgs // docsArgs else sharedArgs // defaultArgs;
 
   mkBench = import ./cargo-bench.nix {
     mkCargoDerivation = craneLib.mkCargoDerivation;
@@ -176,23 +187,25 @@ let
     else
       craneLib.buildPackage;
 in
-builder (args // {
-  inherit src postInstall;
+builder (
+  args
+  // {
+    inherit src postInstall;
 
-  preConfigure = ''
-    # respect the amount of available cores for building
-    export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
-    sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
-      ethereum/contracts/foundry.in.toml > \
-      ethereum/contracts/foundry.toml
-  '';
+    preConfigure = ''
+      # respect the amount of available cores for building
+      export CARGO_BUILD_JOBS=$NIX_BUILD_CORES
+      sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+        ethereum/contracts/foundry.in.toml > \
+        ethereum/contracts/foundry.toml
+    '';
 
-  preFixup =
-    lib.optionalString (isCross && targetInterpreter != "" && !isStatic) ''
+    preFixup = lib.optionalString (isCross && targetInterpreter != "" && !isStatic) ''
       for f in `find $out/bin/ -type f`; do
         echo "patching interpreter for $f to ${targetInterpreter}"
         patchelf --set-interpreter ${targetInterpreter} --output $f.patched $f
         mv $f.patched $f
       done
     '';
-})
+  }
+)
