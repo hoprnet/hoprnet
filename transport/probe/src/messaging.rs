@@ -3,7 +3,7 @@ use hopr_crypto_types::prelude::blake3_hash;
 use hopr_primitive_types::{errors::GeneralError, prelude::BytesEncodable};
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{NetworkingError::MessagingError, Result};
+use crate::errors::{ProbeError::MessagingError, Result};
 
 /// Size of the nonce in the Ping sub protocol
 pub const PING_PONG_NONCE_SIZE: usize = 16;

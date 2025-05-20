@@ -87,6 +87,7 @@ pub use hopr_transport::{
     constants::RESERVED_TAG_UPPER_LIMIT,
     errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
+pub use hopr_transport::{PingQueryReplier, ProbeError};
 use tracing::{debug, error, info, trace, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
@@ -722,7 +723,10 @@ impl Hopr {
                 .await
                 .unwrap_or(false)
             {
-                info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.", my_ethereum_address.to_hex());
+                info!(
+                    "Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.",
+                    my_ethereum_address.to_hex()
+                );
 
                 sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 

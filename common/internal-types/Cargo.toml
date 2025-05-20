@@ -11,6 +11,15 @@ license = "GPL-3.0-only"
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = []
+serde = [
+  "dep:serde",
+  "dep:serde_bytes",
+  "hopr-crypto-types/serde",
+  "bloomfilter/serde",
+]
+
 [dependencies]
 aquamarine = { workspace = true }
 bloomfilter = { workspace = true }
@@ -35,14 +44,8 @@ bincode = { workspace = true }
 criterion = { workspace = true }
 lazy_static = { workspace = true }
 
-[features]
-default = []
-serde = [
-  "dep:serde",
-  "dep:serde_bytes",
-  "hopr-crypto-types/serde",
-  "bloomfilter/serde",
-]
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
 
 [[bench]]
 name = "bloom_filter"

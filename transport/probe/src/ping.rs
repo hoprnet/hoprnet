@@ -12,7 +12,7 @@ use libp2p_identity::PeerId;
 use tracing::{debug, warn};
 
 use crate::{
-    errors::{NetworkingError, Result},
+    errors::{ProbeError, Result},
     messaging::ControlMessage,
 };
 
@@ -105,7 +105,7 @@ impl PingQueryReplier {
                 .div(2u32);
             Ok((unidirectional_latency, version))
         } else {
-            Err(NetworkingError::DecodingError)
+            Err(ProbeError::DecodingError)
         };
 
         if self.notifier.unbounded_send(timed_result).is_err() {
@@ -135,8 +135,8 @@ pub fn to_active_ping(
                 (peer, Ok(latency), version)
             }
             Ok(Some(Err(e))) => {
-                let error = if let NetworkingError::DecodingError = e {
-                    NetworkingError::PingerError(peer, "incorrect pong response".into())
+                let error = if let ProbeError::DecodingError = e {
+                    ProbeError::PingerError(peer, "incorrect pong response".into())
                 } else {
                     e
                 };
@@ -148,13 +148,13 @@ pub fn to_active_ping(
                 debug!(%peer, "Ping canceled");
                 (
                     peer,
-                    Err(NetworkingError::PingerError(peer, "canceled".into())),
+                    Err(ProbeError::PingerError(peer, "canceled".into())),
                     "unknown".into(),
                 )
             }
             Err(_) => {
                 debug!(%peer, "Ping failed due to timeout");
-                (peer, Err(NetworkingError::Timeout(timeout.as_secs())), "unknown".into())
+                (peer, Err(ProbeError::Timeout(timeout.as_secs())), "unknown".into())
             }
         }
     }

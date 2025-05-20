@@ -7,13 +7,23 @@ use futures::{
 use hopr_db_api::peers::HoprDbPeersOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::{histogram_start_measure, metrics::SimpleHistogram};
+use hopr_platform::time::native::current_time;
 use hopr_primitive_types::traits::SaturatingSub;
+use hopr_transport_network::network::Network;
 use libp2p_identity::PeerId;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_with::{DurationSeconds, serde_as};
 use tracing::{debug, info};
 use validator::Validate;
+
+use crate::{
+    constants::{
+        DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
+        DEFAULT_MAX_PARALLEL_PINGS,
+    },
+    ping::Pinging,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -24,17 +34,6 @@ lazy_static::lazy_static! {
             vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0],
         ).unwrap();
 }
-
-use hopr_platform::time::native::current_time;
-
-use crate::{
-    constants::{
-        DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
-        DEFAULT_MAX_PARALLEL_PINGS,
-    },
-    network::Network,
-    ping::Pinging,
-};
 
 /// Configuration for the Heartbeat mechanism
 #[serde_as]
@@ -65,22 +64,22 @@ pub struct HeartbeatConfig {
 }
 
 #[inline]
-fn default_max_parallel_pings() -> usize {
+const fn default_max_parallel_pings() -> usize {
     DEFAULT_MAX_PARALLEL_PINGS
 }
 
 #[inline]
-fn default_heartbeat_interval() -> std::time::Duration {
+const fn default_heartbeat_interval() -> std::time::Duration {
     DEFAULT_HEARTBEAT_INTERVAL
 }
 
 #[inline]
-fn default_heartbeat_threshold() -> std::time::Duration {
+const fn default_heartbeat_threshold() -> std::time::Duration {
     DEFAULT_HEARTBEAT_THRESHOLD
 }
 
 #[inline]
-fn default_heartbeat_variance() -> std::time::Duration {
+const fn default_heartbeat_variance() -> std::time::Duration {
     DEFAULT_HEARTBEAT_INTERVAL_VARIANCE
 }
 

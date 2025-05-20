@@ -7,7 +7,8 @@ use std::{
 };
 
 use hopr_transport_identity::Multiaddr;
-pub use hopr_transport_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
+pub use hopr_transport_network::config::NetworkConfig;
+pub use hopr_transport_probe::heartbeat::HeartbeatConfig;
 pub use hopr_transport_protocol::config::ProtocolConfig;
 use hopr_transport_session::MIN_BALANCER_SAMPLING_INTERVAL;
 use proc_macro_regex::regex;
@@ -19,9 +20,9 @@ use crate::errors::HoprTransportError;
 
 pub struct HoprTransportConfig {
     pub transport: TransportConfig,
-    pub network: hopr_transport_network::config::NetworkConfig,
-    pub protocol: hopr_transport_protocol::config::ProtocolConfig,
-    pub heartbeat: hopr_transport_network::heartbeat::HeartbeatConfig,
+    pub network: NetworkConfig,
+    pub protocol: ProtocolConfig,
+    pub heartbeat: HeartbeatConfig,
     pub session: SessionGlobalConfig,
 }
 
