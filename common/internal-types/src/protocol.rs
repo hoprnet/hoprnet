@@ -22,7 +22,7 @@ pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0;
 pub const DEFAULT_MAXIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0; // TODO: change this in 3.0
 
 /// Tags are currently 16-bit unsigned integers
-pub type Tag = u16;
+pub type Tag = u16; // TODO: change this to u32
 
 /// Represent a default application tag if none is specified in `send_packet`.
 pub const DEFAULT_APPLICATION_TAG: Tag = 0;

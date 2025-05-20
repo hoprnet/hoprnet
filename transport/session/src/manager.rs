@@ -62,7 +62,7 @@ pub struct SessionManagerConfig {
     ///
     /// Default is 16..1024.
     #[default(_code = "16..1024")]
-    pub session_tag_range: Range<Tag>,
+    pub session_tag_range: Range<Tag>, // TODO: this will be a fixed huge range, cfg(test) should have an override
 
     /// The base timeout for initiation of Session initiation.
     ///
@@ -696,6 +696,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         data: ApplicationData,
     ) -> crate::errors::Result<DispatchResult> {
         if (0..self.cfg.session_tag_range.start).contains(&data.application_tag) {
+            // TODO(20250520): modify range to have start from another distinct lower value
             trace!(tag = data.application_tag, "dispatching Start protocol message");
             return self
                 .handle_start_protocol_message(pseudonym, data)

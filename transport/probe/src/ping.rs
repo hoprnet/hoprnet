@@ -187,10 +187,6 @@ where
             recorder,
         }
     }
-
-    pub fn config(&self) -> &PingConfig {
-        &self.config
-    }
 }
 
 impl<T> Pinging for Pinger<T>
