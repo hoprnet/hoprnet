@@ -174,7 +174,6 @@ impl<T> From<Result<Duration, T>> for NodeScoreUpdate {
 ///
 /// When a node reaches zero [quality](Node) and there are no edges (channels) containing this node,
 /// it is removed from the graph entirely.
-
 #[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_with::serde_as)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]

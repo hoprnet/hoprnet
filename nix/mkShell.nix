@@ -24,6 +24,7 @@ let
     gnumake
     gnuplot
     jq
+    just
     llvmPackages.bintools
     lsof
     mold

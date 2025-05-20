@@ -1,9 +1,10 @@
 use hex_literal::hex;
-use hopr_crypto_types::prelude::*;
-use hopr_primitive_types::prelude::*;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use tracing::{debug, error};
+
+use hopr_crypto_types::prelude::*;
+use hopr_primitive_types::prelude::*;
 
 use crate::errors;
 use crate::errors::CoreTypesError;
@@ -19,15 +20,21 @@ const ENCODED_TICKET_LENGTH: usize = 64;
 /// convertible to IEEE754 double-precision and vice versa
 const ENCODED_WIN_PROB_LENGTH: usize = 7;
 
+/// Define the selector for the redeemTicketCall to avoid importing
+/// the entire hopr-bindings crate for one single constant.
+/// This value should be updated with the function interface changes.
+pub const REDEEM_CALL_SELECTOR: [u8; 4] = [252, 183, 121, 111];
+
 /// Winning probability encoded in 7-byte representation
 pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
 
 /// Represents a ticket winning probability.
 ///
-/// It holds the modified IEEE-754, but behaves like a reduced precision float
+/// It holds the modified IEEE-754 but behaves like a reduced precision float
 /// when compared. It can also be fully ordered, because there cannot be NaNs or infinity.
 #[derive(Clone, Copy, Debug)]
-pub struct WinningProbability(EncodedWinProb);
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WinningProbability(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] EncodedWinProb);
 
 impl WinningProbability {
     /// 100% winning probability
@@ -586,8 +593,7 @@ impl Ticket {
     /// must be equal to on-chain computation
     pub fn get_hash(&self, domain_separator: &Hash) -> Hash {
         let ticket_hash = Hash::create(&[self.encode_without_signature().as_ref()]); // cannot fail
-                                                                                     // This contains on-chain prefix: RedeemTicketCall::selector() and zeroes
-        let hash_struct = Hash::create(&[&[252u8, 183u8, 121u8, 111u8], &[0u8; 28], ticket_hash.as_ref()]);
+        let hash_struct = Hash::create(&[&REDEEM_CALL_SELECTOR, &[0u8; 28], ticket_hash.as_ref()]);
         Hash::create(&[&hex!("1901"), domain_separator.as_ref(), hash_struct.as_ref()])
     }
 

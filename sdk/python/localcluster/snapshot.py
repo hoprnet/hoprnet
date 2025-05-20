@@ -20,8 +20,8 @@ class Snapshot:
         self.parent_dir = parent_dir
         self.cluster = cluster
 
-    def create(self, anvil_file: Path):
-        logging.info("Taking snapshot")
+    def create(self):
+        logging.info(f"Taking snapshot (anvil port: {self.anvil_port}")
 
         # delete old snapshot
         shutil.rmtree(self.sdir, ignore_errors=True)
@@ -58,7 +58,7 @@ class Snapshot:
 
         for entry in self.parent_dir.glob("*"):
             if entry.is_dir():
-                if entry.name == "snapshot":
+                if entry.name == f"snapshot-{self.anvil_port}":
                     continue
                 shutil.rmtree(entry, ignore_errors=True)
             else:
@@ -75,17 +75,18 @@ class Snapshot:
             self.sdir.joinpath("barebone.cfg.yaml"),
             self.sdir.joinpath("default.cfg.yaml"),
         ]
+
         for i in range(self.cluster.size):
             node_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
             expected_files.extend([node_dir.joinpath(file) for file in EXPECTED_FILES_FOR_SNAPSHOT])
 
         for f in expected_files:
             if not f.exists():
-                logging.info(f"Cannot find {f} in snapshot")
+                logging.warning(f"Cannot find {f} in snapshot")
                 return False
 
         return True
 
     @property
     def sdir(self):
-        return self.parent_dir.joinpath("snapshot")
+        return self.parent_dir.joinpath(f"snapshot-{self.anvil_port}")

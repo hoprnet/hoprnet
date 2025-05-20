@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.7.1"
+version = "0.7.2"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -28,12 +28,14 @@ libp2p = { workspace = true, features = [
   "cbor",
   "macros",
   "tcp",
+  "autonat",
   "quic",
   "dns",
   "yamux",
 ] }
 libp2p-stream = { workspace = true }
 moka = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }

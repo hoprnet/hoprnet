@@ -34,9 +34,6 @@ from .utils import (
     shuffled,
 )
 
-# used by nodes to get unique port assignments
-PORT_BASE = 19000
-
 
 @asynccontextmanager
 async def create_alias(alias, peer, api):
@@ -180,7 +177,7 @@ class TestIntegrationWithSwarm:
     async def test_hoprd_should_fail_sending_a_message_that_is_too_large(
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
-        maximum_payload_size = 800
+        maximum_payload_size = 1000
         random_tag = gen_random_tag()
 
         packet = "0 hop message too large: " + "".join(

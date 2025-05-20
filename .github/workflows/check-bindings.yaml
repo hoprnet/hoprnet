@@ -1,0 +1,63 @@
+---
+name: Check
+
+on:
+  merge_group:
+    types: [checks_requested]
+  pull_request:
+    types:
+      - synchronize
+      - ready_for_review
+
+jobs:
+  smart-contract-bindings:
+    runs-on: self-hosted-hoprnet-big
+    timeout-minutes: 60
+    if: github.event.pull_request.draft == false
+    env:
+      needs_nix_setup: true
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        if: env.needs_nix_setup == 'true'
+        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
+        if: env.needs_nix_setup == 'true'
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Generate bindings
+        run: |
+          echo "Generating bindings into tracked source directory..."
+
+          cd ./ethereum/contracts && \
+            nix develop -c \
+            forge bind --offline --bindings-path ./../bindings/src/codegen \
+            --module --alloy --overwrite --skip-extra-derives \
+            --select "^(HoprAnnouncements|HoprAnnouncementsEvents|HoprCapabilityPermissions|HoprChannels|HoprChannelsEvents|HoprCrypto|HoprDummyProxyForNetworkRegistry|HoprBoost|HoprToken|HoprLedger|HoprLedgerevents|HoprMultisig|HoprNetworkRegistry|HoprNetworkRegistryEvents|HoprNodeManagementModule|HoprNodeSafeRegistry|HoprNodeSafeRegistryEvents|HoprNodeStakeFactory|HoprNodeStakeFactoryEvents|HoprSafeProxyForNetworkRegistry|HoprStakingProxyForNetworkRegistry|HoprTicketPriceOracle|HoprTicketPriceOracleEvents|HoprWinningProbabilityOracle|HoprWinningProbabilityOracleEvents)$"
+
+      - name: Check for diff
+        run: |
+          echo "Checking if generated bindings introduced changes..."
+
+          git diff --exit-code || {
+            echo "::error::Generated bindings are outdated. Please run the binding generation and commit the changes."
+            exit 1
+          }
+          echo "Bindings are up to date."
