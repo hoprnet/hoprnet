@@ -2,7 +2,6 @@
 pub mod config;
 
 mod account;
-mod alias;
 mod channels;
 mod checks;
 mod network;
@@ -75,7 +74,6 @@ pub(crate) struct InternalState {
     pub hoprd_cfg: String,
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
-    pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub websocket_active_count: Arc<AtomicU16>,
     pub open_listeners: ListenerJoinHandles,
     pub default_listen_host: std::net::SocketAddr,
@@ -87,13 +85,6 @@ pub(crate) struct InternalState {
         account::addresses,
         account::balances,
         account::withdraw,
-        alias::aliases,
-        alias::aliases_addresses,
-        alias::set_alias,
-        alias::get_alias,
-        alias::get_alias_address,
-        alias::delete_alias,
-        alias::clear_aliases,
         channels::close_channel,
         channels::fund_channel,
         channels::list_channels,
@@ -128,7 +119,6 @@ pub(crate) struct InternalState {
         schemas(
             ApiError,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest, account::WithdrawResponse,
-            alias::PeerIdResponse, alias::AliasDestinationBodyRequest,
             channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse, channels::FundChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
             network::TicketPriceResponse,
@@ -143,7 +133,6 @@ pub(crate) struct InternalState {
     modifiers(&SecurityAddon),
     tags(
         (name = "Account", description = "HOPR node account endpoints"),
-        (name = "Alias", description = "HOPR node internal non-persistent alias endpoints"),
         (name = "Channels", description = "HOPR node chain channels manipulation endpoints"),
         (name = "Configuration", description = "HOPR node configuration endpoints"),
         (name = "Checks", description = "HOPR node functionality checks"),
@@ -191,7 +180,6 @@ pub struct RestApiParameters {
     pub hoprd_cfg: String,
     pub cfg: crate::config::Api,
     pub hopr: Arc<hopr_lib::Hopr>,
-    pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub session_listener_sockets: ListenerJoinHandles,
     pub default_session_listen_host: std::net::SocketAddr,
 }
@@ -203,7 +191,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         hoprd_cfg,
         cfg,
         hopr,
-        hoprd_db,
         session_listener_sockets,
         default_session_listen_host,
     } = params;
@@ -212,7 +199,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         hoprd_cfg,
         cfg,
         hopr,
-        hoprd_db,
         session_listener_sockets,
         default_session_listen_host,
     )
@@ -225,7 +211,6 @@ async fn build_api(
     hoprd_cfg: String,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
-    hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     open_listeners: ListenerJoinHandles,
     default_listen_host: std::net::SocketAddr,
 ) -> Router {
@@ -234,7 +219,6 @@ async fn build_api(
         auth: Arc::new(cfg.auth.clone()),
         hoprd_cfg,
         hopr: state.hopr.clone(),
-        hoprd_db,
         open_listeners,
         default_listen_host,
         websocket_active_count: Arc::new(AtomicU16::new(0)),
@@ -284,13 +268,6 @@ async fn build_api(
         .nest(
             BASE_PATH,
             Router::new()
-                .route("/aliases", get(alias::aliases))
-                .route("/aliases-addresses", get(alias::aliases_addresses))
-                .route("/aliases", post(alias::set_alias))
-                .route("/aliases", delete(alias::clear_aliases))
-                .route("/aliases/{alias}", get(alias::get_alias))
-                .route("/aliases-addresses/{alias}", get(alias::get_alias_address))
-                .route("/aliases/{alias}", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
                 .route("/account/withdraw", post(account::withdraw))
@@ -393,9 +370,6 @@ enum ApiErrorStatus {
     NotEnoughAllowance,
     ChannelAlreadyOpen,
     ChannelNotOpen,
-    AliasNotFound,
-    AliasOrPeerIdAliasAlreadyExists,
-    DatabaseError,
     UnsupportedFeature,
     Timeout,
     PingError(String),

@@ -104,7 +104,8 @@ class TestWebsocketWithSwarm:
         time.sleep(0.5)
 
     @pytest.mark.xfail(
-        reason="This test is expected to fail due to a bug in the axum code, where the query is not parsed for the token"
+        reason="This test is expected to fail due to a bug in the axum code,"
+        + "where the query is not parsed for the token"
     )
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(nodes_with_auth(), count=1))
     def test_hoprd_websocket_api_should_accept_a_connection_with_a_query_param_passed_valid_token(

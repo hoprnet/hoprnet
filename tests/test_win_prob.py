@@ -5,23 +5,22 @@ import random
 import pytest
 
 from sdk.python.api import Protocol
-from sdk.python.localcluster.constants import ANVIL_CONFIG_FILE, NETWORK, TICKET_PRICE_PER_HOP, CONTRACTS_DIR
+from sdk.python.localcluster.constants import ANVIL_CONFIG_FILE, CONTRACTS_DIR, NETWORK
 from sdk.python.localcluster.node import Node
 from sdk.python.localcluster.utils import load_private_key
 
 from .conftest import barebone_nodes, nodes_with_lower_outgoing_win_prob, run_hopli_cmd
 from .utils import (
     PARAMETERIZED_SAMPLE_SIZE,
-    check_all_tickets_redeemed,
+    HoprSession,
+    basic_send_and_receive_packets_over_single_route,
     check_min_incoming_win_prob_eq,
     check_rejected_tickets_value,
     check_unredeemed_tickets_value,
+    check_unredeemed_tickets_value_max,
     check_winning_tickets_count,
     create_bidirectional_channels_for_route,
     get_ticket_price,
-    basic_send_and_receive_packets_over_single_route,
-    HoprSession,
-    check_unredeemed_tickets_value_max,
 )
 
 
@@ -328,7 +327,8 @@ class TestWinProbWithSwarm:
                     [swarm7[hop] for hop in route],
                 )
 
-                # in this case, the relay has tickets for all the packets, because the source sends them with win prob = 1
+                # in this case, the relay has tickets for all the packets, because the source sends
+                # them with win prob = 1
                 await asyncio.wait_for(
                     check_unredeemed_tickets_value(
                         swarm7[relay], unredeemed_value_before + (ticket_count + 2) * ticket_price

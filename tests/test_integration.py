@@ -2,45 +2,32 @@ import asyncio
 import logging
 import random
 import re
-from contextlib import asynccontextmanager
 
 import pytest
 
-from sdk.python.api import HoprdAPI, Protocol
+from sdk.python.api import Protocol
 from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.api.request_objects import SessionCapabilitiesBody
-from sdk.python.localcluster.constants import (
-    OPEN_CHANNEL_FUNDING_VALUE_HOPR,
-)
+from sdk.python.localcluster.constants import OPEN_CHANNEL_FUNDING_VALUE_HOPR
 from sdk.python.localcluster.node import Node
 
 from .conftest import barebone_nodes, default_nodes, random_distinct_pairs_from
 from .utils import (
     PARAMETERIZED_SAMPLE_SIZE,
     TICKET_AGGREGATION_THRESHOLD,
+    HoprSession,
+    basic_send_and_receive_packets,
+    basic_send_and_receive_packets_over_single_route,
     check_all_tickets_redeemed,
     check_native_balance_below,
     check_rejected_tickets_value,
     check_safe_balance,
     check_unredeemed_tickets_value,
-    create_channel,
-    shuffled,
-    basic_send_and_receive_packets,
-    HoprSession,
-    get_ticket_price,
     create_bidirectional_channels_for_route,
-    basic_send_and_receive_packets_over_single_route,
+    create_channel,
+    get_ticket_price,
+    shuffled,
 )
-
-
-@asynccontextmanager
-async def create_alias(alias, peer, api):
-    """Ensure that the created alias is also released at the end of the test."""
-    assert await api.aliases_set_alias(alias, peer) is True
-    try:
-        yield api
-    finally:
-        assert await api.aliases_remove_alias(alias)
 
 
 @pytest.mark.usefixtures("swarm7_reset")
@@ -76,43 +63,6 @@ class TestIntegrationWithSwarm:
             balances = await node.api.balances()
             assert int(balances.native) > 0
             assert int(balances.safe_hopr) > 0
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hoprd_should_be_able_to_remove_existing_aliases(self, peer: str, swarm7: dict[str, Node]):
-        other_peers = barebone_nodes()
-        other_peers.remove(peer)
-
-        alice = swarm7[random.choice(other_peers)]
-
-        assert alice.address != swarm7[peer].address
-
-        assert await swarm7[peer].api.aliases_get_alias("Alice") is None
-        assert await swarm7[peer].api.aliases_set_alias("Alice", alice.address) is True
-        assert (await swarm7[peer].api.aliases_get_alias("Alice")).peer_id == alice.peer_id
-        assert (await swarm7[peer].api.aliases_get_aliases())["Alice"] == alice.peer_id
-        assert await swarm7[peer].api.aliases_remove_alias("Alice")
-        assert await swarm7[peer].api.aliases_get_alias("Alice") is None
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hoprd_should_not_be_able_to_set_multiple_aliases_to_a_single_peerid(
-        self, peer: str, swarm7: dict[str, Node]
-    ):
-        other_peers = barebone_nodes()
-        other_peers.remove(peer)
-
-        rufus_peer_id = swarm7[random.choice(other_peers)].peer_id
-        my_peer_id = swarm7[peer].peer_id
-        assert rufus_peer_id != my_peer_id
-
-        async with create_alias("Rufus", rufus_peer_id, swarm7[peer].api) as api:
-            assert await api.aliases_set_alias("Simon", rufus_peer_id) is False
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
-    async def test_hoprd_should_contain_self_alias_automatically(self, peer: str, swarm7: dict[str, Node]):
-        assert (await swarm7[peer].api.aliases_get_alias("me")).peer_id == swarm7[peer].peer_id
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -301,11 +251,13 @@ class TestIntegrationWithSwarm:
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
         async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR):
-            # the context manager handles opening and closing of the channel with verification, using counter-party address
+            # the context manager handles opening and closing of the channel with verification,
+            # using counter-party address
             assert True
 
         async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR, use_peer_id=True):
-            # the context manager handles opening and closing of the channel with verification using counter-party peerID
+            # the context manager handles opening and closing of the channel with verification,
+            # using counter-party peerID
             assert True
 
     # generate a 1-hop route with a node using strategies in the middle
@@ -352,7 +304,10 @@ class TestIntegrationWithSwarm:
 
                     redeemed_value_diff = statistics_now.redeemed_value - statistics_before.redeemed_value
                     logging.debug(
-                        f"redeemed_value diff: {redeemed_value_diff} | before: {statistics_before.redeemed_value} | now: {statistics_now.redeemed_value} | target: {aggregated_ticket_price}"
+                        f"redeemed_value diff: {redeemed_value_diff} |"
+                        + f"before: {statistics_before.redeemed_value} |"
+                        + f"now: {statistics_now.redeemed_value} |"
+                        + f"target: {aggregated_ticket_price}"
                     )
 
                     # break out of the loop if the aggregated value is reached

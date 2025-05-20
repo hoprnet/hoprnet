@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import argparse
 import random
-import sys
 import socket
+import sys
 
 
 def find_available_port_block(min_port, max_port, skip, block_size=None):
@@ -47,9 +47,6 @@ def find_available_port_block(min_port, max_port, skip, block_size=None):
     for start_port in potential_starts:
         # Check if all ports in the block are available
         block_available = True
-
-        # Store open sockets temporarily to prevent others from taking the ports while we're checking
-        temp_sockets = []
 
         # Check each port in the block
         for offset in range(block_size):

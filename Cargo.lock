@@ -5332,7 +5332,6 @@ dependencies = [
  "hopr-network-types",
  "hopr-platform",
  "hoprd-api",
- "hoprd-db-api",
  "hoprd-keypair",
  "lazy_static",
  "opentelemetry",
@@ -5377,7 +5376,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-transport-session",
- "hoprd-db-api",
  "lazy_static",
  "libp2p-identity",
  "oas3",
@@ -5397,53 +5395,6 @@ dependencies = [
  "utoipa-scalar",
  "utoipa-swagger-ui",
  "validator",
-]
-
-[[package]]
-name = "hoprd-db-api"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "env_logger",
- "hex-literal",
- "hopr-async-runtime",
- "hopr-crypto-random",
- "hoprd-db-entity",
- "hoprd-db-migration",
- "lazy_static",
- "libp2p-identity",
- "sea-orm",
- "sqlx",
- "thiserror 2.0.12",
- "tokio",
- "tracing",
- "tracing-test",
-]
-
-[[package]]
-name = "hoprd-db-entity"
-version = "0.1.0"
-dependencies = [
- "clap",
- "hopr-crypto-types",
- "hopr-internal-types",
- "hopr-primitive-types",
- "hoprd-db-migration",
- "sea-orm",
- "sea-orm-cli",
- "sea-orm-migration",
- "serde",
- "thiserror 2.0.12",
- "tokio",
-]
-
-[[package]]
-name = "hoprd-db-migration"
-version = "0.1.0"
-dependencies = [
- "sea-orm-migration",
- "tokio",
 ]
 
 [[package]]

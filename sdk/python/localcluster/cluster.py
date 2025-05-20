@@ -31,9 +31,9 @@ class Cluster:
         index = 1
 
         for network_name, params in config["networks"].items():
-            for alias, node in params["nodes"].items():
+            for node in params["nodes"]:
                 self.nodes[str(index)] = Node.fromConfig(
-                    index, alias, node, config["defaults"], network_name, use_nat, exposed, base_port
+                    index, node, config["defaults"], network_name, use_nat, exposed, base_port
                 )
                 index += 1
 
@@ -176,13 +176,6 @@ class Cluster:
     def get_safe_and_module_addresses(self):
         for node in self.node.values():
             node.get_safe_and_module_addresses()
-
-    async def alias_peers(self):
-        logging.info("Aliasing every other node")
-        aliases_dict = {node.peer_id: node.alias for node in self.nodes.values()}
-
-        for node in self.nodes.values():
-            await node.alias_peers(aliases_dict)
 
     async def connect_peers(self):
         logging.info("Creating a channel to every other node")

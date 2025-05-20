@@ -1,11 +1,10 @@
-from typing import Optional
-
 import asyncio
 import logging
 import random
 import re
 import socket
 from contextlib import asynccontextmanager, contextmanager
+from typing import Optional
 
 from sdk.python.api import Protocol
 from sdk.python.api.channelstatus import ChannelStatus
@@ -175,7 +174,8 @@ class RouteBidirectionalChannels:
             remaining = len(self._route) - 2 - i
 
             logging.debug(
-                f"open forward channel {self._route[i].address} -> {self._route[i+1].address} with {self._funding_fwd * remaining} HOPR"
+                f"open forward channel {self._route[i].address} ->"
+                + f"{self._route[i+1].address} with {self._funding_fwd * remaining} HOPR"
             )
             fwd_channel = await self._route[i].api.open_channel(
                 self._route[i + 1].address, str(int(self._funding_fwd * remaining))
@@ -184,7 +184,8 @@ class RouteBidirectionalChannels:
 
             ri = len(self._route) - i - 1
             logging.debug(
-                f"open return channel {self._route[ri].address} -> {self._route[ri-1].address} with {self._funding_return * remaining} HOPR"
+                f"open return channel {self._route[ri].address} ->"
+                + f"{self._route[ri-1].address} with {self._funding_return * remaining} HOPR"
             )
             ret_channel = await self._route[ri].api.open_channel(
                 self._route[ri - 1].address, str(int(self._funding_return * remaining))
@@ -213,7 +214,8 @@ class RouteBidirectionalChannels:
         logging.debug(f"closing channels for route {self._route}")
         for i in range(len(self._route) - 2):
             logging.debug(
-                f"close channel {self._fwd_channels[i].id}: {self._route[i].address} -> {self._route[i+1].address}"
+                f"close channel {self._fwd_channels[i].id}: {self._route[i].address} -> "
+                + f"{self._route[i+1].address}"
             )
             assert await self._route[i].api.close_channel(self._fwd_channels[i].id)
 
@@ -227,14 +229,16 @@ class RouteBidirectionalChannels:
                 check_channel_status(self._route[i], self._route[i + 1], status=ChannelStatus.PendingToClose), 10.0
             )
             logging.debug(
-                f"pending to close channel {self._fwd_channels[i].id}: {self._route[i].address} -> {self._route[i+1].address}"
+                f"pending to close channel {self._fwd_channels[i].id}: {self._route[i].address} ->"
+                + f"{self._route[i+1].address}"
             )
 
             await asyncio.wait_for(
                 check_channel_status(self._route[ri], self._route[ri - 1], status=ChannelStatus.PendingToClose), 10.0
             )
             logging.debug(
-                f"pending to close channel {self._ret_channels[i].id}: {self._route[ri].address} -> {self._route[ri-1].address}"
+                f"pending to close channel {self._ret_channels[i].id}: {self._route[ri].address} ->"
+                + f"{self._route[ri-1].address}"
             )
 
             await asyncio.sleep(15)
@@ -331,17 +335,21 @@ class HoprSession:
             service=self._loopback,
         )
         if self._session is None:
-            raise Exception(f"Failed to open session {self._src.peer_id} -> {self._dest.peer_id} on {self._proto.name}")
+            raise Exception(
+                f"Failed to open session {self._src.peer_id} -> " + f"{self._dest.peer_id} on {self._proto.name}"
+            )
 
         logging.debug(
-            f"Session opened {self._src.peer_id}:{self._session.port} -> {self._dest.peer_id}:{self._target_port} on {self._proto.name}"
+            f"Session opened {self._src.peer_id}:{self._session.port} ->"
+            + f"{self._dest.peer_id}:{self._target_port} on {self._proto.name}"
         )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self._session is not None and await self._src.api.session_close_client(self._session) is True:
             logging.debug(
-                f"Session closed {self._src.peer_id}:{self._session.port} -> {self._dest.peer_id}:{self._target_port} on {self._proto.name}"
+                f"Session closed {self._src.peer_id}:{self._session.port} ->"
+                + f"{self._dest.peer_id}:{self._target_port} on {self._proto.name}"
             )
             self._session = None
             self._target_port = 0
@@ -443,7 +451,7 @@ async def basic_send_and_receive_packets(
                 # Adapt for situations when data arrive completely unordered (also within the buffer)
                 actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
 
-        logging.debug(f"All bytes received")
+        logging.debug("All bytes received")
         expected = [msg.strip() for msg in expected]
 
         actual.sort()
