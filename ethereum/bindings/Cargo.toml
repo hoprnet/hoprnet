@@ -9,3 +9,4 @@ anyhow = { workspace = true }
 
 [dependencies]
 alloy = { workspace = true, default-features = false, features = ["contract"] }
+serde = { workspace = true }
