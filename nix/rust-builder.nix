@@ -1,35 +1,46 @@
-{ crane
-, crossSystem ? localSystem
-, foundry
-, isCross ? false
-, isStatic ? false
-, localSystem
-, nixpkgs
-, rust-overlay
-, solc
-, useRustNightly ? false
+{
+  crane,
+  crossSystem ? localSystem,
+  foundry,
+  isCross ? false,
+  isStatic ? false,
+  localSystem,
+  nixpkgs,
+  rust-overlay,
+  solc,
+  useRustNightly ? false,
 }@args:
-let crossSystem0 = crossSystem;
-in let
+let
+  crossSystem0 = crossSystem;
+in
+let
   # the foundry overlay uses the hostPlatform, so we need to use a
   # localSystem-only pkgs to get the correct architecture
   pkgsLocal = import nixpkgs {
     localSystem = args.localSystem;
-    overlays = [ foundry.overlay rust-overlay.overlays.default solc.overlay ];
+    overlays = [
+      foundry.overlay
+      rust-overlay.overlays.default
+      solc.overlay
+    ];
   };
 
   localSystem = pkgsLocal.lib.systems.elaborate args.localSystem;
   crossSystem =
-    let system = pkgsLocal.lib.systems.elaborate crossSystem0;
-    in if crossSystem0 == null
-      || pkgsLocal.lib.systems.equals system localSystem then
+    let
+      system = pkgsLocal.lib.systems.elaborate crossSystem0;
+    in
+    if crossSystem0 == null || pkgsLocal.lib.systems.equals system localSystem then
       localSystem
     else
       system;
 
   pkgs = import nixpkgs {
     inherit localSystem crossSystem;
-    overlays = [ rust-overlay.overlays.default solc.overlay ];
+    overlays = [
+      rust-overlay.overlays.default
+      solc.overlay
+    ];
   };
 
   # `buildPlatform` is the local host platform
@@ -39,9 +50,7 @@ in let
 
   foundryBin = pkgsLocal.foundry-bin;
 
-  envCase = triple:
-    pkgsLocal.lib.strings.toUpper
-      (builtins.replaceStrings [ "-" ] [ "_" ] triple);
+  envCase = triple: pkgsLocal.lib.strings.toUpper (builtins.replaceStrings [ "-" ] [ "_" ] triple);
 
   solcDefault = solc.mkDefault pkgs pkgs.pkgsBuildHost.solc_0_8_19;
 
@@ -56,8 +65,9 @@ in let
       p: p.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)
     else
       p:
-      (p.pkgsBuildHost.rust-bin.fromRustupToolchainFile
-        ../rust-toolchain.toml).override { targets = [ cargoTarget ]; };
+      (p.pkgsBuildHost.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml).override {
+        targets = [ cargoTarget ];
+      };
 
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchainFun;
 
@@ -66,16 +76,16 @@ in let
 
   buildEnvBase = {
     CARGO_BUILD_TARGET = cargoTarget;
-    "CARGO_TARGET_${envCase cargoTarget}_LINKER" =
-      "${pkgs.stdenv.cc.targetPrefix}cc";
+    "CARGO_TARGET_${envCase cargoTarget}_LINKER" = "${pkgs.stdenv.cc.targetPrefix}cc";
     HOST_CC = "${pkgs.stdenv.cc.nativePrefix}cc";
     CARGO_BUILD_RUSTFLAGS = "-C link-arg=-fuse-ld=${linker}";
   };
   buildEnvStatic =
-    if isStatic then {
-      CARGO_BUILD_RUSTFLAGS =
-        "${buildEnvBase.CARGO_BUILD_RUSTFLAGS} -C target-feature=+crt-static";
-    } else
+    if isStatic then
+      {
+        CARGO_BUILD_RUSTFLAGS = "${buildEnvBase.CARGO_BUILD_RUSTFLAGS} -C target-feature=+crt-static";
+      }
+    else
       { };
 
   buildEnv = buildEnvBase // buildEnvStatic;
@@ -84,19 +94,34 @@ in
 {
   # inherit rustToolchain;
 
-  callPackage = (package: args:
+  callPackage = (
+    package: args:
     let
-      crate = pkgs.callPackage package
-        (args // { inherit foundryBin solcDefault craneLib isCross isStatic; });
-      # Override the derivation to add cross-compilation environment variables.
+      crate = pkgs.callPackage package (
+        args
+        // {
+          inherit
+            foundryBin
+            solcDefault
+            craneLib
+            isCross
+            isStatic
+            ;
+        }
+      );
     in
-    crate.overrideAttrs (previous:
-      buildEnv // {
+    # Override the derivation to add cross-compilation environment variables.
+    crate.overrideAttrs (
+      previous:
+      buildEnv
+      // {
         # We also have to override the `cargoArtifacts` derivation with the same changes.
         cargoArtifacts =
           if previous.cargoArtifacts != null then
             previous.cargoArtifacts.overrideAttrs (previous: buildEnv)
           else
             null;
-      }));
+      }
+    )
+  );
 }
