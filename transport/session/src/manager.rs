@@ -61,8 +61,9 @@ pub struct SessionManagerConfig {
     /// This is due to the reserved range by the Start sub-protocol.
     ///
     /// Default is 16..1024.
+    #[doc(hidden)]
     #[default(_code = "16..1024")]
-    pub session_tag_range: Range<Tag>, // TODO: this will be a fixed huge range, cfg(test) should have an override
+    pub session_tag_range: Range<Tag>,
 
     /// The base timeout for initiation of Session initiation.
     ///
@@ -755,9 +756,9 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                             Some(session_id) => ((session_id.tag() + 1) % self.cfg.session_tag_range.end)
                                 .max(self.cfg.session_tag_range.start),
                             None => hopr_crypto_random::random_integer(
-                                self.cfg.session_tag_range.start as u64,
-                                Some(self.cfg.session_tag_range.end as u64),
-                            ) as u16,
+                                self.cfg.session_tag_range.start.into(),
+                                Some(self.cfg.session_tag_range.end.into()),
+                            ) as Tag,
                         };
                         SessionId::new(next_tag, pseudonym)
                     },

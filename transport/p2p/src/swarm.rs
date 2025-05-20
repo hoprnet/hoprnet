@@ -359,25 +359,5 @@ fn print_network_info(network_info: NetworkInfo, event: &str) {
     );
 }
 
-/// Composition of all inputs allowing to produce a single stream of
-/// input events passed into the swarm processing logic.
-#[derive(Debug)]
-pub enum Inputs {
-    Message((PeerId, Box<[u8]>)),
-    Acknowledgement((PeerId, Acknowledgement)),
-}
-
-impl From<(PeerId, Acknowledgement)> for Inputs {
-    fn from(value: (PeerId, Acknowledgement)) -> Self {
-        Self::Acknowledgement(value)
-    }
-}
-
-impl From<(PeerId, Box<[u8]>)> for Inputs {
-    fn from(value: (PeerId, Box<[u8]>)) -> Self {
-        Self::Message(value)
-    }
-}
-
 pub type TicketAggregationRequestType = OutboundRequestId;
 pub type TicketAggregationResponseType = ResponseChannel<std::result::Result<Ticket, String>>;
