@@ -74,18 +74,17 @@ pub use hopr_strategy::Strategy;
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
+pub use hopr_transport::{
+    ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
+    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_PAYLOAD_SIZE, SendMsg,
+    ServiceId, Session as HoprSession, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
+    SessionTarget, SurbBalancerConfig, Tag, TicketStatistics, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
+    config::{HostConfig, HostType, looks_like_domain},
+    errors::{HoprTransportError, NetworkingError, ProtocolError},
+};
 use hopr_transport::{
     ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession, OffchainKeypair,
     PeerDiscovery, PeerStatus, execute_on_tick,
-};
-pub use hopr_transport::{
-    HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_PAYLOAD_SIZE, SendMsg,
-    ServiceId, Session as HoprSession, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
-    SessionTarget, SurbBalancerConfig, TicketStatistics, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
-    config::{HostConfig, HostType, looks_like_domain},
-    constants::RESERVED_TAG_UPPER_LIMIT,
-    errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
 use tracing::{debug, error, info, trace, warn};
 #[cfg(all(feature = "prometheus", not(test)))]

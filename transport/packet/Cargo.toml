@@ -10,12 +10,16 @@ crate-type = ["rlib"]
 
 [features]
 default = []
+serde = ["dep:serde", "dep:serde_bytes"]
 
 [dependencies]
-libp2p-identity = { workspace = true }
-
-hopr-crypto-packet = { workspace = true }
-hopr-internal-types = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true, optional = true }
+serde_bytes = { workspace = true, optional = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]

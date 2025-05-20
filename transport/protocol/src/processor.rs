@@ -10,6 +10,7 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_identity::PeerId;
+use hopr_transport_packet::prelude::ApplicationData;
 use tracing::error;
 
 lazy_static::lazy_static! {

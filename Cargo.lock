@@ -4825,7 +4825,6 @@ dependencies = [
  "aquamarine",
  "bincode",
  "criterion",
- "hex",
  "hex-literal",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -5076,6 +5075,7 @@ dependencies = [
  "hopr-transport-mixer",
  "hopr-transport-network",
  "hopr-transport-p2p",
+ "hopr-transport-packet",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "hopr-transport-session",
@@ -5206,9 +5206,10 @@ name = "hopr-transport-packet"
 version = "3.0.0"
 dependencies = [
  "anyhow",
- "hopr-crypto-packet",
- "hopr-internal-types",
- "libp2p-identity",
+ "hex",
+ "serde",
+ "serde_bytes",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -5306,6 +5307,7 @@ dependencies = [
  "hopr-metrics",
  "hopr-network-types",
  "hopr-primitive-types",
+ "hopr-transport-packet",
  "lazy_static",
  "mockall",
  "moka",
