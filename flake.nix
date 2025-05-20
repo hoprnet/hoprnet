@@ -372,7 +372,8 @@
               ./scripts/run-local-cluster.sh
               ./scripts/utils.sh
               (fs.fileFilter (file: true) ./sdk)
-              ./tests/requirements.txt
+              ./pyproject.toml
+              ./tests/pyproject.toml
               ./Makefile
               (fs.fileFilter (file: file.hasExt "sol") ./vendor/solidity)
               (fs.fileFilter (file: file.hasExt "sol") ./ethereum/contracts/src)
@@ -402,6 +403,7 @@
               solcDefault
               time
               tini
+              uv
               which
             ];
             enableFakechroot = true;
@@ -499,6 +501,7 @@
               uv
               foundry-bin
               solcDefault
+              python313
               hopli-dev
               hoprd-dev
             ];
@@ -621,7 +624,6 @@
               "nix/setup-hook-darwin.sh"
               "target/*"
               "tests/pytest.ini"
-              "tests/requirements.txt"
               "vendor/*"
             ];
 
