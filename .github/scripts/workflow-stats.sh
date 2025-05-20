@@ -80,7 +80,7 @@ for workflow_id in $(jq -r '.[] | .databaseId' "$WORKFLOW_DATA"); do
   # Increment total count
   #echo "Workflow ${workflow_id} conclusion: $workflow_conclusion"
   # Increment total count for success and failure
-  if [[ "$workflow_conclusion" == "failure" ]] || [[ "$workflow_conclusion" == "success" ]]; then
+  if [[ $workflow_conclusion == "failure" ]] || [[ $workflow_conclusion == "success" ]]; then
     total_count=$((total_count + 1))
   fi
 done
