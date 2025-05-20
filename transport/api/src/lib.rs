@@ -38,6 +38,7 @@ use futures::{
     future::{Either, select},
     pin_mut,
 };
+use helpers::PathPlanner;
 use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
 use hopr_crypto_packet::prelude::HoprPacket;
 pub use hopr_crypto_types::{
@@ -67,6 +68,8 @@ use hopr_transport_p2p::{
     HoprSwarm,
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
 };
+use hopr_transport_packet::prelude::*;
+pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use hopr_transport_probe::{
     HoprProbeProcess,
     heartbeat::{Heartbeat, HeartbeatExternalInteractions},
@@ -99,13 +102,9 @@ pub use crate::{
     config::HoprTransportConfig,
     helpers::{PeerEligibility, TicketStatistics},
 };
-use crate::{
-    constants::{
-        RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT, SESSION_INITIATION_TIMEOUT_BASE,
-    },
-    errors::HoprTransportError,
-    helpers::PathPlanner,
-};
+use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError};
+
+pub const USABLE_TAG_RANGE: std::ops::Range<Tag> = Tag::USABLE_RANGE;
 
 #[cfg(any(
     all(feature = "mixer-channel", feature = "mixer-stream"),
@@ -249,7 +248,7 @@ where
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             smgr: SessionManager::new(SessionManagerConfig {
-                session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
+                session_tag_range: Tag::USABLE_RANGE,
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
@@ -678,10 +677,12 @@ where
         routing: DestinationRouting,
         application_tag: Tag,
     ) -> errors::Result<()> {
-        // The send_message logic will be entirely removed in 3.0
-        if application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT {
+        let tag: ResolvedTag = application_tag.into();
+
+        if let ResolvedTag::Reserved(reserved_tag) = tag {
             return Err(HoprTransportError::Api(format!(
-                "Application tag must not be lower than {RESERVED_SESSION_TAG_UPPER_LIMIT}"
+                "Application tag must not from range: {:?}, but was {reserved_tag:?}",
+                Tag::USABLE_RANGE
             )));
         }
 

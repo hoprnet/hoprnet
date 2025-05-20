@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use hopr_internal_types::{prelude::ApplicationData, protocol::Tag};
+use hopr_transport_packet::prelude::{ApplicationData, Tag};
 
 use crate::{Capability, errors::TransportSessionError, types::SessionTarget};
 
@@ -209,8 +209,9 @@ impl<T> TryFrom<ApplicationData> for StartProtocol<T> {
 mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_crypto_random::Randomizable;
-    use hopr_internal_types::prelude::{HoprPseudonym, Tag};
+    use hopr_internal_types::prelude::HoprPseudonym;
     use hopr_network_types::prelude::SealedHost;
+    use hopr_transport_packet::prelude::Tag;
 
     use super::*;
     use crate::SessionId;

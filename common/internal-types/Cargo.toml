@@ -18,7 +18,6 @@ serde = ["dep:serde", "dep:serde_bytes", "hopr-crypto-types/serde"]
 [dependencies]
 aquamarine = { workspace = true }
 hex-literal = { workspace = true }
-hex = { workspace = true }
 num_enum = { workspace = true }
 multiaddr = { workspace = true }
 serde = { workspace = true, optional = true }

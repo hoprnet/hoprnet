@@ -11,15 +11,13 @@ use std::{
 
 use futures::{StreamExt, pin_mut};
 use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_internal_types::{
-    prelude::{HoprPseudonym, Tag},
-    protocol::ApplicationData,
-};
+use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::{
     prelude::{DestinationRouting, SealedHost},
     session::state::{SessionConfig, SessionSocket},
 };
 use hopr_primitive_types::prelude::BytesRepresentable;
+use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, error};
 
 use crate::{Capability, errors::TransportSessionError, traits::SendMsg};

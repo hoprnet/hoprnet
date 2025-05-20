@@ -12,9 +12,10 @@ use futures::{
 };
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
-use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
+use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
+use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
@@ -756,8 +757,8 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                             Some(session_id) => ((session_id.tag() + 1) % self.cfg.session_tag_range.end)
                                 .max(self.cfg.session_tag_range.start),
                             None => hopr_crypto_random::random_integer(
-                                self.cfg.session_tag_range.start.into(),
-                                Some(self.cfg.session_tag_range.end.into()),
+                                self.cfg.session_tag_range.start as u64,
+                                Some(self.cfg.session_tag_range.end as u64),
                             ) as Tag,
                         };
                         SessionId::new(next_tag, pseudonym)
