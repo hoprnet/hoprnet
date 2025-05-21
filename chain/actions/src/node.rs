@@ -12,20 +12,21 @@
 //! to the [ActionQueue](crate::action_queue::ActionQueue).
 use async_trait::async_trait;
 use hopr_chain_types::actions::Action;
-use hopr_crypto_types::keypairs::OffchainKeypair;
-use hopr_crypto_types::prelude::Keypair;
+use hopr_crypto_types::{keypairs::OffchainKeypair, prelude::Keypair};
 use hopr_db_sql::accounts::HoprDbAccountOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
 use tracing::info;
 
-use crate::action_queue::PendingAction;
-use crate::errors::{
-    ChainActionsError::{AlreadyAnnounced, InvalidArguments},
-    Result,
+use crate::{
+    ChainActions,
+    action_queue::PendingAction,
+    errors::{
+        ChainActionsError::{AlreadyAnnounced, InvalidArguments},
+        Result,
+    },
 };
-use crate::ChainActions;
 
 /// Contains all on-chain calls specific to HOPR node itself.
 #[async_trait]
@@ -88,24 +89,30 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
-    use crate::action_state::MockActionState;
-    use crate::errors::ChainActionsError;
-    use crate::node::NodeActions;
-    use crate::ChainActions;
+    use std::str::FromStr;
+
     use futures::FutureExt;
     use hex_literal::hex;
-    use hopr_chain_types::actions::Action;
-    use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
+    use hopr_chain_types::{
+        actions::Action,
+        chain_events::{ChainEventType, SignificantChainEvent},
+    };
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::accounts::HoprDbAccountOperations;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::{api::info::DomainSeparator, info::HoprDbInfoOperations};
+    use hopr_db_sql::{
+        accounts::HoprDbAccountOperations, api::info::DomainSeparator, db::HoprDb, info::HoprDbInfoOperations,
+    };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
-    use std::str::FromStr;
+
+    use crate::{
+        ChainActions,
+        action_queue::{ActionQueue, MockTransactionExecutor},
+        action_state::MockActionState,
+        errors::ChainActionsError,
+        node::NodeActions,
+    };
 
     lazy_static::lazy_static! {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -115,7 +122,7 @@ mod tests {
         static ref ALICE_OFFCHAIN: OffchainKeypair = OffchainKeypair::from_secret(&hex!("e0bf93e9c916104da00b1850adc4608bd7e9087bbd3f805451f4556aa6b3fd6e")).expect("lazy static keypair should be constructible");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_announce() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009")?;
@@ -156,7 +163,7 @@ mod tests {
 
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -173,7 +180,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_announce_should_not_allow_reannouncing_with_same_multiaddress() -> anyhow::Result<()> {
         let announce_multiaddr = Multiaddr::from_str("/ip4/1.2.3.4/tcp/9009")?;
 
@@ -214,7 +221,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_withdraw() -> anyhow::Result<()> {
         let stake = Balance::new(10_u32, BalanceType::HOPR);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -235,7 +242,7 @@ mod tests {
 
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -256,7 +263,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_withdraw_zero_amount() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Default::default())

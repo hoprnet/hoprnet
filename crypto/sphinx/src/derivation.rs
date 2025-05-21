@@ -87,14 +87,20 @@ pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
-    use elliptic_curve::{sec1::ToEncodedPoint, ProjectivePoint, ScalarPrimitive};
+    use elliptic_curve::{
+        ProjectivePoint, ScalarPrimitive,
+        hash2curve::{ExpandMsgXmd, GroupDigest},
+        sec1::ToEncodedPoint,
+    };
     use hex_literal::hex;
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-    use hopr_crypto_types::types::PublicKey;
-    use hopr_crypto_types::vrf::derive_vrf_parameters;
+    use hopr_crypto_types::{
+        keypairs::{ChainKeypair, Keypair},
+        types::PublicKey,
+        vrf::derive_vrf_parameters,
+    };
     use k256::{Scalar, Secp256k1};
+
+    use super::*;
 
     #[test]
     fn test_sample_field_element() {

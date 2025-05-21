@@ -1,13 +1,16 @@
 //! `hopli` is a collection of commands to help with identity creation, funding, registration, etc. for HOPR nodes
 
-use crate::faucet::FaucetArgs;
-use crate::identity::IdentitySubcommands;
-use crate::network_registry::NetworkRegistrySubcommands;
-use crate::safe_module::SafeModuleSubcommands;
-use crate::utils::{Cmd, HelperErrors};
-use crate::win_prob::WinProbSubcommands;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::layer::SubscriberExt;
+
+use crate::{
+    faucet::FaucetArgs,
+    identity::IdentitySubcommands,
+    network_registry::NetworkRegistrySubcommands,
+    safe_module::SafeModuleSubcommands,
+    utils::{Cmd, HelperErrors},
+    win_prob::WinProbSubcommands,
+};
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;
@@ -61,7 +64,7 @@ enum Commands {
     },
 }
 
-#[async_std::main]
+#[tokio::main]
 async fn main() -> Result<(), HelperErrors> {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));

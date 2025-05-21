@@ -17,9 +17,6 @@ from .test_integration import create_channel
 logging.basicConfig(format="%(asctime)s %(message)s")
 
 
-PORT_BASE = 19300
-
-
 @pytest.fixture
 async def stress_fixture(request: pytest.FixtureRequest):
     return {
@@ -31,7 +28,7 @@ async def stress_fixture(request: pytest.FixtureRequest):
 
 async def peer_is_present(me: HoprdAPI, target):
     while True:
-        if target in [x.peer_id for x in await me.peers()]:
+        if target in [x.address for x in await me.peers()]:
             break
         else:
             await asyncio.sleep(1)
@@ -62,11 +59,11 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
 
     api_sources = [HoprdAPI(f'http://{d["url"]}', d["token"]) for d in stress_fixture["sources"]]
     api_target = HoprdAPI(f'http://{stress_fixture["target"]["url"]}', stress_fixture["target"]["token"])
-    target_peer_id = (await api_target.addresses()).hopr
+    target_address = (await api_target.addresses()).native
 
     async with AsyncExitStack() as channels:
         await asyncio.gather(
-            *[asyncio.wait_for(peer_is_present(source, target_peer_id), timeout=15.0) for source in api_sources]
+            *[asyncio.wait_for(peer_is_present(source, target_address), timeout=15.0) for source in api_sources]
         )
 
         await asyncio.gather(
@@ -94,7 +91,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
             ],
         )
 
-        async def send_and_receive_all_messages(host, port, token, self_peer_id):
+        async def send_and_receive_all_messages(host, port, token, self_address):
             event = asyncio.Event()
 
             data = bytearray(os.urandom(ROUGH_PAYLOAD_SIZE))
@@ -130,7 +127,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                             ("hops", 1),
                             ("capabilities", "Segmentation"),
                             ("capabilities", "Retransmission"),
-                            ("destination", f"{self_peer_id}"),
+                            ("destination", f"{self_address}"),
                         ],
                     ),
                     additional_headers=[("X-Auth-Token", token)],
@@ -145,7 +142,7 @@ async def test_stress_relayed_flood_test_with_sources_performing_1_hop_to_self(s
                         source["url"].split(":")[0],
                         source["url"].split(":")[1],
                         source["token"],
-                        (await HoprdAPI(f'http://{source["url"]}', source["token"]).addresses()).hopr,
+                        (await HoprdAPI(f'http://{source["url"]}', source["token"]).addresses()).native,
                     ),
                     timeout=60.0,
                 )

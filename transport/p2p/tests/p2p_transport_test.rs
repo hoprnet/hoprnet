@@ -5,17 +5,16 @@ use std::{
 
 use anyhow::Context;
 use futures::{
-    channel::mpsc::{Receiver, Sender},
     SinkExt, StreamExt,
+    channel::mpsc::{Receiver, Sender},
 };
-use lazy_static::lazy_static;
-use libp2p::{Multiaddr, PeerId};
-
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_platform::time::native::current_time;
 use hopr_transport_network::{network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_transport_p2p::HoprSwarm;
-use hopr_transport_protocol::{config::ProtocolConfig, PeerDiscovery};
+use hopr_transport_protocol::{PeerDiscovery, config::ProtocolConfig};
+use lazy_static::lazy_static;
+use libp2p::{Multiaddr, PeerId};
 
 pub fn random_free_local_ipv4_port() -> Option<u16> {
     let socket = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0);
@@ -115,25 +114,23 @@ impl SelfClosingJoinHandle {
     }
 }
 
-#[cfg(feature = "runtime-async-std")]
 impl Drop for SelfClosingJoinHandle {
     fn drop(&mut self) {
         if let Some(handle) = self.handle.take() {
-            block_on(handle.cancel());
+            handle.abort();
         }
     }
 }
 
-#[cfg(feature = "runtime-async-std")]
-use async_std::{
-    future::timeout,
-    task::{block_on, sleep, spawn, JoinHandle},
-};
 use hopr_crypto_packet::prelude::HoprPacket;
+use more_asserts::assert_gt;
+use tokio::{
+    task::{JoinHandle, spawn},
+    time::{sleep, timeout},
+};
 
 #[ignore]
-#[cfg_attr(feature = "runtime-async-std", async_std::test)]
-// #[cfg_attr(feature = "runtime-async-std", tracing_test::traced_test)]
+#[tokio::test]
 async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
     let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
@@ -177,9 +174,13 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
 
     let speed_in_mbytes_s =
         (RANDOM_GIBBERISH.len() * packet_count) as f64 / (start.elapsed()?.as_millis() as f64 * 1000f64);
-    tracing::info!("The measured speed for data transfer is ~{speed_in_mbytes_s}MB/s",);
 
-    assert!(speed_in_mbytes_s > 10.0f64);
+    assert_gt!(
+        speed_in_mbytes_s,
+        100.0f64,
+        "The measured speed for data transfer is ~{}MB/s",
+        speed_in_mbytes_s
+    );
 
     Ok(())
 }

@@ -24,60 +24,74 @@ pub mod network_notifier;
 /// Objects used and possibly exported by the crate for re-use for transport functionality
 pub mod proxy;
 
-use async_lock::RwLock;
-use futures::{
-    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
-    future::{select, Either},
-    pin_mut, FutureExt, SinkExt, StreamExt,
-};
-use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
-use hopr_transport_mixer::MixerConfig;
-use std::time::Duration;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, OnceLock},
+    time::Duration,
 };
-use tracing::{debug, error, info, trace, warn};
 
-use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use async_lock::RwLock;
+use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
+use futures::{
+    FutureExt, SinkExt, StreamExt,
+    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
+    future::{Either, select},
+    pin_mut,
+};
+use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
+use hopr_crypto_packet::prelude::HoprPacket;
+pub use hopr_crypto_types::{
+    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    types::{HalfKeyChallenge, Hash, OffchainPublicKey},
+};
 use hopr_db_sql::{
+    HoprDbAllOperations,
     accounts::ChainOrPacketKey,
     api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
-    HoprDbAllOperations,
 };
+pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
-use hopr_path::PathAddressResolver;
+pub use hopr_network_types::prelude::RoutingOptions;
+use hopr_network_types::prelude::{DestinationRouting, ResolvedTransportRouting};
+use hopr_path::{
+    PathAddressResolver,
+    selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
+};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
+use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
+pub use hopr_transport_identity::{Multiaddr, PeerId};
+use hopr_transport_mixer::MixerConfig;
+pub use hopr_transport_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus};
 use hopr_transport_network::{
     heartbeat::Heartbeat,
     ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
 };
 use hopr_transport_p2p::{
-    swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
     HoprSwarm,
+    swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
 };
+pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
 use hopr_transport_protocol::{
     errors::ProtocolError,
     processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
+};
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_session::transfer_session;
+pub use hopr_transport_session::{
+    Capability as SessionCapability, IncomingSession, SESSION_PAYLOAD_SIZE, ServiceId, Session, SessionClientConfig,
+    SessionId, SessionTarget, SurbBalancerConfig, USABLE_PAYLOAD_CAPACITY_FOR_SESSION, errors::TransportSessionError,
+    traits::SendMsg,
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use hopr_transport_ticket_aggregation::{
     AwaitingAggregator, TicketAggregationActions, TicketAggregationError, TicketAggregationInteraction,
     TicketAggregatorTrait,
 };
-
-use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-
+use rand::seq::SliceRandom;
 #[cfg(feature = "mixer-stream")]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-
-use crate::helpers::PathPlanner;
-
-use hopr_path::selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting};
-
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_session::transfer_session;
+use tracing::{debug, error, info, trace, warn};
 
 pub use crate::{
     config::HoprTransportConfig,
@@ -88,24 +102,7 @@ use crate::{
         RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT, SESSION_INITIATION_TIMEOUT_BASE,
     },
     errors::HoprTransportError,
-};
-use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_network_types::prelude::{DestinationRouting, ResolvedTransportRouting};
-pub use {
-    hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{HalfKeyChallenge, Hash, OffchainPublicKey},
-    },
-    hopr_internal_types::prelude::HoprPseudonym,
-    hopr_network_types::prelude::RoutingOptions,
-    hopr_transport_identity::{Multiaddr, PeerId},
-    hopr_transport_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
-    hopr_transport_protocol::{execute_on_tick, PeerDiscovery},
-    hopr_transport_session::{
-        errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
-        SessionClientConfig, SessionId, SESSION_USABLE_MTU_SIZE,
-    },
-    hopr_transport_session::{ServiceId, SessionTarget},
+    helpers::PathPlanner,
 };
 
 #[cfg(any(
@@ -249,24 +246,22 @@ where
             db,
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
-            smgr: SessionManager::new(
-                me_chain_addr,
-                SessionManagerConfig {
-                    session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
-                    initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
-                    idle_timeout: cfg.session.idle_timeout,
-                },
-            ),
+            smgr: SessionManager::new(SessionManagerConfig {
+                session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
+                initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
+                idle_timeout: cfg.session.idle_timeout,
+                balancer_sampling_interval: cfg.session.balancer_sampling_interval,
+            }),
             cfg,
         }
     }
 
     /// Execute all processes of the [`crate::HoprTransport`] object.
     ///
-    /// This method will spawn the [`crate::HoprTransportProcess::Heartbeat`], [`crate::HoprTransportProcess::BloomFilterSave`],
-    /// [`crate::HoprTransportProcess::Swarm`] and session-related processes and return
-    /// join handles to the calling function. These processes are not started immediately but are
-    /// waiting for a trigger from this piece of code.
+    /// This method will spawn the [`crate::HoprTransportProcess::Heartbeat`],
+    /// [`crate::HoprTransportProcess::BloomFilterSave`], [`crate::HoprTransportProcess::Swarm`] and session-related
+    /// processes and return join handles to the calling function. These processes are not started immediately but
+    /// are waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
     pub async fn run(
         &self,
@@ -366,10 +361,12 @@ where
 
         info!("Loading initial peers from the storage");
 
+        let mut addresses: HashSet<Multiaddr> = HashSet::new();
         let nodes = self.get_public_nodes().await?;
         for (peer, _address, multiaddresses) in nodes {
             if self.is_allowed_to_access_network(either::Left(&peer)).await? {
                 debug!(%peer, ?multiaddresses, "Using initial public node");
+                addresses.extend(multiaddresses.clone());
 
                 internal_discovery_update_tx
                     .send(PeerDiscovery::Allow(peer))
@@ -507,7 +504,7 @@ where
             (tx, rx)
         };
 
-        let transport_layer = HoprSwarm::new(
+        let mut transport_layer = HoprSwarm::new(
             (&self.me).into(),
             network_events_rx,
             discovery_updates,
@@ -516,6 +513,19 @@ where
             self.cfg.protocol,
         )
         .await;
+
+        if let Some(port) = self.cfg.protocol.autonat_port {
+            transport_layer.run_nat_server(port);
+        }
+
+        if addresses.is_empty() {
+            warn!("No addresses found in the database, not dialing any NAT servers");
+        } else {
+            info!(num_addresses = addresses.len(), "Found addresses from the database");
+            let mut randomized_addresses: Vec<_> = addresses.into_iter().collect();
+            randomized_addresses.shuffle(&mut rand::thread_rng());
+            transport_layer.dial_nat_server(randomized_addresses);
+        }
 
         let msg_proto_control =
             transport_layer.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
@@ -531,11 +541,16 @@ where
         // initiate the msg-ack protocol stack over the wire transport
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: self.me.clone(),
-            outgoing_ticket_win_prob: self.cfg.protocol.outgoing_ticket_winning_prob,
+            outgoing_ticket_win_prob: self
+                .cfg
+                .protocol
+                .outgoing_ticket_winning_prob
+                .map(WinningProbability::try_from)
+                .transpose()?,
             outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
         };
 
-        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<ApplicationData>();
+        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -565,10 +580,10 @@ where
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             spawn(async move {
-                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, |data| {
+                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {
-                        match smgr.dispatch_message(data).await {
+                        match smgr.dispatch_message(pseudonym, data).await {
                             Ok(DispatchResult::Processed) => {
                                 trace!("message dispatch completed");
                                 None
@@ -671,8 +686,13 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    pub async fn new_session(&self, cfg: SessionClientConfig) -> errors::Result<Session> {
-        Ok(self.smgr.new_session(cfg).await?)
+    pub async fn new_session(
+        &self,
+        destination: Address,
+        target: SessionTarget,
+        cfg: SessionClientConfig,
+    ) -> errors::Result<Session> {
+        Ok(self.smgr.new_session(destination, target, cfg).await?)
     }
 
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]

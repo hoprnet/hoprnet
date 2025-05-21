@@ -1,23 +1,23 @@
-use futures::{stream, FutureExt, StreamExt};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use tracing::{debug, error, info, trace};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, AtomicU64, Ordering},
+};
 
-use hopr_async_runtime::prelude::{spawn, JoinHandle};
+use futures::{FutureExt, StreamExt, stream};
+use hopr_async_runtime::prelude::{JoinHandle, spawn};
 use hopr_chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
-use hopr_db_sql::info::HoprDbInfoOperations;
-use hopr_db_sql::HoprDbGeneralModelOperations;
-
+use hopr_db_sql::{HoprDbGeneralModelOperations, info::HoprDbInfoOperations};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_primitive_types::prelude::ToHex;
+use tracing::{debug, error, info, trace};
 
 use crate::{
+    IndexerConfig,
     errors::{CoreEthereumIndexerError, Result},
     traits::ChainLogHandler,
-    IndexerConfig,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -49,8 +49,8 @@ lazy_static::lazy_static! {
 /// Indexer
 ///
 /// Accepts the RPC operational functionality [hopr_chain_rpc::HoprIndexerRpcOperations]
-/// and provides the indexing operation resulting in and output of [hopr_chain_types::chain_events::SignificantChainEvent]
-/// streamed outside the indexer by the unbounded channel.
+/// and provides the indexing operation resulting in and output of
+/// [hopr_chain_types::chain_events::SignificantChainEvent] streamed outside the indexer by the unbounded channel.
 ///
 /// The roles of the indexer:
 /// 1. prime the RPC endpoint
@@ -134,7 +134,7 @@ where
             if !contract_topics.is_empty() {
                 addresses.push(*address);
                 for topic in contract_topics {
-                    address_topics.push((*address, Hash::from(topic)));
+                    address_topics.push((*address, Hash::from(topic.0)));
                     topics.push(topic);
                 }
             }
@@ -146,7 +146,7 @@ where
 
         let log_filter = LogFilter {
             address: addresses,
-            topics: topics.into_iter().map(Hash::from).collect(),
+            topics: topics.into_iter().map(|t| Hash::from(t.0)).collect(),
         };
 
         let is_synced = Arc::new(AtomicBool::new(false));
@@ -175,7 +175,10 @@ where
 
         let will_perform_fast_sync = match (fast_sync_configured, index_empty) {
             (true, false) => {
-                info!("Fast sync is enabled, but the index database is not empty. Fast sync will continue on existing unprocessed logs.");
+                info!(
+                    "Fast sync is enabled, but the index database is not empty. Fast sync will continue on existing \
+                     unprocessed logs."
+                );
                 FastSyncMode::Continue
             }
             (false, true) => {
@@ -218,6 +221,12 @@ where
             let _first_log_block_number = log_block_numbers.first().copied().unwrap_or(0);
             let _head = chain_head.load(Ordering::Relaxed);
             for block_number in log_block_numbers {
+                debug!(
+                    block_number,
+                    first_log_block_number = _first_log_block_number,
+                    head = _head,
+                    "computing processed logs"
+                );
                 // Do not pollute the logs with the fast-sync progress
                 Self::process_block_by_id(&db, &logs_handler, block_number).await?;
                 #[cfg(all(feature = "prometheus", not(test)))]
@@ -346,7 +355,8 @@ where
     ///
     /// # Returns
     ///
-    /// A `Result` containing an optional vector of significant chain events if the operation succeeds or an error if it fails.
+    /// A `Result` containing an optional vector of significant chain events if the operation succeeds or an error if it
+    /// fails.
     async fn process_block_by_id(
         db: &Db,
         logs_handler: &U,
@@ -566,31 +576,30 @@ where
 
 #[cfg(test)]
 mod tests {
-    use async_trait::async_trait;
-    use ethers::{
-        abi::{encode, Token},
-        contract::EthEvent,
-    };
-    use futures::{join, Stream};
-    use hex_literal::hex;
-    use mockall::mock;
-    use multiaddr::Multiaddr;
-    use std::collections::BTreeSet;
-    use std::pin::Pin;
+    use std::{collections::BTreeSet, pin::Pin};
 
-    use hopr_bindings::hopr_announcements::AddressAnnouncementFilter;
+    use alloy::{
+        dyn_abi::DynSolValue,
+        primitives::{Address as AlloyAddress, B256},
+        sol_types::SolEvent,
+    };
+    use async_trait::async_trait;
+    use futures::{Stream, join};
+    use hex_literal::hex;
     use hopr_chain_rpc::BlockWithLogs;
     use hopr_chain_types::chain_events::ChainEventType;
-    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
-    use hopr_crypto_types::prelude::ChainKeypair;
-    use hopr_db_sql::accounts::HoprDbAccountOperations;
-    use hopr_db_sql::db::HoprDb;
+    use hopr_crypto_types::{
+        keypairs::{Keypair, OffchainKeypair},
+        prelude::ChainKeypair,
+    };
+    use hopr_db_sql::{accounts::HoprDbAccountOperations, db::HoprDb};
     use hopr_internal_types::account::{AccountEntry, AccountType};
     use hopr_primitive_types::prelude::*;
-
-    use crate::traits::MockChainLogHandler;
+    use mockall::mock;
+    use multiaddr::Multiaddr;
 
     use super::*;
+    use crate::traits::MockChainLogHandler;
 
     lazy_static::lazy_static! {
         static ref ALICE_OKP: OffchainKeypair = OffchainKeypair::random();
@@ -621,11 +630,12 @@ mod tests {
             logs.push(SerializableLog {
                 address,
                 block_hash: block_hash.into(),
-                topics: vec![AddressAnnouncementFilter::signature().into()],
-                data: encode(&[
-                    Token::Address(ethers::abi::Address::from_slice(address.as_ref())),
-                    Token::String(test_multiaddr.to_string()),
+                topics: vec![hopr_bindings::hoprannouncementsevents::HoprAnnouncementsEvents::AddressAnnouncement::SIGNATURE_HASH.into()],
+                data: DynSolValue::Tuple(vec![
+                    DynSolValue::Address(AlloyAddress::from_slice(address.as_ref())),
+                    DynSolValue::String(test_multiaddr.to_string()),
                 ])
+                .abi_encode()
                 .into(),
                 tx_hash: Hash::create(&[format!("my tx hash {i}").as_bytes()]).into(),
                 tx_index: 0,
@@ -653,9 +663,9 @@ mod tests {
         }
     }
 
-    #[async_std::test]
-    async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_none_if_none_is_found(
-    ) -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_none_if_none_is_found()
+    -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
@@ -668,7 +678,7 @@ mod tests {
         handlers
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
-            .return_const(vec![topic.into()]);
+            .return_const(vec![B256::from_slice(topic.as_ref())]);
 
         let head_block = 1000;
         rpc.expect_block_number().return_once(move || Ok(head_block));
@@ -688,7 +698,7 @@ mod tests {
         .without_panic_on_completion();
 
         let (indexing, _) = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
         assert!(indexing.is_err()); // terminated by the close channel
@@ -696,7 +706,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_it_when_found() -> anyhow::Result<()>
     {
         let mut handlers = MockChainLogHandler::new();
@@ -712,7 +722,7 @@ mod tests {
         handlers
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
-            .return_const(vec![topic.into()]);
+            .return_const(vec![B256::from_slice(topic.as_ref())]);
         db.ensure_logs_origin(vec![(addr, topic)]).await?;
 
         rpc.expect_block_number().return_once(move || Ok(head_block));
@@ -754,7 +764,7 @@ mod tests {
         .without_panic_on_completion();
 
         let (indexing, _) = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
         assert!(indexing.is_err()); // terminated by the close channel
@@ -762,7 +772,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_indexer_should_pass_blocks_that_are_finalized() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
@@ -775,7 +785,7 @@ mod tests {
         handlers
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
-            .return_const(vec![Hash::create(&[b"my topic"]).into()]);
+            .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -806,14 +816,14 @@ mod tests {
         let indexer =
             Indexer::new(rpc, handlers, db.clone(), cfg, async_channel::unbounded().0).without_panic_on_completion();
         let _ = join!(indexer.start(), async move {
-            async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             tx.close_channel()
         });
 
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_fast_sync_full_with_resume() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -855,7 +865,7 @@ mod tests {
             handlers
                 .expect_contract_address_topics()
                 .withf(move |x| x == &addr)
-                .return_const(vec![topic.into()]);
+                .return_const(vec![B256::from_slice(topic.as_ref())]);
             handlers
                 .expect_collect_block_events()
                 .times(2)
@@ -868,7 +878,7 @@ mod tests {
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
             });
             assert!(indexing.is_err()); // terminated by the close channel
@@ -935,7 +945,7 @@ mod tests {
             handlers
                 .expect_contract_address_topics()
                 .withf(move |x| x == &addr)
-                .return_const(vec![topic.into()]);
+                .return_const(vec![B256::from_slice(topic.as_ref())]);
 
             handlers
                 .expect_collect_block_events()
@@ -949,7 +959,7 @@ mod tests {
             };
             let indexer = Indexer::new(rpc, handlers, db.clone(), indexer_cfg, tx_events).without_panic_on_completion();
             let (indexing, _) = join!(indexer.start(), async move {
-                async_std::task::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 tx.close_channel()
             });
             assert!(indexing.is_err()); // terminated by the close channel
@@ -961,7 +971,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_should_yield_back_once_the_past_events_are_indexed() -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
@@ -975,7 +985,7 @@ mod tests {
         handlers
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
-            .return_const(vec![Hash::create(&[b"my topic"]).into()]);
+            .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         // Expected to be called once starting at 0 and yield the respective blocks
@@ -1031,7 +1041,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(async_std::test)]
+    #[test_log::test(tokio::test)]
     async fn test_indexer_should_not_reprocess_last_processed_block() -> anyhow::Result<()> {
         let last_processed_block = 100_u64;
 
@@ -1088,7 +1098,7 @@ mod tests {
         handlers
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
-            .return_const(vec![topic.into()]);
+            .return_const(vec![B256::from_slice(topic.as_ref())]);
 
         let indexer_cfg = IndexerConfig {
             start_block_number: 0,

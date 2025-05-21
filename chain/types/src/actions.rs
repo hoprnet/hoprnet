@@ -5,9 +5,10 @@
 //! The actions eventually lead to an on-chain transaction.
 //!
 //! See the `chain-actions` crate for details.
+use std::fmt::{Display, Formatter};
+
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::fmt::{Display, Formatter};
 
 /// Enumerates all possible on-chain state change requests.
 ///

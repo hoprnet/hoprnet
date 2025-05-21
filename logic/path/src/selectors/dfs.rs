@@ -1,17 +1,17 @@
+use std::{cmp::Ordering, collections::BinaryHeap, marker::PhantomData, time::Duration};
+
 use async_trait::async_trait;
 use hopr_crypto_random::random_float;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
-use std::marker::PhantomData;
-use std::time::Duration;
 use tracing::trace;
 
-use crate::channel_graph::{ChannelEdge, ChannelGraph, Node};
-use crate::errors::{PathError, Result};
-use crate::selectors::{EdgeWeighting, PathSelector};
-use crate::ChannelPath;
+use crate::{
+    ChannelPath,
+    channel_graph::{ChannelEdge, ChannelGraph, Node},
+    errors::{PathError, Result},
+    selectors::{EdgeWeighting, PathSelector},
+};
 
 /// Holds a weighted channel path and auxiliary information for the graph traversal.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -320,17 +320,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{ops::Deref, str::FromStr, sync::Arc};
 
     use async_lock::RwLock;
     use regex::Regex;
-    use std::ops::Deref;
-    use std::str::FromStr;
-    use std::sync::Arc;
 
-    use crate::channel_graph::NodeScoreUpdate;
-    use crate::tests::{ADDRESSES, PATH_ADDRS};
-    use crate::{ChainPath, Path, ValidatedPath};
+    use super::*;
+    use crate::{
+        ChainPath, Path, ValidatedPath,
+        channel_graph::NodeScoreUpdate,
+        tests::{ADDRESSES, PATH_ADDRS},
+    };
 
     fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: Balance) -> ChannelEntry {
         ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero())
@@ -338,6 +338,7 @@ mod tests {
 
     async fn check_path(path: &ChannelPath, graph: &ChannelGraph, dst: Address) -> anyhow::Result<()> {
         let _ = ValidatedPath::new(
+            graph.my_address(),
             ChainPath::from_channel_path(path.clone(), dst),
             graph,
             PATH_ADDRS.deref(),
@@ -471,7 +472,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_path_if_isolated() {
         let graph = Arc::new(RwLock::new(define_graph("", ADDRESSES[0], |_| 1.0, |_, _| 0.0)));
 
@@ -483,7 +484,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_zero_weight_path() {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [0] -> 1",
@@ -500,7 +501,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_one_hop_path_when_unrelated_channels_are_in_the_graph() {
         let graph = Arc::new(RwLock::new(define_graph(
             "1 [1] -> 2",
@@ -517,7 +518,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_one_hop_path_in_empty_graph() {
         let graph = Arc::new(RwLock::new(define_graph("", ADDRESSES[0], |_| 1.0, |_, _| 0.0)));
 
@@ -529,7 +530,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_path_with_unreliable_node() {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] -> 1",
@@ -546,7 +547,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_find_loopback_path() {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] <-> [1] 1",
@@ -563,7 +564,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_include_destination_in_path() {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] -> 1",
@@ -580,7 +581,7 @@ mod tests {
             .expect_err("should not find a path");
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_find_path_in_reliable_star() -> anyhow::Result<()> {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] <-> [2] 1, 0 [1] <-> [3] 2, 0 [1] <-> [4] 3, 0 [1] <-> [5] 4",
@@ -598,7 +599,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_find_path_in_reliable_arrow_with_lower_weight() -> anyhow::Result<()> {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] -> 1, 1 [1] -> 2, 2 [1] -> 3, 1 [1] -> 3",
@@ -615,7 +616,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_find_path_in_reliable_arrow_with_higher_weight() -> anyhow::Result<()> {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [1] -> 1, 1 [2] -> 2, 2 [3] -> 3, 1 [2] -> 3",
@@ -632,7 +633,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_find_path_in_reliable_arrow_with_random_weight() -> anyhow::Result<()> {
         let graph = Arc::new(RwLock::new(define_graph(
             "0 [29] -> 1, 1 [5] -> 2, 2 [31] -> 3, 1 [2] -> 3",

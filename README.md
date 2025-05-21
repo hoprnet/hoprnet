@@ -207,6 +207,9 @@ On top of the default configuration options generated for the command line, the 
 - `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
 - `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
 - `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
+- `HOPR_BALANCER_PID_P_GAIN` - proportional (P) gain for the PID controller in SURB balancer (default: `0.6`)
+- `HOPR_BALANCER_PID_I_GAIN` - integral (I) gain for the PID controller in SURB balancer (default: `0.7`)
+- `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in SURB balancer (default: `0.2`)
 
 ### Example execution
 
@@ -468,7 +471,7 @@ deactivate
 With the environment activated, execute the tests locally:
 
 ```bash
-make smoke-tests
+just run-smoke-test integration
 ```
 
 ## Using Fast Sync

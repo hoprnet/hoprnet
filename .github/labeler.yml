@@ -106,9 +106,6 @@ crate:hopr-transport-protocol:
 crate:hoprd:
   - changed-files:
       - any-glob-to-any-file: hoprd/hoprd/**
-crate:hoprd-inbox:
-  - changed-files:
-      - any-glob-to-any-file: hoprd/inbox/**
 crate:hoprd-keypair:
   - changed-files:
       - any-glob-to-any-file: hoprd/keypair/**

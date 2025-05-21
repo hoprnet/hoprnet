@@ -1,5 +1,6 @@
-use crate::prelude::GeneralError;
 use std::fmt::{Display, Formatter};
+
+use crate::prelude::GeneralError;
 
 /// Unsigned integer (`usize`) that has an explicit upper bound.
 /// Trying to convert an integer that's above this bound will fail.
@@ -7,10 +8,10 @@ use std::fmt::{Display, Formatter};
 pub struct BoundedSize<const B: usize>(usize);
 
 impl<const B: usize> BoundedSize<B> {
-    /// Minimum value - evaluates to 0.
-    pub const MIN: Self = Self(0);
     /// Maximum value - evaluates to `B`.
     pub const MAX: Self = Self(B);
+    /// Minimum value - evaluates to 0.
+    pub const MIN: Self = Self(0);
 }
 
 impl<const B: usize> TryFrom<u8> for BoundedSize<B> {
@@ -161,8 +162,8 @@ impl<T, const N: usize> TryFrom<Vec<T>> for BoundedVec<T, N> {
 }
 
 impl<T, const N: usize> IntoIterator for BoundedVec<T, N> {
-    type Item = T;
     type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = T;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -207,8 +208,10 @@ mod tests {
 
     #[test]
     fn bounded_size_should_not_allow_bigger_numbers() {
-        assert_eq!(0usize, BoundedSize::<10>::MIN.into());
-        assert_eq!(10usize, BoundedSize::<10>::MAX.into());
+        let min_bounded_size: usize = BoundedSize::<10>::MIN.into();
+        assert_eq!(0usize, min_bounded_size);
+        let max_bounded_size: usize = BoundedSize::<10>::MAX.into();
+        assert_eq!(10usize, max_bounded_size);
 
         assert!(BoundedSize::<10>::try_from(5).is_ok_and(|b| u8::from(b) == 5));
         assert!(BoundedSize::<10>::try_from(11).is_err());

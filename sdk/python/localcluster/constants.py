@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 logging.basicConfig(format="%(asctime)s %(message)s")
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.DEBUG)
 
 OPEN_CHANNEL_FUNDING_VALUE_HOPR = 1000
 TICKET_PRICE_PER_HOP = 100
@@ -14,7 +14,7 @@ NODE_NAME_PREFIX = f"{IDENTITY_PREFIX}-node"
 
 NETWORK = "anvil-localhost"
 PASSWORD = "e2e-test"
-PORT_BASE = 3000
+BASE_PORT = 3000
 
 SUITE_NAME = "hopr-localcluster"
 MAIN_DIR = Path("/tmp").joinpath(SUITE_NAME)

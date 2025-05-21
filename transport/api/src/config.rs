@@ -1,16 +1,19 @@
-use proc_macro_regex::regex;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use std::fmt::{Display, Formatter};
-use std::net::ToSocketAddrs;
-use std::num::ParseIntError;
-use std::str::FromStr;
-use std::time::Duration;
-use validator::{Validate, ValidationError};
+use std::{
+    fmt::{Display, Formatter},
+    net::ToSocketAddrs,
+    num::ParseIntError,
+    str::FromStr,
+    time::Duration,
+};
 
 use hopr_transport_identity::Multiaddr;
 pub use hopr_transport_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
 pub use hopr_transport_protocol::config::ProtocolConfig;
+use hopr_transport_session::MIN_BALANCER_SAMPLING_INTERVAL;
+use proc_macro_regex::regex;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use validator::{Validate, ValidationError};
 
 use crate::errors::HoprTransportError;
 
@@ -197,6 +200,8 @@ const DEFAULT_SESSION_ESTABLISH_RETRY_DELAY: Duration = Duration::from_secs(2);
 
 const DEFAULT_SESSION_ESTABLISH_MAX_RETRIES: u32 = 3;
 
+const DEFAULT_SESSION_BALANCER_SAMPLING: Duration = Duration::from_secs(1);
+
 fn default_session_establish_max_retries() -> u32 {
     DEFAULT_SESSION_ESTABLISH_MAX_RETRIES
 }
@@ -209,11 +214,23 @@ fn default_session_establish_retry_delay() -> std::time::Duration {
     DEFAULT_SESSION_ESTABLISH_RETRY_DELAY
 }
 
+fn default_session_balancer_sampling() -> std::time::Duration {
+    DEFAULT_SESSION_BALANCER_SAMPLING
+}
+
 fn validate_session_idle_timeout(value: &std::time::Duration) -> Result<(), ValidationError> {
     if SESSION_IDLE_MIN_TIMEOUT <= *value {
         Ok(())
     } else {
         Err(ValidationError::new("session idle timeout is too low"))
+    }
+}
+
+fn validate_balancer_sampling(value: &std::time::Duration) -> Result<(), ValidationError> {
+    if MIN_BALANCER_SAMPLING_INTERVAL <= *value {
+        Ok(())
+    } else {
+        Err(ValidationError::new("balancer sampling interval is too low"))
     }
 }
 
@@ -247,6 +264,15 @@ pub struct SessionGlobalConfig {
     #[serde(default = "default_session_establish_retry_delay")]
     #[serde_as(as = "serde_with::DurationSeconds<u64>")]
     pub establish_retry_timeout: std::time::Duration,
+
+    /// Sampling interval for SURB balancer in milliseconds.
+    ///
+    /// Default is 1000 milliseconds.
+    #[validate(custom(function = "validate_balancer_sampling"))]
+    #[default(DEFAULT_SESSION_BALANCER_SAMPLING)]
+    #[serde(default = "default_session_balancer_sampling")]
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    pub balancer_sampling_interval: std::time::Duration,
 }
 
 #[cfg(test)]

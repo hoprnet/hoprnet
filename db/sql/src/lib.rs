@@ -15,26 +15,24 @@ pub mod resolver;
 mod ticket_manager;
 pub mod tickets;
 
-pub use hopr_db_api as api;
-
-pub use sea_orm::DatabaseConnection;
-pub use sea_orm::DatabaseTransaction;
-
-use crate::accounts::HoprDbAccountOperations;
-use crate::channels::HoprDbChannelOperations;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
+pub use hopr_db_api as api;
+use hopr_db_api::{
+    logs::HoprDbLogOperations, peers::HoprDbPeersOperations, protocol::HoprDbProtocolOperations,
+    resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations,
+};
 use sea_orm::TransactionTrait;
+pub use sea_orm::{DatabaseConnection, DatabaseTransaction};
 
-use crate::db::HoprDb;
-use crate::errors::{DbSqlError, Result};
-use crate::info::HoprDbInfoOperations;
-use crate::registry::HoprDbRegistryOperations;
-use hopr_db_api::logs::HoprDbLogOperations;
-use hopr_db_api::peers::HoprDbPeersOperations;
-use hopr_db_api::protocol::HoprDbProtocolOperations;
-use hopr_db_api::resolver::HoprDbResolverOperations;
-use hopr_db_api::tickets::HoprDbTicketOperations;
+use crate::{
+    accounts::HoprDbAccountOperations,
+    channels::HoprDbChannelOperations,
+    db::HoprDb,
+    errors::{DbSqlError, Result},
+    info::HoprDbInfoOperations,
+    registry::HoprDbRegistryOperations,
+};
 
 /// Primary key used in tables that contain only a single row.
 pub const SINGULAR_TABLE_FIXED_ID: i32 = 1;
@@ -204,16 +202,8 @@ pub trait HoprDbAllOperations:
 
 #[doc(hidden)]
 pub mod prelude {
+    pub use hopr_db_api::{logs::*, peers::*, protocol::*, resolver::*, tickets::*};
+
     pub use super::*;
-    pub use crate::accounts::*;
-    pub use crate::channels::*;
-    pub use crate::db::*;
-    pub use crate::errors::*;
-    pub use crate::info::*;
-    pub use crate::registry::*;
-    pub use hopr_db_api::logs::*;
-    pub use hopr_db_api::peers::*;
-    pub use hopr_db_api::protocol::*;
-    pub use hopr_db_api::resolver::*;
-    pub use hopr_db_api::tickets::*;
+    pub use crate::{accounts::*, channels::*, db::*, errors::*, info::*, registry::*};
 }

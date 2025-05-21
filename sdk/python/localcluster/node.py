@@ -11,7 +11,6 @@ from .constants import (
     NODE_NAME_PREFIX,
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
     PASSWORD,
-    PORT_BASE,
     PWD,
 )
 
@@ -41,18 +40,18 @@ class Node:
         network: str,
         identity_path: str,
         cfg_file: str,
-        alias: str,
+        base_port: int,
         api_addr: str = None,
         use_nat: bool = False,
     ):
         # initialized
         self.id = id
-        self.alias = alias
         self.host_addr: str = host_addr
         self.api_token: str = api_token
         self.network: str = network
         self.identity_path: str = identity_path
         self.use_nat: bool = use_nat
+        self.base_port: int = base_port
 
         # optional
         self.cfg_file: str = cfg_file
@@ -66,13 +65,13 @@ class Node:
         self.proc: Popen = None
 
         # private
-        self.peer_id: str = None
         self.address: str = None
         self.dir: Path = None
         self.cfg_file_path: Path = None
         self.api_port: int = 0
         self.p2p_port: int = 0
         self.anvil_port: int = 0
+        self.tokio_console_port: int = 0
 
         self.prepare()
 
@@ -81,11 +80,20 @@ class Node:
         return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", self.api_token)
 
     def prepare(self):
-        self.anvil_port = PORT_BASE
         self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")
         self.cfg_file_path = MAIN_DIR.joinpath(self.cfg_file)
-        self.api_port = PORT_BASE + self.id
-        self.p2p_port = PORT_BASE + 100 + self.id
+        self.anvil_port = self.base_port
+        self.api_port = self.base_port + (self.id * 3)
+        self.p2p_port = self.api_port + 1
+        self.tokio_console_port = self.p2p_port + 1
+
+        logging.info(
+            f"Node {self.id} ports: "
+            + f"api {self.api_port}, "
+            + f"p2p {self.p2p_port}, "
+            + f"tokio console {self.tokio_console_port}, "
+            + f"anvil {self.anvil_port}"
+        )
 
     def load_addresses(self):
         loaded_env = load_env_file(self.dir.joinpath(".env"))
@@ -178,7 +186,7 @@ class Node:
             "HOPR_TEST_DISABLE_CHECKS": "true",
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
-            "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}",
+            "TOKIO_CONSOLE_BIND": f"localhost:{self.tokio_console_port}",
             "HOPRD_NAT": "true" if self.use_nat else "false",
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
@@ -224,7 +232,7 @@ class Node:
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 
             # filter out peers that are not well-connected yet
-            connected_peers = [p.peer_id for p in peers_info if p.quality >= 0.25]
+            connected_peers = [p.address for p in peers_info if p.quality >= 0.25]
             connected_peers.sort()
             logging.debug(f"Peers connected on {self.id}: {connected_peers}")
 
@@ -245,7 +253,14 @@ class Node:
 
     @classmethod
     def fromConfig(
-        cls, index: int, alias: str, config: dict, defaults: dict, network: str, use_nat: bool, exposed: bool
+        cls,
+        index: int,
+        config: dict,
+        defaults: dict,
+        network: str,
+        use_nat: bool,
+        exposed: bool,
+        base_port: int,
     ):
         token = config.get("api_token", defaults.get("api_token"))
 
@@ -256,25 +271,19 @@ class Node:
             network,
             config["identity_path"],
             config["config_file"],
-            alias,
             api_addr="0.0.0.0" if exposed else None,
             use_nat=use_nat,
+            base_port=base_port,
         )
 
-    async def alias_peers(self, aliases_dict: dict[str, str]):
-        for peer_id, alias in aliases_dict.items():
-            if peer_id == self.peer_id:
-                continue
-            await self.api.aliases_set_alias(alias, peer_id)
-
-    async def connect_peers(self, peer_ids: list[str]):
+    async def connect_peers(self, addresses: list[str]):
         tasks = []
 
-        for peer_id in peer_ids:
-            if peer_id == self.peer_id:
+        for address in addresses:
+            if address == self.address:
                 continue
             tasks.append(
-                asyncio.create_task(self.api.open_channel(peer_id, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"))
+                asyncio.create_task(self.api.open_channel(address, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"))
             )
 
         await asyncio.gather(*tasks)
@@ -286,7 +295,6 @@ class Node:
         output_strings = []
 
         output_strings.append(f"\t{self}")
-        output_strings.append(f"\t\tPeer Id:\t{addresses.hopr}")
         output_strings.append(f"\t\tAddress:\t{addresses.native}")
         output_strings.append(
             f"\t\tRest API:\thttp://{self.api_addr}:{self.api_port}/scalar | http://{self.api_addr}:{self.api_port}/swagger-ui/index.html"
@@ -296,7 +304,7 @@ class Node:
         return "\n".join(output_strings)
 
     def __eq__(self, other):
-        return self.peer_id == other.peer_id
+        return self.address == other.address
 
     def __str__(self):
-        return f"{self.alias} @ {self.api_addr}:{self.api_port}"
+        return f"node @ {self.api_addr}:{self.api_port}"

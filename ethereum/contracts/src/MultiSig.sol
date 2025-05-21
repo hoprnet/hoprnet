@@ -49,12 +49,12 @@ abstract contract HoprMultiSig {
     /**
      * Enforces usage of Safe contract specified in NodeSafeRegistry
      */
-    modifier onlySafe(address self) {
+    modifier onlySafe(address selfAddress) {
         if (!initialized) {
             revert MultiSigUninitialized();
         }
 
-        if (registry.nodeToSafe(self) != msg.sender) {
+        if (registry.nodeToSafe(selfAddress) != msg.sender) {
             revert ContractNotResponsible();
         }
         _;

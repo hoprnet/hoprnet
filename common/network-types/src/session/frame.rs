@@ -38,26 +38,27 @@
 //! the caller should make sure that frames with ID <= `n` will not arrive into the reassembler,
 //! otherwise the [NetworkTypeError::OldSegment] error will be thrown.
 
-use bitvec::array::BitArray;
-use bitvec::{bitarr, BitArr};
-use dashmap::mapref::entry::Entry;
-use dashmap::DashMap;
-use futures::{Sink, Stream};
-use std::collections::BinaryHeap;
-use std::fmt::{Debug, Display, Formatter};
-use std::mem;
-use std::ops::{Add, Sub};
-use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering};
-use std::sync::OnceLock;
-use std::task::{Context, Poll};
-use std::time::{Duration, SystemTime};
+use std::{
+    collections::BinaryHeap,
+    fmt::{Debug, Display, Formatter},
+    mem,
+    ops::{Add, Sub},
+    pin::Pin,
+    sync::{
+        OnceLock,
+        atomic::{AtomicU8, AtomicU32, AtomicU64, Ordering},
+    },
+    task::{Context, Poll},
+    time::{Duration, SystemTime},
+};
 
+use bitvec::{BitArr, array::BitArray, bitarr};
+use dashmap::{DashMap, mapref::entry::Entry};
+use futures::{Sink, Stream};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 
-use crate::errors::NetworkTypeError;
-use crate::session::errors::SessionError;
+use crate::{errors::NetworkTypeError, session::errors::SessionError};
 
 /// ID of a [Frame].
 pub type FrameId = u32;
@@ -68,6 +69,9 @@ pub type SeqNum = u8;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
 pub struct SegmentId(pub FrameId, pub SeqNum);
+
+const EVICTION_TIME_THRESHOLD_MS: u64 = 50;
+const PUSH_TIME_THRESHOLD_MS: u64 = 50;
 
 impl From<&Segment> for SegmentId {
     fn from(value: &Segment) -> Self {
@@ -157,7 +161,6 @@ pub struct Segment {
 impl Segment {
     /// Size of the segment header.
     pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<SeqNum>();
-
     /// The minimum size of a segment: [`Segment::HEADER_SIZE`] + 1 byte of data.
     pub const MINIMUM_SIZE: usize = Self::HEADER_SIZE + 1;
 
@@ -225,6 +228,7 @@ impl TryFrom<&[u8]> for Segment {
 #[derive(Debug)]
 struct FrameBuilder {
     frame_id: FrameId,
+    _initiated: std::time::Instant,
     segments: Vec<OnceLock<Box<[u8]>>>,
     remaining: AtomicU8,
     last_ts: AtomicU64,
@@ -242,6 +246,7 @@ impl FrameBuilder {
     fn empty(frame_id: FrameId, seq_len: SeqNum) -> Self {
         Self {
             frame_id,
+            _initiated: std::time::Instant::now(),
             segments: vec![OnceLock::new(); seq_len as usize],
             remaining: AtomicU8::new(seq_len),
             last_ts: AtomicU64::new(0),
@@ -298,7 +303,8 @@ impl FrameBuilder {
         }
     }
 
-    /// Reassembles the [Frame]. Returns [`NetworkTypeError::IncompleteFrame`] if not [complete](FrameBuilder::is_complete).
+    /// Reassembles the [Frame]. Returns [`NetworkTypeError::IncompleteFrame`] if not
+    /// [complete](FrameBuilder::is_complete).
     fn reassemble(self) -> crate::session::errors::Result<Frame> {
         if self.is_complete() {
             Ok(Frame {
@@ -443,6 +449,9 @@ impl FrameReassembler {
     /// Emits the frame if it is the next in sequence and complete.
     /// If it is not next in the sequence or incomplete, it is discarded forever.
     fn emit_if_complete_discard_otherwise(&self, builder: FrameBuilder) -> crate::session::errors::Result<()> {
+        let time_spent = builder._initiated.elapsed();
+        let frame_id = builder.frame_id;
+
         if self.next_emitted_frame.fetch_add(1, Ordering::SeqCst) == builder.frame_id && builder.is_complete() {
             self.reassembled
                 .unbounded_send(builder.reassemble())
@@ -454,6 +463,9 @@ impl FrameReassembler {
         }
         self.last_emission
             .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+
+        tracing::trace!(frame_id, ?time_spent, "frame finished");
+
         Ok(())
     }
 
@@ -466,9 +478,12 @@ impl FrameReassembler {
             return Err(SessionError::ReassemblerClosed);
         }
 
+        let start = std::time::Instant::now();
+
         // Check if this frame has not been emitted yet.
         let frame_id = segment.frame_id;
         if frame_id < self.next_emitted_frame.load(Ordering::SeqCst) {
+            tracing::trace!("trying to push segment of a frame that has been emitted");
             return Err(SessionError::OldSegment(frame_id));
         }
 
@@ -484,12 +499,18 @@ impl FrameReassembler {
                         .compare_exchange(frame_id, frame_id + 1, Ordering::SeqCst, Ordering::Relaxed)
                         .is_ok()
                 {
+                    let builder = e.remove();
+                    let time_spent = builder._initiated.elapsed();
+
                     // Emit this complete frame
                     self.reassembled
-                        .unbounded_send(e.remove().reassemble())
+                        .unbounded_send(builder.reassemble())
                         .map_err(|_| SessionError::ReassemblerClosed)?;
                     self.last_emission
                         .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+
+                    tracing::trace!(frame_id, ?time_spent, "frame finished");
+
                     cascade = true; // Try to emit next frames in sequence
                 }
             }
@@ -502,12 +523,17 @@ impl FrameReassembler {
                         .compare_exchange(frame_id, frame_id + 1, Ordering::SeqCst, Ordering::Relaxed)
                         .is_ok()
                 {
+                    let time_spent = builder._initiated.elapsed();
+
                     // Emit this frame if already complete
                     self.reassembled
                         .unbounded_send(builder.reassemble())
                         .map_err(|_| SessionError::ReassemblerClosed)?;
                     self.last_emission
                         .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+
+                    tracing::trace!(frame_id, ?time_spent, "frame finished");
+
                     cascade = true; // Try to emit the next frames in sequence
                 } else {
                     // If not complete nor the next one to be emitted, just start building it
@@ -526,6 +552,11 @@ impl FrameReassembler {
                 // If the frame is complete, push it out as reassembled
                 self.emit_if_complete_discard_otherwise(builder)?;
             }
+        }
+
+        let push_time = start.elapsed();
+        if push_time > Duration::from_millis(PUSH_TIME_THRESHOLD_MS) {
+            tracing::trace!(?push_time, "segment push done");
         }
 
         Ok(())
@@ -563,6 +594,8 @@ impl FrameReassembler {
             return Ok(0);
         }
 
+        let start = std::time::Instant::now();
+
         let cutoff = current_time().sub(self.max_age).as_unix_timestamp().as_millis() as u64;
         let mut count = 0;
         loop {
@@ -582,8 +615,14 @@ impl FrameReassembler {
                 count += 1;
             } else {
                 // Break on the first incomplete and non-expired frame
+                tracing::trace!(incomplete = self.sequences.len(), "incomplete frames in reassembler");
                 break;
             }
+        }
+
+        let eviction_time = start.elapsed();
+        if eviction_time > Duration::from_millis(EVICTION_TIME_THRESHOLD_MS) {
+            tracing::trace!(?eviction_time, count, "eviction done");
         }
 
         Ok(count)
@@ -634,20 +673,30 @@ impl Sink<Segment> for FrameReassembler {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
+    use std::{
+        collections::{HashSet, VecDeque},
+        convert::identity,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        time::Duration,
+    };
+
     use async_stream::stream;
-    use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    use futures::{Stream, StreamExt, TryStreamExt, pin_mut};
     use hex_literal::hex;
     use lazy_static::lazy_static;
-    use rand::prelude::{Distribution, SliceRandom};
-    use rand::{seq::IteratorRandom, thread_rng, Rng, SeedableRng};
+    use rand::{
+        Rng, SeedableRng,
+        prelude::{Distribution, SliceRandom},
+        seq::IteratorRandom,
+        thread_rng,
+    };
     use rand_distr::Normal;
     use rayon::prelude::*;
-    use std::collections::{HashSet, VecDeque};
-    use std::convert::identity;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Arc;
-    use std::time::Duration;
+
+    use super::*;
 
     const MTU: usize = 448;
     const FRAME_COUNT: u32 = 65_535;
@@ -746,7 +795,7 @@ pub(crate) mod tests {
         assert_eq!(segment, recovered);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_must_process_ordered_frames() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -766,7 +815,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_must_process_single_frame() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(10));
 
@@ -826,7 +875,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn pushing_segment_of_an_evicted_frame_into_reassembler_should_fail() -> anyhow::Result<()> {
         let (fragmented, _reassembled) = FrameReassembler::new(Duration::from_millis(5));
 
@@ -835,7 +884,7 @@ pub(crate) mod tests {
 
         segments.into_iter().try_for_each(|s| fragmented.push_segment(s))?;
 
-        async_std::task::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
         assert_eq!(1, fragmented.evict()?);
 
         fragmented
@@ -845,7 +894,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_single_frame() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -866,7 +915,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_shuffled_randomized_frames() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -885,7 +934,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_shuffled_randomized_frames_in_parallel() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_secs(30));
 
@@ -907,7 +956,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_should_evict_expired_incomplete_frames() -> anyhow::Result<()> {
         let frames = vec![
             Frame {
@@ -935,7 +984,7 @@ pub(crate) mod tests {
         segments.into_iter().try_for_each(|b| fragmented.push_segment(b))?;
 
         let frames_cpy = frames.clone();
-        let jh = async_std::task::spawn(async move {
+        let jh: hopr_async_runtime::prelude::JoinHandle<Result<(), SessionError>> = tokio::task::spawn(async move {
             pin_mut!(reassembled);
 
             // Frame #1 should yield immediately
@@ -953,14 +1002,16 @@ pub(crate) mod tests {
             Ok(())
         });
 
-        async_std::task::sleep(Duration::from_millis(20)).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         assert_eq!(2, fragmented.evict()?); // One expired, one complete
 
-        jh.await
+        jh.await??;
+
+        Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_should_evict_frame_that_never_arrived() -> anyhow::Result<()> {
         let frames = vec![
             Frame {
@@ -986,7 +1037,7 @@ pub(crate) mod tests {
 
         let flushed_cpy = flushed.clone();
         let frames_cpy = frames.clone();
-        let jh = async_std::task::spawn(async move {
+        let jh: hopr_async_runtime::prelude::JoinHandle<Result<(), SessionError>> = tokio::task::spawn(async move {
             pin_mut!(reassembled);
 
             // The first frame should yield immediately
@@ -1003,16 +1054,18 @@ pub(crate) mod tests {
             Ok(())
         });
 
-        async_std::task::sleep(Duration::from_millis(20)).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         // Prune the expired entry, which is Frame 2 (that is missing a segment)
         flushed.store(true, Ordering::SeqCst);
         assert_eq!(2, fragmented.evict()?); // One expired, one complete
 
-        jh.await
+        jh.await??;
+
+        Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_reassembles_randomized_delayed_frames_in_parallel() -> anyhow::Result<()> {
         let frames = FRAMES.iter().take(100).collect::<Vec<_>>();
 
@@ -1026,12 +1079,13 @@ pub(crate) mod tests {
         futures::stream::iter(segments)
             .map(|segment| {
                 let delay = Duration::from_millis(thread_rng().gen_range(0..10u64));
-                async_std::task::spawn(async move {
-                    async_std::task::sleep(delay).await;
+                tokio::task::spawn(async move {
+                    tokio::time::sleep(delay).await;
                     Ok(segment)
                 })
             })
             .buffer_unordered(4)
+            .map(Result::unwrap) // Unwrap the Result to extract Segment
             .forward(fragmented)
             .await
             .unwrap();
@@ -1083,7 +1137,7 @@ pub(crate) mod tests {
         (segments, expected_frames, excluded_segments)
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_yields_correct_frames_when_also_corrupted_frames_are_present() -> anyhow::Result<()> {
         // Corrupt 30% of the frames, by removing a random segment from them
         let (segments, expected_frames, excluded) = corrupt_frames(FRAME_COUNT / 4, 0.3);
@@ -1099,13 +1153,13 @@ pub(crate) mod tests {
             .collect::<HashSet<_>>();
 
         assert!(computed_missing.par_iter().all(|s| excluded.contains(s)));
-        /*assert!(
-            excluded.par_iter().all(|s| computed_missing.contains(&s)),
-            "seed {}",
-            hex::encode(RAND_SEED.clone())
-        );*/
+        // assert!(
+        // excluded.par_iter().all(|s| computed_missing.contains(&s)),
+        // "seed {}",
+        // hex::encode(RAND_SEED.clone())
+        // );
 
-        async_std::task::sleep(Duration::from_millis(25)).await;
+        tokio::time::sleep(Duration::from_millis(25)).await;
         drop(fragmented);
 
         let (reassembled_frames, discarded_frames) = reassembled
@@ -1142,7 +1196,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_yields_no_frames_when_all_corrupted() -> anyhow::Result<()> {
         // Corrupt each frame
         let (segments, expected_frames, _) = corrupt_frames(1000, 1.0);
@@ -1190,7 +1244,7 @@ pub(crate) mod tests {
                     let segment = segments.remove(sample_index(&mut distr, &mut rng, segments.len())).unwrap();
 
                     if !corrupted_segments.contains(&SegmentId(segment.frame_id, segment.seq_idx)) {
-                        async_std::task::sleep(max_latency.mul_f64(rng.gen())).await;
+                        tokio::time::sleep(max_latency.mul_f64(rng.gen())).await;
                         yield segment;
                     }
                 }
@@ -1202,7 +1256,7 @@ pub(crate) mod tests {
         )
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn frame_reassembler_yields_and_evicts_frames_on_unreliable_network() -> anyhow::Result<()> {
         let (fragmented, reassembled) = FrameReassembler::new(Duration::from_millis(25));
         let fragmented = Arc::new(fragmented);
@@ -1210,9 +1264,9 @@ pub(crate) mod tests {
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
         let frag_clone = fragmented.clone();
-        let eviction_jh = async_std::task::spawn(async move {
+        let eviction_jh = tokio::task::spawn(async move {
             while !done_clone.load(Ordering::SeqCst) {
-                async_std::task::sleep(Duration::from_millis(25)).await;
+                tokio::time::sleep(Duration::from_millis(25)).await;
                 frag_clone.evict().unwrap();
             }
         });
@@ -1226,7 +1280,7 @@ pub(crate) mod tests {
             .await?;
 
         done.store(true, Ordering::SeqCst);
-        eviction_jh.await;
+        eviction_jh.await?;
         drop(fragmented);
 
         let reassembled_frames = reassembled

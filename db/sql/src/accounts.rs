@@ -1,24 +1,27 @@
 use async_trait::async_trait;
 use futures::TryFutureExt;
 use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_db_entity::prelude::{Account, Announcement};
-use hopr_db_entity::{account, announcement};
-use hopr_internal_types::account::AccountType;
-use hopr_internal_types::prelude::AccountEntry;
-use hopr_primitive_types::errors::GeneralError;
-use hopr_primitive_types::prelude::{Address, ToHex};
+use hopr_db_entity::{
+    account, announcement,
+    prelude::{Account, Announcement},
+};
+use hopr_internal_types::{account::AccountType, prelude::AccountEntry};
+use hopr_primitive_types::{
+    errors::GeneralError,
+    prelude::{Address, ToHex},
+};
 use multiaddr::Multiaddr;
-use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
-    Set,
+    Set, sea_query::Expr,
 };
 use sea_query::{Condition, IntoCondition, OnConflict};
 
-use crate::db::HoprDb;
-use crate::errors::DbSqlError::MissingAccount;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::{
+    HoprDbGeneralModelOperations, OptTx,
+    db::HoprDb,
+    errors::{DbSqlError, DbSqlError::MissingAccount, Result},
+};
 
 /// A type that can represent both [chain public key](Address) and [packet public key](OffchainPublicKey).
 #[allow(clippy::large_enum_variant)] // TODO: use CompactOffchainPublicKey
@@ -448,15 +451,17 @@ impl HoprDbAccountOperations for HoprDb {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::errors::DbSqlError;
-    use crate::errors::DbSqlError::DecodingError;
-    use crate::HoprDbGeneralModelOperations;
     use anyhow::Context;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_internal_types::prelude::AccountType::NotAnnounced;
 
-    #[async_std::test]
+    use super::*;
+    use crate::{
+        HoprDbGeneralModelOperations,
+        errors::{DbSqlError, DbSqlError::DecodingError},
+    };
+
+    #[tokio::test]
     async fn test_insert_account_announcement() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -509,7 +514,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_allow_reannouncement() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -550,7 +555,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_insert_account_announcement_to_nonexisting_account() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -568,7 +573,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_allow_duplicate_announcement_per_different_accounts() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -619,7 +624,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_delete_account() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -648,7 +653,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_fail_to_delete_nonexistent_account() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -663,7 +668,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_fail_on_duplicate_account_insert() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -695,7 +700,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_delete_announcements() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -724,7 +729,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_fail_to_delete_nonexistent_account_announcements() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -739,7 +744,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_translate_key() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -799,7 +804,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_translate_key_no_cache() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -861,7 +866,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_accounts() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 

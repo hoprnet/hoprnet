@@ -1,24 +1,26 @@
 //! This module contains struct definition,  utility functions around private keys, password, and keystores.
 //!
-//! Keystore file is often referred as HOPR node identity file, which is an encrypted private key for an Ethereum wallet.
-//! This identity file uses password (received from [PasswordArgs]) for encryption.
+//! Keystore file is often referred as HOPR node identity file, which is an encrypted private key for an Ethereum
+//! wallet. This identity file uses password (received from [PasswordArgs]) for encryption.
 //!
 //! Location of identity files can be provided with [IdentityFileArgs].
 //!
 //! This module also contains definition of argument for private key, defined in [PrivateKeyArgs].
 
-use crate::utils::HelperErrors;
-use clap::{Parser, ValueHint};
-use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-use hopr_primitive_types::primitives::Address;
-use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use std::{
     collections::HashMap,
     env, fs,
     path::{Path, PathBuf},
 };
+
+use clap::{Parser, ValueHint};
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_primitive_types::primitives::Address;
+use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+use crate::utils::HelperErrors;
 
 pub fn read_identity(file: &Path, password: &str) -> Result<(String, HoprKeys), HelperErrors> {
     let file_str = file
@@ -166,7 +168,8 @@ pub trait ArgEnvReader<T, K> {
 /// Arguments for private key.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct PrivateKeyArgs {
-    /// Either provide a private key as argument or as a specific environment variable, e.g. `PRIVATE_KEY`, `MANAGER_PRIVATE_KEY`
+    /// Either provide a private key as argument or as a specific environment variable, e.g. `PRIVATE_KEY`,
+    /// `MANAGER_PRIVATE_KEY`
     #[clap(
         long,
         short = 'k',
@@ -220,7 +223,8 @@ impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
 /// Arguments for private key.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct ManagerPrivateKeyArgs {
-    /// Either provide a private key as argument or as a specific environment variable, e.g. `PRIVATE_KEY`, `MANAGER_PRIVATE_KEY`
+    /// Either provide a private key as argument or as a specific environment variable, e.g. `PRIVATE_KEY`,
+    /// `MANAGER_PRIVATE_KEY`
     #[clap(
         long,
         short = 'q',
@@ -485,8 +489,9 @@ impl IdentityFileArgs {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::tempdir;
+
+    use super::*;
 
     const DUMMY_PRIVATE_KEY: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
     const SPECIAL_ENV_KEY: &str = "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
@@ -707,7 +712,7 @@ mod tests {
         let pwd = "e2e-test";
 
         let weak_crypto_alice_keystore = r#"{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"6084fab56497402930d0833fbc17e7ea"},"ciphertext":"50c0cf2537d7bc0ab6dbb7909d21d3da6445e5bd2cb1236de7efbab33302ddf1dd6a0393c986f8c111fe73a22f36af88858d79d23882a5f991713cb798172069d060f28c680afc28743e8842e8e849ebc21209825e23465afcee52a49f9c4f6734061f91a45b4cc8fbd6b4c95cc4c1b487f0007ed88a1b46b5ebdda616013b3f7ba465f97352b9412e69e6690cee0330c0b25bcf5fc3cdf12e4167336997920df9d6b7d816943ab3817481b9","kdf":"scrypt","kdfparams":{"dklen":32,"n":2,"p":1,"r":8,"salt":"46e30c2d74ba04b881e99fb276ae6a970974499f6abe286a00a69ba774ace095"},"mac":"70dccb366e8ddde13ebeef9a6f35bbc1333176cff3d33a72c925ce23753b34f4"},"id":"b5babdf4-da20-4cc1-9484-58ea24f1b3ae","version":3}"#;
-        //let alice_peer_id = "16Uiu2HAmUYnGY3USo8iy13SBFW7m5BMQvC4NETu1fGTdoB86piw7";
+        // let alice_peer_id = "16Uiu2HAmUYnGY3USo8iy13SBFW7m5BMQvC4NETu1fGTdoB86piw7";
         let alice_address = "0x838d3c1d2ff5c576d7b270aaaaaa67e619217aac";
 
         // create dir if not exist.
