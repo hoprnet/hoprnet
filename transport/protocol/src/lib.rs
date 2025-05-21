@@ -247,7 +247,12 @@ where
                     let me = me.clone();
 
                     async move {
+                        let now = std::time::Instant::now();
                         let res = msg_processor.recv(&peer, data).await.map_err(move |e| (peer, e));
+                        let elapsed = now.elapsed();
+                        if elapsed.as_millis() > 150 {
+                            tracing::warn!("msg_processor.recv took {}ms", elapsed.as_millis());
+                        }
                         if let Err((peer, e)) = &res {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             if let hopr_crypto_packet::errors::PacketError::TicketValidation(_) = e {
@@ -271,6 +276,7 @@ where
                                 .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), peer)
                                 .await {
                                     Ok(ack_packet) => {
+                                        let now = std::time::Instant::now();
                                         msg_to_send_tx
                                             .send((
                                                 ack_packet.next_hop.into(),
@@ -280,6 +286,10 @@ where
                                             .unwrap_or_else(|_e| {
                                                 error!("Failed to forward an acknowledgement for a failed packet recv to the transport layer");
                                             });
+                                        let elapsed = now.elapsed();
+                                        if elapsed.as_millis() > 150 {
+                                            tracing::warn!("msg_to_send_tx.send took {}ms", elapsed.as_millis());
+                                        }
                                     },
                                     Err(error) => tracing::error!(%error, "Failed to create random ack packet for a failed receive"),
                                 }
