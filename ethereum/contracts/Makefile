@@ -7,9 +7,9 @@ forge-script = env NETWORK=$(network) FOUNDRY_PROFILE=$(environment-type) ETHERS
 .PHONY: sc-test
 sc-test:
 	# we must run the tests in separate groups to avoid IO race conditions
-	$(forge) test -vvv --match-path "./test/scripts/DeployAll.t.sol" > test1.log 2>&1
-	$(forge) test -vvv --match-path "./test/scripts/DeployNodeManagement.t.sol" > test2.log 2>&1
-	$(forge) test -vvv --no-match-path "./test/scripts/Deploy*.t.sol" > test3.log 2>&1
+	$(forge) test --gas-report --match-path "./test/scripts/DeployAll.t.sol"
+	$(forge) test --gas-report --match-path "./test/scripts/DeployNodeManagement.t.sol"
+	$(forge) test --gas-report --no-match-path "./test/scripts/Deploy*.t.sol"
 
 .PHONY: sc-coverage
 sc-coverage:
