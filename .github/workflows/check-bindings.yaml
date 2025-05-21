@@ -49,7 +49,8 @@ jobs:
           cd ./ethereum/contracts && \
             nix develop -c \
             forge bind --offline --bindings-path ./../bindings/src/codegen \
-            --module --alloy --overwrite --skip-extra-derives \
+            --module --alloy --overwrite \
+            --force --skip-cargo-toml \
             --select "^(HoprAnnouncements|HoprAnnouncementsEvents|HoprCapabilityPermissions|HoprChannels|HoprChannelsEvents|HoprCrypto|HoprDummyProxyForNetworkRegistry|HoprBoost|HoprToken|HoprLedger|HoprLedgerevents|HoprMultisig|HoprNetworkRegistry|HoprNetworkRegistryEvents|HoprNodeManagementModule|HoprNodeSafeRegistry|HoprNodeSafeRegistryEvents|HoprNodeStakeFactory|HoprNodeStakeFactoryEvents|HoprSafeProxyForNetworkRegistry|HoprStakingProxyForNetworkRegistry|HoprTicketPriceOracle|HoprTicketPriceOracleEvents|HoprWinningProbabilityOracle|HoprWinningProbabilityOracleEvents)$"
 
       - name: Check for diff
