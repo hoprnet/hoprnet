@@ -222,12 +222,12 @@ where
             U256::ZERO,
             primitives::Address::default(),
             wallet.address(),
-            nonce.into(),
+            nonce,
         )
         .call()
         .await?;
 
-    let signed_data_hash = wallet.sign_hash(&data_hash.into()).await?;
+    let signed_data_hash = wallet.sign_hash(&data_hash).await?;
 
     let safe_tx_data = SafeContract::execTransactionCall {
         to: target.into(),
