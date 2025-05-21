@@ -9,7 +9,7 @@
     crane.url = "github:ipetkov/crane/v0.20.1";
     # pin it to a version which we are compatible with
     foundry.url =
-      "github:shazow/foundry.nix/6fef0f19aa2d929434e084834294675ee069f8d2";
+      "github:shazow/foundry.nix/97a82eb0a3467ff5c0850de19bf09a3da41b3faf";
     # use change to add solc 0.8.24
     solc.url = "github:hoprnet/solc.nix/tb/20240129-solc-0.8.24";
     pre-commit.url = "github:cachix/pre-commit-hooks.nix";
