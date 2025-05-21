@@ -1,151 +1,106 @@
-use hopr_crypto_random::random_fill;
-use hopr_crypto_types::prelude::blake3_hash;
-use hopr_primitive_types::{errors::GeneralError, prelude::BytesEncodable};
-use serde::{Deserialize, Serialize};
+use anyhow::Context;
+use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 
-use crate::errors::{ProbeError::MessagingError, Result};
-
-/// Size of the nonce in the Ping sub protocol
-pub const PING_PONG_NONCE_SIZE: usize = 16;
-
-/// Derives a ping challenge (if no challenge is given) or a pong response to a ping challenge.
-pub fn derive_ping_pong(challenge: Option<&[u8]>) -> [u8; PING_PONG_NONCE_SIZE] {
-    let mut ret = [0u8; PING_PONG_NONCE_SIZE];
-    match challenge {
-        None => random_fill(&mut ret),
-        Some(chal) => {
-            let hash = blake3_hash(chal);
-            ret.copy_from_slice(&hash.as_bytes()[0..PING_PONG_NONCE_SIZE]);
-        }
-    }
-    ret
+/// Serializable and deserializable enum for the probe message content
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum NeighborProbe {
+    /// Ping message with a random nonce
+    Ping(u128),
+    /// Pong message repliying to a specific nonce
+    Pong(u128),
 }
 
-/// Implementation of the Control Message sub-protocol, which currently consists of Ping/Pong
-/// messaging for the HOPR protocol.
-#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
-pub enum ControlMessage {
-    /// Ping challenge
-    Ping(PingMessage),
-    /// Pong response to a Ping
-    Pong(PingMessage),
-}
-
-impl ControlMessage {
-    /// Creates a ping challenge message.
-    pub fn generate_ping_request() -> Self {
-        let mut ping = PingMessage::default();
-        ping.nonce.copy_from_slice(&derive_ping_pong(None));
-
-        Self::Ping(ping)
+impl NeighborProbe {
+    /// Returns the nonce of the message
+    pub fn random_ping() -> Self {
+        Self::Ping(rand::random::<u128>())
     }
 
-    /// Given the received ping challenge, generates an appropriate response to the challenge.
-    pub fn generate_pong_response(request: &ControlMessage) -> Result<Self> {
-        match request {
-            ControlMessage::Ping(ping) => {
-                let mut pong = PingMessage::default();
-                pong.nonce.copy_from_slice(&derive_ping_pong(Some(ping.nonce())));
-                Ok(Self::Pong(pong))
-            }
-            ControlMessage::Pong(_) => Err(MessagingError("invalid ping message".into())),
+    pub fn is_complement_to(&self, other: Self) -> bool {
+        match (self, &other) {
+            (Self::Ping(nonce1), Self::Pong(nonce2)) => nonce1 == nonce2,
+            (Self::Pong(nonce1), Self::Ping(nonce2)) => nonce1 == nonce2,
+            _ => false,
         }
     }
+}
 
-    /// Given the original ping challenge message, verifies that the received pong response is valid
-    /// according to the challenge.
-    pub fn validate_pong_response(request: &ControlMessage, response: &ControlMessage) -> Result<()> {
-        if let Self::Pong(expected_pong) = Self::generate_pong_response(request).unwrap() {
-            match response {
-                ControlMessage::Pong(received_pong) => match expected_pong.nonce.eq(&received_pong.nonce) {
-                    true => Ok(()),
-                    false => Err(MessagingError("pong response does not match the challenge".into())),
-                },
-                ControlMessage::Ping(_) => Err(MessagingError("invalid pong response".into())),
-            }
+impl From<NeighborProbe> for u128 {
+    fn from(probe: NeighborProbe) -> Self {
+        match probe {
+            NeighborProbe::Ping(nonce) | NeighborProbe::Pong(nonce) => nonce,
+        }
+    }
+}
+
+/// TODO: TBD as a separate task for network discovery
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct PathTelemetry {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum Message {
+    Telemetry(PathTelemetry),
+    Probe(NeighborProbe),
+}
+
+impl TryFrom<Message> for ApplicationData {
+    type Error = anyhow::Error;
+
+    fn try_from(message: Message) -> Result<Self, Self::Error> {
+        let tag: Tag = ReservedTag::Ping.into();
+        Ok(ApplicationData {
+            application_tag: tag,
+            plain_text: bitcode::serialize(&message)
+                .context("Failed to serialize message")?
+                .into_boxed_slice(),
+        })
+    }
+}
+
+impl TryFrom<ApplicationData> for Message {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ApplicationData) -> Result<Self, Self::Error> {
+        let reserved_probe_tag: Tag = ReservedTag::Ping.into();
+
+        if value.application_tag == reserved_probe_tag {
+            let message: Message = bitcode::deserialize(&value.plain_text).context("Failed to deserialize message")?;
+            Ok(message)
         } else {
-            Err(MessagingError("request is not a valid ping message".into()))
-        }
-    }
-
-    /// Convenience method to de-structure the ping message payload, if this
-    /// instance is a Ping or Pong.
-    pub fn get_ping_message(&self) -> Result<&PingMessage> {
-        match self {
-            ControlMessage::Ping(m) | ControlMessage::Pong(m) => Ok(m),
+            Err(anyhow::anyhow!("Non probing application tag found"))
         }
     }
 }
-
-#[derive(Clone, Debug, Eq, PartialEq, Default, Serialize, Deserialize)]
-pub struct PingMessage {
-    nonce: [u8; PING_PONG_NONCE_SIZE],
-}
-
-impl PingMessage {
-    /// Gets the challenge or response in this ping/pong message.
-    pub fn nonce(&self) -> &[u8] {
-        &self.nonce
-    }
-}
-
-impl From<PingMessage> for [u8; PING_MESSAGE_LEN] {
-    fn from(value: PingMessage) -> Self {
-        let mut ret = [0u8; PING_MESSAGE_LEN];
-        ret[0..PING_MESSAGE_LEN].copy_from_slice(&value.nonce);
-        ret
-    }
-}
-
-impl TryFrom<&[u8]> for PingMessage {
-    type Error = GeneralError;
-
-    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
-        if value.len() >= Self::SIZE {
-            let mut ret = PingMessage::default();
-            ret.nonce.copy_from_slice(&value[0..Self::SIZE]);
-            Ok(ret)
-        } else {
-            Err(GeneralError::ParseError("PingMessage".into()))
-        }
-    }
-}
-
-const PING_MESSAGE_LEN: usize = PING_PONG_NONCE_SIZE;
-impl BytesEncodable<PING_MESSAGE_LEN> for PingMessage {}
 
 #[cfg(test)]
 mod tests {
-    use hopr_primitive_types::prelude::BytesEncodable;
-
-    use crate::messaging::{
-        ControlMessage,
-        ControlMessage::{Ping, Pong},
-        PingMessage,
-    };
+    use super::*;
 
     #[test]
-    fn test_ping_pong_roundtrip() {
-        // ping initiator
-        let sent_req_s: Box<[u8]>;
-        let sent_req: ControlMessage;
-        {
-            sent_req = ControlMessage::generate_ping_request();
-            sent_req_s = sent_req.get_ping_message().unwrap().clone().into_boxed();
-        }
+    fn random_generation_of_a_neighbor_probe_produces_a_ping() {
+        let ping = NeighborProbe::random_ping();
+        assert!(matches!(ping, NeighborProbe::Ping(_)));
+    }
 
-        // pong responder
-        let sent_resp_s: Box<[u8]>;
-        {
-            let recv_req = PingMessage::try_from(sent_req_s.as_ref()).unwrap();
-            let send_resp = ControlMessage::generate_pong_response(&Ping(recv_req)).unwrap();
-            sent_resp_s = send_resp.get_ping_message().unwrap().clone().into_boxed();
-        }
+    #[test]
+    fn check_for_complement_works_for_ping_and_pong_with_the_same_nonce() {
+        let ping = NeighborProbe::random_ping();
+        let pong = {
+            let ping: u128 = ping.into();
+            NeighborProbe::Pong(ping)
+        };
 
-        // verify pong
-        {
-            let recv_resp = PingMessage::try_from(sent_resp_s.as_ref()).unwrap();
-            assert!(ControlMessage::validate_pong_response(&sent_req, &Pong(recv_resp)).is_ok());
-        }
+        assert!(ping.is_complement_to(pong));
+    }
+
+    #[test]
+    fn check_for_complement_fails_for_ping_and_pong_with_different_nonce() {
+        let ping = NeighborProbe::random_ping();
+        let pong = {
+            let ping: u128 = ping.into();
+            NeighborProbe::Pong(ping + 1)
+        };
+
+        assert!(!ping.is_complement_to(pong));
     }
 }

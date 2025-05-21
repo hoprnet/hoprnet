@@ -71,9 +71,8 @@ use hopr_transport_p2p::{
 use hopr_transport_packet::prelude::*;
 pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use hopr_transport_probe::{
-    HoprProbeProcess,
+    HoprProbeProcess, continuous_network_probe,
     ping::{PingConfig, Pinger, Pinging},
-    probe_network,
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
 pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
@@ -191,9 +190,10 @@ where
 {
     me: OffchainKeypair,
     me_peerid: PeerId, // Cache to avoid an expensive conversion: OffchainPublicKey -> PeerId
+    me_address: Address,
     cfg: HoprTransportConfig,
     db: T,
-    ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
+    ping: Arc<OnceLock<Pinger<network_notifier::ProbeNetworkInteractions<T>>>>,
     network: Arc<Network<T>>,
     process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     path_planner: PathPlanner<T, CurrentPathSelector>,
@@ -223,6 +223,7 @@ where
         Self {
             me: me.clone(),
             me_peerid,
+            me_address: me_chain_addr,
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(Network::new(
                 me_peerid,
@@ -505,56 +506,27 @@ where
         let (tx_from_probing, rx_from_probing) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
 
-        probe_network(
+        // manual ping
+        let (manual_ping_tx, manual_ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+
+        for (k, v) in continuous_network_probe(
+            (*self.me.public(), self.me_address),
             (external_msg_send, rx_from_protocol),
-            self.network.clone(),
+            manual_ping_rx,
+            network_notifier::ProbeNetworkInteractions::new(
+                self.network.clone(),
+                self.db.clone(),
+                self.path_planner.channel_graph(),
+                network_events_tx,
+            ),
             self.cfg.probe,
+            self.db.clone(),
         )
-        .await;
-        // // manual ping
-        // let (ping_tx, ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
-
-        // let ping_cfg = PingConfig {
-        //     timeout: self.cfg.protocol.heartbeat.timeout,
-        //     max_parallel_pings: self.cfg.heartbeat.max_parallel_probes,
-        // };
-
-        // let ping: Pinger<network_notifier::PingExternalInteractions<T>> = Pinger::new(
-        //     ping_cfg,
-        //     ping_tx.clone(),
-        //     network_notifier::PingExternalInteractions::new(
-        //         self.network.clone(),
-        //         self.db.clone(),
-        //         self.path_planner.channel_graph(),
-        //         network_events_tx,
-        //     ),
-        // );
-
-        // self.ping
-        //     .clone()
-        //     .set(ping)
-        //     .expect("must set the ping executor only once");
-
-        // // heartbeat
-        // let mut heartbeat = Heartbeat::new(
-        //     self.cfg.heartbeat,
-        //     self.ping
-        //         .get()
-        //         .expect("Ping should be initialized at this point")
-        //         .clone(),
-        //     HeartbeatExternalInteractions::new(self.network.clone()),
-        //     Box::new(|dur| Box::pin(sleep(dur))),
-        // );
-
-        // let half_the_hearbeat_interval = self.cfg.heartbeat.interval / 4;
-        // processes.insert(
-        //     HoprTransportProcess::Probing(HoprProbeProcess::Heartbeat),
-        //     spawn(async move {
-        //         // present to make sure that the heartbeat does not start immediately
-        //         hopr_async_runtime::prelude::sleep(half_the_hearbeat_interval).await;
-        //         heartbeat.heartbeat_loop().await
-        //     }),
-        // );
+        .await
+        .into_iter()
+        {
+            processes.insert(HoprTransportProcess::Probing(k), v);
+        }
 
         // -- session management
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
