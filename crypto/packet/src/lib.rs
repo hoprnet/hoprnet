@@ -11,7 +11,8 @@
 //! The currently used implementation is selected using the [`HoprSphinxSuite`] type in the `packet` module.
 //!
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
-//! In particular, as soon as there is a way to represent `Ed448` PeerIDs, it would be straightforward to create e.g. `X448Suite`.
+//! In particular, as soon as there is a way to represent `Ed448` PeerIDs, it would be straightforward to create e.g.
+//! `X448Suite`.
 //!
 //! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
@@ -33,11 +34,13 @@ mod validation;
 #[doc(hidden)]
 pub mod prelude {
     pub use super::*;
-    pub use crate::packet::{
-        HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
+    pub use crate::{
+        packet::{
+            HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
+        },
+        types::{HoprSenderId, HoprSurbId},
+        validation::validate_unacknowledged_ticket,
     };
-    pub use crate::types::{HoprSenderId, HoprSurbId};
-    pub use crate::validation::validate_unacknowledged_ticket;
 }
 
 pub use hopr_crypto_sphinx::prelude::{KeyIdMapper, ReplyOpener};
@@ -51,14 +54,15 @@ pub type HoprSphinxSuite = X25519Suite;
 pub struct HoprSphinxHeaderSpec;
 
 impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
-    const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
     type KeyId = KeyIdent<4>;
+    type PRG = hopr_crypto_types::primitives::ChaCha20;
+    type PacketReceiverData = types::HoprSenderId;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
-    type PacketReceiverData = types::HoprSenderId;
     type SurbReceiverData = por::SurbReceiverInfo;
-    type PRG = hopr_crypto_types::primitives::ChaCha20;
     type UH = hopr_crypto_types::primitives::Poly1305;
+
+    const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
 }
 
 /// Single Use Reply Block representation for HOPR protocol.
@@ -78,9 +82,10 @@ pub(crate) const PAYLOAD_SIZE_INT: usize = 1000;
 
 #[cfg(test)]
 mod tests {
+    use hopr_crypto_sphinx::prelude::MetaPacket;
+
     use super::*;
     use crate::packet::HoprPacket;
-    use hopr_crypto_sphinx::prelude::MetaPacket;
 
     #[test]
     fn header_and_packet_lengths() {

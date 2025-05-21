@@ -1,9 +1,8 @@
-use clap::builder::ValueParser;
-use clap::{ArgAction, Parser};
-use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use hopr_lib::{looks_like_domain, HostConfig};
+use clap::{ArgAction, Parser, builder::ValueParser};
+use hopr_lib::{HostConfig, looks_like_domain};
+use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;

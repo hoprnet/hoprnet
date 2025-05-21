@@ -1,11 +1,10 @@
 //! This module defines the Start sub-protocol used for HOPR Session initiation and management.
 
-use hopr_internal_types::prelude::ApplicationData;
 use std::collections::HashSet;
 
-use crate::errors::TransportSessionError;
-use crate::types::SessionTarget;
-use crate::Capability;
+use hopr_internal_types::prelude::ApplicationData;
+
+use crate::{Capability, errors::TransportSessionError, types::SessionTarget};
 
 /// Challenge that identifies a Start initiation protocol message.
 pub type StartChallenge = u64;
@@ -208,12 +207,12 @@ impl<T> TryFrom<ApplicationData> for StartProtocol<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::{HoprPseudonym, Tag};
     use hopr_network_types::prelude::SealedHost;
 
+    use super::*;
     use crate::SessionId;
 
     #[cfg(feature = "serde")]

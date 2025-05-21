@@ -4,37 +4,39 @@ pub mod config;
 pub mod errors;
 pub mod executors;
 
-use alloy::rpc::client::ClientBuilder;
-use alloy::rpc::types::TransactionRequest;
-use alloy::transports::http::{Http, ReqwestTransport};
-use alloy::transports::layers::RetryBackoffLayer;
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::{debug, error, info, warn};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
-use hopr_chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
-use hopr_chain_actions::action_state::IndexerActionTracker;
-use hopr_chain_actions::payload::SafePayloadGenerator;
-use hopr_chain_actions::ChainActions;
-use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use hopr_chain_rpc::client::DefaultRetryPolicy;
-use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
-use hopr_chain_rpc::transport::ReqwestClient;
-use hopr_chain_rpc::HoprRpcOperations;
-pub use hopr_chain_types::chain_events::SignificantChainEvent;
-use hopr_chain_types::ContractAddresses;
-use hopr_crypto_types::prelude::*;
-use hopr_db_sql::HoprDbAllOperations;
-use hopr_internal_types::account::AccountEntry;
-pub use hopr_internal_types::channels::ChannelEntry;
-use hopr_internal_types::prelude::ChannelDirection;
-use hopr_internal_types::tickets::WinningProbability;
-use hopr_primitive_types::prelude::*;
-
+use alloy::{
+    rpc::{client::ClientBuilder, types::TransactionRequest},
+    transports::{
+        http::{Http, ReqwestTransport},
+        layers::RetryBackoffLayer,
+    },
+};
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
+use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
+use hopr_chain_actions::{
+    ChainActions,
+    action_queue::{ActionQueue, ActionQueueConfig},
+    action_state::IndexerActionTracker,
+    payload::SafePayloadGenerator,
+};
+use hopr_chain_indexer::{IndexerConfig, block::Indexer, handlers::ContractEventHandlers};
+use hopr_chain_rpc::{
+    HoprRpcOperations,
+    client::DefaultRetryPolicy,
+    rpc::{RpcOperations, RpcOperationsConfig},
+    transport::ReqwestClient,
+};
+use hopr_chain_types::ContractAddresses;
+pub use hopr_chain_types::chain_events::SignificantChainEvent;
+use hopr_crypto_types::prelude::*;
+use hopr_db_sql::HoprDbAllOperations;
+pub use hopr_internal_types::channels::ChannelEntry;
+use hopr_internal_types::{account::AccountEntry, prelude::ChannelDirection, tickets::WinningProbability};
+use hopr_primitive_types::prelude::*;
+use tracing::{debug, error, info, warn};
 
 use crate::errors::{HoprChainError, Result};
 
@@ -164,7 +166,8 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             rpc_http_config.max_requests_per_sec = Some(max_rpc_req); // override the default if set
         }
 
-        // TODO(#7140): replace this DefaultRetryPolicy with a custom one that computes backoff with the number of retries
+        // TODO(#7140): replace this DefaultRetryPolicy with a custom one that computes backoff with the number of
+        // retries
         let rpc_http_retry_policy = DefaultRetryPolicy::default();
 
         // TODO: extract this from the global config type

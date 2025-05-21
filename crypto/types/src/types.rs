@@ -1,52 +1,48 @@
+use std::{
+    fmt::{Debug, Display, Formatter},
+    hash,
+    hash::Hasher,
+    ops::Add,
+    result,
+    str::FromStr,
+    sync::OnceLock,
+};
+
 use cipher::crypto_common::{Output, OutputSizeUser};
 use curve25519_dalek::{
     edwards::{CompressedEdwardsY, EdwardsPoint},
     montgomery::MontgomeryPoint,
 };
 use digest::Digest;
-use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
-use k256::elliptic_curve::group::prime::PrimeCurveAffine;
+use elliptic_curve::{NonZeroScalar, ProjectivePoint, sec1::EncodedPoint};
+use hopr_crypto_random::Randomizable;
+use hopr_primitive_types::{errors::GeneralError::ParseError, prelude::*};
 use k256::{
+    AffinePoint, Secp256k1,
     ecdsa::{
-        self,
-        signature::{hazmat::PrehashVerifier, Verifier},
-        RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey,
+        self, RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey,
+        signature::{Verifier, hazmat::PrehashVerifier},
     },
     elliptic_curve::{
-        self,
+        self, CurveArithmetic,
         generic_array::GenericArray,
+        group::prime::PrimeCurveAffine,
         sec1::{FromEncodedPoint, ToEncodedPoint},
-        CurveArithmetic,
     },
-    AffinePoint, Secp256k1,
 };
 use libp2p_identity::PeerId;
 use sha2::Sha512;
 use sha3::Keccak256;
+use tracing::warn;
 use typenum::Unsigned;
 
-use hopr_crypto_random::Randomizable;
-use hopr_primitive_types::errors::GeneralError::ParseError;
-use hopr_primitive_types::prelude::*;
-use std::fmt::Debug;
-use std::hash::Hasher;
-use std::sync::OnceLock;
-use std::{
-    fmt::{Display, Formatter},
-    hash,
-    ops::Add,
-    result,
-    str::FromStr,
-};
-use tracing::warn;
-
-use crate::utils::random_group_element;
 use crate::{
     errors::{
         CryptoError::{self, CalculationError, InvalidInputValue},
         Result,
     },
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    utils::random_group_element,
 };
 
 /// Represents an elliptic curve point on the secp256k1 curve
@@ -752,11 +748,9 @@ pub struct PublicKey(CurvePoint);
 impl PublicKey {
     /// Size of the compressed public key in bytes
     pub const SIZE_COMPRESSED: usize = 33;
-
-    pub const SIZE_UNCOMPRESSED_PLAIN: usize = 64;
-
     /// Size of the uncompressed public key in bytes
     pub const SIZE_UNCOMPRESSED: usize = 65;
+    pub const SIZE_UNCOMPRESSED_PLAIN: usize = 64;
 
     pub fn from_privkey(private_key: &[u8]) -> Result<PublicKey> {
         // This verifies that it is indeed a non-zero scalar, and thus represents a valid public key
@@ -953,7 +947,7 @@ impl TryFrom<&[u8]> for CompressedPublicKey {
 impl AsRef<[u8]> for CompressedPublicKey {
     fn as_ref(&self) -> &[u8] {
         // CurvePoint::as_ref() returns a compressed representation of the curve point
-        self.0 .0.as_ref()
+        self.0.0.as_ref()
     }
 }
 
@@ -1054,8 +1048,8 @@ impl OffchainSignature {
             &ed25519_dalek::SecretKey::try_from(signing_keypair.secret().as_ref()).expect("invalid private key"),
         );
 
-        // Get the verifying key from the SAME keypair, avoiding Double Public Key Signing Function Oracle Attack on Ed25519
-        // See https://github.com/MystenLabs/ed25519-unsafe-libs for details
+        // Get the verifying key from the SAME keypair, avoiding Double Public Key Signing Function Oracle Attack on
+        // Ed25519 See https://github.com/MystenLabs/ed25519-unsafe-libs for details
         let verifying = ed25519_dalek::VerifyingKey::from(signing_keypair.public().edwards);
 
         ed25519_dalek::hazmat::raw_sign::<Sha512>(&expanded_sk, msg, &verifying).into()
@@ -1277,24 +1271,26 @@ impl Pseudonym for SimplePseudonym {}
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::random_group_element;
+    use std::str::FromStr;
+
+    use ed25519_dalek::Signer;
+    use hex_literal::hex;
+    use hopr_primitive_types::prelude::*;
+    use k256::{
+        AffinePoint, NonZeroScalar, Secp256k1, U256,
+        ecdsa::VerifyingKey,
+        elliptic_curve::{CurveArithmetic, sec1::ToEncodedPoint},
+    };
+    use libp2p_identity::PeerId;
+
     use crate::{
         keypairs::{ChainKeypair, Keypair, OffchainKeypair},
         types::{
             Challenge, CurvePoint, HalfKey, HalfKeyChallenge, Hash, OffchainPublicKey, OffchainSignature, PublicKey,
             Response, Signature,
         },
+        utils::random_group_element,
     };
-    use ed25519_dalek::Signer;
-    use hex_literal::hex;
-    use hopr_primitive_types::prelude::*;
-    use k256::{
-        ecdsa::VerifyingKey,
-        elliptic_curve::{sec1::ToEncodedPoint, CurveArithmetic},
-        AffinePoint, {NonZeroScalar, Secp256k1, U256},
-    };
-    use libp2p_identity::PeerId;
-    use std::str::FromStr;
 
     const PUBLIC_KEY: [u8; 33] = hex!("021464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8");
     const PUBLIC_KEY_UNCOMPRESSED_PLAIN: [u8; 64] = hex!("1464586aeaea0eb5736884ca1bf42d165fc8e2243b1d917130fb9e321d7a93b8fb0699d4f177f9c84712f6d7c5f6b7f4f6916116047fa25c79ef806fc6c9523e");
