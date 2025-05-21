@@ -370,7 +370,7 @@ impl Display for ValidatedPath {
         write!(
             f,
             "validated path [{}]",
-            self.1 .0.iter().map(|p| p.to_hex()).collect::<Vec<String>>().join(", ")
+            self.1.0.iter().map(|p| p.to_hex()).collect::<Vec<String>>().join(", ")
         )
     }
 }
@@ -386,7 +386,7 @@ pub(crate) mod tests {
         time::{Duration, SystemTime},
     };
 
-    use anyhow::{ensure, Context};
+    use anyhow::{Context, ensure};
     use async_trait::async_trait;
     use hex_literal::hex;
     use hopr_internal_types::channels::ChannelEntry;

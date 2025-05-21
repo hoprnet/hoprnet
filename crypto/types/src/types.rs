@@ -14,23 +14,21 @@ use curve25519_dalek::{
     montgomery::MontgomeryPoint,
 };
 use digest::Digest;
-use elliptic_curve::{sec1::EncodedPoint, NonZeroScalar, ProjectivePoint};
+use elliptic_curve::{NonZeroScalar, ProjectivePoint, sec1::EncodedPoint};
 use hopr_crypto_random::Randomizable;
 use hopr_primitive_types::{errors::GeneralError::ParseError, prelude::*};
 use k256::{
+    AffinePoint, Secp256k1,
     ecdsa::{
-        self,
-        signature::{hazmat::PrehashVerifier, Verifier},
-        RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey,
+        self, RecoveryId, Signature as ECDSASignature, SigningKey, VerifyingKey,
+        signature::{Verifier, hazmat::PrehashVerifier},
     },
     elliptic_curve::{
-        self,
+        self, CurveArithmetic,
         generic_array::GenericArray,
         group::prime::PrimeCurveAffine,
         sec1::{FromEncodedPoint, ToEncodedPoint},
-        CurveArithmetic,
     },
-    AffinePoint, Secp256k1,
 };
 use libp2p_identity::PeerId;
 use sha2::Sha512;
@@ -949,7 +947,7 @@ impl TryFrom<&[u8]> for CompressedPublicKey {
 impl AsRef<[u8]> for CompressedPublicKey {
     fn as_ref(&self) -> &[u8] {
         // CurvePoint::as_ref() returns a compressed representation of the curve point
-        self.0 .0.as_ref()
+        self.0.0.as_ref()
     }
 }
 
@@ -1279,9 +1277,9 @@ mod tests {
     use hex_literal::hex;
     use hopr_primitive_types::prelude::*;
     use k256::{
-        ecdsa::VerifyingKey,
-        elliptic_curve::{sec1::ToEncodedPoint, CurveArithmetic},
         AffinePoint, NonZeroScalar, Secp256k1, U256,
+        ecdsa::VerifyingKey,
+        elliptic_curve::{CurveArithmetic, sec1::ToEncodedPoint},
     };
     use libp2p_identity::PeerId;
 

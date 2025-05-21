@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use hopr_lib::{errors::HoprLibError, transfer_session, HoprOffchainKeypair, ServiceId};
+use hopr_lib::{HoprOffchainKeypair, ServiceId, errors::HoprLibError, transfer_session};
 use hopr_network_types::{prelude::ForeignDataMode, udp::UdpStreamParallelism};
 use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 

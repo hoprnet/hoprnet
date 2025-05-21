@@ -39,12 +39,12 @@ use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
 
 use crate::{
+    ChainActions,
     action_queue::PendingAction,
     errors::{
         ChainActionsError::{ChannelDoesNotExist, InvalidState, OldTicket, WrongTicketState},
         Result,
     },
-    ChainActions,
 };
 
 lazy_static::lazy_static! {
@@ -261,11 +261,11 @@ mod tests {
     use futures::FutureExt;
     use hex_literal::hex;
     use hopr_chain_types::chain_events::{ChainEventType::TicketRedeemed, SignificantChainEvent};
-    use hopr_crypto_random::{random_bytes, Randomizable};
+    use hopr_crypto_random::{Randomizable, random_bytes};
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::{
-        api::info::DomainSeparator, db::HoprDb, errors::DbSqlError, info::HoprDbInfoOperations,
-        HoprDbGeneralModelOperations, TargetDb,
+        HoprDbGeneralModelOperations, TargetDb, api::info::DomainSeparator, db::HoprDb, errors::DbSqlError,
+        info::HoprDbInfoOperations,
     };
 
     use super::*;
@@ -627,8 +627,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed(
-    ) -> anyhow::Result<()> {
+    async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed()
+    -> anyhow::Result<()> {
         let ticket_count = 3;
         let ticket_from_previous_epoch_count = 2;
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;

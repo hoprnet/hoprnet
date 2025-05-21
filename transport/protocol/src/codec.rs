@@ -84,8 +84,8 @@ mod tests {
     }
 
     #[test]
-    fn fixed_size_codec_deserialization_of_too_many_bytes_should_produce_the_value_from_only_the_bytes_needed_for_an_item(
-    ) -> anyhow::Result<()> {
+    fn fixed_size_codec_deserialization_of_too_many_bytes_should_produce_the_value_from_only_the_bytes_needed_for_an_item()
+    -> anyhow::Result<()> {
         let mut codec = FixedLengthCodec::<TEST_SIZE>;
         let mut buf = tokio_util::bytes::BytesMut::new();
 

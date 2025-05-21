@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     fmt::{Debug, Formatter},
     time::Duration,
 };
@@ -7,12 +7,12 @@ use std::{
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::{prelude::SMA, primitives::Address, sma::SingleSumSMA};
 use petgraph::{
+    Direction,
     algo::has_path_connecting,
     dot::Dot,
     prelude::StableDiGraph,
     stable_graph::NodeIndex,
     visit::{EdgeFiltered, EdgeRef, NodeFiltered},
-    Direction,
 };
 use tracing::{debug, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -536,14 +536,14 @@ mod tests {
         time::{Duration, SystemTime},
     };
 
-    use anyhow::{anyhow, Context};
+    use anyhow::{Context, anyhow};
     use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
     use hopr_primitive_types::prelude::*;
 
     use super::*;
     use crate::{
         channel_graph::ChannelGraph,
-        tests::{dummy_channel, ADDRESSES},
+        tests::{ADDRESSES, dummy_channel},
     };
 
     #[test]

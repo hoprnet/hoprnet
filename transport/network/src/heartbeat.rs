@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use futures::{
-    future::{select, Either, FutureExt},
-    pin_mut, StreamExt,
+    StreamExt,
+    future::{Either, FutureExt, select},
+    pin_mut,
 };
 use hopr_db_api::peers::HoprDbPeersOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -10,7 +11,7 @@ use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
+use serde_with::{DurationSeconds, serde_as};
 use tracing::{debug, info};
 use validator::Validate;
 

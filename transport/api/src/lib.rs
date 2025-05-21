@@ -33,28 +33,29 @@ use std::{
 use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
+    FutureExt, SinkExt, StreamExt,
     channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
-    future::{select, Either},
-    pin_mut, FutureExt, SinkExt, StreamExt,
+    future::{Either, select},
+    pin_mut,
 };
-use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
 use hopr_crypto_packet::prelude::HoprPacket;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{HalfKeyChallenge, Hash, OffchainPublicKey},
 };
 use hopr_db_sql::{
+    HoprDbAllOperations,
     accounts::ChainOrPacketKey,
     api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
-    HoprDbAllOperations,
 };
 pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::RoutingOptions;
 use hopr_network_types::prelude::{DestinationRouting, ResolvedTransportRouting};
 use hopr_path::{
-    selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
     PathAddressResolver,
+    selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
 };
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
@@ -67,20 +68,20 @@ use hopr_transport_network::{
     ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
 };
 use hopr_transport_p2p::{
-    swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
     HoprSwarm,
+    swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
 };
+pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
 use hopr_transport_protocol::{
     errors::ProtocolError,
     processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
 };
-pub use hopr_transport_protocol::{execute_on_tick, PeerDiscovery};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
-    errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, ServiceId,
-    Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig, SESSION_PAYLOAD_SIZE,
-    USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
+    Capability as SessionCapability, IncomingSession, SESSION_PAYLOAD_SIZE, ServiceId, Session, SessionClientConfig,
+    SessionId, SessionTarget, SurbBalancerConfig, USABLE_PAYLOAD_CAPACITY_FOR_SESSION, errors::TransportSessionError,
+    traits::SendMsg,
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use hopr_transport_ticket_aggregation::{

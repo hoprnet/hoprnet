@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::{stream, StreamExt};
+use futures::{StreamExt, stream};
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_api::{
     errors::{DbError, Result},
@@ -12,15 +12,15 @@ use hopr_db_entity::{
 };
 use hopr_primitive_types::prelude::*;
 use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect,
     entity::Set,
     query::QueryTrait,
     sea_query::{Expr, OnConflict, Value},
-    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect,
 };
 use tracing::{error, trace};
 
-use crate::{db::HoprDb, errors::DbSqlError, HoprDbGeneralModelOperations, TargetDb};
+use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb, errors::DbSqlError};
 
 #[derive(FromQueryResult)]
 struct BlockNumber {

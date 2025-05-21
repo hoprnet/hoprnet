@@ -6,13 +6,13 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    errors::{HoprLibError, HoprStatusError},
     Address, Balance, BalanceType, U256,
+    errors::{HoprLibError, HoprStatusError},
 };
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({

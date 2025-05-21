@@ -44,13 +44,13 @@ use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
 
 use crate::{
+    Strategy::{Aggregating, AutoRedeeming},
     aggregating::AggregatingStrategyConfig,
     auto_funding::AutoFundingStrategyConfig,
     auto_redeeming::AutoRedeemingStrategyConfig,
     channel_finalizer::ClosureFinalizerStrategyConfig,
     promiscuous::PromiscuousStrategyConfig,
     strategy::MultiStrategyConfig,
-    Strategy::{Aggregating, AutoRedeeming},
 };
 
 pub mod aggregating;

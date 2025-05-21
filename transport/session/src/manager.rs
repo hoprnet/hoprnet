@@ -1,13 +1,14 @@
 use std::{
     ops::Range,
-    sync::{atomic::AtomicU64, Arc, OnceLock},
+    sync::{Arc, OnceLock, atomic::AtomicU64},
     time::Duration,
 };
 
 use futures::{
+    FutureExt, StreamExt, TryStreamExt,
     channel::mpsc::UnboundedSender,
     future::{AbortHandle, Either},
-    pin_mut, FutureExt, StreamExt, TryStreamExt,
+    pin_mut,
 };
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
@@ -17,11 +18,11 @@ use hopr_primitive_types::prelude::Address;
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
+    IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget,
     balancer::{RateController, RateLimitExt, SurbBalancer, SurbFlowController},
     errors::{SessionManagerError, TransportSessionError},
     initiation::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol},
     traits::SendMsg,
-    IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -965,7 +966,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        balancer::SurbBalancerConfig, initiation::StartProtocolDiscriminants, types::SessionTarget, Capability,
+        Capability, balancer::SurbBalancerConfig, initiation::StartProtocolDiscriminants, types::SessionTarget,
     };
 
     mockall::mock! {

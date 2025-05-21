@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-use futures::{pin_mut, StreamExt};
+use futures::{StreamExt, pin_mut};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_internal_types::{
     prelude::{HoprPseudonym, Tag},
@@ -22,7 +22,7 @@ use hopr_network_types::{
 use hopr_primitive_types::prelude::BytesRepresentable;
 use tracing::{debug, error};
 
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
+use crate::{Capability, errors::TransportSessionError, traits::SendMsg};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -816,8 +816,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size(
-    ) -> anyhow::Result<()> {
+    async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size()
+    -> anyhow::Result<()> {
         const TO_SEND: usize = USABLE_PAYLOAD_CAPACITY_FOR_SESSION * 2 + 10;
 
         let addr: Address = (&ChainKeypair::random()).into();

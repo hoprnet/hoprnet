@@ -11,7 +11,7 @@ use crate::{
     errors,
     errors::CryptoError::InvalidInputValue,
     types::{CompressedPublicKey, OffchainPublicKey, PublicKey},
-    utils::{k256_scalar_from_bytes, random_group_element, x25519_scalar_from_bytes, SecretValue},
+    utils::{SecretValue, k256_scalar_from_bytes, random_group_element, x25519_scalar_from_bytes},
 };
 
 /// Represents a generic key pair

@@ -2,7 +2,7 @@ use std::ops::Div;
 
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::{channel::mpsc::UnboundedSender, Stream, StreamExt};
+use futures::{Stream, StreamExt, channel::mpsc::UnboundedSender};
 use hopr_async_runtime::prelude::timeout_fut;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
@@ -271,8 +271,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge(
-    ) -> anyhow::Result<()> {
+    async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge()
+    -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
@@ -289,8 +289,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge(
-    ) -> anyhow::Result<()> {
+    async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge()
+    -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);

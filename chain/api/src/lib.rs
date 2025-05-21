@@ -15,22 +15,22 @@ use alloy::{
 };
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
 use hopr_chain_actions::{
+    ChainActions,
     action_queue::{ActionQueue, ActionQueueConfig},
     action_state::IndexerActionTracker,
     payload::SafePayloadGenerator,
-    ChainActions,
 };
-use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
+use hopr_chain_indexer::{IndexerConfig, block::Indexer, handlers::ContractEventHandlers};
 use hopr_chain_rpc::{
+    HoprRpcOperations,
     client::DefaultRetryPolicy,
     rpc::{RpcOperations, RpcOperationsConfig},
     transport::ReqwestClient,
-    HoprRpcOperations,
 };
-pub use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_chain_types::ContractAddresses;
+pub use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::HoprDbAllOperations;
 pub use hopr_internal_types::channels::ChannelEntry;

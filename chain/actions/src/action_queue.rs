@@ -10,9 +10,9 @@ use std::{
     time::Duration,
 };
 
-use async_channel::{bounded, Receiver, Sender};
+use async_channel::{Receiver, Sender, bounded};
 use async_trait::async_trait;
-use futures::{future::Either, pin_mut, FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::spawn;
 use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
 use hopr_crypto_types::types::Hash;

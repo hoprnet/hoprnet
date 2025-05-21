@@ -13,8 +13,8 @@
 use alloy::{
     network::TransactionBuilder,
     primitives::{
-        aliases::{U24, U48, U56, U96},
         B256, U256,
+        aliases::{U24, U48, U56, U96},
     },
     rpc::types::TransactionRequest,
     sol_types::SolCall,
@@ -25,10 +25,10 @@ use hopr_bindings::{
     },
     hoprchannels::{
         HoprChannels::{
-            closeIncomingChannelCall, closeIncomingChannelSafeCall, finalizeOutgoingChannelClosureCall,
-            finalizeOutgoingChannelClosureSafeCall, fundChannelCall, fundChannelSafeCall,
-            initiateOutgoingChannelClosureCall, initiateOutgoingChannelClosureSafeCall, redeemTicketCall,
-            redeemTicketSafeCall, RedeemableTicket as OnChainRedeemableTicket, TicketData,
+            RedeemableTicket as OnChainRedeemableTicket, TicketData, closeIncomingChannelCall,
+            closeIncomingChannelSafeCall, finalizeOutgoingChannelClosureCall, finalizeOutgoingChannelClosureSafeCall,
+            fundChannelCall, fundChannelSafeCall, initiateOutgoingChannelClosureCall,
+            initiateOutgoingChannelClosureSafeCall, redeemTicketCall, redeemTicketSafeCall,
         },
         HoprCrypto::{CompactSignature, VRFParameters},
     },
@@ -631,12 +631,14 @@ mod tests {
         let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None)?;
         let reannounce_tx = generator.announce(ad_reannounce)?;
 
-        assert!(client
-            .send_transaction(reannounce_tx)
-            .await?
-            .get_receipt()
-            .await?
-            .status());
+        assert!(
+            client
+                .send_transaction(reannounce_tx)
+                .await?
+                .get_receipt()
+                .await?
+                .status()
+        );
 
         Ok(())
     }
@@ -698,12 +700,14 @@ mod tests {
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
         let client = create_rpc_client_to_anvil(&anvil, &chain_key_bob);
 
-        assert!(client
-            .send_transaction(redeem_ticket_tx)
-            .await?
-            .get_receipt()
-            .await?
-            .status());
+        assert!(
+            client
+                .send_transaction(redeem_ticket_tx)
+                .await?
+                .get_receipt()
+                .await?
+                .status()
+        );
 
         Ok(())
     }

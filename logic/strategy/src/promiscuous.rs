@@ -32,7 +32,7 @@ use std::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use hopr_chain_actions::channels::ChannelActions;
-use hopr_db_sql::{api::peers::PeerSelector, errors::DbSqlError, HoprDbAllOperations};
+use hopr_db_sql::{HoprDbAllOperations, api::peers::PeerSelector, errors::DbSqlError};
 use hopr_internal_types::prelude::*;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{SimpleCounter, SimpleGauge};
@@ -40,13 +40,13 @@ use hopr_primitive_types::prelude::*;
 use rand::seq::SliceRandom;
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
+    Strategy,
     errors::{Result, StrategyError::CriteriaNotSatisfied},
     strategy::SingularStrategy,
-    Strategy,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -267,11 +267,7 @@ impl validator::Validate for PromiscuousStrategyConfig {
             );
         }
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
     }
 }
 
@@ -618,17 +614,17 @@ where
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use futures::{future::ok, FutureExt};
+    use futures::{FutureExt, future::ok};
     use hex_literal::hex;
     use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
     use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::{
-        accounts::HoprDbAccountOperations, api::peers::HoprDbPeersOperations, channels::HoprDbChannelOperations,
-        db::HoprDb, info::HoprDbInfoOperations, HoprDbGeneralModelOperations,
+        HoprDbGeneralModelOperations, accounts::HoprDbAccountOperations, api::peers::HoprDbPeersOperations,
+        channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
     };
-    use hopr_transport_network::{network::PeerOrigin, PeerId};
+    use hopr_transport_network::{PeerId, network::PeerOrigin};
     use lazy_static::lazy_static;
     use mockall::mock;
 

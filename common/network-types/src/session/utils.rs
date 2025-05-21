@@ -1,17 +1,17 @@
 use std::{
     pin::Pin,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     task::{Context, Poll},
     time::{Duration, Instant},
 };
 
-use futures::{channel::mpsc::UnboundedSender, stream::BoxStream, AsyncRead, AsyncWrite, StreamExt};
+use futures::{AsyncRead, AsyncWrite, StreamExt, channel::mpsc::UnboundedSender, stream::BoxStream};
 use rand::{
     distributions::Bernoulli,
-    prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng},
+    prelude::{Distribution, Rng, SeedableRng, StdRng, thread_rng},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]

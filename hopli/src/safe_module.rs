@@ -92,8 +92,8 @@
 //! ```
 use std::str::FromStr;
 
-use alloy::primitives::{utils::parse_units, Address, U256};
-use clap::{builder::RangedU64ValueParser, Parser};
+use alloy::primitives::{Address, U256, utils::parse_units};
+use clap::{Parser, builder::RangedU64ValueParser};
 use hopr_bindings::{
     hoprnetworkregistry::HoprNetworkRegistry, hoprnodesaferegistry::HoprNodeSafeRegistry,
     hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
@@ -105,10 +105,10 @@ use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{ArgEnvReader, IdentityFileArgs, ManagerPrivateKeyArgs, PrivateKeyArgs},
     methods::{
-        debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries,
+        SafeSingleton, debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries,
         deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry_and_remove_from_module,
         include_nodes_to_module, migrate_nodes, register_safes_and_nodes_on_network_registry, transfer_native_tokens,
-        transfer_or_mint_tokens, SafeSingleton,
+        transfer_or_mint_tokens,
     },
     utils::{Cmd, HelperErrors},
 };

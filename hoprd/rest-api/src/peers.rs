@@ -6,16 +6,16 @@ use axum::{
     response::IntoResponse,
 };
 use hopr_lib::{
-    errors::{HoprLibError, HoprStatusError},
     HoprTransportError, Multiaddr,
+    errors::{HoprLibError, HoprStatusError},
 };
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
+use serde_with::{DisplayFromStr, DurationMilliSeconds, serde_as};
 use tracing::debug;
 
 use crate::{
+    ApiError, ApiErrorStatus, BASE_PATH, InternalState,
     types::{HoprIdentifier, PeerOrAddress},
-    ApiError, ApiErrorStatus, InternalState, BASE_PATH,
 };
 
 #[serde_as]

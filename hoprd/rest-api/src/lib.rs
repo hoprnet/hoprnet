@@ -23,19 +23,19 @@ use std::{
     collections::HashMap,
     error::Error,
     iter::once,
-    sync::{atomic::AtomicU16, Arc},
+    sync::{Arc, atomic::AtomicU16},
 };
 
 use async_lock::RwLock;
 use axum::{
+    Router,
     extract::Json,
-    http::{header::AUTHORIZATION, status::StatusCode, Method},
+    http::{Method, header::AUTHORIZATION, status::StatusCode},
     middleware,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Router,
 };
-use hopr_lib::{errors::HoprLibError, Address, Hopr};
+use hopr_lib::{Address, Hopr, errors::HoprLibError};
 use hopr_network_types::prelude::IpProtocol;
 use serde::Serialize;
 pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
@@ -49,8 +49,8 @@ use tower_http::{
     validate_request::ValidateRequestHeaderLayer,
 };
 use utoipa::{
-    openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
     Modify, OpenApi,
+    openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
 };
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;

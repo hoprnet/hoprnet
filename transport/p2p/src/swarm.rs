@@ -1,26 +1,26 @@
 use std::{net::Ipv4Addr, num::NonZeroU8};
 
-use futures::{select, Stream, StreamExt};
+use futures::{Stream, StreamExt, select};
 use hopr_internal_types::prelude::*;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
 use hopr_transport_identity::{
-    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
     Multiaddr, PeerId,
+    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
 };
 use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
-use hopr_transport_protocol::{config::ProtocolConfig, PeerDiscovery};
+use hopr_transport_protocol::{PeerDiscovery, config::ProtocolConfig};
 use libp2p::{
     autonat,
     multiaddr::Protocol,
     request_response::{OutboundRequestId, ResponseChannel},
-    swarm::{dial_opts::DialOpts, NetworkInfo, SwarmEvent},
+    swarm::{NetworkInfo, SwarmEvent, dial_opts::DialOpts},
 };
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    constants, errors::Result, HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong,
-    HOPR_HEARTBEAT_PROTOCOL_V_0_2_0,
+    HOPR_HEARTBEAT_PROTOCOL_V_0_2_0, HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong, constants,
+    errors::Result,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]

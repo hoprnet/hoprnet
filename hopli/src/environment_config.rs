@@ -19,11 +19,11 @@ use std::{
 use alloy::{
     network::EthereumWallet,
     providers::{
+        Identity, ProviderBuilder, RootProvider,
         fillers::{
             BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
-        Identity, ProviderBuilder, RootProvider,
     },
     rpc::client::ClientBuilder,
     signers::local::PrivateKeySigner,
@@ -33,7 +33,7 @@ use clap::Parser;
 use hopr_chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
 use crate::utils::HelperErrors;
 

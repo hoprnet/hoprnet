@@ -7,13 +7,13 @@ use axum::{
 };
 use hopr_crypto_types::types::Hash;
 use hopr_lib::{
-    errors::{HoprLibError, HoprStatusError},
     HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex,
+    errors::{HoprLibError, HoprStatusError},
 };
 use serde::Deserialize;
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]

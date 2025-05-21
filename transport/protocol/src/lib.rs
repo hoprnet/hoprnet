@@ -150,9 +150,9 @@ pub async fn run_msg_ack_protocol<Db>(
     api: (
         impl futures::Sink<(HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
         impl futures::Stream<Item = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     ),
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::prelude::JoinHandle<()>>
 where

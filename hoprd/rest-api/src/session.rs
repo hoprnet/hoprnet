@@ -1,22 +1,22 @@
 use std::{fmt::Formatter, future::Future, net::IpAddr, str::FromStr, sync::Arc};
 
 use axum::{
+    Error,
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
         Json, Path, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::status::StatusCode,
     response::IntoResponse,
-    Error,
 };
 use axum_extra::extract::Query;
 use base64::Engine;
-use futures::{stream::FuturesUnordered, AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt, stream::FuturesUnordered};
 use futures_concurrency::stream::Merge;
 use hopr_db_api::prelude::HoprDbResolverOperations;
 use hopr_lib::{
-    errors::HoprLibError, transfer_session, Address, HoprSession, ServiceId, SessionClientConfig, SessionTarget,
-    SurbBalancerConfig, SESSION_PAYLOAD_SIZE,
+    Address, HoprSession, SESSION_PAYLOAD_SIZE, ServiceId, SessionClientConfig, SessionTarget, SurbBalancerConfig,
+    errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism},
@@ -24,13 +24,13 @@ use hopr_network_types::{
     utils::AsyncReadStreamer,
 };
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use tokio::net::TcpListener;
 use tracing::{debug, error, info, trace};
 
 use crate::{
+    ApiError, ApiErrorStatus, BASE_PATH, InternalState, ListenerId,
     types::{HoprIdentifier, PeerOrAddress},
-    ApiError, ApiErrorStatus, InternalState, ListenerId, BASE_PATH,
 };
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
@@ -1074,8 +1074,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hoprd_session_connection_should_create_a_working_tcp_socket_through_which_data_can_be_sent_and_received(
-    ) -> anyhow::Result<()> {
+    async fn hoprd_session_connection_should_create_a_working_tcp_socket_through_which_data_can_be_sent_and_received()
+    -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
         let session_id = hopr_lib::HoprSessionId::new(4567, HoprPseudonym::random());
@@ -1120,8 +1120,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hoprd_session_connection_should_create_a_working_udp_socket_through_which_data_can_be_sent_and_received(
-    ) -> anyhow::Result<()> {
+    async fn hoprd_session_connection_should_create_a_working_udp_socket_through_which_data_can_be_sent_and_received()
+    -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
         let session_id = hopr_lib::HoprSessionId::new(4567, HoprPseudonym::random());

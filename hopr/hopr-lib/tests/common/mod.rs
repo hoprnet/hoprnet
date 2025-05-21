@@ -12,10 +12,10 @@ use hopr_chain_rpc::{
     transport::ReqwestClient,
 };
 use hopr_chain_types::{
+    ContractAddresses, ContractInstances,
     utils::{
         add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
     },
-    ContractAddresses, ContractInstances,
 };
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -161,7 +161,7 @@ pub async fn onboard_node(
         provider.clone(),
         safe,
         module,
-        chain_env.contract_instances.announcements.address().0 .0.into(),
+        chain_env.contract_instances.announcements.address().0.0.into(),
         &chain_env.contract_deployer,
     )
     .await
@@ -185,8 +185,8 @@ pub async fn onboard_node(
     approve_channel_transfer_from_safe(
         provider.clone(),
         safe,
-        chain_env.contract_instances.token.address().0 .0.into(),
-        chain_env.contract_instances.channels.address().0 .0.into(),
+        chain_env.contract_instances.token.address().0.0.into(),
+        chain_env.contract_instances.channels.address().0.0.into(),
         &chain_env.contract_deployer,
     )
     .await

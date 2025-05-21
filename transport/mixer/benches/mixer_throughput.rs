@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use futures::{future::BoxFuture, StreamExt};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use futures::{StreamExt, future::BoxFuture};
 use hopr_transport_mixer::{channel, config::MixerConfig};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 

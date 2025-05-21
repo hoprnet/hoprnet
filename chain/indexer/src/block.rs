@@ -1,23 +1,23 @@
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
+    atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
-use futures::{stream, FutureExt, StreamExt};
-use hopr_async_runtime::prelude::{spawn, JoinHandle};
+use futures::{FutureExt, StreamExt, stream};
+use hopr_async_runtime::prelude::{JoinHandle, spawn};
 use hopr_chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
-use hopr_db_sql::{info::HoprDbInfoOperations, HoprDbGeneralModelOperations};
+use hopr_db_sql::{HoprDbGeneralModelOperations, info::HoprDbInfoOperations};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_primitive_types::prelude::ToHex;
 use tracing::{debug, error, info, trace};
 
 use crate::{
+    IndexerConfig,
     errors::{CoreEthereumIndexerError, Result},
     traits::ChainLogHandler,
-    IndexerConfig,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -584,7 +584,7 @@ mod tests {
         sol_types::SolEvent,
     };
     use async_trait::async_trait;
-    use futures::{join, Stream};
+    use futures::{Stream, join};
     use hex_literal::hex;
     use hopr_chain_rpc::BlockWithLogs;
     use hopr_chain_types::chain_events::ChainEventType;
@@ -664,8 +664,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_none_if_none_is_found(
-    ) -> anyhow::Result<()> {
+    async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_none_if_none_is_found()
+    -> anyhow::Result<()> {
         let mut handlers = MockChainLogHandler::new();
         let mut rpc = MockHoprIndexerOps::new();
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;

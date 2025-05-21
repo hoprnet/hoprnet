@@ -13,11 +13,11 @@ use hopr_internal_types::prelude::*;
 use hopr_metrics::metrics::SimpleCounter;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use tracing::info;
 use validator::Validate;
 
-use crate::{errors::StrategyError::CriteriaNotSatisfied, strategy::SingularStrategy, Strategy};
+use crate::{Strategy, errors::StrategyError::CriteriaNotSatisfied, strategy::SingularStrategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -111,7 +111,7 @@ impl<A: ChannelActions + Send + Sync> SingularStrategy for AutoFundingStrategy<A
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
-    use futures::{future::ok, FutureExt};
+    use futures::{FutureExt, future::ok};
     use hex_literal::hex;
     use hopr_chain_actions::{
         action_queue::{ActionConfirmation, PendingAction},

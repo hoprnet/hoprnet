@@ -40,7 +40,7 @@ use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;
 use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_transport_protocol::PeerDiscovery;
-use libp2p::{autonat, swarm::NetworkBehaviour, StreamProtocol};
+use libp2p::{StreamProtocol, autonat, swarm::NetworkBehaviour};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 

@@ -11,7 +11,7 @@ use tracing::{debug, error};
 use crate::{
     errors,
     errors::CoreTypesError,
-    prelude::{generate_channel_id, CoreTypesError::InvalidInputData},
+    prelude::{CoreTypesError::InvalidInputData, generate_channel_id},
 };
 
 /// Size-optimized encoding of the ticket, used for both,
@@ -398,12 +398,12 @@ impl TicketBuilder {
             (Some(_), Some(_)) => {
                 return Err(InvalidInputData(
                     "either amount or balance must be set but not both".into(),
-                ))
+                ));
             }
             _ => {
                 return Err(InvalidInputData(
                     "tickets may not have more than 1% of total supply".into(),
-                ))
+                ));
             }
         };
 
@@ -1290,10 +1290,12 @@ pub mod tests {
             .challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
-        assert!(ticket
-            .leak()
-            .verify(&ALICE.public().to_address(), &Hash::default())
-            .is_ok());
+        assert!(
+            ticket
+                .leak()
+                .verify(&ALICE.public().to_address(), &Hash::default())
+                .is_ok()
+        );
         Ok(())
     }
 

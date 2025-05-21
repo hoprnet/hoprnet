@@ -11,7 +11,7 @@ use typenum::Unsigned;
 use crate::{
     derivation::derive_packet_tag,
     errors::SphinxError,
-    routing::{forward_header, ForwardedHeader, RoutingInfo, SphinxHeaderSpec},
+    routing::{ForwardedHeader, RoutingInfo, SphinxHeaderSpec, forward_header},
     shared_keys::{Alpha, GroupElement, SharedKeys, SharedSecret, SphinxSuite},
     surb::{ReplyOpener, SURB},
 };

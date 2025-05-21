@@ -18,8 +18,8 @@ use hopr_bindings::{
 };
 use hopr_chain_rpc::{BlockWithLogs, Log};
 use hopr_chain_types::{
-    chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent},
     ContractAddresses,
+    chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent},
 };
 use hopr_crypto_types::{
     keypairs::ChainKeypair,
@@ -27,10 +27,10 @@ use hopr_crypto_types::{
     types::OffchainSignature,
 };
 use hopr_db_sql::{
+    HoprDbAllOperations, OpenTransaction,
     api::{info::DomainSeparator, tickets::TicketSelector},
     errors::DbSqlError,
     prelude::TicketMarker,
-    HoprDbAllOperations, OpenTransaction,
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -166,7 +166,7 @@ where
                 let node_address: Address = revocation.node.into();
                 match self.db.delete_all_announcements(Some(tx), node_address).await {
                     Err(DbSqlError::MissingAccount) => {
-                        return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding)
+                        return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
                     }
                     Err(e) => return Err(e.into()),
                     _ => {}
@@ -919,7 +919,7 @@ where
 #[cfg(test)]
 mod tests {
     use std::{
-        sync::{atomic::Ordering, Arc},
+        sync::{Arc, atomic::Ordering},
         time::SystemTime,
     };
 
@@ -928,14 +928,15 @@ mod tests {
         primitives::{Address as AlloyAddress, U256},
         sol_types::{SolEvent, SolValue},
     };
-    use anyhow::{anyhow, Context};
+    use anyhow::{Context, anyhow};
     use hex_literal::hex;
     use hopr_chain_types::{
-        chain_events::{ChainEventType, NetworkRegistryStatus},
         ContractAddresses,
+        chain_events::{ChainEventType, NetworkRegistryStatus},
     };
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::{
+        HoprDbAllOperations, HoprDbGeneralModelOperations,
         accounts::{ChainOrPacketKey, HoprDbAccountOperations},
         api::{info::DomainSeparator, tickets::HoprDbTicketOperations},
         channels::HoprDbChannelOperations,
@@ -943,7 +944,6 @@ mod tests {
         info::HoprDbInfoOperations,
         prelude::HoprDbResolverOperations,
         registry::HoprDbRegistryOperations,
-        HoprDbAllOperations, HoprDbGeneralModelOperations,
     };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;

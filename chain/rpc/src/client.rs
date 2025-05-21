@@ -14,8 +14,8 @@ use std::{
     future::IntoFuture,
     io::{BufWriter, Write},
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::{Context, Poll},
     time::Duration,
@@ -27,18 +27,18 @@ use alloy::{
     network::{EthereumWallet, Network, TransactionBuilder},
     primitives::utils::parse_units,
     providers::{
+        Identity, Provider, RootProvider, SendableTx,
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller, TxFiller,
             WalletFiller,
         },
-        Identity, Provider, RootProvider, SendableTx,
     },
     rpc::json_rpc::{ErrorPayload, RequestPacket, ResponsePacket, ResponsePayload},
-    transports::{layers::RetryPolicy, HttpError, TransportError, TransportErrorKind, TransportFut, TransportResult},
+    transports::{HttpError, TransportError, TransportErrorKind, TransportFut, TransportResult, layers::RetryPolicy},
 };
 use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use tower::{Layer, Service};
 use tracing::{error, trace};
 use url::Url;
@@ -882,10 +882,10 @@ mod tests {
 
     use alloy::{
         network::TransactionBuilder,
-        primitives::{address, U256},
+        primitives::{U256, address},
         providers::{
-            fillers::{BlobGasFiller, CachedNonceManager, ChainIdFiller, GasFiller, NonceFiller},
             Provider, ProviderBuilder,
+            fillers::{BlobGasFiller, CachedNonceManager, ChainIdFiller, GasFiller, NonceFiller},
         },
         rpc::{client::ClientBuilder, types::TransactionRequest},
         signers::local::PrivateKeySigner,
@@ -893,7 +893,7 @@ mod tests {
     };
     use anyhow::Ok;
     use hopr_async_runtime::prelude::sleep;
-    use hopr_chain_types::{utils::create_anvil, ContractAddresses, ContractInstances};
+    use hopr_chain_types::{ContractAddresses, ContractInstances, utils::create_anvil};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
     use serde_json::json;

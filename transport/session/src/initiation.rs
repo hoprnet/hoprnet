@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use hopr_internal_types::prelude::ApplicationData;
 
-use crate::{errors::TransportSessionError, types::SessionTarget, Capability};
+use crate::{Capability, errors::TransportSessionError, types::SessionTarget};
 
 /// Challenge that identifies a Start initiation protocol message.
 pub type StartChallenge = u64;

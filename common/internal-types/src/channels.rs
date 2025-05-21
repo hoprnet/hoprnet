@@ -261,7 +261,7 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 
-    use crate::channels::{generate_channel_id, ChannelEntry, ChannelStatus};
+    use crate::channels::{ChannelEntry, ChannelStatus, generate_channel_id};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");

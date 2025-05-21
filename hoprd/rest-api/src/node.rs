@@ -5,15 +5,15 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, stream::FuturesUnordered};
 use hopr_crypto_types::prelude::Hash;
 use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{
-    checksum_address_serializer, option_checksum_address_serializer, ApiError, ApiErrorStatus, InternalState, BASE_PATH,
+    ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer, option_checksum_address_serializer,
 };
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]

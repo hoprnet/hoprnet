@@ -4,13 +4,13 @@ mod utils;
 
 use std::collections::HashSet;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{AsyncReadExt, AsyncWriteExt};
 use hopr_network_types::{
     prelude::state::{SessionConfig, SessionSocket},
     utils::DuplexIO,
 };
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use utils::{FaultyNetwork, FaultyNetworkConfig};
 
 /// This MTU is based on the current MTU size in HOPR 2.2

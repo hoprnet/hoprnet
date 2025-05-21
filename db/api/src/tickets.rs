@@ -2,7 +2,7 @@ use std::{
     collections::HashSet,
     fmt::{Display, Formatter},
     ops::{Bound, RangeBounds},
-    sync::{atomic::AtomicU64, Arc},
+    sync::{Arc, atomic::AtomicU64},
 };
 
 use async_trait::async_trait;

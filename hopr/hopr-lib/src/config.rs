@@ -2,10 +2,10 @@ use hopr_primitive_types::prelude::*;
 pub use hopr_strategy::StrategyConfig;
 use hopr_transport::config::SessionGlobalConfig;
 pub use hopr_transport::config::{
-    validate_external_host, HeartbeatConfig, HostConfig, HostType, NetworkConfig, ProtocolConfig, TransportConfig,
+    HeartbeatConfig, HostConfig, HostType, NetworkConfig, ProtocolConfig, TransportConfig, validate_external_host,
 };
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use validator::{Validate, ValidationError};
 
 pub const DEFAULT_SAFE_TRANSACTION_SERVICE_PROVIDER: &str = "https://safe-transaction.prod.hoprtech.net/";

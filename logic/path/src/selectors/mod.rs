@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 
-use crate::{channel_graph::ChannelEdge, errors::Result, ChannelPath};
+use crate::{ChannelPath, channel_graph::ChannelEdge, errors::Result};
 
 /// Computes weights of edges corresponding to [`ChannelEdge`].
 pub trait EdgeWeighting<W>

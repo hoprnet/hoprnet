@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
 };
 
-use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({

@@ -1,6 +1,6 @@
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_types::types::PACKET_TAG_LENGTH;
 use hopr_internal_types::prelude::TagBloomFilter;
 

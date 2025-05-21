@@ -285,7 +285,7 @@ mod tokio_utils {
                     match self.poll_fill_buf(cx, reader.as_mut()) {
                         Poll::Ready(Ok(())) => (),
                         Poll::Ready(Err(err)) => {
-                            return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, err)))
+                            return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, err)));
                         }
                         Poll::Pending => {
                             // Try flushing when the reader has no progress to avoid deadlock

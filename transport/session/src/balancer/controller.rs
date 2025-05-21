@@ -215,7 +215,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{atomic::AtomicU64, Arc};
+    use std::sync::{Arc, atomic::AtomicU64};
 
     use super::*;
     use crate::balancer::MockSurbFlowController;

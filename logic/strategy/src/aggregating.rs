@@ -33,7 +33,7 @@ use std::{
 
 use async_lock::RwLock;
 use async_trait::async_trait;
-use hopr_async_runtime::prelude::{spawn, JoinHandle};
+use hopr_async_runtime::prelude::{JoinHandle, spawn};
 use hopr_crypto_types::prelude::Hash;
 use hopr_db_sql::{
     api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
@@ -48,7 +48,7 @@ use serde_with::serde_as;
 use tracing::{debug, error, info, warn};
 use validator::Validate;
 
-use crate::{strategy::SingularStrategy, Strategy};
+use crate::{Strategy, strategy::SingularStrategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -303,17 +303,17 @@ mod tests {
     use std::{ops::Add, pin::pin, sync::Arc, time::Duration};
 
     use anyhow::Context;
-    use futures::{pin_mut, FutureExt, StreamExt};
+    use futures::{FutureExt, StreamExt, pin_mut};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::{
+        HoprDbGeneralModelOperations, TargetDb,
         accounts::HoprDbAccountOperations,
         api::{info::DomainSeparator, tickets::HoprDbTicketOperations},
         channels::HoprDbChannelOperations,
         db::HoprDb,
         errors::DbSqlError,
         info::HoprDbInfoOperations,
-        HoprDbGeneralModelOperations, TargetDb,
     };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
@@ -325,7 +325,7 @@ mod tests {
     use tracing::{debug, error};
 
     use crate::{
-        aggregating::{default_aggregation_threshold, MAX_AGGREGATABLE_TICKET_COUNT},
+        aggregating::{MAX_AGGREGATABLE_TICKET_COUNT, default_aggregation_threshold},
         strategy::SingularStrategy,
     };
 
@@ -618,8 +618,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_strategy_aggregation_on_tick_should_not_agg_when_unrealized_balance_exceeded_via_aggregated_tickets(
-    ) -> anyhow::Result<()> {
+    async fn test_strategy_aggregation_on_tick_should_not_agg_when_unrealized_balance_exceeded_via_aggregated_tickets()
+    -> anyhow::Result<()> {
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await?;
@@ -724,8 +724,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_strategy_aggregation_on_tick_should_not_agg_on_channel_close_if_only_single_ticket(
-    ) -> anyhow::Result<()> {
+    async fn test_strategy_aggregation_on_tick_should_not_agg_on_channel_close_if_only_single_ticket()
+    -> anyhow::Result<()> {
         // db_0: Alice (channel source)
         // db_1: Bob (channel destination)
         let db_alice = HoprDb::new_in_memory(PEERS_CHAIN[0].clone()).await?;

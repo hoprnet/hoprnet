@@ -25,6 +25,7 @@ use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info};
 
 use crate::{
+    ChainActions,
     action_queue::PendingAction,
     errors::{
         ChainActionsError::{
@@ -34,7 +35,6 @@ use crate::{
         Result,
     },
     redeem::TicketRedeemActions,
-    ChainActions,
 };
 
 /// Gathers all channel related on-chain actions.
@@ -235,8 +235,8 @@ mod tests {
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::{
-        api::info::DomainSeparator, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
-        HoprDbGeneralModelOperations,
+        HoprDbGeneralModelOperations, api::info::DomainSeparator, channels::HoprDbChannelOperations, db::HoprDb,
+        info::HoprDbInfoOperations,
     };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
@@ -244,11 +244,11 @@ mod tests {
     use mockall::Sequence;
 
     use crate::{
+        ChainActions,
         action_queue::{ActionQueue, MockTransactionExecutor},
         action_state::MockActionState,
         channels::ChannelActions,
         errors::ChainActionsError,
-        ChainActions,
     };
 
     lazy_static! {

@@ -3,7 +3,7 @@ use std::fmt::Formatter;
 use hopr_crypto_sphinx::prelude::SharedSecret;
 use hopr_crypto_types::{
     crypto_traits::Randomizable,
-    prelude::{sample_secp256k1_field_element, SecretKey},
+    prelude::{SecretKey, sample_secp256k1_field_element},
     types::{Challenge, HalfKey, HalfKeyChallenge, Response},
 };
 use hopr_primitive_types::prelude::*;

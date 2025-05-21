@@ -1,6 +1,6 @@
 use prometheus::{
-    core::Collector, Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter,
-    IntCounterVec, Opts, TextEncoder,
+    Gauge, GaugeVec, Histogram, HistogramOpts, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, Opts,
+    TextEncoder, core::Collector,
 };
 
 /// Gathers all the global Prometheus metrics.

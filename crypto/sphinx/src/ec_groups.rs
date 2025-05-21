@@ -1,6 +1,6 @@
 use curve25519_dalek::traits::IsIdentity;
 #[cfg(feature = "secp256k1")]
-use elliptic_curve::{ops::MulByGenerator, Group};
+use elliptic_curve::{Group, ops::MulByGenerator};
 use hopr_crypto_types::errors::Result;
 
 use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};

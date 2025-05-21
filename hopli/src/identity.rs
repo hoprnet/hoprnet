@@ -36,7 +36,7 @@
 //! ```
 use std::{collections::HashMap, str::FromStr};
 
-use clap::{builder::RangedU64ValueParser, Parser};
+use clap::{Parser, builder::RangedU64ValueParser};
 use hopr_crypto_types::{
     keypairs::Keypair,
     prelude::{OffchainPublicKey, PeerId},
@@ -47,8 +47,8 @@ use tracing::{debug, info};
 
 use crate::{
     key_pair::{
-        create_identity, read_identities, read_identity, update_identity_password, ArgEnvReader, IdentityFileArgs,
-        NewPasswordArgs,
+        ArgEnvReader, IdentityFileArgs, NewPasswordArgs, create_identity, read_identities, read_identity,
+        update_identity_password,
     },
     utils::{Cmd, HelperErrors, HelperErrors::UnableToParseAddress},
 };

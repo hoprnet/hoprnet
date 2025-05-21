@@ -17,7 +17,7 @@ pub use balancer::SurbBalancerConfig;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::state::{SessionFeature, SessionSocket};
 pub use hopr_network_types::types::*;
-pub use manager::{DispatchResult, SessionManager, SessionManagerConfig, MIN_BALANCER_SAMPLING_INTERVAL};
+pub use manager::{DispatchResult, MIN_BALANCER_SAMPLING_INTERVAL, SessionManager, SessionManagerConfig};
 #[cfg(feature = "runtime-tokio")]
 pub use types::transfer_session;
 pub use types::{IncomingSession, ServiceId, Session, SessionId, SessionTarget, USABLE_PAYLOAD_CAPACITY_FOR_SESSION};

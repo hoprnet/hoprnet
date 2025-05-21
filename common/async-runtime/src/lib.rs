@@ -1,12 +1,11 @@
 //! Executor API for HOPR which exposes the necessary async functions depending on the enabled
 //! runtime.
-//!
 #[cfg(feature = "runtime-async-std")]
 #[deprecated(note = "Use `runtime-tokio` feature, the `async-std` crate is deprecated")]
 pub mod prelude {
     pub use async_std::{
         future::timeout as timeout_fut,
-        task::{sleep, spawn, spawn_blocking, spawn_local, JoinHandle},
+        task::{JoinHandle, sleep, spawn, spawn_blocking, spawn_local},
     };
 
     pub async fn cancel_join_handle<T>(handle: JoinHandle<T>) {
@@ -19,7 +18,7 @@ pub mod prelude {
 #[cfg(feature = "runtime-tokio")]
 pub mod prelude {
     pub use tokio::{
-        task::{spawn, spawn_blocking, spawn_local, JoinHandle},
+        task::{JoinHandle, spawn, spawn_blocking, spawn_local},
         time::{sleep, timeout as timeout_fut},
     };
 

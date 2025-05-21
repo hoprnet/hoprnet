@@ -12,16 +12,16 @@ use std::pin::Pin;
 use alloy::{providers::Provider, rpc::types::Filter};
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::{stream::BoxStream, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream::BoxStream};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
 use tracing::{debug, error, trace, warn};
 
 use crate::{
+    BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter,
     errors::{Result, RpcError, RpcError::FilterIsEmpty},
     rpc::RpcOperations,
     transport::HttpRequestor,
-    BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -245,11 +245,11 @@ mod tests {
     use tracing::debug;
 
     use crate::{
+        BlockWithLogs, HoprIndexerRpcOperations, LogFilter,
         client::create_rpc_client_to_anvil,
         errors::RpcError,
         indexer::split_range,
         rpc::{RpcOperations, RpcOperationsConfig},
-        BlockWithLogs, HoprIndexerRpcOperations, LogFilter,
     };
 
     fn filter_bounds(filter: &Filter) -> anyhow::Result<(u64, u64)> {
@@ -481,8 +481,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel(
-    ) -> anyhow::Result<()> {
+    async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel()
+    -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);

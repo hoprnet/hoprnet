@@ -3,8 +3,8 @@ use std::{
     collections::BinaryHeap,
     future::poll_fn,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::Poll,
     time::Duration,

@@ -5,9 +5,9 @@ use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set};
 use sea_query::OnConflict;
 
 use crate::{
+    HoprDbGeneralModelOperations, OptTx,
     db::HoprDb,
     errors::{DbSqlError, Result},
-    HoprDbGeneralModelOperations, OptTx,
 };
 
 /// Defines DB access API for network registry operations.
@@ -15,7 +15,7 @@ use crate::{
 pub trait HoprDbRegistryOperations {
     /// Sets the given node as allowed or denied in network registry.
     async fn set_access_in_network_registry<'a>(&'a self, tx: OptTx<'a>, address: Address, allowed: bool)
-        -> Result<()>;
+    -> Result<()>;
 
     /// Returns `true` if the given node is allowed in network registry.
     async fn is_allowed_in_network_registry<'a, T>(&'a self, tx: OptTx<'a>, address_like: &T) -> Result<bool>

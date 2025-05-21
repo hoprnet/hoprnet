@@ -14,7 +14,7 @@ use hopr_internal_types::prelude::*;
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
 use hopr_parallelize::cpu::spawn_fifo_blocking;
-use hopr_path::{errors::PathError, Path, PathAddressResolver, ValidatedPath};
+use hopr_path::{Path, PathAddressResolver, ValidatedPath, errors::PathError};
 use hopr_primitive_types::prelude::*;
 use tracing::{instrument, trace, warn};
 

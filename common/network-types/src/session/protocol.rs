@@ -482,7 +482,7 @@ mod tests {
     use bitvec::{array::BitArray, bitarr};
     use hex_literal::hex;
     use hopr_platform::time::native::current_time;
-    use rand::{prelude::IteratorRandom, thread_rng, Rng};
+    use rand::{Rng, prelude::IteratorRandom, thread_rng};
 
     use super::*;
     use crate::session::Frame;

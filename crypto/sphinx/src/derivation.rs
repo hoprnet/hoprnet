@@ -88,9 +88,9 @@ pub(crate) fn generate_key_iv<T: crypto_traits::KeyIvInit, S: AsRef<[u8]>>(
 #[cfg(test)]
 mod tests {
     use elliptic_curve::{
+        ProjectivePoint, ScalarPrimitive,
         hash2curve::{ExpandMsgXmd, GroupDigest},
         sec1::ToEncodedPoint,
-        ProjectivePoint, ScalarPrimitive,
     };
     use hex_literal::hex;
     use hopr_crypto_types::{

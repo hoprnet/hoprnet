@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
+use hopr_lib::{Address, HostConfig, HostType, ProtocolsConfig, config::HoprLibConfig};
 use hopr_platform::file::native::read_to_string;
 use hoprd_api::config::{Api, Auth};
 use proc_macro_regex::regex;

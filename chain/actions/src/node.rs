@@ -20,12 +20,12 @@ use multiaddr::Multiaddr;
 use tracing::info;
 
 use crate::{
+    ChainActions,
     action_queue::PendingAction,
     errors::{
         ChainActionsError::{AlreadyAnnounced, InvalidArguments},
         Result,
     },
-    ChainActions,
 };
 
 /// Contains all on-chain calls specific to HOPR node itself.
@@ -107,11 +107,11 @@ mod tests {
     use multiaddr::Multiaddr;
 
     use crate::{
+        ChainActions,
         action_queue::{ActionQueue, MockTransactionExecutor},
         action_state::MockActionState,
         errors::ChainActionsError,
         node::NodeActions,
-        ChainActions,
     };
 
     lazy_static::lazy_static! {

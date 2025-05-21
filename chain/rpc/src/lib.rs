@@ -27,7 +27,7 @@ use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::{errors::Result, RetryAction::NoRetry};
+use crate::{RetryAction::NoRetry, errors::Result};
 
 pub mod client;
 pub mod errors;

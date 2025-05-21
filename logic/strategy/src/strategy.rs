@@ -35,8 +35,9 @@ use validator::Validate;
 use {hopr_metrics::metrics::MultiGauge, strum::VariantNames};
 
 use crate::{
-    aggregating::AggregatingStrategy, auto_funding::AutoFundingStrategy, auto_redeeming::AutoRedeemingStrategy,
-    channel_finalizer::ClosureFinalizerStrategy, errors::Result, promiscuous::PromiscuousStrategy, Strategy,
+    Strategy, aggregating::AggregatingStrategy, auto_funding::AutoFundingStrategy,
+    auto_redeeming::AutoRedeemingStrategy, channel_finalizer::ClosureFinalizerStrategy, errors::Result,
+    promiscuous::PromiscuousStrategy,
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]

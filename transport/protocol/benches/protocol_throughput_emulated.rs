@@ -1,7 +1,7 @@
 #[path = "../tests/common/mod.rs"]
 mod common;
-use common::{create_dbs, create_minimal_topology, random_packets_of_count, resolve_mock_path, PEERS, PEERS_CHAIN};
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use common::{PEERS, PEERS_CHAIN, create_dbs, create_minimal_topology, random_packets_of_count, resolve_mock_path};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::StreamExt;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;

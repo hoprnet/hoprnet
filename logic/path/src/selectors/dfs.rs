@@ -7,10 +7,10 @@ use hopr_primitive_types::prelude::*;
 use tracing::trace;
 
 use crate::{
+    ChannelPath,
     channel_graph::{ChannelEdge, ChannelGraph, Node},
     errors::{PathError, Result},
     selectors::{EdgeWeighting, PathSelector},
-    ChannelPath,
 };
 
 /// Holds a weighted channel path and auxiliary information for the graph traversal.
@@ -327,9 +327,9 @@ mod tests {
 
     use super::*;
     use crate::{
+        ChainPath, Path, ValidatedPath,
         channel_graph::NodeScoreUpdate,
         tests::{ADDRESSES, PATH_ADDRS},
-        ChainPath, Path, ValidatedPath,
     };
 
     fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: Balance) -> ChannelEntry {

@@ -1,4 +1,4 @@
-use futures::{future::Either, pin_mut, Sink, SinkExt};
+use futures::{Sink, SinkExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::sleep;
 use hopr_crypto_packet::errors::{PacketError, PacketError::TransportError, Result};
 use hopr_crypto_types::prelude::*;
@@ -300,11 +300,13 @@ mod tests {
             finalizer.finalize(Ok(()))
         });
 
-        assert!(result
-            .context("Awaiter must be present")?
-            .consume_and_wait(Duration::from_millis(10))
-            .await
-            .is_ok());
+        assert!(
+            result
+                .context("Awaiter must be present")?
+                .consume_and_wait(Duration::from_millis(10))
+                .await
+                .is_ok()
+        );
 
         Ok(())
     }

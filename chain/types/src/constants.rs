@@ -1,5 +1,5 @@
 use alloy::{
-    primitives::{address, Address, U256},
+    primitives::{Address, U256, address},
     uint,
 };
 use hex_literal::hex;

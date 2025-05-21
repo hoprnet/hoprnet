@@ -12,15 +12,15 @@ use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
 use sea_query::Expr;
 use sqlx::{
+    ConnectOptions, SqlitePool,
     pool::PoolOptions,
     sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
-    ConnectOptions, SqlitePool,
 };
 use tracing::{debug, log::LevelFilter};
 
 use crate::{
-    accounts::model_to_account_entry, cache::HoprDbCaches, errors::Result, ticket_manager::TicketManager,
-    HoprDbAllOperations,
+    HoprDbAllOperations, accounts::model_to_account_entry, cache::HoprDbCaches, errors::Result,
+    ticket_manager::TicketManager,
 };
 
 pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
@@ -255,9 +255,9 @@ mod tests {
     use libp2p_identity::PeerId;
     use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
     use multiaddr::Multiaddr;
-    use rand::{distributions::Alphanumeric, Rng};
+    use rand::{Rng, distributions::Alphanumeric};
 
-    use crate::{db::HoprDb, HoprDbGeneralModelOperations, TargetDb}; // 0.8
+    use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb}; // 0.8
 
     #[tokio::test]
     async fn test_basic_db_init() -> anyhow::Result<()> {

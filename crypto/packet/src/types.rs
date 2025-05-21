@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use hopr_crypto_sphinx::{
     errors::SphinxError,
-    prelude::{PaddedPayload, SphinxHeaderSpec, SphinxSuite, SURB},
+    prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
 };
 use hopr_crypto_types::prelude::Hash;
 use hopr_internal_types::prelude::HoprPseudonym;
@@ -181,9 +181,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        packet::HoprPacket,
-        por::{generate_proof_of_relay, SurbReceiverInfo},
         HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
+        packet::HoprPacket,
+        por::{SurbReceiverInfo, generate_proof_of_relay},
     };
 
     lazy_static::lazy_static! {

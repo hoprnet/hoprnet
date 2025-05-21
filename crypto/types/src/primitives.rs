@@ -11,7 +11,7 @@ use crate::{
 pub type Aes128Ctr = ctr::Ctr64BE<aes::Aes128>;
 
 // Re-exports of used cryptographic primitives
-pub use blake3::{hash as blake3_hash, Hasher as Blake3, OutputReader as Blake3Output};
+pub use blake3::{Hasher as Blake3, OutputReader as Blake3Output, hash as blake3_hash};
 pub use chacha20::ChaCha20;
 pub use poly1305::Poly1305;
 pub use sha3::{Keccak256, Sha3_256};

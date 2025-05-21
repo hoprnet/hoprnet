@@ -91,8 +91,8 @@ use std::{
     future::Future,
     pin::Pin,
     sync::{
-        atomic::{AtomicU32, Ordering},
         Arc,
+        atomic::{AtomicU32, Ordering},
     },
     task::{Context, Poll},
     time::{Duration, Instant},
@@ -100,10 +100,10 @@ use std::{
 
 use crossbeam_queue::ArrayQueue;
 use crossbeam_skiplist::SkipMap;
-use dashmap::{mapref::entry::Entry, DashMap};
+use dashmap::{DashMap, mapref::entry::Entry};
 use futures::{
-    channel::mpsc::UnboundedSender, future::BoxFuture, pin_mut, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
-    FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
+    AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
+    channel::mpsc::UnboundedSender, future::BoxFuture, pin_mut,
 };
 use governor::Quota;
 use hopr_async_runtime::prelude::spawn;
@@ -115,7 +115,7 @@ use crate::{
     prelude::protocol::SessionMessageIter,
     session::{
         errors::SessionError,
-        frame::{segment, FrameId, FrameReassembler, Segment, SegmentId},
+        frame::{FrameId, FrameReassembler, Segment, SegmentId, segment},
         protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
         utils::{RetryResult, RetryToken},
     },
@@ -598,8 +598,7 @@ impl<const C: usize> SessionState<C> {
 
         trace!(
             session_id = self.session_id,
-            count,
-            "AUTO-RETRANSMIT BATCH COMPLETE: re-sent segments",
+            count, "AUTO-RETRANSMIT BATCH COMPLETE: re-sent segments",
         );
 
         Ok(count)
@@ -646,9 +645,7 @@ impl<const C: usize> SessionState<C> {
 
         trace!(
             session_id = self.session_id,
-            frame_id,
-            count,
-            "FRAME SEND COMPLETE: sent segments",
+            frame_id, count, "FRAME SEND COMPLETE: sent segments",
         );
 
         Ok(())
@@ -1064,7 +1061,7 @@ mod tests {
     };
     use hex_literal::hex;
     use parameterized::parameterized;
-    use rand::{rngs::StdRng, Rng, SeedableRng};
+    use rand::{Rng, SeedableRng, rngs::StdRng};
     use test_log::test;
 
     use super::*;

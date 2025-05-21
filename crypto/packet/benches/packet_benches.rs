@@ -1,5 +1,5 @@
 use bimap::BiHashMap;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey};

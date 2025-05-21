@@ -7,7 +7,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{pin_mut, ready, FutureExt, Sink, SinkExt};
+use futures::{FutureExt, Sink, SinkExt, pin_mut, ready};
 use tokio::net::UdpSocket;
 use tracing::{debug, error, trace, warn};
 
@@ -338,7 +338,7 @@ impl UdpStreamBuilder {
                         Some(addr) if addr != socket_bound_addr => {
                             return Err(std::io::Error::other(format!(
                                 "inconsistent binding address {addr} != {socket_bound_addr} on socket id {sock_id}"
-                            )))
+                            )));
                         }
                         _ => {}
                     }

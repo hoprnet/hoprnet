@@ -14,7 +14,7 @@
 //! a log that matches [NodeSafeRegistered(`0x0123..ef`)](ChainEventType) event type.
 //! If such event is never encountered by the Indexer, the safe registration action naturally times out.
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     fmt::{Debug, Formatter},
     future::Future,
     pin::Pin,
@@ -23,7 +23,7 @@ use std::{
 
 use async_lock::RwLock;
 use async_trait::async_trait;
-use futures::{channel, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt, channel};
 use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use hopr_crypto_types::types::Hash;
 use tracing::{debug, error};

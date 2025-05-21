@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use bloomfilter::Bloom;
-use hopr_crypto_random::{random_bytes, Randomizable};
+use hopr_crypto_random::{Randomizable, random_bytes};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::warn;

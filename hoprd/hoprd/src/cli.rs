@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use clap::{builder::ValueParser, ArgAction, Parser};
-use hopr_lib::{looks_like_domain, HostConfig};
+use clap::{ArgAction, Parser, builder::ValueParser};
+use hopr_lib::{HostConfig, looks_like_domain};
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_API_HOST: &str = "localhost";

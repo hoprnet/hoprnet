@@ -1,6 +1,6 @@
 use std::sync::{Arc, OnceLock};
 
-use futures::{future::BoxFuture, pin_mut, Sink, SinkExt, StreamExt, TryStreamExt};
+use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::BoxFuture, pin_mut};
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::tickets::TicketSelector;
 use hopr_db_entity::ticket;
@@ -13,7 +13,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, Query
 use tracing::{debug, error};
 
 use crate::{
-    cache::HoprDbCaches, errors::Result, prelude::DbSqlError, tickets::WrappedTicketSelector, OpenTransaction,
+    OpenTransaction, cache::HoprDbCaches, errors::Result, prelude::DbSqlError, tickets::WrappedTicketSelector,
 };
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database

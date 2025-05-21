@@ -6,8 +6,8 @@ use futures_concurrency::stream::Merge;
 use hopr_transport_network::network::NetworkTriggeredEvent;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
-    swarm::{dial_opts::DialOpts, dummy::ConnectionHandler, CloseConnection, NetworkBehaviour, ToSwarm},
     Multiaddr, PeerId,
+    swarm::{CloseConnection, NetworkBehaviour, ToSwarm, dial_opts::DialOpts, dummy::ConnectionHandler},
 };
 use tracing::debug;
 

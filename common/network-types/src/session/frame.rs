@@ -45,15 +45,15 @@ use std::{
     ops::{Add, Sub},
     pin::Pin,
     sync::{
-        atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering},
         OnceLock,
+        atomic::{AtomicU8, AtomicU32, AtomicU64, Ordering},
     },
     task::{Context, Poll},
     time::{Duration, SystemTime},
 };
 
-use bitvec::{array::BitArray, bitarr, BitArr};
-use dashmap::{mapref::entry::Entry, DashMap};
+use bitvec::{BitArr, array::BitArray, bitarr};
+use dashmap::{DashMap, mapref::entry::Entry};
 use futures::{Sink, Stream};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
@@ -639,20 +639,21 @@ pub(crate) mod tests {
         collections::{HashSet, VecDeque},
         convert::identity,
         sync::{
-            atomic::{AtomicBool, Ordering},
             Arc,
+            atomic::{AtomicBool, Ordering},
         },
         time::Duration,
     };
 
     use async_stream::stream;
-    use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
+    use futures::{Stream, StreamExt, TryStreamExt, pin_mut};
     use hex_literal::hex;
     use lazy_static::lazy_static;
     use rand::{
+        Rng, SeedableRng,
         prelude::{Distribution, SliceRandom},
         seq::IteratorRandom,
-        thread_rng, Rng, SeedableRng,
+        thread_rng,
     };
     use rand_distr::Normal;
     use rayon::prelude::*;

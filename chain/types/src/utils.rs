@@ -4,12 +4,13 @@
 //! This used in unit and integration tests.
 use std::str::FromStr;
 
+use SafeContract::SafeContractInstance;
 use alloy::{
     contract::{Error as ContractError, Result as ContractResult},
     network::{ReceiptResponse, TransactionBuilder},
-    primitives::{self, address, aliases, keccak256, Bytes, U256},
+    primitives::{self, Bytes, U256, address, aliases, keccak256},
     rpc::types::TransactionRequest,
-    signers::{local::PrivateKeySigner, Signer},
+    signers::{Signer, local::PrivateKeySigner},
     sol,
     sol_types::{SolCall, SolValue},
 };
@@ -22,12 +23,10 @@ use hopr_bindings::{
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
 use tracing::debug;
-use SafeContract::SafeContractInstance;
 
 use crate::{
-    constants,
+    ContractInstances, constants,
     errors::{ChainTypesError, Result as ChainTypesResult},
-    ContractInstances,
 };
 
 // define basic safe abi

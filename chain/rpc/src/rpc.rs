@@ -4,14 +4,15 @@
 //! [RpcOperations] type, which is the main API exposed by this crate.
 use std::{sync::Arc, time::Duration};
 
+use SafeSingleton::SafeSingletonInstance;
 use alloy::{
     network::EthereumWallet,
     providers::{
+        CallItemBuilder, Identity, PendingTransaction, Provider, ProviderBuilder, RootProvider,
         fillers::{
             BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
-        CallItemBuilder, Identity, PendingTransaction, Provider, ProviderBuilder, RootProvider,
     },
     rpc::{
         client::RpcClient,
@@ -31,14 +32,13 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 use url::Url;
 use validator::Validate;
-use SafeSingleton::SafeSingletonInstance;
 
 // use crate::middleware::GnosisScan;
 use crate::{
+    HoprRpcOperations, NodeSafeModuleStatus,
     client::GasOracleFiller,
     errors::{Result, RpcError},
     transport::HttpRequestor,
-    HoprRpcOperations, NodeSafeModuleStatus,
 };
 
 // define basic safe abi
@@ -376,7 +376,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
             .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
             ._0
             .0
-             .0
+            .0
             .into());
 
         Ok(NodeSafeModuleStatus {
@@ -405,23 +405,23 @@ mod tests {
 
     use alloy::{
         network::{Ethereum, TransactionBuilder},
-        primitives::{address, U256},
+        primitives::{U256, address},
         providers::Provider,
         rpc::{client::ClientBuilder, types::TransactionRequest},
         transports::{http::ReqwestTransport, layers::RetryBackoffLayer},
     };
     use hex_literal::hex;
     use hopr_async_runtime::prelude::sleep;
-    use hopr_chain_types::{utils::create_native_transfer, ContractAddresses, ContractInstances, NetworkRegistryProxy};
+    use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy, utils::create_native_transfer};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::*;
     use primitive_types::H160;
 
     use crate::{
-        client::{create_rpc_client_to_anvil, AnvilRpcClient},
+        HoprRpcOperations, PendingTransaction,
+        client::{AnvilRpcClient, create_rpc_client_to_anvil},
         errors::Result,
         rpc::{RpcOperations, RpcOperationsConfig},
-        HoprRpcOperations, PendingTransaction,
     };
 
     lazy_static::lazy_static! {

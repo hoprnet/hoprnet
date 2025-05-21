@@ -1,12 +1,12 @@
 use std::{
-    sync::{atomic::AtomicU64, Arc, Mutex},
+    sync::{Arc, Mutex, atomic::AtomicU64},
     time::Duration,
 };
 
 use dashmap::{DashMap, Entry};
 use hopr_crypto_packet::{
-    prelude::{HoprSenderId, HoprSurbId},
     HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener,
+    prelude::{HoprSenderId, HoprSurbId},
 };
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::{
@@ -15,7 +15,7 @@ use hopr_db_api::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::{Address, Balance, KeyIdent, U256};
-use moka::{future::Cache, Expiry};
+use moka::{Expiry, future::Cache};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 use crate::errors::DbSqlError;

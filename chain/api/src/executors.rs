@@ -2,10 +2,10 @@ use std::{marker::PhantomData, time::Duration};
 
 use alloy::{providers::PendingTransaction, rpc::types::TransactionRequest};
 use async_trait::async_trait;
-use futures::{future::Either, pin_mut, FutureExt};
+use futures::{FutureExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::sleep;
 use hopr_chain_actions::{action_queue::TransactionExecutor, payload::PayloadGenerator};
-use hopr_chain_rpc::{errors::RpcError, HoprRpcOperations};
+use hopr_chain_rpc::{HoprRpcOperations, errors::RpcError};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;

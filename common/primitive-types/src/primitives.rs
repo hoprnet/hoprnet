@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-use chrono::{serde::ts_seconds_option, DateTime, Utc};
+use chrono::{DateTime, Utc, serde::ts_seconds_option};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha3::Digest;
@@ -134,7 +134,7 @@ impl FromStr for Address {
 
 impl From<alloy::primitives::Address> for Address {
     fn from(a: alloy::primitives::Address) -> Self {
-        Address::from(a.0 .0)
+        Address::from(a.0.0)
     }
 }
 impl From<Address> for alloy::primitives::Address {

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
 use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelude::Channel};
 use hopr_internal_types::prelude::*;
@@ -7,10 +7,10 @@ use hopr_primitive_types::prelude::*;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 
 use crate::{
+    HoprDbGeneralModelOperations, OptTx,
     cache::ChannelParties,
     db::HoprDb,
     errors::{DbSqlError, Result},
-    HoprDbGeneralModelOperations, OptTx,
 };
 
 /// API for editing [ChannelEntry] in the DB.
@@ -356,7 +356,7 @@ mod tests {
     };
     use hopr_primitive_types::prelude::{Address, BalanceType};
 
-    use crate::{channels::HoprDbChannelOperations, db::HoprDb, HoprDbGeneralModelOperations};
+    use crate::{HoprDbGeneralModelOperations, channels::HoprDbChannelOperations, db::HoprDb};
 
     #[tokio::test]
     async fn test_insert_get_by_id() -> anyhow::Result<()> {

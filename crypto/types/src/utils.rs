@@ -1,12 +1,12 @@
 use cipher::zeroize;
 use generic_array::{ArrayLength, GenericArray};
-use hopr_crypto_random::{random_array, Randomizable};
+use hopr_crypto_random::{Randomizable, random_array};
 use k256::{
-    elliptic_curve::{
-        hash2curve::{ExpandMsgXmd, GroupDigest},
-        Group, PrimeField,
-    },
     Secp256k1,
+    elliptic_curve::{
+        Group, PrimeField,
+        hash2curve::{ExpandMsgXmd, GroupDigest},
+    },
 };
 use sha3::Sha3_256;
 use subtle::{Choice, ConstantTimeEq};

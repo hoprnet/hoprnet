@@ -4,8 +4,8 @@ use std::{
     str::FromStr,
 };
 
-use hickory_resolver::{name_server::ConnectionProvider, AsyncResolver};
-use hopr_crypto_packet::{prelude::HoprSenderId, HoprSurb};
+use hickory_resolver::{AsyncResolver, name_server::ConnectionProvider};
+use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_path::ValidatedPath;

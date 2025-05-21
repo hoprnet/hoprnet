@@ -7,15 +7,17 @@
 //! [MultisendTransaction] struct is used for building transactions interacting with Multisend contract
 use std::{ops::Add, str::FromStr, sync::Arc};
 
+use IMulticall3Extract::IMulticall3ExtractInstance;
+use SafeSingleton::{SafeSingletonInstance, execTransactionCall, removeOwnerCall, setupCall};
 use alloy::{
     network::TransactionBuilder,
-    primitives::{keccak256, utils::format_units, Address, Bytes, B256, U256},
+    primitives::{Address, B256, Bytes, U256, keccak256, utils::format_units},
     providers::{
-        bindings::IMulticall3::{aggregate3Call, aggregate3ValueCall, Call3, Call3Value},
-        CallInfoTrait, CallItem, MulticallBuilder, MulticallError, Provider, WalletProvider, MULTICALL3_ADDRESS,
+        CallInfoTrait, CallItem, MULTICALL3_ADDRESS, MulticallBuilder, MulticallError, Provider, WalletProvider,
+        bindings::IMulticall3::{Call3, Call3Value, aggregate3Call, aggregate3ValueCall},
     },
     rpc::types::TransactionRequest,
-    signers::{local::PrivateKeySigner, Signer},
+    signers::{Signer, local::PrivateKeySigner},
     sol,
     sol_types::{SolCall, SolValue},
 };
@@ -23,22 +25,20 @@ use hex_literal::hex;
 use hopr_bindings::{
     hoprnetworkregistry::HoprNetworkRegistry::HoprNetworkRegistryInstance,
     hoprnodemanagementmodule::HoprNodeManagementModule::{
-        addChannelsAndTokenTargetCall, includeNodeCall, removeNodeCall, scopeTargetTokenCall,
-        HoprNodeManagementModuleInstance,
+        HoprNodeManagementModuleInstance, addChannelsAndTokenTargetCall, includeNodeCall, removeNodeCall,
+        scopeTargetTokenCall,
     },
-    hoprnodesaferegistry::HoprNodeSafeRegistry::{deregisterNodeBySafeCall, HoprNodeSafeRegistryInstance},
-    hoprnodestakefactory::HoprNodeStakeFactory::{cloneCall, HoprNodeStakeFactoryInstance},
-    hoprtoken::HoprToken::{approveCall, HoprTokenInstance},
+    hoprnodesaferegistry::HoprNodeSafeRegistry::{HoprNodeSafeRegistryInstance, deregisterNodeBySafeCall},
+    hoprnodestakefactory::HoprNodeStakeFactory::{HoprNodeStakeFactoryInstance, cloneCall},
+    hoprtoken::HoprToken::{HoprTokenInstance, approveCall},
 };
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use tracing::{debug, info};
-use IMulticall3Extract::IMulticall3ExtractInstance;
-use SafeSingleton::{execTransactionCall, removeOwnerCall, setupCall, SafeSingletonInstance};
 
 use crate::utils::{
-    get_create2_address, HelperErrors, DEFAULT_ANNOUNCEMENT_PERMISSIONS, DEFAULT_CAPABILITY_PERMISSIONS,
-    DEFAULT_NODE_PERMISSIONS, DOMAIN_SEPARATOR_TYPEHASH, SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS,
-    SAFE_MULTISEND_ADDRESS, SAFE_SAFEPROXYFACTORY_ADDRESS, SAFE_SAFE_ADDRESS, SAFE_TX_TYPEHASH, SENTINEL_OWNERS,
+    DEFAULT_ANNOUNCEMENT_PERMISSIONS, DEFAULT_CAPABILITY_PERMISSIONS, DEFAULT_NODE_PERMISSIONS,
+    DOMAIN_SEPARATOR_TYPEHASH, HelperErrors, SAFE_COMPATIBILITYFALLBACKHANDLER_ADDRESS, SAFE_MULTISEND_ADDRESS,
+    SAFE_SAFE_ADDRESS, SAFE_SAFEPROXYFACTORY_ADDRESS, SAFE_TX_TYPEHASH, SENTINEL_OWNERS, get_create2_address,
 };
 
 sol!(
@@ -1995,7 +1995,7 @@ mod tests {
         let is_owner = safe.getOwners().call().await?._0;
         assert_eq!(is_owner.len(), 1, "safe has too many owners");
         assert_eq!(
-            is_owner[0].0 .0,
+            is_owner[0].0.0,
             contract_deployer.public().to_address().as_ref(),
             "safe wrong owner"
         );

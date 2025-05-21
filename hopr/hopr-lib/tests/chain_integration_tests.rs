@@ -3,23 +3,23 @@ mod common;
 use std::time::Duration;
 
 use alloy::primitives::{B256, U256};
-use futures::{pin_mut, StreamExt};
+use futures::{StreamExt, pin_mut};
 use hex_literal::hex;
-use hopr_async_runtime::prelude::{cancel_join_handle, sleep, spawn, JoinHandle};
+use hopr_async_runtime::prelude::{JoinHandle, cancel_join_handle, sleep, spawn};
 use hopr_chain_actions::{
+    ChainActions,
     action_queue::{ActionQueue, ActionQueueConfig},
     action_state::{ActionState, IndexerActionTracker},
     channels::ChannelActions,
     node::NodeActions,
     payload::SafePayloadGenerator,
     redeem::TicketRedeemActions,
-    ChainActions,
 };
 use hopr_chain_api::{
-    executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig},
     DefaultHttpRequestor,
+    executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig},
 };
-use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
+use hopr_chain_indexer::{IndexerConfig, block::Indexer, handlers::ContractEventHandlers};
 use hopr_chain_rpc::{
     client::SnapshotRequestor,
     rpc::{RpcOperations, RpcOperationsConfig},
@@ -33,7 +33,7 @@ use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use tracing::info;
 
 use crate::common::{
-    create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node, NodeSafeConfig, TestChainEnv,
+    NodeSafeConfig, TestChainEnv, create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node,
 };
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%

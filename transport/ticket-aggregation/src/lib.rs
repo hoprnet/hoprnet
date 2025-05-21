@@ -3,9 +3,9 @@ use std::{pin::Pin, task::Poll};
 use futures::{
     channel::{
         mpsc,
-        mpsc::{channel, Receiver, Sender, UnboundedSender},
+        mpsc::{Receiver, Sender, UnboundedSender, channel},
     },
-    future::{poll_fn, Either},
+    future::{Either, poll_fn},
     pin_mut,
     stream::{Stream, StreamExt},
 };
@@ -433,12 +433,12 @@ mod tests {
         types::{Hash, Response},
     };
     use hopr_db_sql::{
+        HoprDbGeneralModelOperations,
         accounts::HoprDbAccountOperations,
         api::{info::DomainSeparator, tickets::HoprDbTicketOperations},
         channels::HoprDbChannelOperations,
         db::HoprDb,
         info::HoprDbInfoOperations,
-        HoprDbGeneralModelOperations,
     };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;

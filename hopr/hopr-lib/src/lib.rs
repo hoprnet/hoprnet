@@ -25,17 +25,17 @@ use std::{
     fmt::{Display, Formatter},
     ops::Deref,
     path::PathBuf,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
     time::Duration,
 };
 
 use async_lock::RwLock;
 use errors::{HoprLibError, HoprStatusError};
 use futures::{
-    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     Stream, StreamExt,
+    channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded},
 };
-use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
 pub use hopr_chain_actions::errors::ChainActionsError;
 use hopr_chain_actions::{
     action_state::{ActionState, IndexerActionTracker},
@@ -47,14 +47,15 @@ pub use hopr_chain_api::config::{
     Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
 };
 use hopr_chain_api::{
-    can_register_with_safe, config::ChainNetworkConfig, errors::HoprChainError, wait_for_funds, HoprChain,
-    HoprChainProcess, SignificantChainEvent,
+    HoprChain, HoprChainProcess, SignificantChainEvent, can_register_with_safe, config::ChainNetworkConfig,
+    errors::HoprChainError, wait_for_funds,
 };
 use hopr_chain_rpc::HoprRpcOperations;
-use hopr_chain_types::{chain_events::ChainEventType, ContractAddresses};
+use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{
+    HoprDbAllOperations, HoprDbGeneralModelOperations,
     accounts::HoprDbAccountOperations,
     api::{info::SafeInfo, resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations},
     channels::HoprDbChannelOperations,
@@ -62,7 +63,6 @@ use hopr_db_sql::{
     info::{HoprDbInfoOperations, IndexerStateInfo},
     prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
     registry::HoprDbRegistryOperations,
-    HoprDbAllOperations, HoprDbGeneralModelOperations,
 };
 pub use hopr_internal_types::prelude::*;
 pub use hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions};
@@ -70,22 +70,22 @@ pub use hopr_path::channel_graph::GraphExportConfig;
 use hopr_path::channel_graph::{ChannelGraph, ChannelGraphConfig, NodeScoreUpdate};
 use hopr_platform::file::native::{join, remove_dir_all};
 pub use hopr_primitive_types::prelude::*;
-use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 pub use hopr_strategy::Strategy;
+use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
+use hopr_transport::{
+    ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession, OffchainKeypair,
+    PeerDiscovery, PeerStatus, execute_on_tick,
+};
 pub use hopr_transport::{
-    config::{looks_like_domain, HostConfig, HostType},
+    HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
+    OffchainKeypair as HoprOffchainKeypair, PeerId, SESSION_PAYLOAD_SIZE, SendMsg, ServiceId, Session as HoprSession,
+    SessionCapability, SessionClientConfig, SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig,
+    TicketStatistics, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
+    config::{HostConfig, HostType, looks_like_domain},
     constants::RESERVED_TAG_UPPER_LIMIT,
     errors::{HoprTransportError, NetworkingError, ProtocolError},
-    HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-    OffchainKeypair as HoprOffchainKeypair, PeerId, SendMsg, ServiceId, Session as HoprSession, SessionCapability,
-    SessionClientConfig, SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig, TicketStatistics,
-    SESSION_PAYLOAD_SIZE, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
-};
-use hopr_transport::{
-    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession,
-    OffchainKeypair, PeerDiscovery, PeerStatus,
 };
 use tracing::{debug, error, info, trace, warn};
 #[cfg(all(feature = "prometheus", not(test)))]

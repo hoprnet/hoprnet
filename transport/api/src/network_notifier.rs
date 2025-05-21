@@ -6,9 +6,9 @@ use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 use hopr_path::channel_graph::ChannelGraph;
 use hopr_transport_network::{
+    HoprDbPeersOperations, PeerId,
     network::{Network, NetworkTriggeredEvent},
     ping::PingExternalAPI,
-    HoprDbPeersOperations, PeerId,
 };
 use tracing::{debug, error};
 

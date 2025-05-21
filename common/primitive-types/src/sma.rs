@@ -221,7 +221,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::sma::{NoSumSMA, SingleSumSMA, SMA};
+    use crate::sma::{NoSumSMA, SMA, SingleSumSMA};
 
     fn test_sma<T: SMA<u32>>(mut sma: T, window_size: usize) {
         assert_eq!(window_size, sma.window_size(), "invalid windows size");

@@ -1,8 +1,9 @@
 use std::time::Duration;
 
 use futures::{
-    future::{select, Either},
-    pin_mut, FutureExt,
+    FutureExt,
+    future::{Either, select},
+    pin_mut,
 };
 use hopr_async_runtime::prelude::sleep;
 use hopr_platform::time::native::current_time;

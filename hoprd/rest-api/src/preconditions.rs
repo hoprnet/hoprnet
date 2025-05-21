@@ -3,16 +3,16 @@ use std::{str::FromStr, sync::atomic::Ordering::Relaxed};
 use axum::{
     extract::{OriginalUri, Request, State},
     http::{
-        header::{HeaderName, AUTHORIZATION},
-        status::StatusCode,
         HeaderMap,
+        header::{AUTHORIZATION, HeaderName},
+        status::StatusCode,
     },
     middleware::Next,
     response::IntoResponse,
 };
 use urlencoding::decode;
 
-use crate::{ApiErrorStatus, Auth, InternalState, BASE_PATH};
+use crate::{ApiErrorStatus, Auth, BASE_PATH, InternalState};
 
 fn is_a_websocket_uri(uri: &OriginalUri) -> bool {
     const SESSION_PATH: &str = const_format::formatcp!("{BASE_PATH}/session/websocket");

@@ -7,13 +7,13 @@ use hopr_path::{NonEmptyPath, TransportPath};
 use hopr_primitive_types::prelude::*;
 
 use crate::{
+    HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
     errors::{
         PacketError::{PacketConstructionError, PacketDecodingError},
         Result,
     },
-    por::{derive_ack_key_share, generate_proof_of_relay, pre_verify, SurbReceiverInfo},
+    por::{SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay, pre_verify},
     types::{HoprPacketMessage, HoprSenderId, HoprSurbId},
-    HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
 };
 
 /// Represents an outgoing packet that has been only partially instantiated.
@@ -423,7 +423,7 @@ impl HoprPacket {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::{bail, Context};
+    use anyhow::{Context, bail};
     use bimap::BiHashMap;
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;

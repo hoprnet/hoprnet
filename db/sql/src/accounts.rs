@@ -12,15 +12,15 @@ use hopr_primitive_types::{
 };
 use multiaddr::Multiaddr;
 use sea_orm::{
-    sea_query::Expr, ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
-    QueryOrder, Related, Set,
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
+    Set, sea_query::Expr,
 };
 use sea_query::{Condition, IntoCondition, OnConflict};
 
 use crate::{
+    HoprDbGeneralModelOperations, OptTx,
     db::HoprDb,
     errors::{DbSqlError, DbSqlError::MissingAccount, Result},
-    HoprDbGeneralModelOperations, OptTx,
 };
 
 /// A type that can represent both [chain public key](Address) and [packet public key](OffchainPublicKey).
@@ -457,8 +457,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        errors::{DbSqlError, DbSqlError::DecodingError},
         HoprDbGeneralModelOperations,
+        errors::{DbSqlError, DbSqlError::DecodingError},
     };
 
     #[tokio::test]

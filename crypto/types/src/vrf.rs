@@ -1,12 +1,12 @@
 use hopr_crypto_random::random_bytes;
 use hopr_primitive_types::prelude::*;
 use k256::{
+    Scalar, Secp256k1,
     elliptic_curve::{
+        ProjectivePoint,
         hash2curve::{ExpandMsgXmd, GroupDigest},
         sec1::ToEncodedPoint,
-        ProjectivePoint,
     },
-    Scalar, Secp256k1,
 };
 
 use crate::{
@@ -265,9 +265,11 @@ mod tests {
 
         // check for regressions
         assert_eq!(vrf_values.V, deserialized.V);
-        assert!(deserialized
-            .verify(&*ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
-            .is_ok());
+        assert!(
+            deserialized
+                .verify(&*ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
+                .is_ok()
+        );
 
         // PartialEq is intentionally not implemented for VrfParameters
         let vrf: [u8; VrfParameters::SIZE] = vrf_values.clone().into();
@@ -290,9 +292,11 @@ mod tests {
     fn vrf_values_crypto() -> anyhow::Result<()> {
         let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref())?;
 
-        assert!(vrf_values
-            .verify(&ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
-            .is_ok());
+        assert!(
+            vrf_values
+                .verify(&ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
+                .is_ok()
+        );
 
         Ok(())
     }

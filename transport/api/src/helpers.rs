@@ -1,17 +1,17 @@
 use std::sync::{Arc, OnceLock};
 
 use async_lock::RwLock;
-use futures::{channel::mpsc::Sender, stream::FuturesUnordered, TryStreamExt};
+use futures::{TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_types::crypto_traits::Randomizable;
-use hopr_db_sql::{api::prelude::DbError, HoprDbAllOperations};
+use hopr_db_sql::{HoprDbAllOperations, api::prelude::DbError};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::{
     prelude::{ResolvedTransportRouting, RoutingOptions},
     types::DestinationRouting,
 };
-use hopr_path::{selectors::PathSelector, ChainPath, PathAddressResolver, ValidatedPath};
+use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, selectors::PathSelector};
 use hopr_primitive_types::primitives::Address;
 use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use hopr_transport_session::{

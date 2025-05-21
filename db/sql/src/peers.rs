@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::{stream::BoxStream, TryStreamExt};
+use futures::{TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::{
     errors::Result,

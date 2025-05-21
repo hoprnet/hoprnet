@@ -17,11 +17,11 @@ use hopr_internal_types::{
 use hopr_metrics::metrics::SimpleCounter;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use tracing::{debug, error, info};
 use validator::Validate;
 
-use crate::{errors::StrategyError::CriteriaNotSatisfied, strategy::SingularStrategy, Strategy};
+use crate::{Strategy, errors::StrategyError::CriteriaNotSatisfied, strategy::SingularStrategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -187,21 +187,21 @@ mod tests {
     };
 
     use async_trait::async_trait;
-    use futures::{future::ok, FutureExt};
+    use futures::{FutureExt, future::ok};
     use hex_literal::hex;
     use hopr_chain_actions::{
         action_queue::{ActionConfirmation, PendingAction},
         redeem::TicketRedeemActions,
     };
     use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
-    use hopr_crypto_random::{random_bytes, Randomizable};
+    use hopr_crypto_random::{Randomizable, random_bytes};
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::{
+        HoprDbGeneralModelOperations, TargetDb,
         api::{info::DomainSeparator, tickets::TicketSelector},
         channels::HoprDbChannelOperations,
         db::HoprDb,
         info::HoprDbInfoOperations,
-        HoprDbGeneralModelOperations, TargetDb,
     };
     use mockall::mock;
 
