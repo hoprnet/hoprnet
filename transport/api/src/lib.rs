@@ -24,31 +24,44 @@ pub mod network_notifier;
 /// Objects used and possibly exported by the crate for re-use for transport functionality
 pub mod proxy;
 
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
+
 use async_lock::RwLock;
+use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
     channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
     future::{select, Either},
     pin_mut, FutureExt, SinkExt, StreamExt,
 };
-use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
-use hopr_transport_mixer::MixerConfig;
-use std::{
-    collections::HashMap,
-    sync::{Arc, OnceLock},
-};
-use std::{collections::HashSet, time::Duration};
-use tracing::{debug, error, info, trace, warn};
-
 use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use hopr_crypto_packet::prelude::HoprPacket;
+pub use hopr_crypto_types::{
+    keypairs::{ChainKeypair, Keypair, OffchainKeypair},
+    types::{HalfKeyChallenge, Hash, OffchainPublicKey},
+};
 use hopr_db_sql::{
     accounts::ChainOrPacketKey,
     api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
     HoprDbAllOperations,
 };
+pub use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_internal_types::prelude::*;
-use hopr_path::PathAddressResolver;
+pub use hopr_network_types::prelude::RoutingOptions;
+use hopr_network_types::prelude::{DestinationRouting, ResolvedTransportRouting};
+use hopr_path::{
+    selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
+    PathAddressResolver,
+};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
+use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
+pub use hopr_transport_identity::{Multiaddr, PeerId};
+use hopr_transport_mixer::MixerConfig;
+pub use hopr_transport_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus};
 use hopr_transport_network::{
     heartbeat::Heartbeat,
     ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
@@ -61,24 +74,23 @@ use hopr_transport_protocol::{
     errors::ProtocolError,
     processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer, SendMsgInput},
 };
+pub use hopr_transport_protocol::{execute_on_tick, PeerDiscovery};
+#[cfg(feature = "runtime-tokio")]
+pub use hopr_transport_session::transfer_session;
+pub use hopr_transport_session::{
+    errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, ServiceId,
+    Session, SessionClientConfig, SessionId, SessionTarget, SurbBalancerConfig, SESSION_PAYLOAD_SIZE,
+    USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
+};
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use hopr_transport_ticket_aggregation::{
     AwaitingAggregator, TicketAggregationActions, TicketAggregationError, TicketAggregationInteraction,
     TicketAggregatorTrait,
 };
 use rand::seq::SliceRandom;
-
-use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
-
 #[cfg(feature = "mixer-stream")]
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-
-use crate::helpers::PathPlanner;
-
-use hopr_path::selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting};
-
-#[cfg(feature = "runtime-tokio")]
-pub use hopr_transport_session::transfer_session;
+use tracing::{debug, error, info, trace, warn};
 
 pub use crate::{
     config::HoprTransportConfig,
@@ -89,24 +101,7 @@ use crate::{
         RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT, SESSION_INITIATION_TIMEOUT_BASE,
     },
     errors::HoprTransportError,
-};
-use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_network_types::prelude::{DestinationRouting, ResolvedTransportRouting};
-pub use {
-    hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair, OffchainKeypair},
-        types::{HalfKeyChallenge, Hash, OffchainPublicKey},
-    },
-    hopr_internal_types::prelude::HoprPseudonym,
-    hopr_network_types::prelude::RoutingOptions,
-    hopr_transport_identity::{Multiaddr, PeerId},
-    hopr_transport_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus},
-    hopr_transport_protocol::{execute_on_tick, PeerDiscovery},
-    hopr_transport_session::{
-        errors::TransportSessionError, traits::SendMsg, Capability as SessionCapability, IncomingSession, Session,
-        SessionClientConfig, SessionId, SurbBalancerConfig, SESSION_PAYLOAD_SIZE, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
-    },
-    hopr_transport_session::{ServiceId, SessionTarget},
+    helpers::PathPlanner,
 };
 
 #[cfg(any(
@@ -262,10 +257,10 @@ where
 
     /// Execute all processes of the [`crate::HoprTransport`] object.
     ///
-    /// This method will spawn the [`crate::HoprTransportProcess::Heartbeat`], [`crate::HoprTransportProcess::BloomFilterSave`],
-    /// [`crate::HoprTransportProcess::Swarm`] and session-related processes and return
-    /// join handles to the calling function. These processes are not started immediately but are
-    /// waiting for a trigger from this piece of code.
+    /// This method will spawn the [`crate::HoprTransportProcess::Heartbeat`],
+    /// [`crate::HoprTransportProcess::BloomFilterSave`], [`crate::HoprTransportProcess::Swarm`] and session-related
+    /// processes and return join handles to the calling function. These processes are not started immediately but
+    /// are waiting for a trigger from this piece of code.
     #[allow(clippy::too_many_arguments)]
     pub async fn run(
         &self,

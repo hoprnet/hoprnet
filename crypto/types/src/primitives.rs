@@ -1,9 +1,11 @@
-use std::fmt::Formatter;
-use std::marker::PhantomData;
+use std::{fmt::Formatter, marker::PhantomData};
+
 use typenum::Unsigned;
 
-use crate::crypto_traits::{Iv, IvSizeUser, Key, KeyIvInit, KeySizeUser};
-use crate::utils::SecretValue;
+use crate::{
+    crypto_traits::{Iv, IvSizeUser, Key, KeyIvInit, KeySizeUser},
+    utils::SecretValue,
+};
 
 /// AES with 128-bit key in counter-mode (with big-endian counter).
 pub type Aes128Ctr = ctr::Ctr64BE<aes::Aes128>;
@@ -12,8 +14,7 @@ pub type Aes128Ctr = ctr::Ctr64BE<aes::Aes128>;
 pub use blake3::{hash as blake3_hash, Hasher as Blake3, OutputReader as Blake3Output};
 pub use chacha20::ChaCha20;
 pub use poly1305::Poly1305;
-pub use sha3::Keccak256;
-pub use sha3::Sha3_256;
+pub use sha3::{Keccak256, Sha3_256};
 
 /// Represents a 256-bit secret key of fixed length.
 /// The value is auto-zeroized on drop.

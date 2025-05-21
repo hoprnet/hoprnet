@@ -1,16 +1,16 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{Json, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-use std::sync::Arc;
-
 use hopr_lib::{
     errors::{HoprLibError, HoprStatusError},
     Address, Balance, BalanceType, U256,
 };
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 
 use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
@@ -141,8 +141,8 @@ where
 
 // #[deprecated(
 //     since = "3.2.0",
-//     note = "The `BalanceType` enum deserialization using all capitals is deprecated and will be removed in hoprd v3.0 REST API"
-// )]
+//     note = "The `BalanceType` enum deserialization using all capitals is deprecated and will be removed in hoprd v3.0
+// REST API" )]
 fn deserialize_balance_type<'de, D>(deserializer: D) -> Result<BalanceType, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -229,7 +229,7 @@ pub(super) async fn withdraw(
             }),
         )
             .into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
 

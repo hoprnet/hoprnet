@@ -1,12 +1,12 @@
-use std::collections::HashSet;
-use std::fmt::{Display, Formatter};
-use std::ops::{Bound, RangeBounds};
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
+use std::{
+    collections::HashSet,
+    fmt::{Display, Formatter},
+    ops::{Bound, RangeBounds},
+    sync::{atomic::AtomicU64, Arc},
+};
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
-
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;

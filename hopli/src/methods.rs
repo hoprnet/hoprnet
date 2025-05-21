@@ -1,9 +1,12 @@
 #![allow(clippy::too_many_arguments)]
-//! This module contains all the methods used for onchain interaction, especially with Safe instance, Mutlicall, and Multisend contracts.
+//! This module contains all the methods used for onchain interaction, especially with Safe instance, Mutlicall, and
+//! Multisend contracts.
 //!
 //! [SafeTxOperation] corresponds to the `Operation` Enum used in Safe smart contract.
 //!
 //! [MultisendTransaction] struct is used for building transactions interacting with Multisend contract
+use std::{ops::Add, str::FromStr, sync::Arc};
+
 use alloy::{
     network::TransactionBuilder,
     primitives::{keccak256, utils::format_units, Address, Bytes, B256, U256},
@@ -17,12 +20,6 @@ use alloy::{
     sol_types::{SolCall, SolValue},
 };
 use hex_literal::hex;
-use std::sync::Arc;
-use std::{ops::Add, str::FromStr};
-use tracing::{debug, info};
-use IMulticall3Extract::IMulticall3ExtractInstance;
-use SafeSingleton::{execTransactionCall, removeOwnerCall, setupCall, SafeSingletonInstance};
-
 use hopr_bindings::{
     hoprnetworkregistry::HoprNetworkRegistry::HoprNetworkRegistryInstance,
     hoprnodemanagementmodule::HoprNodeManagementModule::{
@@ -34,6 +31,9 @@ use hopr_bindings::{
     hoprtoken::HoprToken::{approveCall, HoprTokenInstance},
 };
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use tracing::{debug, info};
+use IMulticall3Extract::IMulticall3ExtractInstance;
+use SafeSingleton::{execTransactionCall, removeOwnerCall, setupCall, SafeSingletonInstance};
 
 use crate::utils::{
     get_create2_address, HelperErrors, DEFAULT_ANNOUNCEMENT_PERMISSIONS, DEFAULT_CAPABILITY_PERMISSIONS,
@@ -399,19 +399,22 @@ pub async fn transfer_or_mint_tokens<P: Provider + WalletProvider>(
     let multicall = provider
         .multicall()
         .add(
-            hopr_token.balanceOf(caller), // .method::<_, U256>("balanceOf", caller)
-                                          // .map_err(|e| HelperErrors::MulticallError(e.to_string()))?,
-                                          // false,
+            hopr_token.balanceOf(caller), /* .method::<_, U256>("balanceOf", caller)
+                                           * .map_err(|e| HelperErrors::MulticallError(e.to_string()))?,
+                                           * false, */
         )
         .add(
-            hopr_token.hasRole(encoded_minter_role, caller), // hopr_token
-                                                             //     .method::<_, bool>("hasRole", (encoded_minter_role, caller))
-                                                             //     .map_err(|e| HelperErrors::MulticallError(e.to_string()))?,
-                                                             // false,
+            hopr_token.hasRole(encoded_minter_role, caller), /* hopr_token
+                                                              *     .method::<_, bool>("hasRole",
+                                                              * (encoded_minter_role, caller))
+                                                              *     .map_err(|e|
+                                                              * HelperErrors::MulticallError(e.to_string()))?,
+                                                              * false, */
         );
     let (token_balance_return, has_role_return) = multicall.aggregate().await?;
 
-    // compare the total with caller's current balance. If caller doens't have enough balance, try to mint some. Otherwise, revert
+    // compare the total with caller's current balance. If caller doens't have enough balance, try to mint some.
+    // Otherwise, revert
     if total.gt(&token_balance_return._0) {
         info!("caller does not have enough balance to transfer tokens to recipients.");
         if has_role_return._0 {
@@ -445,8 +448,8 @@ pub async fn transfer_or_mint_tokens<P: Provider + WalletProvider>(
     } else {
         info!("using multicall...");
         // use multicall
-        // TODO: introduce a new ERC777Recipient contract and batch the following separated steps into one, to mitigate the attack vector
-        // approve the multicall to be able to transfer from caller's wallet
+        // TODO: introduce a new ERC777Recipient contract and batch the following separated steps into one, to mitigate
+        // the attack vector approve the multicall to be able to transfer from caller's wallet
         hopr_token
             .approve(MULTICALL3_ADDRESS, total)
             .send()
@@ -549,11 +552,13 @@ pub async fn get_registered_safes_for_nodes_on_network_registry<P: Provider + Wa
 
 /// Register safes and nodes to the network registry, and force-sync the eligibility to true.
 /// It returns the number of removed nodes and nodes being added.
-/// - If nodes have been registered to a different safe, overwrite it (remove the old safe and regsiter with the new safe)
+/// - If nodes have been registered to a different safe, overwrite it (remove the old safe and regsiter with the new
+///   safe)
 /// - If ndoes have been registered to the same safe, no op
 /// - If nodes have not been registered to any safe, register it
 ///
-/// After all the nodes have been added to the network registry, force-sync the eligibility of all the added safes to true
+/// After all the nodes have been added to the network registry, force-sync the eligibility of all the added safes to
+/// true
 pub async fn register_safes_and_nodes_on_network_registry<P: Provider + WalletProvider + Clone>(
     network_registry: HoprNetworkRegistryInstance<(), Arc<P>>,
     safe_addresses: Vec<Address>,
@@ -1376,7 +1381,7 @@ pub async fn debug_node_safe_module_setup_main<P: Provider>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::vec;
 
     use alloy::{
         contract::Result as ContractResult, network::TransactionBuilder, primitives::address,
@@ -1387,11 +1392,11 @@ mod tests {
         hoprnodesaferegistry::HoprNodeSafeRegistry, hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
     };
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
-    use std::vec;
-
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::BytesRepresentable;
+
+    use super::*;
 
     fn get_random_address_for_testing() -> Address {
         // Creates a random Ethereum address, only used for testing
@@ -2321,7 +2326,7 @@ mod tests {
         );
 
         // register some nodes
-        let (_, _) = register_safes_and_nodes_on_network_registry(
+        let (..) = register_safes_and_nodes_on_network_registry(
             instances.network_registry.clone(),
             vec![*safe.address()],
             vec![node_addresses[0]],
@@ -2382,7 +2387,7 @@ mod tests {
         .await?;
 
         // register some nodes
-        let (_, _) = register_safes_and_nodes_on_network_registry(
+        let (..) = register_safes_and_nodes_on_network_registry(
             instances.network_registry.clone(),
             vec![*safe.address()],
             vec![node_addresses[0]],

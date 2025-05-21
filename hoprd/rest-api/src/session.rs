@@ -1,38 +1,37 @@
-use std::fmt::Formatter;
-use std::future::Future;
-use std::str::FromStr;
+use std::{fmt::Formatter, future::Future, net::IpAddr, str::FromStr, sync::Arc};
 
-use crate::types::{HoprIdentifier, PeerOrAddress};
-use crate::{ApiError, ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
-use axum::extract::Path;
-use axum::Error;
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Json, State,
+        Json, Path, State,
     },
     http::status::StatusCode,
     response::IntoResponse,
+    Error,
 };
 use axum_extra::extract::Query;
 use base64::Engine;
-use futures::stream::FuturesUnordered;
-use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{stream::FuturesUnordered, AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
 use hopr_db_api::prelude::HoprDbResolverOperations;
-use hopr_lib::errors::HoprLibError;
-use hopr_lib::{transfer_session, Address};
-use hopr_lib::{HoprSession, ServiceId, SessionClientConfig, SessionTarget};
-use hopr_lib::{SurbBalancerConfig, SESSION_PAYLOAD_SIZE};
-use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
-use hopr_network_types::udp::ForeignDataMode;
-use hopr_network_types::utils::AsyncReadStreamer;
+use hopr_lib::{
+    errors::HoprLibError, transfer_session, Address, HoprSession, ServiceId, SessionClientConfig, SessionTarget,
+    SurbBalancerConfig, SESSION_PAYLOAD_SIZE,
+};
+use hopr_network_types::{
+    prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism},
+    udp::ForeignDataMode,
+    utils::AsyncReadStreamer,
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use std::net::IpAddr;
-use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info, trace};
+
+use crate::{
+    types::{HoprIdentifier, PeerOrAddress},
+    ApiError, ApiErrorStatus, InternalState, ListenerId, BASE_PATH,
+};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -172,7 +171,7 @@ impl From<SessionCapability> for hopr_lib::SessionCapability {
 pub(crate) struct SessionWebsocketClientQueryRequest {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(required = true, value_type = String)]
-    pub destination: String, //PeerId,  // issue in utoipa on overriding the type
+    pub destination: String, // PeerId,  // issue in utoipa on overriding the type
     #[schema(required = true)]
     pub hops: u8,
     #[cfg(feature = "explicit-path")]
@@ -238,14 +237,16 @@ impl SessionWebsocketClientQueryRequest {
 #[allow(dead_code)] // not dead code, just for codegen
 struct WssData(Vec<u8>);
 
-/// Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR sessions.
+/// Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR
+/// sessions.
 ///
-/// Once configured, the session represents and automatically managed connection to a target peer through a network routing
-/// configuration. The session can be used to send and receive binary data over the network.
+/// Once configured, the session represents and automatically managed connection to a target peer through a network
+/// routing configuration. The session can be used to send and receive binary data over the network.
 ///
 /// Authentication (if enabled) is done by cookie `X-Auth-Token`.
 ///
-/// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/session/websocket
+/// Connect to the endpoint by using a WS client. No preview available. Example:
+/// `ws://127.0.0.1:3001/api/v3/session/websocket
 #[allow(dead_code)] // not dead code, just for documentation
 #[utoipa::path(
         get,
@@ -1033,15 +1034,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::HashSet;
+
     use anyhow::Context;
     use futures::channel::mpsc::UnboundedSender;
     use hopr_crypto_types::crypto_traits::Randomizable;
     use hopr_lib::{ApplicationData, HoprPseudonym, SendMsg};
     use hopr_network_types::prelude::DestinationRouting;
     use hopr_transport_session::errors::TransportSessionError;
-    use std::collections::HashSet;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use super::*;
 
     pub struct SendMsgResender {
         tx: UnboundedSender<Box<[u8]>>,

@@ -1,12 +1,15 @@
+use std::fmt::{Display, Formatter};
+
 use bloomfilter::Bloom;
 use hopr_crypto_random::{random_bytes, Randomizable};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::fmt::{Display, Formatter};
 use tracing::warn;
 
-use crate::errors::{CoreTypesError, Result};
-use crate::prelude::UnacknowledgedTicket;
+use crate::{
+    errors::{CoreTypesError, Result},
+    prelude::UnacknowledgedTicket,
+};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
@@ -174,12 +177,11 @@ impl<'de> serde::Deserialize<'de> for SerializableBloomWrapper {
 }
 
 impl TagBloomFilter {
-    // Allowed false positive rate. This amounts to 0.001% chance
-    const FALSE_POSITIVE_RATE: f64 = 0.00001_f64;
-
     // The default maximum number of packet tags this Bloom filter can hold.
     // After these many packets, the Bloom filter resets and packet replays are possible.
     const DEFAULT_MAX_ITEMS: usize = 10_000_000;
+    // Allowed false positive rate. This amounts to 0.001% chance
+    const FALSE_POSITIVE_RATE: f64 = 0.00001_f64;
 
     /// Returns the current number of items in this Bloom filter.
     pub fn count(&self) -> usize {
@@ -286,7 +288,9 @@ impl Display for ApplicationData {
 }
 
 impl ApplicationData {
-    const TAG_SIZE: usize = size_of::<Tag>(); // minimum size
+    const TAG_SIZE: usize = size_of::<Tag>();
+
+    // minimum size
 
     pub fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() >= Self::TAG_SIZE {

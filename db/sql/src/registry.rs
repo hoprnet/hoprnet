@@ -1,13 +1,14 @@
 use async_trait::async_trait;
+use hopr_db_entity::{network_eligibility, network_registry};
+use hopr_primitive_types::prelude::{Address, ToHex};
 use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set};
 use sea_query::OnConflict;
 
-use hopr_db_entity::{network_eligibility, network_registry};
-use hopr_primitive_types::prelude::{Address, ToHex};
-
-use crate::db::HoprDb;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::{
+    db::HoprDb,
+    errors::{DbSqlError, Result},
+    HoprDbGeneralModelOperations, OptTx,
+};
 
 /// Defines DB access API for network registry operations.
 #[async_trait]
@@ -149,14 +150,11 @@ impl HoprDbRegistryOperations for HoprDb {
 
 #[cfg(test)]
 mod tests {
+    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
+    use hopr_primitive_types::prelude::Address;
     use lazy_static::lazy_static;
 
-    use hopr_crypto_types::keypairs::ChainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
-    use hopr_primitive_types::prelude::Address;
-
-    use crate::db::HoprDb;
-    use crate::registry::HoprDbRegistryOperations;
+    use crate::{db::HoprDb, registry::HoprDbRegistryOperations};
 
     lazy_static! {
         static ref ADDR_1: Address = "4331eaa9542b6b034c43090d9ec1c2198758dbc3"

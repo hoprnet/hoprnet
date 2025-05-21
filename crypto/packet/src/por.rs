@@ -1,9 +1,12 @@
-use hopr_crypto_sphinx::prelude::SharedSecret;
-use hopr_crypto_types::crypto_traits::Randomizable;
-use hopr_crypto_types::prelude::{sample_secp256k1_field_element, SecretKey};
-use hopr_crypto_types::types::{Challenge, HalfKey, HalfKeyChallenge, Response};
-use hopr_primitive_types::prelude::*;
 use std::fmt::Formatter;
+
+use hopr_crypto_sphinx::prelude::SharedSecret;
+use hopr_crypto_types::{
+    crypto_traits::Randomizable,
+    prelude::{sample_secp256k1_field_element, SecretKey},
+    types::{Challenge, HalfKey, HalfKeyChallenge, Response},
+};
+use hopr_primitive_types::prelude::*;
 
 use crate::errors::{PacketError, Result};
 
@@ -105,6 +108,7 @@ impl SurbReceiverInfo {
         ret[ProofOfRelayValues::SIZE..ProofOfRelayValues::SIZE + 32].copy_from_slice(&share);
         Self(ret)
     }
+
     pub fn proof_of_relay_values(&self) -> ProofOfRelayValues {
         ProofOfRelayValues::try_from(&self.0[0..ProofOfRelayValues::SIZE])
             .expect("SurbReceiverInfo always contains valid ProofOfRelayValues")

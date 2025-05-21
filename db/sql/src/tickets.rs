@@ -1,38 +1,39 @@
+use std::{
+    cmp,
+    ops::{Add, Bound},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+};
+
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::{StreamExt, TryStreamExt};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
-use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
-use std::cmp;
-use std::ops::{Add, Bound};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use tracing::{debug, error, info, trace, warn};
-
+use futures::{stream::BoxStream, StreamExt, TryStreamExt};
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::prelude::{TicketIndexSelector, TicketMarker};
-use hopr_db_api::resolver::HoprDbResolverOperations;
-use hopr_db_api::tickets::AggregationPrerequisites;
 use hopr_db_api::{
     errors::Result,
     info::DomainSeparator,
-    tickets::{ChannelTicketStatistics, HoprDbTicketOperations, TicketSelector},
+    prelude::{TicketIndexSelector, TicketMarker},
+    resolver::HoprDbResolverOperations,
+    tickets::{AggregationPrerequisites, ChannelTicketStatistics, HoprDbTicketOperations, TicketSelector},
 };
-use hopr_db_entity::ticket_statistics;
-use hopr_db_entity::{outgoing_ticket_index, ticket};
+use hopr_db_entity::{outgoing_ticket_index, ticket, ticket_statistics};
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-
-use crate::channels::HoprDbChannelOperations;
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::errors::DbSqlError::LogicalError;
-use crate::info::HoprDbInfoOperations;
-use crate::{HoprDbGeneralModelOperations, OpenTransaction, OptTx, TargetDb};
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::MultiGauge;
+use hopr_primitive_types::prelude::*;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
+use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
+use tracing::{debug, error, info, trace, warn};
+
+use crate::{
+    channels::HoprDbChannelOperations,
+    db::HoprDb,
+    errors::{DbSqlError, DbSqlError::LogicalError},
+    info::HoprDbInfoOperations,
+    HoprDbGeneralModelOperations, OpenTransaction, OptTx, TargetDb,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -152,7 +153,8 @@ impl IntoCondition for WrappedTicketSelector {
 /// The following is applied:
 /// - the list of tickets is reduced so that the total amount on the tickets does not exceed the channel balance
 /// - it is checked whether the list size is greater than `min_unaggregated_ratio`
-/// - it is checked whether the ratio of total amount on the unaggregated tickets on the list and the channel balance ratio is greater than `min_unaggregated_ratio`
+/// - it is checked whether the ratio of total amount on the unaggregated tickets on the list and the channel balance
+///   ratio is greater than `min_unaggregated_ratio`
 pub(crate) fn filter_satisfying_ticket_models(
     prerequisites: AggregationPrerequisites,
     models: Vec<ticket::Model>,
@@ -1201,7 +1203,11 @@ impl HoprDbTicketOperations for HoprDb {
 
             final_value = final_value.add(&acked_ticket.verified_ticket().amount);
             if final_value.gt(&channel_balance) {
-                return Err(DbSqlError::LogicalError(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")).into());
+                return Err(DbSqlError::LogicalError(format!(
+                    "ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of \
+                     channel {channel_id}"
+                ))
+                .into());
             }
         }
 
@@ -1213,7 +1219,8 @@ impl HoprDbTicketOperations for HoprDb {
         let first_acked_ticket = verified_tickets.first().unwrap();
         let last_acked_ticket = verified_tickets.last().unwrap();
 
-        // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
+        // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain
+        // ticket_index from channel_entry
         let current_ticket_index_from_acked_tickets = last_acked_ticket.verified_ticket().index + 1;
         self.compare_and_set_outgoing_ticket_index(channel_id, current_ticket_index_from_acked_tickets)
             .await?;
@@ -1289,30 +1296,36 @@ impl HoprDb {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        ops::Add,
+        sync::atomic::Ordering,
+        time::{Duration, SystemTime},
+    };
+
     use anyhow::{anyhow, Context};
     use futures::{pin_mut, StreamExt};
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::prelude::{DbError, TicketMarker};
-    use hopr_db_api::{info::DomainSeparator, tickets::ChannelTicketStatistics};
+    use hopr_db_api::{
+        info::DomainSeparator,
+        prelude::{DbError, TicketMarker},
+        tickets::ChannelTicketStatistics,
+    };
     use hopr_db_entity::ticket;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
-    use std::ops::Add;
-    use std::sync::atomic::Ordering;
-    use std::time::{Duration, SystemTime};
 
-    use crate::accounts::HoprDbAccountOperations;
-    use crate::channels::HoprDbChannelOperations;
-    use crate::db::HoprDb;
-    use crate::errors::DbSqlError;
-    use crate::info::HoprDbInfoOperations;
-    use crate::tickets::{
-        filter_satisfying_ticket_models, AggregationPrerequisites, HoprDbTicketOperations, TicketSelector,
+    use crate::{
+        accounts::HoprDbAccountOperations,
+        channels::HoprDbChannelOperations,
+        db::HoprDb,
+        errors::DbSqlError,
+        info::HoprDbInfoOperations,
+        tickets::{filter_satisfying_ticket_models, AggregationPrerequisites, HoprDbTicketOperations, TicketSelector},
+        HoprDbGeneralModelOperations, TargetDb,
     };
-    use crate::{HoprDbGeneralModelOperations, TargetDb};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
@@ -3365,7 +3378,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         const COUNT_TICKETS: u64 = 1;
 
-        let (_, _) = init_db_with_tickets(&db, COUNT_TICKETS).await?;
+        let (..) = init_db_with_tickets(&db, COUNT_TICKETS).await?;
 
         // mark the first ticket as being redeemed
         let mut ticket = hopr_db_entity::ticket::Entity::find()
@@ -3405,7 +3418,7 @@ mod tests {
         const COUNT_TICKETS: u64 = 2;
 
         // we set up the channel to have ticket index 1, and ensure that fix does not trigger
-        let (_, _) = init_db_with_tickets_and_channel(&db, COUNT_TICKETS, Some(1u32)).await?;
+        let (..) = init_db_with_tickets_and_channel(&db, COUNT_TICKETS, Some(1u32)).await?;
 
         // mark the first ticket as being redeemed
         let mut ticket = hopr_db_entity::ticket::Entity::find()

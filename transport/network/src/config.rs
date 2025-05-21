@@ -1,7 +1,8 @@
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use smart_default::SmartDefault;
-use std::time::Duration;
 use validator::Validate;
 
 /// Network quality threshold since which a node is considered

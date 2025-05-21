@@ -15,9 +15,8 @@ impl<const SIZE: usize> Encoder<Box<[u8]>> for FixedLengthCodec<SIZE> {
 }
 
 impl<const SIZE: usize> Decoder for FixedLengthCodec<SIZE> {
-    type Item = Box<[u8]>;
-
     type Error = std::io::Error;
+    type Item = Box<[u8]>;
 
     fn decode(&mut self, src: &mut tokio_util::bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let len = src.len();
@@ -39,8 +38,9 @@ impl<const SIZE: usize> Decoder for FixedLengthCodec<SIZE> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::Context;
+
+    use super::*;
 
     const TEST_SIZE: usize = 10;
 

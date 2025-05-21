@@ -1,17 +1,18 @@
-use std::collections::HashSet;
-use std::net::{IpAddr, SocketAddr};
-use std::str::FromStr;
-use std::time::Duration;
+use std::{
+    collections::HashSet,
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    time::Duration,
+};
 
+use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
+use hopr_platform::file::native::read_to_string;
+use hoprd_api::config::{Api, Auth};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tracing::debug;
 use validator::{Validate, ValidationError};
-
-use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
-use hopr_platform::file::native::read_to_string;
-use hoprd_api::config::{Api, Auth};
 
 use crate::errors::HoprdError;
 
@@ -92,7 +93,6 @@ impl std::fmt::Debug for Identity {
 ///
 /// An always up-to-date config YAML example can be found in [example_cfg.yaml](https://github.com/hoprnet/hoprnet/tree/master/hoprd/hoprd/example_cfg.yaml)
 /// which is always in the root of this crate.
-///
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct HoprdConfig {
@@ -394,12 +394,14 @@ pub struct SessionIpForwardingConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::io::{Read, Write};
+
     use anyhow::Context;
     use clap::{Args, Command, FromArgMatches};
     use hopr_lib::HostType;
-    use std::io::{Read, Write};
     use tempfile::NamedTempFile;
+
+    use super::*;
 
     pub fn example_cfg() -> anyhow::Result<HoprdConfig> {
         let chain = hopr_lib::config::Chain {

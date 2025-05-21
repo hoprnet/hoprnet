@@ -1,6 +1,6 @@
-use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
 use std::sync::Arc;
 
+use axum::{extract::State, http::status::StatusCode, response::IntoResponse};
 use hopr_lib::HoprState;
 
 use crate::AppState;

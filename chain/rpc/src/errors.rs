@@ -1,6 +1,8 @@
-use alloy::contract::Error as AlloyContractError;
-use alloy::providers::{MulticallError, PendingTransactionError};
-use alloy::transports::{RpcError as AlloyRpcError, TransportErrorKind};
+use alloy::{
+    contract::Error as AlloyContractError,
+    providers::{MulticallError, PendingTransactionError},
+    transports::{RpcError as AlloyRpcError, TransportErrorKind},
+};
 /// Errors produced by this crate and other error-related types.
 use thiserror::Error;
 

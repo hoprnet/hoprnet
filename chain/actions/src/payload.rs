@@ -5,19 +5,20 @@
 //! using a [TransactionExecutor](crate::action_queue::TransactionExecutor).
 //!
 //! There are two main implementations:
-//! - [BasicPayloadGenerator] which implements generation of a direct EIP1559 transaction payload. This is currently
-//!   not used by a HOPR node.
-//! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the
-//!   SAFE transaction. This is currently the main mode of HOPR node operation.
-//!
+//! - [BasicPayloadGenerator] which implements generation of a direct EIP1559 transaction payload. This is currently not
+//!   used by a HOPR node.
+//! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the SAFE
+//!   transaction. This is currently the main mode of HOPR node operation.
 
-use alloy::network::TransactionBuilder;
-use alloy::primitives::aliases::U96;
-use alloy::primitives::aliases::{U24, U48, U56};
-use alloy::primitives::{B256, U256};
-use alloy::rpc::types::TransactionRequest;
-use alloy::sol_types::SolCall;
-
+use alloy::{
+    network::TransactionBuilder,
+    primitives::{
+        aliases::{U24, U48, U56, U96},
+        B256, U256,
+    },
+    rpc::types::TransactionRequest,
+    sol_types::SolCall,
+};
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{
         announceCall, announceSafeCall, bindKeysAnnounceCall, bindKeysAnnounceSafeCall,
@@ -562,7 +563,7 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
         Ok(OnChainRedeemableTicket {
             data: TicketData {
                 channelId: B256::from_slice(off_chain.verified_ticket().channel_id.as_ref()),
-                amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), // Extract only the last 12 bytes (lowest 96 bits)
+                amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), /* Extract only the last 12 bytes (lowest 96 bits) */
                 ticketIndex: U48::from_be_slice(&off_chain.verified_ticket().index.to_be_bytes()[8 - 6..]),
                 indexOffset: off_chain.verified_ticket().index_offset,
                 epoch: U24::from_be_slice(&off_chain.verified_ticket().channel_epoch.to_be_bytes()[4 - 3..]),
@@ -581,19 +582,19 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 
 #[cfg(test)]
 mod tests {
-    use super::{BasicPayloadGenerator, PayloadGenerator};
+    use std::str::FromStr;
 
     use alloy::{primitives::U256, providers::Provider};
     use anyhow::Context;
     use hex_literal::hex;
-    use multiaddr::Multiaddr;
-    use std::str::FromStr;
-
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::{Balance, BalanceType};
+    use multiaddr::Multiaddr;
+
+    use super::{BasicPayloadGenerator, PayloadGenerator};
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");

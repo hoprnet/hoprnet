@@ -1,3 +1,5 @@
+use std::{str::FromStr, sync::atomic::Ordering::Relaxed};
+
 use axum::{
     extract::{OriginalUri, Request, State},
     http::{
@@ -8,7 +10,6 @@ use axum::{
     middleware::Next,
     response::IntoResponse,
 };
-use std::{str::FromStr, sync::atomic::Ordering::Relaxed};
 use urlencoding::decode;
 
 use crate::{ApiErrorStatus, Auth, InternalState, BASE_PATH};

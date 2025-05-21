@@ -1,18 +1,18 @@
-use futures::{stream, FutureExt, StreamExt};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::Arc;
-use tracing::{debug, error, info, trace};
+use std::sync::{
+    atomic::{AtomicBool, AtomicU64, Ordering},
+    Arc,
+};
 
+use futures::{stream, FutureExt, StreamExt};
 use hopr_async_runtime::prelude::{spawn, JoinHandle};
 use hopr_chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
-use hopr_db_sql::info::HoprDbInfoOperations;
-use hopr_db_sql::HoprDbGeneralModelOperations;
-
+use hopr_db_sql::{info::HoprDbInfoOperations, HoprDbGeneralModelOperations};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_primitive_types::prelude::ToHex;
+use tracing::{debug, error, info, trace};
 
 use crate::{
     errors::{CoreEthereumIndexerError, Result},
@@ -49,8 +49,8 @@ lazy_static::lazy_static! {
 /// Indexer
 ///
 /// Accepts the RPC operational functionality [hopr_chain_rpc::HoprIndexerRpcOperations]
-/// and provides the indexing operation resulting in and output of [hopr_chain_types::chain_events::SignificantChainEvent]
-/// streamed outside the indexer by the unbounded channel.
+/// and provides the indexing operation resulting in and output of
+/// [hopr_chain_types::chain_events::SignificantChainEvent] streamed outside the indexer by the unbounded channel.
 ///
 /// The roles of the indexer:
 /// 1. prime the RPC endpoint
@@ -175,7 +175,10 @@ where
 
         let will_perform_fast_sync = match (fast_sync_configured, index_empty) {
             (true, false) => {
-                info!("Fast sync is enabled, but the index database is not empty. Fast sync will continue on existing unprocessed logs.");
+                info!(
+                    "Fast sync is enabled, but the index database is not empty. Fast sync will continue on existing \
+                     unprocessed logs."
+                );
                 FastSyncMode::Continue
             }
             (false, true) => {
@@ -352,7 +355,8 @@ where
     ///
     /// # Returns
     ///
-    /// A `Result` containing an optional vector of significant chain events if the operation succeeds or an error if it fails.
+    /// A `Result` containing an optional vector of significant chain events if the operation succeeds or an error if it
+    /// fails.
     async fn process_block_by_id(
         db: &Db,
         logs_handler: &U,
@@ -572,29 +576,30 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloy::dyn_abi::DynSolValue;
-    use alloy::primitives::{Address as AlloyAddress, B256};
-    use alloy::sol_types::SolEvent;
+    use std::{collections::BTreeSet, pin::Pin};
+
+    use alloy::{
+        dyn_abi::DynSolValue,
+        primitives::{Address as AlloyAddress, B256},
+        sol_types::SolEvent,
+    };
     use async_trait::async_trait;
     use futures::{join, Stream};
     use hex_literal::hex;
-    use mockall::mock;
-    use multiaddr::Multiaddr;
-    use std::collections::BTreeSet;
-    use std::pin::Pin;
-
     use hopr_chain_rpc::BlockWithLogs;
     use hopr_chain_types::chain_events::ChainEventType;
-    use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
-    use hopr_crypto_types::prelude::ChainKeypair;
-    use hopr_db_sql::accounts::HoprDbAccountOperations;
-    use hopr_db_sql::db::HoprDb;
+    use hopr_crypto_types::{
+        keypairs::{Keypair, OffchainKeypair},
+        prelude::ChainKeypair,
+    };
+    use hopr_db_sql::{accounts::HoprDbAccountOperations, db::HoprDb};
     use hopr_internal_types::account::{AccountEntry, AccountType};
     use hopr_primitive_types::prelude::*;
-
-    use crate::traits::MockChainLogHandler;
+    use mockall::mock;
+    use multiaddr::Multiaddr;
 
     use super::*;
+    use crate::traits::MockChainLogHandler;
 
     lazy_static::lazy_static! {
         static ref ALICE_OKP: OffchainKeypair = OffchainKeypair::random();

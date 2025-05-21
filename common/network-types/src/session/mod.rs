@@ -14,7 +14,6 @@
 //! - Protocol messages are defined in the [`protocol`] submodule.
 //! - Protocol state machine is defined in the [`state`] submodule.
 //! - Frames, segmentation and reassembly are defined in the `frame` submodule.
-//!
 
 //! Contains errors thrown from this module.
 pub mod errors;

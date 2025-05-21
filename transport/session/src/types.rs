@@ -1,24 +1,28 @@
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
-use futures::{pin_mut, StreamExt};
-use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_internal_types::prelude::{HoprPseudonym, Tag};
-use hopr_internal_types::protocol::ApplicationData;
-use hopr_network_types::prelude::{DestinationRouting, SealedHost};
-use hopr_network_types::session::state::{SessionConfig, SessionSocket};
-use hopr_primitive_types::prelude::BytesRepresentable;
-use std::collections::HashSet;
-use std::fmt::{Debug, Formatter};
-use std::hash::{Hash, Hasher};
-use std::task::Context;
-use std::time::Duration;
 use std::{
-    fmt::Display,
+    collections::HashSet,
+    fmt::{Debug, Display, Formatter},
+    hash::{Hash, Hasher},
     io::{Error, ErrorKind},
     pin::Pin,
     sync::Arc,
-    task::Poll,
+    task::{Context, Poll},
+    time::Duration,
 };
+
+use futures::{pin_mut, StreamExt};
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_internal_types::{
+    prelude::{HoprPseudonym, Tag},
+    protocol::ApplicationData,
+};
+use hopr_network_types::{
+    prelude::{DestinationRouting, SealedHost},
+    session::state::{SessionConfig, SessionSocket},
+};
+use hopr_primitive_types::prelude::BytesRepresentable;
 use tracing::{debug, error};
+
+use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -600,10 +604,8 @@ where
 {
     // We can always read as much as possible from the Session and then write it to the Stream.
     // There are two possibilities for the opposite direction:
-    // 1) If Session protocol is used for segmentation,
-    //    we need to buffer up data at MAX_WRITE_SIZE.
-    // 2) Otherwise, the bare session implements chunking, therefore,
-    //    data can be written with arbitrary sizes.
+    // 1) If Session protocol is used for segmentation, we need to buffer up data at MAX_WRITE_SIZE.
+    // 2) Otherwise, the bare session implements chunking, therefore, data can be written with arbitrary sizes.
     let into_session_len = if session.capabilities().contains(&Capability::Segmentation) {
         max_buffer.min(SessionSocket::<USABLE_PAYLOAD_CAPACITY_FOR_SESSION>::MAX_WRITE_SIZE)
     } else {
@@ -624,13 +626,14 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::traits::MockSendMsg;
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_network_types::prelude::{RoutingOptions, SurbMatcher};
     use hopr_primitive_types::prelude::Address;
+
+    use super::*;
+    use crate::traits::MockSendMsg;
 
     #[test]
     fn test_max_decimal_digits_for_n_bytes() {

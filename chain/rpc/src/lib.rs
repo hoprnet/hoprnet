@@ -10,25 +10,24 @@
 
 extern crate core;
 
-use alloy::primitives::B256;
-use alloy::providers::PendingTransaction;
-use alloy::rpc::types::TransactionRequest;
+use std::{
+    cmp::Ordering,
+    collections::BTreeSet,
+    fmt::{Display, Formatter},
+    pin::Pin,
+    time::Duration,
+};
+
+use alloy::{primitives::B256, providers::PendingTransaction, rpc::types::TransactionRequest};
 use async_trait::async_trait;
 use errors::LogConversionError;
 use futures::Stream;
-use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::collections::BTreeSet;
-use std::fmt::{Display, Formatter};
-use std::pin::Pin;
-use std::time::Duration;
-
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::WinningProbability;
 use hopr_primitive_types::prelude::*;
+use serde::{Deserialize, Serialize};
 
-use crate::errors::Result;
-use crate::RetryAction::NoRetry;
+use crate::{errors::Result, RetryAction::NoRetry};
 
 pub mod client;
 pub mod errors;

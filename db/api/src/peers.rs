@@ -2,12 +2,11 @@ use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use futures::stream::BoxStream;
+use hopr_crypto_types::prelude::OffchainPublicKey;
+use hopr_primitive_types::prelude::*;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use tracing::warn;
-
-use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_primitive_types::prelude::*;
 
 use crate::errors::Result;
 
@@ -161,8 +160,18 @@ impl PeerStatus {
 
 impl std::fmt::Display for PeerStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Entry: [id={}, origin={}, last seen on={:?}, quality={}, heartbeats sent={}, heartbeats succeeded={}, backoff={}]",
-            self.id.1, self.origin, self.last_seen, self.quality, self.heartbeats_sent, self.heartbeats_succeeded, self.backoff)
+        write!(
+            f,
+            "Entry: [id={}, origin={}, last seen on={:?}, quality={}, heartbeats sent={}, heartbeats succeeded={}, \
+             backoff={}]",
+            self.id.1,
+            self.origin,
+            self.last_seen,
+            self.quality,
+            self.heartbeats_sent,
+            self.heartbeats_succeeded,
+            self.backoff
+        )
     }
 }
 

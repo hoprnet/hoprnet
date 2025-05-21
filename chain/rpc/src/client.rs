@@ -2,36 +2,43 @@
 //! and parameters of client layers. The underlying HTTP transport layer is defined in `transport.rs`.
 //!
 //! Extended layers of RPC clients:
-//! - Replace the legacy retry backoff layer with the default [`RetryBackoffService`].
-//!   However the backoff calculation still needs to be improved, as the number of retries
-//!   is not passed to the `backoff_hint` method.
+//! - Replace the legacy retry backoff layer with the default [`RetryBackoffService`]. However the backoff calculation
+//!   still needs to be improved, as the number of retries is not passed to the `backoff_hint` method.
 //! - Add Metrics Layer
 //! - Add Snapshot Layer
 //! - Use tokio runtime for most of the tests
 //!
 //! This module contains defalut gas estimation constants for EIP-1559 for Gnosis chain,
+use std::{
+    fmt::Debug,
+    future::IntoFuture,
+    io::{BufWriter, Write},
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
+    },
+    task::{Context, Poll},
+    time::Duration,
+};
+
 /// as GasOracleMiddleware middleware is migrated to GasFiller
 use alloy::eips::eip1559::Eip1559Estimation;
-use alloy::network::{EthereumWallet, Network, TransactionBuilder};
-use alloy::primitives::utils::parse_units;
-use alloy::providers::fillers::{
-    BlobGasFiller, ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller, TxFiller,
-    WalletFiller,
+use alloy::{
+    network::{EthereumWallet, Network, TransactionBuilder},
+    primitives::utils::parse_units,
+    providers::{
+        fillers::{
+            BlobGasFiller, ChainIdFiller, FillProvider, FillerControlFlow, GasFiller, JoinFill, NonceFiller, TxFiller,
+            WalletFiller,
+        },
+        Identity, Provider, RootProvider, SendableTx,
+    },
+    rpc::json_rpc::{ErrorPayload, RequestPacket, ResponsePacket, ResponsePayload},
+    transports::{layers::RetryPolicy, HttpError, TransportError, TransportErrorKind, TransportFut, TransportResult},
 };
-use alloy::providers::{Identity, Provider, RootProvider, SendableTx};
-use alloy::rpc::json_rpc::{ErrorPayload, RequestPacket, ResponsePacket, ResponsePayload};
-use alloy::transports::layers::RetryPolicy;
-use alloy::transports::{HttpError, TransportError, TransportErrorKind, TransportFut, TransportResult};
 use futures::{FutureExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use std::fmt::Debug;
-use std::future::IntoFuture;
-use std::io::{BufWriter, Write};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::Duration;
 use tower::{Layer, Service};
 use tracing::{error, trace};
 use url::Url;
@@ -83,8 +90,8 @@ lazy_static::lazy_static! {
 /// - Serde error (some of these are treated as JSON RPC error above, if an error code can be obtained).
 ///
 /// The standard `RetryBackoffLayer` defines the following properties:
-/// - `max_rate_limit_retries`: (u32) The maximum number of retries for rate limit errors.
-///   Different from the legacy implementation, there is always an upper limit.
+/// - `max_rate_limit_retries`: (u32) The maximum number of retries for rate limit errors. Different from the legacy
+///   implementation, there is always an upper limit.
 /// - `initial_backoff`: (u64) The initial backoff in milliseconds
 /// - `compute_units_per_second`: (u64) The number of compute units per second for this service
 ///
@@ -152,7 +159,8 @@ pub struct DefaultRetryPolicy {
     /// Default is \[429, 504, 503\]
     #[serde_as(as = "Vec<DisplayFromStr>")]
     #[default(
-        _code = "vec![http::StatusCode::TOO_MANY_REQUESTS,http::StatusCode::GATEWAY_TIMEOUT,http::StatusCode::SERVICE_UNAVAILABLE]"
+        _code = "vec![http::StatusCode::TOO_MANY_REQUESTS,http::StatusCode::GATEWAY_TIMEOUT,\
+                 http::StatusCode::SERVICE_UNAVAILABLE]"
     )]
     pub retryable_http_errors: Vec<http::StatusCode>,
 
@@ -490,9 +498,9 @@ where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError> + Send + 'static + Clone,
     S::Error: Send + 'static + Debug,
 {
-    type Response = ResponsePacket;
     type Error = TransportError;
     type Future = TransportFut<'static>;
+    type Response = ResponsePacket;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
@@ -601,6 +609,7 @@ impl SnapshotRequestor {
             ignore_snapshot: false,
         }
     }
+
     /// Gets the path to the snapshot disk file.
     pub fn snapshot_path(&self) -> &str {
         &self.file
@@ -740,9 +749,9 @@ where
     S: Service<RequestPacket, Future = TransportFut<'static>, Error = TransportError> + Send + 'static + Clone,
     S::Error: Send + 'static + Debug,
 {
-    type Response = ResponsePacket;
     type Error = TransportError;
     type Future = TransportFut<'static>;
+    type Response = ResponsePacket;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
@@ -850,10 +859,10 @@ pub fn create_rpc_client_to_anvil(
     anvil: &alloy::node_bindings::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
 ) -> Arc<AnvilRpcClient> {
-    use alloy::providers::ProviderBuilder;
-    use alloy::rpc::client::ClientBuilder;
-    use alloy::signers::local::PrivateKeySigner;
-    use alloy::transports::http::ReqwestTransport;
+    use alloy::{
+        providers::ProviderBuilder, rpc::client::ClientBuilder, signers::local::PrivateKeySigner,
+        transports::http::ReqwestTransport,
+    };
     use hopr_crypto_types::keypairs::Keypair;
 
     let wallet = PrivateKeySigner::from_slice(signer.secret().as_ref()).expect("failed to construct wallet");
@@ -869,6 +878,8 @@ pub fn create_rpc_client_to_anvil(
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use alloy::{
         network::TransactionBuilder,
         primitives::{address, U256},
@@ -882,12 +893,10 @@ mod tests {
     };
     use anyhow::Ok;
     use hopr_async_runtime::prelude::sleep;
-    use hopr_chain_types::utils::create_anvil;
-    use hopr_chain_types::{ContractAddresses, ContractInstances};
+    use hopr_chain_types::{utils::create_anvil, ContractAddresses, ContractInstances};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::primitives::Address;
     use serde_json::json;
-    use std::time::Duration;
     use tempfile::NamedTempFile;
 
     use crate::client::{

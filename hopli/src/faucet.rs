@@ -23,17 +23,19 @@
 //!     --hopr-amount 10 --native-amount 0.1 \
 //!     --provider-url "http://localhost:8545"
 //! ```
+use std::{ops::Sub, str::FromStr};
+
+use alloy::primitives::{utils::parse_units, Address, U256};
+use clap::Parser;
+use hopr_bindings::hoprtoken::HoprToken;
+use tracing::info;
+
 use crate::{
     environment_config::NetworkProviderArgs,
     key_pair::{ArgEnvReader, IdentityFileArgs, PrivateKeyArgs},
     methods::{get_native_and_token_balances, transfer_native_tokens, transfer_or_mint_tokens},
     utils::{Cmd, HelperErrors},
 };
-use alloy::primitives::{utils::parse_units, Address, U256};
-use clap::Parser;
-use hopr_bindings::hoprtoken::HoprToken;
-use std::{ops::Sub, str::FromStr};
-use tracing::info;
 
 /// CLI arguments for `hopli faucet`
 #[derive(Parser, Default, Debug)]

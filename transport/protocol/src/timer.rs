@@ -1,12 +1,13 @@
-use futures::future::{select, Either};
-use futures::pin_mut;
-use futures::FutureExt;
 use std::time::Duration;
-use tracing::{trace, warn};
 
+use futures::{
+    future::{select, Either},
+    pin_mut, FutureExt,
+};
 use hopr_async_runtime::prelude::sleep;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
+use tracing::{trace, warn};
 
 /// Construct an infinitely running background loop producing ticks with a given period
 /// with the maximum tick duration at most the period.

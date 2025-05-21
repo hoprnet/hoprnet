@@ -1,13 +1,16 @@
 //! `hopli` is a collection of commands to help with identity creation, funding, registration, etc. for HOPR nodes
 
-use crate::faucet::FaucetArgs;
-use crate::identity::IdentitySubcommands;
-use crate::network_registry::NetworkRegistrySubcommands;
-use crate::safe_module::SafeModuleSubcommands;
-use crate::utils::{Cmd, HelperErrors};
-use crate::win_prob::WinProbSubcommands;
 use clap::{Parser, Subcommand};
 use tracing_subscriber::layer::SubscriberExt;
+
+use crate::{
+    faucet::FaucetArgs,
+    identity::IdentitySubcommands,
+    network_registry::NetworkRegistrySubcommands,
+    safe_module::SafeModuleSubcommands,
+    utils::{Cmd, HelperErrors},
+    win_prob::WinProbSubcommands,
+};
 pub mod environment_config;
 pub mod faucet;
 pub mod identity;

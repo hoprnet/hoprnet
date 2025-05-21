@@ -10,9 +10,7 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use hopr_crypto_packet::HoprSphinxSuite;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_sphinx::prelude::{SharedSecret, SphinxSuite};
-use hopr_crypto_types::keypairs::Keypair;
-use hopr_crypto_types::prelude::OffchainKeypair;
-
+use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use por::{generate_proof_of_relay, pre_verify};
 
 const SAMPLE_SIZE: usize = 100_000;

@@ -9,6 +9,13 @@
 //!
 //! [NetworkDetail] specifies the environment type of the network, the starting block number, and
 //! the deployed contract addresses in [ContractAddresses]
+use std::{
+    collections::HashMap,
+    ffi::OsStr,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+
 use alloy::{
     network::EthereumWallet,
     providers::{
@@ -23,18 +30,10 @@ use alloy::{
     transports::http::ReqwestTransport,
 };
 use clap::Parser;
+use hopr_chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use std::{
-    collections::HashMap,
-    ffi::OsStr,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-
-use hopr_chain_api::config::{Addresses as ContractAddresses, EnvironmentType};
-use hopr_crypto_types::keypairs::ChainKeypair;
-use hopr_crypto_types::keypairs::Keypair;
 
 use crate::utils::HelperErrors;
 
@@ -77,8 +76,9 @@ pub struct NetworkProviderArgs {
     #[clap(help = "Network name. E.g. monte_rosa", long, short)]
     network: String,
 
-    /// Path to the root of foundry project (ethereum/contracts), where all the contracts and `contracts-addresses.json` are stored
-    /// Default to "./ethereum/contracts", which is the path to the `contracts` folder from the root of monorepo
+    /// Path to the root of foundry project (ethereum/contracts), where all the contracts and
+    /// `contracts-addresses.json` are stored Default to "./ethereum/contracts", which is the path to the
+    /// `contracts` folder from the root of monorepo
     #[clap(
         env = "HOPLI_CONTRACTS_ROOT",
         help = "Specify path pointing to the contracts root",
@@ -230,12 +230,13 @@ pub fn get_network_details_from_name(make_root_dir_path: &Path, network: &str) -
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use alloy::{
         node_bindings::{Anvil, AnvilInstance},
         providers::Provider,
     };
     use anyhow::Context;
+
+    use super::*;
 
     fn create_anvil_at_port(default: bool) -> AnvilInstance {
         let mut anvil = Anvil::new();

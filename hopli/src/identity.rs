@@ -1,5 +1,6 @@
 //! This module contains subcommands for `hopli identity`,
-//! This command contains subcommands to read, create or update identity files, providing correct [crate::key_pair::PasswordArgs]
+//! This command contains subcommands to read, create or update identity files, providing correct
+//! [crate::key_pair::PasswordArgs]
 //!
 //! For all three actions around identity files, at least two arguments are needed:
 //! - Path to files
@@ -33,22 +34,24 @@
 //!     --password-path "./test/pwd" \
 //!     --new-password-path "./test/newpwd"
 //! ```
+use std::{collections::HashMap, str::FromStr};
+
 use clap::{builder::RangedU64ValueParser, Parser};
-use hopr_crypto_types::keypairs::Keypair;
-use hopr_primitive_types::primitives::Address;
+use hopr_crypto_types::{
+    keypairs::Keypair,
+    prelude::{OffchainPublicKey, PeerId},
+};
+use hopr_primitive_types::{prelude::ToHex, primitives::Address};
 use hoprd_keypair::key_pair::HoprKeys;
 use tracing::{debug, info};
 
-use crate::key_pair::{
-    create_identity, read_identities, read_identity, update_identity_password, ArgEnvReader, IdentityFileArgs,
-    NewPasswordArgs,
+use crate::{
+    key_pair::{
+        create_identity, read_identities, read_identity, update_identity_password, ArgEnvReader, IdentityFileArgs,
+        NewPasswordArgs,
+    },
+    utils::{Cmd, HelperErrors, HelperErrors::UnableToParseAddress},
 };
-use crate::utils::HelperErrors::UnableToParseAddress;
-use crate::utils::{Cmd, HelperErrors};
-use hopr_crypto_types::prelude::{OffchainPublicKey, PeerId};
-use hopr_primitive_types::prelude::ToHex;
-use std::collections::HashMap;
-use std::str::FromStr;
 
 /// CLI arguments for `hopli identity`
 #[derive(Clone, Debug, Parser)]

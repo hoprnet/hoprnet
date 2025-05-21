@@ -1,21 +1,26 @@
-use alloy::network::Ethereum;
-use alloy::node_bindings::AnvilInstance;
-use alloy::primitives::U256;
-use alloy::rpc::client::RpcClient;
-use alloy::transports::http::{Http, ReqwestTransport};
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::sleep;
-use tracing::info;
+use std::{sync::Arc, time::Duration};
 
-use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
-use hopr_chain_rpc::transport::ReqwestClient;
-use hopr_chain_types::utils::{
-    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
+use alloy::{
+    network::Ethereum,
+    node_bindings::AnvilInstance,
+    primitives::U256,
+    rpc::client::RpcClient,
+    transports::http::{Http, ReqwestTransport},
 };
-use hopr_chain_types::{ContractAddresses, ContractInstances};
+use hopr_chain_rpc::{
+    client::{AnvilRpcClient, SnapshotRequestor},
+    transport::ReqwestClient,
+};
+use hopr_chain_types::{
+    utils::{
+        add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
+    },
+    ContractAddresses, ContractInstances,
+};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use tokio::time::sleep;
+use tracing::info;
 
 /// Used for testing. Creates RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
@@ -41,9 +46,7 @@ pub fn create_provider_to_anvil_with_snapshot(
     anvil: &alloy::node_bindings::AnvilInstance,
     signer: &hopr_crypto_types::keypairs::ChainKeypair,
 ) -> Arc<AnvilRpcClient> {
-    use alloy::providers::ProviderBuilder;
-    use alloy::rpc::client::ClientBuilder;
-    use alloy::signers::local::PrivateKeySigner;
+    use alloy::{providers::ProviderBuilder, rpc::client::ClientBuilder, signers::local::PrivateKeySigner};
     use hopr_chain_rpc::client::SnapshotRequestorLayer;
     use hopr_crypto_types::keypairs::Keypair;
 

@@ -1,8 +1,10 @@
-use std::collections::VecDeque;
-use std::fmt::{Display, Formatter};
-use std::iter::Sum;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, Div, SubAssign};
+use std::{
+    collections::VecDeque,
+    fmt::{Display, Formatter},
+    iter::Sum,
+    marker::PhantomData,
+    ops::{AddAssign, Div, SubAssign},
+};
 
 /// Simple Moving Average trait.
 ///

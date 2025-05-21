@@ -1,25 +1,21 @@
 //! This module contains arguments and functions to manage safe and module.
 //! [SafeModuleSubcommands] defines three subcommands: create, move, and migrate.
-//! - [SafeModuleSubcommands::Create] creates staking wallets (safe and node management module)
-//!   and execute necessary on-chain transactions to setup a HOPR node.
-//!   Detailed breakdown of the steps:
+//! - [SafeModuleSubcommands::Create] creates staking wallets (safe and node management module) and execute necessary
+//!   on-chain transactions to setup a HOPR node. Detailed breakdown of the steps:
 //!     - create a Safe proxy instance and HOPR node management module proxy instance
 //!     - include nodes configure default permissions on the created module proxy
 //!     - fund the node and Safe with some native tokens and HOPR tokens respectively
 //!     - approve HOPR tokens to be transferred from the Safe proxy instaces by Channels contract
 //!     - Use manager wallet to add nodes and staking safes to the Network Registry contract
-//! - [SafeModuleSubcommands::Move] moves a node from to an existing Safe.
-//!   Note that the Safe should has a node management module attached and configured.
-//!   Note that the admin key of the old and new safes are the same. This command does not support
-//!   moving nodes to safes controled by a different admin key.
-//!   Note that all the safes involved (old and new) should have a threshold of 1
-//!   Detailed breakdown of the steps:
+//! - [SafeModuleSubcommands::Move] moves a node from to an existing Safe. Note that the Safe should has a node
+//!   management module attached and configured. Note that the admin key of the old and new safes are the same. This
+//!   command does not support moving nodes to safes controled by a different admin key. Note that all the safes
+//!   involved (old and new) should have a threshold of 1 Detailed breakdown of the steps:
 //!     - use old safes to deregister nodes from Node-safe registry
 //!     - use the new safe to include nodes to the module
 //!     - use manager wallet to deregister nodes from the network registry
 //!     - use manager wallet to register nodes with new safes to the network regsitry
-//! - [SafeModuleSubcommands::Migrate] migrates a node to a different network.
-//!   It performs the following steps:
+//! - [SafeModuleSubcommands::Migrate] migrates a node to a different network. It performs the following steps:
 //!     - add the Channel contract of the new network to the module as target and set default permissions.
 //!     - add the Announcement contract as target to the module
 //!     - approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
@@ -54,7 +50,7 @@
 //!     --manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 //!     --private-key 59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d \
 //!     --provider-url "http://localhost:8545"
-//!```
+//! ```
 //!
 //! - Migrate nodes and safe to a new network
 //! ```text
@@ -94,30 +90,28 @@
 //!     --module-address 0x5d46d0c5279fd85ce7365e4d668f415685922839 \
 //!     --provider-url "http://localhost:8545"
 //! ```
-use crate::key_pair::{ArgEnvReader, ManagerPrivateKeyArgs};
-use crate::methods::{
-    debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries, SafeSingleton,
+use std::str::FromStr;
+
+use alloy::primitives::{utils::parse_units, Address, U256};
+use clap::{builder::RangedU64ValueParser, Parser};
+use hopr_bindings::{
+    hoprnetworkregistry::HoprNetworkRegistry, hoprnodesaferegistry::HoprNodeSafeRegistry,
+    hoprnodestakefactory::HoprNodeStakeFactory, hoprtoken::HoprToken,
 };
+use hopr_crypto_types::keypairs::Keypair;
+use tracing::{info, warn};
+
 use crate::{
     environment_config::NetworkProviderArgs,
-    key_pair::{IdentityFileArgs, PrivateKeyArgs},
+    key_pair::{ArgEnvReader, IdentityFileArgs, ManagerPrivateKeyArgs, PrivateKeyArgs},
     methods::{
+        debug_node_safe_module_setup_main, debug_node_safe_module_setup_on_balance_and_registries,
         deploy_safe_module_with_targets_and_nodes, deregister_nodes_from_node_safe_registry_and_remove_from_module,
         include_nodes_to_module, migrate_nodes, register_safes_and_nodes_on_network_registry, transfer_native_tokens,
-        transfer_or_mint_tokens,
+        transfer_or_mint_tokens, SafeSingleton,
     },
     utils::{Cmd, HelperErrors},
 };
-use alloy::primitives::utils::parse_units;
-use alloy::primitives::{Address, U256};
-use clap::{builder::RangedU64ValueParser, Parser};
-use hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry;
-use hopr_bindings::hoprnodesaferegistry::HoprNodeSafeRegistry;
-use hopr_bindings::hoprnodestakefactory::HoprNodeStakeFactory;
-use hopr_bindings::hoprtoken::HoprToken;
-use hopr_crypto_types::keypairs::Keypair;
-use std::str::FromStr;
-use tracing::{info, warn};
 
 /// CLI arguments for `hopli safe-module`
 #[derive(Clone, Debug, Parser)]

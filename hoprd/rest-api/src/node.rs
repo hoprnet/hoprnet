@@ -1,17 +1,16 @@
+use std::{collections::HashMap, sync::Arc};
+
 use axum::{
     extract::{Json, Query, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use futures::{stream::FuturesUnordered, StreamExt};
+use hopr_crypto_types::prelude::Hash;
+use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-use std::{collections::HashMap, sync::Arc};
-
-use hopr_crypto_types::prelude::Hash;
-use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
 
 use crate::{
     checksum_address_serializer, option_checksum_address_serializer, ApiError, ApiErrorStatus, InternalState, BASE_PATH,
@@ -475,7 +474,8 @@ pub(super) async fn channel_graph(
         "indexerLastLogChecksum": "cfde556a7e9ff0848998aa4a9a9f2ccfde556a7e9ff0848998aa4a0cfd8863ae",
     }))]
 #[serde(rename_all = "camelCase")]
-/// Information about the current node. Covers network, addresses, eligibility, connectivity status, contracts addresses and indexer state.
+/// Information about the current node. Covers network, addresses, eligibility, connectivity status, contracts addresses
+/// and indexer state.
 pub(crate) struct NodeInfoResponse {
     #[schema(value_type = String, example = "anvil-localhost")]
     network: String,

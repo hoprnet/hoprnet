@@ -1,15 +1,24 @@
-use crate::errors::CryptoError;
-use crate::errors::CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize};
-use crate::prelude::{HalfKey, SecretKey};
 use cipher::zeroize;
 use generic_array::{ArrayLength, GenericArray};
 use hopr_crypto_random::{random_array, Randomizable};
-use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
-use k256::elliptic_curve::{Group, PrimeField};
-use k256::Secp256k1;
+use k256::{
+    elliptic_curve::{
+        hash2curve::{ExpandMsgXmd, GroupDigest},
+        Group, PrimeField,
+    },
+    Secp256k1,
+};
 use sha3::Sha3_256;
 use subtle::{Choice, ConstantTimeEq};
 use typenum::Unsigned;
+
+use crate::{
+    errors::{
+        CryptoError,
+        CryptoError::{CalculationError, InvalidInputValue, InvalidParameterSize},
+    },
+    prelude::{HalfKey, SecretKey},
+};
 
 /// Generates a random elliptic curve point on the secp256k1 curve (but not a point in infinity).
 /// Returns the encoded secret scalar and the corresponding point.

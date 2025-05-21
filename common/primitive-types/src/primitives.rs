@@ -1,16 +1,24 @@
-use chrono::serde::ts_seconds_option;
-use chrono::{DateTime, Utc};
+use std::{
+    cmp::Ordering,
+    fmt::{Debug, Display, Formatter},
+    ops::{Add, Mul, Sub},
+    str::FromStr,
+};
+
+use chrono::{serde::ts_seconds_option, DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha3::Digest;
-use std::cmp::Ordering;
-use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Add, Mul, Sub};
-use std::str::FromStr;
 
-use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
-use crate::prelude::BytesRepresentable;
-use crate::traits::{IntoEndian, ToHex, UnitaryFloatOps};
+use crate::{
+    errors::{
+        GeneralError,
+        GeneralError::{InvalidInput, ParseError},
+        Result,
+    },
+    prelude::BytesRepresentable,
+    traits::{IntoEndian, ToHex, UnitaryFloatOps},
+};
 
 pub type U256 = primitive_types::U256;
 
@@ -576,11 +584,12 @@ impl<const N: usize> BytesRepresentable for KeyIdent<N> {
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{cmp::Ordering, str::FromStr};
+
     use hex_literal::hex;
     use primitive_types::U256;
-    use std::cmp::Ordering;
-    use std::str::FromStr;
+
+    use super::*;
 
     #[test]
     fn address_tests() -> anyhow::Result<()> {

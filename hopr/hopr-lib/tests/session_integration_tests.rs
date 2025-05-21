@@ -1,17 +1,14 @@
+use std::{collections::HashSet, sync::Arc, time::Duration};
+
 use futures::StreamExt;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_lib::SendMsg;
-use hopr_network_types::prelude::protocol::SessionMessage;
-use hopr_network_types::prelude::*;
+use hopr_network_types::prelude::{protocol::SessionMessage, *};
 use hopr_primitive_types::prelude::Address;
 use hopr_transport::{Session, SessionId, TransportSessionError};
-use hopr_transport_session::transfer_session;
-use hopr_transport_session::Capability;
-use std::collections::HashSet;
-use std::sync::Arc;
-use std::time::Duration;
+use hopr_transport_session::{transfer_session, Capability};
 use tokio::net::UdpSocket;
 
 struct BufferingMsgSender {

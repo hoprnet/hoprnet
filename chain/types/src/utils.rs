@@ -2,6 +2,8 @@
 //! Chain utilities used for testing.
 //!
 //! This used in unit and integration tests.
+use std::str::FromStr;
+
 use alloy::{
     contract::{Error as ContractError, Result as ContractResult},
     network::{ReceiptResponse, TransactionBuilder},
@@ -11,9 +13,6 @@ use alloy::{
     sol,
     sol_types::{SolCall, SolValue},
 };
-use std::str::FromStr;
-use tracing::debug;
-
 use hopr_bindings::{
     hoprchannels::HoprChannels::HoprChannelsInstance,
     hoprnodemanagementmodule::HoprNodeManagementModule,
@@ -22,6 +21,7 @@ use hopr_bindings::{
 };
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
+use tracing::debug;
 use SafeContract::SafeContractInstance;
 
 use crate::{
@@ -371,7 +371,8 @@ where
 /// 1) node should be included to the module
 /// 2) announcement contract should be a target in the module
 ///
-/// Notice that to be able to open channels, the deployed safe should have HOPR tokens and approve token transfer for Channels contract on the token contract.
+/// Notice that to be able to open channels, the deployed safe should have HOPR tokens and approve token transfer for
+/// Channels contract on the token contract.
 ///
 /// Returns (module address, safe address)
 pub async fn deploy_one_safe_one_module_and_setup_for_testing<T, P, N>(

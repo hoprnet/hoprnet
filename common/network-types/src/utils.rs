@@ -1,9 +1,12 @@
+use std::{
+    fmt::{Debug, Display, Formatter},
+    hash::{Hash, Hasher},
+    net::SocketAddr,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use futures::io::{AsyncRead, AsyncWrite};
-use std::fmt::{Debug, Display, Formatter};
-use std::hash::{Hash, Hasher};
-use std::net::SocketAddr;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 /// Joins [futures::AsyncRead] and [futures::AsyncWrite] into a single object.
 pub struct DuplexIO<R, W>(pub R, pub W);
@@ -115,8 +118,9 @@ pub use tokio_utils::copy_duplex;
 
 #[cfg(feature = "runtime-tokio")]
 mod tokio_utils {
-    use super::*;
     use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+
+    use super::*;
 
     #[derive(Debug)]
     enum TransferState {
@@ -152,10 +156,10 @@ mod tokio_utils {
         }
     }
 
-    /// This is a proper re-implementation of Tokio's [`copy_bidirectional_with_sizes`](tokio::io::copy_bidirectional_with_sizes),
-    /// which does not leave the stream in half-open-state when one side closes read or write side.
-    /// Instead, if either side encounters and empty read (EOF indication), the write-side is closed as well
-    /// and vice versa.
+    /// This is a proper re-implementation of Tokio's
+    /// [`copy_bidirectional_with_sizes`](tokio::io::copy_bidirectional_with_sizes), which does not leave the stream
+    /// in half-open-state when one side closes read or write side. Instead, if either side encounters and empty
+    /// read (EOF indication), the write-side is closed as well and vice versa.
     pub async fn copy_duplex<A, B>(
         a: &mut A,
         b: &mut B,
@@ -349,10 +353,11 @@ impl<const S: usize, R: AsyncRead + Unpin> futures::Stream for AsyncReadStreamer
 
 #[cfg(all(feature = "runtime-tokio", test))]
 mod tests {
-    use super::*;
-    use crate::utils::DuplexIO;
     use futures::TryStreamExt;
     use tokio::io::AsyncWriteExt;
+
+    use super::*;
+    use crate::utils::DuplexIO;
 
     #[tokio::test]
     async fn test_copy_duplex() -> anyhow::Result<()> {

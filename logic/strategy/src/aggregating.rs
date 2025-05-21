@@ -6,44 +6,49 @@
 //! will fail if the aggregation takes more than `aggregation_timeout` (in seconds). This does not affect runtime of the
 //! strategy, since the ticket aggregation and awaiting it is performed on a separate thread.
 //!
-//! This strategy listens for two distinct channel events and triggers the interactive aggregation based on different criteria:
+//! This strategy listens for two distinct channel events and triggers the interactive aggregation based on different
+//! criteria:
 //!
 //! ### 1) New winning acknowledged ticket event
 //!
-//! This strategy listens to newly added acknowledged winning tickets and once the amount of tickets in a certain channel reaches
-//! an `aggregation_threshold`, the strategy will initiate ticket aggregation in that channel.
-//! The strategy can independently also check if the unrealized balance (current balance _minus_ total unredeemed unaggregated tickets value) in a certain channel
-//! has not gone over `unrelalized_balance_ratio` percent of the current balance in that channel. If that happens, the strategy will also initiate
-//! ticket aggregation.
+//! This strategy listens to newly added acknowledged winning tickets and once the amount of tickets in a certain
+//! channel reaches an `aggregation_threshold`, the strategy will initiate ticket aggregation in that channel.
+//! The strategy can independently also check if the unrealized balance (current balance _minus_ total unredeemed
+//! unaggregated tickets value) in a certain channel has not gone over `unrelalized_balance_ratio` percent of the
+//! current balance in that channel. If that happens, the strategy will also initiate ticket aggregation.
 //!
 //! ### 2) Channel transition from `Open` to `PendingToClose` event
 //!
-//! If the `aggregate_on_channel_close` flag is set, the aggregation will be triggered once a channel transitions from `Open` to `PendingToClose` state.
-//! This behavior does not have any additional criteria, unlike in the previous event, but there must be at least 2 tickets in the channel.
+//! If the `aggregate_on_channel_close` flag is set, the aggregation will be triggered once a channel transitions from
+//! `Open` to `PendingToClose` state. This behavior does not have any additional criteria, unlike in the previous event,
+//! but there must be at least 2 tickets in the channel.
 //!
 //!
 //! For details on default parameters see [AggregatingStrategyConfig].
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display, Formatter},
+    sync::Arc,
+};
+
 use async_lock::RwLock;
 use async_trait::async_trait;
+use hopr_async_runtime::prelude::{spawn, JoinHandle};
+use hopr_crypto_types::prelude::Hash;
+use hopr_db_sql::{
+    api::tickets::{AggregationPrerequisites, HoprDbTicketOperations},
+    channels::HoprDbChannelOperations,
+};
+use hopr_internal_types::prelude::*;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::SimpleCounter;
+use hopr_transport_ticket_aggregation::TicketAggregatorTrait;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::collections::HashMap;
-use std::fmt::{Debug, Display, Formatter};
-use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use validator::Validate;
 
-use hopr_async_runtime::prelude::{spawn, JoinHandle};
-use hopr_crypto_types::prelude::Hash;
-use hopr_db_sql::api::tickets::{AggregationPrerequisites, HoprDbTicketOperations};
-use hopr_db_sql::channels::HoprDbChannelOperations;
-use hopr_internal_types::prelude::*;
-use hopr_transport_ticket_aggregation::TicketAggregatorTrait;
-
 use crate::{strategy::SingularStrategy, Strategy};
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleCounter;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -88,8 +93,8 @@ pub struct AggregatingStrategyConfig {
     /// Percentage of unrealized balance in unaggregated tickets in a channel
     /// that triggers the ticket aggregation when exceeded.
     ///
-    /// The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed unaggregated tickets.
-    /// This condition is independent of `aggregation_threshold`.
+    /// The unrealized balance in this case is the proportion of the channel balance allocated in unredeemed
+    /// unaggregated tickets. This condition is independent of `aggregation_threshold`.
     ///
     /// Default is 0.9
     #[validate(range(min = 0_f32, max = 1.0_f32))]
@@ -99,8 +104,8 @@ pub struct AggregatingStrategyConfig {
     /// If set, the strategy will automatically aggregate tickets in channel that has transitioned
     /// to the `PendingToClose` state.
     ///
-    /// This happens regardless if `aggregation_threshold` or `unrealized_balance_ratio` thresholds are met on that channel.
-    /// If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
+    /// This happens regardless if `aggregation_threshold` or `unrealized_balance_ratio` thresholds are met on that
+    /// channel. If the aggregation on-close fails, the tickets are automatically sent for redeeming instead.
     ///
     /// Default is true.
     #[default(just_true())]
@@ -295,31 +300,34 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::aggregating::{default_aggregation_threshold, MAX_AGGREGATABLE_TICKET_COUNT};
-    use crate::strategy::SingularStrategy;
+    use std::{ops::Add, pin::pin, sync::Arc, time::Duration};
+
     use anyhow::Context;
     use futures::{pin_mut, FutureExt, StreamExt};
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::accounts::HoprDbAccountOperations;
-    use hopr_db_sql::api::{info::DomainSeparator, tickets::HoprDbTicketOperations};
-    use hopr_db_sql::channels::HoprDbChannelOperations;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::errors::DbSqlError;
-    use hopr_db_sql::info::HoprDbInfoOperations;
-    use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
+    use hopr_db_sql::{
+        accounts::HoprDbAccountOperations,
+        api::{info::DomainSeparator, tickets::HoprDbTicketOperations},
+        channels::HoprDbChannelOperations,
+        db::HoprDb,
+        errors::DbSqlError,
+        info::HoprDbInfoOperations,
+        HoprDbGeneralModelOperations, TargetDb,
+    };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use hopr_transport_ticket_aggregation::{
         AwaitingAggregator, TicketAggregationInteraction, TicketAggregationProcessed,
     };
     use lazy_static::lazy_static;
-    use std::ops::Add;
-    use std::pin::pin;
-    use std::sync::Arc;
-    use std::time::Duration;
     use tokio::time::timeout;
     use tracing::{debug, error};
+
+    use crate::{
+        aggregating::{default_aggregation_threshold, MAX_AGGREGATABLE_TICKET_COUNT},
+        strategy::SingularStrategy,
+    };
 
     #[test]
     fn default_ticket_aggregation_count_is_lower_than_maximum_allowed_ticket_count() -> anyhow::Result<()> {
@@ -481,7 +489,8 @@ mod tests {
                         Err(e) => error!(error = %e, "Failed to received aggregation ticket"),
                     }
                 }
-                //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination, acked_tickets)),
+                //  alice.ack_event_queue.0.start_send(super::TicketAggregationToProcess::ToProcess(destination,
+                // acked_tickets)),
                 _ => panic!("unexpected action happened"),
             };
 
@@ -543,7 +552,7 @@ mod tests {
 
         let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), Arc::new(bob_aggregator));
 
-        //let threshold_ticket = acked_tickets.last().unwrap();
+        // let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy.on_tick().await?;
 
         // Wait until aggregation has finished
@@ -590,7 +599,7 @@ mod tests {
 
         let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), Arc::new(bob_aggregator));
 
-        //let threshold_ticket = acked_tickets.last().unwrap();
+        // let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy.on_tick().await?;
 
         // Wait until aggregation has finished
@@ -649,7 +658,7 @@ mod tests {
 
         let aggregation_strategy = super::AggregatingStrategy::new(cfg, db_bob.clone(), Arc::new(bob_aggregator));
 
-        //let threshold_ticket = acked_tickets.last().unwrap();
+        // let threshold_ticket = acked_tickets.last().unwrap();
         aggregation_strategy.on_tick().await?;
 
         let tickets = db_bob.get_tickets((&channel).into()).await?;

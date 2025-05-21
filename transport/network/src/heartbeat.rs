@@ -4,17 +4,15 @@ use futures::{
     pin_mut, StreamExt,
 };
 use hopr_db_api::peers::HoprDbPeersOperations;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::{histogram_start_measure, metrics::SimpleHistogram};
 use hopr_primitive_types::traits::SaturatingSub;
 use libp2p_identity::PeerId;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
-use validator::Validate;
-
 use tracing::{debug, info};
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::{histogram_start_measure, metrics::SimpleHistogram};
+use validator::Validate;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -28,12 +26,14 @@ lazy_static::lazy_static! {
 
 use hopr_platform::time::native::current_time;
 
-use crate::constants::{
-    DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
-    DEFAULT_MAX_PARALLEL_PINGS,
+use crate::{
+    constants::{
+        DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
+        DEFAULT_MAX_PARALLEL_PINGS,
+    },
+    network::Network,
+    ping::Pinging,
 };
-use crate::network::Network;
-use crate::ping::Pinging;
 
 /// Configuration for the Heartbeat mechanism
 #[serde_as]
@@ -243,10 +243,12 @@ impl<T: Pinging, API: HeartbeatExternalApi> Heartbeat<T, API> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use futures::Stream;
     use std::time::Duration;
+
+    use futures::Stream;
     use tokio::time::sleep;
+
+    use super::*;
 
     fn simple_heartbeat_config() -> HeartbeatConfig {
         HeartbeatConfig {

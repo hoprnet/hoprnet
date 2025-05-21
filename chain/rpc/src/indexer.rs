@@ -7,21 +7,22 @@
 //! historical blockchain data.
 //!
 //! For details on the Indexer see the `chain-indexer` crate.
+use std::pin::Pin;
+
 use alloy::{providers::Provider, rpc::types::Filter};
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::{Stream, StreamExt};
-use std::pin::Pin;
-use tracing::{debug, error, trace, warn};
-
-use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
-use crate::rpc::RpcOperations;
-use crate::transport::HttpRequestor;
-use crate::{BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter};
-
+use futures::{stream::BoxStream, Stream, StreamExt};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
+use tracing::{debug, error, trace, warn};
+
+use crate::{
+    errors::{Result, RpcError, RpcError::FilterIsEmpty},
+    rpc::RpcOperations,
+    transport::HttpRequestor,
+    BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -220,30 +221,36 @@ impl<R: HttpRequestor + 'static + Clone> HoprIndexerRpcOperations for RpcOperati
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::U256;
-    use alloy::rpc::client::ClientBuilder;
-    use alloy::rpc::types::Filter;
-    use alloy::sol_types::SolEvent;
-    use alloy::transports::http::ReqwestTransport;
-    use alloy::transports::layers::RetryBackoffLayer;
+    use std::time::Duration;
+
+    use alloy::{
+        primitives::U256,
+        rpc::{client::ClientBuilder, types::Filter},
+        sol_types::SolEvent,
+        transports::{http::ReqwestTransport, layers::RetryBackoffLayer},
+    };
     use anyhow::Context;
     use futures::StreamExt;
-    use hopr_bindings::hoprchannelsevents::HoprChannelsEvents::{ChannelBalanceIncreased, ChannelOpened};
-    use hopr_bindings::hoprtoken::HoprToken::{Approval, Transfer};
-    use hopr_crypto_types::types::Hash;
-    use std::time::Duration;
+    use hopr_async_runtime::prelude::{sleep, spawn};
+    use hopr_bindings::{
+        hoprchannelsevents::HoprChannelsEvents::{ChannelBalanceIncreased, ChannelOpened},
+        hoprtoken::HoprToken::{Approval, Transfer},
+    };
+    use hopr_chain_types::{ContractAddresses, ContractInstances};
+    use hopr_crypto_types::{
+        keypairs::{ChainKeypair, Keypair},
+        types::Hash,
+    };
     use tokio::time::timeout;
     use tracing::debug;
 
-    use hopr_async_runtime::prelude::{sleep, spawn};
-    use hopr_chain_types::{ContractAddresses, ContractInstances};
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-
-    use crate::client::create_rpc_client_to_anvil;
-    use crate::errors::RpcError;
-    use crate::indexer::split_range;
-    use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
+    use crate::{
+        client::create_rpc_client_to_anvil,
+        errors::RpcError,
+        indexer::split_range,
+        rpc::{RpcOperations, RpcOperationsConfig},
+        BlockWithLogs, HoprIndexerRpcOperations, LogFilter,
+    };
 
     fn filter_bounds(filter: &Filter) -> anyhow::Result<(u64, u64)> {
         Ok((

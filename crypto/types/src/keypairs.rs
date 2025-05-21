@@ -1,16 +1,18 @@
+use std::fmt::Debug;
+
 use digest::Digest;
 use generic_array::{ArrayLength, GenericArray};
+use hopr_crypto_random::random_bytes;
 use hopr_primitive_types::prelude::*;
 use sha2::Sha512;
-use std::fmt::Debug;
 use subtle::{Choice, ConstantTimeEq};
 
-use hopr_crypto_random::random_bytes;
-
-use crate::errors;
-use crate::errors::CryptoError::InvalidInputValue;
-use crate::types::{CompressedPublicKey, OffchainPublicKey, PublicKey};
-use crate::utils::{k256_scalar_from_bytes, random_group_element, x25519_scalar_from_bytes, SecretValue};
+use crate::{
+    errors,
+    errors::CryptoError::InvalidInputValue,
+    types::{CompressedPublicKey, OffchainPublicKey, PublicKey},
+    utils::{k256_scalar_from_bytes, random_group_element, x25519_scalar_from_bytes, SecretValue},
+};
 
 /// Represents a generic key pair
 /// The keypair contains a private key and public key.
@@ -45,8 +47,8 @@ pub trait Keypair: ConstantTimeEq + Sized {
 pub struct OffchainKeypair(SecretValue<typenum::U32>, OffchainPublicKey);
 
 impl Keypair for OffchainKeypair {
-    type SecretLen = typenum::U32;
     type Public = OffchainPublicKey;
+    type SecretLen = typenum::U32;
 
     fn random() -> Self {
         // Safe to unwrap here, as the random bytes length is exact
@@ -114,8 +116,8 @@ impl From<&OffchainKeypair> for libp2p_identity::PeerId {
 pub struct ChainKeypair(SecretValue<typenum::U32>, CompressedPublicKey);
 
 impl Keypair for ChainKeypair {
-    type SecretLen = typenum::U32;
     type Public = CompressedPublicKey;
+    type SecretLen = typenum::U32;
 
     fn random() -> Self {
         let (secret, public) = random_group_element();
@@ -170,9 +172,10 @@ impl From<&ChainKeypair> for Address {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use libp2p_identity::PeerId;
     use subtle::ConstantTimeEq;
+
+    use super::*;
 
     #[test]
     fn test_offchain_keypair() {

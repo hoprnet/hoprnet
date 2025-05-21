@@ -1,8 +1,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use futures::{future::BoxFuture, StreamExt};
-use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-
 use hopr_transport_mixer::{channel, config::MixerConfig};
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
 const SAMPLE_SIZE: usize = 10;
 

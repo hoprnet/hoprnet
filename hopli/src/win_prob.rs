@@ -1,5 +1,5 @@
-//! This module contains arguments and functions to interact with the Winning Probability contract for a privileged account.
-//! It can set the global minimum winning probability and read the current global minimum winning probability.
+//! This module contains arguments and functions to interact with the Winning Probability contract for a privileged
+//! account. It can set the global minimum winning probability and read the current global minimum winning probability.
 //! Some sample commands:
 //! - Set winning probability:
 //! ```text
@@ -17,18 +17,17 @@
 //!     --contracts-root "../ethereum/contracts" \
 //!     --provider-url "http://localhost:8545"
 //! ```
-use crate::key_pair::ArgEnvReader;
-use crate::{
-    environment_config::NetworkProviderArgs,
-    key_pair::PrivateKeyArgs,
-    utils::{Cmd, HelperErrors},
-};
 use alloy::primitives::aliases::U56;
 use clap::Parser;
 use hopr_bindings::hoprwinningprobabilityoracle::HoprWinningProbabilityOracle;
-use hopr_internal_types::prelude::WinningProbability;
-use hopr_internal_types::tickets::EncodedWinProb;
+use hopr_internal_types::{prelude::WinningProbability, tickets::EncodedWinProb};
 use tracing::{debug, info};
+
+use crate::{
+    environment_config::NetworkProviderArgs,
+    key_pair::{ArgEnvReader, PrivateKeyArgs},
+    utils::{Cmd, HelperErrors},
+};
 
 /// CLI arguments for `hopli win-prob`
 #[derive(Clone, Debug, Parser)]

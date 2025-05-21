@@ -1,9 +1,13 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
 
 use futures::Stream;
 use futures_time::task::Sleep;
@@ -172,11 +176,15 @@ impl<S: Stream + Sized> RateLimitExt for S {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use futures::pin_mut;
-    use futures::stream::{self, StreamExt};
-    use futures_time::future::FutureExt;
     use std::time::{Duration, Instant};
+
+    use futures::{
+        pin_mut,
+        stream::{self, StreamExt},
+    };
+    use futures_time::future::FutureExt;
+
+    use super::*;
 
     #[test]
     fn test_rate_controller_set_rate_per_unit() {

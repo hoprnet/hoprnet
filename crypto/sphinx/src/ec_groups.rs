@@ -1,8 +1,7 @@
 use curve25519_dalek::traits::IsIdentity;
-use hopr_crypto_types::errors::Result;
-
 #[cfg(feature = "secp256k1")]
 use elliptic_curve::{ops::MulByGenerator, Group};
+use hopr_crypto_types::errors::Result;
 
 use crate::shared_keys::{Alpha, GroupElement, Scalar, SphinxSuite};
 
@@ -118,9 +117,9 @@ pub struct Secp256k1Suite;
 
 #[cfg(feature = "secp256k1")]
 impl SphinxSuite for Secp256k1Suite {
-    type P = hopr_crypto_types::keypairs::ChainKeypair;
     type E = k256::Scalar;
     type G = k256::ProjectivePoint;
+    type P = hopr_crypto_types::keypairs::ChainKeypair;
     type PRP = hopr_crypto_types::primitives::ChaCha20;
 }
 
@@ -132,9 +131,9 @@ pub struct Ed25519Suite;
 
 #[cfg(feature = "ed25519")]
 impl SphinxSuite for Ed25519Suite {
-    type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::edwards::EdwardsPoint;
+    type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type PRP = hopr_crypto_types::primitives::ChaCha20;
 }
 
@@ -146,16 +145,17 @@ pub struct X25519Suite;
 
 #[cfg(feature = "x25519")]
 impl SphinxSuite for X25519Suite {
-    type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type E = curve25519_dalek::scalar::Scalar;
     type G = curve25519_dalek::montgomery::MontgomeryPoint;
+    type P = hopr_crypto_types::keypairs::OffchainKeypair;
     type PRP = hopr_crypto_types::primitives::ChaCha20;
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::shared_keys::tests::generic_sphinx_suite_test;
     use parameterized::parameterized;
+
+    use crate::shared_keys::tests::generic_sphinx_suite_test;
 
     #[cfg(feature = "secp256k1")]
     #[test]

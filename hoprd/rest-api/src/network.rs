@@ -1,9 +1,10 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{Json, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
-use std::sync::Arc;
 
 use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 

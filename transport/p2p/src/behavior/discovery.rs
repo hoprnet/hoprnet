@@ -3,14 +3,13 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use futures::stream::{BoxStream, Stream, StreamExt};
 use futures_concurrency::stream::Merge;
+use hopr_transport_network::network::NetworkTriggeredEvent;
+use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     swarm::{dial_opts::DialOpts, dummy::ConnectionHandler, CloseConnection, NetworkBehaviour, ToSwarm},
     Multiaddr, PeerId,
 };
 use tracing::debug;
-
-use hopr_transport_network::network::NetworkTriggeredEvent;
-use hopr_transport_protocol::PeerDiscovery;
 
 #[derive(Debug)]
 pub enum DiscoveryInput {
@@ -65,7 +64,6 @@ impl Behaviour {
 
 impl NetworkBehaviour for Behaviour {
     type ConnectionHandler = ConnectionHandler;
-
     type ToSwarm = Event;
 
     fn handle_established_inbound_connection(
@@ -113,9 +111,9 @@ impl NetworkBehaviour for Behaviour {
                 };
             }
             libp2p::swarm::FromSwarm::DialFailure(failure) => {
-                // NOTE: libp2p swarm in the current version removes the (PeerId, Multiaddr) from the cache on a dial failure,
-                // therefore it needs to be readded back to the swarm on every dial failure, for now we want to mirror the entire
-                // announcement back to the swarm
+                // NOTE: libp2p swarm in the current version removes the (PeerId, Multiaddr) from the cache on a dial
+                // failure, therefore it needs to be readded back to the swarm on every dial failure,
+                // for now we want to mirror the entire announcement back to the swarm
                 if let Some(peer_id) = failure.peer_id {
                     if let Some(multiaddress) = self.all_peers.get(&peer_id) {
                         self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {

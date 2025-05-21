@@ -1,18 +1,21 @@
-use proc_macro_regex::regex;
-use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use std::fmt::{Display, Formatter};
-use std::net::ToSocketAddrs;
-use std::num::ParseIntError;
-use std::str::FromStr;
-use std::time::Duration;
-use validator::{Validate, ValidationError};
+use std::{
+    fmt::{Display, Formatter},
+    net::ToSocketAddrs,
+    num::ParseIntError,
+    str::FromStr,
+    time::Duration,
+};
 
-use crate::errors::HoprTransportError;
 use hopr_transport_identity::Multiaddr;
 pub use hopr_transport_network::{config::NetworkConfig, heartbeat::HeartbeatConfig};
 pub use hopr_transport_protocol::config::ProtocolConfig;
 use hopr_transport_session::MIN_BALANCER_SAMPLING_INTERVAL;
+use proc_macro_regex::regex;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use validator::{Validate, ValidationError};
+
+use crate::errors::HoprTransportError;
 
 pub struct HoprTransportConfig {
     pub transport: TransportConfig,

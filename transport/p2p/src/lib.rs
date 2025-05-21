@@ -4,18 +4,22 @@
 //!
 //! ## Modularity
 //!
-//! `rust-libp2p` is highly modular allowing for reimplmenting expected behavior using custom implementations for API traits.
+//! `rust-libp2p` is highly modular allowing for reimplmenting expected behavior using custom implementations for API
+//! traits.
 //!
-//! This way it is possible to experiment with and combine different components of the library in order to construct a specific targeted use case.
+//! This way it is possible to experiment with and combine different components of the library in order to construct a
+//! specific targeted use case.
 //!
 //! ## `rust-libp2p` connectivity
 //!
 //! As per the [official documentation](https://connectivity.libp2p.io/), the connectivity types in the library are divided into the `standalone` (implementation of network over host) and `browser` (implementation of network over browser).
 //!
-//! Nodes that are not located behind a blocking firewall or NAT are designated as **public nodes** and can utilize the `TCP` or `QUIC` connectivity, with the recommendation to use QUIC if possible.
+//! Nodes that are not located behind a blocking firewall or NAT are designated as **public nodes** and can utilize the
+//! `TCP` or `QUIC` connectivity, with the recommendation to use QUIC if possible.
 //!
-//! Browser based solutions are almost always located behind a private network or a blocking firewall and to open a connection towards the standalone nodes these utilize either the `WebSocket` approach (by hijacking the `TCP` connection) or the (not yet fully speced up) `WebTransport` (by hijacking the `QUIC` connection).
-//!
+//! Browser based solutions are almost always located behind a private network or a blocking firewall and to open a
+//! connection towards the standalone nodes these utilize either the `WebSocket` approach (by hijacking the `TCP`
+//! connection) or the (not yet fully speced up) `WebTransport` (by hijacking the `QUIC` connection).
 
 /// Constants exported by the crate.
 pub mod constants;
@@ -29,18 +33,16 @@ pub mod swarm;
 /// P2P behavior definitions for the transport level interactions not related to the HOPR protocol
 mod behavior;
 
+use std::fmt::Debug;
+
 use futures::{AsyncRead, AsyncWrite, Stream};
+use hopr_internal_types::prelude::*;
+use hopr_transport_identity::PeerId;
+use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
+use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{autonat, swarm::NetworkBehaviour, StreamProtocol};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-
-use hopr_internal_types::prelude::*;
-use hopr_transport_identity::PeerId;
-use hopr_transport_network::messaging::ControlMessage;
-use hopr_transport_network::network::NetworkTriggeredEvent;
-use hopr_transport_network::ping::PingQueryReplier;
-use hopr_transport_protocol::PeerDiscovery;
 
 use crate::constants::HOPR_HEARTBEAT_PROTOCOL_V_0_2_0;
 
@@ -144,7 +146,7 @@ impl HoprNetworkBehavior {
             ),
             autonat_client: autonat::v2::client::Behaviour::new(
                 OsRng,
-                autonat::v2::client::Config::default().with_probe_interval(NAT_SERVER_PROBE_INTERVAL), // TODO (jean): make this configurable
+                autonat::v2::client::Config::default().with_probe_interval(NAT_SERVER_PROBE_INTERVAL), /* TODO (jean): make this configurable */
             ),
             autonat_server: autonat::v2::server::Behaviour::new(OsRng),
         }

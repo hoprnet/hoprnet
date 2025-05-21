@@ -38,26 +38,27 @@
 //! the caller should make sure that frames with ID <= `n` will not arrive into the reassembler,
 //! otherwise the [NetworkTypeError::OldSegment] error will be thrown.
 
-use bitvec::array::BitArray;
-use bitvec::{bitarr, BitArr};
-use dashmap::mapref::entry::Entry;
-use dashmap::DashMap;
-use futures::{Sink, Stream};
-use std::collections::BinaryHeap;
-use std::fmt::{Debug, Display, Formatter};
-use std::mem;
-use std::ops::{Add, Sub};
-use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering};
-use std::sync::OnceLock;
-use std::task::{Context, Poll};
-use std::time::{Duration, SystemTime};
+use std::{
+    collections::BinaryHeap,
+    fmt::{Debug, Display, Formatter},
+    mem,
+    ops::{Add, Sub},
+    pin::Pin,
+    sync::{
+        atomic::{AtomicU32, AtomicU64, AtomicU8, Ordering},
+        OnceLock,
+    },
+    task::{Context, Poll},
+    time::{Duration, SystemTime},
+};
 
+use bitvec::{array::BitArray, bitarr, BitArr};
+use dashmap::{mapref::entry::Entry, DashMap};
+use futures::{Sink, Stream};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::AsUnixTimestamp;
 
-use crate::errors::NetworkTypeError;
-use crate::session::errors::SessionError;
+use crate::{errors::NetworkTypeError, session::errors::SessionError};
 
 /// ID of a [Frame].
 pub type FrameId = u32;
@@ -157,7 +158,6 @@ pub struct Segment {
 impl Segment {
     /// Size of the segment header.
     pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<SeqNum>();
-
     /// The minimum size of a segment: [`Segment::HEADER_SIZE`] + 1 byte of data.
     pub const MINIMUM_SIZE: usize = Self::HEADER_SIZE + 1;
 
@@ -298,7 +298,8 @@ impl FrameBuilder {
         }
     }
 
-    /// Reassembles the [Frame]. Returns [`NetworkTypeError::IncompleteFrame`] if not [complete](FrameBuilder::is_complete).
+    /// Reassembles the [Frame]. Returns [`NetworkTypeError::IncompleteFrame`] if not
+    /// [complete](FrameBuilder::is_complete).
     fn reassemble(self) -> crate::session::errors::Result<Frame> {
         if self.is_complete() {
             Ok(Frame {
@@ -634,20 +635,29 @@ impl Sink<Segment> for FrameReassembler {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
+    use std::{
+        collections::{HashSet, VecDeque},
+        convert::identity,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+        time::Duration,
+    };
+
     use async_stream::stream;
     use futures::{pin_mut, Stream, StreamExt, TryStreamExt};
     use hex_literal::hex;
     use lazy_static::lazy_static;
-    use rand::prelude::{Distribution, SliceRandom};
-    use rand::{seq::IteratorRandom, thread_rng, Rng, SeedableRng};
+    use rand::{
+        prelude::{Distribution, SliceRandom},
+        seq::IteratorRandom,
+        thread_rng, Rng, SeedableRng,
+    };
     use rand_distr::Normal;
     use rayon::prelude::*;
-    use std::collections::{HashSet, VecDeque};
-    use std::convert::identity;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Arc;
-    use std::time::Duration;
+
+    use super::*;
 
     const MTU: usize = 448;
     const FRAME_COUNT: u32 = 65_535;
@@ -1104,11 +1114,11 @@ pub(crate) mod tests {
             .collect::<HashSet<_>>();
 
         assert!(computed_missing.par_iter().all(|s| excluded.contains(s)));
-        /*assert!(
-            excluded.par_iter().all(|s| computed_missing.contains(&s)),
-            "seed {}",
-            hex::encode(RAND_SEED.clone())
-        );*/
+        // assert!(
+        // excluded.par_iter().all(|s| computed_missing.contains(&s)),
+        // "seed {}",
+        // hex::encode(RAND_SEED.clone())
+        // );
 
         tokio::time::sleep(Duration::from_millis(25)).await;
         drop(fragmented);

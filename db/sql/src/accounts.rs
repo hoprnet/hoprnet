@@ -1,24 +1,27 @@
 use async_trait::async_trait;
 use futures::TryFutureExt;
 use hopr_crypto_types::prelude::OffchainPublicKey;
-use hopr_db_entity::prelude::{Account, Announcement};
-use hopr_db_entity::{account, announcement};
-use hopr_internal_types::account::AccountType;
-use hopr_internal_types::prelude::AccountEntry;
-use hopr_primitive_types::errors::GeneralError;
-use hopr_primitive_types::prelude::{Address, ToHex};
+use hopr_db_entity::{
+    account, announcement,
+    prelude::{Account, Announcement},
+};
+use hopr_internal_types::{account::AccountType, prelude::AccountEntry};
+use hopr_primitive_types::{
+    errors::GeneralError,
+    prelude::{Address, ToHex},
+};
 use multiaddr::Multiaddr;
-use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter, QueryOrder, Related,
-    Set,
+    sea_query::Expr, ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, IntoActiveModel, ModelTrait, QueryFilter,
+    QueryOrder, Related, Set,
 };
 use sea_query::{Condition, IntoCondition, OnConflict};
 
-use crate::db::HoprDb;
-use crate::errors::DbSqlError::MissingAccount;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::{
+    db::HoprDb,
+    errors::{DbSqlError, DbSqlError::MissingAccount, Result},
+    HoprDbGeneralModelOperations, OptTx,
+};
 
 /// A type that can represent both [chain public key](Address) and [packet public key](OffchainPublicKey).
 #[allow(clippy::large_enum_variant)] // TODO: use CompactOffchainPublicKey
@@ -448,13 +451,15 @@ impl HoprDbAccountOperations for HoprDb {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::errors::DbSqlError;
-    use crate::errors::DbSqlError::DecodingError;
-    use crate::HoprDbGeneralModelOperations;
     use anyhow::Context;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_internal_types::prelude::AccountType::NotAnnounced;
+
+    use super::*;
+    use crate::{
+        errors::{DbSqlError, DbSqlError::DecodingError},
+        HoprDbGeneralModelOperations,
+    };
 
     #[tokio::test]
     async fn test_insert_account_announcement() -> anyhow::Result<()> {

@@ -8,22 +8,24 @@
 //! that must match on any chain event log in a block containing the given transaction hash.
 //!
 //! ### Example
-//! Once the [RegisterSafe(`0x0123..ef`)](hopr_chain_types::actions::Action) action that has been submitted via [ActionQueue](crate::action_queue::ActionQueue)
-//! in a transaction with hash `0xabcd...00`.
+//! Once the [RegisterSafe(`0x0123..ef`)](hopr_chain_types::actions::Action) action that has been submitted via
+//! [ActionQueue](crate::action_queue::ActionQueue) in a transaction with hash `0xabcd...00`.
 //! The [IndexerExpectation] is such that whatever block that will contain the TX hash `0xabcd..00` must also contain
 //! a log that matches [NodeSafeRegistered(`0x0123..ef`)](ChainEventType) event type.
 //! If such event is never encountered by the Indexer, the safe registration action naturally times out.
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    fmt::{Debug, Formatter},
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+};
+
 use async_lock::RwLock;
 use async_trait::async_trait;
 use futures::{channel, FutureExt, TryFutureExt};
 use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use hopr_crypto_types::types::Hash;
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
 use tracing::{debug, error};
 
 use crate::errors::{ChainActionsError, Result};
@@ -32,9 +34,9 @@ use crate::errors::{ChainActionsError, Result};
 /// Also allows mocking in tests.
 pub type ExpectationResolver = Pin<Box<dyn Future<Output = Result<SignificantChainEvent>> + Send>>;
 
-/// Allows tracking state of an [Action](hopr_chain_types::actions::Action) via registering [IndexerExpectations](IndexerExpectation) on
-/// [SignificantChainEvents](SignificantChainEvent) coming from the Indexer and resolving them as they are
-/// matched. Once expectations are matched, they are automatically unregistered.
+/// Allows tracking state of an [Action](hopr_chain_types::actions::Action) via registering
+/// [IndexerExpectations](IndexerExpectation) on [SignificantChainEvents](SignificantChainEvent) coming from the Indexer
+/// and resolving them as they are matched. Once expectations are matched, they are automatically unregistered.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait ActionState {
@@ -163,17 +165,20 @@ impl ActionState for IndexerActionTracker {
 
 #[cfg(test)]
 mod tests {
-    use crate::action_state::{ActionState, IndexerActionTracker, IndexerExpectation};
-    use crate::errors::ChainActionsError;
+    use std::{sync::Arc, time::Duration};
+
     use anyhow::Context;
     use hex_literal::hex;
     use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_primitive_types::prelude::*;
-    use std::sync::Arc;
-    use std::time::Duration;
     use tokio::time::timeout;
+
+    use crate::{
+        action_state::{ActionState, IndexerActionTracker, IndexerExpectation},
+        errors::ChainActionsError,
+    };
 
     lazy_static::lazy_static! {
         // some random address

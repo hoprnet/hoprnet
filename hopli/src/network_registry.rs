@@ -1,12 +1,12 @@
-//! This module contains arguments and functions to interact with the Network Registry contract for a privileged account.
-//! To participate in the HOPR network, a node must be included in the network registry contract.
-//! Nodes and the staking account (Safe) that manages them should be registered as a pair in the Network registry contrat.
-//! Nodes and safes can be registered by either a manager or by the staking account itself.
+//! This module contains arguments and functions to interact with the Network Registry contract for a privileged
+//! account. To participate in the HOPR network, a node must be included in the network registry contract.
+//! Nodes and the staking account (Safe) that manages them should be registered as a pair in the Network registry
+//! contrat. Nodes and safes can be registered by either a manager or by the staking account itself.
 //!
 //! Note the currently only manager wallet can register node-safe pairs. Node runners cannot self-register their nodes.
 //!
-//! A manager (i.e. an account with `MANAGER_ROLE` role), can perform the following actions with `hopli network-registry`,
-//! by specifying the subcommand:
+//! A manager (i.e. an account with `MANAGER_ROLE` role), can perform the following actions with `hopli
+//! network-registry`, by specifying the subcommand:
 //! A manager account can register nodes and safes with `manager-regsiter`
 //! A manager account can deregister nodes with `manager-deregsiter`
 //! A manager account can set eligibility of staking accounts with `manager-force-sync`
@@ -44,21 +44,22 @@
 //!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 //!     --provider-url "http://localhost:8545"
 //! ```
-use crate::key_pair::ArgEnvReader;
+use std::str::FromStr;
+
+use alloy::primitives::Address;
+use clap::Parser;
+use hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry;
+use tracing::info;
+
 use crate::{
     environment_config::NetworkProviderArgs,
-    key_pair::{IdentityFileArgs, PrivateKeyArgs},
+    key_pair::{ArgEnvReader, IdentityFileArgs, PrivateKeyArgs},
     methods::{
         deregister_nodes_from_network_registry, force_sync_safes_on_network_registry,
         register_safes_and_nodes_on_network_registry,
     },
     utils::{Cmd, HelperErrors},
 };
-use alloy::primitives::Address;
-use clap::Parser;
-use hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry;
-use std::str::FromStr;
-use tracing::info;
 
 /// CLI arguments for `hopli network-registry`
 #[derive(Clone, Debug, Parser)]
@@ -154,7 +155,8 @@ pub enum NetworkRegistrySubcommands {
 }
 
 impl NetworkRegistrySubcommands {
-    /// Execute command to register a node and its staking account (safe) with manager privilege and make the safe eligible.
+    /// Execute command to register a node and its staking account (safe) with manager privilege and make the safe
+    /// eligible.
     ///
     /// Manager wallet registers nodes with associated staking accounts
     pub async fn execute_manager_register(
