@@ -5,7 +5,8 @@
 pub mod bounded;
 /// Lists all errors in this crate.
 pub mod errors;
-/// Implements the most primitive types, such as [U256](crate::primitives::U256) or [Address](crate::primitives::Address).
+/// Implements the most primitive types, such as [U256](crate::primitives::U256) or
+/// [Address](crate::primitives::Address).
 pub mod primitives;
 /// Contains various implementations of Simple Moving Average.
 pub mod sma;
@@ -23,11 +24,7 @@ pub fn f64_approx_eq(a: f64, b: f64, epsilon: f64) -> bool {
 }
 
 pub mod prelude {
-    pub use super::errors::GeneralError;
-    pub use super::f64_approx_eq;
-    pub use super::primitives::*;
-    pub use super::sma::*;
-    pub use super::traits::*;
-
     pub use chrono::{DateTime, Utc};
+
+    pub use super::{errors::GeneralError, f64_approx_eq, primitives::*, sma::*, traits::*};
 }

@@ -1,8 +1,10 @@
-use std::collections::VecDeque;
-use std::fmt::{Display, Formatter};
-use std::iter::Sum;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, Div, SubAssign};
+use std::{
+    collections::VecDeque,
+    fmt::{Display, Formatter},
+    iter::Sum,
+    marker::PhantomData,
+    ops::{AddAssign, Div, SubAssign},
+};
 
 /// Simple Moving Average trait.
 ///
@@ -219,7 +221,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::sma::{NoSumSMA, SingleSumSMA, SMA};
+    use crate::sma::{NoSumSMA, SMA, SingleSumSMA};
 
     fn test_sma<T: SMA<u32>>(mut sma: T, window_size: usize) {
         assert_eq!(window_size, sma.window_size(), "invalid windows size");

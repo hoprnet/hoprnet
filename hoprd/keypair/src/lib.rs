@@ -1,6 +1,7 @@
 //! Generates, reads, and writes hopr key material following the Ethereum KeyStore standard.
 //!
-//! Reimplements the `eth_keystore` crate to support WASM which cannot be used because using custom FS access is not foreseen and utilized version of `uuid` cannot use JS `getrandom` entropy.
+//! Reimplements the `eth_keystore` crate to support WASM which cannot be used because using custom FS access is not
+//! foreseen and utilized version of `uuid` cannot use JS `getrandom` entropy.
 //!
 //! Automatically migrates keyStore that only have a `chain_key` to those who also store a `packet_key`.
 //!

@@ -1,29 +1,22 @@
+use std::{collections::HashMap, fmt::Formatter, str::FromStr, sync::Arc};
+
 use async_lock::RwLock;
 use async_signal::{Signal, Signals};
 use futures::StreamExt;
-use std::collections::HashMap;
-use std::fmt::Formatter;
-use std::str::FromStr;
-use std::sync::Arc;
+use hopr_async_runtime::prelude::{JoinHandle, cancel_join_handle, spawn};
+use hopr_lib::{HoprLibProcesses, ToHex};
+use hoprd::{cli::CliArgs, errors::HoprdError, exit::HoprServerIpForwardingReactor};
+use hoprd_api::{ListenerJoinHandles, RestApiParameters, serve_api};
+use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
+use signal_hook::low_level;
+use tracing::{error, info, warn};
+use tracing_subscriber::prelude::*;
 #[cfg(feature = "telemetry")]
 use {
     opentelemetry::trace::TracerProvider,
     opentelemetry_otlp::WithExportConfig as _,
     opentelemetry_sdk::trace::{RandomIdGenerator, Sampler},
 };
-
-use signal_hook::low_level;
-use tracing::{error, info, warn};
-use tracing_subscriber::prelude::*;
-
-use hopr_async_runtime::prelude::{cancel_join_handle, spawn, JoinHandle};
-use hopr_lib::{HoprLibProcesses, ToHex};
-use hoprd::cli::CliArgs;
-use hoprd::errors::HoprdError;
-use hoprd_api::{serve_api, ListenerJoinHandles, RestApiParameters};
-use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
-
-use hoprd::exit::HoprServerIpForwardingReactor;
 
 fn init_logger() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = match tracing_subscriber::EnvFilter::try_from_default_env() {

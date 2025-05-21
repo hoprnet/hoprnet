@@ -1,15 +1,18 @@
-use hex_literal::hex;
-use std::cmp::Ordering;
-use std::fmt::{Display, Formatter};
-use tracing::{debug, error};
+use std::{
+    cmp::Ordering,
+    fmt::{Display, Formatter},
+};
 
+use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use tracing::{debug, error};
 
-use crate::errors;
-use crate::errors::CoreTypesError;
-use crate::prelude::generate_channel_id;
-use crate::prelude::CoreTypesError::InvalidInputData;
+use crate::{
+    errors,
+    errors::CoreTypesError,
+    prelude::{CoreTypesError::InvalidInputData, generate_channel_id},
+};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -40,12 +43,11 @@ pub struct WinningProbability(#[cfg_attr(feature = "serde", serde(with = "serde_
 impl WinningProbability {
     /// 100% winning probability
     pub const ALWAYS: Self = Self([0xff; ENCODED_WIN_PROB_LENGTH]);
-    /// 0% winning probability.
-    pub const NEVER: Self = Self([0u8; ENCODED_WIN_PROB_LENGTH]);
-
     // This value can no longer be represented with the winning probability encoding
     // and is equal to 0
     pub const EPSILON: f64 = 0.00000001;
+    /// 0% winning probability.
+    pub const NEVER: Self = Self([0u8; ENCODED_WIN_PROB_LENGTH]);
 
     /// Converts winning probability to an unsigned integer (luck).
     pub fn as_luck(&self) -> u64 {
@@ -396,12 +398,12 @@ impl TicketBuilder {
             (Some(_), Some(_)) => {
                 return Err(InvalidInputData(
                     "either amount or balance must be set but not both".into(),
-                ))
+                ));
             }
             _ => {
                 return Err(InvalidInputData(
                     "tickets may not have more than 1% of total supply".into(),
-                ))
+                ));
             }
         };
 
@@ -487,8 +489,8 @@ impl From<Ticket> for TicketBuilder {
 ///
 /// # Ticket state machine
 /// See the entire state machine describing the relations of different ticket types below:
-///```mermaid
-///flowchart TB
+/// ```mermaid
+/// flowchart TB
 ///     A[Ticket] -->|verify| B(VerifiedTicket)
 ///     B --> |leak| A
 ///     A --> |sign| B
@@ -499,7 +501,7 @@ impl From<Ticket> for TicketBuilder {
 ///     D --> |into_transferable| F(TransferableWinningTicket)
 ///     E --> |into_transferable| F
 ///     F --> |into_redeemable| E
-///```
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ticket {
@@ -1095,15 +1097,18 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, Response},
     };
-    use hopr_primitive_types::prelude::UnitaryFloatOps;
-    use hopr_primitive_types::primitives::{Address, BalanceType, EthereumChallenge, U256};
+    use hopr_primitive_types::{
+        prelude::UnitaryFloatOps,
+        primitives::{Address, BalanceType, EthereumChallenge, U256},
+    };
+
+    use super::*;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -1285,10 +1290,12 @@ pub mod tests {
             .challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
-        assert!(ticket
-            .leak()
-            .verify(&ALICE.public().to_address(), &Hash::default())
-            .is_ok());
+        assert!(
+            ticket
+                .leak()
+                .verify(&ALICE.public().to_address(), &Hash::default())
+                .is_ok()
+        );
         Ok(())
     }
 

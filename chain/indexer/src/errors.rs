@@ -1,8 +1,6 @@
-use alloy::dyn_abi::Error as AbiError;
-use alloy::sol_types::Error as SolTypeError;
-use thiserror::Error;
-
+use alloy::{dyn_abi::Error as AbiError, sol_types::Error as SolTypeError};
 use hopr_primitive_types::{errors::GeneralError, primitives::Address};
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum CoreEthereumIndexerError {

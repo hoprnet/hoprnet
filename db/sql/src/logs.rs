@@ -1,25 +1,26 @@
 use async_trait::async_trait;
-use futures::{stream, StreamExt};
-use sea_orm::entity::Set;
-use sea_orm::query::QueryTrait;
-use sea_orm::sea_query::{Expr, OnConflict, Value};
+use futures::{StreamExt, stream};
+use hopr_crypto_types::prelude::Hash;
+use hopr_db_api::{
+    errors::{DbError, Result},
+    logs::HoprDbLogOperations,
+};
+use hopr_db_entity::{
+    errors::DbEntityError,
+    log, log_status, log_topic_info,
+    prelude::{Log, LogStatus, LogTopicInfo},
+};
+use hopr_primitive_types::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect,
+    entity::Set,
+    query::QueryTrait,
+    sea_query::{Expr, OnConflict, Value},
 };
 use tracing::{error, trace};
 
-use hopr_crypto_types::prelude::Hash;
-use hopr_db_api::errors::{DbError, Result};
-use hopr_db_api::logs::HoprDbLogOperations;
-use hopr_db_entity::errors::DbEntityError;
-use hopr_db_entity::prelude::{Log, LogStatus, LogTopicInfo};
-use hopr_db_entity::{log, log_status, log_topic_info};
-use hopr_primitive_types::prelude::*;
-
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::{HoprDbGeneralModelOperations, TargetDb};
+use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb, errors::DbSqlError};
 
 #[derive(FromQueryResult)]
 struct BlockNumber {
@@ -448,9 +449,9 @@ fn create_log(raw_log: log::Model, status: log_status::Model) -> crate::errors::
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_store_single_log() {

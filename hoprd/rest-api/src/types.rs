@@ -1,17 +1,20 @@
 // Unified type for PeerId and Address
 //
-// This module provides a unified type for PeerId and Address. This is useful for APIs that accept both PeerId and Address.
-
-use libp2p_identity::PeerId;
-use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display, Formatter};
-use std::str::FromStr;
-use utoipa::ToSchema;
+// This module provides a unified type for PeerId and Address. This is useful for APIs that accept both PeerId and
+// Address.
 
 use core::result::Result;
+use std::{
+    fmt::{Debug, Display, Formatter},
+    str::FromStr,
+};
+
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::prelude::HoprDbResolverOperations;
 use hopr_lib::{Address, GeneralError};
+use libp2p_identity::PeerId;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::ApiErrorStatus;
 

@@ -19,22 +19,26 @@ pub(crate) mod env {
     pub const HOPRD_SESSION_PORT_RANGE: &str = "HOPRD_SESSION_PORT_RANGE";
 }
 
-pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
+use std::{
+    collections::HashMap,
+    error::Error,
+    iter::once,
+    sync::{Arc, atomic::AtomicU16},
+};
 
 use async_lock::RwLock;
 use axum::{
+    Router,
     extract::Json,
-    http::{header::AUTHORIZATION, status::StatusCode, Method},
+    http::{Method, header::AUTHORIZATION, status::StatusCode},
     middleware,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Router,
 };
+use hopr_lib::{Address, Hopr, errors::HoprLibError};
+use hopr_network_types::prelude::IpProtocol;
 use serde::Serialize;
-use std::error::Error;
-use std::iter::once;
-use std::sync::Arc;
-use std::{collections::HashMap, sync::atomic::AtomicU16};
+pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -44,16 +48,14 @@ use tower_http::{
     trace::TraceLayer,
     validate_request::ValidateRequestHeaderLayer,
 };
-use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
-use utoipa::{Modify, OpenApi};
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
+};
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;
 
-use hopr_lib::{errors::HoprLibError, Address, Hopr};
-use hopr_network_types::prelude::IpProtocol;
-
-use crate::config::Auth;
-use crate::session::StoredSessionEntry;
+use crate::{config::Auth, session::StoredSessionEntry};
 
 pub(crate) const BASE_PATH: &str = "/api/v3";
 
@@ -429,10 +431,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::ApiError;
+    use axum::{http::StatusCode, response::IntoResponse};
 
-    use axum::http::StatusCode;
-    use axum::response::IntoResponse;
+    use super::ApiError;
 
     #[test]
     fn test_api_error_to_response() {

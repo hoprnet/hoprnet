@@ -1,50 +1,53 @@
 //! ## Promiscuous Strategy
 //! This strategy opens or closes automatically channels based the following rules:
-//! - if node quality is below or equal to a threshold `network_quality_threshold` and we have a channel opened to it, the strategy will close it
-//!   - if node quality is above `network_quality_threshold` and no channel is opened yet, it will try to open channel to it (with initial stake `new_channel_stake`).
-//!     However, the channel is opened only if the following is both true:
+//! - if node quality is below or equal to a threshold `network_quality_threshold` and we have a channel opened to it,
+//!   the strategy will close it
+//!   - if node quality is above `network_quality_threshold` and no channel is opened yet, it will try to open channel
+//!     to it (with initial stake `new_channel_stake`). However, the channel is opened only if the following is both
+//!     true:
 //!   - the total node balance does not drop below `minimum_node_balance`
 //!   - the number of channels opened by this strategy does not exceed `max_channels`
 //!
 //! Also, the candidates for opening (quality > `network_quality_threshold`), are sorted by best quality first.
-//! So that means if some nodes cannot have a channel opened to them, because we hit `minimum_node_balance` or `max_channels`,
-//! the better quality ones were taking precedence.
+//! So that means if some nodes cannot have a channel opened to them, because we hit `minimum_node_balance` or
+//! `max_channels`, the better quality ones were taking precedence.
 //!
 //! The sorting algorithm is intentionally unstable, so that the nodes which have the same quality get random order.
-//! The constant `k` can be also set to a value > 1, which will make the strategy to open more channels for smaller networks,
-//! but it would keep the same asymptotic properties.
+//! The constant `k` can be also set to a value > 1, which will make the strategy to open more channels for smaller
+//! networks, but it would keep the same asymptotic properties.
 //! Per default `k` = 1.
 //!
-//! The strategy starts acting only after at least `min_network_size_samples` network size samples were gathered, which means
-//! it does not start opening/closing channels earlier than `min_network_size_samples` number of minutes after the node has started.
+//! The strategy starts acting only after at least `min_network_size_samples` network size samples were gathered, which
+//! means it does not start opening/closing channels earlier than `min_network_size_samples` number of minutes after the
+//! node has started.
 //!
 //! For details on default parameters see [PromiscuousStrategyConfig].
-//!
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-use std::collections::HashMap;
-use tracing::{debug, error, info, trace, warn};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display, Formatter},
+    str::FromStr,
+    time::Duration,
+};
 
-use crate::errors::Result;
-use crate::errors::StrategyError::CriteriaNotSatisfied;
-use crate::strategy::SingularStrategy;
-use crate::Strategy;
 use async_trait::async_trait;
 use futures::StreamExt;
 use hopr_chain_actions::channels::ChannelActions;
-use hopr_db_sql::api::peers::PeerSelector;
-use hopr_db_sql::errors::DbSqlError;
-use hopr_db_sql::HoprDbAllOperations;
+use hopr_db_sql::{HoprDbAllOperations, api::peers::PeerSelector, errors::DbSqlError};
+use hopr_internal_types::prelude::*;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::{SimpleCounter, SimpleGauge};
+use hopr_primitive_types::prelude::*;
 use rand::seq::SliceRandom;
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-use std::fmt::{Debug, Display, Formatter};
-use std::str::FromStr;
-use std::time::Duration;
+use serde_with::{DisplayFromStr, serde_as};
+use tracing::{debug, error, info, trace, warn};
 
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{SimpleCounter, SimpleGauge};
+use crate::{
+    Strategy,
+    errors::{Result, StrategyError::CriteriaNotSatisfied},
+    strategy::SingularStrategy,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -264,11 +267,7 @@ impl validator::Validate for PromiscuousStrategyConfig {
             );
         }
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
     }
 }
 
@@ -614,24 +613,22 @@ where
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::Context;
-    use futures::{future::ok, FutureExt};
+    use futures::{FutureExt, future::ok};
     use hex_literal::hex;
     use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use hopr_chain_types::actions::Action;
-    use hopr_chain_types::chain_events::ChainEventType;
+    use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::accounts::HoprDbAccountOperations;
-    use hopr_db_sql::api::peers::HoprDbPeersOperations;
-    use hopr_db_sql::channels::HoprDbChannelOperations;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::info::HoprDbInfoOperations;
-    use hopr_db_sql::HoprDbGeneralModelOperations;
-    use hopr_transport_network::{network::PeerOrigin, PeerId};
+    use hopr_db_sql::{
+        HoprDbGeneralModelOperations, accounts::HoprDbAccountOperations, api::peers::HoprDbPeersOperations,
+        channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
+    };
+    use hopr_transport_network::{PeerId, network::PeerOrigin};
     use lazy_static::lazy_static;
     use mockall::mock;
+
+    use super::*;
 
     lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!(
@@ -843,15 +840,13 @@ mod tests {
             ..Default::default()
         };
 
-        /*
-            Situation:
-            - There are max 3 channels and also 3 are currently opened.
-            - Strategy will close channel to peer 5, because it has quality 0.1
-            - Because of the closure, this means there can be 1 additional channel opened:
-                - Strategy can open channel either to peer 3, 4 or 10 (with qualities 0.8, 0.98 and 1.0 respectively)
-                - It will ignore peer 10 even though it has the highest quality, but does not meet minimum node version
-                - It will prefer peer 4 because it has higher quality than node 3
-        */
+        // Situation:
+        // - There are max 3 channels and also 3 are currently opened.
+        // - Strategy will close channel to peer 5, because it has quality 0.1
+        // - Because of the closure, this means there can be 1 additional channel opened:
+        // - Strategy can open channel either to peer 3, 4 or 10 (with qualities 0.8, 0.98 and 1.0 respectively)
+        // - It will ignore peer 10 even though it has the highest quality, but does not meet minimum node version
+        // - It will prefer peer 4 because it has higher quality than node 3
 
         let mut actions = MockChannelAct::new();
         actions

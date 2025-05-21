@@ -769,11 +769,14 @@
             ];
             programs.rustfmt.enable = true;
             # using the official Nixpkgs formatting
-            # see  # https://github.com/NixOS/rfcs/blob/master/rfcs/0166-nix-formatting.md
+            # see https://github.com/NixOS/rfcs/blob/master/rfcs/0166-nix-formatting.md
             programs.nixfmt.enable = true;
             programs.taplo.enable = true;
             programs.ruff-format.enable = true;
 
+            settings.formatter.rustfmt = {
+              command = "${pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)}/bin/rustfmt";
+            };
             settings.formatter.solc = {
               command = "sh";
               options = [

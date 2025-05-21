@@ -1,34 +1,39 @@
 mod common;
 
-use alloy::primitives::{B256, U256};
-use futures::{pin_mut, StreamExt};
-use hex_literal::hex;
 use std::time::Duration;
-use tracing::info;
 
-use hopr_async_runtime::prelude::{cancel_join_handle, sleep, spawn, JoinHandle};
-use hopr_chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
-use hopr_chain_actions::action_state::{ActionState, IndexerActionTracker};
-use hopr_chain_actions::channels::ChannelActions;
-use hopr_chain_actions::node::NodeActions;
-use hopr_chain_actions::payload::SafePayloadGenerator;
-use hopr_chain_actions::redeem::TicketRedeemActions;
-use hopr_chain_actions::ChainActions;
-use hopr_chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use hopr_chain_api::DefaultHttpRequestor;
-use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use hopr_chain_rpc::client::SnapshotRequestor;
-use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
-use hopr_chain_types::chain_events::ChainEventType;
-use hopr_chain_types::utils::create_anvil;
+use alloy::primitives::{B256, U256};
+use futures::{StreamExt, pin_mut};
+use hex_literal::hex;
+use hopr_async_runtime::prelude::{JoinHandle, cancel_join_handle, sleep, spawn};
+use hopr_chain_actions::{
+    ChainActions,
+    action_queue::{ActionQueue, ActionQueueConfig},
+    action_state::{ActionState, IndexerActionTracker},
+    channels::ChannelActions,
+    node::NodeActions,
+    payload::SafePayloadGenerator,
+    redeem::TicketRedeemActions,
+};
+use hopr_chain_api::{
+    DefaultHttpRequestor,
+    executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig},
+};
+use hopr_chain_indexer::{IndexerConfig, block::Indexer, handlers::ContractEventHandlers};
+use hopr_chain_rpc::{
+    client::SnapshotRequestor,
+    rpc::{RpcOperations, RpcOperationsConfig},
+};
+use hopr_chain_types::{chain_events::ChainEventType, utils::create_anvil};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
+use tracing::info;
 
 use crate::common::{
-    create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node, NodeSafeConfig, TestChainEnv,
+    NodeSafeConfig, TestChainEnv, create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node,
 };
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
@@ -136,7 +141,7 @@ async fn start_node_chain_logic(
 
         while let Some(sce) = rx.next().await {
             let _ = action_state.match_and_resolve(&sce).await;
-            //debug!("{:?}: expectations resolved {:?}", sce, res);
+            // debug!("{:?}: expectations resolved {:?}", sce, res);
         }
     }));
 

@@ -1,18 +1,24 @@
-use crate::errors::DbSqlError;
+use std::{
+    sync::{Arc, Mutex, atomic::AtomicU64},
+    time::Duration,
+};
+
 use dashmap::{DashMap, Entry};
-use hopr_crypto_packet::prelude::{HoprSenderId, HoprSurbId};
-use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener};
+use hopr_crypto_packet::{
+    HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener,
+    prelude::{HoprSenderId, HoprSurbId},
+};
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::info::{IndexerData, SafeInfo};
-use hopr_db_api::prelude::DbError;
+use hopr_db_api::{
+    info::{IndexerData, SafeInfo},
+    prelude::DbError,
+};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::{Address, Balance, KeyIdent, U256};
-use moka::future::Cache;
-use moka::Expiry;
+use moka::{Expiry, future::Cache};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
-use std::sync::atomic::AtomicU64;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+
+use crate::errors::DbSqlError;
 
 /// Lists all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for the long term.

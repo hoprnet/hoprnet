@@ -1,4 +1,5 @@
-//! Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic layers.
+//! Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic
+//! layers.
 //!
 //! ## Contents
 //!
@@ -21,27 +22,31 @@
 //! - `Reply(PeerId, std::result::Result<Ticket, String>, T)`,
 //! - `Send(PeerId, Vec<AcknowledgedTicket>, TicketAggregationFinalizer)`,
 //!
-//! where `U` is the type of an aggregated ticket extractable (`ResponseChannel<Result<Ticket, String>>`) and `T` represents a network negotiated identifier (`RequestId`).
+//! where `U` is the type of an aggregated ticket extractable (`ResponseChannel<Result<Ticket, String>>`) and `T`
+//! represents a network negotiated identifier (`RequestId`).
 //!
 //! In broader context the protocol flow is as follows:
 //!
 //! 1. requesting ticket aggregation
 //!
-//!    - the peer A desires to aggregate tickets, collects the tickets into a data collection and sends a request containing the collection to aggregate `Vec<AcknowledgedTicket>` to peer B using the `Send` mechanism
+//!    - the peer A desires to aggregate tickets, collects the tickets into a data collection and sends a request
+//!      containing the collection to aggregate `Vec<AcknowledgedTicket>` to peer B using the `Send` mechanism
 //!
 //! 2. responding to ticket aggregation
 //!
-//!    - peer B obtains the request from peer A, performs the ticket aggregation and returns a result of that operation in the form of `std::result::Result<Ticket, String>` using the `Reply` mechanism
+//!    - peer B obtains the request from peer A, performs the ticket aggregation and returns a result of that operation
+//!      in the form of `std::result::Result<Ticket, String>` using the `Reply` mechanism
 //!
 //! 3. accepting the aggregated ticket
 //!    - peer A receives the aggregated ticket using the `Receive` mechanism
 //!
 //! Furthermore, apart from the basic positive case scenario, standard mechanics of protocol communication apply:
 //!
-//! - the requesting side can time out, if the responding side takes too long to provide an aggregated ticket, in which case the ticket is not considered aggregated, even if eventually an aggregated ticket is delivered
-//! - the responder can fail to aggregate tickets in which case it replies with an error string describing the failure reason and it is the requester's responsibility to handle the negative case as well
+//! - the requesting side can time out, if the responding side takes too long to provide an aggregated ticket, in which
+//!   case the ticket is not considered aggregated, even if eventually an aggregated ticket is delivered
+//! - the responder can fail to aggregate tickets in which case it replies with an error string describing the failure
+//!   reason and it is the requester's responsibility to handle the negative case as well
 //!   - in the absence of response, the requester will time out
-//!
 
 /// Coder and decoder for the transport binary protocol layer
 mod codec;
@@ -63,24 +68,23 @@ pub mod processor;
 pub mod stream;
 
 pub mod timer;
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_transport_identity::Multiaddr;
-pub use timer::execute_on_tick;
+use std::collections::HashMap;
 
 use futures::{SinkExt, StreamExt};
-use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use std::collections::HashMap;
-use tracing::{error, trace, warn};
-
 use hopr_async_runtime::prelude::spawn;
+use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
-use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
+use hopr_internal_types::{
+    prelude::HoprPseudonym,
+    protocol::{Acknowledgement, ApplicationData},
+};
 use hopr_network_types::prelude::ResolvedTransportRouting;
-use hopr_transport_identity::PeerId;
-
+use hopr_transport_identity::{Multiaddr, PeerId};
 pub use processor::DEFAULT_PRICE_PER_PACKET;
 use processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
+pub use timer::execute_on_tick;
+use tracing::{error, trace, warn};
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 
@@ -146,9 +150,9 @@ pub async fn run_msg_ack_protocol<Db>(
     api: (
         impl futures::Sink<(HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
         impl futures::Stream<Item = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     ),
 ) -> HashMap<ProtocolProcesses, hopr_async_runtime::prelude::JoinHandle<()>>
 where
