@@ -17,10 +17,14 @@ prometheus = ["dep:hopr-metrics", "hopr-transport-network/prometheus"]
 runtime-tokio = ["hopr-async-runtime/runtime-tokio"]
 
 [dependencies]
+anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
+bitcode = { version = "0.6.6", features = ["serde"] }
 futures = { workspace = true }
+futures-concurrency = { workspace = true }
 libp2p-identity = { workspace = true }
+moka = { workspace = true, features = ["future"] }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
@@ -30,6 +34,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 validator = { workspace = true }
 
+hopr-db-api = { workspace = true }
 hopr-async-runtime = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
@@ -43,7 +48,6 @@ hopr-transport-packet = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]
-anyhow = { workspace = true }
 lazy_static = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }

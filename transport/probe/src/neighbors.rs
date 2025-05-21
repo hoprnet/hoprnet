@@ -17,22 +17,6 @@ lazy_static::lazy_static! {
         ).unwrap();
 }
 
-/// Serializable and deserializable enum for the probe message content
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum NeighborProbe {
-    /// Ping message with a random nonce
-    Ping(u128),
-    /// Pong message repliying to a specific nonce
-    Pong(u128),
-}
-
-impl NeighborProbe {
-    /// Returns the nonce of the message
-    pub fn random_ping(&self) -> NeighborProbe {
-        NeighborProbe::Ping(rand::random::<u128>())
-    }
-}
-
 pub fn neighbors_to_probe<T>(fetcher: T, cfg: ProbeConfig) -> impl Stream<Item = PeerId>
 where
     T: PeerDiscoveryFetch + Send + Sync + 'static,

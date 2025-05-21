@@ -1,6 +1,7 @@
 use futures::{Sink, SinkExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::sleep;
-use hopr_crypto_packet::errors::{PacketError, PacketError::TransportError, Result};
+pub use hopr_crypto_packet::errors::PacketError;
+use hopr_crypto_packet::errors::{PacketError::TransportError, Result};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::{
     prelude::HoprDbProtocolOperations,

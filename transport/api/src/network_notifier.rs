@@ -6,11 +6,11 @@ use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 use hopr_path::channel_graph::ChannelGraph;
 use hopr_transport_network::{
-    HoprDbPeersOperations, PeerId,
+    HoprDbPeersOperations,
     network::{Network, NetworkTriggeredEvent},
 };
-use hopr_transport_probe::ping::PingExternalAPI;
-use tracing::{debug, error};
+use hopr_transport_probe::store::{PeerDiscoveryFetch, ProbeStatusUpdate};
+use tracing::{debug, error, trace};
 
 /// Implementor of the ping external API.
 ///
@@ -20,7 +20,7 @@ use tracing::{debug, error};
 /// `Ping` object and keeping both the adaptor and the ping object OCP and SRP
 /// compliant.
 #[derive(Debug, Clone)]
-pub struct PingExternalInteractions<T>
+pub struct ProbeNetworkInteractions<T>
 where
     T: HoprDbPeersOperations + HoprDbResolverOperations + Sync + Send + Clone + std::fmt::Debug,
 {
@@ -32,7 +32,7 @@ where
     emitter: futures::channel::mpsc::Sender<NetworkTriggeredEvent>,
 }
 
-impl<T> PingExternalInteractions<T>
+impl<T> ProbeNetworkInteractions<T>
 where
     T: HoprDbPeersOperations + HoprDbResolverOperations + Sync + Send + Clone + std::fmt::Debug,
 {
@@ -52,16 +52,35 @@ where
 }
 
 #[async_trait]
-impl<T> PingExternalAPI for PingExternalInteractions<T>
+impl<T> PeerDiscoveryFetch for ProbeNetworkInteractions<T>
 where
     T: HoprDbPeersOperations + HoprDbResolverOperations + Sync + Send + Clone + std::fmt::Debug,
 {
-    #[tracing::instrument(level = "info", skip(self))]
-    async fn on_finished_ping(
+    /// Get all peers considered by the `Network` to be pingable.
+    ///
+    /// After a duration of non-pinging based specified by the configurable threshold.
+    #[tracing::instrument(level = "trace", skip(self))]
+    async fn get_peers(&self, from_timestamp: std::time::SystemTime) -> Vec<hopr_transport_network::PeerId> {
+        self.network
+            .find_peers_to_ping(from_timestamp)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::error!(error = %e, "Failed to generate peers for the heartbeat procedure");
+                vec![]
+            })
+    }
+}
+
+#[async_trait]
+impl<T> ProbeStatusUpdate for ProbeNetworkInteractions<T>
+where
+    T: HoprDbPeersOperations + HoprDbResolverOperations + Sync + Send + Clone + std::fmt::Debug,
+{
+    #[tracing::instrument(level = "debug", skip(self))]
+    async fn on_finished(
         &self,
-        peer: &PeerId,
+        peer: &hopr_transport_network::PeerId,
         result: &hopr_transport_probe::errors::Result<std::time::Duration>,
-        version: String,
     ) {
         let result = match &result {
             Ok(duration) => Ok(*duration),
@@ -76,17 +95,13 @@ where
                 g.update_node_score(&chain_key, result.into());
                 debug!(%chain_key, ?result, "update node score for peer");
             } else {
-                error!(%peer, "could not resolve chain key ");
+                error!(%peer, "could not resolve chain key");
             }
         } else {
-            error!(%peer, "encountered invalid peer id:");
+            error!(%peer, "encountered invalid peer id");
         }
 
-        match self
-            .network
-            .update(peer, result, result.is_ok().then_some(version))
-            .await
-        {
+        match self.network.update(peer, result, None).await {
             Ok(Some(updated)) => match updated {
                 NetworkTriggeredEvent::CloseConnection(peer) => {
                     if let Err(e) = self
@@ -98,10 +113,10 @@ where
                     }
                 }
                 NetworkTriggeredEvent::UpdateQuality(peer, quality) => {
-                    debug!("'{peer}' changed quality to '{quality}'");
+                    tracing::trace!(%peer, %quality, "peer changed quality");
                 }
             },
-            Ok(None) => debug!("No update necessary"),
+            Ok(None) => trace!("No update necessary"),
             Err(e) => error!(error = %e, "Encountered error on on updating the collected ping data"),
         }
     }
