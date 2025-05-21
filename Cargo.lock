@@ -5377,7 +5377,6 @@ dependencies = [
  "hopr-network-types",
  "hopr-transport-session",
  "lazy_static",
- "libp2p-identity",
  "oas3",
  "regex",
  "serde",
