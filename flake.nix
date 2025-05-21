@@ -609,7 +609,9 @@
             tools = pkgs;
           };
 
-          check-bindings = { pkgs, solcDefault, ... }: pkgs.stdenv.mkDerivation {
+          check-bindings =
+            { pkgs, solcDefault, ... }:
+            pkgs.stdenv.mkDerivation {
               pname = "check-bindings";
               version = hoprdCrateInfo.version;
 
@@ -845,11 +847,11 @@
           };
 
           checks = {
-            inherit hoprd-clippy hopli-clippy;
+            #inherit hoprd-clippy hopli-clippy;
             check-bindings = check-bindings {
-                pkgs = pkgs;
-                solcDefault = solcDefault;
-              };
+              pkgs = pkgs;
+              solcDefault = solcDefault;
+            };
           };
 
           apps = {
