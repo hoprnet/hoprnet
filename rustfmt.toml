@@ -1,9 +1,17 @@
-edition = "2021"
+edition = "2024"
 max_width = 120
 fn_params_layout = "Tall"
 reorder_imports = true
-# group_imports = "StdExternalCrate"
-# imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+imports_granularity = "Crate"
+comment_width = 120
+condense_wildcard_suffixes = true
+format_code_in_doc_comments = true
+doc_comment_code_block_width = 120
+format_strings = true
+normalize_comments = true
+normalize_doc_attributes = true
+reorder_impl_items = true
+wrap_comments = true
 
-# nightly features:
-#ignore = ["db/entity/src/codegen", "ethereum/bindings/src/codegen"]
+ignore = ["db/entity/src/codegen", "ethereum/bindings/src/codegen"]
