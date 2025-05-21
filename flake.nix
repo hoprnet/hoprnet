@@ -608,6 +608,45 @@
             };
             tools = pkgs;
           };
+
+          check-bindings = { pkgs, solcDefault, ... }: pkgs.stdenv.mkDerivation {
+              pname = "check-bindings";
+              version = hoprdCrateInfo.version;
+
+              src = ./.;
+
+              buildInputs = with pkgs; [
+                diffutils
+                foundry-bin
+                solcDefault
+              ];
+
+              preConfigure = ''
+                mkdir -p ethereum/contracts
+                sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                  ${./ethereum/contracts/foundry.in.toml} > ./ethereum/contracts/foundry.toml
+              '';
+
+              buildPhase = ''
+                cd ./ethereum/contracts
+                forge bind --root . --config-path ./foundry.toml --offline --bindings-path "../bindings/src/codegen" \
+                  --module --alloy --overwrite --skip-extra-derives \
+                  --select "^(HoprAnnouncements|HoprAnnouncementsEvents|HoprCapabilityPermissions|HoprChannels|HoprChannelsEvents|HoprCrypto|HoprDummyProxyForNetworkRegistry|HoprBoost|HoprToken|HoprLedger|HoprLedgerevents|HoprMultisig|HoprNetworkRegistry|HoprNetworkRegistryEvents|HoprNodeManagementModule|HoprNodeSafeRegistry|HoprNodeSafeRegistryEvents|HoprNodeStakeFactory|HoprNodeStakeFactoryEvents|HoprSafeProxyForNetworkRegistry|HoprStakingProxyForNetworkRegistry|HoprTicketPriceOracle|HoprTicketPriceOracleEvents|HoprWinningProbabilityOracle|HoprWinningProbabilityOracleEvents)$"
+              '';
+
+              checkPhase = ''
+                echo "Checking if generated bindings introduced changes..."
+                if [ -d "ethereum/bindings/src/reference" ]; then
+                    echo "Generated bindings are outdated. Please run the binding generation and commit the changes."
+                    exit 1
+                fi
+                echo "Bindings are up to date."
+              '';
+
+              # Disable the installPhase
+              installPhase = ":";
+              doCheck = true;
+            };
           devShell = import ./nix/devShell.nix {
             inherit
               pkgs
@@ -805,7 +844,13 @@
             };
           };
 
-          checks = { inherit hoprd-clippy hopli-clippy; };
+          checks = {
+            inherit hoprd-clippy hopli-clippy;
+            check-bindings = check-bindings {
+                pkgs = pkgs;
+                solcDefault = solcDefault;
+              };
+          };
 
           apps = {
             inherit hoprd-docker-build-and-upload;
