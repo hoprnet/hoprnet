@@ -16,11 +16,14 @@
 //! mechanism can be combined together with the cover traffic into a single mechanism improving
 //! the network view.
 
-pub mod constants;
+pub mod config;
 pub mod errors;
 pub mod heartbeat;
 pub mod messaging;
 pub mod ping;
+
+pub mod neighbors;
+pub mod store;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
 pub enum HoprProbeProcess {

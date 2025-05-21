@@ -41,6 +41,9 @@ hopr-transport-network = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
+lazy_static = { workspace = true }
 mockall = { workspace = true }
 more-asserts = { workspace = true }
 tokio = { workspace = true }
+
+hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
