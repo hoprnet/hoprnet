@@ -621,6 +621,7 @@
                 diffutils
                 foundry-bin
                 solcDefault
+                just
               ];
 
               preConfigure = ''
@@ -630,10 +631,7 @@
               '';
 
               buildPhase = ''
-                cd ./ethereum/contracts
-                forge bind --offline --bindings-path ./../bindings/src/codegen \
-                  --module --alloy --overwrite --skip-cargo-toml \
-                  --select "^(HoprAnnouncements|HoprAnnouncementsEvents|HoprCapabilityPermissions|HoprChannels|HoprChannelsEvents|HoprCrypto|HoprDummyProxyForNetworkRegistry|HoprBoost|HoprToken|HoprLedger|HoprLedgerevents|HoprMultisig|HoprNetworkRegistry|HoprNetworkRegistryEvents|HoprNodeManagementModule|HoprNodeSafeRegistry|HoprNodeSafeRegistryEvents|HoprNodeStakeFactory|HoprNodeStakeFactoryEvents|HoprSafeProxyForNetworkRegistry|HoprStakingProxyForNetworkRegistry|HoprTicketPriceOracle|HoprTicketPriceOracleEvents|HoprWinningProbabilityOracle|HoprWinningProbabilityOracleEvents)$"
+                just generate-bindings
               '';
 
               checkPhase = ''
