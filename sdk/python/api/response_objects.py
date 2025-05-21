@@ -77,7 +77,7 @@ class Infos(ApiResponseObject):
 
 
 class ConnectedPeer(ApiResponseObject):
-    keys = {"address": "peerAddress", "peer_id": "peerId", "version": "reportedVersion", "quality": "quality"}
+    keys = {"address": "address", "version": "reportedVersion", "quality": "quality"}
 
 
 class Channel(ApiResponseObject):
@@ -86,10 +86,8 @@ class Channel(ApiResponseObject):
         "channel_epoch": "channelEpoch",
         "id": "channelId",
         "closure_time": "closureTime",
-        "destination_address": "destinationAddress",
-        "destination_peer_id": "destinationPeerId",
-        "source_address": "sourceAddress",
-        "source_peer_id": "sourcePeerId",
+        "destination": "destination",
+        "source": "source",
         "status": "status",
         "ticket_index": "ticketIndex",
     }

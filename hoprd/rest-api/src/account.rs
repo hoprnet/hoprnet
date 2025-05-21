@@ -16,21 +16,16 @@ use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-    "hopr": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
     "native": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"
 }))]
 #[serde(rename_all = "camelCase")]
-/// Contains the node's HOPR and native addresses.
+/// Contains the node's native addresses.
 pub(crate) struct AccountAddressesResponse {
     #[schema(example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6")]
     native: String,
-    #[schema(example = "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS")]
-    hopr: String,
 }
 
-/// Get node's HOPR and native addresses.
-///
-/// HOPR address is represented by the P2P PeerId and can be used by other node owner to interact with this node.
+/// Get node's native addresses.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/account/addresses"),
@@ -48,7 +43,6 @@ pub(crate) struct AccountAddressesResponse {
 pub(super) async fn addresses(State(state): State<Arc<InternalState>>) -> impl IntoResponse {
     let addresses = AccountAddressesResponse {
         native: state.hopr.me_onchain().to_checksum(),
-        hopr: state.hopr.me_peer_id().to_string(),
     };
 
     (StatusCode::OK, Json(addresses)).into_response()

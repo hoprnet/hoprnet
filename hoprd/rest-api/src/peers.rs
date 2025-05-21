@@ -3,18 +3,19 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
+use hopr_db_api::resolver::HoprDbResolverOperations;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
 use std::sync::Arc;
 use tracing::debug;
 
-use hopr_lib::errors::{HoprLibError, HoprStatusError};
+use hopr_lib::{
+    errors::{HoprLibError, HoprStatusError},
+    Address, PeerId,
+};
 use hopr_lib::{HoprTransportError, Multiaddr};
 
-use crate::{
-    types::{HoprIdentifier, PeerOrAddress},
-    ApiError, ApiErrorStatus, InternalState, BASE_PATH,
-};
+use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -42,7 +43,7 @@ pub(crate) struct NodePeerInfoResponse {
 pub(crate) struct DestinationParams {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    destination: PeerOrAddress,
+    destination: Address,
 }
 
 /// Returns transport-related information about the given peer.
@@ -53,7 +54,7 @@ pub(crate) struct DestinationParams {
     get,
     path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}"),
     params(
-        ("destination" = String, Path, description = "PeerID or address of the requested peer", example = "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA")
+        ("destination" = String, Path, description = "Address of the requested peer", example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"),
     ),
     responses(
         (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfoResponse),
@@ -73,15 +74,18 @@ pub(super) async fn show_peer_info(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
-        Ok(destination) => Ok((
+    match hopr.peer_resolver().resolve_packet_key(&destination).await {
+        Ok(Some(offchain_key)) => Ok((
             StatusCode::OK,
             Json(NodePeerInfoResponse {
-                announced: hopr.multiaddresses_announced_on_chain(&destination.peer_id).await,
-                observed: hopr.network_observed_multiaddresses(&destination.peer_id).await,
+                announced: hopr
+                    .multiaddresses_announced_on_chain(&PeerId::from(offchain_key))
+                    .await,
+                observed: hopr.network_observed_multiaddresses(&PeerId::from(offchain_key)).await,
             }),
         )),
-        Err(e) => Err(e.into_response()),
+        Ok(None) => Err(ApiErrorStatus::PeerNotFound),
+        Err(_) => Err(ApiErrorStatus::PeerNotFound),
     }
 }
 
@@ -107,7 +111,7 @@ pub(crate) struct PingResponse {
     path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}/ping"),
     description = "Directly ping the given peer",
     params(
-        ("destination" = String, Path, description = "PeerID or address of the requested peer", example = "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"),
+        ("destination" = String, Path, description = "Address of the requested peer", example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6"),
     ),
     responses(
         (status = 200, description = "Ping successful", body = PingResponse),
@@ -132,8 +136,8 @@ pub(super) async fn ping_peer(
 
     let hopr = state.hopr.clone();
 
-    match HoprIdentifier::new_with(destination, hopr.peer_resolver()).await {
-        Ok(destination) => match hopr.ping(&destination.peer_id).await {
+    match hopr.peer_resolver().resolve_packet_key(&destination).await {
+        Ok(Some(offchain_key)) => match hopr.ping(&PeerId::from(offchain_key)).await {
             Ok((latency, status)) => {
                 let resp = Json(PingResponse {
                     latency: latency / 2,
@@ -158,6 +162,7 @@ pub(super) async fn ping_peer(
             }
             Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),
         },
-        Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, e).into_response()),
+        Ok(None) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
+        Err(_) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::PeerNotFound).into_response()),
     }
 }
