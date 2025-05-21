@@ -5,18 +5,16 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
+use hopr_db_api::resolver::HoprDbResolverOperations;
 use hopr_lib::{
-    HoprTransportError, Multiaddr,
+    Address, HoprTransportError, Multiaddr, PeerId,
     errors::{HoprLibError, HoprStatusError},
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, DurationMilliSeconds, serde_as};
 use tracing::debug;
 
-use crate::{
-    ApiError, ApiErrorStatus, BASE_PATH, InternalState,
-    types::{HoprIdentifier, PeerOrAddress},
-};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]

@@ -5,15 +5,9 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use futures::StreamExt;
-use futures::stream::FuturesUnordered;
-use serde::{Deserialize, Serialize};
-use serde_with::{DisplayFromStr, serde_as};
-use std::{collections::HashMap, sync::Arc};
-
+use futures::{StreamExt, stream::FuturesUnordered};
 use hopr_crypto_types::prelude::Hash;
 use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
-use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 

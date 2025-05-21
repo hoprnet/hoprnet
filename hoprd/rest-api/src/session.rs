@@ -1,8 +1,5 @@
 use std::{fmt::Formatter, future::Future, net::IpAddr, str::FromStr, sync::Arc};
 
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, ListenerId};
-use axum::Error;
-use axum::extract::Path;
 use axum::{
     Error,
     extract::{
@@ -16,22 +13,21 @@ use axum_extra::extract::Query;
 use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
-use hopr_lib::errors::HoprLibError;
-use hopr_lib::{Address, transfer_session};
-use hopr_lib::{HoprSession, ServiceId, SessionClientConfig, SessionTarget};
-use hopr_lib::{SESSION_PAYLOAD_SIZE, SurbBalancerConfig};
-use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
-use hopr_network_types::udp::ForeignDataMode;
-use hopr_network_types::utils::AsyncReadStreamer;
+use hopr_lib::{
+    Address, HoprSession, SESSION_PAYLOAD_SIZE, ServiceId, SessionClientConfig, SessionTarget, SurbBalancerConfig,
+    errors::HoprLibError, transfer_session,
+};
+use hopr_network_types::{
+    prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism},
+    udp::ForeignDataMode,
+    utils::AsyncReadStreamer,
+};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use tokio::net::TcpListener;
 use tracing::{debug, error, info, trace};
 
-use crate::{
-    ApiError, ApiErrorStatus, BASE_PATH, InternalState, ListenerId,
-    types::{HoprIdentifier, PeerOrAddress},
-};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, ListenerId};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;

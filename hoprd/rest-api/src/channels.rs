@@ -6,15 +6,15 @@ use axum::{
     response::IntoResponse,
 };
 use futures::TryFutureExt;
-use serde::{Deserialize, Serialize};
-use serde_with::{DisplayFromStr, serde_as};
-
-use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer};
 use hopr_crypto_types::types::Hash;
 use hopr_lib::{
     Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry, ChannelStatus, ToHex,
     errors::{HoprLibError, HoprStatusError},
 };
+use serde::{Deserialize, Serialize};
+use serde_with::{DisplayFromStr, serde_as};
+
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
