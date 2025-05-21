@@ -1,6 +1,6 @@
 pub mod skip_queue;
 
-#[cfg(any(feature = "testing", test))]
+#[cfg(test)]
 pub mod test;
 
 use std::cmp::Ordering;

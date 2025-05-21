@@ -32,7 +32,7 @@ use frames::{FrameDashMap, FrameHashMap, FrameMap};
 pub use segmenter::Segmenter;
 use tracing::Instrument;
 
-#[cfg(any(test, feature = "testing"))]
+#[cfg(test)]
 pub use utils::test as testing;
 
 fn build_reconstructor<M: FrameMap + Send + 'static>(
