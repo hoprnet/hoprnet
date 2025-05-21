@@ -17,13 +17,21 @@ use serde_with::{DurationSeconds, serde_as};
 use tracing::{debug, info};
 use validator::Validate;
 
-use crate::{
-    constants::{
-        DEFAULT_HEARTBEAT_INTERVAL, DEFAULT_HEARTBEAT_INTERVAL_VARIANCE, DEFAULT_HEARTBEAT_THRESHOLD,
-        DEFAULT_MAX_PARALLEL_PINGS,
-    },
-    ping::Pinging,
-};
+use crate::ping::Pinging;
+
+/// Interval to run heartbeat rounds, must include enough
+/// time to traverse NATs
+pub(crate) const DEFAULT_HEARTBEAT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Time after which the availability of a node gets rechecked
+pub(crate) const DEFAULT_HEARTBEAT_THRESHOLD: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Randomization of the heartbeat interval to make sure not
+/// all the nodes start their interval at the same time
+pub(crate) const DEFAULT_HEARTBEAT_INTERVAL_VARIANCE: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// The maximum number of parallel probes the heartbeat performs
+pub(crate) const DEFAULT_MAX_PARALLEL_PINGS: usize = 25;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
