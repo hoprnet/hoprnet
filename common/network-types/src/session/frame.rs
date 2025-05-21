@@ -70,6 +70,9 @@ pub type SeqNum = u8;
 #[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
 pub struct SegmentId(pub FrameId, pub SeqNum);
 
+const EVICTION_TIME_THRESHOLD_MS: u64 = 50;
+const PUSH_TIME_THRESHOLD_MS: u64 = 50;
+
 impl From<&Segment> for SegmentId {
     fn from(value: &Segment) -> Self {
         value.id()
@@ -225,6 +228,7 @@ impl TryFrom<&[u8]> for Segment {
 #[derive(Debug)]
 struct FrameBuilder {
     frame_id: FrameId,
+    _initiated: std::time::Instant,
     segments: Vec<OnceLock<Box<[u8]>>>,
     remaining: AtomicU8,
     last_ts: AtomicU64,
@@ -242,6 +246,7 @@ impl FrameBuilder {
     fn empty(frame_id: FrameId, seq_len: SeqNum) -> Self {
         Self {
             frame_id,
+            _initiated: std::time::Instant::now(),
             segments: vec![OnceLock::new(); seq_len as usize],
             remaining: AtomicU8::new(seq_len),
             last_ts: AtomicU64::new(0),
@@ -444,6 +449,9 @@ impl FrameReassembler {
     /// Emits the frame if it is the next in sequence and complete.
     /// If it is not next in the sequence or incomplete, it is discarded forever.
     fn emit_if_complete_discard_otherwise(&self, builder: FrameBuilder) -> crate::session::errors::Result<()> {
+        let time_spent = builder._initiated.elapsed();
+        let frame_id = builder.frame_id;
+
         if self.next_emitted_frame.fetch_add(1, Ordering::SeqCst) == builder.frame_id && builder.is_complete() {
             self.reassembled
                 .unbounded_send(builder.reassemble())
@@ -455,6 +463,9 @@ impl FrameReassembler {
         }
         self.last_emission
             .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+
+        tracing::trace!(frame_id, ?time_spent, "frame finished");
+
         Ok(())
     }
 
@@ -467,9 +478,12 @@ impl FrameReassembler {
             return Err(SessionError::ReassemblerClosed);
         }
 
+        let start = std::time::Instant::now();
+
         // Check if this frame has not been emitted yet.
         let frame_id = segment.frame_id;
         if frame_id < self.next_emitted_frame.load(Ordering::SeqCst) {
+            tracing::trace!("trying to push segment of a frame that has been emitted");
             return Err(SessionError::OldSegment(frame_id));
         }
 
@@ -485,12 +499,18 @@ impl FrameReassembler {
                         .compare_exchange(frame_id, frame_id + 1, Ordering::SeqCst, Ordering::Relaxed)
                         .is_ok()
                 {
+                    let builder = e.remove();
+                    let time_spent = builder._initiated.elapsed();
+
                     // Emit this complete frame
                     self.reassembled
-                        .unbounded_send(e.remove().reassemble())
+                        .unbounded_send(builder.reassemble())
                         .map_err(|_| SessionError::ReassemblerClosed)?;
                     self.last_emission
                         .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+
+                    tracing::trace!(frame_id, ?time_spent, "frame finished");
+
                     cascade = true; // Try to emit next frames in sequence
                 }
             }
@@ -503,12 +523,17 @@ impl FrameReassembler {
                         .compare_exchange(frame_id, frame_id + 1, Ordering::SeqCst, Ordering::Relaxed)
                         .is_ok()
                 {
+                    let time_spent = builder._initiated.elapsed();
+
                     // Emit this frame if already complete
                     self.reassembled
                         .unbounded_send(builder.reassemble())
                         .map_err(|_| SessionError::ReassemblerClosed)?;
                     self.last_emission
                         .store(current_time().as_unix_timestamp().as_millis() as u64, Ordering::Relaxed);
+
+                    tracing::trace!(frame_id, ?time_spent, "frame finished");
+
                     cascade = true; // Try to emit the next frames in sequence
                 } else {
                     // If not complete nor the next one to be emitted, just start building it
@@ -527,6 +552,11 @@ impl FrameReassembler {
                 // If the frame is complete, push it out as reassembled
                 self.emit_if_complete_discard_otherwise(builder)?;
             }
+        }
+
+        let push_time = start.elapsed();
+        if push_time > Duration::from_millis(PUSH_TIME_THRESHOLD_MS) {
+            tracing::trace!(?push_time, "segment push done");
         }
 
         Ok(())
@@ -564,6 +594,8 @@ impl FrameReassembler {
             return Ok(0);
         }
 
+        let start = std::time::Instant::now();
+
         let cutoff = current_time().sub(self.max_age).as_unix_timestamp().as_millis() as u64;
         let mut count = 0;
         loop {
@@ -583,8 +615,14 @@ impl FrameReassembler {
                 count += 1;
             } else {
                 // Break on the first incomplete and non-expired frame
+                tracing::trace!(incomplete = self.sequences.len(), "incomplete frames in reassembler");
                 break;
             }
+        }
+
+        let eviction_time = start.elapsed();
+        if eviction_time > Duration::from_millis(EVICTION_TIME_THRESHOLD_MS) {
+            tracing::trace!(?eviction_time, count, "eviction done");
         }
 
         Ok(count)

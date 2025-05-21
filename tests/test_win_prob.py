@@ -385,8 +385,8 @@ class TestWinProbWithSwarm:
                     Protocol.UDP,
                     swarm7[src],
                     swarm7[dest],
-                    fwd_path={"IntermediatePath": [swarm7[relay].peer_id]},
-                    return_path={"IntermediatePath": [swarm7[relay].peer_id]},
+                    fwd_path={"IntermediatePath": [swarm7[relay].address]},
+                    return_path={"IntermediatePath": [swarm7[relay].address]},
                     use_response_buffer=None,
                 ):
                     was_active = True
