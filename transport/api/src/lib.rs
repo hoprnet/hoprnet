@@ -72,8 +72,8 @@ use hopr_transport_packet::prelude::*;
 pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use hopr_transport_probe::{
     HoprProbeProcess,
-    heartbeat::{Heartbeat, HeartbeatExternalInteractions},
     ping::{PingConfig, Pinger, Pinging},
+    probe_network,
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
 pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
@@ -393,7 +393,7 @@ where
 
         self.process_packet_send
             .clone()
-            .set(MsgSender::new(external_msg_send))
+            .set(MsgSender::new(external_msg_send.clone()))
             .expect("must set the packet processing writer only once");
 
         self.process_ticket_aggregate
@@ -505,50 +505,56 @@ where
         let (tx_from_probing, rx_from_probing) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
 
-        // manual ping
-        let (ping_tx, ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+        probe_network(
+            (external_msg_send, rx_from_protocol),
+            self.network.clone(),
+            self.cfg.probe,
+        )
+        .await;
+        // // manual ping
+        // let (ping_tx, ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
-        let ping_cfg = PingConfig {
-            timeout: self.cfg.protocol.heartbeat.timeout,
-            max_parallel_pings: self.cfg.heartbeat.max_parallel_probes,
-        };
+        // let ping_cfg = PingConfig {
+        //     timeout: self.cfg.protocol.heartbeat.timeout,
+        //     max_parallel_pings: self.cfg.heartbeat.max_parallel_probes,
+        // };
 
-        let ping: Pinger<network_notifier::PingExternalInteractions<T>> = Pinger::new(
-            ping_cfg,
-            ping_tx.clone(),
-            network_notifier::PingExternalInteractions::new(
-                self.network.clone(),
-                self.db.clone(),
-                self.path_planner.channel_graph(),
-                network_events_tx,
-            ),
-        );
+        // let ping: Pinger<network_notifier::PingExternalInteractions<T>> = Pinger::new(
+        //     ping_cfg,
+        //     ping_tx.clone(),
+        //     network_notifier::PingExternalInteractions::new(
+        //         self.network.clone(),
+        //         self.db.clone(),
+        //         self.path_planner.channel_graph(),
+        //         network_events_tx,
+        //     ),
+        // );
 
-        self.ping
-            .clone()
-            .set(ping)
-            .expect("must set the ping executor only once");
+        // self.ping
+        //     .clone()
+        //     .set(ping)
+        //     .expect("must set the ping executor only once");
 
-        // heartbeat
-        let mut heartbeat = Heartbeat::new(
-            self.cfg.heartbeat,
-            self.ping
-                .get()
-                .expect("Ping should be initialized at this point")
-                .clone(),
-            HeartbeatExternalInteractions::new(self.network.clone()),
-            Box::new(|dur| Box::pin(sleep(dur))),
-        );
+        // // heartbeat
+        // let mut heartbeat = Heartbeat::new(
+        //     self.cfg.heartbeat,
+        //     self.ping
+        //         .get()
+        //         .expect("Ping should be initialized at this point")
+        //         .clone(),
+        //     HeartbeatExternalInteractions::new(self.network.clone()),
+        //     Box::new(|dur| Box::pin(sleep(dur))),
+        // );
 
-        let half_the_hearbeat_interval = self.cfg.heartbeat.interval / 4;
-        processes.insert(
-            HoprTransportProcess::Probing(HoprProbeProcess::Heartbeat),
-            spawn(async move {
-                // present to make sure that the heartbeat does not start immediately
-                hopr_async_runtime::prelude::sleep(half_the_hearbeat_interval).await;
-                heartbeat.heartbeat_loop().await
-            }),
-        );
+        // let half_the_hearbeat_interval = self.cfg.heartbeat.interval / 4;
+        // processes.insert(
+        //     HoprTransportProcess::Probing(HoprProbeProcess::Heartbeat),
+        //     spawn(async move {
+        //         // present to make sure that the heartbeat does not start immediately
+        //         hopr_async_runtime::prelude::sleep(half_the_hearbeat_interval).await;
+        //         heartbeat.heartbeat_loop().await
+        //     }),
+        // );
 
         // -- session management
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());

@@ -28,8 +28,6 @@ futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = [
   "noise",
-  "request-response",
-  "cbor",
   "macros",
   "tcp",
   "autonat",

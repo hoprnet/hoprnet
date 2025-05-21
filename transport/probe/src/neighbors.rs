@@ -5,7 +5,7 @@ use hopr_metrics::{histogram_start_measure, metrics::SimpleHistogram};
 use libp2p_identity::PeerId;
 use rand::seq::SliceRandom;
 
-use crate::{config::ProbeConfig, store::PeerDiscoveryFetcher};
+use crate::{config::ProbeConfig, store::PeerDiscoveryFetch};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -17,9 +17,25 @@ lazy_static::lazy_static! {
         ).unwrap();
 }
 
+/// Serializable and deserializable enum for the probe message content
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum NeighborProbe {
+    /// Ping message with a random nonce
+    Ping(u128),
+    /// Pong message repliying to a specific nonce
+    Pong(u128),
+}
+
+impl NeighborProbe {
+    /// Returns the nonce of the message
+    pub fn random_ping(&self) -> NeighborProbe {
+        NeighborProbe::Ping(rand::random::<u128>())
+    }
+}
+
 pub fn neighbors_to_probe<T>(fetcher: T, cfg: ProbeConfig) -> impl Stream<Item = PeerId>
 where
-    T: PeerDiscoveryFetcher + Send + Sync + 'static,
+    T: PeerDiscoveryFetch + Send + Sync + 'static,
 {
     stream! {
         let mut rng = hopr_crypto_random::rng();
@@ -52,13 +68,13 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::store::MockPeerDiscoveryFetcher;
+    use crate::store::MockPeerDiscoveryFetch;
 
     const TINY_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20);
 
     #[tokio::test]
     async fn peers_should_not_be_passed_if_none_are_present() -> anyhow::Result<()> {
-        let mut fetcher = MockPeerDiscoveryFetcher::new();
+        let mut fetcher = MockPeerDiscoveryFetch::new();
         fetcher.expect_get_peers().returning(|_| vec![]);
 
         let stream = neighbors_to_probe(fetcher, Default::default());
@@ -75,7 +91,7 @@ mod tests {
 
     #[tokio::test]
     async fn peers_should_have_randomized_order() -> anyhow::Result<()> {
-        let mut fetcher = MockPeerDiscoveryFetcher::new();
+        let mut fetcher = MockPeerDiscoveryFetch::new();
         fetcher.expect_get_peers().returning(|_| RANDOM_PEERS.clone());
 
         let stream = neighbors_to_probe(fetcher, Default::default());
@@ -97,7 +113,7 @@ mod tests {
             ..Default::default()
         };
 
-        let mut fetcher = MockPeerDiscoveryFetcher::new();
+        let mut fetcher = MockPeerDiscoveryFetch::new();
         fetcher
             .expect_get_peers()
             .times(2)
