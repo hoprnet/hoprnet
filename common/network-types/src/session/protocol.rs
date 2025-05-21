@@ -49,15 +49,20 @@
 //! frames. There can be at most [`MAX_ACK_FRAMES`](FrameAcknowledgements::MAX_ACK_FRAMES)
 //! per message. If more frames need to be acknowledged, more messages need to be sent.
 //! If the message contains fewer entries, it is padded with zeros (0 is not a valid frame ID).
-//!
-use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{Display, Formatter};
-use std::mem;
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, BTreeSet},
+    fmt::{Display, Formatter},
+    mem,
+};
 
-use crate::errors::NetworkTypeError;
-use crate::session::errors::SessionError;
-use crate::session::frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum};
+use crate::{
+    errors::NetworkTypeError,
+    session::{
+        errors::SessionError,
+        frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum},
+    },
+};
 
 /// Holds the Segment Retransmission Request message.
 /// That is an ordered map of frame IDs and a bitmap of missing segments in each frame.
@@ -68,13 +73,10 @@ pub struct SegmentRequest<const C: usize>(BTreeMap<FrameId, SeqNum>);
 impl<const C: usize> SegmentRequest<C> {
     /// Size of a single segment retransmission request entry.
     pub const ENTRY_SIZE: usize = mem::size_of::<FrameId>() + mem::size_of::<SeqNum>();
-
-    /// Maximum number of missing segments per frame.
-    pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = mem::size_of::<SeqNum>() * 8;
-
     /// Maximum number of segment retransmission entries.
     pub const MAX_ENTRIES: usize = Self::SIZE / Self::ENTRY_SIZE;
-
+    /// Maximum number of missing segments per frame.
+    pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = mem::size_of::<SeqNum>() * 8;
     pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
 
     /// Returns the number of segments to retransmit.
@@ -104,8 +106,8 @@ impl Iterator for SegmentIdIter {
 }
 
 impl<const C: usize> IntoIterator for SegmentRequest<C> {
-    type Item = SegmentId;
     type IntoIter = SegmentIdIter;
+    type Item = SegmentId;
 
     fn into_iter(self) -> Self::IntoIter {
         let seq_size = mem::size_of::<SeqNum>() * 8;
@@ -191,7 +193,6 @@ pub struct FrameAcknowledgements<const C: usize>(BTreeSet<FrameId>);
 impl<const C: usize> FrameAcknowledgements<C> {
     /// Maximum number of [frame IDs](FrameId) that can be accommodated.
     pub const MAX_ACK_FRAMES: usize = Self::SIZE / mem::size_of::<FrameId>();
-
     pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
 
     /// Pushes the frame ID.
@@ -234,8 +235,8 @@ impl<const C: usize> From<Vec<FrameId>> for FrameAcknowledgements<C> {
 }
 
 impl<const C: usize> IntoIterator for FrameAcknowledgements<C> {
-    type Item = FrameId;
     type IntoIter = std::collections::btree_set::IntoIter<Self::Item>;
+    type Item = FrameId;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -302,22 +303,18 @@ impl<const C: usize> SessionMessage<C> {
     /// This is currently the version byte, the size of [SessionMessageDiscriminants] representation
     /// and two bytes for the message length.
     pub const HEADER_SIZE: usize = 1 + mem::size_of::<SessionMessageDiscriminants>() + mem::size_of::<u16>();
-
-    /// Size of the overhead that's added to the raw payload of each [`Segment`].
-    ///
-    /// This amounts to [`SessionMessage::HEADER_SIZE`] + [`Segment::HEADER_SIZE`].
-    pub const SEGMENT_OVERHEAD: usize = Self::HEADER_SIZE + Segment::HEADER_SIZE;
-
     /// Maximum size of the Session protocol message.
     ///
     /// This is equal to the typical Ethernet MTU size minus [`Self::SEGMENT_OVERHEAD`].
     pub const MAX_MESSAGE_SIZE: usize = 1492 - Self::SEGMENT_OVERHEAD;
-
-    /// Current version of the protocol.
-    pub const VERSION: u8 = 1;
-
     /// Maximum number of segments per frame.
     pub const MAX_SEGMENTS_PER_FRAME: usize = SegmentRequest::<C>::MAX_MISSING_SEGMENTS_PER_FRAME;
+    /// Size of the overhead that's added to the raw payload of each [`Segment`].
+    ///
+    /// This amounts to [`SessionMessage::HEADER_SIZE`] + [`Segment::HEADER_SIZE`].
+    pub const SEGMENT_OVERHEAD: usize = Self::HEADER_SIZE + Segment::HEADER_SIZE;
+    /// Current version of the protocol.
+    pub const VERSION: u8 = 1;
 
     /// Returns the minimum size of a [SessionMessage].
     pub fn minimum_message_size() -> usize {
@@ -480,15 +477,15 @@ impl<const C: usize> std::iter::FusedIterator for SessionMessageIter<'_, C> {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::session::Frame;
-    use bitvec::array::BitArray;
-    use bitvec::bitarr;
+    use std::time::SystemTime;
+
+    use bitvec::{array::BitArray, bitarr};
     use hex_literal::hex;
     use hopr_platform::time::native::current_time;
-    use rand::prelude::IteratorRandom;
-    use rand::{thread_rng, Rng};
-    use std::time::SystemTime;
+    use rand::{Rng, prelude::IteratorRandom, thread_rng};
+
+    use super::*;
+    use crate::session::Frame;
 
     #[test]
     fn ensure_session_protocol_version_1_values() {

@@ -1,20 +1,17 @@
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::{StreamExt, TryStreamExt};
-use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
-
+use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
-use hopr_db_entity::channel;
-use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
-use hopr_db_entity::prelude::Channel;
+use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelude::Channel};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 
-use crate::cache::ChannelParties;
-use crate::db::HoprDb;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::{
+    HoprDbGeneralModelOperations, OptTx,
+    cache::ChannelParties,
+    db::HoprDb,
+    errors::{DbSqlError, Result},
+};
 
 /// API for editing [ChannelEntry] in the DB.
 pub struct ChannelEditor {
@@ -350,16 +347,16 @@ impl HoprDbChannelOperations for HoprDb {
 
 #[cfg(test)]
 mod tests {
-    use crate::channels::HoprDbChannelOperations;
-    use crate::db::HoprDb;
-    use crate::HoprDbGeneralModelOperations;
     use anyhow::Context;
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::keypairs::ChainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
-    use hopr_internal_types::channels::ChannelStatus;
-    use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry};
+    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
+    use hopr_internal_types::{
+        channels::ChannelStatus,
+        prelude::{ChannelDirection, ChannelEntry},
+    };
     use hopr_primitive_types::prelude::{Address, BalanceType};
+
+    use crate::{HoprDbGeneralModelOperations, channels::HoprDbChannelOperations, db::HoprDb};
 
     #[tokio::test]
     async fn test_insert_get_by_id() -> anyhow::Result<()> {

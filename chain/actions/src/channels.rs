@@ -9,32 +9,33 @@
 //!
 //! All the functions do the necessary validations using the DB and then post the corresponding action
 //! into the [ActionQueue](crate::action_queue::ActionQueue).
-//! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the on-chain
-//! confirmation of the corresponding operation.
-//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent)
-//! by the Indexer.
-use async_trait::async_trait;
+//! The functions return immediately, but provide futures that can be awaited in case the callers wishes to await the
+//! on-chain confirmation of the corresponding operation.
+//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting
+//! the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent) by the Indexer.
 use std::time::Duration;
-use tracing::{debug, error, info};
 
+use async_trait::async_trait;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-
-use crate::action_queue::PendingAction;
-use crate::errors::ChainActionsError::{
-    BalanceTooLow, ClosureTimeHasNotElapsed, InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
-};
-use crate::errors::{
-    ChainActionsError::{ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist},
-    Result,
-};
-use crate::redeem::TicketRedeemActions;
-use crate::ChainActions;
-
 use hopr_platform::time::native::current_time;
+use hopr_primitive_types::prelude::*;
+use tracing::{debug, error, info};
+
+use crate::{
+    ChainActions,
+    action_queue::PendingAction,
+    errors::{
+        ChainActionsError::{
+            BalanceTooLow, ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, ClosureTimeHasNotElapsed,
+            InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
+        },
+        Result,
+    },
+    redeem::TicketRedeemActions,
+};
 
 /// Gathers all channel related on-chain actions.
 #[async_trait]
@@ -45,8 +46,8 @@ pub trait ChannelActions {
     /// Funds the given channel with the given `amount`
     async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<PendingAction>;
 
-    /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that channel,
-    /// in case the `direction` is [`ChannelDirection::Incoming`].
+    /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that
+    /// channel, in case the `direction` is [`ChannelDirection::Incoming`].
     async fn close_channel(
         &self,
         counterparty: Address,
@@ -220,28 +221,34 @@ where
 }
 #[cfg(test)]
 mod tests {
-    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
-    use crate::action_state::MockActionState;
-    use crate::channels::ChannelActions;
-    use crate::errors::ChainActionsError;
-    use crate::ChainActions;
+    use std::{
+        ops::{Add, Sub},
+        time::{Duration, SystemTime},
+    };
+
     use futures::FutureExt;
     use hex_literal::hex;
-    use hopr_chain_types::actions::Action;
-    use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
+    use hopr_chain_types::{
+        actions::Action,
+        chain_events::{ChainEventType, SignificantChainEvent},
+    };
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::channels::HoprDbChannelOperations;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::HoprDbGeneralModelOperations;
-    use hopr_db_sql::{api::info::DomainSeparator, info::HoprDbInfoOperations};
+    use hopr_db_sql::{
+        HoprDbGeneralModelOperations, api::info::DomainSeparator, channels::HoprDbChannelOperations, db::HoprDb,
+        info::HoprDbInfoOperations,
+    };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::Sequence;
-    use std::{
-        ops::{Add, Sub},
-        time::{Duration, SystemTime},
+
+    use crate::{
+        ChainActions,
+        action_queue::{ActionQueue, MockTransactionExecutor},
+        action_state::MockActionState,
+        channels::ChannelActions,
+        errors::ChainActionsError,
     };
 
     lazy_static! {

@@ -1,5 +1,4 @@
 //! This Rust crate contains implementation of common cryptographic types.
-//!
 
 /// Contains error enum implementation used across other `hopr-crypto-...` crates
 pub mod errors;
@@ -31,14 +30,9 @@ pub mod crypto_traits {
 
 #[doc(hidden)]
 pub mod prelude {
-    pub use super::crypto_traits;
-    pub use super::errors::CryptoError;
-    pub use super::keypairs::*;
-    pub use super::primitives::*;
-    pub use super::seal::*;
-    pub use super::types::*;
-    pub use super::utils::*;
-    pub use super::vrf::*;
-
     pub use libp2p_identity::PeerId;
+
+    pub use super::{
+        crypto_traits, errors::CryptoError, keypairs::*, primitives::*, seal::*, types::*, utils::*, vrf::*,
+    };
 }

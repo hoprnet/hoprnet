@@ -1,27 +1,27 @@
-use crate::channels::HoprDbChannelOperations;
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::info::HoprDbInfoOperations;
-use crate::prelude::HoprDbTicketOperations;
+use std::ops::{Mul, Sub};
+
 use async_trait::async_trait;
 use hopr_crypto_packet::prelude::*;
-use hopr_crypto_types::crypto_traits::Randomizable;
-use hopr_crypto_types::prelude::*;
-use hopr_db_api::errors::Result;
-use hopr_db_api::prelude::DbError;
-use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement};
-use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
+use hopr_db_api::{
+    errors::Result,
+    prelude::DbError,
+    protocol::{HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
+    resolver::HoprDbResolverOperations,
+};
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
-use hopr_parallelize::cpu::spawn_fifo_blocking;
-use hopr_path::errors::PathError;
-use hopr_path::{Path, PathAddressResolver, ValidatedPath};
-use hopr_primitive_types::prelude::*;
-use std::ops::{Mul, Sub};
-use tracing::{instrument, trace, warn};
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
+use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
+use hopr_parallelize::cpu::spawn_fifo_blocking;
+use hopr_path::{Path, PathAddressResolver, ValidatedPath, errors::PathError};
+use hopr_primitive_types::prelude::*;
+use tracing::{instrument, trace, warn};
+
+use crate::{
+    channels::HoprDbChannelOperations, db::HoprDb, errors::DbSqlError, info::HoprDbInfoOperations,
+    prelude::HoprDbTicketOperations,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

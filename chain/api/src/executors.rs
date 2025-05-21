@@ -1,20 +1,15 @@
-use alloy::providers::PendingTransaction;
-use alloy::rpc::types::TransactionRequest;
-use async_trait::async_trait;
-use futures::future::Either;
-use futures::{pin_mut, FutureExt};
-use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
-use std::time::Duration;
+use std::{marker::PhantomData, time::Duration};
 
+use alloy::{providers::PendingTransaction, rpc::types::TransactionRequest};
+use async_trait::async_trait;
+use futures::{FutureExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::sleep;
-use hopr_chain_actions::action_queue::TransactionExecutor;
-use hopr_chain_actions::payload::PayloadGenerator;
-use hopr_chain_rpc::errors::RpcError;
-use hopr_chain_rpc::HoprRpcOperations;
+use hopr_chain_actions::{action_queue::TransactionExecutor, payload::PayloadGenerator};
+use hopr_chain_rpc::{HoprRpcOperations, errors::RpcError};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use serde::{Deserialize, Serialize};
 
 /// Represents an abstract client that is capable of submitting
 /// an Ethereum transaction-like object to the blockchain.

@@ -1,9 +1,8 @@
-use hopr_lib::errors::HoprLibError;
-use hopr_lib::{transfer_session, HoprOffchainKeypair, ServiceId};
-use hopr_network_types::prelude::ForeignDataMode;
-use hopr_network_types::udp::UdpStreamParallelism;
-use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use std::net::SocketAddr;
+
+use hopr_lib::{HoprOffchainKeypair, ServiceId, errors::HoprLibError, transfer_session};
+use hopr_network_types::{prelude::ForeignDataMode, udp::UdpStreamParallelism};
+use hoprd_api::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 
 use crate::config::SessionIpForwardingConfig;
 

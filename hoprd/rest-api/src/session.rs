@@ -1,14 +1,13 @@
-use std::fmt::Formatter;
-use std::future::Future;
-use std::str::FromStr;
+use std::{fmt::Formatter, future::Future, net::IpAddr, str::FromStr, sync::Arc};
 
-use crate::{ApiError, ApiErrorStatus, InternalState, ListenerId, BASE_PATH};
-use axum::extract::Path;
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, ListenerId};
 use axum::Error;
+use axum::extract::Path;
 use axum::{
+    Error,
     extract::{
+        Json, Path, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Json, State,
     },
     http::status::StatusCode,
     response::IntoResponse,
@@ -18,18 +17,21 @@ use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
 use hopr_lib::errors::HoprLibError;
-use hopr_lib::{transfer_session, Address};
+use hopr_lib::{Address, transfer_session};
 use hopr_lib::{HoprSession, ServiceId, SessionClientConfig, SessionTarget};
-use hopr_lib::{SurbBalancerConfig, SESSION_PAYLOAD_SIZE};
+use hopr_lib::{SESSION_PAYLOAD_SIZE, SurbBalancerConfig};
 use hopr_network_types::prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism};
 use hopr_network_types::udp::ForeignDataMode;
 use hopr_network_types::utils::AsyncReadStreamer;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-use std::net::IpAddr;
-use std::sync::Arc;
+use serde_with::{DisplayFromStr, serde_as};
 use tokio::net::TcpListener;
 use tracing::{debug, error, info, trace};
+
+use crate::{
+    ApiError, ApiErrorStatus, BASE_PATH, InternalState, ListenerId,
+    types::{HoprIdentifier, PeerOrAddress},
+};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -231,14 +233,16 @@ impl SessionWebsocketClientQueryRequest {
 #[allow(dead_code)] // not dead code, just for codegen
 struct WssData(Vec<u8>);
 
-/// Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR sessions.
+/// Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR
+/// sessions.
 ///
-/// Once configured, the session represents and automatically managed connection to a target peer through a network routing
-/// configuration. The session can be used to send and receive binary data over the network.
+/// Once configured, the session represents and automatically managed connection to a target peer through a network
+/// routing configuration. The session can be used to send and receive binary data over the network.
 ///
 /// Authentication (if enabled) is done by cookie `X-Auth-Token`.
 ///
-/// Connect to the endpoint by using a WS client. No preview available. Example: `ws://127.0.0.1:3001/api/v3/session/websocket
+/// Connect to the endpoint by using a WS client. No preview available. Example:
+/// `ws://127.0.0.1:3001/api/v3/session/websocket
 #[allow(dead_code)] // not dead code, just for documentation
 #[utoipa::path(
         get,
@@ -1018,15 +1022,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::HashSet;
+
     use anyhow::Context;
     use futures::channel::mpsc::UnboundedSender;
     use hopr_crypto_types::crypto_traits::Randomizable;
     use hopr_lib::{ApplicationData, HoprPseudonym, SendMsg};
     use hopr_network_types::prelude::DestinationRouting;
     use hopr_transport_session::errors::TransportSessionError;
-    use std::collections::HashSet;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use super::*;
 
     pub struct SendMsgResender {
         tx: UnboundedSender<Box<[u8]>>,
@@ -1056,8 +1062,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hoprd_session_connection_should_create_a_working_tcp_socket_through_which_data_can_be_sent_and_received(
-    ) -> anyhow::Result<()> {
+    async fn hoprd_session_connection_should_create_a_working_tcp_socket_through_which_data_can_be_sent_and_received()
+    -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
         let session_id = hopr_lib::HoprSessionId::new(4567, HoprPseudonym::random());
@@ -1102,8 +1108,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hoprd_session_connection_should_create_a_working_udp_socket_through_which_data_can_be_sent_and_received(
-    ) -> anyhow::Result<()> {
+    async fn hoprd_session_connection_should_create_a_working_udp_socket_through_which_data_can_be_sent_and_received()
+    -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
         let session_id = hopr_lib::HoprSessionId::new(4567, HoprPseudonym::random());

@@ -1,5 +1,6 @@
-use crate::initiation::StartErrorReason;
 use thiserror::Error;
+
+use crate::initiation::StartErrorReason;
 
 /// Enumeration of errors thrown from this library.
 #[derive(Error, Debug)]

@@ -1,8 +1,7 @@
-use tracing::debug;
-
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use tracing::debug;
 
 use crate::errors::TicketValidationError;
 
@@ -89,12 +88,14 @@ pub fn validate_unacknowledged_ticket(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::validation::validate_unacknowledged_ticket;
+    use std::ops::Add;
+
     use hex_literal::hex;
     use hopr_crypto_types::prelude::*;
     use lazy_static::lazy_static;
-    use std::ops::Add;
+
+    use super::*;
+    use crate::validation::validate_unacknowledged_ticket;
 
     const SENDER_PRIV_BYTES: [u8; 32] = hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775");
     const TARGET_PRIV_BYTES: [u8; 32] = hex!("5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca");

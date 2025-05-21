@@ -1,21 +1,22 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{Json, Path, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
-use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_lib::{
+    HoprTransportError, Multiaddr,
+    errors::{HoprLibError, HoprStatusError},
+};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
-use std::sync::Arc;
+use serde_with::{DisplayFromStr, DurationMilliSeconds, serde_as};
 use tracing::debug;
 
-use hopr_lib::{
-    errors::{HoprLibError, HoprStatusError},
-    Address, PeerId,
+use crate::{
+    ApiError, ApiErrorStatus, BASE_PATH, InternalState,
+    types::{HoprIdentifier, PeerOrAddress},
 };
-use hopr_lib::{HoprTransportError, Multiaddr};
-
-use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -157,7 +158,7 @@ pub(super) async fn ping_peer(
             Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
                 hopr_lib::NetworkingError::NonExistingPeer,
             ))) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
             }
             Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),

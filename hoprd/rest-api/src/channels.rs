@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{Json, Path, Query, State},
     http::status::StatusCode,
@@ -5,16 +7,14 @@ use axum::{
 };
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-use std::sync::Arc;
+use serde_with::{DisplayFromStr, serde_as};
 
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer};
 use hopr_crypto_types::types::Hash;
 use hopr_lib::{
-    errors::{HoprLibError, HoprStatusError},
     Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry, ChannelStatus, ToHex,
+    errors::{HoprLibError, HoprStatusError},
 };
-
-use crate::{checksum_address_serializer, ApiError, ApiErrorStatus, InternalState, BASE_PATH};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -319,7 +319,7 @@ pub(super) async fn open_channel(
         Err(HoprLibError::ChainError(ChainActionsError::ChannelAlreadyExists)) => {
             (StatusCode::CONFLICT, ApiErrorStatus::ChannelAlreadyOpen).into_response()
         }
-        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -445,7 +445,7 @@ pub(super) async fn close_channel(
             Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(_))) => {
                 (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response()
             }
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -527,7 +527,7 @@ pub(super) async fn fund_channel(
             Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
                 (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response()
             }
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),

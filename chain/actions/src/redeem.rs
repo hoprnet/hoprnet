@@ -14,29 +14,38 @@
 //! (= they are not marked as [BeingRedeemed](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingRedeemed) or
 //! [BeingAggregated](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingAggregated) in the DB),
 //! If they are redeemable, their state is changed to
-//! [BeingRedeemed](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the exclusive DB write lock).
-//! Subsequently, the ticket in such a state is transmitted into the [ActionQueue](crate::action_queue::ActionQueue) so the redemption is soon executed on-chain.
-//! The functions return immediately but provide futures that can be awaited in case the callers wish to await the on-chain
-//! confirmation of each ticket redemption.
+//! [BeingRedeemed](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the
+//! exclusive DB write lock). Subsequently, the ticket in such a state is transmitted into the
+//! [ActionQueue](crate::action_queue::ActionQueue) so the redemption is soon executed on-chain. The functions return
+//! immediately but provide futures that can be awaited in case the callers wish to await the on-chain confirmation of
+//! each ticket redemption.
 //!
-//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent).
-//! by the Indexer.
+//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting
+//! the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent). by the Indexer.
 use async_trait::async_trait;
 use futures::StreamExt;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
-use hopr_db_sql::api::info::DomainSeparator;
-use hopr_db_sql::api::tickets::{HoprDbTicketOperations, TicketSelector};
-use hopr_db_sql::channels::HoprDbChannelOperations;
-use hopr_db_sql::prelude::HoprDbInfoOperations;
+use hopr_db_sql::{
+    api::{
+        info::DomainSeparator,
+        tickets::{HoprDbTicketOperations, TicketSelector},
+    },
+    channels::HoprDbChannelOperations,
+    prelude::HoprDbInfoOperations,
+};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
 
-use crate::action_queue::PendingAction;
-use crate::errors::ChainActionsError::{ChannelDoesNotExist, InvalidState, OldTicket};
-use crate::errors::{ChainActionsError::WrongTicketState, Result};
-use crate::ChainActions;
+use crate::{
+    ChainActions,
+    action_queue::PendingAction,
+    errors::{
+        ChainActionsError::{ChannelDoesNotExist, InvalidState, OldTicket, WrongTicketState},
+        Result,
+    },
+};
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -249,21 +258,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use futures::FutureExt;
     use hex_literal::hex;
-    use hopr_chain_types::chain_events::ChainEventType::TicketRedeemed;
-    use hopr_chain_types::chain_events::SignificantChainEvent;
-    use hopr_crypto_random::{random_bytes, Randomizable};
+    use hopr_chain_types::chain_events::{ChainEventType::TicketRedeemed, SignificantChainEvent};
+    use hopr_crypto_random::{Randomizable, random_bytes};
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::api::info::DomainSeparator;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::errors::DbSqlError;
-    use hopr_db_sql::info::HoprDbInfoOperations;
-    use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
+    use hopr_db_sql::{
+        HoprDbGeneralModelOperations, TargetDb, api::info::DomainSeparator, db::HoprDb, errors::DbSqlError,
+        info::HoprDbInfoOperations,
+    };
 
-    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
-    use crate::action_state::MockActionState;
+    use super::*;
+    use crate::{
+        action_queue::{ActionQueue, MockTransactionExecutor},
+        action_state::MockActionState,
+    };
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -618,8 +627,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed(
-    ) -> anyhow::Result<()> {
+    async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed()
+    -> anyhow::Result<()> {
         let ticket_count = 3;
         let ticket_from_previous_epoch_count = 2;
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
