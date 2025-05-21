@@ -147,11 +147,52 @@ jobs:
         env:
           HOPR_NETWORK: anvil-localhost
 
+  build-candidate-binaries:
+    runs-on: self-hosted-hoprnet-bigger
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        binary:
+          - hoprd
+          - hopli
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
+        with:
+          disable-sudo: true
+          egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        if: env.needs_nix_setup == 'true'
+        uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
+        if: env.needs_nix_setup == 'true'
+        with:
+          name: hoprnet
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+        env:
+          USER: runner
+
+      - name: Build binary
+        run: nix build .#${{ matrix.binary }}-candidate
+
   tests-smoke-hopli:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 10
     env:
       needs_nix_setup: true
+    needs:
+      - build-candidate-binaries
     if: github.event.pull_request.draft == false
     steps:
       - name: Harden Runner
