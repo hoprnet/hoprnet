@@ -32,8 +32,8 @@ def make_routes(routes_with_hops: list[int], nodes: list[Node]):
 
 
 @asynccontextmanager
-async def create_channel(src: Node, dest: Node, funding: int, close_from_dest: bool = True, use_peer_id: bool = False):
-    channel = await src.api.open_channel(dest.peer_id if use_peer_id else dest.address, str(int(funding)))
+async def create_channel(src: Node, dest: Node, funding: int, close_from_dest: bool = True):
+    channel = await src.api.open_channel(dest.address, str(int(funding)))
     assert channel is not None
     await asyncio.wait_for(check_channel_status(src, dest, status=ChannelStatus.Open), 10.0)
     try:
@@ -57,18 +57,14 @@ async def create_channel(src: Node, dest: Node, funding: int, close_from_dest: b
 async def get_channel(src: Node, dest: Node, include_closed=False):
     all_channels = await src.api.all_channels(include_closed=include_closed)
 
-    channels = [
-        oc for oc in all_channels.all if oc.source_address == src.address and oc.destination_address == dest.address
-    ]
+    channels = [oc for oc in all_channels.all if oc.source == src.address and oc.destination == dest.address]
 
     return channels[0] if len(channels) > 0 else None
 
 
 async def get_channel_seen_from_dst(src: Node, dest: Node, include_closed=False):
     open_channels = await dest.api.all_channels(include_closed)
-    channels = [
-        oc for oc in open_channels.all if oc.source_address == src.address and oc.destination_address == dest.address
-    ]
+    channels = [oc for oc in open_channels.all if oc.source == src.address and oc.destination == dest.address]
 
     return channels[0] if len(channels) > 0 else None
 
@@ -325,7 +321,7 @@ class HoprSession:
             resp_buffer = self._use_response_buffer
 
         self._session = await self._src.api.session_client(
-            self._dest.peer_id,
+            self._dest.address,
             forward_path=self._fwd_path,
             return_path=self._return_path,
             protocol=self._proto,
@@ -336,20 +332,20 @@ class HoprSession:
         )
         if self._session is None:
             raise Exception(
-                f"Failed to open session {self._src.peer_id} -> " + f"{self._dest.peer_id} on {self._proto.name}"
+                f"Failed to open session {self._src.address} -> " + f"{self._dest.address} on {self._proto.name}"
             )
 
         logging.debug(
-            f"Session opened {self._src.peer_id}:{self._session.port} ->"
-            + f"{self._dest.peer_id}:{self._target_port} on {self._proto.name}"
+            f"Session opened {self._src.address}:{self._session.port} ->"
+            + f"{self._dest.address}:{self._target_port} on {self._proto.name}"
         )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self._session is not None and await self._src.api.session_close_client(self._session) is True:
             logging.debug(
-                f"Session closed {self._src.peer_id}:{self._session.port} ->"
-                + f"{self._dest.peer_id}:{self._target_port} on {self._proto.name}"
+                f"Session closed {self._src.address}:{self._session.port} ->"
+                + f"{self._dest.address}:{self._target_port} on {self._proto.name}"
             )
             self._session = None
             self._target_port = 0
@@ -466,6 +462,6 @@ async def basic_send_and_receive_packets_over_single_route(msg_count: int, route
         msg_count,
         src=route[0],
         dest=route[-1],
-        fwd_path={"IntermediatePath": [n.peer_id for n in route[1:-1]]},
-        return_path={"IntermediatePath": [n.peer_id for n in route[-2:0:-1]]},
+        fwd_path={"IntermediatePath": [n.address for n in route[1:-1]]},
+        return_path={"IntermediatePath": [n.address for n in route[-2:0:-1]]},
     )
