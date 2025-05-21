@@ -11,9 +11,8 @@ use axum::{
 };
 use axum_extra::extract::Query;
 use base64::Engine;
-use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt, stream::FuturesUnordered};
+use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
-use hopr_db_api::prelude::HoprDbResolverOperations;
 use hopr_lib::{
     Address, HoprSession, SESSION_PAYLOAD_SIZE, ServiceId, SessionClientConfig, SessionTarget, SurbBalancerConfig,
     errors::HoprLibError, transfer_session,
@@ -28,10 +27,7 @@ use serde_with::{DisplayFromStr, serde_as};
 use tokio::net::TcpListener;
 use tracing::{debug, error, info, trace};
 
-use crate::{
-    ApiError, ApiErrorStatus, BASE_PATH, InternalState, ListenerId,
-    types::{HoprIdentifier, PeerOrAddress},
-};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, ListenerId};
 
 /// Size of the buffer for forwarding data to/from a TCP stream.
 pub const HOPR_TCP_BUFFER_SIZE: usize = 4096;
@@ -51,7 +47,7 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
 #[schema(
     example = json!({"Plain": "example.com:80"}),
     example = json!({"Sealed": "SGVsbG9Xb3JsZA"}), // base64 for "HelloWorld"
@@ -138,7 +134,15 @@ pub struct StoredSessionEntry {
 
 #[repr(u8)]
 #[derive(
-    Debug, Clone, strum::EnumIter, strum::Display, strum::EnumString, Serialize, Deserialize, utoipa::ToSchema,
+    Debug,
+    Clone,
+    strum::EnumIter,
+    strum::Display,
+    strum::EnumString,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    utoipa::ToSchema,
 )]
 #[schema(example = "Segmentation")]
 /// Session capabilities that can be negotiated with the target peer.
@@ -165,18 +169,17 @@ impl From<SessionCapability> for hopr_lib::SessionCapability {
 }
 
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
-#[into_params(parameter_in = Query)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SessionWebsocketClientQueryRequest {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(required = true, value_type = String)]
-    pub destination: String, // PeerId,  // issue in utoipa on overriding the type
+    pub destination: Address,
     #[schema(required = true)]
     pub hops: u8,
     #[cfg(feature = "explicit-path")]
-    #[schema(required = false)]
-    pub path: Option<String>,
+    #[schema(required = false, value_type = String)]
+    pub path: Option<Vec<Address>>,
     #[schema(required = true)]
     #[serde_as(as = "Vec<DisplayFromStr>")]
     pub capabilities: Vec<SessionCapability>,
@@ -194,9 +197,8 @@ fn default_protocol() -> IpProtocol {
 }
 
 impl SessionWebsocketClientQueryRequest {
-    pub(crate) async fn into_protocol_session_config<R: HoprDbResolverOperations>(
+    pub(crate) async fn into_protocol_session_config(
         self,
-        resolver: &R,
     ) -> Result<(Address, SessionTarget, SessionClientConfig), ApiErrorStatus> {
         #[cfg(not(feature = "explicit-path"))]
         let path_options = hopr_lib::RoutingOptions::Hops((self.hops as u32).try_into()?);
@@ -204,23 +206,13 @@ impl SessionWebsocketClientQueryRequest {
         #[cfg(feature = "explicit-path")]
         let path_options = if let Some(path) = self.path {
             // Explicit `path` will override `hops`
-            hopr_lib::RoutingOptions::IntermediatePath(
-                path.split(',')
-                    .map(|addr| PeerOrAddress::from_str(addr).map(|p| HoprIdentifier::new_with(p, resolver)))
-                    .collect::<Result<FuturesUnordered<_>, _>>()?
-                    .and_then(|f| futures::future::ok(f.address))
-                    .try_collect::<Vec<Address>>()
-                    .await?
-                    .try_into()?,
-            )
+            hopr_lib::RoutingOptions::IntermediatePath(path.try_into()?)
         } else {
             hopr_lib::RoutingOptions::Hops((self.hops as u32).try_into()?)
         };
 
-        let ident = HoprIdentifier::new_with(self.destination.parse()?, resolver).await?;
-
         Ok((
-            ident.address,
+            self.destination,
             self.target.into_target(self.protocol)?,
             SessionClientConfig {
                 forward_path_options: path_options.clone(),
@@ -252,7 +244,11 @@ struct WssData(Vec<u8>);
         get,
         path = const_format::formatcp!("{BASE_PATH}/session/websocket"),
         description = "Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR sessions.",
-        params(SessionWebsocketClientQueryRequest),
+        request_body(
+            content = SessionWebsocketClientQueryRequest,
+            content_type = "application/json",
+            description = "Websocket endpoint exposing a binary socket-like connection to a peer through websockets using underlying HOPR sessions.",
+        ),
         responses(
             (status = 200, description = "Successfully created a new client websocket session."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -272,7 +268,7 @@ pub(crate) async fn websocket(
     State(state): State<Arc<InternalState>>,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let (dst, target, data) = query
-        .into_protocol_session_config(state.hopr.peer_resolver())
+        .into_protocol_session_config()
         .await
         .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e))?;
 
@@ -368,26 +364,16 @@ async fn websocket_connection(socket: WebSocket, session: HoprSession) {
 /// Routing options for the Session.
 pub enum RoutingOptions {
     #[cfg(feature = "explicit-path")]
-    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<PeerOrAddress>),
+    #[schema(value_type = Vec<String>)]
+    IntermediatePath(#[serde_as(as = "Vec<DisplayFromStr>")] Vec<Address>),
     Hops(usize),
 }
 
 impl RoutingOptions {
-    pub(crate) async fn resolve<R: HoprDbResolverOperations>(
-        self,
-        resolver: &R,
-    ) -> Result<hopr_lib::RoutingOptions, ApiErrorStatus> {
+    pub(crate) async fn resolve(self) -> Result<hopr_lib::RoutingOptions, ApiErrorStatus> {
         Ok(match self {
             #[cfg(feature = "explicit-path")]
-            RoutingOptions::IntermediatePath(path) => hopr_lib::RoutingOptions::IntermediatePath(
-                path.into_iter()
-                    .map(|p| HoprIdentifier::new_with(p, resolver))
-                    .collect::<FuturesUnordered<_>>()
-                    .and_then(|f| futures::future::ok(f.address))
-                    .try_collect::<Vec<_>>()
-                    .await?
-                    .try_into()?,
-            ),
+            RoutingOptions::IntermediatePath(path) => hopr_lib::RoutingOptions::IntermediatePath(path.try_into()?),
             RoutingOptions::Hops(hops) => hopr_lib::RoutingOptions::Hops(hops.try_into()?),
         })
     }
@@ -410,7 +396,7 @@ pub(crate) struct SessionClientRequest {
     /// Address of the Exit node.
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub destination: PeerOrAddress,
+    pub destination: Address,
     /// The forward path for the Session.
     pub forward_path: RoutingOptions,
     /// The return path for the Session.
@@ -442,18 +428,16 @@ pub(crate) struct SessionClientRequest {
 }
 
 impl SessionClientRequest {
-    pub(crate) async fn into_protocol_session_config<R: HoprDbResolverOperations>(
+    pub(crate) async fn into_protocol_session_config(
         self,
         target_protocol: IpProtocol,
-        resolver: &R,
     ) -> Result<(Address, SessionTarget, SessionClientConfig), ApiErrorStatus> {
-        let ident = HoprIdentifier::new_with(self.destination, resolver).await?;
         Ok((
-            ident.address,
+            self.destination,
             self.target.into_target(target_protocol)?,
             SessionClientConfig {
-                forward_path_options: self.forward_path.resolve(resolver).await?,
-                return_path_options: self.return_path.resolve(resolver).await?,
+                forward_path_options: self.forward_path.resolve().await?,
+                return_path_options: self.return_path.resolve().await?,
                 capabilities: self
                     .capabilities
                     .map(|vs| {
@@ -513,7 +497,7 @@ pub(crate) struct SessionClientResponse {
     /// Destination node (exit node) of the Session.
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
-    pub destination: PeerOrAddress,
+    pub destination: Address,
     /// Forward routing path.
     pub forward_path: RoutingOptions,
     /// Return routing path.
@@ -620,7 +604,7 @@ pub(crate) async fn create_client(
     let target_spec = args.target.clone();
     let (dst, target, data) = args
         .clone()
-        .into_protocol_session_config(protocol, state.hopr.peer_resolver())
+        .into_protocol_session_config(protocol)
         .await
         .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e))?;
 
@@ -757,7 +741,7 @@ pub(crate) async fn create_client(
                 ip: bound_host.ip().to_string(),
                 port: bound_host.port(),
                 target: target_spec.to_string(),
-                destination: dst.into(),
+                destination: dst,
                 forward_path: args.forward_path.clone(),
                 return_path: args.return_path.clone(),
                 mtu: SESSION_PAYLOAD_SIZE,
@@ -815,7 +799,7 @@ pub(crate) async fn list_clients(
             target: entry.target.to_string(),
             forward_path: entry.forward_path.clone(),
             return_path: entry.return_path.clone(),
-            destination: entry.destination.into(),
+            destination: entry.destination,
             mtu: SESSION_PAYLOAD_SIZE,
         })
         .collect::<Vec<_>>();

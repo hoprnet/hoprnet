@@ -53,21 +53,21 @@ def getlogger():
 log = getlogger()
 
 
-def seal_with_peerid(peer_id: str, plain_text: bytes, random_padding_len: int = 0) -> bytes:
+def seal_with_address(address: str, plain_text: bytes, random_padding_len: int = 0) -> bytes:
     """
-    This function takes a PeerID and plaintext data as inputs,
-    extracts the Ed25519 public key corresponding to the PeerID,
+    This function takes an Address and plaintext data as inputs,
+    extracts the Ed25519 public key corresponding to the Address,
     converts it to a Curve25519 key (for encryption),
     and returns a sealed box of the input plaintext encrypted using that public key.
     If specified, it also adds random padding with `@` character to the plaintext.
     This can be done to obscure the length of the plaintext.
     """
     try:
-        # Step 1: Decode the PeerID from base58
-        decoded_peer_id = base58.b58decode(peer_id)
+        # Step 1: Decode the Address from base58
+        decoded_address = base58.b58decode(address)
 
         # Step 2: Extract the public key (skip the multicodec prefix)
-        ed25519_pubkey = decoded_peer_id[6:]
+        ed25519_pubkey = decoded_address[6:]
 
         # Step 3: Convert the Ed25519 public key to a Curve25519 public key for encryption
         curve25519_pubkey = nacl.bindings.crypto_sign_ed25519_pk_to_curve25519(ed25519_pubkey)
@@ -387,7 +387,7 @@ class HoprdAPI:
     ) -> Optional[Session]:
         """
         Creates a new client session returning the given session listening host & port over TCP or UDP.
-        :param destination: PeerID of the recipient
+        :param destination: Address of the recipient
         :param forward_path: Forward routing options for the session.
         :param return_path: Return routing options for the session.
         :param protocol: Protocol (UDP or TCP)
@@ -400,7 +400,7 @@ class HoprdAPI:
         :return: Session
         """
         actual_target = (
-            {"Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target, "utf-8"), 50)).decode("ascii")}
+            {"Sealed": base64.b64encode(seal_with_address(destination, bytes(target, "utf-8"), 50)).decode("ascii")}
             if sealed_target
             else {"Service": int(target)}
             if service
