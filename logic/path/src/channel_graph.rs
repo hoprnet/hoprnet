@@ -1,19 +1,20 @@
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::primitives::Address;
-use petgraph::algo::has_path_connecting;
-use petgraph::dot::Dot;
-use petgraph::prelude::StableDiGraph;
-use petgraph::stable_graph::NodeIndex;
-use petgraph::visit::{EdgeFiltered, EdgeRef, NodeFiltered};
-use petgraph::Direction;
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
-use std::time::Duration;
-use tracing::{debug, warn};
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    fmt::{Debug, Formatter},
+    time::Duration,
+};
 
-use hopr_primitive_types::prelude::SMA;
-use hopr_primitive_types::sma::SingleSumSMA;
+use hopr_internal_types::prelude::*;
+use hopr_primitive_types::{prelude::SMA, primitives::Address, sma::SingleSumSMA};
+use petgraph::{
+    Direction,
+    algo::has_path_connecting,
+    dot::Dot,
+    prelude::StableDiGraph,
+    stable_graph::NodeIndex,
+    visit::{EdgeFiltered, EdgeRef, NodeFiltered},
+};
+use tracing::{debug, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_internal_types::channels::ChannelDirection, hopr_metrics::metrics::MultiGauge,
@@ -174,7 +175,6 @@ impl<T> From<Result<Duration, T>> for NodeScoreUpdate {
 ///
 /// When a node reaches zero [quality](Node) and there are no edges (channels) containing this node,
 /// it is removed from the graph entirely.
-
 #[cfg_attr(feature = "serde", cfg_eval::cfg_eval, serde_with::serde_as)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
@@ -531,16 +531,20 @@ pub struct GraphExportConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{
+        ops::Add,
+        time::{Duration, SystemTime},
+    };
 
-    use anyhow::{anyhow, Context};
+    use anyhow::{Context, anyhow};
     use hopr_internal_types::channels::{ChannelChange, ChannelStatus};
     use hopr_primitive_types::prelude::*;
-    use std::ops::Add;
-    use std::time::{Duration, SystemTime};
 
-    use crate::channel_graph::ChannelGraph;
-    use crate::tests::{dummy_channel, ADDRESSES};
+    use super::*;
+    use crate::{
+        channel_graph::ChannelGraph,
+        tests::{ADDRESSES, dummy_channel},
+    };
 
     #[test]
     fn channel_graph_self_addr() {

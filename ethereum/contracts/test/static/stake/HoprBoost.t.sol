@@ -89,9 +89,15 @@ contract HoprBoostTest is Test {
     /**
      * @dev only admin can set base URI
      */
-    function testFail_WhenNonAdminSetBaseURI(address account) public {
+    function testRevert_WhenNonAdminSetBaseURI(address account) public {
         vm.assume(account != admin);
         vm.prank(account);
+        vm.expectRevert(abi.encodePacked(
+            "AccessControl: account ",
+            Strings.toHexString(uint160(account), 20),
+            " is missing role ",
+            Strings.toHexString(uint256(0), 32)
+        ));
         hoprBoost.updateBaseURI(newBaseURI);
     }
 

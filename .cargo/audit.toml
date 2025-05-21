@@ -1,10 +1,9 @@
 [advisories]
 ignore = [
-  "RUSTSEC-2020-0056", # 'stdweb' dependency in 'http-types'
-  "RUSTSEC-2021-0059", # 'aesni' dependency in 'http-types'
-  "RUSTSEC-2021-0060", # 'aes-soft' dependency in 'http-types'
-  "RUSTSEC-2021-0064", # 'cpuid-bool' dependency in 'http-types'
-  "RUSTSEC-2024-0384", # 'instant' dependency in 'futures-lite'
+  "RUSTSEC-2024-0384", # 'instant' dependency in 'futures-lite' [unmaintained]
+  "RUSTSEC-2024-0436", # 'paste' dependency in 'libp2p' [unmaintained]
+  "RUSTSEC-2023-0071", # 'rsa' dependency in 'sqlx' [unfixed]
+  "RUSTSEC-2024-0388", # 'derivative' in 'alloy' [unmaintained]
 ]
 informational_warnings = ["unmaintained"]
 severity_threshold = "low"

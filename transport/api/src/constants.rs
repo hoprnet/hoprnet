@@ -12,8 +12,8 @@ pub const RESERVED_TAG_UPPER_LIMIT: u16 = RESERVED_SESSION_TAG_UPPER_LIMIT;
 
 /// The upper limit value for the session reserved tag range.
 ///
-/// The reserved tags are from range <[`RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT`], [`RESERVED_SESSION_TAG_UPPER_LIMIT`]) and are
-/// specifically dedicated for the internal use of the protocol.
+/// The reserved tags are from range <[`RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT`], [`RESERVED_SESSION_TAG_UPPER_LIMIT`])
+/// and are specifically dedicated for the internal use of the protocol.
 pub(crate) const RESERVED_SESSION_TAG_UPPER_LIMIT: u16 = 1024;
 
 /// The upper limit value for subprotocol reserved tag range.

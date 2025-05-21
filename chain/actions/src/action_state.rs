@@ -8,22 +8,24 @@
 //! that must match on any chain event log in a block containing the given transaction hash.
 //!
 //! ### Example
-//! Once the [RegisterSafe(`0x0123..ef`)](hopr_chain_types::actions::Action) action that has been submitted via [ActionQueue](crate::action_queue::ActionQueue)
-//! in a transaction with hash `0xabcd...00`.
+//! Once the [RegisterSafe(`0x0123..ef`)](hopr_chain_types::actions::Action) action that has been submitted via
+//! [ActionQueue](crate::action_queue::ActionQueue) in a transaction with hash `0xabcd...00`.
 //! The [IndexerExpectation] is such that whatever block that will contain the TX hash `0xabcd..00` must also contain
 //! a log that matches [NodeSafeRegistered(`0x0123..ef`)](ChainEventType) event type.
 //! If such event is never encountered by the Indexer, the safe registration action naturally times out.
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    fmt::{Debug, Formatter},
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+};
+
 use async_lock::RwLock;
 use async_trait::async_trait;
-use futures::{channel, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt, channel};
 use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use hopr_crypto_types::types::Hash;
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
 use tracing::{debug, error};
 
 use crate::errors::{ChainActionsError, Result};
@@ -32,9 +34,9 @@ use crate::errors::{ChainActionsError, Result};
 /// Also allows mocking in tests.
 pub type ExpectationResolver = Pin<Box<dyn Future<Output = Result<SignificantChainEvent>> + Send>>;
 
-/// Allows tracking state of an [Action](hopr_chain_types::actions::Action) via registering [IndexerExpectations](IndexerExpectation) on
-/// [SignificantChainEvents](SignificantChainEvent) coming from the Indexer and resolving them as they are
-/// matched. Once expectations are matched, they are automatically unregistered.
+/// Allows tracking state of an [Action](hopr_chain_types::actions::Action) via registering
+/// [IndexerExpectations](IndexerExpectation) on [SignificantChainEvents](SignificantChainEvent) coming from the Indexer
+/// and resolving them as they are matched. Once expectations are matched, they are automatically unregistered.
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait ActionState {
@@ -163,24 +165,27 @@ impl ActionState for IndexerActionTracker {
 
 #[cfg(test)]
 mod tests {
-    use crate::action_state::{ActionState, IndexerActionTracker, IndexerExpectation};
-    use crate::errors::ChainActionsError;
+    use std::{sync::Arc, time::Duration};
+
     use anyhow::Context;
-    use async_std::prelude::FutureExt;
     use hex_literal::hex;
     use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_primitive_types::prelude::*;
-    use std::sync::Arc;
-    use std::time::Duration;
+    use tokio::time::timeout;
+
+    use crate::{
+        action_state::{ActionState, IndexerActionTracker, IndexerExpectation},
+        errors::ChainActionsError,
+    };
 
     lazy_static::lazy_static! {
         // some random address
         static ref RANDY: Address = hex!("60f8492b6fbaf86ac2b064c90283d8978a491a01").into();
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_expectation_should_resolve() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let sample_event = SignificantChainEvent {
@@ -192,32 +197,31 @@ mod tests {
 
         let sample_event_clone = sample_event.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn(async move {
-            let hash = exp_clone
-                .match_and_resolve(&sample_event_clone)
-                .delay(Duration::from_millis(200))
-                .await;
+        tokio::task::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(200)).await; // delay
+            let hash = exp_clone.match_and_resolve(&sample_event_clone).await;
             assert!(
                 hash.iter().all(|e| e.tx_hash == random_hash),
                 "hash must be present as resolved"
             );
         });
 
-        let resolution = exp
-            .register_expectation(IndexerExpectation::new(random_hash, move |e| {
+        let resolution = timeout(
+            Duration::from_secs(5),
+            exp.register_expectation(IndexerExpectation::new(random_hash, move |e| {
                 matches!(e, ChainEventType::NodeSafeRegistered(_))
             }))
-            .await?
-            .timeout(Duration::from_secs(5))
-            .await?
-            .context("resolver must not be cancelled")?;
+            .await?,
+        )
+        .await?
+        .context("resolver must not be cancelled")?;
 
         assert_eq!(sample_event, resolution, "resolving event must be equal");
 
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_expectation_should_error_when_unregistered() -> anyhow::Result<()> {
         let sample_event = SignificantChainEvent {
             tx_hash: Hash::from(random_bytes::<{ Hash::SIZE }>()),
@@ -228,21 +232,20 @@ mod tests {
 
         let sample_event_clone = sample_event.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn(async move {
-            exp_clone
-                .unregister_expectation(sample_event_clone.tx_hash)
-                .delay(Duration::from_millis(200))
-                .await;
+        tokio::task::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(200)).await; // delay
+            exp_clone.unregister_expectation(sample_event_clone.tx_hash).await;
         });
 
-        let err = exp
-            .register_expectation(IndexerExpectation::new(sample_event.tx_hash, move |e| {
+        let err = timeout(
+            Duration::from_secs(5),
+            exp.register_expectation(IndexerExpectation::new(sample_event.tx_hash, move |e| {
                 matches!(e, ChainEventType::NodeSafeRegistered(_))
             }))
-            .await?
-            .timeout(Duration::from_secs(5))
-            .await?
-            .expect_err("should return with error");
+            .await?,
+        )
+        .await?
+        .expect_err("should return with error");
 
         assert!(
             matches!(err, ChainActionsError::ExpectationUnregistered),
@@ -252,7 +255,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_expectation_should_resolve_and_filter() -> anyhow::Result<()> {
         let tx_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         let sample_events = vec![
@@ -274,33 +277,32 @@ mod tests {
 
         let sample_events_clone = sample_events.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             for sample_event in sample_events_clone {
-                exp_clone
-                    .match_and_resolve(&sample_event)
-                    .delay(Duration::from_millis(200))
-                    .await;
+                tokio::time::sleep(Duration::from_millis(200)).await; // delay
+                exp_clone.match_and_resolve(&sample_event).await;
             }
         });
 
-        let resolution = exp
-            .register_expectation(IndexerExpectation::new(tx_hash, move |e| {
+        let resolution = timeout(
+            Duration::from_secs(5),
+            exp.register_expectation(IndexerExpectation::new(tx_hash, move |e| {
                 matches!(
                     e,
                     ChainEventType::NetworkRegistryUpdate(_, NetworkRegistryStatus::Allowed)
                 )
             }))
-            .await?
-            .timeout(Duration::from_secs(5))
-            .await?
-            .context("resolver must not be cancelled")?;
+            .await?,
+        )
+        .await?
+        .context("resolver must not be cancelled")?;
 
         assert_eq!(sample_events[2], resolution, "resolving event must be equal");
 
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_expectation_should_resolve_multiple_expectations() -> anyhow::Result<()> {
         let sample_events = vec![
             SignificantChainEvent {
@@ -321,12 +323,10 @@ mod tests {
 
         let sample_events_clone = sample_events.clone();
         let exp_clone = exp.clone();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             for sample_event in sample_events_clone {
-                exp_clone
-                    .match_and_resolve(&sample_event)
-                    .delay(Duration::from_millis(100))
-                    .await;
+                tokio::time::sleep(Duration::from_millis(100)).await; // delay
+                exp_clone.match_and_resolve(&sample_event).await;
             }
         });
 
@@ -346,8 +346,7 @@ mod tests {
             .context("should register 2")?,
         ];
 
-        let resolutions = futures::future::try_join_all(registered_exps)
-            .timeout(Duration::from_secs(5))
+        let resolutions = timeout(Duration::from_secs(5), futures::future::try_join_all(registered_exps))
             .await?
             .context("no resolver can cancel")?;
 

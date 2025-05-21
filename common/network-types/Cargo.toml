@@ -1,6 +1,6 @@
 [package]
 name = "hopr-network-types"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 description = "Contains types used for networking over the HOPR protocol"
 edition = "2021"
@@ -18,10 +18,6 @@ serde = [
   "hopr-crypto-types/serde",
   "hopr-path/serde",
 ]
-runtime-async-std = [
-  "dep:async-std-resolver",
-  "hopr-async-runtime/runtime-async-std",
-]
 runtime-tokio = [
   "dep:tokio",
   "dep:tokio-util",
@@ -38,6 +34,7 @@ async-std-resolver = { workspace = true, optional = true }
 asynchronous-codec = "0.7.0"
 bitvec = { workspace = true }
 bytes = "1"
+cfg-if = { workspace = true }
 crossbeam-queue = { workspace = true }
 crossbeam-skiplist = { workspace = true }
 dashmap = { workspace = true }
@@ -80,7 +77,6 @@ hopr-path = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true, features = ["attributes", "unstable"] }
 async-stream = { workspace = true }
 ctor = { workspace = true }
 criterion = { workspace = true }

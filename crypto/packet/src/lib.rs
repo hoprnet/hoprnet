@@ -3,7 +3,7 @@
 //! This crate contains the main packet processing functionality for the HOPR protocol.
 //! It implements the following important protocol building blocks:
 //!
-//! - SPHINX packet format
+//! - HOPR specific instantiation of the SPHINX packet format
 //! - Proof of Relay
 //!
 //! Finally, it also implements a utility function which is used to validate tickets (module `validation`).
@@ -11,8 +11,10 @@
 //! The currently used implementation is selected using the [`HoprSphinxSuite`] type in the `packet` module.
 //!
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
-//! In particular, as soon as there's a way to represent `Ed448` PeerIDs, it would be straightforward to create e.g. `X448Suite`.
+//! In particular, as soon as there is a way to represent `Ed448` PeerIDs, it would be straightforward to create e.g.
+//! `X448Suite`.
 //!
+//! This crate implements [RFC-0003](https://github.com/hoprnet/rfc/tree/main/rfcs/RFC-0003-hopr-packet-protocol).
 
 use hopr_crypto_sphinx::prelude::*;
 use hopr_internal_types::prelude::*;
@@ -32,10 +34,13 @@ mod validation;
 #[doc(hidden)]
 pub mod prelude {
     pub use super::*;
-    pub use crate::packet::{
-        HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
+    pub use crate::{
+        packet::{
+            HoprForwardedPacket, HoprIncomingPacket, HoprOutgoingPacket, HoprPacket, PacketRouting, PartialHoprPacket,
+        },
+        types::{HoprSenderId, HoprSurbId},
+        validation::validate_unacknowledged_ticket,
     };
-    pub use crate::validation::validate_unacknowledged_ticket;
 }
 
 pub use hopr_crypto_sphinx::prelude::{KeyIdMapper, ReplyOpener};
@@ -49,30 +54,38 @@ pub type HoprSphinxSuite = X25519Suite;
 pub struct HoprSphinxHeaderSpec;
 
 impl SphinxHeaderSpec for HoprSphinxHeaderSpec {
-    const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
     type KeyId = KeyIdent<4>;
+    type PRG = hopr_crypto_types::primitives::ChaCha20;
+    type PacketReceiverData = types::HoprSenderId;
     type Pseudonym = HoprPseudonym;
     type RelayerData = por::ProofOfRelayString;
-    type SurbReceiverData = por::ProofOfRelayValues;
-    type PRG = hopr_crypto_types::primitives::ChaCha20;
+    type SurbReceiverData = por::SurbReceiverInfo;
     type UH = hopr_crypto_types::primitives::Poly1305;
+
+    const MAX_HOPS: std::num::NonZeroUsize = std::num::NonZeroUsize::new(INTERMEDIATE_HOPS + 1).unwrap();
 }
 
 /// Single Use Reply Block representation for HOPR protocol.
 pub type HoprSurb = SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>;
 
+/// Type alias for identifiable [`ReplyOpener`].
+pub type HoprReplyOpener = (types::HoprSurbId, ReplyOpener);
+
 /// Size of the maximum packet payload.
 ///
 /// Adjust this value to change the maximum packet size.
+/// The calculation here is based on the fact that libp2p Stream over QUIC
+/// leaves space for 1460 bytes in the packet payload.
 ///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
-pub(crate) const PAYLOAD_SIZE_INT: usize = 800;
+pub(crate) const PAYLOAD_SIZE_INT: usize = 1000;
 
 #[cfg(test)]
 mod tests {
+    use hopr_crypto_sphinx::prelude::MetaPacket;
+
     use super::*;
     use crate::packet::HoprPacket;
-    use hopr_crypto_sphinx::prelude::MetaPacket;
 
     #[test]
     fn header_and_packet_lengths() {
@@ -82,6 +95,33 @@ mod tests {
             hopr_packet_len
         );
 
-        assert!(hopr_packet_len < 1492, "HOPR packet must fit within a layer 4 packet");
+        assert!(
+            hopr_packet_len < 1492 - 32, // 32 bytes was measured as the libp2p QUIC overhead
+            "HOPR packet {hopr_packet_len} must fit within a layer 4 packet with libp2p overhead"
+        );
+    }
+
+    #[test]
+    fn packet_length() {
+        let packet_len = HoprPacket::SIZE;
+        assert_eq!(packet_len, 438 + PAYLOAD_SIZE_INT);
+    }
+
+    #[test]
+    fn header_length() {
+        let header_len = HoprSphinxHeaderSpec::HEADER_LEN;
+        assert_eq!(header_len, 241);
+    }
+
+    #[test]
+    fn surb_length() {
+        let surb_len = HoprSurb::SIZE;
+        assert_eq!(surb_len, 395);
+        assert!(HoprPacket::PAYLOAD_SIZE > surb_len * 2);
+    }
+
+    #[test]
+    fn max_surbs_per_packet_must_be_at_least_2() {
+        assert!(HoprPacket::MAX_SURBS_IN_PACKET >= 2);
     }
 }

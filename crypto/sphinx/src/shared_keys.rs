@@ -1,7 +1,7 @@
+use std::{marker::PhantomData, ops::Mul};
+
 use generic_array::{ArrayLength, GenericArray};
 use hopr_crypto_types::prelude::*;
-use std::marker::PhantomData;
-use std::ops::Mul;
 
 use crate::derivation::{create_kdf_instance, generate_key_iv};
 
@@ -168,18 +168,16 @@ pub trait SphinxSuite {
     }
 
     /// Instantiates a new Pseudo-Random Permutation IV and key for reply data.
-    fn new_reply_prp_init<P: Pseudonym>(
-        secret: &SecretKey16,
-        pseudonym: &P,
-    ) -> hopr_crypto_types::errors::Result<IvKey<Self::PRP>> {
-        generate_key_iv(secret, HASH_KEY_REPLY_PRP, Some(pseudonym.as_ref()))
+    fn new_reply_prp_init(secret: &SecretKey16, salt: &[u8]) -> hopr_crypto_types::errors::Result<IvKey<Self::PRP>> {
+        generate_key_iv(secret, HASH_KEY_REPLY_PRP, Some(salt))
     }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
     use subtle::ConstantTimeEq;
+
+    use super::*;
 
     pub fn generic_sphinx_suite_test<S: SphinxSuite>(node_count: usize) {
         let (pub_keys, priv_keys): (Vec<S::G>, Vec<S::E>) = (0..node_count).map(|_| S::G::random_pair()).unzip();

@@ -8,12 +8,11 @@ use std::{
 };
 
 use futures::stream::{BoxStream, Stream, StreamExt};
-use libp2p::{
-    swarm::{dummy::ConnectionHandler, NetworkBehaviour, ToSwarm},
-    PeerId,
-};
-
 use hopr_transport_network::ping::PingQueryReplier;
+use libp2p::{
+    PeerId,
+    swarm::{NetworkBehaviour, ToSwarm, dummy::ConnectionHandler},
+};
 
 #[derive(Debug)]
 pub enum Event {
@@ -44,7 +43,6 @@ impl Behaviour {
 
 impl NetworkBehaviour for Behaviour {
     type ConnectionHandler = ConnectionHandler;
-
     type ToSwarm = Event;
 
     fn handle_established_inbound_connection(

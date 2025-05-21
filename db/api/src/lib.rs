@@ -28,11 +28,5 @@ pub trait HoprDbAllAbstractedOperations:
 #[doc(hidden)]
 pub mod prelude {
     pub use super::*;
-    pub use crate::errors::*;
-    pub use crate::info::*;
-    pub use crate::logs::*;
-    pub use crate::peers::*;
-    pub use crate::protocol::*;
-    pub use crate::resolver::*;
-    pub use crate::tickets::*;
+    pub use crate::{errors::*, info::*, logs::*, peers::*, protocol::*, resolver::*, tickets::*};
 }

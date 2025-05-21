@@ -303,14 +303,14 @@ contract HoprChannels is
      * See `_redeemTicketInternal`, entrypoint for MultiSig contract
      */
     function redeemTicketSafe(
-        address self,
+        address selfAddress,
         RedeemableTicket calldata redeemable,
         HoprCrypto.VRFParameters calldata params
     )
         external
-        HoprMultiSig.onlySafe(self)
+        HoprMultiSig.onlySafe(selfAddress)
     {
-        _redeemTicketInternal(self, redeemable, params);
+        _redeemTicketInternal(selfAddress, redeemable, params);
     }
 
     /**
@@ -362,13 +362,13 @@ contract HoprChannels is
      *
      * @dev This method makes use of several methods to reduce stack height.
      *
-     * @param self account address of the ticket redeemer
+     * @param selfAddress account address of the ticket redeemer
      * @param redeemable ticket, signature of ticket issuer, porSecret
      * @param params pseudo-random VRF value + proof that it was correctly using
      *               ticket redeemer's private key
      */
     function _redeemTicketInternal(
-        address self,
+        address selfAddress,
         RedeemableTicket calldata redeemable,
         HoprCrypto.VRFParameters calldata params
     )
@@ -409,14 +409,14 @@ contract HoprChannels is
         }
 
         HoprCrypto.VRFPayload memory payload =
-            HoprCrypto.VRFPayload(ticketHash, self, abi.encodePacked(domainSeparator));
+            HoprCrypto.VRFPayload(ticketHash, selfAddress, abi.encodePacked(domainSeparator));
 
         if (!vrfVerify(params, payload)) {
             revert InvalidVRFProof();
         }
 
         address source = ECDSA.recover(ticketHash, redeemable.signature.r, redeemable.signature.vs);
-        if (_getChannelId(source, self) != redeemable.data.channelId) {
+        if (_getChannelId(source, selfAddress) != redeemable.data.channelId) {
             revert InvalidTicketSignature();
         }
 
@@ -428,7 +428,7 @@ contract HoprChannels is
         );
         emit ChannelBalanceDecreased(redeemable.data.channelId, spendingChannel.balance);
 
-        bytes32 outgoingChannelId = _getChannelId(self, source);
+        bytes32 outgoingChannelId = _getChannelId(selfAddress, source);
         Channel storage earningChannel = channels[outgoingChannelId];
 
         // Informs about new ticketIndex
@@ -454,13 +454,13 @@ contract HoprChannels is
      * See `_initiateOutgoingChannelClosureInternal`, entrypoint for MultiSig contract
      */
     function initiateOutgoingChannelClosureSafe(
-        address self,
+        address selfAddress,
         address destination
     )
         external
-        HoprMultiSig.onlySafe(self)
+        HoprMultiSig.onlySafe(selfAddress)
     {
-        _initiateOutgoingChannelClosureInternal(self, destination);
+        _initiateOutgoingChannelClosureInternal(selfAddress, destination);
     }
 
     /**
@@ -478,9 +478,9 @@ contract HoprChannels is
      *
      * @param destination destination end of the channel to close
      */
-    function _initiateOutgoingChannelClosureInternal(address self, address destination) internal {
+    function _initiateOutgoingChannelClosureInternal(address selfAddress, address destination) internal {
         // We can only initiate closure to outgoing channels
-        bytes32 channelId = _getChannelId(self, destination);
+        bytes32 channelId = _getChannelId(selfAddress, destination);
         Channel storage channel = channels[channelId];
 
         // calling initiateClosure on a PENDING_TO_CLOSE channel extends the noticePeriod
@@ -500,8 +500,14 @@ contract HoprChannels is
     /**
      * See `_closeIncomingChannelInternal`, entrypoint for MultiSig contract
      */
-    function closeIncomingChannelSafe(address self, address source) external HoprMultiSig.onlySafe(self) {
-        _closeIncomingChannelInternal(self, source);
+    function closeIncomingChannelSafe(
+        address selfAddress,
+        address source
+    )
+        external
+        HoprMultiSig.onlySafe(selfAddress)
+    {
+        _closeIncomingChannelInternal(selfAddress, source);
     }
 
     /**
@@ -519,9 +525,9 @@ contract HoprChannels is
      *
      * @param source source end of the channel to close
      */
-    function _closeIncomingChannelInternal(address self, address source) internal {
+    function _closeIncomingChannelInternal(address selfAddress, address source) internal {
         // We can only close incoming channels directly
-        bytes32 channelId = _getChannelId(source, self);
+        bytes32 channelId = _getChannelId(source, selfAddress);
 
         Channel storage channel = channels[channelId];
 
@@ -552,13 +558,13 @@ contract HoprChannels is
      * See `_finalizeOutgoingChannelClosureInternal`, entrypoint for MultiSig contract
      */
     function finalizeOutgoingChannelClosureSafe(
-        address self,
+        address selfAddress,
         address destination
     )
         external
-        HoprMultiSig.onlySafe(self)
+        HoprMultiSig.onlySafe(selfAddress)
     {
-        _finalizeOutgoingChannelClosureInternal(self, destination);
+        _finalizeOutgoingChannelClosureInternal(selfAddress, destination);
     }
 
     /**
@@ -574,9 +580,9 @@ contract HoprChannels is
      *
      * @param destination the address of the counterparty
      */
-    function _finalizeOutgoingChannelClosureInternal(address self, address destination) internal {
+    function _finalizeOutgoingChannelClosureInternal(address selfAddress, address destination) internal {
         // We can only finalize closure to outgoing channels
-        bytes32 channelId = _getChannelId(self, destination);
+        bytes32 channelId = _getChannelId(selfAddress, destination);
         Channel storage channel = channels[channelId];
 
         if (channel.status != ChannelStatus.PENDING_TO_CLOSE) {
@@ -714,12 +720,19 @@ contract HoprChannels is
      * Fund an outgoing channel
      * Used in channel operation with Safe
      *
-     * @param self address of the source
+     * @param selfAddress address of the source
      * @param account address of the destination
      * @param amount amount to fund for channel
      */
-    function fundChannelSafe(address self, address account, Balance amount) external HoprMultiSig.onlySafe(self) {
-        _fundChannelInternal(self, account, amount);
+    function fundChannelSafe(
+        address selfAddress,
+        address account,
+        Balance amount
+    )
+        external
+        HoprMultiSig.onlySafe(selfAddress)
+    {
+        _fundChannelInternal(selfAddress, account, amount);
 
         // pull tokens from Safe and handle result
         if (token.transferFrom(msg.sender, address(this), Balance.unwrap(amount)) != true) {
@@ -744,23 +757,23 @@ contract HoprChannels is
     }
 
     /**
-     * @dev Internal function to fund an outgoing channel from self to account with amount token
+     * @dev Internal function to fund an outgoing channel from selfAddress to account with amount token
      * @notice only balance above zero can execute
      *
-     * @param self source address
+     * @param selfAddress source address
      * @param account destination address
      * @param amount token amount
      */
     function _fundChannelInternal(
-        address self,
+        address selfAddress,
         address account,
         Balance amount
     )
         internal
         validateBalance(amount)
-        validateChannelParties(self, account)
+        validateChannelParties(selfAddress, account)
     {
-        bytes32 channelId = _getChannelId(self, account);
+        bytes32 channelId = _getChannelId(selfAddress, account);
         Channel storage channel = channels[channelId];
 
         if (channel.status == ChannelStatus.PENDING_TO_CLOSE) {
@@ -776,8 +789,8 @@ contract HoprChannels is
 
             channel.status = ChannelStatus.OPEN;
 
-            indexEvent(abi.encodePacked(ChannelOpened.selector, self, account));
-            emit ChannelOpened(self, account);
+            indexEvent(abi.encodePacked(ChannelOpened.selector, selfAddress, account));
+            emit ChannelOpened(selfAddress, account);
         }
 
         indexEvent(abi.encodePacked(ChannelBalanceIncreased.selector, channelId, channel.balance));

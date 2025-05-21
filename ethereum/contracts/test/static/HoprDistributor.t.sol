@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity >=0.6.0 <0.9.0;
 
-import { Test } from "forge-std/Test.sol";
+import { Test, stdError } from "forge-std/Test.sol";
 
 import "../../src/static/HoprDistributor.sol";
 import "../../src/static/HoprToken.sol";
@@ -485,11 +485,8 @@ contract HoprDistributorTest is Test, ERC1820RegistryFixtureTest {
 
     /**
      * @dev it should fail to allocate if totalToBeMinted is higher than max mint
-     * FIXME: Cannot catch uint128 arithmetic overflow. Encountered error
-     * [FAIL. Reason: Error != expected error: NH{q != NH{q Counterexample:
-     * calldata=0x224dafb90000000000000000000000000000000000000000000000000000000000000000, args=[0]]
      */
-    function testFail_ExceedMaxMint(uint128 amount) public {
+    function testRevert_ExceedMaxMint(uint128 amount) public {
         _helperAddBasicSchedule();
         amount = uint128(bound(amount, DEFAULT_MAX_MINT + 1, 1e20));
 
@@ -499,7 +496,7 @@ contract HoprDistributorTest is Test, ERC1820RegistryFixtureTest {
         amounts[0] = amount;
 
         vm.prank(newOwner);
-        // vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert(stdError.assertionError); // failed at assertion "uint128 addition overflow"
         hoprDistributor.addAllocations(accounts, amounts, SCHEDULE_1_MIN_ALL);
     }
 

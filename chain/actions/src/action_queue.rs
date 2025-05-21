@@ -2,33 +2,35 @@
 //!
 //! The [ActionQueue] acts as a MPSC queue of [Actions](hopr_chain_types::actions::Action) which are executed one-by-one
 //! as they are being popped up from the queue by a runner task.
-use async_channel::{bounded, Receiver, Sender};
+use std::{
+    fmt::{Display, Formatter},
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
+};
+
+use async_channel::{Receiver, Sender, bounded};
 use async_trait::async_trait;
-use futures::future::Either;
-use futures::{pin_mut, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::{debug, error, info, trace, warn};
-
+use futures::{FutureExt, StreamExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::spawn;
-use hopr_chain_types::actions::Action;
-use hopr_chain_types::chain_events::ChainEventType;
+use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
 use hopr_crypto_types::types::Hash;
-use hopr_db_sql::api::tickets::HoprDbTicketOperations;
-use hopr_db_sql::info::HoprDbInfoOperations;
+use hopr_db_sql::{api::tickets::HoprDbTicketOperations, info::HoprDbInfoOperations};
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-
-use crate::action_state::{ActionState, IndexerExpectation};
-use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
-use crate::errors::Result;
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::MultiCounter;
+use hopr_primitive_types::prelude::*;
+use serde::{Deserialize, Serialize};
+use tracing::{debug, error, info, trace, warn};
+
+use crate::{
+    action_state::{ActionState, IndexerExpectation},
+    errors::{
+        ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed},
+        Result,
+    },
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

@@ -1,7 +1,7 @@
 use sea_orm::prelude::ChronoDateTimeUtc;
 use sea_orm_migration::prelude::*;
 
-use crate::{m20240226_000009_peers_create_peer_store::peers_table, BackendType};
+use crate::{BackendType, m20240226_000009_peers_create_peer_store::peers_table};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration(pub BackendType);

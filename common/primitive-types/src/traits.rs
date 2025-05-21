@@ -1,5 +1,4 @@
-use crate::errors::GeneralError::ParseError;
-use crate::errors::{GeneralError, Result};
+use crate::errors::{GeneralError, GeneralError::ParseError, Result};
 
 /// A generic type that can be converted to a hexadecimal string.
 pub trait ToHex {
@@ -16,10 +15,10 @@ pub trait ToHex {
 /// This requires processing and memory allocation to represent the type in binary encoding.
 ///
 /// Differences between [BytesEncodable] and [BytesRepresentable]:
-/// - [BytesRepresentable] is already internally carrying the encoded representation of the type,
-///   so no additional encoding or allocation is required to represent the type as a byte array.
-/// - [BytesEncodable] requires additional transformation and allocation to represent the type as a fixed size
-///   byte array.
+/// - [BytesRepresentable] is already internally carrying the encoded representation of the type, so no additional
+///   encoding or allocation is required to represent the type as a byte array.
+/// - [BytesEncodable] requires additional transformation and allocation to represent the type as a fixed size byte
+///   array.
 /// - [BytesEncodable] is the strict superset of [BytesRepresentable]: meaning the former can be possibly implemented
 ///   for a type that already implements the latter, but it is not possible vice versa.
 pub trait BytesEncodable<const N: usize, E = GeneralError>:

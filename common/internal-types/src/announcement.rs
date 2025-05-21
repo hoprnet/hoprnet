@@ -1,7 +1,8 @@
+use std::fmt::{Display, Formatter};
+
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
-use std::fmt::{Display, Formatter};
 use tracing::debug;
 
 /// Holds the signed binding of the chain key and the packet key.
@@ -19,6 +20,7 @@ pub struct KeyBinding {
 
 impl KeyBinding {
     const SIGNING_SIZE: usize = 16 + Address::SIZE + OffchainPublicKey::SIZE;
+
     fn prepare_for_signing(chain_key: &Address, packet_key: &OffchainPublicKey) -> [u8; Self::SIGNING_SIZE] {
         let mut to_sign = [0u8; Self::SIGNING_SIZE];
         to_sign[0..16].copy_from_slice(b"HOPR_KEY_BINDING");
@@ -99,7 +101,8 @@ impl AnnouncementData {
             // Encapsulate first (if already encapsulated, the operation verifies that peer id matches the given one)
             match multiaddress.with_p2p(binding.packet_key.into()) {
                 Ok(mut multiaddress) => {
-                    // Now decapsulate again, because we store decapsulated multiaddress only (without the /p2p/<peer_id> suffix)
+                    // Now decapsulate again, because we store decapsulated multiaddress only (without the
+                    // /p2p/<peer_id> suffix)
                     multiaddress.pop();
                     Ok(Self {
                         multiaddress,
@@ -138,12 +141,15 @@ impl Display for AnnouncementData {
 
 #[cfg(test)]
 mod tests {
-    use crate::announcement::{AnnouncementData, KeyBinding};
-    use crate::prelude::decapsulate_multiaddress;
     use hex_literal::hex;
     use hopr_crypto_types::keypairs::{Keypair, OffchainKeypair};
     use hopr_primitive_types::primitives::Address;
     use multiaddr::Multiaddr;
+
+    use crate::{
+        announcement::{AnnouncementData, KeyBinding},
+        prelude::decapsulate_multiaddress,
+    };
 
     lazy_static::lazy_static! {
         static ref KEY_PAIR: OffchainKeypair = OffchainKeypair::from_secret(&hex!("60741b83b99e36aa0c1331578156e16b8e21166d01834abb6c64b103f885734d")).expect("lazy static keypair should be constructible");

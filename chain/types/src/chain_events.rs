@@ -3,12 +3,13 @@
 //! These events happen in response to actions (transactions, smart contract calls) done by a HOPR node on chain.
 //!
 //! See `chain-actions` and `chain-indexer` crates for details.
+use std::fmt::{Display, Formatter};
+
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
-use std::fmt::{Display, Formatter};
 
 /// Contains TX hash along with the Chain Event data.
 /// This could be used to pair up some events with [Action](crate::actions::Action).

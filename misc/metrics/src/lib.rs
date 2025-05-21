@@ -61,7 +61,8 @@
 //! metric_histogram.record_measure(timer);
 //!
 //! // Multi-metrics are labeled extensions
-//! let metric_counts_per_version = MultiCounter::new("test_multi_counter", "Testing labeled counter", &["version"]).unwrap();
+//! let metric_counts_per_version =
+//!     MultiCounter::new("test_multi_counter", "Testing labeled counter", &["version"]).unwrap();
 //!
 //! // Tracks counters per different versions
 //! metric_counts_per_version.increment_by(&["1.0.0"], 2);
@@ -73,7 +74,6 @@
 //! // Metrics are in text format and can be exposed using an HTTP API endpoint
 //! println!("{:?}", gathered_metrics);
 //! ```
-//!
 
 /// Contains definitions of metric types.
 pub mod metrics;

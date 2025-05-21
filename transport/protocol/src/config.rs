@@ -1,6 +1,6 @@
 use hopr_primitive_types::prelude::Balance;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
 
 /// Configuration of the P2P protocols.
@@ -18,4 +18,7 @@ pub struct ProtocolConfig {
     /// `heartbeat` protocol config
     #[serde(default)]
     pub heartbeat: crate::heartbeat::config::HeartbeatProtocolConfig,
+    /// auto-nat server port
+    #[serde(default)]
+    pub autonat_port: Option<u16>,
 }

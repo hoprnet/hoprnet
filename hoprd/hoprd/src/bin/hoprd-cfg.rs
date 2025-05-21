@@ -24,7 +24,6 @@
 //!   port: 9091
 //!
 //! ... <snip>
-//!
 //! ```
 //!
 //! ## Validate an existing configuration YAML
@@ -40,7 +39,6 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-
 use hoprd::config::HoprdConfig;
 use validator::Validate;
 

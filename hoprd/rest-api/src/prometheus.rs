@@ -1,5 +1,4 @@
 use axum::{extract::Request, middleware::Next, response::Response};
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
 

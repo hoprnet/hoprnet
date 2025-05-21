@@ -260,6 +260,7 @@ contract Crypto is Test, AccountsFixtureTest, HoprCrypto, CryptoUtils {
         }
     }
 
+    /// forge-config: default.allow_internal_expect_revert = true
     function testRevert_expandMessageLongDST(bytes memory message) public {
         string memory superLongDST =
             "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam leo sem, consectetur facilisis nibh eget, feugiat ultrices ipsum. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis vel elit tempor, laoreet mauris.";
