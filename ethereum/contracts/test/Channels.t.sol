@@ -1864,7 +1864,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
     function testFuzz_DomainSeparator(uint64 newChainId) public {
         // chain ID must be less than 2^64 - 1
-        newChainId = uint64(bound(uint256(newChainId), 1, 0xFFFFFFFFFFFFFFFF));
+        newChainId = uint64(bound(uint256(newChainId), 1, 0xFFFFFFFFFFFFFFFE));
         vm.assume(newChainId != block.chainid);
         bytes32 domainSeparatorOnDeployment = hoprChannels.domainSeparator();
 
@@ -1892,7 +1892,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
 
     function testFuzz_LedgerDomainSeparator(uint64 newChainId) public {
         // chain ID must be less than 2^64 - 1
-        newChainId = uint64(bound(uint256(newChainId), 1, 0xFFFFFFFFFFFFFFFF));
+        newChainId = uint64(bound(uint256(newChainId), 1, 0xFFFFFFFFFFFFFFFE));
         vm.assume(newChainId != block.chainid);
         bytes32 ledgerDomainSeparatorOnDeployment = hoprChannels.ledgerDomainSeparator();
 

@@ -15,7 +15,7 @@ contract HoprLedgerTest is Test, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprChanne
     function setUp() public { }
 
     function test_update_domain_separator(uint256 newChainId) public {
-        newChainId = bound(newChainId, 1, 1e18);
+        newChainId = bound(newChainId, 1, 0xFFFFFFFFFFFFFFFE);
         vm.assume(newChainId != block.chainid);
         bytes32 domainSeparatorOnDeployment = ledgerDomainSeparator;
 
