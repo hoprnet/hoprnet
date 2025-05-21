@@ -132,7 +132,6 @@ pub enum HoprNetworkBehaviorEvent {
     TicketAggregation(
         libp2p::request_response::Event<Vec<TransferableWinningTicket>, std::result::Result<Ticket, String>>,
     ),
-    KeepAlive(void::Void),
     AutonatClient(autonat::v2::client::Event),
     AutonatServer(autonat::v2::server::Event),
 }
@@ -141,12 +140,6 @@ pub enum HoprNetworkBehaviorEvent {
 impl From<()> for HoprNetworkBehaviorEvent {
     fn from(_: ()) -> Self {
         panic!("Unexpected event: ()")
-    }
-}
-
-impl From<void::Void> for HoprNetworkBehaviorEvent {
-    fn from(event: void::Void) -> Self {
-        Self::KeepAlive(event)
     }
 }
 
