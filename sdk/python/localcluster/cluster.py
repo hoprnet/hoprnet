@@ -84,7 +84,6 @@ class Cluster:
         logging.info("Retrieve nodes addresses and peer ids")
         for node in self.nodes.values():
             if addresses := await node.api.addresses():
-                node.peer_id = addresses.hopr
                 node.address = addresses.native
             else:
                 raise RuntimeError(f"Node {node} did not return addresses")
@@ -95,7 +94,7 @@ class Cluster:
 
         tasks = []
         for node in self.nodes.values():
-            required_peers = [n.peer_id for n in self.nodes.values() if n != node and n.network == node.network]
+            required_peers = [n.address for n in self.nodes.values() if n != node and n.network == node.network]
             tasks.append(asyncio.create_task(node.all_peers_connected(required_peers)))
 
         try:
@@ -179,9 +178,9 @@ class Cluster:
 
     async def connect_peers(self):
         logging.info("Creating a channel to every other node")
-        peer_ids = [node.peer_id for node in self.nodes.values()]
+        addresses = [node.address for node in self.nodes.values()]
 
-        tasks = [node.connect_peers(peer_ids) for node in self.nodes.values()]
+        tasks = [node.connect_peers(addresses) for node in self.nodes.values()]
         await asyncio.gather(*tasks)
 
     async def links(self):

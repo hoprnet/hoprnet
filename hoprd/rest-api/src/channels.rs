@@ -8,25 +8,20 @@ use axum::{
 use futures::TryFutureExt;
 use hopr_crypto_types::types::Hash;
 use hopr_lib::{
-    Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry, ChannelStatus, Hopr, ToHex,
+    Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry, ChannelStatus, ToHex,
     errors::{HoprLibError, HoprStatusError},
 };
-use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
-use tracing::warn;
 
-use crate::{
-    ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer,
-    types::{HoprIdentifier, PeerOrAddress},
-};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer};
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(example = json!({
     "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
-    "peerAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+    "address": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
     "status": "Open",
     "balance": "10000000000000000000"
 }))]
@@ -52,10 +47,8 @@ pub(crate) struct NodeChannel {
         "channelEpoch": 1,
         "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
         "closureTime": 0,
-        "destinationAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
-        "destinationPeerId": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
-        "sourceAddress": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
-        "sourcePeerId": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
+        "destination": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+        "source": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
         "status": "Open",
         "ticketIndex": 0
     }))]
@@ -67,14 +60,10 @@ pub(crate) struct ChannelInfoResponse {
     channel_id: Hash,
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6")]
-    source_address: Address,
+    source: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")]
-    destination_address: Address,
-    #[schema(example = "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS")]
-    source_peer_id: String,
-    #[schema(example = "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z")]
-    destination_peer_id: String,
+    destination: Address,
     #[schema(example = "10000000000000000000")]
     balance: String,
     #[serde_as(as = "DisplayFromStr")]
@@ -93,10 +82,8 @@ pub(crate) struct ChannelInfoResponse {
 #[schema(example = json!({
         "all": [{
             "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
-            "sourceAddress": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
-            "destinationAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
-            "sourcePeerId": "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS",
-            "destinationPeerId": "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z",
+            "source": "0x07eaf07d6624f741e04f4092a755a9027aaab7f6",
+            "destination": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
             "balance": "10000000000000000000",
             "status": "Open",
             "ticketIndex": 0,
@@ -120,27 +107,11 @@ pub(crate) struct NodeChannelsResponse {
     all: Vec<ChannelInfoResponse>,
 }
 
-async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<ChannelInfoResponse, HoprLibError> {
+async fn query_topology_info(channel: &ChannelEntry) -> Result<ChannelInfoResponse, HoprLibError> {
     Ok(ChannelInfoResponse {
         channel_id: channel.get_id(),
-        source_address: channel.source,
-        destination_address: channel.destination,
-        source_peer_id: node
-            .chain_key_to_peerid(&channel.source)
-            .await?
-            .map(|v| PeerId::to_string(&v))
-            .unwrap_or_else(|| {
-                warn!(address = %channel.source, "failed to map address to PeerId", );
-                "<FAILED_TO_MAP_THE_PEERID>".into()
-            }),
-        destination_peer_id: node
-            .chain_key_to_peerid(&channel.destination)
-            .await?
-            .map(|v| PeerId::to_string(&v))
-            .unwrap_or_else(|| {
-                warn!(address = %channel.destination, "failed to map address to PeerId", );
-                "<FAILED_TO_MAP_THE_PEERID>".into()
-            }),
+        source: channel.source,
+        destination: channel.destination,
         balance: channel.balance.amount().to_string(),
         status: channel.status,
         ticket_index: channel.ticket_index.as_u32(),
@@ -196,12 +167,10 @@ pub(super) async fn list_channels(
     let hopr = state.hopr.clone();
 
     if query.full_topology {
-        let hopr_clone = hopr.clone();
         let topology = hopr
             .all_channels()
             .and_then(|channels| async move {
-                futures::future::try_join_all(channels.iter().map(|c| query_topology_info(c, hopr_clone.as_ref())))
-                    .await
+                futures::future::try_join_all(channels.iter().map(query_topology_info)).await
             })
             .await;
 
@@ -271,7 +240,7 @@ pub(crate) struct OpenChannelBodyRequest {
     /// On-chain address of the counterparty.
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "0xa8194d36e322592d4c707b70dbe96121f5c74c64")]
-    destination: PeerOrAddress,
+    destination: Address,
     /// Initial amount of stake in HOPR tokens.
     #[schema(example = "10")]
     amount: String,
@@ -326,13 +295,11 @@ pub(super) async fn open_channel(
 ) -> impl IntoResponse {
     let hopr = state.hopr.clone();
 
-    let address = match HoprIdentifier::new_with(open_req.destination, hopr.peer_resolver()).await {
-        Ok(destination) => destination.address,
-        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, e).into_response(),
-    };
-
     match hopr
-        .open_channel(&address, &Balance::new_from_str(&open_req.amount, BalanceType::HOPR))
+        .open_channel(
+            &open_req.destination,
+            &Balance::new_from_str(&open_req.amount, BalanceType::HOPR),
+        )
         .await
     {
         Ok(channel_details) => (
@@ -398,7 +365,7 @@ pub(super) async fn show_channel(
     match Hash::from_hex(channel_id.as_str()) {
         Ok(channel_id) => match hopr.channel_from_hash(&channel_id).await {
             Ok(Some(channel)) => {
-                let info = query_topology_info(&channel, hopr.as_ref()).await;
+                let info = query_topology_info(&channel).await;
                 match info {
                     Ok(info) => (StatusCode::OK, Json(info)).into_response(),
                     Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
