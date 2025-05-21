@@ -707,9 +707,7 @@ mod tests {
             deploy_multicall3_to_anvil(&client.clone()).await?;
 
             let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<
-                (),
                 Arc<AnvilRpcClient>,
-                Ethereum,
             >(&instances, client.clone(), &chain_key_0)
             .await?;
 
@@ -802,9 +800,7 @@ mod tests {
             deploy_multicall3_to_anvil(&client.clone()).await?;
 
             let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<
-                (),
                 Arc<AnvilRpcClient>,
-                Ethereum,
             >(&instances, client.clone(), &chain_key_0)
             .await?;
 

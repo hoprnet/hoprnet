@@ -315,9 +315,9 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         vm.clearMockedCalls();
     }
 
-    function testFuzz_DomainSeparator(uint256 newChainId) public {
+    function testFuzz_DomainSeparator(uint64 newChainId) public {
         // chain ID must be less than 2^64 - 1
-        newChainId = bound(newChainId, 1, 0xFFFFFFFFFFFFFFFF);
+        newChainId = uint64(bound(uint256(newChainId), 1, 0xFFFFFFFFFFFFFFFF));
         vm.assume(newChainId != block.chainid);
         bytes32 domainSeparatorOnDeployment = nodeSafeRegistry.domainSeparator();
 

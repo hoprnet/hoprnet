@@ -1,16 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
 use alloy::{
-    network::Ethereum,
-    node_bindings::AnvilInstance,
-    primitives::U256,
-    rpc::client::RpcClient,
-    transports::http::{Http, ReqwestTransport},
+    node_bindings::AnvilInstance, primitives::U256, rpc::client::RpcClient, transports::http::ReqwestTransport,
 };
-use hopr_chain_rpc::{
-    client::{AnvilRpcClient, SnapshotRequestor},
-    transport::ReqwestClient,
-};
+use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
 use hopr_chain_types::{
     ContractAddresses, ContractInstances,
     utils::{
@@ -130,7 +123,7 @@ pub async fn onboard_node(
 
     // Deploy Safe and Module for node
     let (module, safe) =
-        hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<(), Arc<AnvilRpcClient>, Ethereum>(
+        hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<Arc<AnvilRpcClient>>(
             &chain_env.contract_instances,
             provider.clone(),
             &chain_env.contract_deployer,

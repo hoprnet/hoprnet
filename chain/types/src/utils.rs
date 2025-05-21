@@ -366,7 +366,7 @@ where
 /// Channels contract on the token contract.
 ///
 /// Returns (module address, safe address)
-pub async fn deploy_one_safe_one_module_and_setup_for_testing<P, N>(
+pub async fn deploy_one_safe_one_module_and_setup_for_testing<P>(
     instances: &ContractInstances<P>,
     provider: P,
     deployer: &ChainKeypair,

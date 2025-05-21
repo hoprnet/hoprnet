@@ -1900,9 +1900,9 @@ mod tests {
         let try_get_announcement_target = node_module
             .tryGetTarget(*instances.announcements.address())
             .call()
-            .await;
+            .await?;
 
-        assert!(try_get_announcement_target?, "announcement is not a target");
+        assert!(try_get_announcement_target._0, "announcement is not a target");
 
         // check allowance for channel contract has increased
         let allowance = instances
@@ -2222,9 +2222,9 @@ mod tests {
 
         // check new network is not included
         let old_channels_inclusion = node_module.tryGetTarget(*instances.channels.address()).call().await?;
-        assert!(old_channels_inclusion, "old channel should be included");
+        assert!(old_channels_inclusion._0, "old channel should be included");
         let new_channels_inclusion = node_module.tryGetTarget(*new_channels.address()).call().await?;
-        assert!(!new_channels_inclusion, "new channel should not be included");
+        assert!(!new_channels_inclusion._0, "new channel should not be included");
 
         // migrate nodes
         migrate_nodes(
@@ -2240,9 +2240,9 @@ mod tests {
 
         // check new network is included
         let old_channels_inclusion = node_module.tryGetTarget(*instances.channels.address()).call().await?;
-        assert!(old_channels_inclusion, "old channel should still be included");
+        assert!(old_channels_inclusion._0, "old channel should still be included");
         let new_channels_inclusion = node_module.tryGetTarget(*new_channels.address()).call().await?;
-        assert!(new_channels_inclusion, "new channel should now be included");
+        assert!(new_channels_inclusion._0, "new channel should now be included");
         Ok(())
     }
 
