@@ -87,6 +87,7 @@ pub use timer::execute_on_tick;
 use tracing::{error, trace, warn};
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
+const SLOW_OP_MS: u128 = 150;
 
 pub type HoprBinaryCodec = crate::codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
 pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
@@ -250,7 +251,7 @@ where
                         let now = std::time::Instant::now();
                         let res = msg_processor.recv(&peer, data).await.map_err(move |e| (peer, e));
                         let elapsed = now.elapsed();
-                        if elapsed.as_millis() > 150 {
+                        if elapsed.as_millis() > SLOW_OP_MS {
                             tracing::warn!("msg_processor.recv took {}ms", elapsed.as_millis());
                         }
                         if let Err((peer, e)) = &res {
@@ -287,7 +288,7 @@ where
                                                 error!("Failed to forward an acknowledgement for a failed packet recv to the transport layer");
                                             });
                                         let elapsed = now.elapsed();
-                                        if elapsed.as_millis() > 150 {
+                                        if elapsed.as_millis() > SLOW_OP_MS {
                                             tracing::warn!("msg_to_send_tx.send took {}ms", elapsed.as_millis());
                                         }
                                     },

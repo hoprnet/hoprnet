@@ -4903,7 +4903,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5202,7 +5202,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",

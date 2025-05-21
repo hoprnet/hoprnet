@@ -70,6 +70,9 @@ pub type SeqNum = u8;
 #[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
 pub struct SegmentId(pub FrameId, pub SeqNum);
 
+const EVICTION_TIME_THRESHOLD_MS: u64 = 50;
+const PUSH_TIME_THRESHOLD_MS: u64 = 50;
+
 impl From<&Segment> for SegmentId {
     fn from(value: &Segment) -> Self {
         value.id()
@@ -552,7 +555,7 @@ impl FrameReassembler {
         }
 
         let push_time = start.elapsed();
-        if push_time > Duration::from_millis(50) {
+        if push_time > Duration::from_millis(PUSH_TIME_THRESHOLD_MS) {
             tracing::trace!(?push_time, "segment push done");
         }
 
@@ -618,7 +621,7 @@ impl FrameReassembler {
         }
 
         let eviction_time = start.elapsed();
-        if eviction_time > Duration::from_millis(50) {
+        if eviction_time > Duration::from_millis(EVICTION_TIME_THRESHOLD_MS) {
             tracing::trace!(?eviction_time, count, "eviction done");
         }
 
