@@ -15,10 +15,10 @@ use sea_orm::{
 use tracing::trace;
 
 use crate::{
+    HoprDbGeneralModelOperations, OptTx, SINGULAR_TABLE_FIXED_ID, TargetDb,
     cache::{CachedValue, CachedValueDiscriminants},
     db::HoprDb,
     errors::{DbSqlError, DbSqlError::MissingFixedTableEntry, Result},
-    HoprDbGeneralModelOperations, OptTx, TargetDb, SINGULAR_TABLE_FIXED_ID,
 };
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
@@ -36,7 +36,9 @@ pub struct IndexerStateInfo {
 /// $H$ denotes Keccak256 hash function and $||$  byte string concatenation.
 ///
 /// For a block $b_1$ containing logs $L_1, L_2, \ldots L_n$ corresponding to tx hashes $Tx_1, Tx_2, \ldots Tx_n$, a
-/// block hash is computed as: ```math
+/// block hash is computed as:
+///
+/// ```math
 /// H_{b_1} = H(Tx_1 || Tx_2 || \ldots || Tx_n)
 /// ```
 /// Given $C_0 = H(0x00...0)$ , the checksum $C_{k+1}$ after processing block $b_{k+1}$ is given as follows:
