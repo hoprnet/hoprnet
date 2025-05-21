@@ -629,8 +629,8 @@
 
               buildPhase = ''
                 cd ./ethereum/contracts
-                forge bind --root . --config-path ./foundry.toml --offline --bindings-path "../bindings/src/codegen" \
-                  --module --alloy --overwrite --skip-extra-derives \
+                forge bind --offline --bindings-path ./../bindings/src/codegen \
+                  --module --alloy --overwrite --skip-cargo-toml \
                   --select "^(HoprAnnouncements|HoprAnnouncementsEvents|HoprCapabilityPermissions|HoprChannels|HoprChannelsEvents|HoprCrypto|HoprDummyProxyForNetworkRegistry|HoprBoost|HoprToken|HoprLedger|HoprLedgerevents|HoprMultisig|HoprNetworkRegistry|HoprNetworkRegistryEvents|HoprNodeManagementModule|HoprNodeSafeRegistry|HoprNodeSafeRegistryEvents|HoprNodeStakeFactory|HoprNodeStakeFactoryEvents|HoprSafeProxyForNetworkRegistry|HoprStakingProxyForNetworkRegistry|HoprTicketPriceOracle|HoprTicketPriceOracleEvents|HoprWinningProbabilityOracle|HoprWinningProbabilityOracleEvents)$"
               '';
 
@@ -644,7 +644,7 @@
               '';
 
               # Disable the installPhase
-              installPhase = ":";
+              installPhase = "mkdir -p $out";
               doCheck = true;
             };
           devShell = import ./nix/devShell.nix {
