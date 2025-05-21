@@ -847,7 +847,7 @@
           };
 
           checks = {
-            #inherit hoprd-clippy hopli-clippy;
+            inherit hoprd-clippy hopli-clippy;
             check-bindings = check-bindings {
               pkgs = pkgs;
               solcDefault = solcDefault;
