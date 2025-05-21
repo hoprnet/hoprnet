@@ -8,6 +8,12 @@ use validator::Validate;
 #[serde(deny_unknown_fields)]
 pub struct ProbeConfig {
     /// Maximum number of parallel probes performed by the mechanism
+    #[serde_as(as = "DurationSeconds<u64>")]
+    #[default(default_max_probe_timeout())]
+    #[serde(default = "default_max_probe_timeout")]
+    pub timeout: std::time::Duration,
+
+    /// Maximum number of parallel probes performed by the mechanism
     #[validate(range(min = 1))]
     #[default(default_max_parallel_probes())]
     #[serde(default = "default_max_parallel_probes")]
@@ -26,6 +32,9 @@ pub struct ProbeConfig {
     pub recheck_threshold: std::time::Duration,
 }
 
+/// The maximum time waiting for a reply from the probe
+const DEFAULT_MAX_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// The maximum number of parallel probes the heartbeat performs
 const DEFAULT_MAX_PARALLEL_PROBES: usize = 100;
 
@@ -34,6 +43,11 @@ const DEFAULT_REPEATED_PROBING_DELAY: std::time::Duration = std::time::Duration:
 
 /// Time after which the availability of a node gets rechecked
 const DEFAULT_PROBE_RECHECK_THRESHOLD: std::time::Duration = std::time::Duration::from_secs(60);
+
+#[inline]
+const fn default_max_probe_timeout() -> std::time::Duration {
+    DEFAULT_MAX_PROBE_TIMEOUT
+}
 
 #[inline]
 const fn default_max_parallel_probes() -> usize {

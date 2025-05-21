@@ -441,7 +441,7 @@ impl Hopr {
                 transport: cfg.transport.clone(),
                 network: cfg.network_options.clone(),
                 protocol: cfg.protocol,
-                heartbeat: cfg.heartbeat,
+                probe: cfg.probe,
                 session: cfg.session,
             },
             db.clone(),

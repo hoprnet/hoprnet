@@ -18,6 +18,8 @@ serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
+hopr-crypto-packet = { workspace = true }
+
 [dev-dependencies]
 anyhow = { workspace = true }
 
