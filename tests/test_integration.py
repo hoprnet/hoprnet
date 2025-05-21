@@ -39,7 +39,7 @@ class TestIntegrationWithSwarm:
         async def check_all_connected(me: Node, others: list[str]):
             others2 = set(others)
             while True:
-                current_peers = set([x.peer_id for x in await me.api.peers()])
+                current_peers = set([x.address for x in await me.api.peers()])
                 if current_peers.intersection(others) == others2:
                     break
                 else:
@@ -49,7 +49,7 @@ class TestIntegrationWithSwarm:
         await asyncio.gather(
             *[
                 asyncio.wait_for(
-                    check_all_connected(swarm7[k], [swarm7[v].peer_id for v in barebone_nodes() if v != k]), 60.0
+                    check_all_connected(swarm7[k], [swarm7[v].address for v in barebone_nodes() if v != k]), 60.0
                 )
                 for k in barebone_nodes()
             ]
@@ -69,7 +69,7 @@ class TestIntegrationWithSwarm:
     async def test_hoprd_ping_should_work_between_nodes_in_the_same_network(
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
-        response = await swarm7[src].api.ping(swarm7[dest].peer_id)
+        response = await swarm7[src].api.ping(swarm7[dest].address)
 
         assert response is not None
         # Zero-roundtrip (in ms precision) can happen on fast local setups
@@ -78,7 +78,7 @@ class TestIntegrationWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_ping_to_self_should_fail(self, peer: str, swarm7: dict[str, Node]):
-        response = await swarm7[peer].api.ping(swarm7[peer].peer_id)
+        response = await swarm7[peer].api.ping(swarm7[peer].address)
 
         assert response is None, "Pinging self should fail"
 
@@ -202,8 +202,8 @@ class TestIntegrationWithSwarm:
                 Protocol.UDP,
                 swarm7[src],
                 swarm7[dest],
-                {"IntermediatePath": [swarm7[mid].peer_id]},
-                {"IntermediatePath": [swarm7[mid].peer_id]},
+                {"IntermediatePath": [swarm7[mid].address]},
+                {"IntermediatePath": [swarm7[mid].address]},
                 capabilities=SessionCapabilitiesBody(segmentation=True, no_delay=True),
                 use_response_buffer=None,
             ) as session:
@@ -253,11 +253,6 @@ class TestIntegrationWithSwarm:
         async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR):
             # the context manager handles opening and closing of the channel with verification,
             # using counter-party address
-            assert True
-
-        async with create_channel(swarm7[src], swarm7[dest], OPEN_CHANNEL_FUNDING_VALUE_HOPR, use_peer_id=True):
-            # the context manager handles opening and closing of the channel with verification,
-            # using counter-party peerID
             assert True
 
     # generate a 1-hop route with a node using strategies in the middle

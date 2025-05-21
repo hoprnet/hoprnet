@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "3.15.0"
+version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "API enabling developers to interact with a hoprd node programatically through HTTP REST API."
@@ -34,11 +34,6 @@ either = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }
-libp2p-identity = { workspace = true, features = [
-  "peerid",
-  "ed25519",
-  "serde",
-] }
 regex = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

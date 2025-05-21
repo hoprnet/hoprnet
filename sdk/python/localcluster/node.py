@@ -65,7 +65,6 @@ class Node:
         self.proc: Popen = None
 
         # private
-        self.peer_id: str = None
         self.address: str = None
         self.dir: Path = None
         self.cfg_file_path: Path = None
@@ -233,7 +232,7 @@ class Node:
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 
             # filter out peers that are not well-connected yet
-            connected_peers = [p.peer_id for p in peers_info if p.quality >= 0.25]
+            connected_peers = [p.address for p in peers_info if p.quality >= 0.25]
             connected_peers.sort()
             logging.debug(f"Peers connected on {self.id}: {connected_peers}")
 
@@ -277,14 +276,14 @@ class Node:
             base_port=base_port,
         )
 
-    async def connect_peers(self, peer_ids: list[str]):
+    async def connect_peers(self, addresses: list[str]):
         tasks = []
 
-        for peer_id in peer_ids:
-            if peer_id == self.peer_id:
+        for address in addresses:
+            if address == self.address:
                 continue
             tasks.append(
-                asyncio.create_task(self.api.open_channel(peer_id, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"))
+                asyncio.create_task(self.api.open_channel(address, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"))
             )
 
         await asyncio.gather(*tasks)
@@ -296,7 +295,6 @@ class Node:
         output_strings = []
 
         output_strings.append(f"\t{self}")
-        output_strings.append(f"\t\tPeer Id:\t{addresses.hopr}")
         output_strings.append(f"\t\tAddress:\t{addresses.native}")
         output_strings.append(
             f"\t\tRest API:\thttp://{self.api_addr}:{self.api_port}/scalar | http://{self.api_addr}:{self.api_port}/swagger-ui/index.html"
@@ -306,7 +304,7 @@ class Node:
         return "\n".join(output_strings)
 
     def __eq__(self, other):
-        return self.peer_id == other.peer_id
+        return self.address == other.address
 
     def __str__(self):
         return f"node @ {self.api_addr}:{self.api_port}"
