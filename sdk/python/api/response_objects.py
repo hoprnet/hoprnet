@@ -59,7 +59,7 @@ class ApiResponseObject:
 
 
 class Addresses(ApiResponseObject):
-    keys = {"hopr": "hopr", "native": "native"}
+    keys = {"native": "native"}
 
 
 class Balances(ApiResponseObject):
