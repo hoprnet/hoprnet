@@ -11,10 +11,10 @@ from .cluster import Cluster
 from .constants import (
     ANVIL_CONFIG_FILE,
     ANVIL_FOLDER,
+    BASE_PORT,
     CONTRACTS_ADDRESSES,
     MAIN_DIR,
     NETWORK,
-    BASE_PORT,
     logging,
 )
 from .snapshot import Snapshot
@@ -104,11 +104,8 @@ async def bringup(
         anvil.kill()
         raise e
 
-    if not test_mode:
-        await cluster.alias_peers()
-
-        if fully_connected:
-            await cluster.connect_peers()
+    if not test_mode and fully_connected:
+        await cluster.connect_peers()
 
     logging.info("All nodes ready")
 

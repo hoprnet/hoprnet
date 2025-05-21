@@ -2,7 +2,7 @@ import asyncio
 import base64
 import logging
 import random
-from typing import Optional, Union
+from typing import Optional
 
 import aiohttp
 import base58
@@ -19,26 +19,18 @@ from .request_objects import (
     CreateSessionBody,
     FundChannelBody,
     GetChannelsBody,
-    GetMessagesBody,
     OpenChannelBody,
-    PeekAllMessagesBody,
-    SendMessageBody,
     SessionCapabilitiesBody,
-    SetAliasBody,
     WithdrawBody,
 )
 from .response_objects import (
     Addresses,
-    Alias,
-    AliasAddress,
     Balances,
     Channel,
     Channels,
     Configuration,
     ConnectedPeer,
     Infos,
-    Message,
-    MessageSent,
     OpenedChannel,
     Ping,
     Session,
@@ -154,44 +146,6 @@ class HoprdAPI:
         except asyncio.TimeoutError:
             logging.error(f"TimeoutError calling {method} {endpoint}")
             return (False, None)
-
-    async def aliases_get_aliases(self, return_address: bool = False):
-        """
-        Returns all aliases.
-        :param: return_address: bool. If true, returns addresses instead of peer_ids
-        :return: aliases: list
-        """
-        endpoint = "aliases_addresses" if return_address else "aliases"
-        is_ok, response = await self.__call_api(HTTPMethod.GET, endpoint)
-        return response if is_ok else None
-
-    async def aliases_get_alias(self, alias: str, return_address: bool = False) -> Optional[Union[Alias, AliasAddress]]:
-        """
-        Returns the peer id recognized by the node.
-        :return: alias: Alias
-        """
-
-        endpoint = f"aliases_addresses/{alias}" if return_address else f"aliases/{alias}"
-        response_class = AliasAddress if return_address else Alias
-        is_ok, response = await self.__call_api(HTTPMethod.GET, endpoint)
-        return response_class(response) if is_ok else None
-
-    async def aliases_set_alias(self, alias: str, destination: str):
-        """
-        Returns the aliases recognized by the node.
-        :return: bool
-        """
-        data = SetAliasBody(alias, destination)
-        is_ok, _ = await self.__call_api(HTTPMethod.POST, "aliases", data=data)
-        return is_ok
-
-    async def aliases_remove_alias(self, alias: str):
-        """
-        Returns the aliases recognized by the node.
-        :return: bool
-        """
-        is_ok, _ = await self.__call_api(HTTPMethod.DELETE, f"aliases/{alias}")
-        return is_ok
 
     async def balances(self) -> Optional[Balances]:
         """
@@ -409,21 +363,6 @@ class HoprdAPI:
         is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "tickets/statistics")
         return is_ok
 
-    async def send_message(
-        self, destination: str, message: str, hops: list[str], tag: int = MESSAGE_TAG
-    ) -> Optional[MessageSent]:
-        """
-        Sends a message to the given destination.
-        :param: destination: str
-        :param: message: str
-        :param: hops: list[str]
-        :param: tag: int = 0x0320
-        :return: bool
-        """
-        data = SendMessageBody(body=message, hops=None, path=hops, destination=destination, tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages", data=data)
-        return MessageSent(response) if is_ok else None
-
     async def session_list_clients(self, protocol: Protocol = Protocol.UDP) -> list[Session]:
         """
         Lists existing Session listeners for the given IP protocol
@@ -488,53 +427,6 @@ class HoprdAPI:
         )
 
         return is_ok
-
-    async def messages_pop(self, tag: int = MESSAGE_TAG) -> Optional[Message]:
-        """
-        Pop next message from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-
-        data = GetMessagesBody(tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/pop", data)
-        return Message(response) if is_ok else None
-
-    async def messages_pop_all(self, tag: int = MESSAGE_TAG) -> Optional[list[Message]]:
-        """
-        Pop all messages from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-        data = GetMessagesBody(tag=tag)
-
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/pop-all", data)
-        return [Message(entry) for entry in response["messages"]] if is_ok else None
-
-    async def messages_peek(self, tag: int = MESSAGE_TAG) -> Optional[Message]:
-        """
-        Peek next message from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-
-        data = GetMessagesBody(tag=tag)
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/peek", data)
-        return Message(response) if is_ok else None
-
-    async def messages_peek_all(self, tag: int = MESSAGE_TAG, timestamp: int = 0) -> Optional[list[Message]]:
-        """
-        Peek all messages from the inbox
-        :param: tag = 0x0320
-        :return: dict
-        """
-        if not isinstance(timestamp, int):
-            data = PeekAllMessagesBody(tag=tag)
-        else:
-            data = PeekAllMessagesBody(tag=tag, timestamp=timestamp)
-
-        is_ok, response = await self.__call_api(HTTPMethod.POST, "messages/peek-all", data)
-        return [Message(entry) for entry in response["messages"]] if is_ok else None
 
     async def readyz(self, timeout: int = 20) -> bool:
         """

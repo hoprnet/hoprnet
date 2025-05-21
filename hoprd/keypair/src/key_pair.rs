@@ -1,13 +1,16 @@
-//use hex;
-use hopr_crypto_random::{random_bytes, Randomizable};
-use hopr_crypto_types::crypto_traits::{Digest, KeyIvInit, StreamCipher, Update};
-use hopr_crypto_types::prelude::*;
+// use hex;
+use std::fmt::Debug;
+
+use hopr_crypto_random::{Randomizable, random_bytes};
+use hopr_crypto_types::{
+    crypto_traits::{Digest, KeyIvInit, StreamCipher, Update},
+    prelude::*,
+};
 use hopr_platform::file::native::{metadata, read_to_string, write};
 use hopr_primitive_types::prelude::*;
-use scrypt::{scrypt, Params as ScryptParams};
-use serde::{ser::SerializeStruct, Serialize, Serializer};
+use scrypt::{Params as ScryptParams, scrypt};
+use serde::{Serialize, Serializer, ser::SerializeStruct};
 use serde_json::{from_str as from_json_string, to_string as to_json_string};
-use std::fmt::Debug;
 use tracing::{info, warn};
 use typenum::Unsigned;
 use uuid::Uuid;
@@ -144,16 +147,17 @@ impl TryFrom<&str> for HoprKeys {
 
 impl TryFrom<[u8; PACKET_KEY_LENGTH + CHAIN_KEY_LENGTH]> for HoprKeys {
     type Error = KeyPairError;
+
     /// Deserializes HoprKeys from binary string
     ///
     /// ```rust
     /// use hoprd_keypair::key_pair::HoprKeys;
     ///
     /// let priv_keys = [
-    ///     0x56,0xb2,0x9c,0xef,0xcd,0xf5,0x76,0xee,0xa3,0x06,0xba,0x2f,0xd5,0xf3,0x2e,0x65,
-    ///     0x1c,0x09,0xe0,0xab,0xbc,0x01,0x8c,0x47,0xbd,0xc6,0xef,0x44,0xf6,0xb7,0x50,0x6f,
-    ///     0x10,0x50,0xf9,0x51,0x37,0x77,0x04,0x78,0xf5,0x0b,0x45,0x62,0x67,0xf7,0x61,0xf1,
-    ///     0xb8,0xb3,0x41,0xa1,0x3d,0xa6,0x8b,0xc3,0x2e,0x5c,0x96,0x98,0x4f,0xcd,0x52,0xae
+    ///     0x56, 0xb2, 0x9c, 0xef, 0xcd, 0xf5, 0x76, 0xee, 0xa3, 0x06, 0xba, 0x2f, 0xd5, 0xf3, 0x2e, 0x65, 0x1c, 0x09,
+    ///     0xe0, 0xab, 0xbc, 0x01, 0x8c, 0x47, 0xbd, 0xc6, 0xef, 0x44, 0xf6, 0xb7, 0x50, 0x6f, 0x10, 0x50, 0xf9, 0x51,
+    ///     0x37, 0x77, 0x04, 0x78, 0xf5, 0x0b, 0x45, 0x62, 0x67, 0xf7, 0x61, 0xf1, 0xb8, 0xb3, 0x41, 0xa1, 0x3d, 0xa6,
+    ///     0x8b, 0xc3, 0x2e, 0x5c, 0x96, 0x98, 0x4f, 0xcd, 0x52, 0xae,
     /// ];
     /// assert!(HoprKeys::try_from(priv_keys).is_ok());
     /// ```
@@ -176,13 +180,15 @@ impl TryFrom<([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])> for HoprKeys {
     /// use hoprd_keypair::key_pair::HoprKeys;
     ///
     /// let priv_keys = (
-    /// [
-    ///     0x56,0xb2,0x9c,0xef,0xcd,0xf5,0x76,0xee,0xa3,0x06,0xba,0x2f,0xd5,0xf3,0x2e,0x65,
-    ///     0x1c,0x09,0xe0,0xab,0xbc,0x01,0x8c,0x47,0xbd,0xc6,0xef,0x44,0xf6,0xb7,0x50,0x6f,
-    /// ], [
-    ///     0x10,0x50,0xf9,0x51,0x37,0x77,0x04,0x78,0xf5,0x0b,0x45,0x62,0x67,0xf7,0x61,0xf1,
-    ///     0xb8,0xb3,0x41,0xa1,0x3d,0xa6,0x8b,0xc3,0x2e,0x5c,0x96,0x98,0x4f,0xcd,0x52,0xae
-    /// ]);
+    ///     [
+    ///         0x56, 0xb2, 0x9c, 0xef, 0xcd, 0xf5, 0x76, 0xee, 0xa3, 0x06, 0xba, 0x2f, 0xd5, 0xf3, 0x2e, 0x65, 0x1c, 0x09,
+    ///         0xe0, 0xab, 0xbc, 0x01, 0x8c, 0x47, 0xbd, 0xc6, 0xef, 0x44, 0xf6, 0xb7, 0x50, 0x6f,
+    ///     ],
+    ///     [
+    ///         0x10, 0x50, 0xf9, 0x51, 0x37, 0x77, 0x04, 0x78, 0xf5, 0x0b, 0x45, 0x62, 0x67, 0xf7, 0x61, 0xf1, 0xb8, 0xb3,
+    ///         0x41, 0xa1, 0x3d, 0xa6, 0x8b, 0xc3, 0x2e, 0x5c, 0x96, 0x98, 0x4f, 0xcd, 0x52, 0xae,
+    ///     ],
+    /// );
     /// assert!(HoprKeys::try_from(priv_keys).is_ok());
     /// ```
     fn try_from(value: ([u8; PACKET_KEY_LENGTH], [u8; CHAIN_KEY_LENGTH])) -> std::result::Result<Self, Self::Error> {
@@ -230,9 +236,10 @@ impl HoprKeys {
                             }
                             Ok(keys)
                         }
-                        Err(e) => Err(KeyPairError::GeneralError(
-                            format!("An identity file is present at {id_path} but the provided password <REDACTED> is not sufficient to decrypt it {e}"),
-                        )),
+                        Err(e) => Err(KeyPairError::GeneralError(format!(
+                            "An identity file is present at {id_path} but the provided password <REDACTED> is not \
+                             sufficient to decrypt it {e}"
+                        ))),
                     }
                 } else {
                     let keys = HoprKeys::random();
@@ -459,12 +466,13 @@ impl Debug for HoprKeys {
 mod tests {
     use std::fs;
 
-    use super::HoprKeys;
     use anyhow::Context;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
     use tempfile::tempdir;
     use uuid::Uuid;
+
+    use super::HoprKeys;
 
     const DEFAULT_PASSWORD: &str = "dummy password for unit testing";
 
@@ -533,11 +541,13 @@ mod tests {
         let old_keystore_file = r#"{"id":"8e5fe142-6ef9-4fbb-aae8-5de32b680e31","version":3,"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"04141354edb9dfb0c65e6905a3a0b9dd"},"ciphertext":"74f12f72cf2d3d73ff09f783cb9b57995b3808f7d3f71aa1fa1968696aedfbdd","kdf":"scrypt","kdfparams":{"salt":"f5e3f04eaa0c9efffcb5168c6735d7e1fe4d96f48a636c4f00107e7c34722f45","n":1,"dklen":32,"p":1,"r":8},"mac":"d0daf0e5d14a2841f0f7221014d805addfb7609d85329d4c6424a098e50b6fbe"}}"#;
         fs::write(identity_path, old_keystore_file.as_bytes()).unwrap();
 
-        assert!(super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
-            password: "local".into(),
-            id_path: identity_path.into()
-        })
-        .is_ok());
+        assert!(
+            super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
+                password: "local".into(),
+                id_path: identity_path.into()
+            })
+            .is_ok()
+        );
 
         let (deserialized, needs_migration) = super::HoprKeys::read_eth_keystore(identity_path, "local").unwrap();
 
@@ -559,11 +569,13 @@ mod tests {
         fs::write(identity_path, "".as_bytes())?;
 
         // Overwriting existing keys must not be possible
-        assert!(super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
-            password: "local".into(),
-            id_path: identity_path.into()
-        })
-        .is_err());
+        assert!(
+            super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
+                password: "local".into(),
+                id_path: identity_path.into()
+            })
+            .is_err()
+        );
 
         Ok(())
     }
@@ -586,23 +598,29 @@ mod tests {
 
         let too_short_private_key = "0xb29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52ae";
 
-        assert!(HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey {
-            private_key: too_short_private_key
-        })
-        .is_err());
+        assert!(
+            HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey {
+                private_key: too_short_private_key
+            })
+            .is_err()
+        );
 
         let too_long_private_key = "0x56b29cefcdf576eea306ba2fd5f32e651c09e0abbc018c47bdc6ef44f6b7506f1050f95137770478f50b456267f761f1b8b341a13da68bc32e5c96984fcd52aeae";
 
-        assert!(HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey {
-            private_key: too_long_private_key
-        })
-        .is_err());
+        assert!(
+            HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey {
+                private_key: too_long_private_key
+            })
+            .is_err()
+        );
 
         let non_hex_private = "this is the story of hopr: in 2018 ...";
-        assert!(HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey {
-            private_key: non_hex_private
-        })
-        .is_err());
+        assert!(
+            HoprKeys::init(super::IdentityRetrievalModes::FromPrivateKey {
+                private_key: non_hex_private
+            })
+            .is_err()
+        );
     }
 
     #[test]
@@ -628,12 +646,14 @@ mod tests {
         );
 
         // Overwriting existing keys must not be possible
-        assert!(super::HoprKeys::init(super::IdentityRetrievalModes::FromIdIntoFile {
-            password: "local",
-            id_path: identity_path,
-            id
-        })
-        .is_err());
+        assert!(
+            super::HoprKeys::init(super::IdentityRetrievalModes::FromIdIntoFile {
+                password: "local",
+                id_path: identity_path,
+                id
+            })
+            .is_err()
+        );
 
         Ok(())
     }

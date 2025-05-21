@@ -1,8 +1,9 @@
-{ pkgs
-, extraPackages ? [ ]
-, hoprd
-, hopli
-, ...
+{
+  pkgs,
+  extraPackages ? [ ],
+  hoprd,
+  hopli,
+  ...
 }@args:
 let
   packages = with pkgs; [
@@ -14,6 +15,9 @@ let
     "hopli"
   ];
 in
-import ./testShell.nix (cleanArgs // {
-  extraPackages = packages ++ extraPackages;
-})
+import ./testShell.nix (
+  cleanArgs
+  // {
+    extraPackages = packages ++ extraPackages;
+  }
+)

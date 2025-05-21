@@ -4,10 +4,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use hex_literal::hex;
-use hopr_crypto_random::{random_bytes, random_integer, Randomizable};
-use lazy_static::lazy_static;
-use libp2p::{Multiaddr, PeerId};
-
+use hopr_crypto_random::{Randomizable, random_bytes, random_integer};
 use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{Hash, OffchainPublicKey},
@@ -18,14 +15,15 @@ use hopr_db_sql::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
-use hopr_path::errors::PathError;
-use hopr_path::{channel_graph::ChannelGraph, ChainPath, Path, PathAddressResolver, ValidatedPath};
+use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_graph::ChannelGraph, errors::PathError};
 use hopr_primitive_types::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
-    processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
     DEFAULT_PRICE_PER_PACKET,
+    processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
 };
+use lazy_static::lazy_static;
+use libp2p::{Multiaddr, PeerId};
 use tokio::time::timeout;
 use tracing::debug;
 

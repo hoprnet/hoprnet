@@ -1,19 +1,21 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{Json, Path, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
+use hopr_lib::{
+    HoprTransportError, Multiaddr,
+    errors::{HoprLibError, HoprStatusError},
+};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr, DurationMilliSeconds};
-use std::sync::Arc;
+use serde_with::{DisplayFromStr, DurationMilliSeconds, serde_as};
 use tracing::debug;
 
-use hopr_lib::errors::{HoprLibError, HoprStatusError};
-use hopr_lib::{HoprTransportError, Multiaddr};
-
 use crate::{
+    ApiError, ApiErrorStatus, BASE_PATH, InternalState,
     types::{HoprIdentifier, PeerOrAddress},
-    ApiError, ApiErrorStatus, InternalState, BASE_PATH,
 };
 
 #[serde_as]
@@ -26,12 +28,13 @@ use crate::{
         "/ip4/10.0.2.100/tcp/19093"
     ]
 }))]
+/// Contains the multiaddresses of peers that are `announced` on-chain and `observed` by the node.
 pub(crate) struct NodePeerInfoResponse {
     #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[schema(value_type = Vec<String>)]
+    #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19093"]))]
     announced: Vec<Multiaddr>,
     #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[schema(value_type = Vec<String>)]
+    #[schema(value_type = Vec<String>, example = json!(["/ip4/10.0.2.100/tcp/19093"]))]
     observed: Vec<Multiaddr>,
 }
 
@@ -52,7 +55,7 @@ pub(crate) struct DestinationParams {
     get,
     path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}"),
     params(
-        ("destination" = String, Path, description = "PeerID or address of the requested peer")
+        ("destination" = String, Path, description = "PeerID or address of the requested peer", example = "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA")
     ),
     responses(
         (status = 200, description = "Peer information fetched successfully.", body = NodePeerInfoResponse),
@@ -91,10 +94,12 @@ pub(super) async fn show_peer_info(
     "reportedVersion": "2.1.0"
 }))]
 #[serde(rename_all = "camelCase")]
+/// Contains the latency and the reported version of a peer that has been pinged.
 pub(crate) struct PingResponse {
     #[serde_as(as = "DurationMilliSeconds<u64>")]
-    #[schema(value_type = u64)]
+    #[schema(value_type = u64, example = 200)]
     latency: std::time::Duration,
+    #[schema(example = "2.1.0")]
     reported_version: String,
 }
 
@@ -102,8 +107,9 @@ pub(crate) struct PingResponse {
 #[utoipa::path(
     post,
     path = const_format::formatcp!("{BASE_PATH}/peers/{{destination}}/ping"),
+    description = "Directly ping the given peer",
     params(
-        ("destination" = String, Path, description = "PeerID or address of the requested peer")
+        ("destination" = String, Path, description = "PeerID or address of the requested peer", example = "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA"),
     ),
     responses(
         (status = 200, description = "Ping successful", body = PingResponse),
@@ -149,7 +155,7 @@ pub(super) async fn ping_peer(
             Err(HoprLibError::TransportError(HoprTransportError::NetworkError(
                 hopr_lib::NetworkingError::NonExistingPeer,
             ))) => Ok((StatusCode::NOT_FOUND, ApiErrorStatus::PeerNotFound).into_response()),
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 Ok((StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response())
             }
             Err(e) => Ok((StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response()),

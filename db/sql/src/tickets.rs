@@ -1,38 +1,39 @@
+use std::{
+    cmp,
+    ops::{Add, Bound},
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
+
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::{StreamExt, TryStreamExt};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
-use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
-use std::cmp;
-use std::ops::{Add, Bound};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use tracing::{debug, error, info, trace, warn};
-
+use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::prelude::{TicketIndexSelector, TicketMarker};
-use hopr_db_api::resolver::HoprDbResolverOperations;
-use hopr_db_api::tickets::AggregationPrerequisites;
 use hopr_db_api::{
     errors::Result,
     info::DomainSeparator,
-    tickets::{ChannelTicketStatistics, HoprDbTicketOperations, TicketSelector},
+    prelude::{TicketIndexSelector, TicketMarker},
+    resolver::HoprDbResolverOperations,
+    tickets::{AggregationPrerequisites, ChannelTicketStatistics, HoprDbTicketOperations, TicketSelector},
 };
-use hopr_db_entity::ticket_statistics;
-use hopr_db_entity::{outgoing_ticket_index, ticket};
+use hopr_db_entity::{outgoing_ticket_index, ticket, ticket_statistics};
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-
-use crate::channels::HoprDbChannelOperations;
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::errors::DbSqlError::LogicalError;
-use crate::info::HoprDbInfoOperations;
-use crate::{HoprDbGeneralModelOperations, OpenTransaction, OptTx, TargetDb};
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::MultiGauge;
+use hopr_primitive_types::prelude::*;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set};
+use sea_query::{Condition, Expr, IntoCondition, SimpleExpr};
+use tracing::{debug, error, info, trace, warn};
+
+use crate::{
+    HoprDbGeneralModelOperations, OpenTransaction, OptTx, TargetDb,
+    channels::HoprDbChannelOperations,
+    db::HoprDb,
+    errors::{DbSqlError, DbSqlError::LogicalError},
+    info::HoprDbInfoOperations,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -152,7 +153,8 @@ impl IntoCondition for WrappedTicketSelector {
 /// The following is applied:
 /// - the list of tickets is reduced so that the total amount on the tickets does not exceed the channel balance
 /// - it is checked whether the list size is greater than `min_unaggregated_ratio`
-/// - it is checked whether the ratio of total amount on the unaggregated tickets on the list and the channel balance ratio is greater than `min_unaggregated_ratio`
+/// - it is checked whether the ratio of total amount on the unaggregated tickets on the list and the channel balance
+///   ratio is greater than `min_unaggregated_ratio`
 pub(crate) fn filter_satisfying_ticket_models(
     prerequisites: AggregationPrerequisites,
     models: Vec<ticket::Model>,
@@ -1201,7 +1203,11 @@ impl HoprDbTicketOperations for HoprDb {
 
             final_value = final_value.add(&acked_ticket.verified_ticket().amount);
             if final_value.gt(&channel_balance) {
-                return Err(DbSqlError::LogicalError(format!("ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of channel {channel_id}")).into());
+                return Err(DbSqlError::LogicalError(format!(
+                    "ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of \
+                     channel {channel_id}"
+                ))
+                .into());
             }
         }
 
@@ -1213,7 +1219,8 @@ impl HoprDbTicketOperations for HoprDb {
         let first_acked_ticket = verified_tickets.first().unwrap();
         let last_acked_ticket = verified_tickets.last().unwrap();
 
-        // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain ticket_index from channel_entry
+        // calculate the minimum current ticket index as the larger value from the acked ticket index and on-chain
+        // ticket_index from channel_entry
         let current_ticket_index_from_acked_tickets = last_acked_ticket.verified_ticket().index + 1;
         self.compare_and_set_outgoing_ticket_index(channel_id, current_ticket_index_from_acked_tickets)
             .await?;
@@ -1289,30 +1296,36 @@ impl HoprDb {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::{anyhow, Context};
-    use futures::{pin_mut, StreamExt};
+    use std::{
+        ops::Add,
+        sync::atomic::Ordering,
+        time::{Duration, SystemTime},
+    };
+
+    use anyhow::{Context, anyhow};
+    use futures::{StreamExt, pin_mut};
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_api::prelude::{DbError, TicketMarker};
-    use hopr_db_api::{info::DomainSeparator, tickets::ChannelTicketStatistics};
+    use hopr_db_api::{
+        info::DomainSeparator,
+        prelude::{DbError, TicketMarker},
+        tickets::ChannelTicketStatistics,
+    };
     use hopr_db_entity::ticket;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
-    use std::ops::Add;
-    use std::sync::atomic::Ordering;
-    use std::time::{Duration, SystemTime};
 
-    use crate::accounts::HoprDbAccountOperations;
-    use crate::channels::HoprDbChannelOperations;
-    use crate::db::HoprDb;
-    use crate::errors::DbSqlError;
-    use crate::info::HoprDbInfoOperations;
-    use crate::tickets::{
-        filter_satisfying_ticket_models, AggregationPrerequisites, HoprDbTicketOperations, TicketSelector,
+    use crate::{
+        HoprDbGeneralModelOperations, TargetDb,
+        accounts::HoprDbAccountOperations,
+        channels::HoprDbChannelOperations,
+        db::HoprDb,
+        errors::DbSqlError,
+        info::HoprDbInfoOperations,
+        tickets::{AggregationPrerequisites, HoprDbTicketOperations, TicketSelector, filter_satisfying_ticket_models},
     };
-    use crate::{HoprDbGeneralModelOperations, TargetDb};
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");
@@ -2004,8 +2017,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_aggregation_prerequisites_should_filter_out_tickets_with_lower_than_min_win_prob(
-    ) -> anyhow::Result<()> {
+    async fn test_aggregation_prerequisites_should_filter_out_tickets_with_lower_than_min_win_prob()
+    -> anyhow::Result<()> {
         let prerequisites = AggregationPrerequisites::default();
         assert_eq!(None, prerequisites.min_unaggregated_ratio);
         assert_eq!(None, prerequisites.min_ticket_count);
@@ -2106,8 +2119,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_unaggregated_ratio_is_not_met(
-    ) -> anyhow::Result<()> {
+    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_unaggregated_ratio_is_not_met()
+    -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 10;
 
         let prerequisites = AggregationPrerequisites {
@@ -2170,8 +2183,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_aggregation_prerequisites_must_return_all_when_minimum_ticket_count_is_met_regardless_ratio(
-    ) -> anyhow::Result<()> {
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_ticket_count_is_met_regardless_ratio()
+    -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 10;
 
         let prerequisites = AggregationPrerequisites {
@@ -2201,8 +2214,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_aggregation_prerequisites_must_return_all_when_minimum_unaggregated_ratio_is_met(
-    ) -> anyhow::Result<()> {
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_unaggregated_ratio_is_met()
+    -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 90;
 
         let prerequisites = AggregationPrerequisites {
@@ -2232,8 +2245,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_aggregation_prerequisites_must_return_all_when_minimum_unaggregated_ratio_is_met_regardless_count(
-    ) -> anyhow::Result<()> {
+    async fn test_aggregation_prerequisites_must_return_all_when_minimum_unaggregated_ratio_is_met_regardless_count()
+    -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 90;
 
         let prerequisites = AggregationPrerequisites {
@@ -2263,8 +2276,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_aggregation_prerequisites_must_return_tickets_when_minimum_incl_aggregated_ratio_is_met(
-    ) -> anyhow::Result<()> {
+    async fn test_aggregation_prerequisites_must_return_tickets_when_minimum_incl_aggregated_ratio_is_met()
+    -> anyhow::Result<()> {
         const TICKET_COUNT: usize = 90;
 
         let prerequisites = AggregationPrerequisites {
@@ -2294,8 +2307,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_only_unaggregated_ratio_is_met_in_single_ticket_only(
-    ) -> anyhow::Result<()> {
+    async fn test_aggregation_prerequisites_must_return_empty_when_minimum_only_unaggregated_ratio_is_met_in_single_ticket_only()
+    -> anyhow::Result<()> {
         let prerequisites = AggregationPrerequisites {
             min_ticket_count: None,
             min_unaggregated_ratio: Some(0.9),
@@ -2343,8 +2356,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_should_fail_if_any_ticket_is_being_aggregated_in_that_channel(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_should_fail_if_any_ticket_is_being_aggregated_in_that_channel()
+    -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2362,10 +2375,11 @@ mod tests {
         ticket.state = Set(AcknowledgedTicketStatus::BeingAggregated as i8);
         ticket.save(&db.tickets_db).await?;
 
-        assert!(db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
-            .await
-            .is_err());
+        assert!(
+            db.prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
+                .await
+                .is_err()
+        );
 
         Ok(())
     }
@@ -2420,8 +2434,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_prepare_request_with_multiple_tickets_should_return_that_ticket(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_prepare_request_with_multiple_tickets_should_return_that_ticket()
+    -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 2;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2451,8 +2465,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_prepare_request_with_duplicate_tickets_should_return_dedup_aggregated_ticket(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_prepare_request_with_duplicate_tickets_should_return_dedup_aggregated_ticket()
+    -> anyhow::Result<()> {
         let (db, channel, _) = create_alice_db_with_tickets_from_bob(0).await?;
         let tickets = vec![
             generate_random_ack_ticket(&BOB, &ALICE, 1, 1, 1.0),
@@ -2505,8 +2519,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_prepare_request_with_a_being_redeemed_ticket_should_aggregate_only_the_tickets_following_it(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_prepare_request_with_a_being_redeemed_ticket_should_aggregate_only_the_tickets_following_it()
+    -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2546,8 +2560,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_return_when_ticket_threshold_is_met(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_return_when_ticket_threshold_is_met()
+    -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2581,8 +2595,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_not_return_when_ticket_threshold_is_not_met(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_prepare_request_with_some_requirements_should_not_return_when_ticket_threshold_is_not_met()
+    -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 2;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2612,8 +2626,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_prepare_request_with_no_aggregatable_tickets_should_return_nothing(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_prepare_request_with_no_aggregatable_tickets_should_return_nothing()
+    -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 3;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2650,8 +2664,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_rollback_should_rollback_all_the_being_aggregated_tickets_but_nothing_else(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_rollback_should_rollback_all_the_being_aggregated_tickets_but_nothing_else()
+    -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2669,10 +2683,11 @@ mod tests {
         ticket.state = Set(AcknowledgedTicketStatus::BeingRedeemed as i8);
         ticket.save(&db.tickets_db).await?;
 
-        assert!(db
-            .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
-            .await
-            .is_ok());
+        assert!(
+            db.prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
+                .await
+                .is_ok()
+        );
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
@@ -2681,10 +2696,11 @@ mod tests {
 
         assert_eq!(actual_being_aggregated_count, COUNT_TICKETS - 1);
 
-        assert!(db
-            .rollback_aggregation_in_channel(existing_channel_with_multiple_tickets)
-            .await
-            .is_ok());
+        assert!(
+            db.rollback_aggregation_in_channel(existing_channel_with_multiple_tickets)
+                .await
+                .is_ok()
+        );
 
         let actual_being_aggregated_count = hopr_db_entity::ticket::Entity::find()
             .filter(hopr_db_entity::ticket::Column::State.eq(AcknowledgedTicketStatus::BeingAggregated as u8))
@@ -2697,8 +2713,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_should_replace_the_tickets_with_a_correctly_aggregated_ticket(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_should_replace_the_tickets_with_a_correctly_aggregated_ticket()
+    -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2760,8 +2776,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_should_fail_if_the_aggregated_ticket_value_is_lower_than_the_stored_one(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_should_fail_if_the_aggregated_ticket_value_is_lower_than_the_stored_one()
+    -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2793,17 +2809,18 @@ mod tests {
 
         assert_eq!(actual, Some((*BOB_OFFCHAIN.public(), tickets, Default::default())));
 
-        assert!(db
-            .process_received_aggregated_ticket(aggregated_ticket.leak(), &ALICE)
-            .await
-            .is_err());
+        assert!(
+            db.process_received_aggregated_ticket(aggregated_ticket.leak(), &ALICE)
+                .await
+                .is_err()
+        );
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_ticket_aggregation_should_fail_if_the_aggregated_ticket_win_probability_is_not_equal_to_1(
-    ) -> anyhow::Result<()> {
+    async fn test_ticket_aggregation_should_fail_if_the_aggregated_ticket_win_probability_is_not_equal_to_1()
+    -> anyhow::Result<()> {
         const COUNT_TICKETS: usize = 5;
 
         let (db, channel, tickets) = create_alice_db_with_tickets_from_bob(COUNT_TICKETS).await?;
@@ -2835,10 +2852,11 @@ mod tests {
 
         assert_eq!(actual, Some((*BOB_OFFCHAIN.public(), tickets, Default::default())));
 
-        assert!(db
-            .process_received_aggregated_ticket(aggregated_ticket.leak(), &ALICE)
-            .await
-            .is_err());
+        assert!(
+            db.process_received_aggregated_ticket(aggregated_ticket.leak(), &ALICE)
+                .await
+                .is_err()
+        );
 
         Ok(())
     }
@@ -3365,7 +3383,7 @@ mod tests {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         const COUNT_TICKETS: u64 = 1;
 
-        let (_, _) = init_db_with_tickets(&db, COUNT_TICKETS).await?;
+        let (..) = init_db_with_tickets(&db, COUNT_TICKETS).await?;
 
         // mark the first ticket as being redeemed
         let mut ticket = hopr_db_entity::ticket::Entity::find()
@@ -3405,7 +3423,7 @@ mod tests {
         const COUNT_TICKETS: u64 = 2;
 
         // we set up the channel to have ticket index 1, and ensure that fix does not trigger
-        let (_, _) = init_db_with_tickets_and_channel(&db, COUNT_TICKETS, Some(1u32)).await?;
+        let (..) = init_db_with_tickets_and_channel(&db, COUNT_TICKETS, Some(1u32)).await?;
 
         // mark the first ticket as being redeemed
         let mut ticket = hopr_db_entity::ticket::Entity::find()

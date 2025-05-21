@@ -2,14 +2,17 @@
 //!
 //! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
 //! [RpcOperations] type, which is the main API exposed by this crate.
+use std::{sync::Arc, time::Duration};
+
+use SafeSingleton::SafeSingletonInstance;
 use alloy::{
     network::EthereumWallet,
     providers::{
+        CallItemBuilder, Identity, PendingTransaction, Provider, ProviderBuilder, RootProvider,
         fillers::{
             BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
-        CallItemBuilder, Identity, PendingTransaction, Provider, ProviderBuilder, RootProvider,
     },
     rpc::{
         client::RpcClient,
@@ -19,28 +22,23 @@ use alloy::{
     sol,
 };
 use async_trait::async_trait;
-use primitive_types::U256;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::debug;
-use url::Url;
-use validator::Validate;
-
 use hopr_bindings::hoprnodemanagementmodule::HoprNodeManagementModule::{self, HoprNodeManagementModuleInstance};
 use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_internal_types::prelude::{EncodedWinProb, WinningProbability};
 use hopr_primitive_types::prelude::*;
-
-use SafeSingleton::SafeSingletonInstance;
+use primitive_types::U256;
+use serde::{Deserialize, Serialize};
+use tracing::debug;
+use url::Url;
+use validator::Validate;
 
 // use crate::middleware::GnosisScan;
 use crate::{
+    HoprRpcOperations, NodeSafeModuleStatus,
     client::GasOracleFiller,
     errors::{Result, RpcError},
     transport::HttpRequestor,
-    HoprRpcOperations, NodeSafeModuleStatus,
 };
 
 // define basic safe abi
@@ -370,7 +368,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         let is_safe_owner_of_module = self.cfg.safe_address.eq(&safe_of_module_ownership
             .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
             .0
-             .0
+            .0
             .into());
 
         Ok(NodeSafeModuleStatus {
@@ -395,27 +393,28 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
 
 #[cfg(test)]
 mod tests {
-    use crate::client::{create_rpc_client_to_anvil, AnvilRpcClient};
-    use crate::errors::Result;
-    use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{HoprRpcOperations, PendingTransaction};
-    use alloy::network::{Ethereum, TransactionBuilder};
-    use alloy::primitives::{address, U256};
-    use alloy::providers::Provider;
-    use alloy::rpc::client::ClientBuilder;
-    use alloy::rpc::types::TransactionRequest;
-    use alloy::transports::http::ReqwestTransport;
-    use alloy::transports::layers::RetryBackoffLayer;
-    use hex_literal::hex;
-    use hopr_chain_types::utils::create_native_transfer;
-    use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
-    use primitive_types::H160;
-    use std::sync::Arc;
-    use std::time::Duration;
+    use std::{sync::Arc, time::Duration};
 
+    use alloy::{
+        network::{Ethereum, TransactionBuilder},
+        primitives::{U256, address},
+        providers::Provider,
+        rpc::{client::ClientBuilder, types::TransactionRequest},
+        transports::{http::ReqwestTransport, layers::RetryBackoffLayer},
+    };
+    use hex_literal::hex;
     use hopr_async_runtime::prelude::sleep;
+    use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy, utils::create_native_transfer};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::*;
+    use primitive_types::H160;
+
+    use crate::{
+        HoprRpcOperations, PendingTransaction,
+        client::{AnvilRpcClient, create_rpc_client_to_anvil},
+        errors::Result,
+        rpc::{RpcOperations, RpcOperationsConfig},
+    };
 
     lazy_static::lazy_static! {
         static ref RANDY: Address = hex!("762614a5ed652457a2f1cdb8006380530c26ae6a").into();
@@ -714,7 +713,8 @@ mod tests {
             >(&instances, client.clone(), &chain_key_0)
             .await?;
 
-            // deploy a module and safe instance and add node into the module. The module is enabled by default in the safe
+            // deploy a module and safe instance and add node into the module. The module is enabled by default in the
+            // safe
             (instances, module, safe)
         };
 
@@ -808,7 +808,8 @@ mod tests {
             >(&instances, client.clone(), &chain_key_0)
             .await?;
 
-            // deploy a module and safe instance and add node into the module. The module is enabled by default in the safe
+            // deploy a module and safe instance and add node into the module. The module is enabled by default in the
+            // safe
             (instances, module, safe)
         };
 

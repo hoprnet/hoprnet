@@ -1,22 +1,22 @@
-use futures::{FutureExt, SinkExt, Stream, StreamExt};
-use futures_timer::Delay;
 use std::{
     cmp::Reverse,
     collections::BinaryHeap,
     future::poll_fn,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::Poll,
     time::Duration,
 };
+
+use futures::{FutureExt, SinkExt, Stream, StreamExt};
+use futures_timer::Delay;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::SimpleGauge;
 use tracing::{error, trace};
 
 use crate::{config::MixerConfig, data::DelayedData};
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleGauge;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {

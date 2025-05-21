@@ -1,22 +1,20 @@
-use async_stream::stream;
-use async_trait::async_trait;
-use futures::channel::mpsc::UnboundedSender;
-use futures::{Stream, StreamExt};
-use hopr_primitive_types::traits::SaturatingSub;
-use libp2p_identity::PeerId;
 use std::ops::Div;
 
-use tracing::{debug, warn};
-
+use async_stream::stream;
+use async_trait::async_trait;
+use futures::{Stream, StreamExt, channel::mpsc::UnboundedSender};
 use hopr_async_runtime::prelude::timeout_fut;
-use hopr_platform::time::native::current_time;
-
-use crate::errors::{NetworkingError, Result};
-use crate::messaging::ControlMessage;
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
-use hopr_primitive_types::prelude::AsUnixTimestamp;
+use hopr_platform::time::native::current_time;
+use hopr_primitive_types::{prelude::AsUnixTimestamp, traits::SaturatingSub};
+use libp2p_identity::PeerId;
+use tracing::{debug, warn};
+
+use crate::{
+    errors::{NetworkingError, Result},
+    messaging::ControlMessage,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -257,13 +255,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::messaging::ControlMessage;
-    use crate::ping::Pinger;
     use futures::TryStreamExt;
     use hopr_primitive_types::traits::SaturatingSub;
     use mockall::*;
     use more_asserts::*;
+
+    use super::*;
+    use crate::{messaging::ControlMessage, ping::Pinger};
 
     fn simple_ping_config() -> PingConfig {
         PingConfig {
@@ -273,8 +271,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge(
-    ) -> anyhow::Result<()> {
+    async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge()
+    -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
@@ -291,8 +289,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge(
-    ) -> anyhow::Result<()> {
+    async fn ping_query_replier_should_return_err_result_when_the_pong_is_incorrect_for_the_challenge()
+    -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);

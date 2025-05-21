@@ -1,9 +1,8 @@
-use clap::builder::ValueParser;
-use clap::{ArgAction, Parser};
-use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use hopr_lib::{looks_like_domain, HostConfig};
+use clap::{ArgAction, Parser, builder::ValueParser};
+use hopr_lib::{HostConfig, looks_like_domain};
+use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -217,15 +216,6 @@ pub struct CliArgs {
         value_name = "PRIVATE_KEY"
     )]
     pub private_key: Option<String>,
-
-    #[arg(
-        long = "inbox-capacity",
-        value_parser = clap::value_parser ! (u32).range(1..),
-        value_name = "INBOX_CAPACITY",
-        help = "Set maximum capacity of the HOPRd inbox",
-        env = "HOPRD_INBOX_CAPACITY"
-    )]
-    pub inbox_capacity: Option<u32>,
 
     #[arg(
         long = "testAnnounceLocalAddresses",

@@ -1,15 +1,18 @@
-use hex_literal::hex;
-use std::cmp::Ordering;
-use std::fmt::{Display, Formatter};
-use tracing::{debug, error};
+use std::{
+    cmp::Ordering,
+    fmt::{Display, Formatter},
+};
 
+use hex_literal::hex;
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use tracing::{debug, error};
 
-use crate::errors;
-use crate::errors::CoreTypesError;
-use crate::prelude::generate_channel_id;
-use crate::prelude::CoreTypesError::InvalidInputData;
+use crate::{
+    errors,
+    errors::CoreTypesError,
+    prelude::{CoreTypesError::InvalidInputData, generate_channel_id},
+};
 
 /// Size-optimized encoding of the ticket, used for both,
 /// network transfer and in the smart contract.
@@ -30,8 +33,9 @@ pub type EncodedWinProb = [u8; ENCODED_WIN_PROB_LENGTH];
 
 /// Represents a ticket winning probability.
 ///
-/// It holds the modified IEEE-754 but behaves like a reduced precision float
-/// when compared. It can also be fully ordered, because there cannot be NaNs or infinity.
+/// It holds the modified IEEE-754 but behaves like a reduced precision float.
+/// It intentionally does not implement `Ord` or `Eq`, as
+/// it can be only [approximately compared](WinningProbability::approx_cmp).
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WinningProbability(#[cfg_attr(feature = "serde", serde(with = "serde_bytes"))] EncodedWinProb);
@@ -39,12 +43,11 @@ pub struct WinningProbability(#[cfg_attr(feature = "serde", serde(with = "serde_
 impl WinningProbability {
     /// 100% winning probability
     pub const ALWAYS: Self = Self([0xff; ENCODED_WIN_PROB_LENGTH]);
-    /// 0% winning probability.
-    pub const NEVER: Self = Self([0u8; ENCODED_WIN_PROB_LENGTH]);
-
     // This value can no longer be represented with the winning probability encoding
     // and is equal to 0
-    const EPSILON: f64 = 0.00000001;
+    pub const EPSILON: f64 = 0.00000001;
+    /// 0% winning probability.
+    pub const NEVER: Self = Self([0u8; ENCODED_WIN_PROB_LENGTH]);
 
     /// Converts winning probability to an unsigned integer (luck).
     pub fn as_luck(&self) -> u64 {
@@ -108,7 +111,7 @@ impl WinningProbability {
         Ok(Self(res))
     }
 
-    /// Performs approximate comparison.
+    /// Performs approximate comparison up to [`Self::EPSILON`].
     pub fn approx_cmp(&self, other: &Self) -> Ordering {
         let a = self.as_f64();
         let b = other.as_f64();
@@ -119,12 +122,12 @@ impl WinningProbability {
         }
     }
 
-    /// Performs approximate equality check.
+    /// Performs approximate equality comparison up to [`Self::EPSILON`].
     pub fn approx_eq(&self, other: &Self) -> bool {
         self.approx_cmp(other) == Ordering::Equal
     }
 
-    /// Gets the mininum of two winning probabilities.
+    /// Gets the minimum of two winning probabilities.
     pub fn min(&self, other: &Self) -> Self {
         if self.approx_cmp(other) == Ordering::Less {
             *self
@@ -395,12 +398,12 @@ impl TicketBuilder {
             (Some(_), Some(_)) => {
                 return Err(InvalidInputData(
                     "either amount or balance must be set but not both".into(),
-                ))
+                ));
             }
             _ => {
                 return Err(InvalidInputData(
                     "tickets may not have more than 1% of total supply".into(),
-                ))
+                ));
             }
         };
 
@@ -486,8 +489,8 @@ impl From<Ticket> for TicketBuilder {
 ///
 /// # Ticket state machine
 /// See the entire state machine describing the relations of different ticket types below:
-///```mermaid
-///flowchart TB
+/// ```mermaid
+/// flowchart TB
 ///     A[Ticket] -->|verify| B(VerifiedTicket)
 ///     B --> |leak| A
 ///     A --> |sign| B
@@ -498,7 +501,7 @@ impl From<Ticket> for TicketBuilder {
 ///     D --> |into_transferable| F(TransferableWinningTicket)
 ///     E --> |into_transferable| F
 ///     F --> |into_redeemable| E
-///```
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Ticket {
@@ -552,8 +555,12 @@ impl Display for Ticket {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ticket #{}, offset {}, epoch {} in channel {}",
-            self.index, self.index_offset, self.channel_epoch, self.channel_id
+            "ticket #{}, amount {}, offset {}, epoch {} in channel {}",
+            self.index,
+            self.amount.to_formatted_string(),
+            self.index_offset,
+            self.channel_epoch,
+            self.channel_id
         )
     }
 }
@@ -793,7 +800,7 @@ impl VerifiedTicket {
         self.0
     }
 
-    /// Creates new unacknowledged ticket from the [VerifiedTicket],
+    /// Creates a new unacknowledged ticket from the [VerifiedTicket],
     /// given our own part of the PoR challenge.
     pub fn into_unacknowledged(self, own_key: HalfKey) -> UnacknowledgedTicket {
         UnacknowledgedTicket { ticket: self, own_key }
@@ -850,7 +857,7 @@ impl UnacknowledgedTicket {
     /// the received acknowledgement of the forwarded packet.
     pub fn acknowledge(self, acknowledgement: &HalfKey) -> crate::errors::Result<AcknowledgedTicket> {
         let response = Response::from_half_keys(&self.own_key, acknowledgement)?;
-        debug!("acknowledging ticket using response {}", response.to_hex());
+        debug!(ticket = %self.ticket, response = response.to_hex(), "acknowledging ticket using response");
 
         if self.ticket.verified_ticket().challenge == response.to_challenge().into() {
             Ok(self.ticket.into_acknowledged(response))
@@ -961,7 +968,7 @@ impl Display for AcknowledgedTicket {
     }
 }
 
-/// Represents a winning ticket that can be successfully redeemed on chain.
+/// Represents a winning ticket that can be successfully redeemed on-chain.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RedeemableTicket {
@@ -1090,15 +1097,18 @@ impl From<RedeemableTicket> for TransferableWinningTicket {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::{
         keypairs::{ChainKeypair, Keypair},
         types::{Challenge, CurvePoint, HalfKey, Hash, Response},
     };
-    use hopr_primitive_types::prelude::UnitaryFloatOps;
-    use hopr_primitive_types::primitives::{Address, BalanceType, EthereumChallenge, U256};
+    use hopr_primitive_types::{
+        prelude::UnitaryFloatOps,
+        primitives::{Address, BalanceType, EthereumChallenge, U256},
+    };
+
+    use super::*;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -1280,10 +1290,12 @@ pub mod tests {
             .challenge(Default::default())
             .build_signed(&ALICE, &Default::default())?;
 
-        assert!(ticket
-            .leak()
-            .verify(&ALICE.public().to_address(), &Hash::default())
-            .is_ok());
+        assert!(
+            ticket
+                .leak()
+                .verify(&ALICE.public().to_address(), &Hash::default())
+                .is_ok()
+        );
         Ok(())
     }
 

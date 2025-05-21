@@ -1,28 +1,27 @@
 //! ## Auto Redeeming Strategy
-//! This strategy listens for newly added acknowledged tickets and automatically issues a redeem transaction on that ticket.
-//! It can be configured to automatically redeem all tickets or only aggregated tickets (which results in far fewer on-chain transactions being issued).
+//! This strategy listens for newly added acknowledged tickets and automatically issues a redeem transaction on that
+//! ticket. It can be configured to automatically redeem all tickets or only aggregated tickets (which results in far
+//! fewer on-chain transactions being issued).
 //!
 //! For details on default parameters, see [AutoRedeemingStrategyConfig].
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
+
+use async_trait::async_trait;
+use hopr_chain_actions::redeem::TicketRedeemActions;
+use hopr_db_sql::{api::tickets::HoprDbTicketOperations, prelude::TicketSelector};
+use hopr_internal_types::{
+    prelude::*,
+    tickets::{AcknowledgedTicket, AcknowledgedTicketStatus},
+};
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::SimpleCounter;
+use hopr_primitive_types::prelude::*;
+use serde::{Deserialize, Serialize};
+use serde_with::{DisplayFromStr, serde_as};
 use tracing::{debug, error, info};
 use validator::Validate;
 
-use hopr_chain_actions::redeem::TicketRedeemActions;
-use hopr_db_sql::api::tickets::HoprDbTicketOperations;
-use hopr_db_sql::prelude::TicketSelector;
-use hopr_internal_types::prelude::*;
-use hopr_internal_types::tickets::{AcknowledgedTicket, AcknowledgedTicketStatus};
-use hopr_primitive_types::prelude::*;
-
-use crate::errors::StrategyError::CriteriaNotSatisfied;
-use crate::strategy::SingularStrategy;
-use crate::Strategy;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleCounter;
+use crate::{Strategy, errors::StrategyError::CriteriaNotSatisfied, strategy::SingularStrategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -182,24 +181,31 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{
+        ops::Add,
+        time::{Duration, SystemTime},
+    };
+
     use async_trait::async_trait;
-    use futures::{future::ok, FutureExt};
+    use futures::{FutureExt, future::ok};
     use hex_literal::hex;
-    use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use hopr_chain_actions::redeem::TicketRedeemActions;
-    use hopr_chain_types::actions::Action;
-    use hopr_chain_types::chain_events::ChainEventType;
-    use hopr_crypto_random::{random_bytes, Randomizable};
+    use hopr_chain_actions::{
+        action_queue::{ActionConfirmation, PendingAction},
+        redeem::TicketRedeemActions,
+    };
+    use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
+    use hopr_crypto_random::{Randomizable, random_bytes};
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::api::tickets::TicketSelector;
-    use hopr_db_sql::channels::HoprDbChannelOperations;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::{api::info::DomainSeparator, info::HoprDbInfoOperations};
-    use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
+    use hopr_db_sql::{
+        HoprDbGeneralModelOperations, TargetDb,
+        api::{info::DomainSeparator, tickets::TicketSelector},
+        channels::HoprDbChannelOperations,
+        db::HoprDb,
+        info::HoprDbInfoOperations,
+    };
     use mockall::mock;
-    use std::ops::Add;
-    use std::time::{Duration, SystemTime};
+
+    use super::*;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");

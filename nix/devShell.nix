@@ -1,8 +1,9 @@
-{ pkgs
-, extraPackages ? [ ]
-, pre-commit-check
-, solcDefault
-, ...
+{
+  pkgs,
+  extraPackages ? [ ],
+  pre-commit-check,
+  solcDefault,
+  ...
 }@args:
 let
   shellHook = ''
@@ -14,6 +15,9 @@ let
     "pre-commit-check"
   ];
 in
-import ./testShell.nix (cleanArgs // {
-  inherit shellHook shellPackages;
-})
+import ./testShell.nix (
+  cleanArgs
+  // {
+    inherit shellHook shellPackages;
+  }
+)

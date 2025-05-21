@@ -1,40 +1,47 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{Json, Path, Query, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
 use futures::TryFutureExt;
-use libp2p_identity::PeerId;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-use std::sync::Arc;
-use tracing::warn;
-
 use hopr_crypto_types::types::Hash;
 use hopr_lib::{
-    errors::{HoprLibError, HoprStatusError},
     Address, AsUnixTimestamp, Balance, BalanceType, ChainActionsError, ChannelEntry, ChannelStatus, Hopr, ToHex,
+    errors::{HoprLibError, HoprStatusError},
 };
+use libp2p_identity::PeerId;
+use serde::{Deserialize, Serialize};
+use serde_with::{DisplayFromStr, serde_as};
+use tracing::warn;
 
 use crate::{
-    checksum_address_serializer,
+    ApiError, ApiErrorStatus, BASE_PATH, InternalState, checksum_address_serializer,
     types::{HoprIdentifier, PeerOrAddress},
-    ApiError, ApiErrorStatus, InternalState, BASE_PATH,
 };
 
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
+#[schema(example = json!({
+    "id": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+    "peerAddress": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
+    "status": "Open",
+    "balance": "10000000000000000000"
+}))]
+/// Channel information as seen by the node.
 pub(crate) struct NodeChannel {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
     id: Hash,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")]
     peer_address: Address,
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "Open")]
     status: ChannelStatus,
+    #[schema(example = "10000000000000000000")]
     balance: String,
 }
 
@@ -53,24 +60,31 @@ pub(crate) struct NodeChannel {
         "ticketIndex": 0
     }))]
 #[serde(rename_all = "camelCase")]
+/// General information about a channel state.
 pub(crate) struct ChannelInfoResponse {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
     channel_id: Hash,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x07eaf07d6624f741e04f4092a755a9027aaab7f6")]
     source_address: Address,
     #[serde(serialize_with = "checksum_address_serializer")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x188c4462b75e46f0c7262d7f48d182447b93a93c")]
     destination_address: Address,
+    #[schema(example = "12D3KooWJmLm8FnBfvYQ5BAZ5qcYBxQFFBzAAEYUBUNJNE8cRsYS")]
     source_peer_id: String,
+    #[schema(example = "12D3KooWPWD5P5ZzMRDckgfVaicY5JNoo7JywGotoAv17d7iKx1z")]
     destination_peer_id: String,
+    #[schema(example = "10000000000000000000")]
     balance: String,
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "Open")]
     status: ChannelStatus,
+    #[schema(example = 0)]
     ticket_index: u32,
+    #[schema(example = 1)]
     channel_epoch: u32,
+    #[schema(example = 0)]
     closure_time: u64,
 }
 
@@ -138,10 +152,14 @@ async fn query_topology_info(channel: &ChannelEntry, node: &Hopr) -> Result<Chan
     })
 }
 
-/// Parameters for enumerating channels.
 #[derive(Debug, Default, Copy, Clone, Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 #[into_params(parameter_in = Query)]
 #[serde(default, rename_all = "camelCase")]
+#[schema(example = json!({
+        "includingClosed": true,
+        "fullTopology": false
+    }))]
+/// Parameters for enumerating channels.
 pub(crate) struct ChannelsQueryRequest {
     /// Should be the closed channels included?
     #[schema(required = false)]
@@ -158,6 +176,7 @@ pub(crate) struct ChannelsQueryRequest {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
+        description = "List channels opened to/from this node. Alternatively, it can print all the channels in the network as this node sees them.",
         params(ChannelsQueryRequest),
         responses(
             (status = 200, description = "Channels fetched successfully", body = NodeChannelsResponse),
@@ -247,12 +266,14 @@ pub(super) async fn list_channels(
         "amount": "10",
         "destination": "0xa8194d36e322592d4c707b70dbe96121f5c74c64"
     }))]
+/// Request body for opening a channel.
 pub(crate) struct OpenChannelBodyRequest {
     /// On-chain address of the counterparty.
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0xa8194d36e322592d4c707b70dbe96121f5c74c64")]
     destination: PeerOrAddress,
     /// Initial amount of stake in HOPR tokens.
+    #[schema(example = "10")]
     amount: String,
 }
 
@@ -263,14 +284,15 @@ pub(crate) struct OpenChannelBodyRequest {
         "transactionReceipt": "0x5181ac24759b8e01b3c932e4636c3852f386d17517a8dfc640a5ba6f2258f29c"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Response body for opening a channel.
 pub(crate) struct OpenChannelResponse {
     /// ID of the new channel.
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
     channel_id: Hash,
     /// Receipt of the channel open transaction.
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x5181ac24759b8e01b3c932e4636c3852f386d17517a8dfc640a5ba6f2258f29c")]
     transaction_receipt: Hash,
 }
 
@@ -278,6 +300,7 @@ pub(crate) struct OpenChannelResponse {
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels"),
+        description = "Opens a channel to the given on-chain address with the given initial stake of HOPR tokens.",
         request_body(
             content = OpenChannelBodyRequest,
             description = "Open channel request specification: on-chain address of the counterparty and the initial HOPR token stake.",
@@ -329,7 +352,7 @@ pub(super) async fn open_channel(
         Err(HoprLibError::ChainError(ChainActionsError::ChannelAlreadyExists)) => {
             (StatusCode::CONFLICT, ApiErrorStatus::ChannelAlreadyOpen).into_response()
         }
-        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -349,8 +372,9 @@ pub(crate) struct ChannelIdParams {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
+        description = "Returns information about the given channel.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.")
+            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         responses(
             (status = 200, description = "Channel fetched successfully", body = ChannelInfoResponse),
@@ -394,14 +418,15 @@ pub(super) async fn show_channel(
         "channelStatus": "PendingToClose"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Status of the channel after a close operation.
 pub(crate) struct CloseChannelResponse {
     /// Receipt for the channel close transaction.
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0xd77da7c1821249e663dead1464d185c03223d9663a06bc1d46ed0ad449a07118")]
     receipt: Hash,
     /// New status of the channel. Will be one of `Closed` or `PendingToClose`.
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "PendingToClose")]
     channel_status: ChannelStatus,
 }
 
@@ -413,8 +438,9 @@ pub(crate) struct CloseChannelResponse {
 #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}"),
+        description = "Closes the given channel.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.")
+            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         responses(
             (status = 200, description = "Channel closed successfully", body = CloseChannelResponse),
@@ -452,7 +478,7 @@ pub(super) async fn close_channel(
             Err(HoprLibError::ChainError(ChainActionsError::InvalidArguments(_))) => {
                 (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::UnsupportedFeature).into_response()
             }
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -467,6 +493,7 @@ pub(super) async fn close_channel(
         "hash": "0x188c4462b75e46f0c7262d7f48d182447b93a93c",
 }))]
 #[serde(rename_all = "camelCase")]
+/// Response body for funding a channel.
 pub(crate) struct FundChannelResponse {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String)]
@@ -480,6 +507,7 @@ pub(crate) struct FundChannelResponse {
     }))]
 pub(crate) struct FundBodyRequest {
     /// Amount of HOPR tokens to fund the channel with.
+    #[schema(example = "10000000000000000000")]
     amount: String,
 }
 
@@ -487,8 +515,9 @@ pub(crate) struct FundBodyRequest {
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/fund"),
+        description = "Funds the given channel with the given amount of HOPR tokens.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.")
+            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         request_body(
             content = FundBodyRequest,
@@ -531,7 +560,7 @@ pub(super) async fn fund_channel(
             Err(HoprLibError::ChainError(ChainActionsError::BalanceTooLow)) => {
                 (StatusCode::FORBIDDEN, ApiErrorStatus::NotEnoughBalance).into_response()
             }
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),

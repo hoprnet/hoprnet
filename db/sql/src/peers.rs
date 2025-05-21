@@ -2,14 +2,7 @@ use std::time::Duration;
 
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::{stream::BoxStream, TryStreamExt};
-use libp2p_identity::PeerId;
-use multiaddr::Multiaddr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
-use sea_query::{Condition, Expr, IntoCondition, Order};
-use sqlx::types::chrono::{self, DateTime, Utc};
-use tracing::{error, trace};
-
+use futures::{TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::{
     errors::Result,
@@ -17,6 +10,12 @@ use hopr_db_api::{
 };
 use hopr_db_entity::network_peer;
 use hopr_primitive_types::prelude::*;
+use libp2p_identity::PeerId;
+use multiaddr::Multiaddr;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
+use sea_query::{Condition, Expr, IntoCondition, Order};
+use sqlx::types::chrono::{self, DateTime, Utc};
+use tracing::{error, trace};
 
 use crate::{db::HoprDb, prelude::DbSqlError};
 
@@ -326,13 +325,17 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{
+        ops::Add,
+        time::{Duration, SystemTime},
+    };
+
     use futures::StreamExt;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use libp2p_identity::PeerId;
     use multiaddr::Multiaddr;
-    use std::ops::Add;
-    use std::time::{Duration, SystemTime};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_add_get() -> anyhow::Result<()> {

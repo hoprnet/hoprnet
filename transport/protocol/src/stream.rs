@@ -22,7 +22,8 @@ pub async fn process_stream_protocol<C, V>(
     control: V,
 ) -> crate::errors::Result<(
     futures::channel::mpsc::Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
-    futures::channel::mpsc::Receiver<(PeerId, <C as Decoder>::Item)>, // impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
+    futures::channel::mpsc::Receiver<(PeerId, <C as Decoder>::Item)>, /* impl Stream<Item = (PeerId, <C as
+                                                                     * Decoder>::Item)>, */
 )>
 where
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
@@ -143,9 +144,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::Context;
     use futures::SinkExt;
+
+    use super::*;
 
     struct AsyncBinaryStreamChannel {
         read: async_channel_io::ChannelReader,

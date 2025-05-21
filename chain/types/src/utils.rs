@@ -2,18 +2,18 @@
 //! Chain utilities used for testing.
 //!
 //! This used in unit and integration tests.
+use std::str::FromStr;
+
+use SafeContract::SafeContractInstance;
 use alloy::{
     contract::{Error as ContractError, Result as ContractResult},
     network::{ReceiptResponse, TransactionBuilder},
-    primitives::{self, address, aliases, keccak256, Bytes, U256},
+    primitives::{self, Bytes, U256, address, aliases, keccak256},
     rpc::types::TransactionRequest,
-    signers::{local::PrivateKeySigner, Signer},
+    signers::{Signer, local::PrivateKeySigner},
     sol,
     sol_types::{SolCall, SolValue},
 };
-use std::str::FromStr;
-use tracing::debug;
-
 use hopr_bindings::{
     hoprchannels::HoprChannels::HoprChannelsInstance,
     hoprnodemanagementmodule::HoprNodeManagementModule,
@@ -22,12 +22,11 @@ use hopr_bindings::{
 };
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
-use SafeContract::SafeContractInstance;
+use tracing::debug;
 
 use crate::{
-    constants,
+    ContractInstances, constants,
     errors::{ChainTypesError, Result as ChainTypesResult},
-    ContractInstances,
 };
 
 // define basic safe abi
@@ -363,7 +362,8 @@ where
 /// 1) node should be included to the module
 /// 2) announcement contract should be a target in the module
 ///
-/// Notice that to be able to open channels, the deployed safe should have HOPR tokens and approve token transfer for Channels contract on the token contract.
+/// Notice that to be able to open channels, the deployed safe should have HOPR tokens and approve token transfer for
+/// Channels contract on the token contract.
 ///
 /// Returns (module address, safe address)
 pub async fn deploy_one_safe_one_module_and_setup_for_testing<P, N>(

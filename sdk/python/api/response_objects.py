@@ -62,14 +62,6 @@ class Addresses(ApiResponseObject):
     keys = {"hopr": "hopr", "native": "native"}
 
 
-class Alias(ApiResponseObject):
-    keys = {"peer_id": "peerId"}
-
-
-class AliasAddress(ApiResponseObject):
-    keys = {"address": "address"}
-
-
 class Balances(ApiResponseObject):
     keys = {
         "hopr": "hopr",
@@ -151,14 +143,6 @@ class Ping(ApiResponseObject):
     keys = {"latency": "latency", "version": "reportedVersion"}
 
 
-class Message(ApiResponseObject):
-    keys = {"body": "body", "received_at": "receivedAt", "tag": "tag"}
-
-
-class MessageSent(ApiResponseObject):
-    keys = {"timestamp": "timestamp"}
-
-
 class Channels:
     def __init__(self, data: dict, category: str = "all"):
         self.all = []
@@ -181,4 +165,7 @@ class Session(ApiResponseObject):
         "port": "port",
         "protocol": "protocol",
         "target": "target",
+        "forward_path": "forwardPath",
+        "return_path": "returnPath",
+        "mtu": "mtu",
     }
