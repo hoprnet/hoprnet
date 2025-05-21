@@ -67,14 +67,14 @@ pub mod HoprChannels {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(
+            pub const fn from_underlying(
                 value: alloy::sol_types::private::primitives::aliases::U96,
             ) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(
+            pub const fn into_underlying(
                 self,
             ) -> alloy::sol_types::private::primitives::aliases::U96 {
                 self.0
@@ -90,6 +90,18 @@ pub mod HoprChannels {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<alloy::sol_types::private::primitives::aliases::U96> for Balance {
+            fn from(value: alloy::sol_types::private::primitives::aliases::U96) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<Balance> for alloy::sol_types::private::primitives::aliases::U96 {
+            fn from(value: Balance) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -198,14 +210,14 @@ pub mod HoprChannels {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(
+            pub const fn from_underlying(
                 value: alloy::sol_types::private::primitives::aliases::U48,
             ) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(
+            pub const fn into_underlying(
                 self,
             ) -> alloy::sol_types::private::primitives::aliases::U48 {
                 self.0
@@ -221,6 +233,18 @@ pub mod HoprChannels {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<alloy::sol_types::private::primitives::aliases::U48> for TicketIndex {
+            fn from(value: alloy::sol_types::private::primitives::aliases::U48) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<TicketIndex> for alloy::sol_types::private::primitives::aliases::U48 {
+            fn from(value: TicketIndex) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -328,12 +352,12 @@ pub mod HoprChannels {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(value: u32) -> Self {
+            pub const fn from_underlying(value: u32) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(self) -> u32 {
+            pub const fn into_underlying(self) -> u32 {
                 self.0
             }
             /// Return the single encoding of this value, delegating to the
@@ -347,6 +371,18 @@ pub mod HoprChannels {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<u32> for Timestamp {
+            fn from(value: u32) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<Timestamp> for u32 {
+            fn from(value: Timestamp) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -412,14 +448,13 @@ pub mod HoprChannels {
 See the [wrapper's documentation](`HoprChannelsInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprChannelsInstance<T, P, N> {
-        HoprChannelsInstance::<T, P, N>::new(address, provider)
+    ) -> HoprChannelsInstance<P, N> {
+        HoprChannelsInstance::<P, N>::new(address, provider)
     }
     /**A [`HoprChannels`](self) instance.
 
@@ -433,13 +468,13 @@ be used to deploy a new instance of the contract.
 
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
-    pub struct HoprChannelsInstance<T, P, N = alloy_contract::private::Ethereum> {
+    pub struct HoprChannelsInstance<P, N = alloy_contract::private::Ethereum> {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprChannelsInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprChannelsInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprChannelsInstance").field(&self.address).finish()
@@ -448,10 +483,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprChannelsInstance<T, P, N> {
+    > HoprChannelsInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprChannels`](self) contract instance.
 
 See the [wrapper's documentation](`HoprChannelsInstance`) for more details.*/
@@ -463,7 +497,7 @@ See the [wrapper's documentation](`HoprChannelsInstance`) for more details.*/
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /// Returns a reference to the address.
@@ -487,24 +521,23 @@ See the [wrapper's documentation](`HoprChannelsInstance`) for more details.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprChannelsInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprChannelsInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprChannelsInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprChannelsInstance<P, N> {
             HoprChannelsInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprChannelsInstance<T, P, N> {
+    > HoprChannelsInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -512,24 +545,23 @@ See the [wrapper's documentation](`HoprChannelsInstance`) for more details.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprChannelsInstance<T, P, N> {
+    > HoprChannelsInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
     }
@@ -1588,7 +1620,6 @@ event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTick
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(
@@ -1597,7 +1628,6 @@ event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTick
                     <ChannelBalanceDecreased as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ChannelBalanceDecreased)
                 }
@@ -1607,7 +1637,6 @@ event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTick
                     <ChannelBalanceIncreased as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ChannelBalanceIncreased)
                 }
@@ -1615,7 +1644,6 @@ event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTick
                     <ChannelClosed as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ChannelClosed)
                 }
@@ -1623,7 +1651,6 @@ event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTick
                     <ChannelOpened as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ChannelOpened)
                 }
@@ -1633,7 +1660,6 @@ event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTick
                     <DomainSeparatorUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::DomainSeparatorUpdated)
                 }
@@ -1643,7 +1669,6 @@ event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTick
                     <OutgoingChannelClosureInitiated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::OutgoingChannelClosureInitiated)
                 }
@@ -1651,7 +1676,6 @@ event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTick
                     <TicketRedeemed as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::TicketRedeemed)
                 }
@@ -1728,14 +1752,13 @@ event TicketRedeemed(bytes32 indexed channelId, HoprChannels.TicketIndex newTick
 See the [wrapper's documentation](`HoprChannelsEventsInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprChannelsEventsInstance<T, P, N> {
-        HoprChannelsEventsInstance::<T, P, N>::new(address, provider)
+    ) -> HoprChannelsEventsInstance<P, N> {
+        HoprChannelsEventsInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -1744,15 +1767,14 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprChannelsEventsInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprChannelsEventsInstance<P, N>>,
     > {
-        HoprChannelsEventsInstance::<T, P, N>::deploy(provider)
+        HoprChannelsEventsInstance::<P, N>::deploy(provider)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -1761,11 +1783,10 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprChannelsEventsInstance::<T, P, N>::deploy_builder(provider)
+    >(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprChannelsEventsInstance::<P, N>::deploy_builder(provider)
     }
     /**A [`HoprChannelsEvents`](self) instance.
 
@@ -1779,13 +1800,13 @@ be used to deploy a new instance of the contract.
 
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
-    pub struct HoprChannelsEventsInstance<T, P, N = alloy_contract::private::Ethereum> {
+    pub struct HoprChannelsEventsInstance<P, N = alloy_contract::private::Ethereum> {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprChannelsEventsInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprChannelsEventsInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprChannelsEventsInstance").field(&self.address).finish()
@@ -1794,10 +1815,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprChannelsEventsInstance<T, P, N> {
+    > HoprChannelsEventsInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprChannelsEvents`](self) contract instance.
 
 See the [wrapper's documentation](`HoprChannelsEventsInstance`) for more details.*/
@@ -1809,7 +1829,7 @@ See the [wrapper's documentation](`HoprChannelsEventsInstance`) for more details
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -1820,7 +1840,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         #[inline]
         pub async fn deploy(
             provider: P,
-        ) -> alloy_contract::Result<HoprChannelsEventsInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprChannelsEventsInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -1831,7 +1851,7 @@ and constructor arguments, if any.
 This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         #[inline]
-        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
+        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 ::core::clone::Clone::clone(&BYTECODE),
@@ -1858,24 +1878,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprChannelsEventsInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprChannelsEventsInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprChannelsEventsInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprChannelsEventsInstance<P, N> {
             HoprChannelsEventsInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprChannelsEventsInstance<T, P, N> {
+    > HoprChannelsEventsInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -1883,66 +1902,65 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprChannelsEventsInstance<T, P, N> {
+    > HoprChannelsEventsInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`ChannelBalanceDecreased`] event.
         pub fn ChannelBalanceDecreased_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ChannelBalanceDecreased, N> {
+        ) -> alloy_contract::Event<&P, ChannelBalanceDecreased, N> {
             self.event_filter::<ChannelBalanceDecreased>()
         }
         ///Creates a new event filter for the [`ChannelBalanceIncreased`] event.
         pub fn ChannelBalanceIncreased_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ChannelBalanceIncreased, N> {
+        ) -> alloy_contract::Event<&P, ChannelBalanceIncreased, N> {
             self.event_filter::<ChannelBalanceIncreased>()
         }
         ///Creates a new event filter for the [`ChannelClosed`] event.
         pub fn ChannelClosed_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ChannelClosed, N> {
+        ) -> alloy_contract::Event<&P, ChannelClosed, N> {
             self.event_filter::<ChannelClosed>()
         }
         ///Creates a new event filter for the [`ChannelOpened`] event.
         pub fn ChannelOpened_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ChannelOpened, N> {
+        ) -> alloy_contract::Event<&P, ChannelOpened, N> {
             self.event_filter::<ChannelOpened>()
         }
         ///Creates a new event filter for the [`DomainSeparatorUpdated`] event.
         pub fn DomainSeparatorUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, DomainSeparatorUpdated, N> {
+        ) -> alloy_contract::Event<&P, DomainSeparatorUpdated, N> {
             self.event_filter::<DomainSeparatorUpdated>()
         }
         ///Creates a new event filter for the [`OutgoingChannelClosureInitiated`] event.
         pub fn OutgoingChannelClosureInitiated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, OutgoingChannelClosureInitiated, N> {
+        ) -> alloy_contract::Event<&P, OutgoingChannelClosureInitiated, N> {
             self.event_filter::<OutgoingChannelClosureInitiated>()
         }
         ///Creates a new event filter for the [`TicketRedeemed`] event.
         pub fn TicketRedeemed_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, TicketRedeemed, N> {
+        ) -> alloy_contract::Event<&P, TicketRedeemed, N> {
             self.event_filter::<TicketRedeemed>()
         }
     }

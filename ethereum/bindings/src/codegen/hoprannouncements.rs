@@ -345,7 +345,7 @@ error AlreadyInitialized();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct AlreadyInitialized {}
+    pub struct AlreadyInitialized;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -380,7 +380,7 @@ error AlreadyInitialized();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for AlreadyInitialized {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -401,6 +401,13 @@ error AlreadyInitialized();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -411,7 +418,7 @@ error ContractNotResponsible();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ContractNotResponsible {}
+    pub struct ContractNotResponsible;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -446,7 +453,7 @@ error ContractNotResponsible();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for ContractNotResponsible {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -467,6 +474,13 @@ error ContractNotResponsible();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -477,7 +491,7 @@ error InvalidSafeAddress();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidSafeAddress {}
+    pub struct InvalidSafeAddress;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -512,7 +526,7 @@ error InvalidSafeAddress();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for InvalidSafeAddress {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -533,6 +547,13 @@ error InvalidSafeAddress();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -543,7 +564,7 @@ error MultiSigUninitialized();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct MultiSigUninitialized {}
+    pub struct MultiSigUninitialized;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -578,7 +599,7 @@ error MultiSigUninitialized();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for MultiSigUninitialized {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -598,6 +619,13 @@ error MultiSigUninitialized();
             #[inline]
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
+            }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
             }
         }
     };
@@ -1103,6 +1131,13 @@ function announce(string memory baseMultiaddr) external;
                 }
             }
         }
+        impl announceReturn {
+            fn _tokenize(
+                &self,
+            ) -> <announceCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for announceCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::String,);
@@ -1131,13 +1166,23 @@ function announce(string memory baseMultiaddr) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                announceReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -1239,6 +1284,13 @@ function announceSafe(address selfAddress, string memory baseMultiaddr) external
                 }
             }
         }
+        impl announceSafeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <announceSafeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for announceSafeCall {
             type Parameters<'a> = (
@@ -1273,13 +1325,23 @@ function announceSafe(address selfAddress, string memory baseMultiaddr) external
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                announceSafeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -1386,6 +1448,13 @@ function bindKeys(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_
                 }
             }
         }
+        impl bindKeysReturn {
+            fn _tokenize(
+                &self,
+            ) -> <bindKeysCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for bindKeysCall {
             type Parameters<'a> = (
@@ -1424,13 +1493,23 @@ function bindKeys(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                bindKeysReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -1551,6 +1630,13 @@ function bindKeysAnnounce(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 
                 }
             }
         }
+        impl bindKeysAnnounceReturn {
+            fn _tokenize(
+                &self,
+            ) -> <bindKeysAnnounceCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for bindKeysAnnounceCall {
             type Parameters<'a> = (
@@ -1593,13 +1679,23 @@ function bindKeysAnnounce(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                bindKeysAnnounceReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -1726,6 +1822,15 @@ function bindKeysAnnounceSafe(address selfAddress, bytes32 ed25519_sig_0, bytes3
                 }
             }
         }
+        impl bindKeysAnnounceSafeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <bindKeysAnnounceSafeCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for bindKeysAnnounceSafeCall {
             type Parameters<'a> = (
@@ -1772,13 +1877,23 @@ function bindKeysAnnounceSafe(address selfAddress, bytes32 ed25519_sig_0, bytes3
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                bindKeysAnnounceSafeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -1895,6 +2010,13 @@ function bindKeysSafe(address selfAddress, bytes32 ed25519_sig_0, bytes32 ed2551
                 }
             }
         }
+        impl bindKeysSafeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <bindKeysSafeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for bindKeysSafeCall {
             type Parameters<'a> = (
@@ -1937,13 +2059,23 @@ function bindKeysSafe(address selfAddress, bytes32 ed25519_sig_0, bytes32 ed2551
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                bindKeysSafeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2055,7 +2187,9 @@ function multicall(bytes[] memory data) external returns (bytes[] memory results
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = multicallReturn;
+            type Return = alloy::sol_types::private::Vec<
+                alloy::sol_types::private::Bytes,
+            >;
             type ReturnTuple<'a> = (
                 alloy::sol_types::sol_data::Array<alloy::sol_types::sol_data::Bytes>,
             );
@@ -2079,14 +2213,34 @@ function multicall(bytes[] memory data) external returns (bytes[] memory results
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Array<
+                        alloy::sol_types::sol_data::Bytes,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: multicallReturn = r.into();
+                        r.results
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: multicallReturn = r.into();
+                        r.results
+                    })
             }
         }
     };
@@ -2098,7 +2252,7 @@ function revoke() external;
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct revokeCall {}
+    pub struct revokeCall;
     ///Container type for the return parameters of the [`revoke()`](revokeCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2138,7 +2292,7 @@ function revoke() external;
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for revokeCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2173,6 +2327,13 @@ function revoke() external;
                 }
             }
         }
+        impl revokeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <revokeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for revokeCall {
             type Parameters<'a> = ();
@@ -2197,13 +2358,23 @@ function revoke() external;
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                revokeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2294,6 +2465,13 @@ function revokeSafe(address selfAddress) external;
                 }
             }
         }
+        impl revokeSafeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <revokeSafeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for revokeSafeCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -2322,13 +2500,23 @@ function revokeSafe(address selfAddress) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                revokeSafeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2420,20 +2608,16 @@ function revokeSafe(address selfAddress) external;
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprAnnouncementsCalls>] = &[
                 {
                     fn revokeSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
                         <revokeSafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprAnnouncementsCalls::revokeSafe)
                     }
@@ -2442,12 +2626,8 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn multicall(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
-                        <multicallCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <multicallCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprAnnouncementsCalls::multicall)
                     }
                     multicall
@@ -2455,12 +2635,8 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn revoke(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
-                        <revokeCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <revokeCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprAnnouncementsCalls::revoke)
                     }
                     revoke
@@ -2468,11 +2644,9 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn bindKeysSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
                         <bindKeysSafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprAnnouncementsCalls::bindKeysSafe)
                     }
@@ -2481,12 +2655,8 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn bindKeys(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
-                        <bindKeysCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <bindKeysCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprAnnouncementsCalls::bindKeys)
                     }
                     bindKeys
@@ -2494,11 +2664,9 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn bindKeysAnnounceSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
                         <bindKeysAnnounceSafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprAnnouncementsCalls::bindKeysAnnounceSafe)
                     }
@@ -2507,12 +2675,8 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn announce(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
-                        <announceCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <announceCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprAnnouncementsCalls::announce)
                     }
                     announce
@@ -2520,11 +2684,9 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn bindKeysAnnounce(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
                         <bindKeysAnnounceCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprAnnouncementsCalls::bindKeysAnnounce)
                     }
@@ -2533,11 +2695,9 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn announceSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
                         <announceSafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprAnnouncementsCalls::announceSafe)
                     }
@@ -2552,7 +2712,126 @@ function revokeSafe(address selfAddress) external;
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprAnnouncementsCalls>] = &[
+                {
+                    fn revokeSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
+                        <revokeSafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsCalls::revokeSafe)
+                    }
+                    revokeSafe
+                },
+                {
+                    fn multicall(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
+                        <multicallCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsCalls::multicall)
+                    }
+                    multicall
+                },
+                {
+                    fn revoke(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
+                        <revokeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsCalls::revoke)
+                    }
+                    revoke
+                },
+                {
+                    fn bindKeysSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
+                        <bindKeysSafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsCalls::bindKeysSafe)
+                    }
+                    bindKeysSafe
+                },
+                {
+                    fn bindKeys(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
+                        <bindKeysCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsCalls::bindKeys)
+                    }
+                    bindKeys
+                },
+                {
+                    fn bindKeysAnnounceSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
+                        <bindKeysAnnounceSafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsCalls::bindKeysAnnounceSafe)
+                    }
+                    bindKeysAnnounceSafe
+                },
+                {
+                    fn announce(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
+                        <announceCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsCalls::announce)
+                    }
+                    announce
+                },
+                {
+                    fn bindKeysAnnounce(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
+                        <bindKeysAnnounceCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsCalls::bindKeysAnnounce)
+                    }
+                    bindKeysAnnounce
+                },
+                {
+                    fn announceSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsCalls> {
+                        <announceSafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsCalls::announceSafe)
+                    }
+                    announceSafe
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -2714,20 +2993,16 @@ function revokeSafe(address selfAddress) external;
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprAnnouncementsErrors>] = &[
                 {
                     fn AlreadyInitialized(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsErrors> {
                         <AlreadyInitialized as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprAnnouncementsErrors::AlreadyInitialized)
                     }
@@ -2736,11 +3011,9 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn MultiSigUninitialized(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsErrors> {
                         <MultiSigUninitialized as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprAnnouncementsErrors::MultiSigUninitialized)
                     }
@@ -2749,11 +3022,9 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn InvalidSafeAddress(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsErrors> {
                         <InvalidSafeAddress as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprAnnouncementsErrors::InvalidSafeAddress)
                     }
@@ -2762,11 +3033,9 @@ function revokeSafe(address selfAddress) external;
                 {
                     fn ContractNotResponsible(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprAnnouncementsErrors> {
                         <ContractNotResponsible as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprAnnouncementsErrors::ContractNotResponsible)
                     }
@@ -2781,7 +3050,71 @@ function revokeSafe(address selfAddress) external;
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprAnnouncementsErrors>] = &[
+                {
+                    fn AlreadyInitialized(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsErrors> {
+                        <AlreadyInitialized as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsErrors::AlreadyInitialized)
+                    }
+                    AlreadyInitialized
+                },
+                {
+                    fn MultiSigUninitialized(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsErrors> {
+                        <MultiSigUninitialized as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsErrors::MultiSigUninitialized)
+                    }
+                    MultiSigUninitialized
+                },
+                {
+                    fn InvalidSafeAddress(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsErrors> {
+                        <InvalidSafeAddress as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsErrors::InvalidSafeAddress)
+                    }
+                    InvalidSafeAddress
+                },
+                {
+                    fn ContractNotResponsible(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprAnnouncementsErrors> {
+                        <ContractNotResponsible as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprAnnouncementsErrors::ContractNotResponsible)
+                    }
+                    ContractNotResponsible
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -2882,7 +3215,6 @@ function revokeSafe(address selfAddress) external;
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(
@@ -2891,7 +3223,6 @@ function revokeSafe(address selfAddress) external;
                     <AddressAnnouncement as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::AddressAnnouncement)
                 }
@@ -2899,7 +3230,6 @@ function revokeSafe(address selfAddress) external;
                     <KeyBinding as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::KeyBinding)
                 }
@@ -2909,7 +3239,6 @@ function revokeSafe(address selfAddress) external;
                     <RevokeAnnouncement as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RevokeAnnouncement)
                 }
@@ -2962,14 +3291,13 @@ function revokeSafe(address selfAddress) external;
 See the [wrapper's documentation](`HoprAnnouncementsInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprAnnouncementsInstance<T, P, N> {
-        HoprAnnouncementsInstance::<T, P, N>::new(address, provider)
+    ) -> HoprAnnouncementsInstance<P, N> {
+        HoprAnnouncementsInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -2978,16 +3306,15 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
         safeRegistry: alloy::sol_types::private::Address,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprAnnouncementsInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprAnnouncementsInstance<P, N>>,
     > {
-        HoprAnnouncementsInstance::<T, P, N>::deploy(provider, safeRegistry)
+        HoprAnnouncementsInstance::<P, N>::deploy(provider, safeRegistry)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -2996,14 +3323,13 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
         safeRegistry: alloy::sol_types::private::Address,
-    ) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprAnnouncementsInstance::<T, P, N>::deploy_builder(provider, safeRegistry)
+    ) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprAnnouncementsInstance::<P, N>::deploy_builder(provider, safeRegistry)
     }
     /**A [`HoprAnnouncements`](self) instance.
 
@@ -3017,13 +3343,13 @@ be used to deploy a new instance of the contract.
 
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
-    pub struct HoprAnnouncementsInstance<T, P, N = alloy_contract::private::Ethereum> {
+    pub struct HoprAnnouncementsInstance<P, N = alloy_contract::private::Ethereum> {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprAnnouncementsInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprAnnouncementsInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprAnnouncementsInstance").field(&self.address).finish()
@@ -3032,10 +3358,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprAnnouncementsInstance<T, P, N> {
+    > HoprAnnouncementsInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprAnnouncements`](self) contract instance.
 
 See the [wrapper's documentation](`HoprAnnouncementsInstance`) for more details.*/
@@ -3047,7 +3372,7 @@ See the [wrapper's documentation](`HoprAnnouncementsInstance`) for more details.
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -3059,7 +3384,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         pub async fn deploy(
             provider: P,
             safeRegistry: alloy::sol_types::private::Address,
-        ) -> alloy_contract::Result<HoprAnnouncementsInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprAnnouncementsInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider, safeRegistry);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -3073,7 +3398,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn deploy_builder(
             provider: P,
             safeRegistry: alloy::sol_types::private::Address,
-        ) -> alloy_contract::RawCallBuilder<T, P, N> {
+        ) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 [
@@ -3107,24 +3432,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprAnnouncementsInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprAnnouncementsInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprAnnouncementsInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprAnnouncementsInstance<P, N> {
             HoprAnnouncementsInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprAnnouncementsInstance<T, P, N> {
+    > HoprAnnouncementsInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -3132,14 +3456,14 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
         ///Creates a new call builder for the [`announce`] function.
         pub fn announce(
             &self,
             baseMultiaddr: alloy::sol_types::private::String,
-        ) -> alloy_contract::SolCallBuilder<T, &P, announceCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, announceCall, N> {
             self.call_builder(&announceCall { baseMultiaddr })
         }
         ///Creates a new call builder for the [`announceSafe`] function.
@@ -3147,7 +3471,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             selfAddress: alloy::sol_types::private::Address,
             baseMultiaddr: alloy::sol_types::private::String,
-        ) -> alloy_contract::SolCallBuilder<T, &P, announceSafeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, announceSafeCall, N> {
             self.call_builder(
                 &announceSafeCall {
                     selfAddress,
@@ -3161,7 +3485,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             ed25519_sig_0: alloy::sol_types::private::FixedBytes<32>,
             ed25519_sig_1: alloy::sol_types::private::FixedBytes<32>,
             ed25519_pub_key: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, bindKeysCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, bindKeysCall, N> {
             self.call_builder(
                 &bindKeysCall {
                     ed25519_sig_0,
@@ -3177,7 +3501,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             ed25519_sig_1: alloy::sol_types::private::FixedBytes<32>,
             ed25519_pub_key: alloy::sol_types::private::FixedBytes<32>,
             baseMultiaddr: alloy::sol_types::private::String,
-        ) -> alloy_contract::SolCallBuilder<T, &P, bindKeysAnnounceCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, bindKeysAnnounceCall, N> {
             self.call_builder(
                 &bindKeysAnnounceCall {
                     ed25519_sig_0,
@@ -3195,7 +3519,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             ed25519_sig_1: alloy::sol_types::private::FixedBytes<32>,
             ed25519_pub_key: alloy::sol_types::private::FixedBytes<32>,
             baseMultiaddr: alloy::sol_types::private::String,
-        ) -> alloy_contract::SolCallBuilder<T, &P, bindKeysAnnounceSafeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, bindKeysAnnounceSafeCall, N> {
             self.call_builder(
                 &bindKeysAnnounceSafeCall {
                     selfAddress,
@@ -3213,7 +3537,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             ed25519_sig_0: alloy::sol_types::private::FixedBytes<32>,
             ed25519_sig_1: alloy::sol_types::private::FixedBytes<32>,
             ed25519_pub_key: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, bindKeysSafeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, bindKeysSafeCall, N> {
             self.call_builder(
                 &bindKeysSafeCall {
                     selfAddress,
@@ -3227,51 +3551,50 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn multicall(
             &self,
             data: alloy::sol_types::private::Vec<alloy::sol_types::private::Bytes>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, multicallCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, multicallCall, N> {
             self.call_builder(&multicallCall { data })
         }
         ///Creates a new call builder for the [`revoke`] function.
-        pub fn revoke(&self) -> alloy_contract::SolCallBuilder<T, &P, revokeCall, N> {
-            self.call_builder(&revokeCall {})
+        pub fn revoke(&self) -> alloy_contract::SolCallBuilder<&P, revokeCall, N> {
+            self.call_builder(&revokeCall)
         }
         ///Creates a new call builder for the [`revokeSafe`] function.
         pub fn revokeSafe(
             &self,
             selfAddress: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, revokeSafeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, revokeSafeCall, N> {
             self.call_builder(&revokeSafeCall { selfAddress })
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprAnnouncementsInstance<T, P, N> {
+    > HoprAnnouncementsInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`AddressAnnouncement`] event.
         pub fn AddressAnnouncement_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, AddressAnnouncement, N> {
+        ) -> alloy_contract::Event<&P, AddressAnnouncement, N> {
             self.event_filter::<AddressAnnouncement>()
         }
         ///Creates a new event filter for the [`KeyBinding`] event.
-        pub fn KeyBinding_filter(&self) -> alloy_contract::Event<T, &P, KeyBinding, N> {
+        pub fn KeyBinding_filter(&self) -> alloy_contract::Event<&P, KeyBinding, N> {
             self.event_filter::<KeyBinding>()
         }
         ///Creates a new event filter for the [`RevokeAnnouncement`] event.
         pub fn RevokeAnnouncement_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RevokeAnnouncement, N> {
+        ) -> alloy_contract::Event<&P, RevokeAnnouncement, N> {
             self.event_filter::<RevokeAnnouncement>()
         }
     }

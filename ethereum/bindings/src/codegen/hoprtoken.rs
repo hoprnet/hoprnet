@@ -2396,7 +2396,7 @@ function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct DEFAULT_ADMIN_ROLECall {}
+    pub struct DEFAULT_ADMIN_ROLECall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`DEFAULT_ADMIN_ROLE()`](DEFAULT_ADMIN_ROLECall) function.
@@ -2443,7 +2443,7 @@ function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for DEFAULT_ADMIN_ROLECall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2486,7 +2486,7 @@ function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = DEFAULT_ADMIN_ROLEReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2504,14 +2504,34 @@ function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: DEFAULT_ADMIN_ROLEReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: DEFAULT_ADMIN_ROLEReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -2523,7 +2543,7 @@ function MINTER_ROLE() external view returns (bytes32);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct MINTER_ROLECall {}
+    pub struct MINTER_ROLECall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`MINTER_ROLE()`](MINTER_ROLECall) function.
@@ -2568,7 +2588,7 @@ function MINTER_ROLE() external view returns (bytes32);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for MINTER_ROLECall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2609,7 +2629,7 @@ function MINTER_ROLE() external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = MINTER_ROLEReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2627,14 +2647,34 @@ function MINTER_ROLE() external view returns (bytes32);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: MINTER_ROLEReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: MINTER_ROLEReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -2749,6 +2789,20 @@ function accountSnapshots(address, uint256) external view returns (uint128 fromB
                 }
             }
         }
+        impl accountSnapshotsReturn {
+            fn _tokenize(
+                &self,
+            ) -> <accountSnapshotsCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        128,
+                    > as alloy_sol_types::SolType>::tokenize(&self.fromBlock),
+                    <alloy::sol_types::sol_data::Uint<
+                        128,
+                    > as alloy_sol_types::SolType>::tokenize(&self.value),
+                )
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for accountSnapshotsCall {
             type Parameters<'a> = (
@@ -2786,13 +2840,23 @@ function accountSnapshots(address, uint256) external view returns (uint128 fromB
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                accountSnapshotsReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2910,7 +2974,7 @@ function allowance(address holder, address spender) external view returns (uint2
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = allowanceReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2935,14 +2999,34 @@ function allowance(address holder, address spender) external view returns (uint2
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: allowanceReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: allowanceReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -3057,7 +3141,7 @@ function approve(address spender, uint256 value) external returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = approveReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3082,14 +3166,34 @@ function approve(address spender, uint256 value) external returns (bool);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: approveReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: approveReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -3183,6 +3287,13 @@ function authorizeOperator(address operator) external;
                 }
             }
         }
+        impl authorizeOperatorReturn {
+            fn _tokenize(
+                &self,
+            ) -> <authorizeOperatorCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for authorizeOperatorCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -3211,13 +3322,23 @@ function authorizeOperator(address operator) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                authorizeOperatorReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -3321,7 +3442,7 @@ function balanceOf(address tokenHolder) external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = balanceOfReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3343,14 +3464,34 @@ function balanceOf(address tokenHolder) external view returns (uint256);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: balanceOfReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: balanceOfReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -3464,7 +3605,7 @@ function balanceOfAt(address _owner, uint128 _blockNumber) external view returns
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = balanceOfAtReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3489,14 +3630,34 @@ function balanceOfAt(address _owner, uint128 _blockNumber) external view returns
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: balanceOfAtReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: balanceOfAtReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -3597,6 +3758,13 @@ function burn(uint256 amount, bytes memory data) external;
                 }
             }
         }
+        impl burnReturn {
+            fn _tokenize(
+                &self,
+            ) -> <burnCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for burnCall {
             type Parameters<'a> = (
@@ -3631,13 +3799,23 @@ function burn(uint256 amount, bytes memory data) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                burnReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -3650,7 +3828,7 @@ function decimals() external pure returns (uint8);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct decimalsCall {}
+    pub struct decimalsCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`decimals()`](decimalsCall) function.
@@ -3695,7 +3873,7 @@ function decimals() external pure returns (uint8);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for decimalsCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3736,7 +3914,7 @@ function decimals() external pure returns (uint8);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = decimalsReturn;
+            type Return = u8;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<8>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3754,14 +3932,34 @@ function decimals() external pure returns (uint8);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        8,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: decimalsReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: decimalsReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -3773,7 +3971,7 @@ function defaultOperators() external view returns (address[] memory);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct defaultOperatorsCall {}
+    pub struct defaultOperatorsCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`defaultOperators()`](defaultOperatorsCall) function.
@@ -3820,7 +4018,7 @@ function defaultOperators() external view returns (address[] memory);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for defaultOperatorsCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3867,7 +4065,9 @@ function defaultOperators() external view returns (address[] memory);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = defaultOperatorsReturn;
+            type Return = alloy::sol_types::private::Vec<
+                alloy::sol_types::private::Address,
+            >;
             type ReturnTuple<'a> = (
                 alloy::sol_types::sol_data::Array<alloy::sol_types::sol_data::Address>,
             );
@@ -3887,14 +4087,34 @@ function defaultOperators() external view returns (address[] memory);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Array<
+                        alloy::sol_types::sol_data::Address,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: defaultOperatorsReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: defaultOperatorsReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -3995,7 +4215,7 @@ function getRoleAdmin(bytes32 role) external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = getRoleAdminReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4017,14 +4237,34 @@ function getRoleAdmin(bytes32 role) external view returns (bytes32);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: getRoleAdminReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: getRoleAdminReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -4139,7 +4379,7 @@ function getRoleMember(bytes32 role, uint256 index) external view returns (addre
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = getRoleMemberReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4164,14 +4404,34 @@ function getRoleMember(bytes32 role, uint256 index) external view returns (addre
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: getRoleMemberReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: getRoleMemberReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -4278,7 +4538,7 @@ function getRoleMemberCount(bytes32 role) external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = getRoleMemberCountReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4300,14 +4560,34 @@ function getRoleMemberCount(bytes32 role) external view returns (uint256);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: getRoleMemberCountReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: getRoleMemberCountReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -4408,6 +4688,13 @@ function grantRole(bytes32 role, address account) external;
                 }
             }
         }
+        impl grantRoleReturn {
+            fn _tokenize(
+                &self,
+            ) -> <grantRoleCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for grantRoleCall {
             type Parameters<'a> = (
@@ -4442,13 +4729,23 @@ function grantRole(bytes32 role, address account) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                grantRoleReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -4461,7 +4758,7 @@ function granularity() external view returns (uint256);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct granularityCall {}
+    pub struct granularityCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`granularity()`](granularityCall) function.
@@ -4506,7 +4803,7 @@ function granularity() external view returns (uint256);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for granularityCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -4549,7 +4846,7 @@ function granularity() external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = granularityReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4567,14 +4864,34 @@ function granularity() external view returns (uint256);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: granularityReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: granularityReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -4689,7 +5006,7 @@ function hasRole(bytes32 role, address account) external view returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = hasRoleReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4714,14 +5031,34 @@ function hasRole(bytes32 role, address account) external view returns (bool);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: hasRoleReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: hasRoleReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -4836,7 +5173,7 @@ function isOperatorFor(address operator, address tokenHolder) external view retu
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = isOperatorForReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4861,14 +5198,34 @@ function isOperatorFor(address operator, address tokenHolder) external view retu
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: isOperatorForReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: isOperatorForReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -4979,6 +5336,13 @@ function mint(address account, uint256 amount, bytes memory userData, bytes memo
                 }
             }
         }
+        impl mintReturn {
+            fn _tokenize(
+                &self,
+            ) -> <mintCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for mintCall {
             type Parameters<'a> = (
@@ -5021,13 +5385,23 @@ function mint(address account, uint256 amount, bytes memory userData, bytes memo
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                mintReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -5040,7 +5414,7 @@ function name() external view returns (string memory);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct nameCall {}
+    pub struct nameCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`name()`](nameCall) function.
@@ -5085,7 +5459,7 @@ function name() external view returns (string memory);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for nameCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -5126,7 +5500,7 @@ function name() external view returns (string memory);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = nameReturn;
+            type Return = alloy::sol_types::private::String;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::String,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -5144,14 +5518,34 @@ function name() external view returns (string memory);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::String as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: nameReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: nameReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -5262,6 +5656,13 @@ function operatorBurn(address account, uint256 amount, bytes memory data, bytes 
                 }
             }
         }
+        impl operatorBurnReturn {
+            fn _tokenize(
+                &self,
+            ) -> <operatorBurnCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for operatorBurnCall {
             type Parameters<'a> = (
@@ -5304,13 +5705,23 @@ function operatorBurn(address account, uint256 amount, bytes memory data, bytes 
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                operatorBurnReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -5433,6 +5844,13 @@ function operatorSend(address sender, address recipient, uint256 amount, bytes m
                 }
             }
         }
+        impl operatorSendReturn {
+            fn _tokenize(
+                &self,
+            ) -> <operatorSendCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for operatorSendCall {
             type Parameters<'a> = (
@@ -5479,13 +5897,23 @@ function operatorSend(address sender, address recipient, uint256 amount, bytes m
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                operatorSendReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -5587,6 +6015,13 @@ function renounceRole(bytes32 role, address account) external;
                 }
             }
         }
+        impl renounceRoleReturn {
+            fn _tokenize(
+                &self,
+            ) -> <renounceRoleCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for renounceRoleCall {
             type Parameters<'a> = (
@@ -5621,13 +6056,23 @@ function renounceRole(bytes32 role, address account) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                renounceRoleReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -5720,6 +6165,13 @@ function revokeOperator(address operator) external;
                 }
             }
         }
+        impl revokeOperatorReturn {
+            fn _tokenize(
+                &self,
+            ) -> <revokeOperatorCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for revokeOperatorCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -5748,13 +6200,23 @@ function revokeOperator(address operator) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                revokeOperatorReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -5856,6 +6318,13 @@ function revokeRole(bytes32 role, address account) external;
                 }
             }
         }
+        impl revokeRoleReturn {
+            fn _tokenize(
+                &self,
+            ) -> <revokeRoleCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for revokeRoleCall {
             type Parameters<'a> = (
@@ -5890,13 +6359,23 @@ function revokeRole(bytes32 role, address account) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                revokeRoleReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -6003,6 +6482,13 @@ function send(address recipient, uint256 amount, bytes memory data) external;
                 }
             }
         }
+        impl sendReturn {
+            fn _tokenize(
+                &self,
+            ) -> <sendCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for sendCall {
             type Parameters<'a> = (
@@ -6041,13 +6527,23 @@ function send(address recipient, uint256 amount, bytes memory data) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                sendReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -6153,7 +6649,7 @@ function supportsInterface(bytes4 interfaceId) external view returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = supportsInterfaceReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6175,14 +6671,34 @@ function supportsInterface(bytes4 interfaceId) external view returns (bool);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: supportsInterfaceReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: supportsInterfaceReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6194,7 +6710,7 @@ function symbol() external view returns (string memory);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct symbolCall {}
+    pub struct symbolCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`symbol()`](symbolCall) function.
@@ -6239,7 +6755,7 @@ function symbol() external view returns (string memory);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for symbolCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6280,7 +6796,7 @@ function symbol() external view returns (string memory);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = symbolReturn;
+            type Return = alloy::sol_types::private::String;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::String,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6298,14 +6814,34 @@ function symbol() external view returns (string memory);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::String as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: symbolReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: symbolReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6317,7 +6853,7 @@ function totalSupply() external view returns (uint256);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct totalSupplyCall {}
+    pub struct totalSupplyCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`totalSupply()`](totalSupplyCall) function.
@@ -6362,7 +6898,7 @@ function totalSupply() external view returns (uint256);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for totalSupplyCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6405,7 +6941,7 @@ function totalSupply() external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = totalSupplyReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6423,14 +6959,34 @@ function totalSupply() external view returns (uint256);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: totalSupplyReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: totalSupplyReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6533,7 +7089,7 @@ function totalSupplyAt(uint128 _blockNumber) external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = totalSupplyAtReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6555,14 +7111,34 @@ function totalSupplyAt(uint128 _blockNumber) external view returns (uint256);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: totalSupplyAtReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: totalSupplyAtReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6574,10 +7150,9 @@ function totalSupplySnapshots(uint256) external view returns (uint128 fromBlock,
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct totalSupplySnapshotsCall {
-        #[allow(missing_docs)]
-        pub _0: alloy::sol_types::private::primitives::aliases::U256,
-    }
+    pub struct totalSupplySnapshotsCall(
+        pub alloy::sol_types::private::primitives::aliases::U256,
+    );
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`totalSupplySnapshots(uint256)`](totalSupplySnapshotsCall) function.
@@ -6620,7 +7195,7 @@ function totalSupplySnapshots(uint256) external view returns (uint128 fromBlock,
             impl ::core::convert::From<totalSupplySnapshotsCall>
             for UnderlyingRustTuple<'_> {
                 fn from(value: totalSupplySnapshotsCall) -> Self {
-                    (value._0,)
+                    (value.0,)
                 }
             }
             #[automatically_derived]
@@ -6628,7 +7203,7 @@ function totalSupplySnapshots(uint256) external view returns (uint128 fromBlock,
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for totalSupplySnapshotsCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self { _0: tuple.0 }
+                    Self(tuple.0)
                 }
             }
         }
@@ -6671,6 +7246,22 @@ function totalSupplySnapshots(uint256) external view returns (uint128 fromBlock,
                 }
             }
         }
+        impl totalSupplySnapshotsReturn {
+            fn _tokenize(
+                &self,
+            ) -> <totalSupplySnapshotsCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        128,
+                    > as alloy_sol_types::SolType>::tokenize(&self.fromBlock),
+                    <alloy::sol_types::sol_data::Uint<
+                        128,
+                    > as alloy_sol_types::SolType>::tokenize(&self.value),
+                )
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for totalSupplySnapshotsCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Uint<256>,);
@@ -6698,17 +7289,27 @@ function totalSupplySnapshots(uint256) external view returns (uint128 fromBlock,
                 (
                     <alloy::sol_types::sol_data::Uint<
                         256,
-                    > as alloy_sol_types::SolType>::tokenize(&self._0),
+                    > as alloy_sol_types::SolType>::tokenize(&self.0),
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                totalSupplySnapshotsReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -6824,7 +7425,7 @@ function transfer(address recipient, uint256 amount) external returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = transferReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6849,14 +7450,34 @@ function transfer(address recipient, uint256 amount) external returns (bool);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: transferReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: transferReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6977,7 +7598,7 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = transferFromReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -7005,14 +7626,34 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: transferFromReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: transferFromReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -7235,20 +7876,16 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprTokenCalls>] = &[
                 {
                     fn supportsInterface(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <supportsInterfaceCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::supportsInterface)
                     }
@@ -7257,38 +7894,24 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn defaultOperators(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <defaultOperatorsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::defaultOperators)
                     }
                     defaultOperators
                 },
                 {
-                    fn name(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <nameCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                    fn name(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <nameCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::name)
                     }
                     name
                 },
                 {
-                    fn approve(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <approveCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                    fn approve(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <approveCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::approve)
                     }
                     approve
@@ -7296,11 +7919,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn totalSupply(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <totalSupplyCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::totalSupply)
                     }
@@ -7309,11 +7930,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn transferFrom(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <transferFromCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::transferFrom)
                     }
@@ -7322,11 +7941,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn getRoleAdmin(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <getRoleAdminCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::getRoleAdmin)
                     }
@@ -7335,11 +7952,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn accountSnapshots(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <accountSnapshotsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::accountSnapshots)
                     }
@@ -7348,25 +7963,15 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn grantRole(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <grantRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <grantRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::grantRole)
                     }
                     grantRole
                 },
                 {
-                    fn decimals(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <decimalsCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                    fn decimals(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <decimalsCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::decimals)
                     }
                     decimals
@@ -7374,11 +7979,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn renounceRole(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <renounceRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::renounceRole)
                     }
@@ -7387,11 +7990,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn granularity(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <granularityCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::granularity)
                     }
@@ -7400,11 +8001,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn operatorSend(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <operatorSendCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::operatorSend)
                     }
@@ -7413,12 +8012,8 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn balanceOf(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <balanceOfCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <balanceOfCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::balanceOf)
                     }
                     balanceOf
@@ -7426,25 +8021,17 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn getRoleMember(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <getRoleMemberCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::getRoleMember)
                     }
                     getRoleMember
                 },
                 {
-                    fn hasRole(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <hasRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                    fn hasRole(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <hasRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::hasRole)
                     }
                     hasRole
@@ -7452,11 +8039,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn totalSupplyAt(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <totalSupplyAtCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::totalSupplyAt)
                     }
@@ -7465,38 +8050,24 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn authorizeOperator(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <authorizeOperatorCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::authorizeOperator)
                     }
                     authorizeOperator
                 },
                 {
-                    fn symbol(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <symbolCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                    fn symbol(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <symbolCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::symbol)
                     }
                     symbol
                 },
                 {
-                    fn send(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <sendCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                    fn send(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <sendCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::send)
                     }
                     send
@@ -7504,25 +8075,17 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn DEFAULT_ADMIN_ROLE(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <DEFAULT_ADMIN_ROLECall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::DEFAULT_ADMIN_ROLE)
                     }
                     DEFAULT_ADMIN_ROLE
                 },
                 {
-                    fn transfer(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <transferCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                    fn transfer(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <transferCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::transfer)
                     }
                     transfer
@@ -7530,11 +8093,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn totalSupplySnapshots(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <totalSupplySnapshotsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::totalSupplySnapshots)
                     }
@@ -7543,11 +8104,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn getRoleMemberCount(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <getRoleMemberCountCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::getRoleMemberCount)
                     }
@@ -7556,11 +8115,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn MINTER_ROLE(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <MINTER_ROLECall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::MINTER_ROLE)
                     }
@@ -7569,11 +8126,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn revokeRole(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <revokeRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::revokeRole)
                     }
@@ -7582,25 +8137,17 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn isOperatorFor(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <isOperatorForCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::isOperatorFor)
                     }
                     isOperatorFor
                 },
                 {
-                    fn mint(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <mintCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                    fn mint(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <mintCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::mint)
                     }
                     mint
@@ -7608,12 +8155,8 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn allowance(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <allowanceCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <allowanceCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprTokenCalls::allowance)
                     }
                     allowance
@@ -7621,11 +8164,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn balanceOfAt(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <balanceOfAtCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::balanceOfAt)
                     }
@@ -7634,11 +8175,9 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn revokeOperator(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <revokeOperatorCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::revokeOperator)
                     }
@@ -7647,24 +8186,381 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                 {
                     fn operatorBurn(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
                         <operatorBurnCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprTokenCalls::operatorBurn)
                     }
                     operatorBurn
                 },
                 {
-                    fn burn(
+                    fn burn(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <burnCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
+                            .map(HoprTokenCalls::burn)
+                    }
+                    burn
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprTokenCalls>] = &[
+                {
+                    fn supportsInterface(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprTokenCalls> {
-                        <burnCall as alloy_sol_types::SolCall>::abi_decode_raw(
+                        <supportsInterfaceCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
                                 data,
-                                validate,
+                            )
+                            .map(HoprTokenCalls::supportsInterface)
+                    }
+                    supportsInterface
+                },
+                {
+                    fn defaultOperators(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <defaultOperatorsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::defaultOperators)
+                    }
+                    defaultOperators
+                },
+                {
+                    fn name(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <nameCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::name)
+                    }
+                    name
+                },
+                {
+                    fn approve(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <approveCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::approve)
+                    }
+                    approve
+                },
+                {
+                    fn totalSupply(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <totalSupplyCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::totalSupply)
+                    }
+                    totalSupply
+                },
+                {
+                    fn transferFrom(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <transferFromCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::transferFrom)
+                    }
+                    transferFrom
+                },
+                {
+                    fn getRoleAdmin(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <getRoleAdminCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::getRoleAdmin)
+                    }
+                    getRoleAdmin
+                },
+                {
+                    fn accountSnapshots(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <accountSnapshotsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::accountSnapshots)
+                    }
+                    accountSnapshots
+                },
+                {
+                    fn grantRole(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <grantRoleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::grantRole)
+                    }
+                    grantRole
+                },
+                {
+                    fn decimals(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <decimalsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::decimals)
+                    }
+                    decimals
+                },
+                {
+                    fn renounceRole(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <renounceRoleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::renounceRole)
+                    }
+                    renounceRole
+                },
+                {
+                    fn granularity(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <granularityCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::granularity)
+                    }
+                    granularity
+                },
+                {
+                    fn operatorSend(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <operatorSendCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::operatorSend)
+                    }
+                    operatorSend
+                },
+                {
+                    fn balanceOf(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <balanceOfCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::balanceOf)
+                    }
+                    balanceOf
+                },
+                {
+                    fn getRoleMember(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <getRoleMemberCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::getRoleMember)
+                    }
+                    getRoleMember
+                },
+                {
+                    fn hasRole(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <hasRoleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::hasRole)
+                    }
+                    hasRole
+                },
+                {
+                    fn totalSupplyAt(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <totalSupplyAtCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::totalSupplyAt)
+                    }
+                    totalSupplyAt
+                },
+                {
+                    fn authorizeOperator(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <authorizeOperatorCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::authorizeOperator)
+                    }
+                    authorizeOperator
+                },
+                {
+                    fn symbol(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <symbolCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::symbol)
+                    }
+                    symbol
+                },
+                {
+                    fn send(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <sendCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::send)
+                    }
+                    send
+                },
+                {
+                    fn DEFAULT_ADMIN_ROLE(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <DEFAULT_ADMIN_ROLECall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::DEFAULT_ADMIN_ROLE)
+                    }
+                    DEFAULT_ADMIN_ROLE
+                },
+                {
+                    fn transfer(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <transferCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::transfer)
+                    }
+                    transfer
+                },
+                {
+                    fn totalSupplySnapshots(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <totalSupplySnapshotsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::totalSupplySnapshots)
+                    }
+                    totalSupplySnapshots
+                },
+                {
+                    fn getRoleMemberCount(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <getRoleMemberCountCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::getRoleMemberCount)
+                    }
+                    getRoleMemberCount
+                },
+                {
+                    fn MINTER_ROLE(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <MINTER_ROLECall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::MINTER_ROLE)
+                    }
+                    MINTER_ROLE
+                },
+                {
+                    fn revokeRole(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <revokeRoleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::revokeRole)
+                    }
+                    revokeRole
+                },
+                {
+                    fn isOperatorFor(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <isOperatorForCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::isOperatorFor)
+                    }
+                    isOperatorFor
+                },
+                {
+                    fn mint(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <mintCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::mint)
+                    }
+                    mint
+                },
+                {
+                    fn allowance(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <allowanceCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::allowance)
+                    }
+                    allowance
+                },
+                {
+                    fn balanceOfAt(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <balanceOfAtCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::balanceOfAt)
+                    }
+                    balanceOfAt
+                },
+                {
+                    fn revokeOperator(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <revokeOperatorCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::revokeOperator)
+                    }
+                    revokeOperator
+                },
+                {
+                    fn operatorBurn(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <operatorBurnCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprTokenCalls::operatorBurn)
+                    }
+                    operatorBurn
+                },
+                {
+                    fn burn(data: &[u8]) -> alloy_sol_types::Result<HoprTokenCalls> {
+                        <burnCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
                             )
                             .map(HoprTokenCalls::burn)
                     }
@@ -7679,7 +8575,7 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -8101,15 +8997,10 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(<Approval as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
-                    <Approval as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
+                    <Approval as alloy_sol_types::SolEvent>::decode_raw_log(topics, data)
                         .map(Self::Approval)
                 }
                 Some(
@@ -8118,31 +9009,21 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                     <AuthorizedOperator as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::AuthorizedOperator)
                 }
                 Some(<Burned as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
-                    <Burned as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
+                    <Burned as alloy_sol_types::SolEvent>::decode_raw_log(topics, data)
                         .map(Self::Burned)
                 }
                 Some(<Minted as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
-                    <Minted as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
+                    <Minted as alloy_sol_types::SolEvent>::decode_raw_log(topics, data)
                         .map(Self::Minted)
                 }
                 Some(<RevokedOperator as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <RevokedOperator as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RevokedOperator)
                 }
@@ -8150,7 +9031,6 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                     <RoleAdminChanged as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RoleAdminChanged)
                 }
@@ -8158,7 +9038,6 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                     <RoleGranted as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RoleGranted)
                 }
@@ -8166,24 +9045,15 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
                     <RoleRevoked as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RoleRevoked)
                 }
                 Some(<Sent as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
-                    <Sent as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
+                    <Sent as alloy_sol_types::SolEvent>::decode_raw_log(topics, data)
                         .map(Self::Sent)
                 }
                 Some(<Transfer as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
-                    <Transfer as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
+                    <Transfer as alloy_sol_types::SolEvent>::decode_raw_log(topics, data)
                         .map(Self::Transfer)
                 }
                 _ => {
@@ -8277,14 +9147,13 @@ function transferFrom(address holder, address recipient, uint256 amount) externa
 See the [wrapper's documentation](`HoprTokenInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprTokenInstance<T, P, N> {
-        HoprTokenInstance::<T, P, N>::new(address, provider)
+    ) -> HoprTokenInstance<P, N> {
+        HoprTokenInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -8293,15 +9162,14 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprTokenInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprTokenInstance<P, N>>,
     > {
-        HoprTokenInstance::<T, P, N>::deploy(provider)
+        HoprTokenInstance::<P, N>::deploy(provider)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -8310,11 +9178,10 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprTokenInstance::<T, P, N>::deploy_builder(provider)
+    >(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprTokenInstance::<P, N>::deploy_builder(provider)
     }
     /**A [`HoprToken`](self) instance.
 
@@ -8328,13 +9195,13 @@ be used to deploy a new instance of the contract.
 
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
-    pub struct HoprTokenInstance<T, P, N = alloy_contract::private::Ethereum> {
+    pub struct HoprTokenInstance<P, N = alloy_contract::private::Ethereum> {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprTokenInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprTokenInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprTokenInstance").field(&self.address).finish()
@@ -8343,10 +9210,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprTokenInstance<T, P, N> {
+    > HoprTokenInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprToken`](self) contract instance.
 
 See the [wrapper's documentation](`HoprTokenInstance`) for more details.*/
@@ -8358,7 +9224,7 @@ See the [wrapper's documentation](`HoprTokenInstance`) for more details.*/
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -8369,7 +9235,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         #[inline]
         pub async fn deploy(
             provider: P,
-        ) -> alloy_contract::Result<HoprTokenInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprTokenInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -8380,7 +9246,7 @@ and constructor arguments, if any.
 This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         #[inline]
-        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
+        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 ::core::clone::Clone::clone(&BYTECODE),
@@ -8407,24 +9273,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprTokenInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprTokenInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprTokenInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprTokenInstance<P, N> {
             HoprTokenInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprTokenInstance<T, P, N> {
+    > HoprTokenInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -8432,27 +9297,27 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
         ///Creates a new call builder for the [`DEFAULT_ADMIN_ROLE`] function.
         pub fn DEFAULT_ADMIN_ROLE(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, DEFAULT_ADMIN_ROLECall, N> {
-            self.call_builder(&DEFAULT_ADMIN_ROLECall {})
+        ) -> alloy_contract::SolCallBuilder<&P, DEFAULT_ADMIN_ROLECall, N> {
+            self.call_builder(&DEFAULT_ADMIN_ROLECall)
         }
         ///Creates a new call builder for the [`MINTER_ROLE`] function.
         pub fn MINTER_ROLE(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, MINTER_ROLECall, N> {
-            self.call_builder(&MINTER_ROLECall {})
+        ) -> alloy_contract::SolCallBuilder<&P, MINTER_ROLECall, N> {
+            self.call_builder(&MINTER_ROLECall)
         }
         ///Creates a new call builder for the [`accountSnapshots`] function.
         pub fn accountSnapshots(
             &self,
             _0: alloy::sol_types::private::Address,
             _1: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<T, &P, accountSnapshotsCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, accountSnapshotsCall, N> {
             self.call_builder(&accountSnapshotsCall { _0, _1 })
         }
         ///Creates a new call builder for the [`allowance`] function.
@@ -8460,7 +9325,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             holder: alloy::sol_types::private::Address,
             spender: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, allowanceCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, allowanceCall, N> {
             self.call_builder(&allowanceCall { holder, spender })
         }
         ///Creates a new call builder for the [`approve`] function.
@@ -8468,21 +9333,21 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             spender: alloy::sol_types::private::Address,
             value: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<T, &P, approveCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, approveCall, N> {
             self.call_builder(&approveCall { spender, value })
         }
         ///Creates a new call builder for the [`authorizeOperator`] function.
         pub fn authorizeOperator(
             &self,
             operator: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, authorizeOperatorCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, authorizeOperatorCall, N> {
             self.call_builder(&authorizeOperatorCall { operator })
         }
         ///Creates a new call builder for the [`balanceOf`] function.
         pub fn balanceOf(
             &self,
             tokenHolder: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, balanceOfCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, balanceOfCall, N> {
             self.call_builder(&balanceOfCall { tokenHolder })
         }
         ///Creates a new call builder for the [`balanceOfAt`] function.
@@ -8490,7 +9355,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             _owner: alloy::sol_types::private::Address,
             _blockNumber: u128,
-        ) -> alloy_contract::SolCallBuilder<T, &P, balanceOfAtCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, balanceOfAtCall, N> {
             self.call_builder(
                 &balanceOfAtCall {
                     _owner,
@@ -8503,26 +9368,24 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             amount: alloy::sol_types::private::primitives::aliases::U256,
             data: alloy::sol_types::private::Bytes,
-        ) -> alloy_contract::SolCallBuilder<T, &P, burnCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, burnCall, N> {
             self.call_builder(&burnCall { amount, data })
         }
         ///Creates a new call builder for the [`decimals`] function.
-        pub fn decimals(
-            &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, decimalsCall, N> {
-            self.call_builder(&decimalsCall {})
+        pub fn decimals(&self) -> alloy_contract::SolCallBuilder<&P, decimalsCall, N> {
+            self.call_builder(&decimalsCall)
         }
         ///Creates a new call builder for the [`defaultOperators`] function.
         pub fn defaultOperators(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, defaultOperatorsCall, N> {
-            self.call_builder(&defaultOperatorsCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, defaultOperatorsCall, N> {
+            self.call_builder(&defaultOperatorsCall)
         }
         ///Creates a new call builder for the [`getRoleAdmin`] function.
         pub fn getRoleAdmin(
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, getRoleAdminCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, getRoleAdminCall, N> {
             self.call_builder(&getRoleAdminCall { role })
         }
         ///Creates a new call builder for the [`getRoleMember`] function.
@@ -8530,14 +9393,14 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
             index: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<T, &P, getRoleMemberCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, getRoleMemberCall, N> {
             self.call_builder(&getRoleMemberCall { role, index })
         }
         ///Creates a new call builder for the [`getRoleMemberCount`] function.
         pub fn getRoleMemberCount(
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, getRoleMemberCountCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, getRoleMemberCountCall, N> {
             self.call_builder(&getRoleMemberCountCall { role })
         }
         ///Creates a new call builder for the [`grantRole`] function.
@@ -8545,21 +9408,21 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, grantRoleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, grantRoleCall, N> {
             self.call_builder(&grantRoleCall { role, account })
         }
         ///Creates a new call builder for the [`granularity`] function.
         pub fn granularity(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, granularityCall, N> {
-            self.call_builder(&granularityCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, granularityCall, N> {
+            self.call_builder(&granularityCall)
         }
         ///Creates a new call builder for the [`hasRole`] function.
         pub fn hasRole(
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, hasRoleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, hasRoleCall, N> {
             self.call_builder(&hasRoleCall { role, account })
         }
         ///Creates a new call builder for the [`isOperatorFor`] function.
@@ -8567,7 +9430,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             operator: alloy::sol_types::private::Address,
             tokenHolder: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, isOperatorForCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, isOperatorForCall, N> {
             self.call_builder(
                 &isOperatorForCall {
                     operator,
@@ -8582,7 +9445,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             amount: alloy::sol_types::private::primitives::aliases::U256,
             userData: alloy::sol_types::private::Bytes,
             operatorData: alloy::sol_types::private::Bytes,
-        ) -> alloy_contract::SolCallBuilder<T, &P, mintCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, mintCall, N> {
             self.call_builder(
                 &mintCall {
                     account,
@@ -8593,8 +9456,8 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             )
         }
         ///Creates a new call builder for the [`name`] function.
-        pub fn name(&self) -> alloy_contract::SolCallBuilder<T, &P, nameCall, N> {
-            self.call_builder(&nameCall {})
+        pub fn name(&self) -> alloy_contract::SolCallBuilder<&P, nameCall, N> {
+            self.call_builder(&nameCall)
         }
         ///Creates a new call builder for the [`operatorBurn`] function.
         pub fn operatorBurn(
@@ -8603,7 +9466,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             amount: alloy::sol_types::private::primitives::aliases::U256,
             data: alloy::sol_types::private::Bytes,
             operatorData: alloy::sol_types::private::Bytes,
-        ) -> alloy_contract::SolCallBuilder<T, &P, operatorBurnCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, operatorBurnCall, N> {
             self.call_builder(
                 &operatorBurnCall {
                     account,
@@ -8621,7 +9484,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             amount: alloy::sol_types::private::primitives::aliases::U256,
             data: alloy::sol_types::private::Bytes,
             operatorData: alloy::sol_types::private::Bytes,
-        ) -> alloy_contract::SolCallBuilder<T, &P, operatorSendCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, operatorSendCall, N> {
             self.call_builder(
                 &operatorSendCall {
                     sender,
@@ -8637,14 +9500,14 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, renounceRoleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, renounceRoleCall, N> {
             self.call_builder(&renounceRoleCall { role, account })
         }
         ///Creates a new call builder for the [`revokeOperator`] function.
         pub fn revokeOperator(
             &self,
             operator: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, revokeOperatorCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, revokeOperatorCall, N> {
             self.call_builder(&revokeOperatorCall { operator })
         }
         ///Creates a new call builder for the [`revokeRole`] function.
@@ -8652,7 +9515,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, revokeRoleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, revokeRoleCall, N> {
             self.call_builder(&revokeRoleCall { role, account })
         }
         ///Creates a new call builder for the [`send`] function.
@@ -8661,7 +9524,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             recipient: alloy::sol_types::private::Address,
             amount: alloy::sol_types::private::primitives::aliases::U256,
             data: alloy::sol_types::private::Bytes,
-        ) -> alloy_contract::SolCallBuilder<T, &P, sendCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, sendCall, N> {
             self.call_builder(
                 &sendCall {
                     recipient,
@@ -8674,7 +9537,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn supportsInterface(
             &self,
             interfaceId: alloy::sol_types::private::FixedBytes<4>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, supportsInterfaceCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, supportsInterfaceCall, N> {
             self.call_builder(
                 &supportsInterfaceCall {
                     interfaceId,
@@ -8682,35 +9545,35 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             )
         }
         ///Creates a new call builder for the [`symbol`] function.
-        pub fn symbol(&self) -> alloy_contract::SolCallBuilder<T, &P, symbolCall, N> {
-            self.call_builder(&symbolCall {})
+        pub fn symbol(&self) -> alloy_contract::SolCallBuilder<&P, symbolCall, N> {
+            self.call_builder(&symbolCall)
         }
         ///Creates a new call builder for the [`totalSupply`] function.
         pub fn totalSupply(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, totalSupplyCall, N> {
-            self.call_builder(&totalSupplyCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, totalSupplyCall, N> {
+            self.call_builder(&totalSupplyCall)
         }
         ///Creates a new call builder for the [`totalSupplyAt`] function.
         pub fn totalSupplyAt(
             &self,
             _blockNumber: u128,
-        ) -> alloy_contract::SolCallBuilder<T, &P, totalSupplyAtCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, totalSupplyAtCall, N> {
             self.call_builder(&totalSupplyAtCall { _blockNumber })
         }
         ///Creates a new call builder for the [`totalSupplySnapshots`] function.
         pub fn totalSupplySnapshots(
             &self,
             _0: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<T, &P, totalSupplySnapshotsCall, N> {
-            self.call_builder(&totalSupplySnapshotsCall { _0 })
+        ) -> alloy_contract::SolCallBuilder<&P, totalSupplySnapshotsCall, N> {
+            self.call_builder(&totalSupplySnapshotsCall(_0))
         }
         ///Creates a new call builder for the [`transfer`] function.
         pub fn transfer(
             &self,
             recipient: alloy::sol_types::private::Address,
             amount: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<T, &P, transferCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, transferCall, N> {
             self.call_builder(&transferCall { recipient, amount })
         }
         ///Creates a new call builder for the [`transferFrom`] function.
@@ -8719,7 +9582,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             holder: alloy::sol_types::private::Address,
             recipient: alloy::sol_types::private::Address,
             amount: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<T, &P, transferFromCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, transferFromCall, N> {
             self.call_builder(
                 &transferFromCall {
                     holder,
@@ -8732,67 +9595,62 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprTokenInstance<T, P, N> {
+    > HoprTokenInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`Approval`] event.
-        pub fn Approval_filter(&self) -> alloy_contract::Event<T, &P, Approval, N> {
+        pub fn Approval_filter(&self) -> alloy_contract::Event<&P, Approval, N> {
             self.event_filter::<Approval>()
         }
         ///Creates a new event filter for the [`AuthorizedOperator`] event.
         pub fn AuthorizedOperator_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, AuthorizedOperator, N> {
+        ) -> alloy_contract::Event<&P, AuthorizedOperator, N> {
             self.event_filter::<AuthorizedOperator>()
         }
         ///Creates a new event filter for the [`Burned`] event.
-        pub fn Burned_filter(&self) -> alloy_contract::Event<T, &P, Burned, N> {
+        pub fn Burned_filter(&self) -> alloy_contract::Event<&P, Burned, N> {
             self.event_filter::<Burned>()
         }
         ///Creates a new event filter for the [`Minted`] event.
-        pub fn Minted_filter(&self) -> alloy_contract::Event<T, &P, Minted, N> {
+        pub fn Minted_filter(&self) -> alloy_contract::Event<&P, Minted, N> {
             self.event_filter::<Minted>()
         }
         ///Creates a new event filter for the [`RevokedOperator`] event.
         pub fn RevokedOperator_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RevokedOperator, N> {
+        ) -> alloy_contract::Event<&P, RevokedOperator, N> {
             self.event_filter::<RevokedOperator>()
         }
         ///Creates a new event filter for the [`RoleAdminChanged`] event.
         pub fn RoleAdminChanged_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RoleAdminChanged, N> {
+        ) -> alloy_contract::Event<&P, RoleAdminChanged, N> {
             self.event_filter::<RoleAdminChanged>()
         }
         ///Creates a new event filter for the [`RoleGranted`] event.
-        pub fn RoleGranted_filter(
-            &self,
-        ) -> alloy_contract::Event<T, &P, RoleGranted, N> {
+        pub fn RoleGranted_filter(&self) -> alloy_contract::Event<&P, RoleGranted, N> {
             self.event_filter::<RoleGranted>()
         }
         ///Creates a new event filter for the [`RoleRevoked`] event.
-        pub fn RoleRevoked_filter(
-            &self,
-        ) -> alloy_contract::Event<T, &P, RoleRevoked, N> {
+        pub fn RoleRevoked_filter(&self) -> alloy_contract::Event<&P, RoleRevoked, N> {
             self.event_filter::<RoleRevoked>()
         }
         ///Creates a new event filter for the [`Sent`] event.
-        pub fn Sent_filter(&self) -> alloy_contract::Event<T, &P, Sent, N> {
+        pub fn Sent_filter(&self) -> alloy_contract::Event<&P, Sent, N> {
             self.event_filter::<Sent>()
         }
         ///Creates a new event filter for the [`Transfer`] event.
-        pub fn Transfer_filter(&self) -> alloy_contract::Event<T, &P, Transfer, N> {
+        pub fn Transfer_filter(&self) -> alloy_contract::Event<&P, Transfer, N> {
             self.event_filter::<Transfer>()
         }
     }

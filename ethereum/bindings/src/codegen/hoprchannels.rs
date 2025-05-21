@@ -573,14 +573,13 @@ struct VRFParameters { uint256 vx; uint256 vy; uint256 s; uint256 h; uint256 sBx
 See the [wrapper's documentation](`HoprCryptoInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprCryptoInstance<T, P, N> {
-        HoprCryptoInstance::<T, P, N>::new(address, provider)
+    ) -> HoprCryptoInstance<P, N> {
+        HoprCryptoInstance::<P, N>::new(address, provider)
     }
     /**A [`HoprCrypto`](self) instance.
 
@@ -594,13 +593,13 @@ be used to deploy a new instance of the contract.
 
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
-    pub struct HoprCryptoInstance<T, P, N = alloy_contract::private::Ethereum> {
+    pub struct HoprCryptoInstance<P, N = alloy_contract::private::Ethereum> {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprCryptoInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprCryptoInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprCryptoInstance").field(&self.address).finish()
@@ -609,10 +608,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprCryptoInstance<T, P, N> {
+    > HoprCryptoInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprCrypto`](self) contract instance.
 
 See the [wrapper's documentation](`HoprCryptoInstance`) for more details.*/
@@ -624,7 +622,7 @@ See the [wrapper's documentation](`HoprCryptoInstance`) for more details.*/
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /// Returns a reference to the address.
@@ -648,24 +646,23 @@ See the [wrapper's documentation](`HoprCryptoInstance`) for more details.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprCryptoInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprCryptoInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprCryptoInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprCryptoInstance<P, N> {
             HoprCryptoInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprCryptoInstance<T, P, N> {
+    > HoprCryptoInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -673,24 +670,23 @@ See the [wrapper's documentation](`HoprCryptoInstance`) for more details.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprCryptoInstance<T, P, N> {
+    > HoprCryptoInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
     }
@@ -2079,12 +2075,12 @@ pub mod HoprChannels {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(value: u8) -> Self {
+            pub const fn from_underlying(value: u8) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(self) -> u8 {
+            pub const fn into_underlying(self) -> u8 {
                 self.0
             }
             /// Return the single encoding of this value, delegating to the
@@ -2098,6 +2094,18 @@ pub mod HoprChannels {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<u8> for ChannelStatus {
+            fn from(value: u8) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<ChannelStatus> for u8 {
+            fn from(value: ChannelStatus) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -2206,14 +2214,14 @@ pub mod HoprChannels {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(
+            pub const fn from_underlying(
                 value: alloy::sol_types::private::primitives::aliases::U96,
             ) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(
+            pub const fn into_underlying(
                 self,
             ) -> alloy::sol_types::private::primitives::aliases::U96 {
                 self.0
@@ -2229,6 +2237,18 @@ pub mod HoprChannels {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<alloy::sol_types::private::primitives::aliases::U96> for Balance {
+            fn from(value: alloy::sol_types::private::primitives::aliases::U96) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<Balance> for alloy::sol_types::private::primitives::aliases::U96 {
+            fn from(value: Balance) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -2337,14 +2357,14 @@ pub mod HoprChannels {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(
+            pub const fn from_underlying(
                 value: alloy::sol_types::private::primitives::aliases::U24,
             ) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(
+            pub const fn into_underlying(
                 self,
             ) -> alloy::sol_types::private::primitives::aliases::U24 {
                 self.0
@@ -2360,6 +2380,18 @@ pub mod HoprChannels {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<alloy::sol_types::private::primitives::aliases::U24> for ChannelEpoch {
+            fn from(value: alloy::sol_types::private::primitives::aliases::U24) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<ChannelEpoch> for alloy::sol_types::private::primitives::aliases::U24 {
+            fn from(value: ChannelEpoch) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -2468,14 +2500,14 @@ pub mod HoprChannels {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(
+            pub const fn from_underlying(
                 value: alloy::sol_types::private::primitives::aliases::U48,
             ) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(
+            pub const fn into_underlying(
                 self,
             ) -> alloy::sol_types::private::primitives::aliases::U48 {
                 self.0
@@ -2491,6 +2523,18 @@ pub mod HoprChannels {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<alloy::sol_types::private::primitives::aliases::U48> for TicketIndex {
+            fn from(value: alloy::sol_types::private::primitives::aliases::U48) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<TicketIndex> for alloy::sol_types::private::primitives::aliases::U48 {
+            fn from(value: TicketIndex) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -2598,12 +2642,12 @@ pub mod HoprChannels {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(value: u32) -> Self {
+            pub const fn from_underlying(value: u32) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(self) -> u32 {
+            pub const fn into_underlying(self) -> u32 {
                 self.0
             }
             /// Return the single encoding of this value, delegating to the
@@ -2617,6 +2661,18 @@ pub mod HoprChannels {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<u32> for TicketIndexOffset {
+            fn from(value: u32) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<TicketIndexOffset> for u32 {
+            fn from(value: TicketIndexOffset) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -2724,12 +2780,12 @@ pub mod HoprChannels {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(value: u32) -> Self {
+            pub const fn from_underlying(value: u32) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(self) -> u32 {
+            pub const fn into_underlying(self) -> u32 {
                 self.0
             }
             /// Return the single encoding of this value, delegating to the
@@ -2743,6 +2799,18 @@ pub mod HoprChannels {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<u32> for Timestamp {
+            fn from(value: u32) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<Timestamp> for u32 {
+            fn from(value: Timestamp) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -2851,14 +2919,14 @@ pub mod HoprChannels {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(
+            pub const fn from_underlying(
                 value: alloy::sol_types::private::primitives::aliases::U56,
             ) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(
+            pub const fn into_underlying(
                 self,
             ) -> alloy::sol_types::private::primitives::aliases::U56 {
                 self.0
@@ -2874,6 +2942,18 @@ pub mod HoprChannels {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<alloy::sol_types::private::primitives::aliases::U56> for WinProb {
+            fn from(value: alloy::sol_types::private::primitives::aliases::U56) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<WinProb> for alloy::sol_types::private::primitives::aliases::U56 {
+            fn from(value: WinProb) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -3494,7 +3574,7 @@ error AlreadyInitialized();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct AlreadyInitialized {}
+    pub struct AlreadyInitialized;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -3529,7 +3609,7 @@ error AlreadyInitialized();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for AlreadyInitialized {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -3550,6 +3630,13 @@ error AlreadyInitialized();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -3560,7 +3647,7 @@ error BalanceExceedsGlobalPerChannelAllowance();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct BalanceExceedsGlobalPerChannelAllowance {}
+    pub struct BalanceExceedsGlobalPerChannelAllowance;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -3597,7 +3684,7 @@ error BalanceExceedsGlobalPerChannelAllowance();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for BalanceExceedsGlobalPerChannelAllowance {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -3618,6 +3705,13 @@ error BalanceExceedsGlobalPerChannelAllowance();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -3628,7 +3722,7 @@ error ContractNotResponsible();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ContractNotResponsible {}
+    pub struct ContractNotResponsible;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -3663,7 +3757,7 @@ error ContractNotResponsible();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for ContractNotResponsible {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -3684,6 +3778,13 @@ error ContractNotResponsible();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -3694,7 +3795,7 @@ error InsufficientChannelBalance();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InsufficientChannelBalance {}
+    pub struct InsufficientChannelBalance;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -3731,7 +3832,7 @@ error InsufficientChannelBalance();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for InsufficientChannelBalance {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -3752,6 +3853,13 @@ error InsufficientChannelBalance();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -3762,7 +3870,7 @@ error InvalidAggregatedTicketInterval();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidAggregatedTicketInterval {}
+    pub struct InvalidAggregatedTicketInterval;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -3799,7 +3907,7 @@ error InvalidAggregatedTicketInterval();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for InvalidAggregatedTicketInterval {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -3820,6 +3928,13 @@ error InvalidAggregatedTicketInterval();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -3830,7 +3945,7 @@ error InvalidBalance();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidBalance {}
+    pub struct InvalidBalance;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -3865,7 +3980,7 @@ error InvalidBalance();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for InvalidBalance {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -3886,6 +4001,13 @@ error InvalidBalance();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -3896,7 +4018,7 @@ error InvalidCurvePoint();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidCurvePoint {}
+    pub struct InvalidCurvePoint;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -3931,7 +4053,7 @@ error InvalidCurvePoint();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for InvalidCurvePoint {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -3952,6 +4074,13 @@ error InvalidCurvePoint();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -3962,7 +4091,7 @@ error InvalidFieldElement();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidFieldElement {}
+    pub struct InvalidFieldElement;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -3997,7 +4126,7 @@ error InvalidFieldElement();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for InvalidFieldElement {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4018,6 +4147,13 @@ error InvalidFieldElement();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4028,7 +4164,7 @@ error InvalidNoticePeriod();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidNoticePeriod {}
+    pub struct InvalidNoticePeriod;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4063,7 +4199,7 @@ error InvalidNoticePeriod();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for InvalidNoticePeriod {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4084,6 +4220,13 @@ error InvalidNoticePeriod();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4094,7 +4237,7 @@ error InvalidPointWitness();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidPointWitness {}
+    pub struct InvalidPointWitness;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4129,7 +4272,7 @@ error InvalidPointWitness();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for InvalidPointWitness {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4150,6 +4293,13 @@ error InvalidPointWitness();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4160,7 +4310,7 @@ error InvalidSafeAddress();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidSafeAddress {}
+    pub struct InvalidSafeAddress;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4195,7 +4345,7 @@ error InvalidSafeAddress();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for InvalidSafeAddress {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4216,6 +4366,13 @@ error InvalidSafeAddress();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4226,7 +4383,7 @@ error InvalidTicketSignature();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidTicketSignature {}
+    pub struct InvalidTicketSignature;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4261,7 +4418,7 @@ error InvalidTicketSignature();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for InvalidTicketSignature {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4282,6 +4439,13 @@ error InvalidTicketSignature();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4292,7 +4456,7 @@ error InvalidTokenRecipient();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidTokenRecipient {}
+    pub struct InvalidTokenRecipient;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4327,7 +4491,7 @@ error InvalidTokenRecipient();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for InvalidTokenRecipient {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4348,6 +4512,13 @@ error InvalidTokenRecipient();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4358,7 +4529,7 @@ error InvalidTokensReceivedUsage();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidTokensReceivedUsage {}
+    pub struct InvalidTokensReceivedUsage;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4395,7 +4566,7 @@ error InvalidTokensReceivedUsage();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for InvalidTokensReceivedUsage {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4416,6 +4587,13 @@ error InvalidTokensReceivedUsage();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4426,7 +4604,7 @@ error InvalidVRFProof();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct InvalidVRFProof {}
+    pub struct InvalidVRFProof;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4461,7 +4639,7 @@ error InvalidVRFProof();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for InvalidVRFProof {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4482,6 +4660,13 @@ error InvalidVRFProof();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4492,7 +4677,7 @@ error MultiSigUninitialized();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct MultiSigUninitialized {}
+    pub struct MultiSigUninitialized;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4527,7 +4712,7 @@ error MultiSigUninitialized();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for MultiSigUninitialized {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4548,6 +4733,13 @@ error MultiSigUninitialized();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4558,7 +4750,7 @@ error NoticePeriodNotDue();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NoticePeriodNotDue {}
+    pub struct NoticePeriodNotDue;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4593,7 +4785,7 @@ error NoticePeriodNotDue();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NoticePeriodNotDue {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4614,6 +4806,13 @@ error NoticePeriodNotDue();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4624,7 +4823,7 @@ error SourceEqualsDestination();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct SourceEqualsDestination {}
+    pub struct SourceEqualsDestination;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4659,7 +4858,7 @@ error SourceEqualsDestination();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for SourceEqualsDestination {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4680,6 +4879,13 @@ error SourceEqualsDestination();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4690,7 +4896,7 @@ error TicketIsNotAWin();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TicketIsNotAWin {}
+    pub struct TicketIsNotAWin;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4725,7 +4931,7 @@ error TicketIsNotAWin();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for TicketIsNotAWin {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4746,6 +4952,13 @@ error TicketIsNotAWin();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4756,7 +4969,7 @@ error TokenTransferFailed();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TokenTransferFailed {}
+    pub struct TokenTransferFailed;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4791,7 +5004,7 @@ error TokenTransferFailed();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for TokenTransferFailed {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4811,6 +5024,13 @@ error TokenTransferFailed();
             #[inline]
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
+            }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
             }
         }
     };
@@ -4885,6 +5105,13 @@ error WrongChannelState(string reason);
                     ),
                 )
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -4895,7 +5122,7 @@ error WrongToken();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct WrongToken {}
+    pub struct WrongToken;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4930,7 +5157,7 @@ error WrongToken();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for WrongToken {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -4950,6 +5177,13 @@ error WrongToken();
             #[inline]
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
+            }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
             }
         }
     };
@@ -5023,6 +5257,13 @@ error ZeroAddress(string reason);
                         &self.reason,
                     ),
                 )
+            }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
             }
         }
     };
@@ -6035,7 +6276,7 @@ function ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE() external view returns (uint256);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ERC777_HOOK_FUND_CHANNEL_MULTI_SIZECall {}
+    pub struct ERC777_HOOK_FUND_CHANNEL_MULTI_SIZECall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE()`](ERC777_HOOK_FUND_CHANNEL_MULTI_SIZECall) function.
@@ -6082,7 +6323,7 @@ function ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE() external view returns (uint256);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for ERC777_HOOK_FUND_CHANNEL_MULTI_SIZECall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6127,7 +6368,7 @@ function ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE() external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = ERC777_HOOK_FUND_CHANNEL_MULTI_SIZEReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6145,14 +6386,34 @@ function ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE() external view returns (uint256);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: ERC777_HOOK_FUND_CHANNEL_MULTI_SIZEReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: ERC777_HOOK_FUND_CHANNEL_MULTI_SIZEReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6164,7 +6425,7 @@ function ERC777_HOOK_FUND_CHANNEL_SIZE() external view returns (uint256);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ERC777_HOOK_FUND_CHANNEL_SIZECall {}
+    pub struct ERC777_HOOK_FUND_CHANNEL_SIZECall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`ERC777_HOOK_FUND_CHANNEL_SIZE()`](ERC777_HOOK_FUND_CHANNEL_SIZECall) function.
@@ -6211,7 +6472,7 @@ function ERC777_HOOK_FUND_CHANNEL_SIZE() external view returns (uint256);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for ERC777_HOOK_FUND_CHANNEL_SIZECall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6256,7 +6517,7 @@ function ERC777_HOOK_FUND_CHANNEL_SIZE() external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = ERC777_HOOK_FUND_CHANNEL_SIZEReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6274,14 +6535,34 @@ function ERC777_HOOK_FUND_CHANNEL_SIZE() external view returns (uint256);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: ERC777_HOOK_FUND_CHANNEL_SIZEReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: ERC777_HOOK_FUND_CHANNEL_SIZEReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6293,7 +6574,7 @@ function LEDGER_VERSION() external view returns (string memory);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct LEDGER_VERSIONCall {}
+    pub struct LEDGER_VERSIONCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`LEDGER_VERSION()`](LEDGER_VERSIONCall) function.
@@ -6338,7 +6619,7 @@ function LEDGER_VERSION() external view returns (string memory);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for LEDGER_VERSIONCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6381,7 +6662,7 @@ function LEDGER_VERSION() external view returns (string memory);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = LEDGER_VERSIONReturn;
+            type Return = alloy::sol_types::private::String;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::String,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6399,14 +6680,34 @@ function LEDGER_VERSION() external view returns (string memory);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::String as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: LEDGER_VERSIONReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: LEDGER_VERSIONReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6418,7 +6719,7 @@ function MAX_USED_BALANCE() external view returns (Balance);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct MAX_USED_BALANCECall {}
+    pub struct MAX_USED_BALANCECall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`MAX_USED_BALANCE()`](MAX_USED_BALANCECall) function.
@@ -6465,7 +6766,7 @@ function MAX_USED_BALANCE() external view returns (Balance);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for MAX_USED_BALANCECall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6510,7 +6811,7 @@ function MAX_USED_BALANCE() external view returns (Balance);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = MAX_USED_BALANCEReturn;
+            type Return = <Balance as alloy::sol_types::SolType>::RustType;
             type ReturnTuple<'a> = (Balance,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6528,14 +6829,30 @@ function MAX_USED_BALANCE() external view returns (Balance);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (<Balance as alloy_sol_types::SolType>::tokenize(ret),)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: MAX_USED_BALANCEReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: MAX_USED_BALANCEReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6547,7 +6864,7 @@ function MIN_USED_BALANCE() external view returns (Balance);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct MIN_USED_BALANCECall {}
+    pub struct MIN_USED_BALANCECall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`MIN_USED_BALANCE()`](MIN_USED_BALANCECall) function.
@@ -6594,7 +6911,7 @@ function MIN_USED_BALANCE() external view returns (Balance);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for MIN_USED_BALANCECall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6639,7 +6956,7 @@ function MIN_USED_BALANCE() external view returns (Balance);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = MIN_USED_BALANCEReturn;
+            type Return = <Balance as alloy::sol_types::SolType>::RustType;
             type ReturnTuple<'a> = (Balance,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6657,14 +6974,30 @@ function MIN_USED_BALANCE() external view returns (Balance);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (<Balance as alloy_sol_types::SolType>::tokenize(ret),)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: MIN_USED_BALANCEReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: MIN_USED_BALANCEReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6676,7 +7009,7 @@ function TOKENS_RECIPIENT_INTERFACE_HASH() external view returns (bytes32);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TOKENS_RECIPIENT_INTERFACE_HASHCall {}
+    pub struct TOKENS_RECIPIENT_INTERFACE_HASHCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`TOKENS_RECIPIENT_INTERFACE_HASH()`](TOKENS_RECIPIENT_INTERFACE_HASHCall) function.
@@ -6723,7 +7056,7 @@ function TOKENS_RECIPIENT_INTERFACE_HASH() external view returns (bytes32);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for TOKENS_RECIPIENT_INTERFACE_HASHCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6766,7 +7099,7 @@ function TOKENS_RECIPIENT_INTERFACE_HASH() external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = TOKENS_RECIPIENT_INTERFACE_HASHReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6784,14 +7117,34 @@ function TOKENS_RECIPIENT_INTERFACE_HASH() external view returns (bytes32);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: TOKENS_RECIPIENT_INTERFACE_HASHReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: TOKENS_RECIPIENT_INTERFACE_HASHReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6803,7 +7156,7 @@ function VERSION() external view returns (string memory);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct VERSIONCall {}
+    pub struct VERSIONCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`VERSION()`](VERSIONCall) function.
@@ -6848,7 +7201,7 @@ function VERSION() external view returns (string memory);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for VERSIONCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6889,7 +7242,7 @@ function VERSION() external view returns (string memory);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = VERSIONReturn;
+            type Return = alloy::sol_types::private::String;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::String,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6907,14 +7260,34 @@ function VERSION() external view returns (string memory);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::String as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: VERSIONReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: VERSIONReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6926,7 +7299,7 @@ function _currentBlockTimestamp() external view returns (Timestamp);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct _currentBlockTimestampCall {}
+    pub struct _currentBlockTimestampCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`_currentBlockTimestamp()`](_currentBlockTimestampCall) function.
@@ -6973,7 +7346,7 @@ function _currentBlockTimestamp() external view returns (Timestamp);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for _currentBlockTimestampCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -7018,7 +7391,7 @@ function _currentBlockTimestamp() external view returns (Timestamp);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = _currentBlockTimestampReturn;
+            type Return = <Timestamp as alloy::sol_types::SolType>::RustType;
             type ReturnTuple<'a> = (Timestamp,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -7036,14 +7409,30 @@ function _currentBlockTimestamp() external view returns (Timestamp);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (<Timestamp as alloy_sol_types::SolType>::tokenize(ret),)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: _currentBlockTimestampReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: _currentBlockTimestampReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -7158,7 +7547,7 @@ function _getChannelId(address source, address destination) external pure return
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = _getChannelIdReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -7183,14 +7572,34 @@ function _getChannelId(address source, address destination) external pure return
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: _getChannelIdReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: _getChannelIdReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -7295,7 +7704,7 @@ function _getTicketHash(RedeemableTicket memory redeemable) external view return
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = _getTicketHashReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -7317,14 +7726,34 @@ function _getTicketHash(RedeemableTicket memory redeemable) external view return
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: _getTicketHashReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: _getTicketHashReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -7449,7 +7878,7 @@ function _isWinningTicket(bytes32 ticketHash, RedeemableTicket memory redeemable
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = _isWinningTicketReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -7477,14 +7906,34 @@ function _isWinningTicket(bytes32 ticketHash, RedeemableTicket memory redeemable
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: _isWinningTicketReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: _isWinningTicketReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -7603,7 +8052,7 @@ function canImplementInterfaceForAddress(bytes32 interfaceHash, address account)
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = canImplementInterfaceForAddressReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -7628,14 +8077,34 @@ function canImplementInterfaceForAddress(bytes32 interfaceHash, address account)
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: canImplementInterfaceForAddressReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: canImplementInterfaceForAddressReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -7647,10 +8116,7 @@ function channels(bytes32) external view returns (Balance balance, TicketIndex t
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct channelsCall {
-        #[allow(missing_docs)]
-        pub _0: alloy::sol_types::private::FixedBytes<32>,
-    }
+    pub struct channelsCall(pub alloy::sol_types::private::FixedBytes<32>);
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`channels(bytes32)`](channelsCall) function.
@@ -7696,14 +8162,14 @@ function channels(bytes32) external view returns (Balance balance, TicketIndex t
             #[doc(hidden)]
             impl ::core::convert::From<channelsCall> for UnderlyingRustTuple<'_> {
                 fn from(value: channelsCall) -> Self {
-                    (value._0,)
+                    (value.0,)
                 }
             }
             #[automatically_derived]
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for channelsCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self { _0: tuple.0 }
+                    Self(tuple.0)
                 }
             }
         }
@@ -7762,6 +8228,21 @@ function channels(bytes32) external view returns (Balance balance, TicketIndex t
                 }
             }
         }
+        impl channelsReturn {
+            fn _tokenize(
+                &self,
+            ) -> <channelsCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                (
+                    <Balance as alloy_sol_types::SolType>::tokenize(&self.balance),
+                    <TicketIndex as alloy_sol_types::SolType>::tokenize(
+                        &self.ticketIndex,
+                    ),
+                    <Timestamp as alloy_sol_types::SolType>::tokenize(&self.closureTime),
+                    <ChannelEpoch as alloy_sol_types::SolType>::tokenize(&self.epoch),
+                    <ChannelStatus as alloy_sol_types::SolType>::tokenize(&self.status),
+                )
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for channelsCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
@@ -7792,17 +8273,27 @@ function channels(bytes32) external view returns (Balance balance, TicketIndex t
                 (
                     <alloy::sol_types::sol_data::FixedBytes<
                         32,
-                    > as alloy_sol_types::SolType>::tokenize(&self._0),
+                    > as alloy_sol_types::SolType>::tokenize(&self.0),
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                channelsReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -7897,6 +8388,15 @@ function closeIncomingChannel(address source) external;
                 }
             }
         }
+        impl closeIncomingChannelReturn {
+            fn _tokenize(
+                &self,
+            ) -> <closeIncomingChannelCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for closeIncomingChannelCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -7925,13 +8425,23 @@ function closeIncomingChannel(address source) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                closeIncomingChannelReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -8037,6 +8547,15 @@ function closeIncomingChannelSafe(address selfAddress, address source) external;
                 }
             }
         }
+        impl closeIncomingChannelSafeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <closeIncomingChannelSafeCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for closeIncomingChannelSafeCall {
             type Parameters<'a> = (
@@ -8071,13 +8590,23 @@ function closeIncomingChannelSafe(address selfAddress, address source) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                closeIncomingChannelSafeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -8090,7 +8619,7 @@ function domainSeparator() external view returns (bytes32);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct domainSeparatorCall {}
+    pub struct domainSeparatorCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`domainSeparator()`](domainSeparatorCall) function.
@@ -8135,7 +8664,7 @@ function domainSeparator() external view returns (bytes32);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for domainSeparatorCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -8178,7 +8707,7 @@ function domainSeparator() external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = domainSeparatorReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -8196,14 +8725,34 @@ function domainSeparator() external view returns (bytes32);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: domainSeparatorReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: domainSeparatorReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -8297,6 +8846,15 @@ function finalizeOutgoingChannelClosure(address destination) external;
                 }
             }
         }
+        impl finalizeOutgoingChannelClosureReturn {
+            fn _tokenize(
+                &self,
+            ) -> <finalizeOutgoingChannelClosureCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for finalizeOutgoingChannelClosureCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -8325,13 +8883,23 @@ function finalizeOutgoingChannelClosure(address destination) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                finalizeOutgoingChannelClosureReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -8437,6 +9005,15 @@ function finalizeOutgoingChannelClosureSafe(address selfAddress, address destina
                 }
             }
         }
+        impl finalizeOutgoingChannelClosureSafeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <finalizeOutgoingChannelClosureSafeCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for finalizeOutgoingChannelClosureSafeCall {
             type Parameters<'a> = (
@@ -8471,13 +9048,23 @@ function finalizeOutgoingChannelClosureSafe(address selfAddress, address destina
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                finalizeOutgoingChannelClosureSafeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -8576,6 +9163,13 @@ function fundChannel(address account, Balance amount) external;
                 }
             }
         }
+        impl fundChannelReturn {
+            fn _tokenize(
+                &self,
+            ) -> <fundChannelCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for fundChannelCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address, Balance);
@@ -8605,13 +9199,23 @@ function fundChannel(address account, Balance amount) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                fundChannelReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -8720,6 +9324,13 @@ function fundChannelSafe(address selfAddress, address account, Balance amount) e
                 }
             }
         }
+        impl fundChannelSafeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <fundChannelSafeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for fundChannelSafeCall {
             type Parameters<'a> = (
@@ -8756,13 +9367,23 @@ function fundChannelSafe(address selfAddress, address account, Balance amount) e
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                fundChannelSafeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -8857,6 +9478,15 @@ function initiateOutgoingChannelClosure(address destination) external;
                 }
             }
         }
+        impl initiateOutgoingChannelClosureReturn {
+            fn _tokenize(
+                &self,
+            ) -> <initiateOutgoingChannelClosureCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for initiateOutgoingChannelClosureCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -8885,13 +9515,23 @@ function initiateOutgoingChannelClosure(address destination) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                initiateOutgoingChannelClosureReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -8997,6 +9637,15 @@ function initiateOutgoingChannelClosureSafe(address selfAddress, address destina
                 }
             }
         }
+        impl initiateOutgoingChannelClosureSafeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <initiateOutgoingChannelClosureSafeCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for initiateOutgoingChannelClosureSafeCall {
             type Parameters<'a> = (
@@ -9031,13 +9680,23 @@ function initiateOutgoingChannelClosureSafe(address selfAddress, address destina
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                initiateOutgoingChannelClosureSafeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -9050,7 +9709,7 @@ function ledgerDomainSeparator() external view returns (bytes32);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ledgerDomainSeparatorCall {}
+    pub struct ledgerDomainSeparatorCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`ledgerDomainSeparator()`](ledgerDomainSeparatorCall) function.
@@ -9097,7 +9756,7 @@ function ledgerDomainSeparator() external view returns (bytes32);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for ledgerDomainSeparatorCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -9140,7 +9799,7 @@ function ledgerDomainSeparator() external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = ledgerDomainSeparatorReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -9158,14 +9817,34 @@ function ledgerDomainSeparator() external view returns (bytes32);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: ledgerDomainSeparatorReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: ledgerDomainSeparatorReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -9276,7 +9955,9 @@ function multicall(bytes[] memory data) external returns (bytes[] memory results
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = multicallReturn;
+            type Return = alloy::sol_types::private::Vec<
+                alloy::sol_types::private::Bytes,
+            >;
             type ReturnTuple<'a> = (
                 alloy::sol_types::sol_data::Array<alloy::sol_types::sol_data::Bytes>,
             );
@@ -9300,14 +9981,34 @@ function multicall(bytes[] memory data) external returns (bytes[] memory results
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Array<
+                        alloy::sol_types::sol_data::Bytes,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: multicallReturn = r.into();
+                        r.results
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: multicallReturn = r.into();
+                        r.results
+                    })
             }
         }
     };
@@ -9319,7 +10020,7 @@ function noticePeriodChannelClosure() external view returns (Timestamp);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct noticePeriodChannelClosureCall {}
+    pub struct noticePeriodChannelClosureCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`noticePeriodChannelClosure()`](noticePeriodChannelClosureCall) function.
@@ -9366,7 +10067,7 @@ function noticePeriodChannelClosure() external view returns (Timestamp);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for noticePeriodChannelClosureCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -9411,7 +10112,7 @@ function noticePeriodChannelClosure() external view returns (Timestamp);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = noticePeriodChannelClosureReturn;
+            type Return = <Timestamp as alloy::sol_types::SolType>::RustType;
             type ReturnTuple<'a> = (Timestamp,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -9429,14 +10130,30 @@ function noticePeriodChannelClosure() external view returns (Timestamp);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (<Timestamp as alloy_sol_types::SolType>::tokenize(ret),)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: noticePeriodChannelClosureReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: noticePeriodChannelClosureReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -9534,6 +10251,13 @@ function redeemTicket(RedeemableTicket memory redeemable, HoprCrypto.VRFParamete
                 }
             }
         }
+        impl redeemTicketReturn {
+            fn _tokenize(
+                &self,
+            ) -> <redeemTicketCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for redeemTicketCall {
             type Parameters<'a> = (RedeemableTicket, HoprCrypto::VRFParameters);
@@ -9565,13 +10289,23 @@ function redeemTicket(RedeemableTicket memory redeemable, HoprCrypto.VRFParamete
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                redeemTicketReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -9682,6 +10416,13 @@ function redeemTicketSafe(address selfAddress, RedeemableTicket memory redeemabl
                 }
             }
         }
+        impl redeemTicketSafeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <redeemTicketSafeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for redeemTicketSafeCall {
             type Parameters<'a> = (
@@ -9720,13 +10461,23 @@ function redeemTicketSafe(address selfAddress, RedeemableTicket memory redeemabl
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                redeemTicketSafeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -9739,7 +10490,7 @@ function token() external view returns (address);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct tokenCall {}
+    pub struct tokenCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`token()`](tokenCall) function.
@@ -9784,7 +10535,7 @@ function token() external view returns (address);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for tokenCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -9825,7 +10576,7 @@ function token() external view returns (address);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = tokenReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -9843,14 +10594,34 @@ function token() external view returns (address);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: tokenReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: tokenReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -9980,6 +10751,13 @@ function tokensReceived(address, address from, address to, uint256 amount, bytes
                 }
             }
         }
+        impl tokensReceivedReturn {
+            fn _tokenize(
+                &self,
+            ) -> <tokensReceivedCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for tokensReceivedCall {
             type Parameters<'a> = (
@@ -10030,13 +10808,23 @@ function tokensReceived(address, address from, address to, uint256 amount, bytes
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                tokensReceivedReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -10049,7 +10837,7 @@ function updateDomainSeparator() external;
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct updateDomainSeparatorCall {}
+    pub struct updateDomainSeparatorCall;
     ///Container type for the return parameters of the [`updateDomainSeparator()`](updateDomainSeparatorCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -10091,7 +10879,7 @@ function updateDomainSeparator() external;
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for updateDomainSeparatorCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -10128,6 +10916,15 @@ function updateDomainSeparator() external;
                 }
             }
         }
+        impl updateDomainSeparatorReturn {
+            fn _tokenize(
+                &self,
+            ) -> <updateDomainSeparatorCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for updateDomainSeparatorCall {
             type Parameters<'a> = ();
@@ -10152,13 +10949,23 @@ function updateDomainSeparator() external;
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                updateDomainSeparatorReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -10171,7 +10978,7 @@ function updateLedgerDomainSeparator() external;
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct updateLedgerDomainSeparatorCall {}
+    pub struct updateLedgerDomainSeparatorCall;
     ///Container type for the return parameters of the [`updateLedgerDomainSeparator()`](updateLedgerDomainSeparatorCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -10213,7 +11020,7 @@ function updateLedgerDomainSeparator() external;
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for updateLedgerDomainSeparatorCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -10250,6 +11057,15 @@ function updateLedgerDomainSeparator() external;
                 }
             }
         }
+        impl updateLedgerDomainSeparatorReturn {
+            fn _tokenize(
+                &self,
+            ) -> <updateLedgerDomainSeparatorCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for updateLedgerDomainSeparatorCall {
             type Parameters<'a> = ();
@@ -10274,13 +11090,23 @@ function updateLedgerDomainSeparator() external;
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                updateLedgerDomainSeparatorReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -10504,20 +11330,16 @@ function updateLedgerDomainSeparator() external;
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprChannelsCalls>] = &[
                 {
                     fn tokensReceived(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <tokensReceivedCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::tokensReceived)
                     }
@@ -10526,11 +11348,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn fundChannelSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <fundChannelSafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::fundChannelSafe)
                     }
@@ -10539,11 +11359,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn redeemTicketSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <redeemTicketSafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::redeemTicketSafe)
                     }
@@ -10552,11 +11370,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn closeIncomingChannel(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <closeIncomingChannelCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::closeIncomingChannel)
                     }
@@ -10565,11 +11381,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn finalizeOutgoingChannelClosure(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <finalizeOutgoingChannelClosureCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::finalizeOutgoingChannelClosure)
                     }
@@ -10578,11 +11392,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn _getTicketHash(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <_getTicketHashCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::_getTicketHash)
                     }
@@ -10591,11 +11403,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn canImplementInterfaceForAddress(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <canImplementInterfaceForAddressCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::canImplementInterfaceForAddress)
                     }
@@ -10604,11 +11414,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn MIN_USED_BALANCE(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <MIN_USED_BALANCECall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::MIN_USED_BALANCE)
                     }
@@ -10617,11 +11425,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn ERC777_HOOK_FUND_CHANNEL_SIZE(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <ERC777_HOOK_FUND_CHANNEL_SIZECall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::ERC777_HOOK_FUND_CHANNEL_SIZE)
                     }
@@ -10630,11 +11436,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn closeIncomingChannelSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <closeIncomingChannelSafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::closeIncomingChannelSafe)
                     }
@@ -10643,11 +11447,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn MAX_USED_BALANCE(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <MAX_USED_BALANCECall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::MAX_USED_BALANCE)
                     }
@@ -10656,11 +11458,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn finalizeOutgoingChannelClosureSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <finalizeOutgoingChannelClosureSafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::finalizeOutgoingChannelClosureSafe)
                     }
@@ -10669,11 +11469,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn TOKENS_RECIPIENT_INTERFACE_HASH(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <TOKENS_RECIPIENT_INTERFACE_HASHCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::TOKENS_RECIPIENT_INTERFACE_HASH)
                     }
@@ -10682,11 +11480,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <ERC777_HOOK_FUND_CHANNEL_MULTI_SIZECall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE)
                     }
@@ -10695,12 +11491,8 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn channels(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
-                        <channelsCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <channelsCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprChannelsCalls::channels)
                     }
                     channels
@@ -10708,11 +11500,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn initiateOutgoingChannelClosure(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <initiateOutgoingChannelClosureCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::initiateOutgoingChannelClosure)
                     }
@@ -10721,11 +11511,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn noticePeriodChannelClosure(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <noticePeriodChannelClosureCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::noticePeriodChannelClosure)
                     }
@@ -10734,11 +11522,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn updateDomainSeparator(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <updateDomainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::updateDomainSeparator)
                     }
@@ -10747,11 +11533,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn _isWinningTicket(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <_isWinningTicketCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::_isWinningTicket)
                     }
@@ -10760,12 +11544,8 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn multicall(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
-                        <multicallCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <multicallCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprChannelsCalls::multicall)
                     }
                     multicall
@@ -10773,11 +11553,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn _currentBlockTimestamp(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <_currentBlockTimestampCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::_currentBlockTimestamp)
                     }
@@ -10786,11 +11564,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn initiateOutgoingChannelClosureSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <initiateOutgoingChannelClosureSafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::initiateOutgoingChannelClosureSafe)
                     }
@@ -10799,11 +11575,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn _getChannelId(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <_getChannelIdCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::_getChannelId)
                     }
@@ -10812,11 +11586,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn ledgerDomainSeparator(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <ledgerDomainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::ledgerDomainSeparator)
                     }
@@ -10825,11 +11597,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn updateLedgerDomainSeparator(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <updateLedgerDomainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::updateLedgerDomainSeparator)
                     }
@@ -10838,11 +11608,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn LEDGER_VERSION(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <LEDGER_VERSIONCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::LEDGER_VERSION)
                     }
@@ -10851,25 +11619,17 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn domainSeparator(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <domainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::domainSeparator)
                     }
                     domainSeparator
                 },
                 {
-                    fn token(
-                        data: &[u8],
-                        validate: bool,
-                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
-                        <tokenCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                    fn token(data: &[u8]) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <tokenCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprChannelsCalls::token)
                     }
                     token
@@ -10877,11 +11637,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn fundChannel(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <fundChannelCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::fundChannel)
                     }
@@ -10890,11 +11648,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn redeemTicket(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
                         <redeemTicketCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsCalls::redeemTicket)
                     }
@@ -10903,11 +11659,366 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn VERSION(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsCalls> {
-                        <VERSIONCall as alloy_sol_types::SolCall>::abi_decode_raw(
+                        <VERSIONCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
+                            .map(HoprChannelsCalls::VERSION)
+                    }
+                    VERSION
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprChannelsCalls>] = &[
+                {
+                    fn tokensReceived(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <tokensReceivedCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
                                 data,
-                                validate,
+                            )
+                            .map(HoprChannelsCalls::tokensReceived)
+                    }
+                    tokensReceived
+                },
+                {
+                    fn fundChannelSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <fundChannelSafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::fundChannelSafe)
+                    }
+                    fundChannelSafe
+                },
+                {
+                    fn redeemTicketSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <redeemTicketSafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::redeemTicketSafe)
+                    }
+                    redeemTicketSafe
+                },
+                {
+                    fn closeIncomingChannel(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <closeIncomingChannelCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::closeIncomingChannel)
+                    }
+                    closeIncomingChannel
+                },
+                {
+                    fn finalizeOutgoingChannelClosure(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <finalizeOutgoingChannelClosureCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::finalizeOutgoingChannelClosure)
+                    }
+                    finalizeOutgoingChannelClosure
+                },
+                {
+                    fn _getTicketHash(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <_getTicketHashCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::_getTicketHash)
+                    }
+                    _getTicketHash
+                },
+                {
+                    fn canImplementInterfaceForAddress(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <canImplementInterfaceForAddressCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::canImplementInterfaceForAddress)
+                    }
+                    canImplementInterfaceForAddress
+                },
+                {
+                    fn MIN_USED_BALANCE(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <MIN_USED_BALANCECall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::MIN_USED_BALANCE)
+                    }
+                    MIN_USED_BALANCE
+                },
+                {
+                    fn ERC777_HOOK_FUND_CHANNEL_SIZE(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <ERC777_HOOK_FUND_CHANNEL_SIZECall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::ERC777_HOOK_FUND_CHANNEL_SIZE)
+                    }
+                    ERC777_HOOK_FUND_CHANNEL_SIZE
+                },
+                {
+                    fn closeIncomingChannelSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <closeIncomingChannelSafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::closeIncomingChannelSafe)
+                    }
+                    closeIncomingChannelSafe
+                },
+                {
+                    fn MAX_USED_BALANCE(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <MAX_USED_BALANCECall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::MAX_USED_BALANCE)
+                    }
+                    MAX_USED_BALANCE
+                },
+                {
+                    fn finalizeOutgoingChannelClosureSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <finalizeOutgoingChannelClosureSafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::finalizeOutgoingChannelClosureSafe)
+                    }
+                    finalizeOutgoingChannelClosureSafe
+                },
+                {
+                    fn TOKENS_RECIPIENT_INTERFACE_HASH(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <TOKENS_RECIPIENT_INTERFACE_HASHCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::TOKENS_RECIPIENT_INTERFACE_HASH)
+                    }
+                    TOKENS_RECIPIENT_INTERFACE_HASH
+                },
+                {
+                    fn ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <ERC777_HOOK_FUND_CHANNEL_MULTI_SIZECall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE)
+                    }
+                    ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE
+                },
+                {
+                    fn channels(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <channelsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::channels)
+                    }
+                    channels
+                },
+                {
+                    fn initiateOutgoingChannelClosure(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <initiateOutgoingChannelClosureCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::initiateOutgoingChannelClosure)
+                    }
+                    initiateOutgoingChannelClosure
+                },
+                {
+                    fn noticePeriodChannelClosure(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <noticePeriodChannelClosureCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::noticePeriodChannelClosure)
+                    }
+                    noticePeriodChannelClosure
+                },
+                {
+                    fn updateDomainSeparator(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <updateDomainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::updateDomainSeparator)
+                    }
+                    updateDomainSeparator
+                },
+                {
+                    fn _isWinningTicket(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <_isWinningTicketCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::_isWinningTicket)
+                    }
+                    _isWinningTicket
+                },
+                {
+                    fn multicall(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <multicallCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::multicall)
+                    }
+                    multicall
+                },
+                {
+                    fn _currentBlockTimestamp(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <_currentBlockTimestampCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::_currentBlockTimestamp)
+                    }
+                    _currentBlockTimestamp
+                },
+                {
+                    fn initiateOutgoingChannelClosureSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <initiateOutgoingChannelClosureSafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::initiateOutgoingChannelClosureSafe)
+                    }
+                    initiateOutgoingChannelClosureSafe
+                },
+                {
+                    fn _getChannelId(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <_getChannelIdCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::_getChannelId)
+                    }
+                    _getChannelId
+                },
+                {
+                    fn ledgerDomainSeparator(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <ledgerDomainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::ledgerDomainSeparator)
+                    }
+                    ledgerDomainSeparator
+                },
+                {
+                    fn updateLedgerDomainSeparator(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <updateLedgerDomainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::updateLedgerDomainSeparator)
+                    }
+                    updateLedgerDomainSeparator
+                },
+                {
+                    fn LEDGER_VERSION(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <LEDGER_VERSIONCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::LEDGER_VERSION)
+                    }
+                    LEDGER_VERSION
+                },
+                {
+                    fn domainSeparator(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <domainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::domainSeparator)
+                    }
+                    domainSeparator
+                },
+                {
+                    fn token(data: &[u8]) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <tokenCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::token)
+                    }
+                    token
+                },
+                {
+                    fn fundChannel(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <fundChannelCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::fundChannel)
+                    }
+                    fundChannel
+                },
+                {
+                    fn redeemTicket(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <redeemTicketCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsCalls::redeemTicket)
+                    }
+                    redeemTicket
+                },
+                {
+                    fn VERSION(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsCalls> {
+                        <VERSIONCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
                             )
                             .map(HoprChannelsCalls::VERSION)
                     }
@@ -10922,7 +12033,7 @@ function updateLedgerDomainSeparator() external;
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -11439,20 +12550,16 @@ function updateLedgerDomainSeparator() external;
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprChannelsErrors>] = &[
                 {
                     fn TokenTransferFailed(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <TokenTransferFailed as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::TokenTransferFailed)
                     }
@@ -11461,11 +12568,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn AlreadyInitialized(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <AlreadyInitialized as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::AlreadyInitialized)
                     }
@@ -11474,11 +12579,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidFieldElement(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidFieldElement as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidFieldElement)
                     }
@@ -11487,11 +12590,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn MultiSigUninitialized(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <MultiSigUninitialized as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::MultiSigUninitialized)
                     }
@@ -11500,11 +12601,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn WrongChannelState(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <WrongChannelState as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::WrongChannelState)
                     }
@@ -11513,11 +12612,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidTokensReceivedUsage(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidTokensReceivedUsage as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidTokensReceivedUsage)
                     }
@@ -11526,11 +12623,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn NoticePeriodNotDue(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <NoticePeriodNotDue as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::NoticePeriodNotDue)
                     }
@@ -11539,11 +12634,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidCurvePoint(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidCurvePoint as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidCurvePoint)
                     }
@@ -11552,11 +12645,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidSafeAddress(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidSafeAddress as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidSafeAddress)
                     }
@@ -11565,11 +12656,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidVRFProof(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidVRFProof as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidVRFProof)
                     }
@@ -11578,11 +12667,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn SourceEqualsDestination(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <SourceEqualsDestination as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::SourceEqualsDestination)
                     }
@@ -11591,12 +12678,8 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn WrongToken(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
-                        <WrongToken as alloy_sol_types::SolError>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <WrongToken as alloy_sol_types::SolError>::abi_decode_raw(data)
                             .map(HoprChannelsErrors::WrongToken)
                     }
                     WrongToken
@@ -11604,11 +12687,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn BalanceExceedsGlobalPerChannelAllowance(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <BalanceExceedsGlobalPerChannelAllowance as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprChannelsErrors::BalanceExceedsGlobalPerChannelAllowance,
@@ -11619,11 +12700,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn ContractNotResponsible(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <ContractNotResponsible as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::ContractNotResponsible)
                     }
@@ -11632,11 +12711,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InsufficientChannelBalance(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InsufficientChannelBalance as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InsufficientChannelBalance)
                     }
@@ -11645,11 +12722,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidTokenRecipient(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidTokenRecipient as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidTokenRecipient)
                     }
@@ -11658,11 +12733,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidBalance(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidBalance as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidBalance)
                     }
@@ -11671,11 +12744,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidTicketSignature(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidTicketSignature as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidTicketSignature)
                     }
@@ -11684,11 +12755,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidAggregatedTicketInterval(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidAggregatedTicketInterval as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidAggregatedTicketInterval)
                     }
@@ -11697,12 +12766,8 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn ZeroAddress(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
-                        <ZeroAddress as alloy_sol_types::SolError>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <ZeroAddress as alloy_sol_types::SolError>::abi_decode_raw(data)
                             .map(HoprChannelsErrors::ZeroAddress)
                     }
                     ZeroAddress
@@ -11710,11 +12775,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidPointWitness(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidPointWitness as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidPointWitness)
                     }
@@ -11723,11 +12786,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn TicketIsNotAWin(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <TicketIsNotAWin as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::TicketIsNotAWin)
                     }
@@ -11736,11 +12797,9 @@ function updateLedgerDomainSeparator() external;
                 {
                     fn InvalidNoticePeriod(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprChannelsErrors> {
                         <InvalidNoticePeriod as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprChannelsErrors::InvalidNoticePeriod)
                     }
@@ -11755,7 +12814,282 @@ function updateLedgerDomainSeparator() external;
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprChannelsErrors>] = &[
+                {
+                    fn TokenTransferFailed(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <TokenTransferFailed as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::TokenTransferFailed)
+                    }
+                    TokenTransferFailed
+                },
+                {
+                    fn AlreadyInitialized(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <AlreadyInitialized as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::AlreadyInitialized)
+                    }
+                    AlreadyInitialized
+                },
+                {
+                    fn InvalidFieldElement(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidFieldElement as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidFieldElement)
+                    }
+                    InvalidFieldElement
+                },
+                {
+                    fn MultiSigUninitialized(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <MultiSigUninitialized as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::MultiSigUninitialized)
+                    }
+                    MultiSigUninitialized
+                },
+                {
+                    fn WrongChannelState(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <WrongChannelState as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::WrongChannelState)
+                    }
+                    WrongChannelState
+                },
+                {
+                    fn InvalidTokensReceivedUsage(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidTokensReceivedUsage as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidTokensReceivedUsage)
+                    }
+                    InvalidTokensReceivedUsage
+                },
+                {
+                    fn NoticePeriodNotDue(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <NoticePeriodNotDue as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::NoticePeriodNotDue)
+                    }
+                    NoticePeriodNotDue
+                },
+                {
+                    fn InvalidCurvePoint(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidCurvePoint as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidCurvePoint)
+                    }
+                    InvalidCurvePoint
+                },
+                {
+                    fn InvalidSafeAddress(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidSafeAddress as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidSafeAddress)
+                    }
+                    InvalidSafeAddress
+                },
+                {
+                    fn InvalidVRFProof(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidVRFProof as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidVRFProof)
+                    }
+                    InvalidVRFProof
+                },
+                {
+                    fn SourceEqualsDestination(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <SourceEqualsDestination as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::SourceEqualsDestination)
+                    }
+                    SourceEqualsDestination
+                },
+                {
+                    fn WrongToken(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <WrongToken as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::WrongToken)
+                    }
+                    WrongToken
+                },
+                {
+                    fn BalanceExceedsGlobalPerChannelAllowance(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <BalanceExceedsGlobalPerChannelAllowance as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprChannelsErrors::BalanceExceedsGlobalPerChannelAllowance,
+                            )
+                    }
+                    BalanceExceedsGlobalPerChannelAllowance
+                },
+                {
+                    fn ContractNotResponsible(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <ContractNotResponsible as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::ContractNotResponsible)
+                    }
+                    ContractNotResponsible
+                },
+                {
+                    fn InsufficientChannelBalance(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InsufficientChannelBalance as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InsufficientChannelBalance)
+                    }
+                    InsufficientChannelBalance
+                },
+                {
+                    fn InvalidTokenRecipient(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidTokenRecipient as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidTokenRecipient)
+                    }
+                    InvalidTokenRecipient
+                },
+                {
+                    fn InvalidBalance(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidBalance as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidBalance)
+                    }
+                    InvalidBalance
+                },
+                {
+                    fn InvalidTicketSignature(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidTicketSignature as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidTicketSignature)
+                    }
+                    InvalidTicketSignature
+                },
+                {
+                    fn InvalidAggregatedTicketInterval(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidAggregatedTicketInterval as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidAggregatedTicketInterval)
+                    }
+                    InvalidAggregatedTicketInterval
+                },
+                {
+                    fn ZeroAddress(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <ZeroAddress as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::ZeroAddress)
+                    }
+                    ZeroAddress
+                },
+                {
+                    fn InvalidPointWitness(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidPointWitness as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidPointWitness)
+                    }
+                    InvalidPointWitness
+                },
+                {
+                    fn TicketIsNotAWin(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <TicketIsNotAWin as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::TicketIsNotAWin)
+                    }
+                    TicketIsNotAWin
+                },
+                {
+                    fn InvalidNoticePeriod(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprChannelsErrors> {
+                        <InvalidNoticePeriod as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprChannelsErrors::InvalidNoticePeriod)
+                    }
+                    InvalidNoticePeriod
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -12093,7 +13427,6 @@ function updateLedgerDomainSeparator() external;
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(
@@ -12102,7 +13435,6 @@ function updateLedgerDomainSeparator() external;
                     <ChannelBalanceDecreased as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ChannelBalanceDecreased)
                 }
@@ -12112,7 +13444,6 @@ function updateLedgerDomainSeparator() external;
                     <ChannelBalanceIncreased as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ChannelBalanceIncreased)
                 }
@@ -12120,7 +13451,6 @@ function updateLedgerDomainSeparator() external;
                     <ChannelClosed as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ChannelClosed)
                 }
@@ -12128,7 +13458,6 @@ function updateLedgerDomainSeparator() external;
                     <ChannelOpened as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ChannelOpened)
                 }
@@ -12138,7 +13467,6 @@ function updateLedgerDomainSeparator() external;
                     <DomainSeparatorUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::DomainSeparatorUpdated)
                 }
@@ -12148,7 +13476,6 @@ function updateLedgerDomainSeparator() external;
                     <LedgerDomainSeparatorUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::LedgerDomainSeparatorUpdated)
                 }
@@ -12158,7 +13485,6 @@ function updateLedgerDomainSeparator() external;
                     <OutgoingChannelClosureInitiated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::OutgoingChannelClosureInitiated)
                 }
@@ -12166,7 +13492,6 @@ function updateLedgerDomainSeparator() external;
                     <TicketRedeemed as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::TicketRedeemed)
                 }
@@ -12249,14 +13574,13 @@ function updateLedgerDomainSeparator() external;
 See the [wrapper's documentation](`HoprChannelsInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprChannelsInstance<T, P, N> {
-        HoprChannelsInstance::<T, P, N>::new(address, provider)
+    ) -> HoprChannelsInstance<P, N> {
+        HoprChannelsInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -12265,8 +13589,7 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
@@ -12274,10 +13597,9 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         _noticePeriodChannelClosure: <Timestamp as alloy::sol_types::SolType>::RustType,
         _safeRegistry: alloy::sol_types::private::Address,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprChannelsInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprChannelsInstance<P, N>>,
     > {
         HoprChannelsInstance::<
-            T,
             P,
             N,
         >::deploy(provider, _token, _noticePeriodChannelClosure, _safeRegistry)
@@ -12289,17 +13611,15 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
         _token: alloy::sol_types::private::Address,
         _noticePeriodChannelClosure: <Timestamp as alloy::sol_types::SolType>::RustType,
         _safeRegistry: alloy::sol_types::private::Address,
-    ) -> alloy_contract::RawCallBuilder<T, P, N> {
+    ) -> alloy_contract::RawCallBuilder<P, N> {
         HoprChannelsInstance::<
-            T,
             P,
             N,
         >::deploy_builder(provider, _token, _noticePeriodChannelClosure, _safeRegistry)
@@ -12316,13 +13636,13 @@ be used to deploy a new instance of the contract.
 
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
-    pub struct HoprChannelsInstance<T, P, N = alloy_contract::private::Ethereum> {
+    pub struct HoprChannelsInstance<P, N = alloy_contract::private::Ethereum> {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprChannelsInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprChannelsInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprChannelsInstance").field(&self.address).finish()
@@ -12331,10 +13651,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprChannelsInstance<T, P, N> {
+    > HoprChannelsInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprChannels`](self) contract instance.
 
 See the [wrapper's documentation](`HoprChannelsInstance`) for more details.*/
@@ -12346,7 +13665,7 @@ See the [wrapper's documentation](`HoprChannelsInstance`) for more details.*/
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -12360,7 +13679,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
             _token: alloy::sol_types::private::Address,
             _noticePeriodChannelClosure: <Timestamp as alloy::sol_types::SolType>::RustType,
             _safeRegistry: alloy::sol_types::private::Address,
-        ) -> alloy_contract::Result<HoprChannelsInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprChannelsInstance<P, N>> {
             let call_builder = Self::deploy_builder(
                 provider,
                 _token,
@@ -12381,7 +13700,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             _token: alloy::sol_types::private::Address,
             _noticePeriodChannelClosure: <Timestamp as alloy::sol_types::SolType>::RustType,
             _safeRegistry: alloy::sol_types::private::Address,
-        ) -> alloy_contract::RawCallBuilder<T, P, N> {
+        ) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 [
@@ -12419,24 +13738,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprChannelsInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprChannelsInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprChannelsInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprChannelsInstance<P, N> {
             HoprChannelsInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprChannelsInstance<T, P, N> {
+    > HoprChannelsInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -12444,85 +13762,65 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
         ///Creates a new call builder for the [`ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE`] function.
         pub fn ERC777_HOOK_FUND_CHANNEL_MULTI_SIZE(
             &self,
         ) -> alloy_contract::SolCallBuilder<
-            T,
             &P,
             ERC777_HOOK_FUND_CHANNEL_MULTI_SIZECall,
             N,
         > {
-            self.call_builder(
-                &ERC777_HOOK_FUND_CHANNEL_MULTI_SIZECall {
-                },
-            )
+            self.call_builder(&ERC777_HOOK_FUND_CHANNEL_MULTI_SIZECall)
         }
         ///Creates a new call builder for the [`ERC777_HOOK_FUND_CHANNEL_SIZE`] function.
         pub fn ERC777_HOOK_FUND_CHANNEL_SIZE(
             &self,
-        ) -> alloy_contract::SolCallBuilder<
-            T,
-            &P,
-            ERC777_HOOK_FUND_CHANNEL_SIZECall,
-            N,
-        > {
-            self.call_builder(
-                &ERC777_HOOK_FUND_CHANNEL_SIZECall {
-                },
-            )
+        ) -> alloy_contract::SolCallBuilder<&P, ERC777_HOOK_FUND_CHANNEL_SIZECall, N> {
+            self.call_builder(&ERC777_HOOK_FUND_CHANNEL_SIZECall)
         }
         ///Creates a new call builder for the [`LEDGER_VERSION`] function.
         pub fn LEDGER_VERSION(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, LEDGER_VERSIONCall, N> {
-            self.call_builder(&LEDGER_VERSIONCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, LEDGER_VERSIONCall, N> {
+            self.call_builder(&LEDGER_VERSIONCall)
         }
         ///Creates a new call builder for the [`MAX_USED_BALANCE`] function.
         pub fn MAX_USED_BALANCE(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, MAX_USED_BALANCECall, N> {
-            self.call_builder(&MAX_USED_BALANCECall {})
+        ) -> alloy_contract::SolCallBuilder<&P, MAX_USED_BALANCECall, N> {
+            self.call_builder(&MAX_USED_BALANCECall)
         }
         ///Creates a new call builder for the [`MIN_USED_BALANCE`] function.
         pub fn MIN_USED_BALANCE(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, MIN_USED_BALANCECall, N> {
-            self.call_builder(&MIN_USED_BALANCECall {})
+        ) -> alloy_contract::SolCallBuilder<&P, MIN_USED_BALANCECall, N> {
+            self.call_builder(&MIN_USED_BALANCECall)
         }
         ///Creates a new call builder for the [`TOKENS_RECIPIENT_INTERFACE_HASH`] function.
         pub fn TOKENS_RECIPIENT_INTERFACE_HASH(
             &self,
-        ) -> alloy_contract::SolCallBuilder<
-            T,
-            &P,
-            TOKENS_RECIPIENT_INTERFACE_HASHCall,
-            N,
-        > {
-            self.call_builder(
-                &TOKENS_RECIPIENT_INTERFACE_HASHCall {
-                },
-            )
+        ) -> alloy_contract::SolCallBuilder<&P, TOKENS_RECIPIENT_INTERFACE_HASHCall, N> {
+            self.call_builder(&TOKENS_RECIPIENT_INTERFACE_HASHCall)
         }
         ///Creates a new call builder for the [`VERSION`] function.
-        pub fn VERSION(&self) -> alloy_contract::SolCallBuilder<T, &P, VERSIONCall, N> {
-            self.call_builder(&VERSIONCall {})
+        pub fn VERSION(&self) -> alloy_contract::SolCallBuilder<&P, VERSIONCall, N> {
+            self.call_builder(&VERSIONCall)
         }
         ///Creates a new call builder for the [`_currentBlockTimestamp`] function.
         pub fn _currentBlockTimestamp(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, _currentBlockTimestampCall, N> {
-            self.call_builder(&_currentBlockTimestampCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, _currentBlockTimestampCall, N> {
+            self.call_builder(&_currentBlockTimestampCall)
         }
         ///Creates a new call builder for the [`_getChannelId`] function.
         pub fn _getChannelId(
             &self,
             source: alloy::sol_types::private::Address,
             destination: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, _getChannelIdCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, _getChannelIdCall, N> {
             self.call_builder(
                 &_getChannelIdCall {
                     source,
@@ -12534,7 +13832,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn _getTicketHash(
             &self,
             redeemable: <RedeemableTicket as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, _getTicketHashCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, _getTicketHashCall, N> {
             self.call_builder(&_getTicketHashCall { redeemable })
         }
         ///Creates a new call builder for the [`_isWinningTicket`] function.
@@ -12543,7 +13841,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             ticketHash: alloy::sol_types::private::FixedBytes<32>,
             redeemable: <RedeemableTicket as alloy::sol_types::SolType>::RustType,
             params: <HoprCrypto::VRFParameters as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, _isWinningTicketCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, _isWinningTicketCall, N> {
             self.call_builder(
                 &_isWinningTicketCall {
                     ticketHash,
@@ -12557,12 +13855,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             interfaceHash: alloy::sol_types::private::FixedBytes<32>,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<
-            T,
-            &P,
-            canImplementInterfaceForAddressCall,
-            N,
-        > {
+        ) -> alloy_contract::SolCallBuilder<&P, canImplementInterfaceForAddressCall, N> {
             self.call_builder(
                 &canImplementInterfaceForAddressCall {
                     interfaceHash,
@@ -12574,14 +13867,14 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn channels(
             &self,
             _0: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, channelsCall, N> {
-            self.call_builder(&channelsCall { _0 })
+        ) -> alloy_contract::SolCallBuilder<&P, channelsCall, N> {
+            self.call_builder(&channelsCall(_0))
         }
         ///Creates a new call builder for the [`closeIncomingChannel`] function.
         pub fn closeIncomingChannel(
             &self,
             source: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, closeIncomingChannelCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, closeIncomingChannelCall, N> {
             self.call_builder(&closeIncomingChannelCall { source })
         }
         ///Creates a new call builder for the [`closeIncomingChannelSafe`] function.
@@ -12589,7 +13882,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             selfAddress: alloy::sol_types::private::Address,
             source: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, closeIncomingChannelSafeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, closeIncomingChannelSafeCall, N> {
             self.call_builder(
                 &closeIncomingChannelSafeCall {
                     selfAddress,
@@ -12600,19 +13893,14 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         ///Creates a new call builder for the [`domainSeparator`] function.
         pub fn domainSeparator(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, domainSeparatorCall, N> {
-            self.call_builder(&domainSeparatorCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, domainSeparatorCall, N> {
+            self.call_builder(&domainSeparatorCall)
         }
         ///Creates a new call builder for the [`finalizeOutgoingChannelClosure`] function.
         pub fn finalizeOutgoingChannelClosure(
             &self,
             destination: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<
-            T,
-            &P,
-            finalizeOutgoingChannelClosureCall,
-            N,
-        > {
+        ) -> alloy_contract::SolCallBuilder<&P, finalizeOutgoingChannelClosureCall, N> {
             self.call_builder(
                 &finalizeOutgoingChannelClosureCall {
                     destination,
@@ -12625,7 +13913,6 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             selfAddress: alloy::sol_types::private::Address,
             destination: alloy::sol_types::private::Address,
         ) -> alloy_contract::SolCallBuilder<
-            T,
             &P,
             finalizeOutgoingChannelClosureSafeCall,
             N,
@@ -12642,7 +13929,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             account: alloy::sol_types::private::Address,
             amount: <Balance as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, fundChannelCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, fundChannelCall, N> {
             self.call_builder(&fundChannelCall { account, amount })
         }
         ///Creates a new call builder for the [`fundChannelSafe`] function.
@@ -12651,7 +13938,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             selfAddress: alloy::sol_types::private::Address,
             account: alloy::sol_types::private::Address,
             amount: <Balance as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, fundChannelSafeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, fundChannelSafeCall, N> {
             self.call_builder(
                 &fundChannelSafeCall {
                     selfAddress,
@@ -12664,12 +13951,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn initiateOutgoingChannelClosure(
             &self,
             destination: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<
-            T,
-            &P,
-            initiateOutgoingChannelClosureCall,
-            N,
-        > {
+        ) -> alloy_contract::SolCallBuilder<&P, initiateOutgoingChannelClosureCall, N> {
             self.call_builder(
                 &initiateOutgoingChannelClosureCall {
                     destination,
@@ -12682,7 +13964,6 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             selfAddress: alloy::sol_types::private::Address,
             destination: alloy::sol_types::private::Address,
         ) -> alloy_contract::SolCallBuilder<
-            T,
             &P,
             initiateOutgoingChannelClosureSafeCall,
             N,
@@ -12697,28 +13978,28 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         ///Creates a new call builder for the [`ledgerDomainSeparator`] function.
         pub fn ledgerDomainSeparator(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, ledgerDomainSeparatorCall, N> {
-            self.call_builder(&ledgerDomainSeparatorCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, ledgerDomainSeparatorCall, N> {
+            self.call_builder(&ledgerDomainSeparatorCall)
         }
         ///Creates a new call builder for the [`multicall`] function.
         pub fn multicall(
             &self,
             data: alloy::sol_types::private::Vec<alloy::sol_types::private::Bytes>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, multicallCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, multicallCall, N> {
             self.call_builder(&multicallCall { data })
         }
         ///Creates a new call builder for the [`noticePeriodChannelClosure`] function.
         pub fn noticePeriodChannelClosure(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, noticePeriodChannelClosureCall, N> {
-            self.call_builder(&noticePeriodChannelClosureCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, noticePeriodChannelClosureCall, N> {
+            self.call_builder(&noticePeriodChannelClosureCall)
         }
         ///Creates a new call builder for the [`redeemTicket`] function.
         pub fn redeemTicket(
             &self,
             redeemable: <RedeemableTicket as alloy::sol_types::SolType>::RustType,
             params: <HoprCrypto::VRFParameters as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, redeemTicketCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, redeemTicketCall, N> {
             self.call_builder(
                 &redeemTicketCall {
                     redeemable,
@@ -12732,7 +14013,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             selfAddress: alloy::sol_types::private::Address,
             redeemable: <RedeemableTicket as alloy::sol_types::SolType>::RustType,
             params: <HoprCrypto::VRFParameters as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, redeemTicketSafeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, redeemTicketSafeCall, N> {
             self.call_builder(
                 &redeemTicketSafeCall {
                     selfAddress,
@@ -12742,8 +14023,8 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             )
         }
         ///Creates a new call builder for the [`token`] function.
-        pub fn token(&self) -> alloy_contract::SolCallBuilder<T, &P, tokenCall, N> {
-            self.call_builder(&tokenCall {})
+        pub fn token(&self) -> alloy_contract::SolCallBuilder<&P, tokenCall, N> {
+            self.call_builder(&tokenCall)
         }
         ///Creates a new call builder for the [`tokensReceived`] function.
         pub fn tokensReceived(
@@ -12754,7 +14035,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             amount: alloy::sol_types::private::primitives::aliases::U256,
             userData: alloy::sol_types::private::Bytes,
             _5: alloy::sol_types::private::Bytes,
-        ) -> alloy_contract::SolCallBuilder<T, &P, tokensReceivedCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, tokensReceivedCall, N> {
             self.call_builder(
                 &tokensReceivedCall {
                     _0,
@@ -12769,78 +14050,77 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         ///Creates a new call builder for the [`updateDomainSeparator`] function.
         pub fn updateDomainSeparator(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, updateDomainSeparatorCall, N> {
-            self.call_builder(&updateDomainSeparatorCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, updateDomainSeparatorCall, N> {
+            self.call_builder(&updateDomainSeparatorCall)
         }
         ///Creates a new call builder for the [`updateLedgerDomainSeparator`] function.
         pub fn updateLedgerDomainSeparator(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, updateLedgerDomainSeparatorCall, N> {
-            self.call_builder(&updateLedgerDomainSeparatorCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, updateLedgerDomainSeparatorCall, N> {
+            self.call_builder(&updateLedgerDomainSeparatorCall)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprChannelsInstance<T, P, N> {
+    > HoprChannelsInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`ChannelBalanceDecreased`] event.
         pub fn ChannelBalanceDecreased_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ChannelBalanceDecreased, N> {
+        ) -> alloy_contract::Event<&P, ChannelBalanceDecreased, N> {
             self.event_filter::<ChannelBalanceDecreased>()
         }
         ///Creates a new event filter for the [`ChannelBalanceIncreased`] event.
         pub fn ChannelBalanceIncreased_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ChannelBalanceIncreased, N> {
+        ) -> alloy_contract::Event<&P, ChannelBalanceIncreased, N> {
             self.event_filter::<ChannelBalanceIncreased>()
         }
         ///Creates a new event filter for the [`ChannelClosed`] event.
         pub fn ChannelClosed_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ChannelClosed, N> {
+        ) -> alloy_contract::Event<&P, ChannelClosed, N> {
             self.event_filter::<ChannelClosed>()
         }
         ///Creates a new event filter for the [`ChannelOpened`] event.
         pub fn ChannelOpened_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ChannelOpened, N> {
+        ) -> alloy_contract::Event<&P, ChannelOpened, N> {
             self.event_filter::<ChannelOpened>()
         }
         ///Creates a new event filter for the [`DomainSeparatorUpdated`] event.
         pub fn DomainSeparatorUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, DomainSeparatorUpdated, N> {
+        ) -> alloy_contract::Event<&P, DomainSeparatorUpdated, N> {
             self.event_filter::<DomainSeparatorUpdated>()
         }
         ///Creates a new event filter for the [`LedgerDomainSeparatorUpdated`] event.
         pub fn LedgerDomainSeparatorUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, LedgerDomainSeparatorUpdated, N> {
+        ) -> alloy_contract::Event<&P, LedgerDomainSeparatorUpdated, N> {
             self.event_filter::<LedgerDomainSeparatorUpdated>()
         }
         ///Creates a new event filter for the [`OutgoingChannelClosureInitiated`] event.
         pub fn OutgoingChannelClosureInitiated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, OutgoingChannelClosureInitiated, N> {
+        ) -> alloy_contract::Event<&P, OutgoingChannelClosureInitiated, N> {
             self.event_filter::<OutgoingChannelClosureInitiated>()
         }
         ///Creates a new event filter for the [`TicketRedeemed`] event.
         pub fn TicketRedeemed_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, TicketRedeemed, N> {
+        ) -> alloy_contract::Event<&P, TicketRedeemed, N> {
             self.event_filter::<TicketRedeemed>()
         }
     }

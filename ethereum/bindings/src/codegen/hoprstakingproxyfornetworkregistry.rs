@@ -552,7 +552,7 @@ error MaxRegistrationsMismatch();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct MaxRegistrationsMismatch {}
+    pub struct MaxRegistrationsMismatch;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -589,7 +589,7 @@ error MaxRegistrationsMismatch();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for MaxRegistrationsMismatch {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -610,6 +610,13 @@ error MaxRegistrationsMismatch();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -620,7 +627,7 @@ error NftRanksMismatch();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NftRanksMismatch {}
+    pub struct NftRanksMismatch;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -655,7 +662,7 @@ error NftRanksMismatch();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NftRanksMismatch {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -676,6 +683,13 @@ error NftRanksMismatch();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -686,7 +700,7 @@ error SameStakingThreshold();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct SameStakingThreshold {}
+    pub struct SameStakingThreshold;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -721,7 +735,7 @@ error SameStakingThreshold();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for SameStakingThreshold {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -741,6 +755,13 @@ error SameStakingThreshold();
             #[inline]
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
+            }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
             }
         }
     };
@@ -1757,7 +1778,7 @@ function canOperateFor(address, address) external pure returns (bool eligiblity)
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = canOperateForReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -1782,14 +1803,34 @@ function canOperateFor(address, address) external pure returns (bool eligiblity)
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: canOperateForReturn = r.into();
+                        r.eligiblity
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: canOperateForReturn = r.into();
+                        r.eligiblity
+                    })
             }
         }
     };
@@ -1801,10 +1842,9 @@ function eligibleNftTypeAndRank(uint256) external view returns (uint256 nftType,
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct eligibleNftTypeAndRankCall {
-        #[allow(missing_docs)]
-        pub _0: alloy::sol_types::private::primitives::aliases::U256,
-    }
+    pub struct eligibleNftTypeAndRankCall(
+        pub alloy::sol_types::private::primitives::aliases::U256,
+    );
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`eligibleNftTypeAndRank(uint256)`](eligibleNftTypeAndRankCall) function.
@@ -1847,7 +1887,7 @@ function eligibleNftTypeAndRank(uint256) external view returns (uint256 nftType,
             impl ::core::convert::From<eligibleNftTypeAndRankCall>
             for UnderlyingRustTuple<'_> {
                 fn from(value: eligibleNftTypeAndRankCall) -> Self {
-                    (value._0,)
+                    (value.0,)
                 }
             }
             #[automatically_derived]
@@ -1855,7 +1895,7 @@ function eligibleNftTypeAndRank(uint256) external view returns (uint256 nftType,
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for eligibleNftTypeAndRankCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self { _0: tuple.0 }
+                    Self(tuple.0)
                 }
             }
         }
@@ -1901,6 +1941,22 @@ function eligibleNftTypeAndRank(uint256) external view returns (uint256 nftType,
                 }
             }
         }
+        impl eligibleNftTypeAndRankReturn {
+            fn _tokenize(
+                &self,
+            ) -> <eligibleNftTypeAndRankCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(&self.nftType),
+                    <alloy::sol_types::sol_data::String as alloy_sol_types::SolType>::tokenize(
+                        &self.nftRank,
+                    ),
+                )
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for eligibleNftTypeAndRankCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Uint<256>,);
@@ -1928,17 +1984,27 @@ function eligibleNftTypeAndRank(uint256) external view returns (uint256 nftType,
                 (
                     <alloy::sol_types::sol_data::Uint<
                         256,
-                    > as alloy_sol_types::SolType>::tokenize(&self._0),
+                    > as alloy_sol_types::SolType>::tokenize(&self.0),
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                eligibleNftTypeAndRankReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2046,7 +2112,7 @@ function maxAllowedRegistrations(address account) external view returns (uint256
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = maxAllowedRegistrationsReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2068,14 +2134,34 @@ function maxAllowedRegistrations(address account) external view returns (uint256
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: maxAllowedRegistrationsReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: maxAllowedRegistrationsReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -2087,10 +2173,9 @@ function maxRegistrationsPerSpecialNft(uint256) external view returns (uint256);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct maxRegistrationsPerSpecialNftCall {
-        #[allow(missing_docs)]
-        pub _0: alloy::sol_types::private::primitives::aliases::U256,
-    }
+    pub struct maxRegistrationsPerSpecialNftCall(
+        pub alloy::sol_types::private::primitives::aliases::U256,
+    );
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`maxRegistrationsPerSpecialNft(uint256)`](maxRegistrationsPerSpecialNftCall) function.
@@ -2131,7 +2216,7 @@ function maxRegistrationsPerSpecialNft(uint256) external view returns (uint256);
             impl ::core::convert::From<maxRegistrationsPerSpecialNftCall>
             for UnderlyingRustTuple<'_> {
                 fn from(value: maxRegistrationsPerSpecialNftCall) -> Self {
-                    (value._0,)
+                    (value.0,)
                 }
             }
             #[automatically_derived]
@@ -2139,7 +2224,7 @@ function maxRegistrationsPerSpecialNft(uint256) external view returns (uint256);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for maxRegistrationsPerSpecialNftCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self { _0: tuple.0 }
+                    Self(tuple.0)
                 }
             }
         }
@@ -2184,7 +2269,7 @@ function maxRegistrationsPerSpecialNft(uint256) external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = maxRegistrationsPerSpecialNftReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2202,18 +2287,38 @@ function maxRegistrationsPerSpecialNft(uint256) external view returns (uint256);
                 (
                     <alloy::sol_types::sol_data::Uint<
                         256,
-                    > as alloy_sol_types::SolType>::tokenize(&self._0),
+                    > as alloy_sol_types::SolType>::tokenize(&self.0),
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: maxRegistrationsPerSpecialNftReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: maxRegistrationsPerSpecialNftReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -2225,7 +2330,7 @@ function owner() external view returns (address);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ownerCall {}
+    pub struct ownerCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`owner()`](ownerCall) function.
@@ -2270,7 +2375,7 @@ function owner() external view returns (address);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for ownerCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2311,7 +2416,7 @@ function owner() external view returns (address);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = ownerReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2329,14 +2434,34 @@ function owner() external view returns (address);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: ownerReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: ownerReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -2441,6 +2566,15 @@ function ownerAddNftTypeAndRank(uint256 nftType, string memory nftRank) external
                 }
             }
         }
+        impl ownerAddNftTypeAndRankReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerAddNftTypeAndRankCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerAddNftTypeAndRankCall {
             type Parameters<'a> = (
@@ -2475,13 +2609,23 @@ function ownerAddNftTypeAndRank(uint256 nftType, string memory nftRank) external
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerAddNftTypeAndRankReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2591,6 +2735,15 @@ function ownerBatchAddNftTypeAndRank(uint256[] memory nftTypes, string[] memory 
                 }
             }
         }
+        impl ownerBatchAddNftTypeAndRankReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerBatchAddNftTypeAndRankCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerBatchAddNftTypeAndRankCall {
             type Parameters<'a> = (
@@ -2625,13 +2778,23 @@ function ownerBatchAddNftTypeAndRank(uint256[] memory nftTypes, string[] memory 
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerBatchAddNftTypeAndRankReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2750,6 +2913,15 @@ function ownerBatchAddSpecialNftTypeAndRank(uint256[] memory nftTypes, string[] 
                 }
             }
         }
+        impl ownerBatchAddSpecialNftTypeAndRankReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerBatchAddSpecialNftTypeAndRankCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerBatchAddSpecialNftTypeAndRankCall {
             type Parameters<'a> = (
@@ -2788,13 +2960,23 @@ function ownerBatchAddSpecialNftTypeAndRank(uint256[] memory nftTypes, string[] 
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerBatchAddSpecialNftTypeAndRankReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2904,6 +3086,15 @@ function ownerBatchRemoveNftTypeAndRank(uint256[] memory nftTypes, string[] memo
                 }
             }
         }
+        impl ownerBatchRemoveNftTypeAndRankReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerBatchRemoveNftTypeAndRankCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerBatchRemoveNftTypeAndRankCall {
             type Parameters<'a> = (
@@ -2938,13 +3129,23 @@ function ownerBatchRemoveNftTypeAndRank(uint256[] memory nftTypes, string[] memo
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerBatchRemoveNftTypeAndRankReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -3054,6 +3255,15 @@ function ownerBatchRemoveSpecialNftTypeAndRank(uint256[] memory nftTypes, string
                 }
             }
         }
+        impl ownerBatchRemoveSpecialNftTypeAndRankReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerBatchRemoveSpecialNftTypeAndRankCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerBatchRemoveSpecialNftTypeAndRankCall {
             type Parameters<'a> = (
@@ -3088,13 +3298,23 @@ function ownerBatchRemoveSpecialNftTypeAndRank(uint256[] memory nftTypes, string
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerBatchRemoveSpecialNftTypeAndRankReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -3200,6 +3420,15 @@ function ownerRemoveNftTypeAndRank(uint256 nftType, string memory nftRank) exter
                 }
             }
         }
+        impl ownerRemoveNftTypeAndRankReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerRemoveNftTypeAndRankCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerRemoveNftTypeAndRankCall {
             type Parameters<'a> = (
@@ -3234,13 +3463,23 @@ function ownerRemoveNftTypeAndRank(uint256 nftType, string memory nftRank) exter
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerRemoveNftTypeAndRankReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -3337,6 +3576,15 @@ function ownerUpdateThreshold(uint256 newThreshold) external;
                 }
             }
         }
+        impl ownerUpdateThresholdReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerUpdateThresholdCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerUpdateThresholdCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Uint<256>,);
@@ -3365,13 +3613,23 @@ function ownerUpdateThreshold(uint256 newThreshold) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerUpdateThresholdReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -3384,7 +3642,7 @@ function renounceOwnership() external;
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct renounceOwnershipCall {}
+    pub struct renounceOwnershipCall;
     ///Container type for the return parameters of the [`renounceOwnership()`](renounceOwnershipCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3426,7 +3684,7 @@ function renounceOwnership() external;
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for renounceOwnershipCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3463,6 +3721,13 @@ function renounceOwnership() external;
                 }
             }
         }
+        impl renounceOwnershipReturn {
+            fn _tokenize(
+                &self,
+            ) -> <renounceOwnershipCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for renounceOwnershipCall {
             type Parameters<'a> = ();
@@ -3487,13 +3752,23 @@ function renounceOwnership() external;
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                renounceOwnershipReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -3506,10 +3781,9 @@ function specialNftTypeAndRank(uint256) external view returns (uint256 nftType, 
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct specialNftTypeAndRankCall {
-        #[allow(missing_docs)]
-        pub _0: alloy::sol_types::private::primitives::aliases::U256,
-    }
+    pub struct specialNftTypeAndRankCall(
+        pub alloy::sol_types::private::primitives::aliases::U256,
+    );
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`specialNftTypeAndRank(uint256)`](specialNftTypeAndRankCall) function.
@@ -3552,7 +3826,7 @@ function specialNftTypeAndRank(uint256) external view returns (uint256 nftType, 
             impl ::core::convert::From<specialNftTypeAndRankCall>
             for UnderlyingRustTuple<'_> {
                 fn from(value: specialNftTypeAndRankCall) -> Self {
-                    (value._0,)
+                    (value.0,)
                 }
             }
             #[automatically_derived]
@@ -3560,7 +3834,7 @@ function specialNftTypeAndRank(uint256) external view returns (uint256 nftType, 
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for specialNftTypeAndRankCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self { _0: tuple.0 }
+                    Self(tuple.0)
                 }
             }
         }
@@ -3606,6 +3880,22 @@ function specialNftTypeAndRank(uint256) external view returns (uint256 nftType, 
                 }
             }
         }
+        impl specialNftTypeAndRankReturn {
+            fn _tokenize(
+                &self,
+            ) -> <specialNftTypeAndRankCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(&self.nftType),
+                    <alloy::sol_types::sol_data::String as alloy_sol_types::SolType>::tokenize(
+                        &self.nftRank,
+                    ),
+                )
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for specialNftTypeAndRankCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Uint<256>,);
@@ -3633,17 +3923,27 @@ function specialNftTypeAndRank(uint256) external view returns (uint256 nftType, 
                 (
                     <alloy::sol_types::sol_data::Uint<
                         256,
-                    > as alloy_sol_types::SolType>::tokenize(&self._0),
+                    > as alloy_sol_types::SolType>::tokenize(&self.0),
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                specialNftTypeAndRankReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -3656,7 +3956,7 @@ function stakeContract() external view returns (address);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct stakeContractCall {}
+    pub struct stakeContractCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`stakeContract()`](stakeContractCall) function.
@@ -3701,7 +4001,7 @@ function stakeContract() external view returns (address);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for stakeContractCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3742,7 +4042,7 @@ function stakeContract() external view returns (address);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = stakeContractReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3760,14 +4060,34 @@ function stakeContract() external view returns (address);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: stakeContractReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: stakeContractReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -3779,7 +4099,7 @@ function stakeThreshold() external view returns (uint256);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct stakeThresholdCall {}
+    pub struct stakeThresholdCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`stakeThreshold()`](stakeThresholdCall) function.
@@ -3824,7 +4144,7 @@ function stakeThreshold() external view returns (uint256);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for stakeThresholdCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3869,7 +4189,7 @@ function stakeThreshold() external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = stakeThresholdReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3887,14 +4207,34 @@ function stakeThreshold() external view returns (uint256);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: stakeThresholdReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: stakeThresholdReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -3988,6 +4328,13 @@ function transferOwnership(address newOwner) external;
                 }
             }
         }
+        impl transferOwnershipReturn {
+            fn _tokenize(
+                &self,
+            ) -> <transferOwnershipCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for transferOwnershipCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -4016,13 +4363,23 @@ function transferOwnership(address newOwner) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                transferOwnershipReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -4117,6 +4474,13 @@ function updateStakeContract(address _stakeContract) external;
                 }
             }
         }
+        impl updateStakeContractReturn {
+            fn _tokenize(
+                &self,
+            ) -> <updateStakeContractCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for updateStakeContractCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -4145,13 +4509,23 @@ function updateStakeContract(address _stakeContract) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                updateStakeContractReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -4301,22 +4675,18 @@ function updateStakeContract(address _stakeContract) external;
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprStakingProxyForNetworkRegistryCalls>] = &[
                 {
                     fn stakeContract(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <stakeContractCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprStakingProxyForNetworkRegistryCalls::stakeContract)
                     }
@@ -4325,13 +4695,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn specialNftTypeAndRank(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <specialNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::specialNftTypeAndRank,
@@ -4342,13 +4710,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn ownerBatchAddNftTypeAndRank(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <ownerBatchAddNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::ownerBatchAddNftTypeAndRank,
@@ -4359,13 +4725,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn ownerRemoveNftTypeAndRank(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <ownerRemoveNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::ownerRemoveNftTypeAndRank,
@@ -4376,13 +4740,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn ownerBatchAddSpecialNftTypeAndRank(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <ownerBatchAddSpecialNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::ownerBatchAddSpecialNftTypeAndRank,
@@ -4393,13 +4755,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn renounceOwnership(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <renounceOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::renounceOwnership,
@@ -4410,13 +4770,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn updateStakeContract(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <updateStakeContractCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::updateStakeContract,
@@ -4427,14 +4785,10 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn owner(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
-                        <ownerCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <ownerCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprStakingProxyForNetworkRegistryCalls::owner)
                     }
                     owner
@@ -4442,13 +4796,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn ownerAddNftTypeAndRank(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <ownerAddNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::ownerAddNftTypeAndRank,
@@ -4459,13 +4811,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn ownerBatchRemoveSpecialNftTypeAndRank(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <ownerBatchRemoveSpecialNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::ownerBatchRemoveSpecialNftTypeAndRank,
@@ -4476,13 +4826,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn maxAllowedRegistrations(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <maxAllowedRegistrationsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::maxAllowedRegistrations,
@@ -4493,13 +4841,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn maxRegistrationsPerSpecialNft(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <maxRegistrationsPerSpecialNftCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::maxRegistrationsPerSpecialNft,
@@ -4510,13 +4856,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn canOperateFor(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <canOperateForCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprStakingProxyForNetworkRegistryCalls::canOperateFor)
                     }
@@ -4525,13 +4869,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn eligibleNftTypeAndRank(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <eligibleNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::eligibleNftTypeAndRank,
@@ -4542,13 +4884,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn ownerUpdateThreshold(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <ownerUpdateThresholdCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::ownerUpdateThreshold,
@@ -4559,13 +4899,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn stakeThreshold(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <stakeThresholdCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprStakingProxyForNetworkRegistryCalls::stakeThreshold)
                     }
@@ -4574,13 +4912,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn transferOwnership(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <transferOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::transferOwnership,
@@ -4591,13 +4927,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn ownerBatchRemoveNftTypeAndRank(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryCalls,
                     > {
                         <ownerBatchRemoveNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryCalls::ownerBatchRemoveNftTypeAndRank,
@@ -4614,7 +4948,289 @@ function updateStakeContract(address _stakeContract) external;
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprStakingProxyForNetworkRegistryCalls>] = &[
+                {
+                    fn stakeContract(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <stakeContractCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprStakingProxyForNetworkRegistryCalls::stakeContract)
+                    }
+                    stakeContract
+                },
+                {
+                    fn specialNftTypeAndRank(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <specialNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::specialNftTypeAndRank,
+                            )
+                    }
+                    specialNftTypeAndRank
+                },
+                {
+                    fn ownerBatchAddNftTypeAndRank(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <ownerBatchAddNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::ownerBatchAddNftTypeAndRank,
+                            )
+                    }
+                    ownerBatchAddNftTypeAndRank
+                },
+                {
+                    fn ownerRemoveNftTypeAndRank(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <ownerRemoveNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::ownerRemoveNftTypeAndRank,
+                            )
+                    }
+                    ownerRemoveNftTypeAndRank
+                },
+                {
+                    fn ownerBatchAddSpecialNftTypeAndRank(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <ownerBatchAddSpecialNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::ownerBatchAddSpecialNftTypeAndRank,
+                            )
+                    }
+                    ownerBatchAddSpecialNftTypeAndRank
+                },
+                {
+                    fn renounceOwnership(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <renounceOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::renounceOwnership,
+                            )
+                    }
+                    renounceOwnership
+                },
+                {
+                    fn updateStakeContract(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <updateStakeContractCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::updateStakeContract,
+                            )
+                    }
+                    updateStakeContract
+                },
+                {
+                    fn owner(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <ownerCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprStakingProxyForNetworkRegistryCalls::owner)
+                    }
+                    owner
+                },
+                {
+                    fn ownerAddNftTypeAndRank(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <ownerAddNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::ownerAddNftTypeAndRank,
+                            )
+                    }
+                    ownerAddNftTypeAndRank
+                },
+                {
+                    fn ownerBatchRemoveSpecialNftTypeAndRank(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <ownerBatchRemoveSpecialNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::ownerBatchRemoveSpecialNftTypeAndRank,
+                            )
+                    }
+                    ownerBatchRemoveSpecialNftTypeAndRank
+                },
+                {
+                    fn maxAllowedRegistrations(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <maxAllowedRegistrationsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::maxAllowedRegistrations,
+                            )
+                    }
+                    maxAllowedRegistrations
+                },
+                {
+                    fn maxRegistrationsPerSpecialNft(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <maxRegistrationsPerSpecialNftCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::maxRegistrationsPerSpecialNft,
+                            )
+                    }
+                    maxRegistrationsPerSpecialNft
+                },
+                {
+                    fn canOperateFor(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <canOperateForCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprStakingProxyForNetworkRegistryCalls::canOperateFor)
+                    }
+                    canOperateFor
+                },
+                {
+                    fn eligibleNftTypeAndRank(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <eligibleNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::eligibleNftTypeAndRank,
+                            )
+                    }
+                    eligibleNftTypeAndRank
+                },
+                {
+                    fn ownerUpdateThreshold(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <ownerUpdateThresholdCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::ownerUpdateThreshold,
+                            )
+                    }
+                    ownerUpdateThreshold
+                },
+                {
+                    fn stakeThreshold(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <stakeThresholdCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprStakingProxyForNetworkRegistryCalls::stakeThreshold)
+                    }
+                    stakeThreshold
+                },
+                {
+                    fn transferOwnership(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <transferOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::transferOwnership,
+                            )
+                    }
+                    transferOwnership
+                },
+                {
+                    fn ownerBatchRemoveNftTypeAndRank(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryCalls,
+                    > {
+                        <ownerBatchRemoveNftTypeAndRankCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryCalls::ownerBatchRemoveNftTypeAndRank,
+                            )
+                    }
+                    ownerBatchRemoveNftTypeAndRank
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -4877,22 +5493,18 @@ function updateStakeContract(address _stakeContract) external;
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprStakingProxyForNetworkRegistryErrors>] = &[
                 {
                     fn MaxRegistrationsMismatch(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryErrors,
                     > {
                         <MaxRegistrationsMismatch as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryErrors::MaxRegistrationsMismatch,
@@ -4903,13 +5515,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn SameStakingThreshold(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryErrors,
                     > {
                         <SameStakingThreshold as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryErrors::SameStakingThreshold,
@@ -4920,13 +5530,11 @@ function updateStakeContract(address _stakeContract) external;
                 {
                     fn NftRanksMismatch(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<
                         HoprStakingProxyForNetworkRegistryErrors,
                     > {
                         <NftRanksMismatch as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprStakingProxyForNetworkRegistryErrors::NftRanksMismatch,
@@ -4943,7 +5551,72 @@ function updateStakeContract(address _stakeContract) external;
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprStakingProxyForNetworkRegistryErrors>] = &[
+                {
+                    fn MaxRegistrationsMismatch(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryErrors,
+                    > {
+                        <MaxRegistrationsMismatch as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryErrors::MaxRegistrationsMismatch,
+                            )
+                    }
+                    MaxRegistrationsMismatch
+                },
+                {
+                    fn SameStakingThreshold(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryErrors,
+                    > {
+                        <SameStakingThreshold as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryErrors::SameStakingThreshold,
+                            )
+                    }
+                    SameStakingThreshold
+                },
+                {
+                    fn NftRanksMismatch(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<
+                        HoprStakingProxyForNetworkRegistryErrors,
+                    > {
+                        <NftRanksMismatch as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprStakingProxyForNetworkRegistryErrors::NftRanksMismatch,
+                            )
+                    }
+                    NftRanksMismatch
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -5063,7 +5736,6 @@ function updateStakeContract(address _stakeContract) external;
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(
@@ -5072,7 +5744,6 @@ function updateStakeContract(address _stakeContract) external;
                     <NftTypeAndRankAdded as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::NftTypeAndRankAdded)
                 }
@@ -5082,7 +5753,6 @@ function updateStakeContract(address _stakeContract) external;
                     <NftTypeAndRankRemoved as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::NftTypeAndRankRemoved)
                 }
@@ -5092,7 +5762,6 @@ function updateStakeContract(address _stakeContract) external;
                     <OwnershipTransferred as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::OwnershipTransferred)
                 }
@@ -5102,7 +5771,6 @@ function updateStakeContract(address _stakeContract) external;
                     <SpecialNftTypeAndRankAdded as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::SpecialNftTypeAndRankAdded)
                 }
@@ -5112,7 +5780,6 @@ function updateStakeContract(address _stakeContract) external;
                     <SpecialNftTypeAndRankRemoved as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::SpecialNftTypeAndRankRemoved)
                 }
@@ -5122,7 +5789,6 @@ function updateStakeContract(address _stakeContract) external;
                     <StakeContractUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::StakeContractUpdated)
                 }
@@ -5130,7 +5796,6 @@ function updateStakeContract(address _stakeContract) external;
                     <ThresholdUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ThresholdUpdated)
                 }
@@ -5208,14 +5873,13 @@ function updateStakeContract(address _stakeContract) external;
 See the [wrapper's documentation](`HoprStakingProxyForNetworkRegistryInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprStakingProxyForNetworkRegistryInstance<T, P, N> {
-        HoprStakingProxyForNetworkRegistryInstance::<T, P, N>::new(address, provider)
+    ) -> HoprStakingProxyForNetworkRegistryInstance<P, N> {
+        HoprStakingProxyForNetworkRegistryInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -5224,8 +5888,7 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
@@ -5233,12 +5896,9 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         _newOwner: alloy::sol_types::private::Address,
         _minStake: alloy::sol_types::private::primitives::aliases::U256,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<
-            HoprStakingProxyForNetworkRegistryInstance<T, P, N>,
-        >,
+        Output = alloy_contract::Result<HoprStakingProxyForNetworkRegistryInstance<P, N>>,
     > {
         HoprStakingProxyForNetworkRegistryInstance::<
-            T,
             P,
             N,
         >::deploy(provider, _stakeContract, _newOwner, _minStake)
@@ -5250,17 +5910,15 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
         _stakeContract: alloy::sol_types::private::Address,
         _newOwner: alloy::sol_types::private::Address,
         _minStake: alloy::sol_types::private::primitives::aliases::U256,
-    ) -> alloy_contract::RawCallBuilder<T, P, N> {
+    ) -> alloy_contract::RawCallBuilder<P, N> {
         HoprStakingProxyForNetworkRegistryInstance::<
-            T,
             P,
             N,
         >::deploy_builder(provider, _stakeContract, _newOwner, _minStake)
@@ -5278,17 +5936,15 @@ be used to deploy a new instance of the contract.
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
     pub struct HoprStakingProxyForNetworkRegistryInstance<
-        T,
         P,
         N = alloy_contract::private::Ethereum,
     > {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug
-    for HoprStakingProxyForNetworkRegistryInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprStakingProxyForNetworkRegistryInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprStakingProxyForNetworkRegistryInstance")
@@ -5299,10 +5955,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprStakingProxyForNetworkRegistryInstance<T, P, N> {
+    > HoprStakingProxyForNetworkRegistryInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprStakingProxyForNetworkRegistry`](self) contract instance.
 
 See the [wrapper's documentation](`HoprStakingProxyForNetworkRegistryInstance`) for more details.*/
@@ -5314,7 +5969,7 @@ See the [wrapper's documentation](`HoprStakingProxyForNetworkRegistryInstance`) 
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -5328,9 +5983,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
             _stakeContract: alloy::sol_types::private::Address,
             _newOwner: alloy::sol_types::private::Address,
             _minStake: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::Result<
-            HoprStakingProxyForNetworkRegistryInstance<T, P, N>,
-        > {
+        ) -> alloy_contract::Result<HoprStakingProxyForNetworkRegistryInstance<P, N>> {
             let call_builder = Self::deploy_builder(
                 provider,
                 _stakeContract,
@@ -5351,7 +6004,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             _stakeContract: alloy::sol_types::private::Address,
             _newOwner: alloy::sol_types::private::Address,
             _minStake: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::RawCallBuilder<T, P, N> {
+        ) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 [
@@ -5389,30 +6042,25 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<
-        T,
-        P: ::core::clone::Clone,
-        N,
-    > HoprStakingProxyForNetworkRegistryInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprStakingProxyForNetworkRegistryInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
         pub fn with_cloned_provider(
             self,
-        ) -> HoprStakingProxyForNetworkRegistryInstance<T, P, N> {
+        ) -> HoprStakingProxyForNetworkRegistryInstance<P, N> {
             HoprStakingProxyForNetworkRegistryInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprStakingProxyForNetworkRegistryInstance<T, P, N> {
+    > HoprStakingProxyForNetworkRegistryInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -5420,7 +6068,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
         ///Creates a new call builder for the [`canOperateFor`] function.
@@ -5428,21 +6076,21 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             _0: alloy::sol_types::private::Address,
             _1: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, canOperateForCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, canOperateForCall, N> {
             self.call_builder(&canOperateForCall { _0, _1 })
         }
         ///Creates a new call builder for the [`eligibleNftTypeAndRank`] function.
         pub fn eligibleNftTypeAndRank(
             &self,
             _0: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<T, &P, eligibleNftTypeAndRankCall, N> {
-            self.call_builder(&eligibleNftTypeAndRankCall { _0 })
+        ) -> alloy_contract::SolCallBuilder<&P, eligibleNftTypeAndRankCall, N> {
+            self.call_builder(&eligibleNftTypeAndRankCall(_0))
         }
         ///Creates a new call builder for the [`maxAllowedRegistrations`] function.
         pub fn maxAllowedRegistrations(
             &self,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, maxAllowedRegistrationsCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, maxAllowedRegistrationsCall, N> {
             self.call_builder(
                 &maxAllowedRegistrationsCall {
                     account,
@@ -5453,28 +6101,19 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn maxRegistrationsPerSpecialNft(
             &self,
             _0: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<
-            T,
-            &P,
-            maxRegistrationsPerSpecialNftCall,
-            N,
-        > {
-            self.call_builder(
-                &maxRegistrationsPerSpecialNftCall {
-                    _0,
-                },
-            )
+        ) -> alloy_contract::SolCallBuilder<&P, maxRegistrationsPerSpecialNftCall, N> {
+            self.call_builder(&maxRegistrationsPerSpecialNftCall(_0))
         }
         ///Creates a new call builder for the [`owner`] function.
-        pub fn owner(&self) -> alloy_contract::SolCallBuilder<T, &P, ownerCall, N> {
-            self.call_builder(&ownerCall {})
+        pub fn owner(&self) -> alloy_contract::SolCallBuilder<&P, ownerCall, N> {
+            self.call_builder(&ownerCall)
         }
         ///Creates a new call builder for the [`ownerAddNftTypeAndRank`] function.
         pub fn ownerAddNftTypeAndRank(
             &self,
             nftType: alloy::sol_types::private::primitives::aliases::U256,
             nftRank: alloy::sol_types::private::String,
-        ) -> alloy_contract::SolCallBuilder<T, &P, ownerAddNftTypeAndRankCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, ownerAddNftTypeAndRankCall, N> {
             self.call_builder(
                 &ownerAddNftTypeAndRankCall {
                     nftType,
@@ -5489,7 +6128,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
                 alloy::sol_types::private::primitives::aliases::U256,
             >,
             nftRanks: alloy::sol_types::private::Vec<alloy::sol_types::private::String>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, ownerBatchAddNftTypeAndRankCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, ownerBatchAddNftTypeAndRankCall, N> {
             self.call_builder(
                 &ownerBatchAddNftTypeAndRankCall {
                     nftTypes,
@@ -5508,7 +6147,6 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
                 alloy::sol_types::private::primitives::aliases::U256,
             >,
         ) -> alloy_contract::SolCallBuilder<
-            T,
             &P,
             ownerBatchAddSpecialNftTypeAndRankCall,
             N,
@@ -5528,12 +6166,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
                 alloy::sol_types::private::primitives::aliases::U256,
             >,
             nftRanks: alloy::sol_types::private::Vec<alloy::sol_types::private::String>,
-        ) -> alloy_contract::SolCallBuilder<
-            T,
-            &P,
-            ownerBatchRemoveNftTypeAndRankCall,
-            N,
-        > {
+        ) -> alloy_contract::SolCallBuilder<&P, ownerBatchRemoveNftTypeAndRankCall, N> {
             self.call_builder(
                 &ownerBatchRemoveNftTypeAndRankCall {
                     nftTypes,
@@ -5549,7 +6182,6 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             >,
             nftRanks: alloy::sol_types::private::Vec<alloy::sol_types::private::String>,
         ) -> alloy_contract::SolCallBuilder<
-            T,
             &P,
             ownerBatchRemoveSpecialNftTypeAndRankCall,
             N,
@@ -5566,7 +6198,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             nftType: alloy::sol_types::private::primitives::aliases::U256,
             nftRank: alloy::sol_types::private::String,
-        ) -> alloy_contract::SolCallBuilder<T, &P, ownerRemoveNftTypeAndRankCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, ownerRemoveNftTypeAndRankCall, N> {
             self.call_builder(
                 &ownerRemoveNftTypeAndRankCall {
                     nftType,
@@ -5578,7 +6210,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn ownerUpdateThreshold(
             &self,
             newThreshold: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<T, &P, ownerUpdateThresholdCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, ownerUpdateThresholdCall, N> {
             self.call_builder(
                 &ownerUpdateThresholdCall {
                     newThreshold,
@@ -5588,40 +6220,40 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         ///Creates a new call builder for the [`renounceOwnership`] function.
         pub fn renounceOwnership(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, renounceOwnershipCall, N> {
-            self.call_builder(&renounceOwnershipCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, renounceOwnershipCall, N> {
+            self.call_builder(&renounceOwnershipCall)
         }
         ///Creates a new call builder for the [`specialNftTypeAndRank`] function.
         pub fn specialNftTypeAndRank(
             &self,
             _0: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<T, &P, specialNftTypeAndRankCall, N> {
-            self.call_builder(&specialNftTypeAndRankCall { _0 })
+        ) -> alloy_contract::SolCallBuilder<&P, specialNftTypeAndRankCall, N> {
+            self.call_builder(&specialNftTypeAndRankCall(_0))
         }
         ///Creates a new call builder for the [`stakeContract`] function.
         pub fn stakeContract(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, stakeContractCall, N> {
-            self.call_builder(&stakeContractCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, stakeContractCall, N> {
+            self.call_builder(&stakeContractCall)
         }
         ///Creates a new call builder for the [`stakeThreshold`] function.
         pub fn stakeThreshold(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, stakeThresholdCall, N> {
-            self.call_builder(&stakeThresholdCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, stakeThresholdCall, N> {
+            self.call_builder(&stakeThresholdCall)
         }
         ///Creates a new call builder for the [`transferOwnership`] function.
         pub fn transferOwnership(
             &self,
             newOwner: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, transferOwnershipCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, transferOwnershipCall, N> {
             self.call_builder(&transferOwnershipCall { newOwner })
         }
         ///Creates a new call builder for the [`updateStakeContract`] function.
         pub fn updateStakeContract(
             &self,
             _stakeContract: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, updateStakeContractCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, updateStakeContractCall, N> {
             self.call_builder(
                 &updateStakeContractCall {
                     _stakeContract,
@@ -5632,59 +6264,58 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprStakingProxyForNetworkRegistryInstance<T, P, N> {
+    > HoprStakingProxyForNetworkRegistryInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`NftTypeAndRankAdded`] event.
         pub fn NftTypeAndRankAdded_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, NftTypeAndRankAdded, N> {
+        ) -> alloy_contract::Event<&P, NftTypeAndRankAdded, N> {
             self.event_filter::<NftTypeAndRankAdded>()
         }
         ///Creates a new event filter for the [`NftTypeAndRankRemoved`] event.
         pub fn NftTypeAndRankRemoved_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, NftTypeAndRankRemoved, N> {
+        ) -> alloy_contract::Event<&P, NftTypeAndRankRemoved, N> {
             self.event_filter::<NftTypeAndRankRemoved>()
         }
         ///Creates a new event filter for the [`OwnershipTransferred`] event.
         pub fn OwnershipTransferred_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, OwnershipTransferred, N> {
+        ) -> alloy_contract::Event<&P, OwnershipTransferred, N> {
             self.event_filter::<OwnershipTransferred>()
         }
         ///Creates a new event filter for the [`SpecialNftTypeAndRankAdded`] event.
         pub fn SpecialNftTypeAndRankAdded_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, SpecialNftTypeAndRankAdded, N> {
+        ) -> alloy_contract::Event<&P, SpecialNftTypeAndRankAdded, N> {
             self.event_filter::<SpecialNftTypeAndRankAdded>()
         }
         ///Creates a new event filter for the [`SpecialNftTypeAndRankRemoved`] event.
         pub fn SpecialNftTypeAndRankRemoved_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, SpecialNftTypeAndRankRemoved, N> {
+        ) -> alloy_contract::Event<&P, SpecialNftTypeAndRankRemoved, N> {
             self.event_filter::<SpecialNftTypeAndRankRemoved>()
         }
         ///Creates a new event filter for the [`StakeContractUpdated`] event.
         pub fn StakeContractUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, StakeContractUpdated, N> {
+        ) -> alloy_contract::Event<&P, StakeContractUpdated, N> {
             self.event_filter::<StakeContractUpdated>()
         }
         ///Creates a new event filter for the [`ThresholdUpdated`] event.
         pub fn ThresholdUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ThresholdUpdated, N> {
+        ) -> alloy_contract::Event<&P, ThresholdUpdated, N> {
             self.event_filter::<ThresholdUpdated>()
         }
     }

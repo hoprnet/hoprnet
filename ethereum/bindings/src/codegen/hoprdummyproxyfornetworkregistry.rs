@@ -810,7 +810,7 @@ function MAX_REGISTRATION_PER_ACCOUNT() external view returns (uint256);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct MAX_REGISTRATION_PER_ACCOUNTCall {}
+    pub struct MAX_REGISTRATION_PER_ACCOUNTCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`MAX_REGISTRATION_PER_ACCOUNT()`](MAX_REGISTRATION_PER_ACCOUNTCall) function.
@@ -857,7 +857,7 @@ function MAX_REGISTRATION_PER_ACCOUNT() external view returns (uint256);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for MAX_REGISTRATION_PER_ACCOUNTCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -902,7 +902,7 @@ function MAX_REGISTRATION_PER_ACCOUNT() external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = MAX_REGISTRATION_PER_ACCOUNTReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -920,14 +920,34 @@ function MAX_REGISTRATION_PER_ACCOUNT() external view returns (uint256);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: MAX_REGISTRATION_PER_ACCOUNTReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: MAX_REGISTRATION_PER_ACCOUNTReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -1039,7 +1059,7 @@ function canOperateFor(address, address) external pure returns (bool eligiblity)
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = canOperateForReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -1064,14 +1084,34 @@ function canOperateFor(address, address) external pure returns (bool eligiblity)
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: canOperateForReturn = r.into();
+                        r.eligiblity
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: canOperateForReturn = r.into();
+                        r.eligiblity
+                    })
             }
         }
     };
@@ -1083,7 +1123,7 @@ function isAllAllowed() external view returns (bool);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct isAllAllowedCall {}
+    pub struct isAllAllowedCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`isAllAllowed()`](isAllAllowedCall) function.
@@ -1128,7 +1168,7 @@ function isAllAllowed() external view returns (bool);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for isAllAllowedCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -1169,7 +1209,7 @@ function isAllAllowed() external view returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = isAllAllowedReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -1187,14 +1227,34 @@ function isAllAllowed() external view returns (bool);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: isAllAllowedReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: isAllAllowedReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -1301,7 +1361,7 @@ function maxAllowedRegistrations(address account) external view returns (uint256
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = maxAllowedRegistrationsReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -1323,14 +1383,34 @@ function maxAllowedRegistrations(address account) external view returns (uint256
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: maxAllowedRegistrationsReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: maxAllowedRegistrationsReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -1342,7 +1422,7 @@ function owner() external view returns (address);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ownerCall {}
+    pub struct ownerCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`owner()`](ownerCall) function.
@@ -1387,7 +1467,7 @@ function owner() external view returns (address);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for ownerCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -1428,7 +1508,7 @@ function owner() external view returns (address);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = ownerReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -1446,14 +1526,34 @@ function owner() external view returns (address);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: ownerReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: ownerReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -1545,6 +1645,13 @@ function ownerAddAccount(address account) external;
                 }
             }
         }
+        impl ownerAddAccountReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerAddAccountCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerAddAccountCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -1573,13 +1680,23 @@ function ownerAddAccount(address account) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerAddAccountReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -1678,6 +1795,15 @@ function ownerBatchAddAccounts(address[] memory accounts) external;
                 }
             }
         }
+        impl ownerBatchAddAccountsReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerBatchAddAccountsCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerBatchAddAccountsCall {
             type Parameters<'a> = (
@@ -1708,13 +1834,23 @@ function ownerBatchAddAccounts(address[] memory accounts) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerBatchAddAccountsReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -1813,6 +1949,15 @@ function ownerBatchRemoveAccounts(address[] memory accounts) external;
                 }
             }
         }
+        impl ownerBatchRemoveAccountsReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerBatchRemoveAccountsCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerBatchRemoveAccountsCall {
             type Parameters<'a> = (
@@ -1843,13 +1988,23 @@ function ownerBatchRemoveAccounts(address[] memory accounts) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerBatchRemoveAccountsReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -1944,6 +2099,13 @@ function ownerRemoveAccount(address account) external;
                 }
             }
         }
+        impl ownerRemoveAccountReturn {
+            fn _tokenize(
+                &self,
+            ) -> <ownerRemoveAccountCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for ownerRemoveAccountCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -1972,13 +2134,23 @@ function ownerRemoveAccount(address account) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                ownerRemoveAccountReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -1991,7 +2163,7 @@ function renounceOwnership() external;
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct renounceOwnershipCall {}
+    pub struct renounceOwnershipCall;
     ///Container type for the return parameters of the [`renounceOwnership()`](renounceOwnershipCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2033,7 +2205,7 @@ function renounceOwnership() external;
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for renounceOwnershipCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2070,6 +2242,13 @@ function renounceOwnership() external;
                 }
             }
         }
+        impl renounceOwnershipReturn {
+            fn _tokenize(
+                &self,
+            ) -> <renounceOwnershipCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for renounceOwnershipCall {
             type Parameters<'a> = ();
@@ -2094,13 +2273,23 @@ function renounceOwnership() external;
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                renounceOwnershipReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2195,6 +2384,13 @@ function transferOwnership(address newOwner) external;
                 }
             }
         }
+        impl transferOwnershipReturn {
+            fn _tokenize(
+                &self,
+            ) -> <transferOwnershipCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for transferOwnershipCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -2223,13 +2419,23 @@ function transferOwnership(address newOwner) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                transferOwnershipReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2322,6 +2528,13 @@ function updateAllowAll(bool _updatedAllow) external;
                 }
             }
         }
+        impl updateAllowAllReturn {
+            fn _tokenize(
+                &self,
+            ) -> <updateAllowAllCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for updateAllowAllCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Bool,);
@@ -2350,13 +2563,23 @@ function updateAllowAll(bool _updatedAllow) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                updateAllowAllReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2470,20 +2693,16 @@ function updateAllowAll(bool _updatedAllow) external;
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls>] = &[
                 {
                     fn updateAllowAll(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <updateAllowAllCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprDummyProxyForNetworkRegistryCalls::updateAllowAll)
                     }
@@ -2492,11 +2711,9 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn ownerRemoveAccount(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <ownerRemoveAccountCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprDummyProxyForNetworkRegistryCalls::ownerRemoveAccount,
@@ -2507,11 +2724,9 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn ownerBatchAddAccounts(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <ownerBatchAddAccountsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprDummyProxyForNetworkRegistryCalls::ownerBatchAddAccounts,
@@ -2522,11 +2737,9 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn ownerBatchRemoveAccounts(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <ownerBatchRemoveAccountsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprDummyProxyForNetworkRegistryCalls::ownerBatchRemoveAccounts,
@@ -2537,11 +2750,9 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn renounceOwnership(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <renounceOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprDummyProxyForNetworkRegistryCalls::renounceOwnership,
@@ -2552,12 +2763,8 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn owner(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
-                        <ownerCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <ownerCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprDummyProxyForNetworkRegistryCalls::owner)
                     }
                     owner
@@ -2565,11 +2772,9 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn ownerAddAccount(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <ownerAddAccountCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprDummyProxyForNetworkRegistryCalls::ownerAddAccount)
                     }
@@ -2578,11 +2783,9 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn maxAllowedRegistrations(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <maxAllowedRegistrationsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprDummyProxyForNetworkRegistryCalls::maxAllowedRegistrations,
@@ -2593,11 +2796,9 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn canOperateFor(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <canOperateForCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprDummyProxyForNetworkRegistryCalls::canOperateFor)
                     }
@@ -2606,11 +2807,9 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn transferOwnership(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <transferOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprDummyProxyForNetworkRegistryCalls::transferOwnership,
@@ -2621,11 +2820,9 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn MAX_REGISTRATION_PER_ACCOUNT(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <MAX_REGISTRATION_PER_ACCOUNTCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprDummyProxyForNetworkRegistryCalls::MAX_REGISTRATION_PER_ACCOUNT,
@@ -2636,11 +2833,9 @@ function updateAllowAll(bool _updatedAllow) external;
                 {
                     fn isAllAllowed(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
                         <isAllAllowedCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprDummyProxyForNetworkRegistryCalls::isAllAllowed)
                     }
@@ -2655,7 +2850,173 @@ function updateAllowAll(bool _updatedAllow) external;
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls>] = &[
+                {
+                    fn updateAllowAll(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <updateAllowAllCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprDummyProxyForNetworkRegistryCalls::updateAllowAll)
+                    }
+                    updateAllowAll
+                },
+                {
+                    fn ownerRemoveAccount(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <ownerRemoveAccountCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprDummyProxyForNetworkRegistryCalls::ownerRemoveAccount,
+                            )
+                    }
+                    ownerRemoveAccount
+                },
+                {
+                    fn ownerBatchAddAccounts(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <ownerBatchAddAccountsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprDummyProxyForNetworkRegistryCalls::ownerBatchAddAccounts,
+                            )
+                    }
+                    ownerBatchAddAccounts
+                },
+                {
+                    fn ownerBatchRemoveAccounts(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <ownerBatchRemoveAccountsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprDummyProxyForNetworkRegistryCalls::ownerBatchRemoveAccounts,
+                            )
+                    }
+                    ownerBatchRemoveAccounts
+                },
+                {
+                    fn renounceOwnership(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <renounceOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprDummyProxyForNetworkRegistryCalls::renounceOwnership,
+                            )
+                    }
+                    renounceOwnership
+                },
+                {
+                    fn owner(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <ownerCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprDummyProxyForNetworkRegistryCalls::owner)
+                    }
+                    owner
+                },
+                {
+                    fn ownerAddAccount(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <ownerAddAccountCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprDummyProxyForNetworkRegistryCalls::ownerAddAccount)
+                    }
+                    ownerAddAccount
+                },
+                {
+                    fn maxAllowedRegistrations(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <maxAllowedRegistrationsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprDummyProxyForNetworkRegistryCalls::maxAllowedRegistrations,
+                            )
+                    }
+                    maxAllowedRegistrations
+                },
+                {
+                    fn canOperateFor(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <canOperateForCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprDummyProxyForNetworkRegistryCalls::canOperateFor)
+                    }
+                    canOperateFor
+                },
+                {
+                    fn transferOwnership(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <transferOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprDummyProxyForNetworkRegistryCalls::transferOwnership,
+                            )
+                    }
+                    transferOwnership
+                },
+                {
+                    fn MAX_REGISTRATION_PER_ACCOUNT(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <MAX_REGISTRATION_PER_ACCOUNTCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprDummyProxyForNetworkRegistryCalls::MAX_REGISTRATION_PER_ACCOUNT,
+                            )
+                    }
+                    MAX_REGISTRATION_PER_ACCOUNT
+                },
+                {
+                    fn isAllAllowed(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprDummyProxyForNetworkRegistryCalls> {
+                        <isAllAllowedCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprDummyProxyForNetworkRegistryCalls::isAllAllowed)
+                    }
+                    isAllAllowed
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -2846,7 +3207,6 @@ function updateAllowAll(bool _updatedAllow) external;
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(
@@ -2855,7 +3215,6 @@ function updateAllowAll(bool _updatedAllow) external;
                     <AccountDeregistered as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::AccountDeregistered)
                 }
@@ -2865,7 +3224,6 @@ function updateAllowAll(bool _updatedAllow) external;
                     <AccountRegistered as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::AccountRegistered)
                 }
@@ -2875,7 +3233,6 @@ function updateAllowAll(bool _updatedAllow) external;
                     <AllowAllAccountsEligible as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::AllowAllAccountsEligible)
                 }
@@ -2885,7 +3242,6 @@ function updateAllowAll(bool _updatedAllow) external;
                     <OwnershipTransferred as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::OwnershipTransferred)
                 }
@@ -2945,14 +3301,13 @@ function updateAllowAll(bool _updatedAllow) external;
 See the [wrapper's documentation](`HoprDummyProxyForNetworkRegistryInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprDummyProxyForNetworkRegistryInstance<T, P, N> {
-        HoprDummyProxyForNetworkRegistryInstance::<T, P, N>::new(address, provider)
+    ) -> HoprDummyProxyForNetworkRegistryInstance<P, N> {
+        HoprDummyProxyForNetworkRegistryInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -2961,18 +3316,15 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
         newOwner: alloy::sol_types::private::Address,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<
-            HoprDummyProxyForNetworkRegistryInstance<T, P, N>,
-        >,
+        Output = alloy_contract::Result<HoprDummyProxyForNetworkRegistryInstance<P, N>>,
     > {
-        HoprDummyProxyForNetworkRegistryInstance::<T, P, N>::deploy(provider, newOwner)
+        HoprDummyProxyForNetworkRegistryInstance::<P, N>::deploy(provider, newOwner)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -2981,15 +3333,13 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
         newOwner: alloy::sol_types::private::Address,
-    ) -> alloy_contract::RawCallBuilder<T, P, N> {
+    ) -> alloy_contract::RawCallBuilder<P, N> {
         HoprDummyProxyForNetworkRegistryInstance::<
-            T,
             P,
             N,
         >::deploy_builder(provider, newOwner)
@@ -3007,17 +3357,15 @@ be used to deploy a new instance of the contract.
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
     pub struct HoprDummyProxyForNetworkRegistryInstance<
-        T,
         P,
         N = alloy_contract::private::Ethereum,
     > {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug
-    for HoprDummyProxyForNetworkRegistryInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprDummyProxyForNetworkRegistryInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprDummyProxyForNetworkRegistryInstance")
@@ -3028,10 +3376,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprDummyProxyForNetworkRegistryInstance<T, P, N> {
+    > HoprDummyProxyForNetworkRegistryInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprDummyProxyForNetworkRegistry`](self) contract instance.
 
 See the [wrapper's documentation](`HoprDummyProxyForNetworkRegistryInstance`) for more details.*/
@@ -3043,7 +3390,7 @@ See the [wrapper's documentation](`HoprDummyProxyForNetworkRegistryInstance`) fo
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -3055,7 +3402,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         pub async fn deploy(
             provider: P,
             newOwner: alloy::sol_types::private::Address,
-        ) -> alloy_contract::Result<HoprDummyProxyForNetworkRegistryInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprDummyProxyForNetworkRegistryInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider, newOwner);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -3069,7 +3416,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn deploy_builder(
             provider: P,
             newOwner: alloy::sol_types::private::Address,
-        ) -> alloy_contract::RawCallBuilder<T, P, N> {
+        ) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 [
@@ -3103,30 +3450,25 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<
-        T,
-        P: ::core::clone::Clone,
-        N,
-    > HoprDummyProxyForNetworkRegistryInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprDummyProxyForNetworkRegistryInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
         pub fn with_cloned_provider(
             self,
-        ) -> HoprDummyProxyForNetworkRegistryInstance<T, P, N> {
+        ) -> HoprDummyProxyForNetworkRegistryInstance<P, N> {
             HoprDummyProxyForNetworkRegistryInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprDummyProxyForNetworkRegistryInstance<T, P, N> {
+    > HoprDummyProxyForNetworkRegistryInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -3134,37 +3476,34 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
         ///Creates a new call builder for the [`MAX_REGISTRATION_PER_ACCOUNT`] function.
         pub fn MAX_REGISTRATION_PER_ACCOUNT(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, MAX_REGISTRATION_PER_ACCOUNTCall, N> {
-            self.call_builder(
-                &MAX_REGISTRATION_PER_ACCOUNTCall {
-                },
-            )
+        ) -> alloy_contract::SolCallBuilder<&P, MAX_REGISTRATION_PER_ACCOUNTCall, N> {
+            self.call_builder(&MAX_REGISTRATION_PER_ACCOUNTCall)
         }
         ///Creates a new call builder for the [`canOperateFor`] function.
         pub fn canOperateFor(
             &self,
             _0: alloy::sol_types::private::Address,
             _1: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, canOperateForCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, canOperateForCall, N> {
             self.call_builder(&canOperateForCall { _0, _1 })
         }
         ///Creates a new call builder for the [`isAllAllowed`] function.
         pub fn isAllAllowed(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, isAllAllowedCall, N> {
-            self.call_builder(&isAllAllowedCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, isAllAllowedCall, N> {
+            self.call_builder(&isAllAllowedCall)
         }
         ///Creates a new call builder for the [`maxAllowedRegistrations`] function.
         pub fn maxAllowedRegistrations(
             &self,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, maxAllowedRegistrationsCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, maxAllowedRegistrationsCall, N> {
             self.call_builder(
                 &maxAllowedRegistrationsCall {
                     account,
@@ -3172,21 +3511,21 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             )
         }
         ///Creates a new call builder for the [`owner`] function.
-        pub fn owner(&self) -> alloy_contract::SolCallBuilder<T, &P, ownerCall, N> {
-            self.call_builder(&ownerCall {})
+        pub fn owner(&self) -> alloy_contract::SolCallBuilder<&P, ownerCall, N> {
+            self.call_builder(&ownerCall)
         }
         ///Creates a new call builder for the [`ownerAddAccount`] function.
         pub fn ownerAddAccount(
             &self,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, ownerAddAccountCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, ownerAddAccountCall, N> {
             self.call_builder(&ownerAddAccountCall { account })
         }
         ///Creates a new call builder for the [`ownerBatchAddAccounts`] function.
         pub fn ownerBatchAddAccounts(
             &self,
             accounts: alloy::sol_types::private::Vec<alloy::sol_types::private::Address>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, ownerBatchAddAccountsCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, ownerBatchAddAccountsCall, N> {
             self.call_builder(
                 &ownerBatchAddAccountsCall {
                     accounts,
@@ -3197,7 +3536,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn ownerBatchRemoveAccounts(
             &self,
             accounts: alloy::sol_types::private::Vec<alloy::sol_types::private::Address>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, ownerBatchRemoveAccountsCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, ownerBatchRemoveAccountsCall, N> {
             self.call_builder(
                 &ownerBatchRemoveAccountsCall {
                     accounts,
@@ -3208,27 +3547,27 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn ownerRemoveAccount(
             &self,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, ownerRemoveAccountCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, ownerRemoveAccountCall, N> {
             self.call_builder(&ownerRemoveAccountCall { account })
         }
         ///Creates a new call builder for the [`renounceOwnership`] function.
         pub fn renounceOwnership(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, renounceOwnershipCall, N> {
-            self.call_builder(&renounceOwnershipCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, renounceOwnershipCall, N> {
+            self.call_builder(&renounceOwnershipCall)
         }
         ///Creates a new call builder for the [`transferOwnership`] function.
         pub fn transferOwnership(
             &self,
             newOwner: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, transferOwnershipCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, transferOwnershipCall, N> {
             self.call_builder(&transferOwnershipCall { newOwner })
         }
         ///Creates a new call builder for the [`updateAllowAll`] function.
         pub fn updateAllowAll(
             &self,
             _updatedAllow: bool,
-        ) -> alloy_contract::SolCallBuilder<T, &P, updateAllowAllCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, updateAllowAllCall, N> {
             self.call_builder(
                 &updateAllowAllCall {
                     _updatedAllow,
@@ -3239,41 +3578,40 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprDummyProxyForNetworkRegistryInstance<T, P, N> {
+    > HoprDummyProxyForNetworkRegistryInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`AccountDeregistered`] event.
         pub fn AccountDeregistered_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, AccountDeregistered, N> {
+        ) -> alloy_contract::Event<&P, AccountDeregistered, N> {
             self.event_filter::<AccountDeregistered>()
         }
         ///Creates a new event filter for the [`AccountRegistered`] event.
         pub fn AccountRegistered_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, AccountRegistered, N> {
+        ) -> alloy_contract::Event<&P, AccountRegistered, N> {
             self.event_filter::<AccountRegistered>()
         }
         ///Creates a new event filter for the [`AllowAllAccountsEligible`] event.
         pub fn AllowAllAccountsEligible_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, AllowAllAccountsEligible, N> {
+        ) -> alloy_contract::Event<&P, AllowAllAccountsEligible, N> {
             self.event_filter::<AllowAllAccountsEligible>()
         }
         ///Creates a new event filter for the [`OwnershipTransferred`] event.
         pub fn OwnershipTransferred_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, OwnershipTransferred, N> {
+        ) -> alloy_contract::Event<&P, OwnershipTransferred, N> {
             self.event_filter::<OwnershipTransferred>()
         }
     }

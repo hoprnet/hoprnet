@@ -321,7 +321,7 @@ error NodeAddressZero();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NodeAddressZero {}
+    pub struct NodeAddressZero;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -356,7 +356,7 @@ error NodeAddressZero();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NodeAddressZero {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -377,6 +377,13 @@ error NodeAddressZero();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -387,7 +394,7 @@ error NodeHasSafe();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NodeHasSafe {}
+    pub struct NodeHasSafe;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -422,7 +429,7 @@ error NodeHasSafe();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NodeHasSafe {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -443,6 +450,13 @@ error NodeHasSafe();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -453,7 +467,7 @@ error NodeIsContract();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NodeIsContract {}
+    pub struct NodeIsContract;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -488,7 +502,7 @@ error NodeIsContract();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NodeIsContract {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -509,6 +523,13 @@ error NodeIsContract();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -519,7 +540,7 @@ error NodeNotModuleMember();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NodeNotModuleMember {}
+    pub struct NodeNotModuleMember;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -554,7 +575,7 @@ error NodeNotModuleMember();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NodeNotModuleMember {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -575,6 +596,13 @@ error NodeNotModuleMember();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -585,7 +613,7 @@ error NotValidSafe();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NotValidSafe {}
+    pub struct NotValidSafe;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -620,7 +648,7 @@ error NotValidSafe();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NotValidSafe {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -641,6 +669,13 @@ error NotValidSafe();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -651,7 +686,7 @@ error NotValidSignatureFromNode();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NotValidSignatureFromNode {}
+    pub struct NotValidSignatureFromNode;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -688,7 +723,7 @@ error NotValidSignatureFromNode();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for NotValidSignatureFromNode {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -709,6 +744,13 @@ error NotValidSignatureFromNode();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -719,7 +761,7 @@ error SafeAddressZero();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct SafeAddressZero {}
+    pub struct SafeAddressZero;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -754,7 +796,7 @@ error SafeAddressZero();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for SafeAddressZero {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -774,6 +816,13 @@ error SafeAddressZero();
             #[inline]
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
+            }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
             }
         }
     };
@@ -1190,7 +1239,7 @@ function NODE_SAFE_TYPEHASH() external view returns (bytes32);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NODE_SAFE_TYPEHASHCall {}
+    pub struct NODE_SAFE_TYPEHASHCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`NODE_SAFE_TYPEHASH()`](NODE_SAFE_TYPEHASHCall) function.
@@ -1237,7 +1286,7 @@ function NODE_SAFE_TYPEHASH() external view returns (bytes32);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for NODE_SAFE_TYPEHASHCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -1280,7 +1329,7 @@ function NODE_SAFE_TYPEHASH() external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = NODE_SAFE_TYPEHASHReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -1298,14 +1347,34 @@ function NODE_SAFE_TYPEHASH() external view returns (bytes32);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: NODE_SAFE_TYPEHASHReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: NODE_SAFE_TYPEHASHReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -1317,7 +1386,7 @@ function VERSION() external view returns (string memory);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct VERSIONCall {}
+    pub struct VERSIONCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`VERSION()`](VERSIONCall) function.
@@ -1362,7 +1431,7 @@ function VERSION() external view returns (string memory);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for VERSIONCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -1403,7 +1472,7 @@ function VERSION() external view returns (string memory);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = VERSIONReturn;
+            type Return = alloy::sol_types::private::String;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::String,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -1421,14 +1490,34 @@ function VERSION() external view returns (string memory);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::String as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: VERSIONReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: VERSIONReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -1522,6 +1611,15 @@ function deregisterNodeBySafe(address nodeAddr) external;
                 }
             }
         }
+        impl deregisterNodeBySafeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <deregisterNodeBySafeCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for deregisterNodeBySafeCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -1550,13 +1648,23 @@ function deregisterNodeBySafe(address nodeAddr) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                deregisterNodeBySafeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -1569,7 +1677,7 @@ function domainSeparator() external view returns (bytes32);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct domainSeparatorCall {}
+    pub struct domainSeparatorCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`domainSeparator()`](domainSeparatorCall) function.
@@ -1614,7 +1722,7 @@ function domainSeparator() external view returns (bytes32);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for domainSeparatorCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -1657,7 +1765,7 @@ function domainSeparator() external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = domainSeparatorReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -1675,14 +1783,34 @@ function domainSeparator() external view returns (bytes32);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: domainSeparatorReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: domainSeparatorReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -1801,7 +1929,7 @@ function isNodeSafeRegistered(address safeAddress, address nodeChainKeyAddress) 
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = isNodeSafeRegisteredReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -1826,14 +1954,34 @@ function isNodeSafeRegistered(address safeAddress, address nodeChainKeyAddress) 
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: isNodeSafeRegisteredReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: isNodeSafeRegisteredReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -1936,7 +2084,7 @@ function nodeSigNonce(address nodeAddress) external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = nodeSigNonceReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -1958,14 +2106,34 @@ function nodeSigNonce(address nodeAddress) external view returns (uint256);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: nodeSigNonceReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: nodeSigNonceReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -2066,7 +2234,7 @@ function nodeToSafe(address nodeAddress) external view returns (address);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = nodeToSafeReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2088,14 +2256,34 @@ function nodeToSafe(address nodeAddress) external view returns (address);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: nodeToSafeReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: nodeToSafeReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -2189,6 +2377,13 @@ function registerSafeByNode(address safeAddr) external;
                 }
             }
         }
+        impl registerSafeByNodeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <registerSafeByNodeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for registerSafeByNodeCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -2217,13 +2412,23 @@ function registerSafeByNode(address safeAddr) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                registerSafeByNodeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2334,6 +2539,15 @@ function registerSafeWithNodeSig(address safeAddress, address nodeChainKeyAddres
                 }
             }
         }
+        impl registerSafeWithNodeSigReturn {
+            fn _tokenize(
+                &self,
+            ) -> <registerSafeWithNodeSigCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for registerSafeWithNodeSigCall {
             type Parameters<'a> = (
@@ -2372,13 +2586,23 @@ function registerSafeWithNodeSig(address safeAddress, address nodeChainKeyAddres
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                registerSafeWithNodeSigReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2391,7 +2615,7 @@ function updateDomainSeparator() external;
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct updateDomainSeparatorCall {}
+    pub struct updateDomainSeparatorCall;
     ///Container type for the return parameters of the [`updateDomainSeparator()`](updateDomainSeparatorCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2433,7 +2657,7 @@ function updateDomainSeparator() external;
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for updateDomainSeparatorCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2470,6 +2694,15 @@ function updateDomainSeparator() external;
                 }
             }
         }
+        impl updateDomainSeparatorReturn {
+            fn _tokenize(
+                &self,
+            ) -> <updateDomainSeparatorCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for updateDomainSeparatorCall {
             type Parameters<'a> = ();
@@ -2494,13 +2727,23 @@ function updateDomainSeparator() external;
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                updateDomainSeparatorReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -2602,20 +2845,16 @@ function updateDomainSeparator() external;
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls>] = &[
                 {
                     fn isNodeSafeRegistered(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
                         <isNodeSafeRegisteredCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryCalls::isNodeSafeRegistered)
                     }
@@ -2624,11 +2863,9 @@ function updateDomainSeparator() external;
                 {
                     fn registerSafeWithNodeSig(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
                         <registerSafeWithNodeSigCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryCalls::registerSafeWithNodeSig)
                     }
@@ -2637,11 +2874,9 @@ function updateDomainSeparator() external;
                 {
                     fn registerSafeByNode(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
                         <registerSafeByNodeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryCalls::registerSafeByNode)
                     }
@@ -2650,11 +2885,9 @@ function updateDomainSeparator() external;
                 {
                     fn NODE_SAFE_TYPEHASH(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
                         <NODE_SAFE_TYPEHASHCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryCalls::NODE_SAFE_TYPEHASH)
                     }
@@ -2663,11 +2896,9 @@ function updateDomainSeparator() external;
                 {
                     fn nodeToSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
                         <nodeToSafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryCalls::nodeToSafe)
                     }
@@ -2676,11 +2907,9 @@ function updateDomainSeparator() external;
                 {
                     fn updateDomainSeparator(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
                         <updateDomainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryCalls::updateDomainSeparator)
                     }
@@ -2689,11 +2918,9 @@ function updateDomainSeparator() external;
                 {
                     fn deregisterNodeBySafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
                         <deregisterNodeBySafeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryCalls::deregisterNodeBySafe)
                     }
@@ -2702,11 +2929,9 @@ function updateDomainSeparator() external;
                 {
                     fn nodeSigNonce(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
                         <nodeSigNonceCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryCalls::nodeSigNonce)
                     }
@@ -2715,11 +2940,9 @@ function updateDomainSeparator() external;
                 {
                     fn domainSeparator(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
                         <domainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryCalls::domainSeparator)
                     }
@@ -2728,11 +2951,137 @@ function updateDomainSeparator() external;
                 {
                     fn VERSION(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
-                        <VERSIONCall as alloy_sol_types::SolCall>::abi_decode_raw(
+                        <VERSIONCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
+                            .map(HoprNodeSafeRegistryCalls::VERSION)
+                    }
+                    VERSION
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls>] = &[
+                {
+                    fn isNodeSafeRegistered(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
+                        <isNodeSafeRegisteredCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
                                 data,
-                                validate,
+                            )
+                            .map(HoprNodeSafeRegistryCalls::isNodeSafeRegistered)
+                    }
+                    isNodeSafeRegistered
+                },
+                {
+                    fn registerSafeWithNodeSig(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
+                        <registerSafeWithNodeSigCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryCalls::registerSafeWithNodeSig)
+                    }
+                    registerSafeWithNodeSig
+                },
+                {
+                    fn registerSafeByNode(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
+                        <registerSafeByNodeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryCalls::registerSafeByNode)
+                    }
+                    registerSafeByNode
+                },
+                {
+                    fn NODE_SAFE_TYPEHASH(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
+                        <NODE_SAFE_TYPEHASHCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryCalls::NODE_SAFE_TYPEHASH)
+                    }
+                    NODE_SAFE_TYPEHASH
+                },
+                {
+                    fn nodeToSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
+                        <nodeToSafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryCalls::nodeToSafe)
+                    }
+                    nodeToSafe
+                },
+                {
+                    fn updateDomainSeparator(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
+                        <updateDomainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryCalls::updateDomainSeparator)
+                    }
+                    updateDomainSeparator
+                },
+                {
+                    fn deregisterNodeBySafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
+                        <deregisterNodeBySafeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryCalls::deregisterNodeBySafe)
+                    }
+                    deregisterNodeBySafe
+                },
+                {
+                    fn nodeSigNonce(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
+                        <nodeSigNonceCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryCalls::nodeSigNonce)
+                    }
+                    nodeSigNonce
+                },
+                {
+                    fn domainSeparator(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
+                        <domainSeparatorCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryCalls::domainSeparator)
+                    }
+                    domainSeparator
+                },
+                {
+                    fn VERSION(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryCalls> {
+                        <VERSIONCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
                             )
                             .map(HoprNodeSafeRegistryCalls::VERSION)
                     }
@@ -2747,7 +3096,7 @@ function updateDomainSeparator() external;
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -2944,20 +3293,16 @@ function updateDomainSeparator() external;
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors>] = &[
                 {
                     fn SafeAddressZero(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
                         <SafeAddressZero as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryErrors::SafeAddressZero)
                     }
@@ -2966,12 +3311,8 @@ function updateDomainSeparator() external;
                 {
                     fn NotValidSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
-                        <NotValidSafe as alloy_sol_types::SolError>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <NotValidSafe as alloy_sol_types::SolError>::abi_decode_raw(data)
                             .map(HoprNodeSafeRegistryErrors::NotValidSafe)
                     }
                     NotValidSafe
@@ -2979,12 +3320,8 @@ function updateDomainSeparator() external;
                 {
                     fn NodeHasSafe(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
-                        <NodeHasSafe as alloy_sol_types::SolError>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <NodeHasSafe as alloy_sol_types::SolError>::abi_decode_raw(data)
                             .map(HoprNodeSafeRegistryErrors::NodeHasSafe)
                     }
                     NodeHasSafe
@@ -2992,11 +3329,9 @@ function updateDomainSeparator() external;
                 {
                     fn NodeAddressZero(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
                         <NodeAddressZero as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryErrors::NodeAddressZero)
                     }
@@ -3005,11 +3340,9 @@ function updateDomainSeparator() external;
                 {
                     fn NodeIsContract(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
                         <NodeIsContract as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryErrors::NodeIsContract)
                     }
@@ -3018,11 +3351,9 @@ function updateDomainSeparator() external;
                 {
                     fn NotValidSignatureFromNode(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
                         <NotValidSignatureFromNode as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryErrors::NotValidSignatureFromNode)
                     }
@@ -3031,11 +3362,9 @@ function updateDomainSeparator() external;
                 {
                     fn NodeNotModuleMember(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
                         <NodeNotModuleMember as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeSafeRegistryErrors::NodeNotModuleMember)
                     }
@@ -3050,7 +3379,104 @@ function updateDomainSeparator() external;
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors>] = &[
+                {
+                    fn SafeAddressZero(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
+                        <SafeAddressZero as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryErrors::SafeAddressZero)
+                    }
+                    SafeAddressZero
+                },
+                {
+                    fn NotValidSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
+                        <NotValidSafe as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryErrors::NotValidSafe)
+                    }
+                    NotValidSafe
+                },
+                {
+                    fn NodeHasSafe(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
+                        <NodeHasSafe as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryErrors::NodeHasSafe)
+                    }
+                    NodeHasSafe
+                },
+                {
+                    fn NodeAddressZero(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
+                        <NodeAddressZero as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryErrors::NodeAddressZero)
+                    }
+                    NodeAddressZero
+                },
+                {
+                    fn NodeIsContract(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
+                        <NodeIsContract as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryErrors::NodeIsContract)
+                    }
+                    NodeIsContract
+                },
+                {
+                    fn NotValidSignatureFromNode(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
+                        <NotValidSignatureFromNode as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryErrors::NotValidSignatureFromNode)
+                    }
+                    NotValidSignatureFromNode
+                },
+                {
+                    fn NodeNotModuleMember(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeSafeRegistryErrors> {
+                        <NodeNotModuleMember as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeSafeRegistryErrors::NodeNotModuleMember)
+                    }
+                    NodeNotModuleMember
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -3180,7 +3606,6 @@ function updateDomainSeparator() external;
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(
@@ -3189,7 +3614,6 @@ function updateDomainSeparator() external;
                     <DergisteredNodeSafe as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::DergisteredNodeSafe)
                 }
@@ -3199,7 +3623,6 @@ function updateDomainSeparator() external;
                     <DomainSeparatorUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::DomainSeparatorUpdated)
                 }
@@ -3209,7 +3632,6 @@ function updateDomainSeparator() external;
                     <RegisteredNodeSafe as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RegisteredNodeSafe)
                 }
@@ -3262,14 +3684,13 @@ function updateDomainSeparator() external;
 See the [wrapper's documentation](`HoprNodeSafeRegistryInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprNodeSafeRegistryInstance<T, P, N> {
-        HoprNodeSafeRegistryInstance::<T, P, N>::new(address, provider)
+    ) -> HoprNodeSafeRegistryInstance<P, N> {
+        HoprNodeSafeRegistryInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -3278,15 +3699,14 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprNodeSafeRegistryInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprNodeSafeRegistryInstance<P, N>>,
     > {
-        HoprNodeSafeRegistryInstance::<T, P, N>::deploy(provider)
+        HoprNodeSafeRegistryInstance::<P, N>::deploy(provider)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -3295,11 +3715,10 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprNodeSafeRegistryInstance::<T, P, N>::deploy_builder(provider)
+    >(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprNodeSafeRegistryInstance::<P, N>::deploy_builder(provider)
     }
     /**A [`HoprNodeSafeRegistry`](self) instance.
 
@@ -3313,17 +3732,13 @@ be used to deploy a new instance of the contract.
 
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
-    pub struct HoprNodeSafeRegistryInstance<
-        T,
-        P,
-        N = alloy_contract::private::Ethereum,
-    > {
+    pub struct HoprNodeSafeRegistryInstance<P, N = alloy_contract::private::Ethereum> {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprNodeSafeRegistryInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprNodeSafeRegistryInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprNodeSafeRegistryInstance").field(&self.address).finish()
@@ -3332,10 +3747,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeSafeRegistryInstance<T, P, N> {
+    > HoprNodeSafeRegistryInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprNodeSafeRegistry`](self) contract instance.
 
 See the [wrapper's documentation](`HoprNodeSafeRegistryInstance`) for more details.*/
@@ -3347,7 +3761,7 @@ See the [wrapper's documentation](`HoprNodeSafeRegistryInstance`) for more detai
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -3358,7 +3772,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         #[inline]
         pub async fn deploy(
             provider: P,
-        ) -> alloy_contract::Result<HoprNodeSafeRegistryInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprNodeSafeRegistryInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -3369,7 +3783,7 @@ and constructor arguments, if any.
 This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         #[inline]
-        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
+        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 ::core::clone::Clone::clone(&BYTECODE),
@@ -3396,24 +3810,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprNodeSafeRegistryInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprNodeSafeRegistryInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprNodeSafeRegistryInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprNodeSafeRegistryInstance<P, N> {
             HoprNodeSafeRegistryInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeSafeRegistryInstance<T, P, N> {
+    > HoprNodeSafeRegistryInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -3421,24 +3834,24 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
         ///Creates a new call builder for the [`NODE_SAFE_TYPEHASH`] function.
         pub fn NODE_SAFE_TYPEHASH(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, NODE_SAFE_TYPEHASHCall, N> {
-            self.call_builder(&NODE_SAFE_TYPEHASHCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, NODE_SAFE_TYPEHASHCall, N> {
+            self.call_builder(&NODE_SAFE_TYPEHASHCall)
         }
         ///Creates a new call builder for the [`VERSION`] function.
-        pub fn VERSION(&self) -> alloy_contract::SolCallBuilder<T, &P, VERSIONCall, N> {
-            self.call_builder(&VERSIONCall {})
+        pub fn VERSION(&self) -> alloy_contract::SolCallBuilder<&P, VERSIONCall, N> {
+            self.call_builder(&VERSIONCall)
         }
         ///Creates a new call builder for the [`deregisterNodeBySafe`] function.
         pub fn deregisterNodeBySafe(
             &self,
             nodeAddr: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, deregisterNodeBySafeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, deregisterNodeBySafeCall, N> {
             self.call_builder(
                 &deregisterNodeBySafeCall {
                     nodeAddr,
@@ -3448,15 +3861,15 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         ///Creates a new call builder for the [`domainSeparator`] function.
         pub fn domainSeparator(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, domainSeparatorCall, N> {
-            self.call_builder(&domainSeparatorCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, domainSeparatorCall, N> {
+            self.call_builder(&domainSeparatorCall)
         }
         ///Creates a new call builder for the [`isNodeSafeRegistered`] function.
         pub fn isNodeSafeRegistered(
             &self,
             safeAddress: alloy::sol_types::private::Address,
             nodeChainKeyAddress: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, isNodeSafeRegisteredCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, isNodeSafeRegisteredCall, N> {
             self.call_builder(
                 &isNodeSafeRegisteredCall {
                     safeAddress,
@@ -3468,21 +3881,21 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn nodeSigNonce(
             &self,
             nodeAddress: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, nodeSigNonceCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, nodeSigNonceCall, N> {
             self.call_builder(&nodeSigNonceCall { nodeAddress })
         }
         ///Creates a new call builder for the [`nodeToSafe`] function.
         pub fn nodeToSafe(
             &self,
             nodeAddress: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, nodeToSafeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, nodeToSafeCall, N> {
             self.call_builder(&nodeToSafeCall { nodeAddress })
         }
         ///Creates a new call builder for the [`registerSafeByNode`] function.
         pub fn registerSafeByNode(
             &self,
             safeAddr: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, registerSafeByNodeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, registerSafeByNodeCall, N> {
             self.call_builder(&registerSafeByNodeCall { safeAddr })
         }
         ///Creates a new call builder for the [`registerSafeWithNodeSig`] function.
@@ -3491,7 +3904,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             safeAddress: alloy::sol_types::private::Address,
             nodeChainKeyAddress: alloy::sol_types::private::Address,
             sig: alloy::sol_types::private::Bytes,
-        ) -> alloy_contract::SolCallBuilder<T, &P, registerSafeWithNodeSigCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, registerSafeWithNodeSigCall, N> {
             self.call_builder(
                 &registerSafeWithNodeSigCall {
                     safeAddress,
@@ -3503,42 +3916,41 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         ///Creates a new call builder for the [`updateDomainSeparator`] function.
         pub fn updateDomainSeparator(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, updateDomainSeparatorCall, N> {
-            self.call_builder(&updateDomainSeparatorCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, updateDomainSeparatorCall, N> {
+            self.call_builder(&updateDomainSeparatorCall)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeSafeRegistryInstance<T, P, N> {
+    > HoprNodeSafeRegistryInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`DergisteredNodeSafe`] event.
         pub fn DergisteredNodeSafe_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, DergisteredNodeSafe, N> {
+        ) -> alloy_contract::Event<&P, DergisteredNodeSafe, N> {
             self.event_filter::<DergisteredNodeSafe>()
         }
         ///Creates a new event filter for the [`DomainSeparatorUpdated`] event.
         pub fn DomainSeparatorUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, DomainSeparatorUpdated, N> {
+        ) -> alloy_contract::Event<&P, DomainSeparatorUpdated, N> {
             self.event_filter::<DomainSeparatorUpdated>()
         }
         ///Creates a new event filter for the [`RegisteredNodeSafe`] event.
         pub fn RegisteredNodeSafe_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RegisteredNodeSafe, N> {
+        ) -> alloy_contract::Event<&P, RegisteredNodeSafe, N> {
             self.event_filter::<RegisteredNodeSafe>()
         }
     }

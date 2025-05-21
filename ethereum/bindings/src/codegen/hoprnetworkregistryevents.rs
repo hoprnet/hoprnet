@@ -1059,14 +1059,12 @@ event RequirementUpdated(address indexed requirementImplementation);
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(<Deregistered as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <Deregistered as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::Deregistered)
                 }
@@ -1076,7 +1074,6 @@ event RequirementUpdated(address indexed requirementImplementation);
                     <DeregisteredByManager as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::DeregisteredByManager)
                 }
@@ -1086,7 +1083,6 @@ event RequirementUpdated(address indexed requirementImplementation);
                     <EligibilityUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::EligibilityUpdated)
                 }
@@ -1096,7 +1092,6 @@ event RequirementUpdated(address indexed requirementImplementation);
                     <NetworkRegistryStatusUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::NetworkRegistryStatusUpdated)
                 }
@@ -1104,7 +1099,6 @@ event RequirementUpdated(address indexed requirementImplementation);
                     <Registered as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::Registered)
                 }
@@ -1114,7 +1108,6 @@ event RequirementUpdated(address indexed requirementImplementation);
                     <RegisteredByManager as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RegisteredByManager)
                 }
@@ -1124,7 +1117,6 @@ event RequirementUpdated(address indexed requirementImplementation);
                     <RequirementUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RequirementUpdated)
                 }
@@ -1201,14 +1193,13 @@ event RequirementUpdated(address indexed requirementImplementation);
 See the [wrapper's documentation](`HoprNetworkRegistryEventsInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprNetworkRegistryEventsInstance<T, P, N> {
-        HoprNetworkRegistryEventsInstance::<T, P, N>::new(address, provider)
+    ) -> HoprNetworkRegistryEventsInstance<P, N> {
+        HoprNetworkRegistryEventsInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -1217,15 +1208,14 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprNetworkRegistryEventsInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprNetworkRegistryEventsInstance<P, N>>,
     > {
-        HoprNetworkRegistryEventsInstance::<T, P, N>::deploy(provider)
+        HoprNetworkRegistryEventsInstance::<P, N>::deploy(provider)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -1234,11 +1224,10 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprNetworkRegistryEventsInstance::<T, P, N>::deploy_builder(provider)
+    >(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprNetworkRegistryEventsInstance::<P, N>::deploy_builder(provider)
     }
     /**A [`HoprNetworkRegistryEvents`](self) instance.
 
@@ -1253,16 +1242,15 @@ be used to deploy a new instance of the contract.
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
     pub struct HoprNetworkRegistryEventsInstance<
-        T,
         P,
         N = alloy_contract::private::Ethereum,
     > {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprNetworkRegistryEventsInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprNetworkRegistryEventsInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprNetworkRegistryEventsInstance")
@@ -1273,10 +1261,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNetworkRegistryEventsInstance<T, P, N> {
+    > HoprNetworkRegistryEventsInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprNetworkRegistryEvents`](self) contract instance.
 
 See the [wrapper's documentation](`HoprNetworkRegistryEventsInstance`) for more details.*/
@@ -1288,7 +1275,7 @@ See the [wrapper's documentation](`HoprNetworkRegistryEventsInstance`) for more 
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -1299,7 +1286,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         #[inline]
         pub async fn deploy(
             provider: P,
-        ) -> alloy_contract::Result<HoprNetworkRegistryEventsInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprNetworkRegistryEventsInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -1310,7 +1297,7 @@ and constructor arguments, if any.
 This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         #[inline]
-        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
+        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 ::core::clone::Clone::clone(&BYTECODE),
@@ -1337,24 +1324,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprNetworkRegistryEventsInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprNetworkRegistryEventsInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprNetworkRegistryEventsInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprNetworkRegistryEventsInstance<P, N> {
             HoprNetworkRegistryEventsInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNetworkRegistryEventsInstance<T, P, N> {
+    > HoprNetworkRegistryEventsInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -1362,64 +1348,61 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNetworkRegistryEventsInstance<T, P, N> {
+    > HoprNetworkRegistryEventsInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`Deregistered`] event.
-        pub fn Deregistered_filter(
-            &self,
-        ) -> alloy_contract::Event<T, &P, Deregistered, N> {
+        pub fn Deregistered_filter(&self) -> alloy_contract::Event<&P, Deregistered, N> {
             self.event_filter::<Deregistered>()
         }
         ///Creates a new event filter for the [`DeregisteredByManager`] event.
         pub fn DeregisteredByManager_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, DeregisteredByManager, N> {
+        ) -> alloy_contract::Event<&P, DeregisteredByManager, N> {
             self.event_filter::<DeregisteredByManager>()
         }
         ///Creates a new event filter for the [`EligibilityUpdated`] event.
         pub fn EligibilityUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, EligibilityUpdated, N> {
+        ) -> alloy_contract::Event<&P, EligibilityUpdated, N> {
             self.event_filter::<EligibilityUpdated>()
         }
         ///Creates a new event filter for the [`NetworkRegistryStatusUpdated`] event.
         pub fn NetworkRegistryStatusUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, NetworkRegistryStatusUpdated, N> {
+        ) -> alloy_contract::Event<&P, NetworkRegistryStatusUpdated, N> {
             self.event_filter::<NetworkRegistryStatusUpdated>()
         }
         ///Creates a new event filter for the [`Registered`] event.
-        pub fn Registered_filter(&self) -> alloy_contract::Event<T, &P, Registered, N> {
+        pub fn Registered_filter(&self) -> alloy_contract::Event<&P, Registered, N> {
             self.event_filter::<Registered>()
         }
         ///Creates a new event filter for the [`RegisteredByManager`] event.
         pub fn RegisteredByManager_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RegisteredByManager, N> {
+        ) -> alloy_contract::Event<&P, RegisteredByManager, N> {
             self.event_filter::<RegisteredByManager>()
         }
         ///Creates a new event filter for the [`RequirementUpdated`] event.
         pub fn RequirementUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RequirementUpdated, N> {
+        ) -> alloy_contract::Event<&P, RequirementUpdated, N> {
             self.event_filter::<RequirementUpdated>()
         }
     }

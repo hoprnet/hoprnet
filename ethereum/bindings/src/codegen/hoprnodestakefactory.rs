@@ -177,7 +177,7 @@ error TooFewOwners();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TooFewOwners {}
+    pub struct TooFewOwners;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -212,7 +212,7 @@ error TooFewOwners();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for TooFewOwners {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -232,6 +232,13 @@ error TooFewOwners();
             #[inline]
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
+            }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
             }
         }
     };
@@ -640,6 +647,20 @@ function clone(address moduleSingletonAddress, address[] memory admins, uint256 
                 }
             }
         }
+        impl cloneReturn {
+            fn _tokenize(
+                &self,
+            ) -> <cloneCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        &self._0,
+                    ),
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        &self._1,
+                    ),
+                )
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for cloneCall {
             type Parameters<'a> = (
@@ -685,13 +706,23 @@ function clone(address moduleSingletonAddress, address[] memory admins, uint256 
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                cloneReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -811,7 +842,7 @@ function predictDeterministicAddress(address implementation, bytes32 salt) exter
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = predictDeterministicAddressReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -836,14 +867,34 @@ function predictDeterministicAddress(address implementation, bytes32 salt) exter
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: predictDeterministicAddressReturn = r.into();
+                        r.predicted
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: predictDeterministicAddressReturn = r.into();
+                        r.predicted
+                    })
             }
         }
     };
@@ -855,7 +906,7 @@ function safeVersion() external pure returns (string memory);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct safeVersionCall {}
+    pub struct safeVersionCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`safeVersion()`](safeVersionCall) function.
@@ -900,7 +951,7 @@ function safeVersion() external pure returns (string memory);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for safeVersionCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -941,7 +992,7 @@ function safeVersion() external pure returns (string memory);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = safeVersionReturn;
+            type Return = alloy::sol_types::private::String;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::String,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -959,14 +1010,34 @@ function safeVersion() external pure returns (string memory);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::String as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: safeVersionReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: safeVersionReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -1025,20 +1096,16 @@ function safeVersion() external pure returns (string memory);
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprNodeStakeFactoryCalls>] = &[
                 {
                     fn predictDeterministicAddress(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeStakeFactoryCalls> {
                         <predictDeterministicAddressCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeStakeFactoryCalls::predictDeterministicAddress)
                     }
@@ -1047,11 +1114,9 @@ function safeVersion() external pure returns (string memory);
                 {
                     fn safeVersion(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeStakeFactoryCalls> {
                         <safeVersionCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeStakeFactoryCalls::safeVersion)
                     }
@@ -1060,11 +1125,60 @@ function safeVersion() external pure returns (string memory);
                 {
                     fn clone(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeStakeFactoryCalls> {
-                        <cloneCall as alloy_sol_types::SolCall>::abi_decode_raw(
+                        <cloneCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
+                            .map(HoprNodeStakeFactoryCalls::clone)
+                    }
+                    clone
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprNodeStakeFactoryCalls>] = &[
+                {
+                    fn predictDeterministicAddress(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeStakeFactoryCalls> {
+                        <predictDeterministicAddressCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
                                 data,
-                                validate,
+                            )
+                            .map(HoprNodeStakeFactoryCalls::predictDeterministicAddress)
+                    }
+                    predictDeterministicAddress
+                },
+                {
+                    fn safeVersion(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeStakeFactoryCalls> {
+                        <safeVersionCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeStakeFactoryCalls::safeVersion)
+                    }
+                    safeVersion
+                },
+                {
+                    fn clone(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeStakeFactoryCalls> {
+                        <cloneCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
                             )
                             .map(HoprNodeStakeFactoryCalls::clone)
                     }
@@ -1079,7 +1193,7 @@ function safeVersion() external pure returns (string memory);
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -1163,20 +1277,45 @@ function safeVersion() external pure returns (string memory);
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprNodeStakeFactoryErrors>] = &[
                 {
                     fn TooFewOwners(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeStakeFactoryErrors> {
-                        <TooFewOwners as alloy_sol_types::SolError>::abi_decode_raw(
+                        <TooFewOwners as alloy_sol_types::SolError>::abi_decode_raw(data)
+                            .map(HoprNodeStakeFactoryErrors::TooFewOwners)
+                    }
+                    TooFewOwners
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprNodeStakeFactoryErrors>] = &[
+                {
+                    fn TooFewOwners(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeStakeFactoryErrors> {
+                        <TooFewOwners as alloy_sol_types::SolError>::abi_decode_raw_validate(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeStakeFactoryErrors::TooFewOwners)
                     }
@@ -1191,7 +1330,7 @@ function safeVersion() external pure returns (string memory);
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -1251,7 +1390,6 @@ function safeVersion() external pure returns (string memory);
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(
@@ -1260,7 +1398,6 @@ function safeVersion() external pure returns (string memory);
                     <NewHoprNodeStakeModule as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::NewHoprNodeStakeModule)
                 }
@@ -1270,7 +1407,6 @@ function safeVersion() external pure returns (string memory);
                     <NewHoprNodeStakeSafe as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::NewHoprNodeStakeSafe)
                 }
@@ -1317,14 +1453,13 @@ function safeVersion() external pure returns (string memory);
 See the [wrapper's documentation](`HoprNodeStakeFactoryInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprNodeStakeFactoryInstance<T, P, N> {
-        HoprNodeStakeFactoryInstance::<T, P, N>::new(address, provider)
+    ) -> HoprNodeStakeFactoryInstance<P, N> {
+        HoprNodeStakeFactoryInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -1333,15 +1468,14 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprNodeStakeFactoryInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprNodeStakeFactoryInstance<P, N>>,
     > {
-        HoprNodeStakeFactoryInstance::<T, P, N>::deploy(provider)
+        HoprNodeStakeFactoryInstance::<P, N>::deploy(provider)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -1350,11 +1484,10 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprNodeStakeFactoryInstance::<T, P, N>::deploy_builder(provider)
+    >(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprNodeStakeFactoryInstance::<P, N>::deploy_builder(provider)
     }
     /**A [`HoprNodeStakeFactory`](self) instance.
 
@@ -1368,17 +1501,13 @@ be used to deploy a new instance of the contract.
 
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
-    pub struct HoprNodeStakeFactoryInstance<
-        T,
-        P,
-        N = alloy_contract::private::Ethereum,
-    > {
+    pub struct HoprNodeStakeFactoryInstance<P, N = alloy_contract::private::Ethereum> {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprNodeStakeFactoryInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprNodeStakeFactoryInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprNodeStakeFactoryInstance").field(&self.address).finish()
@@ -1387,10 +1516,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeStakeFactoryInstance<T, P, N> {
+    > HoprNodeStakeFactoryInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprNodeStakeFactory`](self) contract instance.
 
 See the [wrapper's documentation](`HoprNodeStakeFactoryInstance`) for more details.*/
@@ -1402,7 +1530,7 @@ See the [wrapper's documentation](`HoprNodeStakeFactoryInstance`) for more detai
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -1413,7 +1541,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         #[inline]
         pub async fn deploy(
             provider: P,
-        ) -> alloy_contract::Result<HoprNodeStakeFactoryInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprNodeStakeFactoryInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -1424,7 +1552,7 @@ and constructor arguments, if any.
 This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         #[inline]
-        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
+        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 ::core::clone::Clone::clone(&BYTECODE),
@@ -1451,24 +1579,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprNodeStakeFactoryInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprNodeStakeFactoryInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprNodeStakeFactoryInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprNodeStakeFactoryInstance<P, N> {
             HoprNodeStakeFactoryInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeStakeFactoryInstance<T, P, N> {
+    > HoprNodeStakeFactoryInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -1476,7 +1603,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
         ///Creates a new call builder for the [`clone`] function.
@@ -1486,7 +1613,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             admins: alloy::sol_types::private::Vec<alloy::sol_types::private::Address>,
             nonce: alloy::sol_types::private::primitives::aliases::U256,
             defaultTarget: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, cloneCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, cloneCall, N> {
             self.call_builder(
                 &cloneCall {
                     moduleSingletonAddress,
@@ -1501,7 +1628,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             implementation: alloy::sol_types::private::Address,
             salt: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, predictDeterministicAddressCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, predictDeterministicAddressCall, N> {
             self.call_builder(
                 &predictDeterministicAddressCall {
                     implementation,
@@ -1512,36 +1639,35 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         ///Creates a new call builder for the [`safeVersion`] function.
         pub fn safeVersion(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, safeVersionCall, N> {
-            self.call_builder(&safeVersionCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, safeVersionCall, N> {
+            self.call_builder(&safeVersionCall)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeStakeFactoryInstance<T, P, N> {
+    > HoprNodeStakeFactoryInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`NewHoprNodeStakeModule`] event.
         pub fn NewHoprNodeStakeModule_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, NewHoprNodeStakeModule, N> {
+        ) -> alloy_contract::Event<&P, NewHoprNodeStakeModule, N> {
             self.event_filter::<NewHoprNodeStakeModule>()
         }
         ///Creates a new event filter for the [`NewHoprNodeStakeSafe`] event.
         pub fn NewHoprNodeStakeSafe_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, NewHoprNodeStakeSafe, N> {
+        ) -> alloy_contract::Event<&P, NewHoprNodeStakeSafe, N> {
             self.event_filter::<NewHoprNodeStakeSafe>()
         }
     }

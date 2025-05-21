@@ -64,12 +64,12 @@ pub mod Enum {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(value: u8) -> Self {
+            pub const fn from_underlying(value: u8) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(self) -> u8 {
+            pub const fn into_underlying(self) -> u8 {
                 self.0
             }
             /// Return the single encoding of this value, delegating to the
@@ -83,6 +83,18 @@ pub mod Enum {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<u8> for Operation {
+            fn from(value: u8) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<Operation> for u8 {
+            fn from(value: Operation) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -148,11 +160,10 @@ pub mod Enum {
 See the [wrapper's documentation](`EnumInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(address: alloy_sol_types::private::Address, provider: P) -> EnumInstance<T, P, N> {
-        EnumInstance::<T, P, N>::new(address, provider)
+    >(address: alloy_sol_types::private::Address, provider: P) -> EnumInstance<P, N> {
+        EnumInstance::<P, N>::new(address, provider)
     }
     /**A [`Enum`](self) instance.
 
@@ -166,13 +177,13 @@ be used to deploy a new instance of the contract.
 
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
-    pub struct EnumInstance<T, P, N = alloy_contract::private::Ethereum> {
+    pub struct EnumInstance<P, N = alloy_contract::private::Ethereum> {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for EnumInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for EnumInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("EnumInstance").field(&self.address).finish()
@@ -181,10 +192,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > EnumInstance<T, P, N> {
+    > EnumInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`Enum`](self) contract instance.
 
 See the [wrapper's documentation](`EnumInstance`) for more details.*/
@@ -196,7 +206,7 @@ See the [wrapper's documentation](`EnumInstance`) for more details.*/
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /// Returns a reference to the address.
@@ -220,24 +230,23 @@ See the [wrapper's documentation](`EnumInstance`) for more details.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> EnumInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> EnumInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> EnumInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> EnumInstance<P, N> {
             EnumInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > EnumInstance<T, P, N> {
+    > EnumInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -245,24 +254,23 @@ See the [wrapper's documentation](`EnumInstance`) for more details.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > EnumInstance<T, P, N> {
+    > EnumInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
     }
@@ -1203,12 +1211,12 @@ pub mod HoprNodeManagementModule {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(value: u8) -> Self {
+            pub const fn from_underlying(value: u8) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(self) -> u8 {
+            pub const fn into_underlying(self) -> u8 {
                 self.0
             }
             /// Return the single encoding of this value, delegating to the
@@ -1222,6 +1230,18 @@ pub mod HoprNodeManagementModule {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<u8> for GranularPermission {
+            fn from(value: u8) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<GranularPermission> for u8 {
+            fn from(value: GranularPermission) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -1330,14 +1350,14 @@ pub mod HoprNodeManagementModule {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(
+            pub const fn from_underlying(
                 value: alloy::sol_types::private::primitives::aliases::U256,
             ) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(
+            pub const fn into_underlying(
                 self,
             ) -> alloy::sol_types::private::primitives::aliases::U256 {
                 self.0
@@ -1353,6 +1373,20 @@ pub mod HoprNodeManagementModule {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<alloy::sol_types::private::primitives::aliases::U256> for Target {
+            fn from(
+                value: alloy::sol_types::private::primitives::aliases::U256,
+            ) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<Target> for alloy::sol_types::private::primitives::aliases::U256 {
+            fn from(value: Target) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -1420,7 +1454,7 @@ error AddressIsZero();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct AddressIsZero {}
+    pub struct AddressIsZero;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1455,7 +1489,7 @@ error AddressIsZero();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for AddressIsZero {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1476,6 +1510,13 @@ error AddressIsZero();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -1486,7 +1527,7 @@ error AlreadyInitialized();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct AlreadyInitialized {}
+    pub struct AlreadyInitialized;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1521,7 +1562,7 @@ error AlreadyInitialized();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for AlreadyInitialized {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1542,6 +1583,13 @@ error AlreadyInitialized();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -1552,7 +1600,7 @@ error ArrayTooLong();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ArrayTooLong {}
+    pub struct ArrayTooLong;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1587,7 +1635,7 @@ error ArrayTooLong();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for ArrayTooLong {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1608,6 +1656,13 @@ error ArrayTooLong();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -1618,7 +1673,7 @@ error ArraysDifferentLength();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ArraysDifferentLength {}
+    pub struct ArraysDifferentLength;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1653,7 +1708,7 @@ error ArraysDifferentLength();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for ArraysDifferentLength {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1674,6 +1729,13 @@ error ArraysDifferentLength();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -1684,7 +1746,7 @@ error CalldataOutOfBounds();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct CalldataOutOfBounds {}
+    pub struct CalldataOutOfBounds;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1719,7 +1781,7 @@ error CalldataOutOfBounds();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for CalldataOutOfBounds {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1740,6 +1802,13 @@ error CalldataOutOfBounds();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -1750,7 +1819,7 @@ error CannotChangeOwner();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct CannotChangeOwner {}
+    pub struct CannotChangeOwner;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1785,7 +1854,7 @@ error CannotChangeOwner();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for CannotChangeOwner {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1806,6 +1875,13 @@ error CannotChangeOwner();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -1816,7 +1892,7 @@ error DefaultPermissionRejected();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct DefaultPermissionRejected {}
+    pub struct DefaultPermissionRejected;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1853,7 +1929,7 @@ error DefaultPermissionRejected();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for DefaultPermissionRejected {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1874,6 +1950,13 @@ error DefaultPermissionRejected();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -1884,7 +1967,7 @@ error DelegateCallNotAllowed();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct DelegateCallNotAllowed {}
+    pub struct DelegateCallNotAllowed;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1919,7 +2002,7 @@ error DelegateCallNotAllowed();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for DelegateCallNotAllowed {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1940,6 +2023,13 @@ error DelegateCallNotAllowed();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -1950,7 +2040,7 @@ error FunctionSignatureTooShort();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct FunctionSignatureTooShort {}
+    pub struct FunctionSignatureTooShort;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1987,7 +2077,7 @@ error FunctionSignatureTooShort();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for FunctionSignatureTooShort {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2008,6 +2098,13 @@ error FunctionSignatureTooShort();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2018,7 +2115,7 @@ error GranularPermissionRejected();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct GranularPermissionRejected {}
+    pub struct GranularPermissionRejected;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2055,7 +2152,7 @@ error GranularPermissionRejected();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for GranularPermissionRejected {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2076,6 +2173,13 @@ error GranularPermissionRejected();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2086,7 +2190,7 @@ error NoMembership();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NoMembership {}
+    pub struct NoMembership;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2121,7 +2225,7 @@ error NoMembership();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NoMembership {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2142,6 +2246,13 @@ error NoMembership();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2152,7 +2263,7 @@ error NodePermissionRejected();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NodePermissionRejected {}
+    pub struct NodePermissionRejected;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2187,7 +2298,7 @@ error NodePermissionRejected();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NodePermissionRejected {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2208,6 +2319,13 @@ error NodePermissionRejected();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2218,7 +2336,7 @@ error NonExistentKey();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NonExistentKey {}
+    pub struct NonExistentKey;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2253,7 +2371,7 @@ error NonExistentKey();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NonExistentKey {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2274,6 +2392,13 @@ error NonExistentKey();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2284,7 +2409,7 @@ error ParameterNotAllowed();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ParameterNotAllowed {}
+    pub struct ParameterNotAllowed;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2319,7 +2444,7 @@ error ParameterNotAllowed();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for ParameterNotAllowed {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2340,6 +2465,13 @@ error ParameterNotAllowed();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2350,7 +2482,7 @@ error PermissionNotConfigured();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct PermissionNotConfigured {}
+    pub struct PermissionNotConfigured;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2385,7 +2517,7 @@ error PermissionNotConfigured();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for PermissionNotConfigured {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2406,6 +2538,13 @@ error PermissionNotConfigured();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2416,7 +2555,7 @@ error PermissionNotFound();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct PermissionNotFound {}
+    pub struct PermissionNotFound;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2451,7 +2590,7 @@ error PermissionNotFound();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for PermissionNotFound {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2472,6 +2611,13 @@ error PermissionNotFound();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2482,7 +2628,7 @@ error SafeMultisendSameAddress();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct SafeMultisendSameAddress {}
+    pub struct SafeMultisendSameAddress;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2519,7 +2665,7 @@ error SafeMultisendSameAddress();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for SafeMultisendSameAddress {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2540,6 +2686,13 @@ error SafeMultisendSameAddress();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2550,7 +2703,7 @@ error SendNotAllowed();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct SendNotAllowed {}
+    pub struct SendNotAllowed;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2585,7 +2738,7 @@ error SendNotAllowed();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for SendNotAllowed {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2606,6 +2759,13 @@ error SendNotAllowed();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2616,7 +2776,7 @@ error TargetAddressNotAllowed();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TargetAddressNotAllowed {}
+    pub struct TargetAddressNotAllowed;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2651,7 +2811,7 @@ error TargetAddressNotAllowed();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for TargetAddressNotAllowed {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2672,6 +2832,13 @@ error TargetAddressNotAllowed();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2682,7 +2849,7 @@ error TargetIsNotScoped();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TargetIsNotScoped {}
+    pub struct TargetIsNotScoped;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2717,7 +2884,7 @@ error TargetIsNotScoped();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for TargetIsNotScoped {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2738,6 +2905,13 @@ error TargetIsNotScoped();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2748,7 +2922,7 @@ error TargetIsScoped();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TargetIsScoped {}
+    pub struct TargetIsScoped;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2783,7 +2957,7 @@ error TargetIsScoped();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for TargetIsScoped {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2804,6 +2978,13 @@ error TargetIsScoped();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2814,7 +2995,7 @@ error TooManyCapabilities();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TooManyCapabilities {}
+    pub struct TooManyCapabilities;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2849,7 +3030,7 @@ error TooManyCapabilities();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for TooManyCapabilities {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2870,6 +3051,13 @@ error TooManyCapabilities();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2880,7 +3068,7 @@ error UnacceptableMultiSendOffset();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct UnacceptableMultiSendOffset {}
+    pub struct UnacceptableMultiSendOffset;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2917,7 +3105,7 @@ error UnacceptableMultiSendOffset();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for UnacceptableMultiSendOffset {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -2938,6 +3126,13 @@ error UnacceptableMultiSendOffset();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -2948,7 +3143,7 @@ error WithMembership();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct WithMembership {}
+    pub struct WithMembership;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -2983,7 +3178,7 @@ error WithMembership();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for WithMembership {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -3003,6 +3198,13 @@ error WithMembership();
             #[inline]
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
+            }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
             }
         }
     };
@@ -3242,7 +3444,7 @@ event ExecutionFailure();
         clippy::style
     )]
     #[derive(Clone)]
-    pub struct ExecutionFailure {}
+    pub struct ExecutionFailure;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -3340,7 +3542,7 @@ event ExecutionSuccess();
         clippy::style
     )]
     #[derive(Clone)]
-    pub struct ExecutionSuccess {}
+    pub struct ExecutionSuccess;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -4228,6 +4430,15 @@ function addChannelsAndTokenTarget(Target defaultTarget) external;
                 }
             }
         }
+        impl addChannelsAndTokenTargetReturn {
+            fn _tokenize(
+                &self,
+            ) -> <addChannelsAndTokenTargetCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for addChannelsAndTokenTargetCall {
             type Parameters<'a> = (Target,);
@@ -4252,13 +4463,23 @@ function addChannelsAndTokenTarget(Target defaultTarget) external;
                 (<Target as alloy_sol_types::SolType>::tokenize(&self.defaultTarget),)
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                addChannelsAndTokenTargetReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -4349,6 +4570,13 @@ function addNode(address nodeAddress) external;
                 }
             }
         }
+        impl addNodeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <addNodeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for addNodeCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -4377,13 +4605,23 @@ function addNode(address nodeAddress) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                addNodeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -4513,6 +4751,22 @@ function decodeFunctionSigsAndPermissions(bytes32 encoded, uint256 length) exter
                 }
             }
         }
+        impl decodeFunctionSigsAndPermissionsReturn {
+            fn _tokenize(
+                &self,
+            ) -> <decodeFunctionSigsAndPermissionsCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                (
+                    <alloy::sol_types::sol_data::Array<
+                        alloy::sol_types::sol_data::FixedBytes<4>,
+                    > as alloy_sol_types::SolType>::tokenize(&self.functionSigs),
+                    <alloy::sol_types::sol_data::Array<
+                        GranularPermission,
+                    > as alloy_sol_types::SolType>::tokenize(&self.permissions),
+                )
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for decodeFunctionSigsAndPermissionsCall {
             type Parameters<'a> = (
@@ -4552,13 +4806,23 @@ function decodeFunctionSigsAndPermissions(bytes32 encoded, uint256 length) exter
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                decodeFunctionSigsAndPermissionsReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -4688,6 +4952,22 @@ function encodeFunctionSigsAndPermissions(bytes4[] memory functionSigs, Granular
                 }
             }
         }
+        impl encodeFunctionSigsAndPermissionsReturn {
+            fn _tokenize(
+                &self,
+            ) -> <encodeFunctionSigsAndPermissionsCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(&self.encoded),
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(&self.length),
+                )
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for encodeFunctionSigsAndPermissionsCall {
             type Parameters<'a> = (
@@ -4727,13 +5007,23 @@ function encodeFunctionSigsAndPermissions(bytes4[] memory functionSigs, Granular
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                encodeFunctionSigsAndPermissionsReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -4865,7 +5155,7 @@ function execTransactionFromModule(address to, uint256 value, bytes memory data,
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = execTransactionFromModuleReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4896,14 +5186,34 @@ function execTransactionFromModule(address to, uint256 value, bytes memory data,
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: execTransactionFromModuleReturn = r.into();
+                        r.success
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: execTransactionFromModuleReturn = r.into();
+                        r.success
+                    })
             }
         }
     };
@@ -5028,6 +5338,22 @@ function execTransactionFromModuleReturnData(address to, uint256 value, bytes me
                 }
             }
         }
+        impl execTransactionFromModuleReturnDataReturn {
+            fn _tokenize(
+                &self,
+            ) -> <execTransactionFromModuleReturnDataCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        &self._0,
+                    ),
+                    <alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::tokenize(
+                        &self._1,
+                    ),
+                )
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for execTransactionFromModuleReturnDataCall {
             type Parameters<'a> = (
@@ -5073,13 +5399,23 @@ function execTransactionFromModuleReturnData(address to, uint256 value, bytes me
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                execTransactionFromModuleReturnDataReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -5201,7 +5537,7 @@ function getGranularPermissions(bytes32 capabilityKey, bytes32 pairId) external 
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = getGranularPermissionsReturn;
+            type Return = <GranularPermission as alloy::sol_types::SolType>::RustType;
             type ReturnTuple<'a> = (GranularPermission,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -5226,14 +5562,30 @@ function getGranularPermissions(bytes32 capabilityKey, bytes32 pairId) external 
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (<GranularPermission as alloy_sol_types::SolType>::tokenize(ret),)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: getGranularPermissionsReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: getGranularPermissionsReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -5245,7 +5597,7 @@ function getTargets() external view returns (Target[] memory);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct getTargetsCall {}
+    pub struct getTargetsCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`getTargets()`](getTargetsCall) function.
@@ -5292,7 +5644,7 @@ function getTargets() external view returns (Target[] memory);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for getTargetsCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -5337,7 +5689,9 @@ function getTargets() external view returns (Target[] memory);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = getTargetsReturn;
+            type Return = alloy::sol_types::private::Vec<
+                <Target as alloy::sol_types::SolType>::RustType,
+            >;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Array<Target>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -5355,14 +5709,34 @@ function getTargets() external view returns (Target[] memory);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Array<
+                        Target,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: getTargetsReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: getTargetsReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -5454,6 +5828,13 @@ function includeNode(Target nodeDefaultTarget) external;
                 }
             }
         }
+        impl includeNodeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <includeNodeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for includeNodeCall {
             type Parameters<'a> = (Target,);
@@ -5482,13 +5863,23 @@ function includeNode(Target nodeDefaultTarget) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                includeNodeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -5579,6 +5970,13 @@ function initialize(bytes memory initParams) external;
                 }
             }
         }
+        impl initializeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <initializeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for initializeCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Bytes,);
@@ -5607,13 +6005,23 @@ function initialize(bytes memory initParams) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                initializeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -5626,7 +6034,7 @@ function isHoprNodeManagementModule() external view returns (bool);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct isHoprNodeManagementModuleCall {}
+    pub struct isHoprNodeManagementModuleCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`isHoprNodeManagementModule()`](isHoprNodeManagementModuleCall) function.
@@ -5673,7 +6081,7 @@ function isHoprNodeManagementModule() external view returns (bool);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for isHoprNodeManagementModuleCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -5716,7 +6124,7 @@ function isHoprNodeManagementModule() external view returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = isHoprNodeManagementModuleReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -5734,14 +6142,34 @@ function isHoprNodeManagementModule() external view returns (bool);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: isHoprNodeManagementModuleReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: isHoprNodeManagementModuleReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -5842,7 +6270,7 @@ function isNode(address nodeAddress) external view returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = isNodeReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -5864,14 +6292,34 @@ function isNode(address nodeAddress) external view returns (bool);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: isNodeReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: isNodeReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -5883,7 +6331,7 @@ function multisend() external view returns (address);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct multisendCall {}
+    pub struct multisendCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`multisend()`](multisendCall) function.
@@ -5928,7 +6376,7 @@ function multisend() external view returns (address);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for multisendCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -5969,7 +6417,7 @@ function multisend() external view returns (address);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = multisendReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -5987,14 +6435,34 @@ function multisend() external view returns (address);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: multisendReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: multisendReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6006,7 +6474,7 @@ function owner() external view returns (address);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ownerCall {}
+    pub struct ownerCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`owner()`](ownerCall) function.
@@ -6051,7 +6519,7 @@ function owner() external view returns (address);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for ownerCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6092,7 +6560,7 @@ function owner() external view returns (address);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = ownerReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6110,14 +6578,34 @@ function owner() external view returns (address);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: ownerReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: ownerReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6129,7 +6617,7 @@ function proxiableUUID() external view returns (bytes32);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct proxiableUUIDCall {}
+    pub struct proxiableUUIDCall;
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`proxiableUUID()`](proxiableUUIDCall) function.
@@ -6174,7 +6662,7 @@ function proxiableUUID() external view returns (bytes32);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for proxiableUUIDCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6215,7 +6703,7 @@ function proxiableUUID() external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = proxiableUUIDReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6233,14 +6721,34 @@ function proxiableUUID() external view returns (bytes32);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: proxiableUUIDReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: proxiableUUIDReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
@@ -6330,6 +6838,13 @@ function removeNode(address nodeAddress) external;
                 }
             }
         }
+        impl removeNodeReturn {
+            fn _tokenize(
+                &self,
+            ) -> <removeNodeCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for removeNodeCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -6358,13 +6873,23 @@ function removeNode(address nodeAddress) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                removeNodeReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -6377,7 +6902,7 @@ function renounceOwnership() external;
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct renounceOwnershipCall {}
+    pub struct renounceOwnershipCall;
     ///Container type for the return parameters of the [`renounceOwnership()`](renounceOwnershipCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -6419,7 +6944,7 @@ function renounceOwnership() external;
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for renounceOwnershipCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6456,6 +6981,13 @@ function renounceOwnership() external;
                 }
             }
         }
+        impl renounceOwnershipReturn {
+            fn _tokenize(
+                &self,
+            ) -> <renounceOwnershipCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for renounceOwnershipCall {
             type Parameters<'a> = ();
@@ -6480,13 +7012,23 @@ function renounceOwnership() external;
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                renounceOwnershipReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -6577,6 +7119,13 @@ function revokeTarget(address targetAddress) external;
                 }
             }
         }
+        impl revokeTargetReturn {
+            fn _tokenize(
+                &self,
+            ) -> <revokeTargetCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for revokeTargetCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -6605,13 +7154,23 @@ function revokeTarget(address targetAddress) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                revokeTargetReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -6722,6 +7281,15 @@ function scopeChannelsCapabilities(address targetAddress, bytes32 channelId, byt
                 }
             }
         }
+        impl scopeChannelsCapabilitiesReturn {
+            fn _tokenize(
+                &self,
+            ) -> <scopeChannelsCapabilitiesCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for scopeChannelsCapabilitiesCall {
             type Parameters<'a> = (
@@ -6762,13 +7330,23 @@ function scopeChannelsCapabilities(address targetAddress, bytes32 channelId, byt
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                scopeChannelsCapabilitiesReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -6879,6 +7457,13 @@ function scopeSendCapability(address nodeAddress, address beneficiary, GranularP
                 }
             }
         }
+        impl scopeSendCapabilityReturn {
+            fn _tokenize(
+                &self,
+            ) -> <scopeSendCapabilityCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for scopeSendCapabilityCall {
             type Parameters<'a> = (
@@ -6917,13 +7502,23 @@ function scopeSendCapability(address nodeAddress, address beneficiary, GranularP
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                scopeSendCapabilityReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -7020,6 +7615,13 @@ function scopeTargetChannels(Target defaultTarget) external;
                 }
             }
         }
+        impl scopeTargetChannelsReturn {
+            fn _tokenize(
+                &self,
+            ) -> <scopeTargetChannelsCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for scopeTargetChannelsCall {
             type Parameters<'a> = (Target,);
@@ -7044,13 +7646,23 @@ function scopeTargetChannels(Target defaultTarget) external;
                 (<Target as alloy_sol_types::SolType>::tokenize(&self.defaultTarget),)
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                scopeTargetChannelsReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -7145,6 +7757,13 @@ function scopeTargetSend(Target defaultTarget) external;
                 }
             }
         }
+        impl scopeTargetSendReturn {
+            fn _tokenize(
+                &self,
+            ) -> <scopeTargetSendCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for scopeTargetSendCall {
             type Parameters<'a> = (Target,);
@@ -7169,13 +7788,23 @@ function scopeTargetSend(Target defaultTarget) external;
                 (<Target as alloy_sol_types::SolType>::tokenize(&self.defaultTarget),)
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                scopeTargetSendReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -7272,6 +7901,13 @@ function scopeTargetToken(Target defaultTarget) external;
                 }
             }
         }
+        impl scopeTargetTokenReturn {
+            fn _tokenize(
+                &self,
+            ) -> <scopeTargetTokenCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for scopeTargetTokenCall {
             type Parameters<'a> = (Target,);
@@ -7296,13 +7932,23 @@ function scopeTargetToken(Target defaultTarget) external;
                 (<Target as alloy_sol_types::SolType>::tokenize(&self.defaultTarget),)
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                scopeTargetTokenReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -7423,6 +8069,15 @@ function scopeTokenCapabilities(address nodeAddress, address targetAddress, addr
                 }
             }
         }
+        impl scopeTokenCapabilitiesReturn {
+            fn _tokenize(
+                &self,
+            ) -> <scopeTokenCapabilitiesCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for scopeTokenCapabilitiesCall {
             type Parameters<'a> = (
@@ -7467,13 +8122,23 @@ function scopeTokenCapabilities(address nodeAddress, address targetAddress, addr
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                scopeTokenCapabilitiesReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -7564,6 +8229,13 @@ function setMultisend(address _multisend) external;
                 }
             }
         }
+        impl setMultisendReturn {
+            fn _tokenize(
+                &self,
+            ) -> <setMultisendCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for setMultisendCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -7592,13 +8264,23 @@ function setMultisend(address _multisend) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                setMultisendReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -7693,6 +8375,13 @@ function transferOwnership(address newOwner) external;
                 }
             }
         }
+        impl transferOwnershipReturn {
+            fn _tokenize(
+                &self,
+            ) -> <transferOwnershipCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for transferOwnershipCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -7721,13 +8410,23 @@ function transferOwnership(address newOwner) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                transferOwnershipReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -7828,6 +8527,18 @@ function tryGetTarget(address targetAddress) external view returns (bool, Target
                 }
             }
         }
+        impl tryGetTargetReturn {
+            fn _tokenize(
+                &self,
+            ) -> <tryGetTargetCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        &self._0,
+                    ),
+                    <Target as alloy_sol_types::SolType>::tokenize(&self._1),
+                )
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for tryGetTargetCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -7856,13 +8567,23 @@ function tryGetTarget(address targetAddress) external view returns (bool, Target
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                tryGetTargetReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -7953,6 +8674,13 @@ function upgradeTo(address newImplementation) external;
                 }
             }
         }
+        impl upgradeToReturn {
+            fn _tokenize(
+                &self,
+            ) -> <upgradeToCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for upgradeToCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -7981,13 +8709,23 @@ function upgradeTo(address newImplementation) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                upgradeToReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -8093,6 +8831,13 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 }
             }
         }
+        impl upgradeToAndCallReturn {
+            fn _tokenize(
+                &self,
+            ) -> <upgradeToAndCallCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for upgradeToAndCallCall {
             type Parameters<'a> = (
@@ -8127,13 +8872,23 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                upgradeToAndCallReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
@@ -8345,21 +9100,15 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls>] = &[
                 {
                     fn isNode(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
-                        <isNodeCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <isNodeCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprNodeManagementModuleCalls::isNode)
                     }
                     isNode
@@ -8367,12 +9116,8 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn multisend(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
-                        <multisendCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <multisendCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprNodeManagementModuleCalls::multisend)
                     }
                     multisend
@@ -8380,11 +9125,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn revokeTarget(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <revokeTargetCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::revokeTarget)
                     }
@@ -8393,12 +9136,8 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn upgradeTo(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
-                        <upgradeToCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <upgradeToCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprNodeManagementModuleCalls::upgradeTo)
                     }
                     upgradeTo
@@ -8406,11 +9145,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn initialize(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <initializeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::initialize)
                     }
@@ -8419,11 +9156,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn execTransactionFromModule(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <execTransactionFromModuleCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleCalls::execTransactionFromModule,
@@ -8434,11 +9169,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn isHoprNodeManagementModule(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <isHoprNodeManagementModuleCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleCalls::isHoprNodeManagementModule,
@@ -8449,11 +9182,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn upgradeToAndCall(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <upgradeToAndCallCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::upgradeToAndCall)
                     }
@@ -8462,11 +9193,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn execTransactionFromModuleReturnData(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <execTransactionFromModuleReturnDataCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleCalls::execTransactionFromModuleReturnData,
@@ -8477,11 +9206,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn proxiableUUID(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <proxiableUUIDCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::proxiableUUID)
                     }
@@ -8490,11 +9217,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn encodeFunctionSigsAndPermissions(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <encodeFunctionSigsAndPermissionsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleCalls::encodeFunctionSigsAndPermissions,
@@ -8505,11 +9230,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn decodeFunctionSigsAndPermissions(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <decodeFunctionSigsAndPermissionsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleCalls::decodeFunctionSigsAndPermissions,
@@ -8520,11 +9243,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn getTargets(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <getTargetsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::getTargets)
                     }
@@ -8533,11 +9254,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn renounceOwnership(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <renounceOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::renounceOwnership)
                     }
@@ -8546,11 +9265,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn scopeTargetChannels(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <scopeTargetChannelsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::scopeTargetChannels)
                     }
@@ -8559,11 +9276,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn setMultisend(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <setMultisendCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::setMultisend)
                     }
@@ -8572,12 +9287,8 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn owner(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
-                        <ownerCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <ownerCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprNodeManagementModuleCalls::owner)
                     }
                     owner
@@ -8585,12 +9296,8 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn addNode(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
-                        <addNodeCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <addNodeCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprNodeManagementModuleCalls::addNode)
                     }
                     addNode
@@ -8598,11 +9305,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn addChannelsAndTokenTarget(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <addChannelsAndTokenTargetCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleCalls::addChannelsAndTokenTarget,
@@ -8613,11 +9318,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn scopeTargetToken(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <scopeTargetTokenCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::scopeTargetToken)
                     }
@@ -8626,11 +9329,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn removeNode(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <removeNodeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::removeNode)
                     }
@@ -8639,11 +9340,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn includeNode(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <includeNodeCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::includeNode)
                     }
@@ -8652,11 +9351,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn scopeTokenCapabilities(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <scopeTokenCapabilitiesCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::scopeTokenCapabilities)
                     }
@@ -8665,11 +9362,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn scopeSendCapability(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <scopeSendCapabilityCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::scopeSendCapability)
                     }
@@ -8678,11 +9373,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn scopeTargetSend(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <scopeTargetSendCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::scopeTargetSend)
                     }
@@ -8691,11 +9384,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn getGranularPermissions(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <getGranularPermissionsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::getGranularPermissions)
                     }
@@ -8704,11 +9395,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn tryGetTarget(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <tryGetTargetCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::tryGetTarget)
                     }
@@ -8717,11 +9406,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn transferOwnership(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <transferOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleCalls::transferOwnership)
                     }
@@ -8730,11 +9417,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn scopeChannelsCapabilities(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
                         <scopeChannelsCapabilitiesCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleCalls::scopeChannelsCapabilities,
@@ -8751,7 +9436,360 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls>] = &[
+                {
+                    fn isNode(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <isNodeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::isNode)
+                    }
+                    isNode
+                },
+                {
+                    fn multisend(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <multisendCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::multisend)
+                    }
+                    multisend
+                },
+                {
+                    fn revokeTarget(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <revokeTargetCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::revokeTarget)
+                    }
+                    revokeTarget
+                },
+                {
+                    fn upgradeTo(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <upgradeToCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::upgradeTo)
+                    }
+                    upgradeTo
+                },
+                {
+                    fn initialize(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <initializeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::initialize)
+                    }
+                    initialize
+                },
+                {
+                    fn execTransactionFromModule(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <execTransactionFromModuleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleCalls::execTransactionFromModule,
+                            )
+                    }
+                    execTransactionFromModule
+                },
+                {
+                    fn isHoprNodeManagementModule(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <isHoprNodeManagementModuleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleCalls::isHoprNodeManagementModule,
+                            )
+                    }
+                    isHoprNodeManagementModule
+                },
+                {
+                    fn upgradeToAndCall(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <upgradeToAndCallCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::upgradeToAndCall)
+                    }
+                    upgradeToAndCall
+                },
+                {
+                    fn execTransactionFromModuleReturnData(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <execTransactionFromModuleReturnDataCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleCalls::execTransactionFromModuleReturnData,
+                            )
+                    }
+                    execTransactionFromModuleReturnData
+                },
+                {
+                    fn proxiableUUID(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <proxiableUUIDCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::proxiableUUID)
+                    }
+                    proxiableUUID
+                },
+                {
+                    fn encodeFunctionSigsAndPermissions(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <encodeFunctionSigsAndPermissionsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleCalls::encodeFunctionSigsAndPermissions,
+                            )
+                    }
+                    encodeFunctionSigsAndPermissions
+                },
+                {
+                    fn decodeFunctionSigsAndPermissions(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <decodeFunctionSigsAndPermissionsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleCalls::decodeFunctionSigsAndPermissions,
+                            )
+                    }
+                    decodeFunctionSigsAndPermissions
+                },
+                {
+                    fn getTargets(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <getTargetsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::getTargets)
+                    }
+                    getTargets
+                },
+                {
+                    fn renounceOwnership(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <renounceOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::renounceOwnership)
+                    }
+                    renounceOwnership
+                },
+                {
+                    fn scopeTargetChannels(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <scopeTargetChannelsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::scopeTargetChannels)
+                    }
+                    scopeTargetChannels
+                },
+                {
+                    fn setMultisend(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <setMultisendCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::setMultisend)
+                    }
+                    setMultisend
+                },
+                {
+                    fn owner(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <ownerCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::owner)
+                    }
+                    owner
+                },
+                {
+                    fn addNode(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <addNodeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::addNode)
+                    }
+                    addNode
+                },
+                {
+                    fn addChannelsAndTokenTarget(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <addChannelsAndTokenTargetCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleCalls::addChannelsAndTokenTarget,
+                            )
+                    }
+                    addChannelsAndTokenTarget
+                },
+                {
+                    fn scopeTargetToken(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <scopeTargetTokenCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::scopeTargetToken)
+                    }
+                    scopeTargetToken
+                },
+                {
+                    fn removeNode(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <removeNodeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::removeNode)
+                    }
+                    removeNode
+                },
+                {
+                    fn includeNode(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <includeNodeCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::includeNode)
+                    }
+                    includeNode
+                },
+                {
+                    fn scopeTokenCapabilities(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <scopeTokenCapabilitiesCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::scopeTokenCapabilities)
+                    }
+                    scopeTokenCapabilities
+                },
+                {
+                    fn scopeSendCapability(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <scopeSendCapabilityCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::scopeSendCapability)
+                    }
+                    scopeSendCapability
+                },
+                {
+                    fn scopeTargetSend(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <scopeTargetSendCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::scopeTargetSend)
+                    }
+                    scopeTargetSend
+                },
+                {
+                    fn getGranularPermissions(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <getGranularPermissionsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::getGranularPermissions)
+                    }
+                    getGranularPermissions
+                },
+                {
+                    fn tryGetTarget(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <tryGetTargetCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::tryGetTarget)
+                    }
+                    tryGetTarget
+                },
+                {
+                    fn transferOwnership(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <transferOwnershipCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleCalls::transferOwnership)
+                    }
+                    transferOwnership
+                },
+                {
+                    fn scopeChannelsCapabilities(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleCalls> {
+                        <scopeChannelsCapabilitiesCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleCalls::scopeChannelsCapabilities,
+                            )
+                    }
+                    scopeChannelsCapabilities
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -9241,20 +10279,16 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors>] = &[
                 {
                     fn SendNotAllowed(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <SendNotAllowed as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::SendNotAllowed)
                     }
@@ -9263,11 +10297,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn DelegateCallNotAllowed(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <DelegateCallNotAllowed as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::DelegateCallNotAllowed)
                     }
@@ -9276,11 +10308,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn AlreadyInitialized(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <AlreadyInitialized as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::AlreadyInitialized)
                     }
@@ -9289,11 +10319,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn NonExistentKey(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <NonExistentKey as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::NonExistentKey)
                     }
@@ -9302,11 +10330,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn ParameterNotAllowed(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <ParameterNotAllowed as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::ParameterNotAllowed)
                     }
@@ -9315,11 +10341,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn FunctionSignatureTooShort(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <FunctionSignatureTooShort as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleErrors::FunctionSignatureTooShort,
@@ -9330,11 +10354,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn PermissionNotConfigured(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <PermissionNotConfigured as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::PermissionNotConfigured)
                     }
@@ -9343,11 +10365,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn TargetIsNotScoped(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <TargetIsNotScoped as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::TargetIsNotScoped)
                     }
@@ -9356,11 +10376,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn DefaultPermissionRejected(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <DefaultPermissionRejected as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleErrors::DefaultPermissionRejected,
@@ -9371,11 +10389,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn SafeMultisendSameAddress(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <SafeMultisendSameAddress as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleErrors::SafeMultisendSameAddress,
@@ -9386,11 +10402,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn NodePermissionRejected(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <NodePermissionRejected as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::NodePermissionRejected)
                     }
@@ -9399,11 +10413,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn CalldataOutOfBounds(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <CalldataOutOfBounds as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::CalldataOutOfBounds)
                     }
@@ -9412,11 +10424,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn ArraysDifferentLength(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <ArraysDifferentLength as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::ArraysDifferentLength)
                     }
@@ -9425,11 +10435,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn UnacceptableMultiSendOffset(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <UnacceptableMultiSendOffset as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleErrors::UnacceptableMultiSendOffset,
@@ -9440,11 +10448,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn GranularPermissionRejected(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <GranularPermissionRejected as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNodeManagementModuleErrors::GranularPermissionRejected,
@@ -9455,11 +10461,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn AddressIsZero(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <AddressIsZero as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::AddressIsZero)
                     }
@@ -9468,11 +10472,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn TooManyCapabilities(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <TooManyCapabilities as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::TooManyCapabilities)
                     }
@@ -9481,12 +10483,8 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn ArrayTooLong(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
-                        <ArrayTooLong as alloy_sol_types::SolError>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <ArrayTooLong as alloy_sol_types::SolError>::abi_decode_raw(data)
                             .map(HoprNodeManagementModuleErrors::ArrayTooLong)
                     }
                     ArrayTooLong
@@ -9494,11 +10492,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn PermissionNotFound(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <PermissionNotFound as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::PermissionNotFound)
                     }
@@ -9507,11 +10503,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn WithMembership(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <WithMembership as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::WithMembership)
                     }
@@ -9520,11 +10514,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn TargetIsScoped(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <TargetIsScoped as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::TargetIsScoped)
                     }
@@ -9533,11 +10525,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn TargetAddressNotAllowed(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <TargetAddressNotAllowed as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::TargetAddressNotAllowed)
                     }
@@ -9546,11 +10536,9 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn CannotChangeOwner(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
                         <CannotChangeOwner as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNodeManagementModuleErrors::CannotChangeOwner)
                     }
@@ -9559,11 +10547,301 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                 {
                     fn NoMembership(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
-                        <NoMembership as alloy_sol_types::SolError>::abi_decode_raw(
+                        <NoMembership as alloy_sol_types::SolError>::abi_decode_raw(data)
+                            .map(HoprNodeManagementModuleErrors::NoMembership)
+                    }
+                    NoMembership
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors>] = &[
+                {
+                    fn SendNotAllowed(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <SendNotAllowed as alloy_sol_types::SolError>::abi_decode_raw_validate(
                                 data,
-                                validate,
+                            )
+                            .map(HoprNodeManagementModuleErrors::SendNotAllowed)
+                    }
+                    SendNotAllowed
+                },
+                {
+                    fn DelegateCallNotAllowed(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <DelegateCallNotAllowed as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::DelegateCallNotAllowed)
+                    }
+                    DelegateCallNotAllowed
+                },
+                {
+                    fn AlreadyInitialized(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <AlreadyInitialized as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::AlreadyInitialized)
+                    }
+                    AlreadyInitialized
+                },
+                {
+                    fn NonExistentKey(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <NonExistentKey as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::NonExistentKey)
+                    }
+                    NonExistentKey
+                },
+                {
+                    fn ParameterNotAllowed(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <ParameterNotAllowed as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::ParameterNotAllowed)
+                    }
+                    ParameterNotAllowed
+                },
+                {
+                    fn FunctionSignatureTooShort(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <FunctionSignatureTooShort as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleErrors::FunctionSignatureTooShort,
+                            )
+                    }
+                    FunctionSignatureTooShort
+                },
+                {
+                    fn PermissionNotConfigured(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <PermissionNotConfigured as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::PermissionNotConfigured)
+                    }
+                    PermissionNotConfigured
+                },
+                {
+                    fn TargetIsNotScoped(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <TargetIsNotScoped as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::TargetIsNotScoped)
+                    }
+                    TargetIsNotScoped
+                },
+                {
+                    fn DefaultPermissionRejected(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <DefaultPermissionRejected as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleErrors::DefaultPermissionRejected,
+                            )
+                    }
+                    DefaultPermissionRejected
+                },
+                {
+                    fn SafeMultisendSameAddress(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <SafeMultisendSameAddress as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleErrors::SafeMultisendSameAddress,
+                            )
+                    }
+                    SafeMultisendSameAddress
+                },
+                {
+                    fn NodePermissionRejected(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <NodePermissionRejected as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::NodePermissionRejected)
+                    }
+                    NodePermissionRejected
+                },
+                {
+                    fn CalldataOutOfBounds(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <CalldataOutOfBounds as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::CalldataOutOfBounds)
+                    }
+                    CalldataOutOfBounds
+                },
+                {
+                    fn ArraysDifferentLength(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <ArraysDifferentLength as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::ArraysDifferentLength)
+                    }
+                    ArraysDifferentLength
+                },
+                {
+                    fn UnacceptableMultiSendOffset(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <UnacceptableMultiSendOffset as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleErrors::UnacceptableMultiSendOffset,
+                            )
+                    }
+                    UnacceptableMultiSendOffset
+                },
+                {
+                    fn GranularPermissionRejected(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <GranularPermissionRejected as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNodeManagementModuleErrors::GranularPermissionRejected,
+                            )
+                    }
+                    GranularPermissionRejected
+                },
+                {
+                    fn AddressIsZero(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <AddressIsZero as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::AddressIsZero)
+                    }
+                    AddressIsZero
+                },
+                {
+                    fn TooManyCapabilities(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <TooManyCapabilities as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::TooManyCapabilities)
+                    }
+                    TooManyCapabilities
+                },
+                {
+                    fn ArrayTooLong(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <ArrayTooLong as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::ArrayTooLong)
+                    }
+                    ArrayTooLong
+                },
+                {
+                    fn PermissionNotFound(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <PermissionNotFound as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::PermissionNotFound)
+                    }
+                    PermissionNotFound
+                },
+                {
+                    fn WithMembership(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <WithMembership as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::WithMembership)
+                    }
+                    WithMembership
+                },
+                {
+                    fn TargetIsScoped(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <TargetIsScoped as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::TargetIsScoped)
+                    }
+                    TargetIsScoped
+                },
+                {
+                    fn TargetAddressNotAllowed(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <TargetAddressNotAllowed as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::TargetAddressNotAllowed)
+                    }
+                    TargetAddressNotAllowed
+                },
+                {
+                    fn CannotChangeOwner(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <CannotChangeOwner as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNodeManagementModuleErrors::CannotChangeOwner)
+                    }
+                    CannotChangeOwner
+                },
+                {
+                    fn NoMembership(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNodeManagementModuleErrors> {
+                        <NoMembership as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
                             )
                             .map(HoprNodeManagementModuleErrors::NoMembership)
                     }
@@ -9578,7 +10856,7 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -9942,14 +11220,12 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(<AdminChanged as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <AdminChanged as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::AdminChanged)
                 }
@@ -9957,7 +11233,6 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                     <BeaconUpgraded as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::BeaconUpgraded)
                 }
@@ -9965,7 +11240,6 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                     <ExecutionFailure as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ExecutionFailure)
                 }
@@ -9973,7 +11247,6 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                     <ExecutionSuccess as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ExecutionSuccess)
                 }
@@ -9981,7 +11254,6 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                     <Initialized as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::Initialized)
                 }
@@ -9989,7 +11261,6 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                     <NodeAdded as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::NodeAdded)
                 }
@@ -9997,7 +11268,6 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                     <NodeRemoved as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::NodeRemoved)
                 }
@@ -10007,7 +11277,6 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                     <OwnershipTransferred as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::OwnershipTransferred)
                 }
@@ -10017,16 +11286,11 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
                     <SetMultisendAddress as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::SetMultisendAddress)
                 }
                 Some(<Upgraded as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
-                    <Upgraded as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
+                    <Upgraded as alloy_sol_types::SolEvent>::decode_raw_log(topics, data)
                         .map(Self::Upgraded)
                 }
                 _ => {
@@ -10120,14 +11384,13 @@ function upgradeToAndCall(address newImplementation, bytes memory data) external
 See the [wrapper's documentation](`HoprNodeManagementModuleInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprNodeManagementModuleInstance<T, P, N> {
-        HoprNodeManagementModuleInstance::<T, P, N>::new(address, provider)
+    ) -> HoprNodeManagementModuleInstance<P, N> {
+        HoprNodeManagementModuleInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -10136,15 +11399,14 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprNodeManagementModuleInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprNodeManagementModuleInstance<P, N>>,
     > {
-        HoprNodeManagementModuleInstance::<T, P, N>::deploy(provider)
+        HoprNodeManagementModuleInstance::<P, N>::deploy(provider)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -10153,11 +11415,10 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprNodeManagementModuleInstance::<T, P, N>::deploy_builder(provider)
+    >(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprNodeManagementModuleInstance::<P, N>::deploy_builder(provider)
     }
     /**A [`HoprNodeManagementModule`](self) instance.
 
@@ -10172,16 +11433,15 @@ be used to deploy a new instance of the contract.
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
     pub struct HoprNodeManagementModuleInstance<
-        T,
         P,
         N = alloy_contract::private::Ethereum,
     > {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprNodeManagementModuleInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprNodeManagementModuleInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprNodeManagementModuleInstance")
@@ -10192,10 +11452,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeManagementModuleInstance<T, P, N> {
+    > HoprNodeManagementModuleInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprNodeManagementModule`](self) contract instance.
 
 See the [wrapper's documentation](`HoprNodeManagementModuleInstance`) for more details.*/
@@ -10207,7 +11466,7 @@ See the [wrapper's documentation](`HoprNodeManagementModuleInstance`) for more d
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -10218,7 +11477,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         #[inline]
         pub async fn deploy(
             provider: P,
-        ) -> alloy_contract::Result<HoprNodeManagementModuleInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprNodeManagementModuleInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -10229,7 +11488,7 @@ and constructor arguments, if any.
 This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         #[inline]
-        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
+        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 ::core::clone::Clone::clone(&BYTECODE),
@@ -10256,24 +11515,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprNodeManagementModuleInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprNodeManagementModuleInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprNodeManagementModuleInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprNodeManagementModuleInstance<P, N> {
             HoprNodeManagementModuleInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeManagementModuleInstance<T, P, N> {
+    > HoprNodeManagementModuleInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -10281,14 +11539,14 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
         ///Creates a new call builder for the [`addChannelsAndTokenTarget`] function.
         pub fn addChannelsAndTokenTarget(
             &self,
             defaultTarget: <Target as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, addChannelsAndTokenTargetCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, addChannelsAndTokenTargetCall, N> {
             self.call_builder(
                 &addChannelsAndTokenTargetCall {
                     defaultTarget,
@@ -10299,7 +11557,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn addNode(
             &self,
             nodeAddress: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, addNodeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, addNodeCall, N> {
             self.call_builder(&addNodeCall { nodeAddress })
         }
         ///Creates a new call builder for the [`decodeFunctionSigsAndPermissions`] function.
@@ -10308,7 +11566,6 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             encoded: alloy::sol_types::private::FixedBytes<32>,
             length: alloy::sol_types::private::primitives::aliases::U256,
         ) -> alloy_contract::SolCallBuilder<
-            T,
             &P,
             decodeFunctionSigsAndPermissionsCall,
             N,
@@ -10330,7 +11587,6 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
                 <GranularPermission as alloy::sol_types::SolType>::RustType,
             >,
         ) -> alloy_contract::SolCallBuilder<
-            T,
             &P,
             encodeFunctionSigsAndPermissionsCall,
             N,
@@ -10349,7 +11605,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             value: alloy::sol_types::private::primitives::aliases::U256,
             data: alloy::sol_types::private::Bytes,
             operation: <Enum::Operation as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, execTransactionFromModuleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, execTransactionFromModuleCall, N> {
             self.call_builder(
                 &execTransactionFromModuleCall {
                     to,
@@ -10367,7 +11623,6 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             data: alloy::sol_types::private::Bytes,
             operation: <Enum::Operation as alloy::sol_types::SolType>::RustType,
         ) -> alloy_contract::SolCallBuilder<
-            T,
             &P,
             execTransactionFromModuleReturnDataCall,
             N,
@@ -10386,7 +11641,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             capabilityKey: alloy::sol_types::private::FixedBytes<32>,
             pairId: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, getGranularPermissionsCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, getGranularPermissionsCall, N> {
             self.call_builder(
                 &getGranularPermissionsCall {
                     capabilityKey,
@@ -10397,14 +11652,14 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         ///Creates a new call builder for the [`getTargets`] function.
         pub fn getTargets(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, getTargetsCall, N> {
-            self.call_builder(&getTargetsCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, getTargetsCall, N> {
+            self.call_builder(&getTargetsCall)
         }
         ///Creates a new call builder for the [`includeNode`] function.
         pub fn includeNode(
             &self,
             nodeDefaultTarget: <Target as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, includeNodeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, includeNodeCall, N> {
             self.call_builder(
                 &includeNodeCall {
                     nodeDefaultTarget,
@@ -10415,56 +11670,54 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn initialize(
             &self,
             initParams: alloy::sol_types::private::Bytes,
-        ) -> alloy_contract::SolCallBuilder<T, &P, initializeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, initializeCall, N> {
             self.call_builder(&initializeCall { initParams })
         }
         ///Creates a new call builder for the [`isHoprNodeManagementModule`] function.
         pub fn isHoprNodeManagementModule(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, isHoprNodeManagementModuleCall, N> {
-            self.call_builder(&isHoprNodeManagementModuleCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, isHoprNodeManagementModuleCall, N> {
+            self.call_builder(&isHoprNodeManagementModuleCall)
         }
         ///Creates a new call builder for the [`isNode`] function.
         pub fn isNode(
             &self,
             nodeAddress: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, isNodeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, isNodeCall, N> {
             self.call_builder(&isNodeCall { nodeAddress })
         }
         ///Creates a new call builder for the [`multisend`] function.
-        pub fn multisend(
-            &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, multisendCall, N> {
-            self.call_builder(&multisendCall {})
+        pub fn multisend(&self) -> alloy_contract::SolCallBuilder<&P, multisendCall, N> {
+            self.call_builder(&multisendCall)
         }
         ///Creates a new call builder for the [`owner`] function.
-        pub fn owner(&self) -> alloy_contract::SolCallBuilder<T, &P, ownerCall, N> {
-            self.call_builder(&ownerCall {})
+        pub fn owner(&self) -> alloy_contract::SolCallBuilder<&P, ownerCall, N> {
+            self.call_builder(&ownerCall)
         }
         ///Creates a new call builder for the [`proxiableUUID`] function.
         pub fn proxiableUUID(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, proxiableUUIDCall, N> {
-            self.call_builder(&proxiableUUIDCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, proxiableUUIDCall, N> {
+            self.call_builder(&proxiableUUIDCall)
         }
         ///Creates a new call builder for the [`removeNode`] function.
         pub fn removeNode(
             &self,
             nodeAddress: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, removeNodeCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, removeNodeCall, N> {
             self.call_builder(&removeNodeCall { nodeAddress })
         }
         ///Creates a new call builder for the [`renounceOwnership`] function.
         pub fn renounceOwnership(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, renounceOwnershipCall, N> {
-            self.call_builder(&renounceOwnershipCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, renounceOwnershipCall, N> {
+            self.call_builder(&renounceOwnershipCall)
         }
         ///Creates a new call builder for the [`revokeTarget`] function.
         pub fn revokeTarget(
             &self,
             targetAddress: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, revokeTargetCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, revokeTargetCall, N> {
             self.call_builder(&revokeTargetCall { targetAddress })
         }
         ///Creates a new call builder for the [`scopeChannelsCapabilities`] function.
@@ -10473,7 +11726,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             targetAddress: alloy::sol_types::private::Address,
             channelId: alloy::sol_types::private::FixedBytes<32>,
             encodedSigsPermissions: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, scopeChannelsCapabilitiesCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, scopeChannelsCapabilitiesCall, N> {
             self.call_builder(
                 &scopeChannelsCapabilitiesCall {
                     targetAddress,
@@ -10488,7 +11741,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             nodeAddress: alloy::sol_types::private::Address,
             beneficiary: alloy::sol_types::private::Address,
             permission: <GranularPermission as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, scopeSendCapabilityCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, scopeSendCapabilityCall, N> {
             self.call_builder(
                 &scopeSendCapabilityCall {
                     nodeAddress,
@@ -10501,7 +11754,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn scopeTargetChannels(
             &self,
             defaultTarget: <Target as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, scopeTargetChannelsCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, scopeTargetChannelsCall, N> {
             self.call_builder(
                 &scopeTargetChannelsCall {
                     defaultTarget,
@@ -10512,7 +11765,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn scopeTargetSend(
             &self,
             defaultTarget: <Target as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, scopeTargetSendCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, scopeTargetSendCall, N> {
             self.call_builder(
                 &scopeTargetSendCall {
                     defaultTarget,
@@ -10523,7 +11776,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn scopeTargetToken(
             &self,
             defaultTarget: <Target as alloy::sol_types::SolType>::RustType,
-        ) -> alloy_contract::SolCallBuilder<T, &P, scopeTargetTokenCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, scopeTargetTokenCall, N> {
             self.call_builder(
                 &scopeTargetTokenCall {
                     defaultTarget,
@@ -10537,7 +11790,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             targetAddress: alloy::sol_types::private::Address,
             beneficiary: alloy::sol_types::private::Address,
             encodedSigsPermissions: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, scopeTokenCapabilitiesCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, scopeTokenCapabilitiesCall, N> {
             self.call_builder(
                 &scopeTokenCapabilitiesCall {
                     nodeAddress,
@@ -10551,28 +11804,28 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn setMultisend(
             &self,
             _multisend: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, setMultisendCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, setMultisendCall, N> {
             self.call_builder(&setMultisendCall { _multisend })
         }
         ///Creates a new call builder for the [`transferOwnership`] function.
         pub fn transferOwnership(
             &self,
             newOwner: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, transferOwnershipCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, transferOwnershipCall, N> {
             self.call_builder(&transferOwnershipCall { newOwner })
         }
         ///Creates a new call builder for the [`tryGetTarget`] function.
         pub fn tryGetTarget(
             &self,
             targetAddress: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, tryGetTargetCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, tryGetTargetCall, N> {
             self.call_builder(&tryGetTargetCall { targetAddress })
         }
         ///Creates a new call builder for the [`upgradeTo`] function.
         pub fn upgradeTo(
             &self,
             newImplementation: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, upgradeToCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, upgradeToCall, N> {
             self.call_builder(&upgradeToCall { newImplementation })
         }
         ///Creates a new call builder for the [`upgradeToAndCall`] function.
@@ -10580,7 +11833,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             newImplementation: alloy::sol_types::private::Address,
             data: alloy::sol_types::private::Bytes,
-        ) -> alloy_contract::SolCallBuilder<T, &P, upgradeToAndCallCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, upgradeToAndCallCall, N> {
             self.call_builder(
                 &upgradeToAndCallCall {
                     newImplementation,
@@ -10592,73 +11845,66 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeManagementModuleInstance<T, P, N> {
+    > HoprNodeManagementModuleInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`AdminChanged`] event.
-        pub fn AdminChanged_filter(
-            &self,
-        ) -> alloy_contract::Event<T, &P, AdminChanged, N> {
+        pub fn AdminChanged_filter(&self) -> alloy_contract::Event<&P, AdminChanged, N> {
             self.event_filter::<AdminChanged>()
         }
         ///Creates a new event filter for the [`BeaconUpgraded`] event.
         pub fn BeaconUpgraded_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, BeaconUpgraded, N> {
+        ) -> alloy_contract::Event<&P, BeaconUpgraded, N> {
             self.event_filter::<BeaconUpgraded>()
         }
         ///Creates a new event filter for the [`ExecutionFailure`] event.
         pub fn ExecutionFailure_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ExecutionFailure, N> {
+        ) -> alloy_contract::Event<&P, ExecutionFailure, N> {
             self.event_filter::<ExecutionFailure>()
         }
         ///Creates a new event filter for the [`ExecutionSuccess`] event.
         pub fn ExecutionSuccess_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ExecutionSuccess, N> {
+        ) -> alloy_contract::Event<&P, ExecutionSuccess, N> {
             self.event_filter::<ExecutionSuccess>()
         }
         ///Creates a new event filter for the [`Initialized`] event.
-        pub fn Initialized_filter(
-            &self,
-        ) -> alloy_contract::Event<T, &P, Initialized, N> {
+        pub fn Initialized_filter(&self) -> alloy_contract::Event<&P, Initialized, N> {
             self.event_filter::<Initialized>()
         }
         ///Creates a new event filter for the [`NodeAdded`] event.
-        pub fn NodeAdded_filter(&self) -> alloy_contract::Event<T, &P, NodeAdded, N> {
+        pub fn NodeAdded_filter(&self) -> alloy_contract::Event<&P, NodeAdded, N> {
             self.event_filter::<NodeAdded>()
         }
         ///Creates a new event filter for the [`NodeRemoved`] event.
-        pub fn NodeRemoved_filter(
-            &self,
-        ) -> alloy_contract::Event<T, &P, NodeRemoved, N> {
+        pub fn NodeRemoved_filter(&self) -> alloy_contract::Event<&P, NodeRemoved, N> {
             self.event_filter::<NodeRemoved>()
         }
         ///Creates a new event filter for the [`OwnershipTransferred`] event.
         pub fn OwnershipTransferred_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, OwnershipTransferred, N> {
+        ) -> alloy_contract::Event<&P, OwnershipTransferred, N> {
             self.event_filter::<OwnershipTransferred>()
         }
         ///Creates a new event filter for the [`SetMultisendAddress`] event.
         pub fn SetMultisendAddress_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, SetMultisendAddress, N> {
+        ) -> alloy_contract::Event<&P, SetMultisendAddress, N> {
             self.event_filter::<SetMultisendAddress>()
         }
         ///Creates a new event filter for the [`Upgraded`] event.
-        pub fn Upgraded_filter(&self) -> alloy_contract::Event<T, &P, Upgraded, N> {
+        pub fn Upgraded_filter(&self) -> alloy_contract::Event<&P, Upgraded, N> {
             self.event_filter::<Upgraded>()
         }
     }
