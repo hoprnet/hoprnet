@@ -206,8 +206,6 @@ uuid = { version = "1.17.0" }
 url = { version = "2.5.4", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
-void = "1.0.2"
-
 
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { path = "ethereum/bindings", default-features = false }
