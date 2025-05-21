@@ -55,7 +55,7 @@ pub fn create_provider_to_anvil_with_snapshot(
         .layer(SnapshotRequestorLayer::from_requestor(snapshot_requestor))
         .transport(transport_client.clone(), transport_client.guess_local());
 
-    let provider = ProviderBuilder::new().wallet(wallet).on_client(rpc_client);
+    let provider = ProviderBuilder::new().wallet(wallet).connect_client(rpc_client);
 
     Arc::new(provider)
 }

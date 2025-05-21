@@ -66,10 +66,9 @@ pub fn create_anvil(block_time: Option<std::time::Duration>) -> alloy::node_bind
 /// Mints specified amount of HOPR tokens to the contract deployer wallet.
 /// Assumes that the `hopr_token` contract is associated with a RPC client that also deployed the contract.
 /// Returns the block number at which the minting transaction was confirmed.
-pub async fn mint_tokens<T, P, N>(hopr_token: HoprTokenInstance<T, P, N>, amount: U256) -> ContractResult<Option<u64>>
+pub async fn mint_tokens<P, N>(hopr_token: HoprTokenInstance<P, N>, amount: U256) -> ContractResult<Option<u64>>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N>,
+    P: alloy::contract::private::Provider<N>,
     N: alloy::providers::Network,
 {
     let deployer = hopr_token
@@ -106,15 +105,14 @@ where
 
 /// Funds the given wallet address with specified amount of native tokens and HOPR tokens.
 /// These must be present in the client's wallet.
-pub async fn fund_node<T, P, N>(
+pub async fn fund_node<P, N>(
     node: Address,
     native_token: U256,
     hopr_token: U256,
-    hopr_token_contract: HoprTokenInstance<T, P, N>,
+    hopr_token_contract: HoprTokenInstance<P, N>,
 ) -> ContractResult<()>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N>,
+    P: alloy::contract::private::Provider<N>,
     N: alloy::providers::Network,
 {
     let native_transfer_tx = N::TransactionRequest::default()
@@ -140,15 +138,14 @@ where
 
 /// Funds the channel to the counterparty with the given amount of HOPR tokens.
 /// The amount must be present in the wallet of the client.
-pub async fn fund_channel<T, P, N>(
+pub async fn fund_channel<P, N>(
     counterparty: Address,
-    hopr_token: HoprTokenInstance<T, P, N>,
-    hopr_channels: HoprChannelsInstance<T, P, N>,
+    hopr_token: HoprTokenInstance<P, N>,
+    hopr_channels: HoprChannelsInstance<P, N>,
     amount: U256,
 ) -> ContractResult<()>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N>,
+    P: alloy::contract::private::Provider<N>,
     N: alloy::providers::Network,
 {
     hopr_token
@@ -170,7 +167,7 @@ where
 
 /// Funds the channel to the counterparty with the given amount of HOPR tokens, from a different client
 /// The amount must be present in the wallet of the client.
-pub async fn fund_channel_from_different_client<T, P, N>(
+pub async fn fund_channel_from_different_client<P, N>(
     counterparty: Address,
     hopr_token_address: Address,
     hopr_channels_address: Address,
@@ -178,11 +175,10 @@ pub async fn fund_channel_from_different_client<T, P, N>(
     new_client: P,
 ) -> ContractResult<()>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N> + Clone,
+    P: alloy::contract::private::Provider<N> + Clone,
     N: alloy::providers::Network,
 {
-    let hopr_token_with_new_client: HoprTokenInstance<_, P, N> =
+    let hopr_token_with_new_client: HoprTokenInstance<P, N> =
         HoprTokenInstance::new(hopr_token_address.into(), new_client.clone());
     let hopr_channels_with_new_client = HoprChannelsInstance::new(hopr_channels_address.into(), new_client.clone());
     hopr_token_with_new_client
@@ -203,15 +199,14 @@ where
 }
 
 /// Prepare a safe transaction
-pub async fn get_safe_tx<T, P, N>(
-    safe_contract: SafeContractInstance<T, P, N>,
+pub async fn get_safe_tx<P, N>(
+    safe_contract: SafeContractInstance<P, N>,
     target: Address,
     inner_tx_data: Bytes,
     wallet: PrivateKeySigner,
 ) -> ChainTypesResult<N::TransactionRequest>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N>,
+    P: alloy::contract::private::Provider<N>,
     N: alloy::providers::Network,
 {
     let nonce = safe_contract.nonce().call().await?;
@@ -227,12 +222,12 @@ where
             U256::ZERO,
             primitives::Address::default(),
             wallet.address(),
-            nonce._0,
+            nonce.into(),
         )
         .call()
         .await?;
 
-    let signed_data_hash = wallet.sign_hash(&data_hash._0).await?;
+    let signed_data_hash = wallet.sign_hash(&data_hash.into()).await?;
 
     let safe_tx_data = SafeContract::execTransactionCall {
         to: target.into(),
@@ -257,7 +252,7 @@ where
 }
 
 /// Send a Safe transaction to the module to include node to the module
-pub async fn include_node_to_module_by_safe<T, P, N>(
+pub async fn include_node_to_module_by_safe<P, N>(
     provider: P,
     safe_address: Address,
     module_address: Address,
@@ -265,8 +260,7 @@ pub async fn include_node_to_module_by_safe<T, P, N>(
     deployer: &ChainKeypair, // also node address
 ) -> Result<(), ChainTypesError>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N> + Clone,
+    P: alloy::contract::private::Provider<N> + Clone,
     N: alloy::providers::Network,
 {
     // prepare default permission for node.
@@ -298,7 +292,7 @@ where
 }
 
 /// Send a Safe transaction to the module to include annoucement to the module
-pub async fn add_announcement_as_target<T, P, N>(
+pub async fn add_announcement_as_target<P, N>(
     provider: P,
     safe_address: Address,
     module_address: Address,
@@ -306,8 +300,7 @@ pub async fn add_announcement_as_target<T, P, N>(
     deployer: &ChainKeypair, // also node address
 ) -> ContractResult<()>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N> + Clone,
+    P: alloy::contract::private::Provider<N> + Clone,
     N: alloy::providers::Network,
 {
     // prepare default permission for announcement.
@@ -335,7 +328,7 @@ where
 }
 
 /// Send a Safe transaction to the token contract, to approve channels on behalf of safe.
-pub async fn approve_channel_transfer_from_safe<T, P, N>(
+pub async fn approve_channel_transfer_from_safe<P, N>(
     provider: P,
     safe_address: Address,
     token_address: Address,
@@ -343,8 +336,7 @@ pub async fn approve_channel_transfer_from_safe<T, P, N>(
     deployer: &ChainKeypair, // also node address
 ) -> ContractResult<()>
 where
-    T: alloy::contract::private::Transport + Clone,
-    P: alloy::contract::private::Provider<T, N> + Clone,
+    P: alloy::contract::private::Provider<N> + Clone,
     N: alloy::providers::Network,
 {
     // Inner tx payload: include node to the module
@@ -374,7 +366,7 @@ where
 /// Notice that to be able to open channels, the deployed safe should have HOPR tokens and approve token transfer for Channels contract on the token contract.
 ///
 /// Returns (module address, safe address)
-pub async fn deploy_one_safe_one_module_and_setup_for_testing<T, P, N>(
+pub async fn deploy_one_safe_one_module_and_setup_for_testing<P, N>(
     instances: &ContractInstances<P>,
     provider: P,
     deployer: &ChainKeypair,
