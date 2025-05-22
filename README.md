@@ -145,12 +145,16 @@ Options:
           Set host IP to which the API server will bind [env: HOPRD_API_HOST=]
       --apiPort <PORT>
           Set port to which the API server will bind [env: HOPRD_API_PORT=]
+      --default-session-listen-host <DEFAULT_SESSION_LISTEN_HOST>
+          Default Session listening host for Session IP forwarding [env: HOPRD_DEFAULT_SESSION_LISTEN_HOST=]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
       --password <PASSWORD>
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
-      --disableUnrealizedBalanceCheck...
-          Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK=]
+      --noKeepLogs...
+          Disables keeping RPC logs in the logs database after they were processed. [env: HOPRD_INDEXER_DISABLE_KEEP_LOGS=]
+      --noFastSync...
+          Disables using fast sync at node start. [env: HOPRD_INDEXER_DISABLE_FAST_SYNC=]
       --maxBlockRange <MAX_BLOCK_RANGE>
           Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
       --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>
@@ -161,14 +165,8 @@ Options:
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
       --forceInit...
           initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
-      --inbox-capacity <INBOX_CAPACITY>
-          Set maximum capacity of the HOPRd inbox [env: HOPRD_INBOX_CAPACITY=]
-      --heartbeatInterval <MILLISECONDS>
-          Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL=]
-      --heartbeatThreshold <MILLISECONDS>
-          Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since [env: HOPRD_HEARTBEAT_THRESHOLD=]
-      --heartbeatVariance <MILLISECONDS>
-          Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE=]
+      --probeRecheckThreshold <SECONDS>
+          Timeframe in seconds after which it is reasonable to recheck the nearest neighbor [env: HOPRD_PROBE_RECHECK_THRESHOLD=]
       --networkQualityThreshold <THRESHOLD>
           Minimum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD=]
       --configurationFilePath <CONFIG_FILE_PATH>

@@ -236,13 +236,13 @@ pub struct CliArgs {
     pub test_prefer_local_addresses: u8,
 
     #[arg(
-        long = "probeThreshold",
-        help = "Timeframe in seconds after which a heartbeat to another peer is performed, if it hasn't been seen since",
-        value_name = "MILLISECONDS",
+        long = "probeRecheckThreshold",
+        help = "Timeframe in seconds after which it is reasonable to recheck the nearest neighbor",
+        value_name = "SECONDS",
         value_parser = clap::value_parser ! (u64),
-        env = "HOPRD_HEARTBEAT_THRESHOLD",
+        env = "HOPRD_PROBE_RECHECK_THRESHOLD",
     )]
-    pub probe_threshold: Option<u64>,
+    pub probe_recheck_threshold: Option<u64>,
 
     #[arg(
         long = "networkQualityThreshold",
