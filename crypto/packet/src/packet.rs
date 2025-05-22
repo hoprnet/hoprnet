@@ -444,7 +444,7 @@ mod tests {
         static ref MAPPER: bimap::BiMap<KeyIdent, OffchainPublicKey> = PEERS
             .iter()
             .enumerate()
-            .map(|(i, (_, k))| (KeyIdent::from(i as u32), k.public().clone()))
+            .map(|(i, (_, k))| (KeyIdent::from(i as u32), *k.public()))
             .collect::<BiHashMap<_, _>>();
     }
 
@@ -584,10 +584,10 @@ mod tests {
         assert!((0..=4).contains(&node_pos), "node position must be between 1 and 3");
 
         let prev_hop = match (node_pos, is_reply) {
-            (1, false) => PEERS[0].1.public().clone(),
-            (_, false) => PEERS[node_pos - 1].1.public().clone(),
-            (3, true) => PEERS[4].1.public().clone(),
-            (_, true) => PEERS[node_pos + 1].1.public().clone(),
+            (1, false) => *PEERS[0].1.public(),
+            (_, false) => *PEERS[node_pos - 1].1.public(),
+            (3, true) => *PEERS[4].1.public(),
+            (_, true) => *PEERS[node_pos + 1].1.public(),
         };
 
         let packet = HoprPacket::from_incoming(&packet.to_bytes(), &PEERS[node_pos].1, prev_hop, &*MAPPER, openers)

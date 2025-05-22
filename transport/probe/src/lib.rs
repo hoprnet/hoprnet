@@ -6,19 +6,18 @@
 //! lay groundworks for mitigating potential adversarial behavior.
 //!
 //! There are 2 fundamental types of probing:
-//! 1. Immediate hop probing - collects telemetry for direct 0-hop neighbors. Such telemetry
-//! can be identified and potentially gamed by an adversary, but it is still useful to identify
-//! the basic properties of the most immediate connection to the neighbor, since in the worst
-//! case scenario the mitigation strategy can discard unsuitable peers.
+//! 1. Immediate hop probing - collects telemetry for direct 0-hop neighbors. Such telemetry can be identified and
+//!    potentially gamed by an adversary, but it is still useful to identify the basic properties of the most immediate
+//!    connection to the neighbor, since in the worst case scenario the mitigation strategy can discard unsuitable
+//!    peers.
 //!
-//! 2. Multi-hop probing - collects telemetry using a probing mechanism based on looping. A loop
-//! is a message sent by this peer to itself through different pre-selected peers. This probing
-//! mechanism can be combined together with the cover traffic into a single mechanism improving
-//! the network view.
+//! 2. Multi-hop probing - collects telemetry using a probing mechanism based on looping. A loop is a message sent by
+//!    this peer to itself through different pre-selected peers. This probing mechanism can be combined together with
+//!    the cover traffic into a single mechanism improving the network view.
 
 pub mod config;
-pub mod errors;
 pub mod content;
+pub mod errors;
 pub mod ping;
 
 pub mod neighbors;
@@ -185,8 +184,8 @@ impl Probe {
 
                                 Ok::<ResolvedTransportRouting, anyhow::Error>(ResolvedTransportRouting::Forward {
                                     pseudonym: HoprPseudonym::random(),
-                                    forward_path: ValidatedPath::direct(cp_ofk.into(), cp_address),
-                                    return_paths: vec![ValidatedPath::direct(me.0.into(), me.1)],
+                                    forward_path: ValidatedPath::direct(cp_ofk, cp_address),
+                                    return_paths: vec![ValidatedPath::direct(me.0, me.1)],
                                 })
                             })
                             .await;

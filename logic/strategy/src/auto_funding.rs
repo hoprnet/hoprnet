@@ -193,11 +193,11 @@ mod tests {
         );
 
         let mut actions = MockChannelAct::new();
-        let fund_amount_c = fund_amount.clone();
+        let fund_amount_c = fund_amount;
         actions
             .expect_fund_channel()
             .times(1)
-            .withf(move |h, balance| c2.get_id().eq(h) && fund_amount_c.eq(&balance))
+            .withf(move |h, balance| c2.get_id().eq(h) && fund_amount_c.eq(balance))
             .return_once(move |_, _| Ok(ok(mock_action_confirmation(c2, fund_amount)).boxed()));
 
         let cfg = AutoFundingStrategyConfig {

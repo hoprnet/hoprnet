@@ -638,8 +638,7 @@ mod tests {
                     DynSolValue::Address(AlloyAddress::from_slice(address.as_ref())),
                     DynSolValue::String(test_multiaddr.to_string()),
                 ])
-                .abi_encode()
-                .into(),
+                .abi_encode(),
                 tx_hash: Hash::create(&[format!("my tx hash {i}").as_bytes()]).into(),
                 tx_index,
                 block_number,
@@ -999,7 +998,7 @@ mod tests {
             .return_once(move |_, _| Ok(Box::pin(rx)));
 
         let head_block = 1000;
-        let block_numbers = vec![head_block - 1, head_block, head_block + 1];
+        let block_numbers = [head_block - 1, head_block, head_block + 1];
 
         let blocks: Vec<BlockWithLogs> = block_numbers
             .iter()

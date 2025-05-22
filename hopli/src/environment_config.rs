@@ -323,7 +323,7 @@ mod tests {
         let network_provider_args = NetworkProviderArgs {
             network: "anvil-localhost".into(),
             contracts_root: Some("../ethereum/contracts".into()),
-            provider_url: anvil.endpoint().into(),
+            provider_url: anvil.endpoint(),
         };
 
         let provider = network_provider_args.get_provider_with_signer(&chain_key).await?;
@@ -344,7 +344,7 @@ mod tests {
         let network_provider_args = NetworkProviderArgs {
             network: "anvil-localhost".into(),
             contracts_root: None,
-            provider_url: anvil.endpoint().into(),
+            provider_url: anvil.endpoint(),
         };
 
         let provider = network_provider_args.get_provider_with_signer(&chain_key).await?;

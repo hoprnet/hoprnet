@@ -543,8 +543,8 @@ mod tests {
 
         assert!(
             super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
-                password: "local".into(),
-                id_path: identity_path.into()
+                password: "local",
+                id_path: identity_path
             })
             .is_ok()
         );
@@ -571,8 +571,8 @@ mod tests {
         // Overwriting existing keys must not be possible
         assert!(
             super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
-                password: "local".into(),
-                id_path: identity_path.into()
+                password: "local",
+                id_path: identity_path
             })
             .is_err()
         );

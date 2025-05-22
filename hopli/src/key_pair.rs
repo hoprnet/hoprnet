@@ -503,7 +503,7 @@ mod tests {
         };
         let key = private_key_args.read_default()?;
 
-        let ref_decoded_value = hex::decode(&DUMMY_PRIVATE_KEY)?;
+        let ref_decoded_value = hex::decode(DUMMY_PRIVATE_KEY)?;
         println!("ref_decoded_value {:?}", ref_decoded_value);
 
         assert_eq!(
@@ -541,7 +541,7 @@ mod tests {
         let files = get_files(path, &None);
         assert_eq!(files.len(), 1, "must have one identity file");
 
-        let read_id = read_identity(files[0].as_path(), &pwd)?;
+        let read_id = read_identity(files[0].as_path(), pwd)?;
         assert_eq!(
             read_id.1.chain_key.public().0.to_address(),
             created_id.chain_key.public().0.to_address()
@@ -564,7 +564,7 @@ mod tests {
         let address = created_id.chain_key.public().0.to_address();
 
         let new_pwd = "supersecured";
-        let (_, returned_key) = update_identity_password(created_id, &files[0].as_path(), new_pwd)?;
+        let (_, returned_key) = update_identity_password(created_id, files[0].as_path(), new_pwd)?;
 
         // check the returned value
         assert_eq!(
@@ -574,7 +574,7 @@ mod tests {
         );
 
         // check the read value
-        let (_, read_id) = read_identity(files[0].as_path(), &new_pwd)?;
+        let (_, read_id) = read_identity(files[0].as_path(), new_pwd)?;
         assert_eq!(
             read_id.chain_key.public().0.to_address(),
             address,
@@ -594,7 +594,7 @@ mod tests {
 
         // created and the read id is identical
         let files = get_files(path, &None);
-        let read_id = read_identities(files, &pwd.to_string())?;
+        let read_id = read_identities(files, pwd)?;
         assert_eq!(read_id.len(), 1);
         assert_eq!(
             read_id.values().next().unwrap().chain_key.public().0.to_address(),
@@ -617,7 +617,7 @@ mod tests {
         let wrong_pwd = "wrong_password";
         create_identity(path, pwd, &None)?;
         let files = get_files(path, &None);
-        match read_identities(files, &wrong_pwd.to_string()) {
+        match read_identities(files, wrong_pwd) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
@@ -630,7 +630,7 @@ mod tests {
 
         let path = tmp.path().to_str().unwrap();
         let files = get_files(path, &None);
-        match read_identities(files, &"".to_string()) {
+        match read_identities(files, "") {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
@@ -646,7 +646,7 @@ mod tests {
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &None);
-        match read_identities(files, &pwd.to_string()) {
+        match read_identities(files, pwd) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
@@ -662,7 +662,7 @@ mod tests {
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &Some("local".to_string()));
-        match read_identities(files, &pwd.to_string()) {
+        match read_identities(files, pwd) {
             Ok(val) => assert_eq!(val.len(), 1),
             _ => assert!(false),
         }
@@ -678,7 +678,7 @@ mod tests {
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &Some("npm-".to_string()));
-        match read_identities(files, &pwd.to_string()) {
+        match read_identities(files, pwd) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
@@ -695,7 +695,7 @@ mod tests {
         create_identity(path, pwd, &Some("local-alice".into()))?;
 
         let files = get_files(path, &Some("alice".to_string()));
-        match read_identities(files, &pwd.to_string()) {
+        match read_identities(files, pwd) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
@@ -721,7 +721,7 @@ mod tests {
         fs::write(PathBuf::from(path).join(name), weak_crypto_alice_keystore.as_bytes())?;
 
         let files = get_files(path, &None);
-        let val = read_identities(files, &pwd.to_string())?;
+        let val = read_identities(files, pwd)?;
         assert_eq!(val.len(), 1);
         assert_eq!(
             val.values()
@@ -855,7 +855,7 @@ mod tests {
             new_password_path: None,
         };
         // let file_path = PathBuf::from(path).join("fileid2");
-        fs::write(&PathBuf::from(path).join("fileid2"), "supersound")?;
+        fs::write(PathBuf::from(path).join("fileid2"), "supersound")?;
 
         // test new_password_path
         env::set_var("NEW_IDENTITY_PASSWORD", "ultraviolet");

@@ -1138,7 +1138,7 @@ mod tests {
                 .take(num_frames)
                 .collect::<Vec<_>>()
         } else {
-            std::iter::repeat(frame_size).take(num_frames).collect::<Vec<_>>()
+            std::iter::repeat_n(frame_size, num_frames).collect::<Vec<_>>()
         };
 
         let socket_worker = |mut socket: S, d: Direction| {

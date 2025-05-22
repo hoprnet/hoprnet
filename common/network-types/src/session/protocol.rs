@@ -663,7 +663,7 @@ mod tests {
                 .iter()
                 .cloned()
                 .flat_map(|m| m.into_encoded().into_vec())
-                .chain(std::iter::repeat(0).take(10))
+                .chain(std::iter::repeat_n(0, 10))
                 .collect::<Vec<u8>>(),
         );
 
@@ -692,7 +692,7 @@ mod tests {
             .iter()
             .cloned()
             .flat_map(|m| m.into_encoded().into_vec())
-            .chain(std::iter::repeat(0u8).take(10))
+            .chain(std::iter::repeat_n(0u8, 10))
             .collect::<Vec<_>>();
 
         let mut iter = SessionMessageIter::<MTU>::from(data);
