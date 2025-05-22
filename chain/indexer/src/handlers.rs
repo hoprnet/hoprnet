@@ -1,7 +1,7 @@
 use std::{
     cmp::Ordering,
     fmt::Formatter,
-    ops::{Add, Sub},
+    ops::Add,
     sync::Arc,
     time::{Duration, SystemTime},
 };
@@ -193,11 +193,8 @@ where
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
-                    let new_balance = Balance::new(
-                        U256::from_be_bytes(balance_decreased.newBalance.to_be_bytes::<12>()),
-                        BalanceType::HOPR,
-                    );
-                    let diff = channel_edits.entry().balance.sub(&new_balance);
+                    let new_balance = HoprBalance::from_be_bytes(balance_decreased.newBalance.to_be_bytes::<12>());
+                    let diff = channel_edits.entry().balance - new_balance;
 
                     let updated_channel = self
                         .db
@@ -217,11 +214,8 @@ where
                     .await?;
 
                 if let Some(channel_edits) = maybe_channel {
-                    let new_balance = Balance::new(
-                        U256::from_be_bytes(balance_increased.newBalance.to_be_bytes::<12>()),
-                        BalanceType::HOPR,
-                    );
-                    let diff = new_balance.sub(&channel_edits.entry().balance);
+                    let new_balance = HoprBalance::from_be_bytes(balance_increased.newBalance.to_be_bytes::<12>());
+                    let diff = new_balance - channel_edits.entry().balance;
 
                     let updated_channel = self
                         .db
@@ -256,7 +250,7 @@ where
                         // Set all channel fields like we do on-chain on close
                         let channel_edits = channel_edits
                             .change_status(ChannelStatus::Closed)
-                            .change_balance(BalanceType::HOPR.zero())
+                            .change_balance(HoprBalance::zero())
                             .change_ticket_index(0);
 
                         let updated_channel = self.db.finish_channel_update(tx.into(), channel_edits).await?;
@@ -337,7 +331,7 @@ where
                     let new_channel = ChannelEntry::new(
                         source,
                         destination,
-                        BalanceType::HOPR.zero(),
+                        0_u32.into(),
                         0_u32.into(),
                         ChannelStatus::Open,
                         1_u32.into(),
@@ -527,18 +521,18 @@ where
                 );
 
                 let mut current_balance = self.db.get_safe_hopr_balance(Some(tx)).await?;
-                let transferred_value = Balance::new(transferred.value.to_be_bytes(), BalanceType::HOPR);
+                let transferred_value = HoprBalance::from_be_bytes(transferred.value.to_be_bytes::<32>());
 
                 if to.ne(&self.safe_address) && from.ne(&self.safe_address) {
                     return Ok(None);
                 } else if to.eq(&self.safe_address) {
                     // This + is internally defined as saturating add
                     info!(?current_balance, added_value = %transferred_value, "Safe balance increased ");
-                    current_balance = current_balance + transferred_value;
+                    current_balance += transferred_value;
                 } else if from.eq(&self.safe_address) {
                     // This - is internally defined as saturating sub
                     info!(?current_balance, removed_value = %transferred_value, "Safe balance decreased");
-                    current_balance = current_balance - transferred_value;
+                    current_balance -= transferred_value;
                 }
 
                 self.db.set_safe_hopr_balance(Some(tx), current_balance).await?;
@@ -558,7 +552,7 @@ where
                     self.db
                         .set_safe_hopr_allowance(
                             Some(tx),
-                            Balance::new(approved.value.to_be_bytes(), BalanceType::HOPR),
+                            HoprBalance::from_be_bytes(approved.value.to_be_bytes::<32>()),
                         )
                         .await?;
                 } else {
@@ -776,7 +770,7 @@ where
                 );
 
                 self.db
-                    .update_ticket_price(Some(tx), Balance::new(update._1.to_be_bytes(), BalanceType::HOPR))
+                    .update_ticket_price(Some(tx), HoprBalance::from_be_bytes(update._1.to_be_bytes::<32>()))
                     .await?;
 
                 info!(price = %update._1, "ticket price updated");

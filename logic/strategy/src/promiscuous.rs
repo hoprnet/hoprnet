@@ -66,7 +66,7 @@ lazy_static::lazy_static! {
 #[derive(Clone, Debug, PartialEq, Default)]
 struct ChannelDecision {
     to_close: Vec<ChannelEntry>,
-    to_open: Vec<(Address, Balance)>,
+    to_open: Vec<(Address, HoprBalance)>,
 }
 
 impl ChannelDecision {
@@ -78,7 +78,7 @@ impl ChannelDecision {
         self.to_close.push(entry);
     }
 
-    pub fn add_to_open(&mut self, address: Address, balance: Balance) {
+    pub fn add_to_open(&mut self, address: Address, balance: HoprBalance) {
         self.to_open.push((address, balance));
     }
 
@@ -86,7 +86,7 @@ impl ChannelDecision {
         &self.to_close
     }
 
-    pub fn get_to_open(&self) -> &Vec<(Address, Balance)> {
+    pub fn get_to_open(&self) -> &Vec<(Address, HoprBalance)> {
         &self.to_open
     }
 }
@@ -103,13 +103,13 @@ impl Display for ChannelDecision {
 }
 
 #[inline]
-fn default_new_channel_stake() -> Balance {
-    Balance::new_from_str("10000000000000000000", BalanceType::HOPR)
+fn default_new_channel_stake() -> HoprBalance {
+    HoprBalance::new_base(10)
 }
 
 #[inline]
-fn default_min_safe_balance() -> Balance {
-    Balance::new_from_str("1000000000000000000000", BalanceType::HOPR)
+fn default_min_safe_balance() -> HoprBalance {
+    HoprBalance::new_base(1000)
 }
 
 #[inline]
@@ -178,7 +178,7 @@ pub struct PromiscuousStrategyConfig {
     #[serde_as(as = "DisplayFromStr")]
     #[serde(default = "default_new_channel_stake")]
     #[default(default_new_channel_stake())]
-    pub new_channel_stake: Balance,
+    pub new_channel_stake: HoprBalance,
 
     /// Minimum token balance of the node's Safe.
     /// When reached, the strategy will not open any new channels.
@@ -187,7 +187,7 @@ pub struct PromiscuousStrategyConfig {
     #[serde_as(as = "DisplayFromStr")]
     #[serde(default = "default_min_safe_balance")]
     #[default(default_min_safe_balance())]
-    pub minimum_safe_balance: Balance,
+    pub minimum_safe_balance: HoprBalance,
 
     /// The maximum number of opened channels the strategy should maintain.
     ///

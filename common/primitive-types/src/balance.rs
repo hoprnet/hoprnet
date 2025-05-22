@@ -12,18 +12,23 @@ use bigdecimal::{
 use crate::{
     errors::GeneralError,
     prelude::{IntoEndian, U256},
+    traits::UnitaryFloatOps,
 };
 
 /// Represents a general currency - like a token or a coin.
-pub trait Currency: Display + FromStr<Err = GeneralError> + Default {
+pub trait Currency: Display + FromStr<Err = GeneralError> + Default + PartialEq + Eq {
     /// Base unit exponent used for the currency.
     const SCALE: usize;
     /// Name of the currency.
     const NAME: &'static str;
+
+    fn is<C: Currency>() -> bool {
+        Self::NAME == C::NAME
+    }
 }
 
 /// Represents wxHOPR token [`Currency`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
 pub struct WxHOPR;
 
 impl Display for WxHOPR {
@@ -50,7 +55,7 @@ impl Currency for WxHOPR {
 }
 
 /// Represents xDai coin [`Currency`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
 pub struct XDai;
 
 impl Display for XDai {
@@ -78,16 +83,15 @@ impl Currency for XDai {
 
 /// Represents a non-negative balance of some [`Currency`].
 ///
-/// The value is internally always stored in `wei`.
-/// When printed as string using the standard ` Display ` implementation, it is formatted in `wei`.
+/// The value is internally always stored in `wei`, but always printed in human-readable format.
 ///
-/// To print it in human-readable format (in base units instead of `wei`), use [`Balance::to_formatted_string`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+/// All arithmetic on this type is implicitly saturating at bounds given by [`U256`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
 pub struct Balance<C: Currency>(U256, C);
 
 impl<C: Currency> Display for Balance<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}{}", self.0, Self::WEI_PREFIX, self.1)
+        write!(f, "{} {}", self.amount_in_base_units(), self.1)
     }
 }
 
@@ -135,6 +139,11 @@ impl<C: Currency> AsRef<U256> for Balance<C> {
 impl<C: Currency> Balance<C> {
     const WEI_PREFIX: &'static str = "wei";
 
+    /// Creates new balance in base units, instead of `wei`.
+    pub fn new_base<T: Into<U256>>(value: T) -> Self {
+        Self(value.into() * U256::exp10(C::SCALE), C::default())
+    }
+
     /// Zero balance.
     pub fn zero() -> Self {
         Self(U256::zero(), C::default())
@@ -150,19 +159,47 @@ impl<C: Currency> Balance<C> {
         self.0
     }
 
-    /// Returns the amount in base units (human-readable), not in `wei`.
-    pub fn to_formatted_string(&self) -> String {
-        let dec = BigDecimal::from_biguint(
+    fn base_amount(&self) -> BigDecimal {
+        BigDecimal::from_biguint(
             bigdecimal::num_bigint::BigUint::from_bytes_be(&self.0.to_be_bytes()),
             C::SCALE as i64,
-        );
+        )
+    }
+
+    /// Returns the amount in base units (human-readable), not in `wei`.
+    pub fn amount_in_base_units(&self) -> String {
+        let dec = self.base_amount();
         let str = dec.to_plain_string();
+
+        // Trim excess zeroes if any
         if dec.fractional_digit_count() > 0 {
-            // Trim excess zeroes if any
-            format!("{} {}", str.trim_end_matches('0').trim_end_matches('.'), self.1)
+            str.trim_end_matches('0').trim_end_matches('.').to_owned()
         } else {
-            format!("{str} {}", self.1)
+            str
         }
+    }
+
+    /// Prints the balance formated in `wei` units.
+    pub fn format_in_wei(&self) -> String {
+        format!("{} {} {}", self.0, Self::WEI_PREFIX, self.1)
+    }
+}
+
+impl<C: Currency> IntoEndian<32> for Balance<C> {
+    fn from_be_bytes<T: AsRef<[u8]>>(bytes: T) -> Self {
+        Self(U256::from_be_bytes(bytes.as_ref()), C::default())
+    }
+
+    fn from_le_bytes<T: AsRef<[u8]>>(bytes: T) -> Self {
+        Self(U256::from_le_bytes(bytes.as_ref()), C::default())
+    }
+
+    fn to_le_bytes(self) -> [u8; 32] {
+        self.0.to_le_bytes()
+    }
+
+    fn to_be_bytes(self) -> [u8; 32] {
+        self.0.to_be_bytes()
     }
 }
 
@@ -256,6 +293,16 @@ impl<C: Currency> std::iter::Sum for Balance<C> {
     }
 }
 
+impl<C: Currency> UnitaryFloatOps for Balance<C> {
+    fn mul_f64(&self, rhs: f64) -> crate::errors::Result<Self> {
+        self.0.mul_f64(rhs).map(|x| Self(x, C::default()))
+    }
+
+    fn div_f64(&self, rhs: f64) -> crate::errors::Result<Self> {
+        self.0.div_f64(rhs).map(|x| Self(x, C::default()))
+    }
+}
+
 pub type HoprBalance = Balance<WxHOPR>;
 
 pub type XDaiBalance = Balance<XDai>;
@@ -266,10 +313,21 @@ mod tests {
     use crate::primitives::U256;
 
     #[test]
-    fn balance_is_zero_when_zero() {
+    fn balance_is_not_zero_when_not_zero() {
+        assert!(!HoprBalance::from(1).is_zero())
+    }
+
+    #[test]
+    fn balance_zero_is_zero() {
+        assert_eq!(HoprBalance::zero(), HoprBalance::from(0));
         assert!(HoprBalance::zero().is_zero());
         assert!(HoprBalance::zero().amount().is_zero());
-        assert!(!HoprBalance::from(1).is_zero())
+    }
+
+    #[test]
+    fn balance_should_have_zero_default() {
+        assert_eq!(HoprBalance::default(), HoprBalance::zero());
+        assert!(HoprBalance::default().is_zero());
     }
 
     #[test]
@@ -307,12 +365,19 @@ mod tests {
     }
 
     #[test]
+    fn balance_should_translate_from_non_wei_units() {
+        let balance = HoprBalance::new_base(10);
+        assert_eq!(balance.amount(), U256::from(10) * U256::exp10(WxHOPR::SCALE));
+        assert_eq!(balance.amount_in_base_units(), "10");
+    }
+
+    #[test]
     fn balance_should_parse_from_non_wei_string() -> anyhow::Result<()> {
         let balance = HoprBalance::from_str("5 wxHOPR")?;
-        assert_eq!(balance.amount(), U256::from(5) * U256::exp10(WxHOPR::SCALE));
+        assert_eq!(balance, Balance::new_base(5));
 
         let balance = HoprBalance::from_str("5 wxhopr")?;
-        assert_eq!(balance.amount(), U256::from(5) * U256::exp10(WxHOPR::SCALE));
+        assert_eq!(balance, Balance::new_base(5));
 
         let balance = HoprBalance::from_str(".5 wxHOPR")?;
         assert_eq!(balance.amount(), U256::from(5) * U256::exp10(WxHOPR::SCALE - 1));
@@ -389,6 +454,16 @@ mod tests {
     }
 
     #[test]
+    fn balance_should_have_consistent_formatted_string_from_str() -> anyhow::Result<()> {
+        let balance_1 = HoprBalance::from(10);
+        let balance_2 = HoprBalance::from_str(&balance_1.format_in_wei())?;
+
+        assert_eq!(balance_1, balance_2);
+
+        Ok(())
+    }
+
+    #[test]
     fn balance_test_formatted_string() -> anyhow::Result<()> {
         let base = U256::from(123) * U256::exp10(WxHOPR::SCALE - 2);
 
@@ -403,10 +478,10 @@ mod tests {
         let b4 = format!("{} wei_wxHOPR", base / 10);
         let b4: HoprBalance = b4.parse()?;
 
-        assert_eq!("1.23 wxHOPR", b1.to_formatted_string());
-        assert_eq!("123 wxHOPR", b2.to_formatted_string());
-        assert_eq!("0.00123 wxHOPR", b3.to_formatted_string());
-        assert_eq!("0.123 wxHOPR", b4.to_formatted_string());
+        assert_eq!("1.23 wxHOPR", b1.to_string());
+        assert_eq!("123 wxHOPR", b2.to_string());
+        assert_eq!("0.00123 wxHOPR", b3.to_string());
+        assert_eq!("0.123 wxHOPR", b4.to_string());
 
         Ok(())
     }

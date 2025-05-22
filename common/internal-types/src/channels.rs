@@ -71,7 +71,7 @@ pub type ChannelId = Hash;
 pub struct ChannelEntry {
     pub source: Address,
     pub destination: Address,
-    pub balance: Balance,
+    pub balance: HoprBalance,
     pub ticket_index: U256,
     pub status: ChannelStatus,
     pub channel_epoch: U256,
@@ -82,12 +82,11 @@ impl ChannelEntry {
     pub fn new(
         source: Address,
         destination: Address,
-        balance: Balance,
+        balance: HoprBalance,
         ticket_index: U256,
         status: ChannelStatus,
         channel_epoch: U256,
     ) -> Self {
-        assert_eq!(BalanceType::HOPR, balance.balance_type(), "invalid balance currency");
         ChannelEntry {
             source,
             destination,
@@ -177,7 +176,7 @@ pub enum ChannelChange {
     Status { left: ChannelStatus, right: ChannelStatus },
 
     /// Channel balance has changed
-    CurrentBalance { left: Balance, right: Balance },
+    CurrentBalance { left: HoprBalance, right: HoprBalance },
 
     /// Channel epoch has changed
     Epoch { left: u32, right: u32 },

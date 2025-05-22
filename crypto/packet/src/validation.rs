@@ -10,9 +10,9 @@ use crate::errors::TicketValidationError;
 pub fn validate_unacknowledged_ticket(
     ticket: Ticket,
     channel: &ChannelEntry,
-    min_ticket_amount: Balance,
+    min_ticket_amount: HoprBalance,
     required_win_prob: WinningProbability,
-    unrealized_balance: Balance,
+    unrealized_balance: HoprBalance,
     domain_separator: &Hash,
 ) -> Result<VerifiedTicket, TicketValidationError> {
     debug!(source = %channel.source, %ticket, "validating unacknowledged ticket");

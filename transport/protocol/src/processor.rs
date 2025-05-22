@@ -109,7 +109,7 @@ where
 
     // NOTE: as opposed to the winning probability, the ticket price does not have
     // a reasonable default and therefore the operation fails
-    async fn determine_actual_outgoing_ticket_price(&self) -> Result<Balance> {
+    async fn determine_actual_outgoing_ticket_price(&self) -> Result<HoprBalance> {
         // This operation hits the cache unless the new value is fetched for the first time
         let network_ticket_price =
             self.db.get_network_ticket_price().await.map_err(|e| {
@@ -235,7 +235,7 @@ where
 pub struct PacketInteractionConfig {
     pub packet_keypair: OffchainKeypair,
     pub outgoing_ticket_win_prob: Option<WinningProbability>,
-    pub outgoing_ticket_price: Option<Balance>,
+    pub outgoing_ticket_price: Option<HoprBalance>,
 }
 
 #[cfg(test)]

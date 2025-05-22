@@ -10,6 +10,7 @@
 //!
 //! All necessary pre-requisites are checked by the implementation before the respective [Action] is submitted
 //! to the [ActionQueue](crate::action_queue::ActionQueue).
+
 use async_trait::async_trait;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::{keypairs::OffchainKeypair, prelude::Keypair};
@@ -28,14 +29,17 @@ use crate::{
     },
 };
 
-/// Contains all on-chain calls specific to HOPR node itself.
+/// Contains all on-chain calls specific to the HOPR node itself.
 #[async_trait]
 pub trait NodeActions {
     /// Withdraws the specified `amount` of tokens to the given `recipient`.
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction>;
+    async fn withdraw(&self, recipient: Address, amount: HoprBalance) -> Result<PendingAction>;
+
+    /// Withdraws the specified `amount` of native coins to the given `recipient`.
+    async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> Result<PendingAction>;
 
     /// Announces node on-chain with key binding.
-    /// The operation should also check if such announcement has not been already made on-chain.
+    /// The operation should also check if such an announcement has not been already made on-chain.
     async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction>;
 
     /// Registers the safe address with the node
@@ -48,15 +52,23 @@ where
     Db: HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug,
 {
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
-        if amount.eq(&amount.of_same("0")) {
-            return Err(InvalidArguments("cannot withdraw zero amount".into()));
+    async fn withdraw(&self, recipient: Address, amount: HoprBalance) -> Result<PendingAction> {
+        if !amount.is_zero() {
+            info!(%amount, %recipient, "initiating withdrawal");
+            self.tx_sender.send(Action::Withdraw(recipient, amount)).await
+        } else {
+            Err(InvalidArguments("cannot withdraw zero amount".into()))
         }
+    }
 
-        // TODO: should we check native/token balance here before withdrawing ?
-
-        info!(%amount, %recipient, "initiating withdrawal");
-        self.tx_sender.send(Action::Withdraw(recipient, amount)).await
+    #[tracing::instrument(level = "debug", skip(self))]
+    async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> Result<PendingAction> {
+        if !amount.is_zero() {
+            info!(%amount, %recipient, "initiating native withdrawal");
+            self.tx_sender.send(Action::WithdrawNative(recipient, amount)).await
+        } else {
+            Err(InvalidArguments("cannot withdraw zero amount".into()))
+        }
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

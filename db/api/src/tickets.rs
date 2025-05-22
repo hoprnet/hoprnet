@@ -55,7 +55,7 @@ pub struct TicketSelector {
     pub win_prob: (Bound<WinningProbability>, Bound<WinningProbability>),
     /// If given, the tickets are further restricted to the ones with an amount
     /// in this range.
-    pub amount: (Bound<Balance>, Bound<Balance>),
+    pub amount: (Bound<HoprBalance>, Bound<HoprBalance>),
     /// Further restriction to tickets with the given state.
     pub state: Option<AcknowledgedTicketStatus>,
     /// Further restrict to only aggregated tickets.
@@ -188,7 +188,7 @@ impl TicketSelector {
     }
 
     /// Returns this instance with the ticket amount range bounds set.
-    pub fn with_amount<T: RangeBounds<Balance>>(mut self, range: T) -> Self {
+    pub fn with_amount<T: RangeBounds<HoprBalance>>(mut self, range: T) -> Self {
         self.amount = (range.start_bound().cloned(), range.end_bound().cloned());
         self
     }
@@ -320,7 +320,7 @@ pub trait HoprDbTicketOperations {
     /// Counts the tickets matching the given `selector` and their total value.
     ///
     /// The optional transaction `tx` must be in the database.
-    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)>;
+    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance)>;
 
     /// Sets the stored outgoing ticket index to `index`, only if the currently stored value
     /// is less than `index`. This ensures the stored value can only be growing.
@@ -393,20 +393,20 @@ pub trait HoprDbTicketOperations {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ChannelTicketStatistics {
     pub winning_tickets: u128,
-    pub neglected_value: Balance,
-    pub redeemed_value: Balance,
-    pub unredeemed_value: Balance,
-    pub rejected_value: Balance,
+    pub neglected_value: HoprBalance,
+    pub redeemed_value: HoprBalance,
+    pub unredeemed_value: HoprBalance,
+    pub rejected_value: HoprBalance,
 }
 
 impl Default for ChannelTicketStatistics {
     fn default() -> Self {
         Self {
             winning_tickets: 0,
-            neglected_value: BalanceType::HOPR.zero(),
-            redeemed_value: BalanceType::HOPR.zero(),
-            unredeemed_value: BalanceType::HOPR.zero(),
-            rejected_value: BalanceType::HOPR.zero(),
+            neglected_value: HoprBalance::zero(),
+            redeemed_value: HoprBalance::zero(),
+            unredeemed_value: HoprBalance::zero(),
+            rejected_value: HoprBalance::zero(),
         }
     }
 }

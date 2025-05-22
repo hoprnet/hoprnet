@@ -1,4 +1,4 @@
-use hopr_primitive_types::prelude::Balance;
+use hopr_primitive_types::prelude::HoprBalance;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
@@ -14,7 +14,7 @@ pub struct ProtocolConfig {
     pub outgoing_ticket_winning_prob: Option<f64>,
     #[serde_as(as = "Option<DisplayFromStr>")]
     /// Possible override of the network outgoing ticket price.
-    pub outgoing_ticket_price: Option<Balance>,
+    pub outgoing_ticket_price: Option<HoprBalance>,
     /// `heartbeat` protocol config
     #[serde(default)]
     pub heartbeat: crate::heartbeat::config::HeartbeatProtocolConfig,

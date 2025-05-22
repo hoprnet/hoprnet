@@ -164,7 +164,7 @@ pub(crate) fn filter_satisfying_ticket_models(
     let channel_id = channel_entry.get_id();
 
     let mut to_be_aggregated = Vec::with_capacity(models.len());
-    let mut total_balance = BalanceType::HOPR.zero();
+    let mut total_balance = HoprBalance::zero();
 
     for m in models {
         let ticket_wp: WinningProbability = m
@@ -181,13 +181,13 @@ pub(crate) fn filter_satisfying_ticket_models(
             continue;
         }
 
-        let to_add = BalanceType::HOPR.balance_bytes(&m.amount);
+        let to_add = HoprBalance::from_be_bytes(&m.amount);
 
         // Do a balance check to be sure not to aggregate more than the current channel stake
-        total_balance = total_balance + to_add;
+        total_balance += to_add;
         if total_balance.gt(&channel_entry.balance) {
-            // Remove last sub-balance which led to the overflow before breaking out of the loop.
-            total_balance = total_balance - to_add;
+            // Remove the last sub-balance which led to the overflow before breaking out of the loop.
+            total_balance -= to_add;
             break;
         }
 
@@ -256,7 +256,11 @@ pub(crate) async fn find_stats_for_channel(
 }
 
 impl HoprDb {
-    async fn get_tickets_value_int<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<(usize, Balance)> {
+    async fn get_tickets_value_int<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        selector: TicketSelector,
+    ) -> Result<(usize, HoprBalance)> {
         let selector: WrappedTicketSelector = selector.into();
         Ok(self
             .nest_transaction_in_db(tx, TargetDb::Tickets)
@@ -269,8 +273,8 @@ impl HoprDb {
                         .await
                         .map_err(DbSqlError::from)?
                         .map_err(DbSqlError::from)
-                        .try_fold((0_usize, BalanceType::HOPR.zero()), |(count, value), t| async move {
-                            Ok((count + 1, value + BalanceType::HOPR.balance_bytes(t.amount)))
+                        .try_fold((0_usize, HoprBalance::zero()), |(count, value), t| async move {
+                            Ok((count + 1, value + HoprBalance::from_be_bytes(t.amount)))
                         })
                         .await
                 })
@@ -384,7 +388,7 @@ impl HoprDbTicketOperations for HoprDb {
                                             .unrealized_value
                                             .get(&(*channel_id, *epoch))
                                             .await
-                                            .unwrap_or(Balance::zero(BalanceType::HOPR));
+                                            .unwrap_or_default();
 
                                         METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                                             &[&channel, "unredeemed"],
@@ -547,12 +551,12 @@ impl HoprDbTicketOperations for HoprDb {
                                 .await?
                                 .into_iter()
                                 .fold(ChannelTicketStatistics::default(), |mut acc, stats| {
-                                    let neglected_value = BalanceType::HOPR.balance_bytes(stats.neglected_value);
-                                    acc.neglected_value = acc.neglected_value + neglected_value;
-                                    let redeemed_value = BalanceType::HOPR.balance_bytes(stats.redeemed_value);
-                                    acc.redeemed_value = acc.redeemed_value + redeemed_value;
-                                    let rejected_value = BalanceType::HOPR.balance_bytes(stats.rejected_value);
-                                    acc.rejected_value = acc.rejected_value + rejected_value;
+                                    let neglected_value = HoprBalance::from_be_bytes(stats.neglected_value);
+                                    acc.neglected_value += neglected_value;
+                                    let redeemed_value = HoprBalance::from_be_bytes(stats.redeemed_value);
+                                    acc.redeemed_value += redeemed_value;
+                                    let rejected_value = HoprBalance::from_be_bytes(stats.rejected_value);
+                                    acc.rejected_value += rejected_value;
                                     acc.winning_tickets += stats.winning_tickets as u128;
 
                                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -576,7 +580,7 @@ impl HoprDbTicketOperations for HoprDb {
                                     acc
                                 });
 
-                            all_stats.unredeemed_value = BalanceType::HOPR.balance(unredeemed_value);
+                            all_stats.unredeemed_value = unredeemed_value.into();
 
                             Ok::<_, DbSqlError>(all_stats)
                         })
@@ -606,10 +610,10 @@ impl HoprDbTicketOperations for HoprDb {
 
                             Ok::<_, DbSqlError>(ChannelTicketStatistics {
                                 winning_tickets: stats.winning_tickets as u128,
-                                neglected_value: BalanceType::HOPR.balance_bytes(stats.neglected_value),
-                                redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value),
-                                unredeemed_value: BalanceType::HOPR.balance(unredeemed_value),
-                                rejected_value: BalanceType::HOPR.balance_bytes(stats.rejected_value),
+                                neglected_value: HoprBalance::from_be_bytes(stats.neglected_value),
+                                redeemed_value: HoprBalance::from_be_bytes(stats.redeemed_value),
+                                unredeemed_value: unredeemed_value.into(),
+                                rejected_value: HoprBalance::from_be_bytes(stats.rejected_value),
                             })
                         })
                     })
@@ -654,7 +658,7 @@ impl HoprDbTicketOperations for HoprDb {
         Ok(res?)
     }
 
-    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)> {
+    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance)> {
         self.get_tickets_value_int(None, selector).await
     }
 
@@ -1043,10 +1047,10 @@ impl HoprDbTicketOperations for HoprDb {
 
         let stored_value = acknowledged_tickets
             .iter()
-            .map(|m| BalanceType::HOPR.balance_bytes(&m.amount))
-            .fold(Balance::zero(BalanceType::HOPR), |acc, amount| acc.add(amount));
+            .map(|m| HoprBalance::from_be_bytes(&m.amount))
+            .sum();
 
-        // The value of received ticket can be higher (profit for us) but not lower
+        // The value of a received ticket can be higher (profit for us) but not lower
         if aggregated_ticket.verified_ticket().amount.lt(&stored_value) {
             error!(channel = %channel_id, "Aggregated ticket value in channel is lower than sum of stored tickets");
             return Err(DbSqlError::LogicalError("Value of received aggregated ticket is too low".into()).into());
@@ -1157,7 +1161,7 @@ impl HoprDbTicketOperations for HoprDb {
         let channel_epoch = channel_entry.channel_epoch.as_u32();
         let channel_id = channel_entry.get_id();
 
-        let mut final_value = Balance::zero(BalanceType::HOPR);
+        let mut final_value = HoprBalance::zero();
 
         // Validate all received tickets and turn them into RedeemableTickets
         let verified_tickets = acked_tickets
@@ -1201,7 +1205,7 @@ impl HoprDbTicketOperations for HoprDb {
                 .into());
             }
 
-            final_value = final_value.add(&acked_ticket.verified_ticket().amount);
+            final_value += acked_ticket.verified_ticket().amount;
             if final_value.gt(&channel_balance) {
                 return Err(DbSqlError::LogicalError(format!(
                     "ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of \

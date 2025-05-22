@@ -309,7 +309,7 @@ impl ChannelGraph {
                                 &[channel.destination.to_hex().as_str(), "out"],
                                 channel
                                     .balance
-                                    .amount_base_units()
+                                    .amount_in_base_units()
                                     .parse::<f64>()
                                     .unwrap_or(f64::INFINITY),
                             );
@@ -327,7 +327,7 @@ impl ChannelGraph {
                                 &[channel.source.to_hex().as_str(), "in"],
                                 channel
                                     .balance
-                                    .amount_base_units()
+                                    .amount_in_base_units()
                                     .parse::<f64>()
                                     .unwrap_or(f64::INFINITY),
                             );

@@ -27,8 +27,7 @@ impl ChannelEditor {
     }
 
     /// Change the HOPR balance of the channel.
-    pub fn change_balance(mut self, balance: Balance) -> Self {
-        assert_eq!(BalanceType::HOPR, balance.balance_type());
+    pub fn change_balance(mut self, balance: HoprBalance) -> Self {
         self.model.balance = Set(balance.amount().to_be_bytes().to_vec());
         self
     }

@@ -1,7 +1,8 @@
 //! This crate contains basic types used throughout the entire HOPR codebase.
 //! Types from this crate are not necessarily specific only to HOPR.
 
-mod balance;
+/// Contains implementations for the token and coin balance types.
+pub mod balance;
 /// Contains various size-bounded types
 pub mod bounded;
 /// Lists all errors in this crate.
@@ -27,5 +28,5 @@ pub fn f64_approx_eq(a: f64, b: f64, epsilon: f64) -> bool {
 pub mod prelude {
     pub use chrono::{DateTime, Utc};
 
-    pub use super::{errors::GeneralError, f64_approx_eq, primitives::*, sma::*, traits::*};
+    pub use super::{balance::*, errors::GeneralError, f64_approx_eq, primitives::*, sma::*, traits::*};
 }

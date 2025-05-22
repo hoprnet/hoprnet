@@ -33,18 +33,18 @@ pub struct AutoFundingStrategyConfig {
     ///
     /// Default is 1 wxHOPR
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("1000000000000000000", BalanceType::HOPR))]
-    pub min_stake_threshold: Balance,
+    #[default(HoprBalance::new_base(1))]
+    pub min_stake_threshold: HoprBalance,
 
     /// Funding amount.
     ///
     /// Defaults to 10 wxHOPR.
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
-    pub funding_amount: Balance,
+    #[default(HoprBalance::new_base(10))]
+    pub funding_amount: HoprBalance,
 }
 
-/// The `AutoFundingStrategy` automatically funds channel that
+/// The `AutoFundingStrategy` automatically funds a channel that
 /// dropped it's staked balance below the configured threshold.
 pub struct AutoFundingStrategy<A: ChannelActions> {
     hopr_chain_actions: A,

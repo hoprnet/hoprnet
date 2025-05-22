@@ -191,22 +191,22 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         Ok(self.get_block(block_number).await?.map(|b| b.header.timestamp))
     }
 
-    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance> {
-        match balance_type {
-            BalanceType::Native => {
-                let native = self
-                    .provider
-                    .get_balance(address.into())
-                    // .number(self.get_block_number().await?)
-                    .await?;
+    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>> {
+        let value: [u8; 32] = if C::is::<XDai>() {
+            self.provider.get_balance(address.into()).await?.to_be_bytes()
+        } else if C::is::<WxHOPR>() {
+            self.contract_instances
+                .token
+                .balanceOf(address.into())
+                .call()
+                .await?
+                ._0
+                .to_be_bytes()
+        } else {
+            return Err(RpcError::Other("unknown currency".into()));
+        };
 
-                Ok(Balance::new(native.to_be_bytes(), BalanceType::Native))
-            }
-            BalanceType::HOPR => match self.contract_instances.token.balanceOf(address.into()).call().await {
-                Ok(token_balance) => Ok(Balance::new(token_balance._0.to_be_bytes(), BalanceType::HOPR)),
-                Err(e) => Err(e.into()),
-            },
-        }
+        Ok(Balance::<C>::from(U256::from_be_bytes(value)))
     }
 
     async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability> {
@@ -220,16 +220,19 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         }
     }
 
-    async fn get_minimum_network_ticket_price(&self) -> Result<Balance> {
-        match self.contract_instances.price_oracle.currentTicketPrice().call().await {
-            Ok(ticket_price) => Ok(BalanceType::HOPR.balance(ticket_price._0.to_be_bytes_vec().as_slice())),
-            Err(e) => Err(e.into()),
-        }
+    async fn get_minimum_network_ticket_price(&self) -> Result<HoprBalance> {
+        Ok(self
+            .contract_instances
+            .price_oracle
+            .currentTicketPrice()
+            .call()
+            .await
+            .map(|v| HoprBalance::from(U256::from_be_bytes(v._0.to_be_bytes::<32>())))?)
     }
 
     async fn get_eligibility_status(&self, address: Address) -> Result<bool> {
         // 2) check if the node is registered to an account. In case the selfRegister is disabled
-        // (i.e. when staking threshold is zero), this value is used to check if the node is eligible
+        // (i.e., when the staking threshold is zero) this value is used to check if the node is eligible
         let tx_2 = CallItemBuilder::new(
             self.contract_instances
                 .network_registry

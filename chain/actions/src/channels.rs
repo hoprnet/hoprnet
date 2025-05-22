@@ -41,10 +41,10 @@ use crate::{
 #[async_trait]
 pub trait ChannelActions {
     /// Opens a channel to the given `destination` with the given `amount` staked.
-    async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction>;
+    async fn open_channel(&self, destination: Address, amount: HoprBalance) -> Result<PendingAction>;
 
     /// Funds the given channel with the given `amount`
-    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<PendingAction>;
+    async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> Result<PendingAction>;
 
     /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that
     /// channel, in case the `direction` is [`ChannelDirection::Incoming`].
@@ -62,12 +62,12 @@ where
     Db: HoprDbAllOperations + Clone + Send + Sync + std::fmt::Debug + 'static,
 {
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn open_channel(&self, destination: Address, amount: Balance) -> Result<PendingAction> {
+    async fn open_channel(&self, destination: Address, amount: HoprBalance) -> Result<PendingAction> {
         if self.self_address() == destination {
             return Err(InvalidArguments("cannot open channel to self".into()));
         }
 
-        if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
+        if amount.is_zero() {
             return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 
@@ -120,8 +120,8 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> Result<PendingAction> {
-        if amount.eq(&amount.of_same("0")) || amount.balance_type() != BalanceType::HOPR {
+    async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> Result<PendingAction> {
+        if amount.is_zero() {
             return Err(InvalidArguments("invalid balance or balance type given".into()));
         }
 

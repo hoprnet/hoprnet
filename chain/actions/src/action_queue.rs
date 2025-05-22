@@ -18,8 +18,6 @@ use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::{api::tickets::HoprDbTicketOperations, info::HoprDbInfoOperations};
 use hopr_internal_types::prelude::*;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::MultiCounter;
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info, trace, warn};
@@ -34,7 +32,7 @@ use crate::{
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_ACTIONS: MultiCounter = MultiCounter::new(
+    static ref METRIC_COUNT_ACTIONS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
         "hopr_chain_actions_count",
         "Number of different chain actions and their results",
         &["action", "result"]
@@ -53,7 +51,7 @@ pub trait TransactionExecutor {
 
     /// Executes channel funding transaction (or channel opening) to the given `destination` and stake.
     /// Channel funding and channel opening are both same transactions.
-    async fn fund_channel(&self, destination: Address, balance: Balance) -> Result<Hash>;
+    async fn fund_channel(&self, destination: Address, balance: HoprBalance) -> Result<Hash>;
 
     /// Initiates closure of an outgoing channel.
     async fn initiate_outgoing_channel_closure(&self, dst: Address) -> Result<Hash>;
@@ -67,7 +65,7 @@ pub trait TransactionExecutor {
     /// Performs withdrawal of a certain amount from an address.
     /// Note that this transaction is typically awaited via polling and is not tracked
     /// by the Indexer.
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<Hash>;
+    async fn withdraw<C: Currency + Send>(&self, recipient: Address, amount: Balance<C>) -> Result<Hash>;
 
     /// Announces the node on-chain given the `AnnouncementData`
     async fn announce(&self, data: AnnouncementData) -> Result<Hash>;
@@ -246,11 +244,19 @@ where
                 },
             },
 
+            // Withdrawals are not awaited via the Indexer, but polled for completion,
+            // so no indexer event stream expectation awaiting is needed.
+            // So return once the future completes
             Action::Withdraw(recipient, amount) => {
-                // Withdrawal is not awaited via the Indexer, but polled for completion,
-                // so no indexer event stream expectation awaiting is needed.
-                // So return once the future completes
                 debug!(%recipient, %amount, "withdrawing funds");
+                return Ok(ActionConfirmation {
+                    tx_hash: self.tx_exec.withdraw(recipient, amount).await?,
+                    event: None,
+                    action: action.clone(),
+                });
+            }
+            Action::WithdrawNative(recipient, amount) => {
+                debug!(%recipient, %amount, "withdrawing native funds");
                 return Ok(ActionConfirmation {
                     tx_hash: self.tx_exec.withdraw(recipient, amount).await?,
                     event: None,
