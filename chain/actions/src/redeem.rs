@@ -478,7 +478,8 @@ mod tests {
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
 
-        for tkt in bob_tickets.iter().cloned() {
+        // Skipping ticket with index 0
+        for tkt in bob_tickets.iter().skip(1).cloned() {
             indexer_action_tracker
                 .expect_register_expectation()
                 .once()
@@ -492,11 +493,14 @@ mod tests {
                 });
         }
 
-        // Expect only Bob's tickets to get redeemed
         let mut tx_exec = MockTransactionExecutor::new();
+        let mut seq = mockall::Sequence::new();
+
+        // Expect only Bob's tickets to get redeemed
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - 1)
+            .in_sequence(&mut seq)
             .withf(move |t| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
             .returning(move |_| Ok(random_hash));
 
@@ -699,7 +703,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_redeem_must_not_work_for_tickets_of_next_epoch_being_redeemed() -> anyhow::Result<()> {
-        let ticket_count = 4;
+        let ticket_count = 3;
         let ticket_from_next_epoch_count = 2;
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
