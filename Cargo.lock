@@ -4509,6 +4509,7 @@ dependencies = [
  "multiaddr",
  "serde",
  "smart-default",
+ "test-log",
  "thiserror 2.0.12",
  "tokio",
  "tracing",
