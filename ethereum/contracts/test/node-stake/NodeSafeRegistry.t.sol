@@ -315,10 +315,11 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         vm.clearMockedCalls();
     }
 
-    function testFuzz_DomainSeparator(uint64 newChainId) public {
+    function test_DomainSeparator(uint64 newId) public {
         // chain ID must be less than 2^64 - 1
-        newChainId = uint64(bound(uint256(newChainId), 1, 0xFFFFFFFFFFFFFFFE));
-        vm.assume(newChainId != block.chainid);
+        uint256 newChainId = bound(uint256(newId), 1, 0xFFFFFFFFFFFFFFFE);
+        uint256 oldChainId = block.chainid;
+        vm.assume(newChainId != oldChainId);
         bytes32 domainSeparatorOnDeployment = nodeSafeRegistry.domainSeparator();
 
         // call updateDomainSeparator when chainid is the same
@@ -341,6 +342,7 @@ contract HoprNodeSafeRegistryTest is Test, HoprNodeSafeRegistryEvents {
         );
         nodeSafeRegistry.updateDomainSeparator();
         assertTrue(nodeSafeRegistry.domainSeparator() != domainSeparatorOnDeployment);
+        vm.chainId(oldChainId);
     }
 
     // ================== helper functions ==================

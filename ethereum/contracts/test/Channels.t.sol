@@ -1862,10 +1862,11 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         vm.clearMockedCalls();
     }
 
-    function testFuzz_DomainSeparator(uint64 newChainId) public {
+    function testFuzz_DomainSeparator(uint64 newId) public {
         // chain ID must be less than 2^64 - 1
-        newChainId = uint64(bound(uint256(newChainId), 1, 0xFFFFFFFFFFFFFFFE));
-        vm.assume(newChainId != block.chainid);
+        uint256 newChainId = bound(uint256(newId), 1, 0xFFFFFFFFFFFFFFFE);
+        uint256 oldChainId = block.chainid;
+        vm.assume(newChainId != oldChainId);
         bytes32 domainSeparatorOnDeployment = hoprChannels.domainSeparator();
 
         // call updateDomainSeparator when chainid is the same
@@ -1888,12 +1889,14 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
         hoprChannels.updateDomainSeparator();
         assertTrue(hoprChannels.domainSeparator() != domainSeparatorOnDeployment);
+        vm.chainId(oldChainId);
     }
 
-    function testFuzz_LedgerDomainSeparator(uint64 newChainId) public {
+    function testFuzz_LedgerDomainSeparator(uint64 newId) public {
         // chain ID must be less than 2^64 - 1
-        newChainId = uint64(bound(uint256(newChainId), 1, 0xFFFFFFFFFFFFFFFE));
-        vm.assume(newChainId != block.chainid);
+        uint256 newChainId = bound(uint256(newId), 1, 0xFFFFFFFFFFFFFFFE);
+        uint256 oldChainId = block.chainid;
+        vm.assume(newChainId != oldChainId);
         bytes32 ledgerDomainSeparatorOnDeployment = hoprChannels.ledgerDomainSeparator();
 
         // call updateLedgerDomainSeparator when chainid is the same
@@ -1916,6 +1919,7 @@ contract HoprChannelsTest is Test, ERC1820RegistryFixtureTest, CryptoUtils, Hopr
         );
         hoprChannels.updateLedgerDomainSeparator();
         assertTrue(hoprChannels.ledgerDomainSeparator() != ledgerDomainSeparatorOnDeployment);
+        vm.chainId(oldChainId);
     }
 
     /**
