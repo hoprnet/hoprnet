@@ -71,8 +71,8 @@ use hopr_transport_p2p::{
 use hopr_transport_packet::prelude::*;
 pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use hopr_transport_probe::{
-    HoprProbeProcess, continuous_network_probe,
-    ping::{PingConfig, Pinger, Pinging},
+    Probe,
+    ping::{Pinger, Pinging},
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
 pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
@@ -509,21 +509,21 @@ where
         // manual ping
         let (manual_ping_tx, manual_ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
-        for (k, v) in continuous_network_probe(
-            (*self.me.public(), self.me_address),
-            (external_msg_send, rx_from_protocol),
-            manual_ping_rx,
-            network_notifier::ProbeNetworkInteractions::new(
-                self.network.clone(),
+        let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
+        for (k, v) in probe
+            .continuous_network_probe(
+                (external_msg_send, rx_from_protocol),
+                manual_ping_rx,
+                network_notifier::ProbeNetworkInteractions::new(
+                    self.network.clone(),
+                    self.db.clone(),
+                    self.path_planner.channel_graph(),
+                    network_events_tx,
+                ),
                 self.db.clone(),
-                self.path_planner.channel_graph(),
-                network_events_tx,
-            ),
-            self.cfg.probe,
-            self.db.clone(),
-        )
-        .await
-        .into_iter()
+            )
+            .await
+            .into_iter()
         {
             processes.insert(HoprTransportProcess::Probing(k), v);
         }
