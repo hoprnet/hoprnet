@@ -19,13 +19,13 @@ pub struct ProbeConfig {
     #[serde(default = "default_max_parallel_probes")]
     pub max_parallel_probes: usize,
 
-    /// The time threshold after which it is reasonable to recheck the peer
+    /// The delay between individual probing rounds for neighbor discovery
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_probing_interval")]
     #[default(default_probing_interval())]
     pub(crate) interval: std::time::Duration,
 
-    /// The time threshold after which it is reasonable to recheck the peer
+    /// The time threshold after which it is reasonable to recheck the nearest neighbor
     #[serde_as(as = "DurationSeconds<u64>")]
     #[serde(default = "default_recheck_threshold")]
     #[default(default_recheck_threshold())]
@@ -39,7 +39,7 @@ const DEFAULT_MAX_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from
 const DEFAULT_MAX_PARALLEL_PROBES: usize = 50;
 
 /// Delay before repeating probing rounds, must include enough time to traverse NATs
-const DEFAULT_REPEATED_PROBING_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
+const DEFAULT_REPEATED_PROBING_DELAY: std::time::Duration = std::time::Duration::from_secs(5);
 
 /// Time after which the availability of a node gets rechecked
 const DEFAULT_PROBE_RECHECK_THRESHOLD: std::time::Duration = std::time::Duration::from_secs(60);

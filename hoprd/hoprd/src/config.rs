@@ -186,7 +186,7 @@ impl HoprdConfig {
         };
 
         // probe
-        if let Some(x) = cli_args.probe_threshold {
+        if let Some(x) = cli_args.probe_recheck_threshold {
             cfg.hopr.probe.recheck_threshold = std::time::Duration::from_secs(x)
         };
 
