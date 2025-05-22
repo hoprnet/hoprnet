@@ -1,16 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
 use alloy::{
-    network::Ethereum,
-    node_bindings::AnvilInstance,
-    primitives::U256,
-    rpc::client::RpcClient,
-    transports::http::{Http, ReqwestTransport},
+    network::Ethereum, node_bindings::AnvilInstance, primitives::U256, rpc::client::RpcClient,
+    transports::http::ReqwestTransport,
 };
-use hopr_chain_rpc::{
-    client::{AnvilRpcClient, SnapshotRequestor},
-    transport::ReqwestClient,
-};
+use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
 use hopr_chain_types::{
     ContractAddresses, ContractInstances,
     utils::{
@@ -23,6 +17,7 @@ use tokio::time::sleep;
 use tracing::info;
 
 /// Used for testing. Creates RPC client to the local Anvil instance.
+#[allow(unused)]
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,
@@ -39,7 +34,7 @@ pub fn create_rpc_client_to_anvil_with_snapshot(
     rpc_client
 }
 
-/// Used for testing. Creates RPC client to the local Anvil instance.
+/// Used for testing. Creates an RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_provider_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,

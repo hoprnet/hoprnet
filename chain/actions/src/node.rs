@@ -235,7 +235,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_withdraw() -> anyhow::Result<()> {
-        let stake = Balance::new(10_u32, BalanceType::HOPR);
+        let stake = HoprBalance::from(10_u32);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -292,7 +292,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .withdraw(*BOB, Balance::zero(BalanceType::HOPR))
+                    .withdraw(*BOB, HoprBalance::zero())
                     .await
                     .err()
                     .expect("must be error"),

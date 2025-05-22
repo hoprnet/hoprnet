@@ -330,7 +330,7 @@ impl HoprDbChannelOperations for HoprDb {
 
         self.caches.src_dst_to_channel.invalidate(&parties).await;
 
-        // Finally invalidate any unrealized values from the cache.
+        // Finally, invalidate any unrealized values from the cache.
         // This might be a no-op if the channel was not in the cache
         // like for channels that are not ours.
         let channel_id = channel_entry.get_id();
@@ -353,7 +353,7 @@ mod tests {
         channels::ChannelStatus,
         prelude::{ChannelDirection, ChannelEntry},
     };
-    use hopr_primitive_types::prelude::{Address, BalanceType};
+    use hopr_primitive_types::prelude::Address;
 
     use crate::{HoprDbGeneralModelOperations, channels::HoprDbChannelOperations, db::HoprDb};
 
@@ -364,7 +364,7 @@ mod tests {
         let ce = ChannelEntry::new(
             Address::default(),
             Address::default(),
-            BalanceType::HOPR.zero(),
+            0.into(),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -388,14 +388,7 @@ mod tests {
         let a = Address::from(random_bytes());
         let b = Address::from(random_bytes());
 
-        let ce = ChannelEntry::new(
-            a,
-            b,
-            BalanceType::HOPR.zero(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let ce = ChannelEntry::new(a, b, 0.into(), 0_u32.into(), ChannelStatus::Open, 0_u32.into());
 
         db.upsert_channel(None, ce).await?;
         let from_db = db
@@ -432,7 +425,7 @@ mod tests {
         let ce = ChannelEntry::new(
             Address::default(),
             expected_destination,
-            BalanceType::HOPR.zero(),
+            0.into(),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -461,7 +454,7 @@ mod tests {
         let ce_1 = ChannelEntry::new(
             addr_1,
             addr_2,
-            BalanceType::HOPR.zero(),
+            0.into(),
             1_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -470,7 +463,7 @@ mod tests {
         let ce_2 = ChannelEntry::new(
             addr_2,
             addr_1,
-            BalanceType::HOPR.zero(),
+            0.into(),
             2_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),

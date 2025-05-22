@@ -65,7 +65,7 @@ pub trait TransactionExecutor {
     /// Performs withdrawal of a certain amount from an address.
     /// Note that this transaction is typically awaited via polling and is not tracked
     /// by the Indexer.
-    async fn withdraw<C: Currency + Send>(&self, recipient: Address, amount: Balance<C>) -> Result<Hash>;
+    async fn withdraw<C: Currency + Send + 'static>(&self, recipient: Address, amount: Balance<C>) -> Result<Hash>;
 
     /// Announces the node on-chain given the `AnnouncementData`
     async fn announce(&self, data: AnnouncementData) -> Result<Hash>;

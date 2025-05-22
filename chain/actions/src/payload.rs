@@ -576,7 +576,7 @@ mod tests {
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
-    use hopr_primitive_types::prelude::{Balance, BalanceType};
+    use hopr_primitive_types::prelude::HoprBalance;
     use multiaddr::Multiaddr;
 
     use super::{BasicPayloadGenerator, PayloadGenerator};
@@ -721,13 +721,7 @@ mod tests {
         assert_eq!(balance, U256::from(1000_u128));
 
         // Alice withdraws 100 HOPR (to Bob's address)
-        let tx = generator.transfer(
-            (&chain_key_bob).into(),
-            Balance::new(
-                hopr_primitive_types::primitives::U256::from(100_u128),
-                BalanceType::HOPR,
-            ),
-        )?;
+        let tx = generator.transfer((&chain_key_bob).into(), HoprBalance::from(100))?;
 
         assert!(client.send_transaction(tx).await?.get_receipt().await?.status());
 

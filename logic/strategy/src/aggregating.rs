@@ -300,7 +300,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{ops::Add, pin::pin, sync::Arc, time::Duration};
+    use std::{pin::pin, sync::Arc, time::Duration};
 
     use anyhow::Context;
     use futures::{FutureExt, StreamExt, pin_mut};
@@ -394,7 +394,7 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     let mut acked_tickets = Vec::new();
-                    let mut total_value = Balance::zero(BalanceType::HOPR);
+                    let mut total_value = HoprBalance::zero();
 
                     for i in 0..amount {
                         let acked_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i as u64, 1)
@@ -403,7 +403,7 @@ mod tests {
 
                         db_clone.upsert_ticket(Some(tx), acked_ticket.clone()).await?;
 
-                        total_value = total_value.add(&acked_ticket.verified_ticket().amount);
+                        total_value += acked_ticket.verified_ticket().amount;
                         acked_tickets.push(acked_ticket);
                     }
 
@@ -645,7 +645,7 @@ mod tests {
         let tickets = db_bob.get_tickets((&channel).into()).await?;
         assert_eq!(tickets.len(), NUM_TICKETS, "nothing should be aggregated");
 
-        channel.balance = Balance::new(100_u32, BalanceType::HOPR);
+        channel.balance = HoprBalance::from(100_u32);
 
         db_alice.upsert_channel(None, channel).await?;
         db_bob.upsert_channel(None, channel).await?;

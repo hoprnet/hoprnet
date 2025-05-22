@@ -57,10 +57,7 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
     ChannelEntry::new(
         from,
         to,
-        Balance::new(
-            U256::from(1234u64) * U256::from(*DEFAULT_PRICE_PER_PACKET),
-            BalanceType::HOPR,
-        ),
+        (U256::from(1234u64) * U256::from(*DEFAULT_PRICE_PER_PACKET)).into(),
         U256::zero(),
         ChannelStatus::Open,
         U256::zero(),
@@ -85,9 +82,7 @@ pub async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()
             .set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
 
-        dbs[index]
-            .update_ticket_price(None, Balance::new(100u128, BalanceType::HOPR))
-            .await?;
+        dbs[index].update_ticket_price(None, 100.into()).await?;
 
         // Link all the node keys and chain keys from the simulated announcements
         for i in 0..PEERS.len() {
@@ -196,7 +191,7 @@ pub async fn peer_setup_for(
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: opk.clone(),
             outgoing_ticket_win_prob: Some(WinningProbability::ALWAYS),
-            outgoing_ticket_price: Some(BalanceType::HOPR.balance(100)),
+            outgoing_ticket_price: Some(100.into()),
         };
 
         db.start_ticket_processing(Some(received_ack_tickets_tx))?;
@@ -322,7 +317,7 @@ pub async fn resolve_mock_path(
         let c = ChannelEntry::new(
             last_addr,
             *addr,
-            Balance::new(1000_u32, BalanceType::HOPR),
+            1000.into(),
             0u32.into(),
             ChannelStatus::Open,
             0u32.into(),

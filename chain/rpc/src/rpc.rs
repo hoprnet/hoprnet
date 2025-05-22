@@ -545,7 +545,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        let balance_1: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         // Send 1 ETH to some random address
@@ -585,7 +585,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg.clone())?;
 
-        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        let balance_1: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         let txs_count = 5_u64;
@@ -603,7 +603,7 @@ mod tests {
 
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let balance_2 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        let balance_2: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
 
         assert!(
             balance_2.amount() <= balance_1.amount() - txs_count * send_amount,
@@ -641,7 +641,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        let balance_1: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         // Send 1 ETH to some random address
@@ -651,7 +651,7 @@ mod tests {
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
 
-        let balance_2 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        let balance_2: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
         assert!(balance_2.lt(&balance_1), "balance must be diminished");
 
         Ok(())
@@ -695,7 +695,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await?;
+        let balance: HoprBalance = rpc.get_balance((&chain_key_0).into()).await?;
         assert_eq!(amount, balance.amount().as_u64(), "invalid balance");
 
         Ok(())

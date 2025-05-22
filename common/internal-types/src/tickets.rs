@@ -1097,7 +1097,7 @@ pub mod tests {
     };
     use hopr_primitive_types::{
         prelude::UnitaryFloatOps,
-        primitives::{Address, BalanceType, EthereumChallenge, U256},
+        primitives::{Address, EthereumChallenge, U256},
     };
 
     use super::*;
@@ -1214,7 +1214,7 @@ pub mod tests {
     pub fn test_ticket_serialize_deserialize() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
             .win_prob(1.0.try_into()?)
@@ -1237,7 +1237,7 @@ pub mod tests {
     pub fn test_ticket_serialize_deserialize_serde() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
             .win_prob(1.0.try_into()?)
@@ -1260,7 +1260,7 @@ pub mod tests {
     pub fn test_ticket_sign_verify() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
             .win_prob(1.0.try_into()?)
@@ -1383,7 +1383,7 @@ pub mod tests {
 
         let verified = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
             .win_prob(1.0.try_into()?)

@@ -268,7 +268,7 @@ mod tests {
                 ChannelEntry::new(
                     BOB.public().to_address(),
                     ALICE.public().to_address(),
-                    Balance::new_from_str("10", BalanceType::HOPR),
+                    10.into(),
                     U256::zero(),
                     ChannelStatus::Open,
                     U256::zero(),
@@ -299,7 +299,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
-            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
+            minimum_redeem_ticket_value: 0.into(),
             ..Default::default()
         };
 
@@ -330,7 +330,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
-            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
+            minimum_redeem_ticket_value: 0.into(),
             ..Default::default()
         };
 
@@ -364,7 +364,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
-            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
             ..Default::default()
         };
 
@@ -386,13 +386,13 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(10),
+            10.into(),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             4.into(),
         );
 
-        // Make ticket worth exactly the threshold
+        // Make the ticket worth exactly the threshold
         let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
 
         db.upsert_channel(None, channel).await?;
@@ -412,7 +412,7 @@ mod tests {
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
             redeem_all_on_close: true,
-            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db, actions);
@@ -439,7 +439,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(10),
+            10.into(),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             0.into(),
@@ -455,7 +455,7 @@ mod tests {
         actions.expect_redeem_ticket().never();
 
         let cfg = AutoRedeemingStrategyConfig {
-            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
             redeem_only_aggregated: false,
             redeem_all_on_close: true,
         };
@@ -483,7 +483,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(10),
+            10.into(),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             4.into(),
@@ -516,7 +516,7 @@ mod tests {
             .return_once(move |_| Ok(ok(mock_confirm).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
-            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
             redeem_only_aggregated: false,
             redeem_all_on_close: true,
         };

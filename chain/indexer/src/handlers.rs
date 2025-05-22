@@ -1317,10 +1317,7 @@ mod tests {
 
         assert!(event_type.is_none(), "token transfer does not have chain event type");
 
-        assert_eq!(
-            db.get_safe_hopr_balance(None).await?,
-            Balance::new(value.to_be_bytes(), BalanceType::HOPR)
-        );
+        assert_eq!(db.get_safe_hopr_balance(None).await?, value.to_be_bytes().into());
 
         Ok(())
     }
@@ -1335,8 +1332,7 @@ mod tests {
 
         let encoded_data = (value).abi_encode();
 
-        db.set_safe_hopr_balance(None, Balance::new(value.to_be_bytes(), BalanceType::HOPR))
-            .await?;
+        db.set_safe_hopr_balance(None, value.to_be_bytes().into()).await?;
 
         let transferred_log = SerializableLog {
             address: handlers.addresses.token.into(),
@@ -1357,7 +1353,7 @@ mod tests {
 
         assert!(event_type.is_none(), "token transfer does not have chain event type");
 
-        assert_eq!(db.get_safe_hopr_balance(None).await?, BalanceType::HOPR.zero());
+        assert_eq!(db.get_safe_hopr_balance(None).await?, HoprBalance::zero());
 
         Ok(())
     }
@@ -1381,7 +1377,7 @@ mod tests {
             ..test_log()
         };
 
-        assert_eq!(db.get_safe_hopr_allowance(None).await?, BalanceType::HOPR.zero());
+        assert_eq!(db.get_safe_hopr_allowance(None).await?, HoprBalance::zero());
 
         let approval_log_clone = approval_log.clone();
         let handlers_clone = handlers.clone();
@@ -1397,16 +1393,16 @@ mod tests {
 
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            Balance::new(U256::from(1000u64).to_be_bytes(), BalanceType::HOPR)
+            U256::from(1000u64).to_be_bytes().into()
         );
 
         // reduce allowance manually to verify a second time
         let _ = db
-            .set_safe_hopr_allowance(None, Balance::new(U256::from(10u64).to_be_bytes(), BalanceType::HOPR))
+            .set_safe_hopr_allowance(None, U256::from(10u64).to_be_bytes().into())
             .await;
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            Balance::new(U256::from(10u64).to_be_bytes(), BalanceType::HOPR)
+            U256::from(10u64).to_be_bytes().into()
         );
 
         let handlers_clone = handlers.clone();
@@ -1420,7 +1416,7 @@ mod tests {
 
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            Balance::new(U256::from(1000u64).to_be_bytes(), BalanceType::HOPR)
+            U256::from(1000u64).to_be_bytes().into()
         );
         Ok(())
     }
@@ -1754,7 +1750,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::new(0, BalanceType::HOPR),
+            0.into(),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -1762,7 +1758,7 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let solidity_balance = BalanceType::HOPR.balance(U256::from((1u128 << 96) - 1).to_be_bytes());
+        let solidity_balance: HoprBalance = hopr_primitive_types::primitives::U256::from((1u128 << 96) - 1).into();
         let diff = solidity_balance - channel.balance;
 
         let encoded_data = (solidity_balance.amount().to_be_bytes()).abi_encode();
@@ -1852,7 +1848,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR),
+            U256::from((1u128 << 96) - 1).to_be_bytes().into(),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -1860,7 +1856,7 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let solidity_balance = Balance::new(primitive_types::U256::from((1u128 << 96) - 2), BalanceType::HOPR);
+        let solidity_balance: HoprBalance = primitive_types::U256::from((1u128 << 96) - 2).into();
         let diff = channel.balance - solidity_balance;
 
         // let encoded_data = (solidity_balance).abi_encode();
@@ -1907,7 +1903,7 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR);
+        let starting_balance = U256::from((1u128 << 96) - 1).to_be_bytes().into();
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -1968,7 +1964,7 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let starting_balance = Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR);
+        let starting_balance = U256::from((1u128 << 96) - 1).to_be_bytes().into();
 
         let channel = ChannelEntry::new(
             Address::new(&hex!("B7397C218766eBe6A1A634df523A1a7e412e67eA")),
@@ -2071,7 +2067,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::zero(BalanceType::HOPR),
+            HoprBalance::zero(),
             primitive_types::U256::zero(),
             ChannelStatus::Closed,
             3.into(),
@@ -2131,7 +2127,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::zero(BalanceType::HOPR),
+            0.into(),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             3.into(),
@@ -2201,7 +2197,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
             *SELF_CHAIN_ADDRESS,
-            Balance::new(U256::from((1u128 << 96) - 1).to_be_bytes(), BalanceType::HOPR),
+            U256::from((1u128 << 96) - 1).to_be_bytes().into(),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -2242,12 +2238,12 @@ mod tests {
 
         let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             stats.redeemed_value,
             "there should not be any redeemed value"
         );
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             stats.neglected_value,
             "there should not be any neglected value"
         );
@@ -2293,7 +2289,7 @@ mod tests {
             "there should be redeemed value worth 1 ticket"
         );
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             stats.neglected_value,
             "there should not be any neglected ticket"
         );
@@ -2311,7 +2307,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
             *SELF_CHAIN_ADDRESS,
-            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::from((1u128 << 96) - 1).into(),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -2351,12 +2347,12 @@ mod tests {
 
         let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             stats.redeemed_value,
             "there should not be any redeemed value"
         );
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             stats.neglected_value,
             "there should not be any neglected value"
         );
@@ -2418,7 +2414,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::from((1u128 << 96) - 1).into(),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -2490,7 +2486,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
             *SELF_CHAIN_ADDRESS,
-            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::from((1u128 << 96) - 1).into(),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -2543,7 +2539,7 @@ mod tests {
         let channel = ChannelEntry::new(
             Address::from(hopr_crypto_random::random_bytes()),
             Address::from(hopr_crypto_random::random_bytes()),
-            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::from((1u128 << 96) - 1).into(),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -2596,7 +2592,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::from((1u128 << 96) - 1).into(),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -2807,7 +2803,7 @@ mod tests {
         let channel_1 = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
             *SELF_CHAIN_ADDRESS,
-            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::from((1u128 << 96) - 1).into(),
             3_u32.into(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -2830,7 +2826,7 @@ mod tests {
         let channel_2 = ChannelEntry::new(
             other_counterparty.public().to_address(),
             *SELF_CHAIN_ADDRESS,
-            Balance::new(primitive_types::U256::from((1u128 << 96) - 1), BalanceType::HOPR),
+            primitive_types::U256::from((1u128 << 96) - 1).into(),
             3_u32.into(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -2848,7 +2844,7 @@ mod tests {
         assert_eq!(tickets.len(), 2);
 
         let stats = db.get_ticket_statistics(None).await?;
-        assert_eq!(BalanceType::HOPR.zero(), stats.rejected_value);
+        assert_eq!(HoprBalance::zero(), stats.rejected_value);
 
         let handlers = init_handlers(db.clone());
 
@@ -2902,7 +2898,7 @@ mod tests {
             .reduce(|a, b| a + b)
             .ok_or(anyhow!("must sum"))?;
 
-        assert_eq!(BalanceType::HOPR.balance(rejected_value), stats.rejected_value);
+        assert_eq!(HoprBalance::from(rejected_value), stats.rejected_value);
 
         Ok(())
     }

@@ -295,7 +295,7 @@ mod tests {
         let mut ce = ChannelEntry::new(
             *ADDRESS_1,
             *ADDRESS_2,
-            Balance::new(10_u64, BalanceType::HOPR),
+            10.into(),
             23u64.into(),
             ChannelStatus::Open,
             3u64.into(),

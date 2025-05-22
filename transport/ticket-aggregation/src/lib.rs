@@ -421,10 +421,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        ops::{Add, Mul},
-        time::Duration,
-    };
+    use std::{ops::Mul, time::Duration};
 
     use futures::{pin_mut, stream::StreamExt};
     use hex_literal::hex;
@@ -538,7 +535,7 @@ mod tests {
         const NUM_TICKETS: u64 = 30;
 
         let mut tickets = vec![];
-        let mut agg_balance = Balance::zero(BalanceType::HOPR);
+        let mut agg_balance = HoprBalance::zero();
         // Generate acknowledged tickets
         for i in 1..=NUM_TICKETS {
             let mut ack_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i)?;
@@ -547,7 +544,7 @@ mod tests {
             if i == 1 {
                 ack_ticket.status = AcknowledgedTicketStatus::BeingRedeemed;
             } else {
-                agg_balance = agg_balance.add(&ack_ticket.verified_ticket().amount);
+                agg_balance += ack_ticket.verified_ticket().amount;
             }
 
             tickets.push(ack_ticket)
@@ -668,12 +665,12 @@ mod tests {
         const CHANNEL_TICKET_IDX: u64 = 20;
 
         let mut tickets = vec![];
-        let mut agg_balance = Balance::zero(BalanceType::HOPR);
+        let mut agg_balance = HoprBalance::zero();
         // Generate acknowledged tickets
         for i in 1..=NUM_TICKETS {
             let ack_ticket = mock_acknowledged_ticket(&PEERS_CHAIN[0], &PEERS_CHAIN[1], i)?;
             if i >= CHANNEL_TICKET_IDX {
-                agg_balance = agg_balance.add(&ack_ticket.verified_ticket().amount);
+                agg_balance += ack_ticket.verified_ticket().amount;
             }
             tickets.push(ack_ticket)
         }

@@ -391,7 +391,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             1.into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -400,7 +400,7 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         assert_eq!(
-            Balance::zero(BalanceType::HOPR),
+            HoprBalance::zero(),
             db.ticket_manager.unrealized_value((&channel).into()).await?
         );
 

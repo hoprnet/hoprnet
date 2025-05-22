@@ -738,7 +738,7 @@ mod tests {
         assert!(c.eq(cr), "channels must be equal");
 
         let ts = SystemTime::now().add(Duration::from_secs(10));
-        c.balance = Balance::zero(BalanceType::HOPR);
+        c.balance = 0.into();
         c.status = ChannelStatus::PendingToClose(ts);
         let changes = cg.update_channel(c).context("should contain channel changes")?;
         assert_eq!(2, changes.len(), "must contain 2 changes");
@@ -750,12 +750,8 @@ mod tests {
                     assert_eq!(ChannelStatus::PendingToClose(ts), right, "new status does not match");
                 }
                 ChannelChange::CurrentBalance { left, right } => {
-                    assert_eq!(
-                        Balance::new(1_u32, BalanceType::HOPR),
-                        left,
-                        "previous balance does not match"
-                    );
-                    assert_eq!(Balance::zero(BalanceType::HOPR), right, "new balance does not match");
+                    assert_eq!(HoprBalance::from(1), left, "previous balance does not match");
+                    assert_eq!(HoprBalance::zero(), right, "new balance does not match");
                 }
                 _ => panic!("unexpected change"),
             }
@@ -784,7 +780,7 @@ mod tests {
             .context("must contain channel")?;
         assert!(c.eq(cr), "channels must be equal");
 
-        c.balance = Balance::zero(BalanceType::HOPR);
+        c.balance = 0.into();
         c.status = ChannelStatus::Closed;
         let changes = cg.update_channel(c).context("must contain changes")?;
         assert_eq!(2, changes.len(), "must contain 2 changes");
@@ -800,12 +796,8 @@ mod tests {
                     assert_eq!(ChannelStatus::Closed, right, "new status does not match");
                 }
                 ChannelChange::CurrentBalance { left, right } => {
-                    assert_eq!(
-                        Balance::new(1_u32, BalanceType::HOPR),
-                        left,
-                        "previous balance does not match"
-                    );
-                    assert_eq!(Balance::zero(BalanceType::HOPR), right, "new balance does not match");
+                    assert_eq!(HoprBalance::from(1), left, "previous balance does not match");
+                    assert_eq!(HoprBalance::zero(), right, "new balance does not match");
                 }
                 _ => panic!("unexpected change"),
             }

@@ -588,7 +588,7 @@ impl HoprDbInfoOperations for HoprDb {
 mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
-    use hopr_primitive_types::prelude::{Address, BalanceType};
+    use hopr_primitive_types::{balance::HoprBalance, prelude::Address};
 
     use crate::{
         db::HoprDb,
@@ -605,12 +605,12 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             db.get_safe_hopr_balance(None).await?,
             "balance must be 0"
         );
 
-        let balance = BalanceType::HOPR.balance(10_000);
+        let balance = HoprBalance::from(10_000);
         db.set_safe_hopr_balance(None, balance).await?;
 
         assert_eq!(
@@ -626,12 +626,12 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             db.get_safe_hopr_allowance(None).await?,
             "balance must be 0"
         );
 
-        let balance = BalanceType::HOPR.balance(10_000);
+        let balance = HoprBalance::from(10_000);
         db.set_safe_hopr_allowance(None, balance).await?;
 
         assert_eq!(
@@ -650,7 +650,7 @@ mod tests {
         let data = db.get_indexer_data(None).await?;
         assert_eq!(data.ticket_price, None);
 
-        let price = BalanceType::HOPR.balance(10);
+        let price = HoprBalance::from(10);
         db.update_ticket_price(None, price).await?;
 
         db.set_minimum_incoming_ticket_win_prob(None, 0.5.try_into()?).await?;
