@@ -8,7 +8,7 @@ use crate::prelude::TagRangeExt;
 pub type Tag = u32;
 
 impl TagRangeExt for Tag {
-    const USABLE_RANGE: Range<Tag> = ReservedTag::UPPER_BOUND..size_of::<Tag>() as Tag;
+    const USABLE_RANGE: Range<Tag> = ReservedTag::UPPER_BOUND..CustomTag::UPPER_BOUND;
 }
 
 /// Resolved tag type with translated tag annotation.
@@ -57,7 +57,7 @@ pub enum ReservedTag {
 
 impl ReservedTag {
     /// The upper limit value for the session reserved tag range.
-    pub const UPPER_BOUND: Tag = 2 ^ 4;
+    pub const UPPER_BOUND: Tag = 1 << 4; // 16
 }
 
 impl From<ReservedTag> for Tag {
@@ -68,6 +68,10 @@ impl From<ReservedTag> for Tag {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CustomTag(Tag);
+
+impl CustomTag {
+    pub const UPPER_BOUND: Tag = u32::MAX as Tag;
+}
 
 impl From<CustomTag> for Tag {
     fn from(tag: CustomTag) -> Self {

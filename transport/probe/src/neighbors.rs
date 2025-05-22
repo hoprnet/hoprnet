@@ -9,10 +9,10 @@ use crate::{config::ProbeConfig, store::PeerDiscoveryFetch};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_TIME_TO_HEARTBEAT: SimpleHistogram =
+    static ref METRIC_TIME_TO_PROBE: SimpleHistogram =
         SimpleHistogram::new(
-            "hopr_heartbeat_round_time_sec",
-            "Measures total time in seconds it takes to probe all other nodes",
+            "hopr_probe_round_time_sec",
+            "Measures total time in seconds it takes to probe all nodes",
             vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0],
         ).unwrap();
 }
@@ -30,15 +30,15 @@ where
             peers.shuffle(&mut rng);    // shuffle peers to randomize order between rounds
 
             #[cfg(all(feature = "prometheus", not(test)))]
-            let heartbeat_round_timer = if peers.empty() { None } else { Some(histogram_start_measure!(METRIC_TIME_TO_HEARTBEAT)) };
+            let probe_round_timer = if peers.is_empty() { None } else { Some(histogram_start_measure!(METRIC_TIME_TO_PROBE)) };
 
             for peer in peers {
                 yield peer;
             }
 
             #[cfg(all(feature = "prometheus", not(test)))]
-            if let Some(heartbeat_round_timer) = heartbeat_round_timer {
-                METRIC_TIME_TO_HEARTBEAT.record_measure(heartbeat_round_timer);
+            if let Some(probe_round_timer) = probe_round_timer {
+                METRIC_TIME_TO_PROBE.record_measure(probe_round_timer);
             }
 
             hopr_async_runtime::prelude::sleep(cfg.interval).await;
