@@ -273,7 +273,7 @@ mod tests {
 
         let sender = MsgSender::new(tx);
 
-        let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03])?;
+        let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03, 0x04, 0x05])?;
         let expected_path = ValidatedPath::direct(
             *OffchainKeypair::random().public(),
             ChainKeypair::random().public().to_address(),
