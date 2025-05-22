@@ -43,17 +43,17 @@ pub type PingQueryResult = Result<std::time::Duration>;
 pub struct PingQueryReplier {
     /// Back channel for notifications, is [`Clone`] to allow caching
     notifier: UnboundedSender<PingQueryResult>,
-    challenge: Box<(u64, NeighborProbe)>,
+    challenge: (u64, NeighborProbe),
 }
 
 impl PingQueryReplier {
     pub fn new(notifier: UnboundedSender<PingQueryResult>) -> Self {
         Self {
             notifier,
-            challenge: Box::new((
+            challenge: (
                 current_time().as_unix_timestamp().as_millis() as u64,
                 NeighborProbe::random_nonce(),
-            )),
+            ),
         }
     }
 

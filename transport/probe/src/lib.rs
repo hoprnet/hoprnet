@@ -54,8 +54,8 @@ lazy_static::lazy_static! {
             "Measures total time it takes to ping a single node (seconds)",
             vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
         ).unwrap();
-    static ref METRIC_PING_COUNT: MultiCounter = MultiCounter::new(
-            "hopr_heartbeat_pings_count",
+    static ref METRIC_PROBE_COUNT: MultiCounter = MultiCounter::new(
+            "hopr_probe_count",
             "Total number of pings by result",
             &["success"]
         ).unwrap();
@@ -140,7 +140,7 @@ impl Probe {
                                 .await;
 
                             #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_PING_COUNT.increment(&["false"]);
+                            METRIC_PROBE_COUNT.increment(&["false"]);
                         }
                         .boxed()
                     } else {
@@ -208,7 +208,7 @@ impl Probe {
                                             if let Err(error) = packet_sent_rx.await {
                                                 tracing::error!(%peer, %error, "failed to receive packet sent confirmation")
                                             } else {
-                                                tracing::debug!(%peer, %pseudonym, ?nonce, "waiting a sent probe");
+                                                tracing::debug!(%peer, %pseudonym, ?nonce, "waiting for a sent probe");
                                                 active_probes
                                                     .insert((pseudonym, nonce), (peer, current_time().as_unix_timestamp(), notifier))
                                                     .await;
@@ -282,7 +282,7 @@ impl Probe {
                                         #[cfg(all(feature = "prometheus", not(test)))]
                                         {
                                             METRIC_TIME_TO_PING.observe((latency.as_millis() as f64) / 1000.0); // precision for seconds
-                                            METRIC_PING_COUNT.increment(&["true"]);
+                                            METRIC_PROBE_COUNT.increment(&["true"]);
                                         }
 
                                         if let Some(replier) = replier {
