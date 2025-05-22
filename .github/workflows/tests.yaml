@@ -17,7 +17,7 @@ on:
       - ready_for_review
 
 concurrency:
-  group: ${{ github.workflow}}-${{ github.ref }}-test
+  group: ${{ github.workflow }}-${{ github.ref }}-test
   cancel-in-progress: true
 
 jobs:
@@ -56,7 +56,6 @@ jobs:
 
       - name: Run unit tests
         run: nix build -L .#hopr-test
-<<<<<<< HEAD
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -64,11 +63,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./result
           fail_ci_if_error: true
-||||||| 82381cf104
-        run: |
-          nix build -L .#hopr-test
-=======
->>>>>>> origin/master
 
   tests-unit-nightly:
     runs-on: self-hosted-hoprnet-bigger
