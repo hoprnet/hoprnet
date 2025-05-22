@@ -92,6 +92,12 @@ impl Currency for XDai {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
 pub struct Balance<C: Currency>(U256, C);
 
+const WEI_PREFIX: &'static str = "wei";
+
+lazy_static::lazy_static! {
+    static ref BALANCE_REGEX: regex::Regex = regex::Regex::new(&format!("^([\\d\\s.]*\\d)\\s+({}[_\\s]?)?([A-Za-z]+)$", WEI_PREFIX)).unwrap();
+}
+
 impl<C: Currency> Display for Balance<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {}", self.amount_in_base_units(), self.1)
@@ -102,8 +108,7 @@ impl<C: Currency> FromStr for Balance<C> {
     type Err = GeneralError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let captures = regex::Regex::new(&format!("^([\\d\\s.]*\\d)\\s+({}[_\\s]?)?([A-z]+)$", Self::WEI_PREFIX))
-            .map_err(|_| GeneralError::ParseError("invalid balance regex".into()))?
+        let captures = BALANCE_REGEX
             .captures(s)
             .ok_or(GeneralError::ParseError("cannot parse balance".into()))?;
 
@@ -145,8 +150,6 @@ impl<C: Currency> AsRef<U256> for Balance<C> {
 }
 
 impl<C: Currency> Balance<C> {
-    const WEI_PREFIX: &'static str = "wei";
-
     /// Creates new balance in base units, instead of `wei`.
     pub fn new_base<T: Into<U256>>(value: T) -> Self {
         Self(value.into() * U256::exp10(C::SCALE), C::default())
@@ -189,7 +192,7 @@ impl<C: Currency> Balance<C> {
 
     /// Prints the balance formated in `wei` units.
     pub fn format_in_wei(&self) -> String {
-        format!("{} {} {}", self.0, Self::WEI_PREFIX, self.1)
+        format!("{} {} {}", self.0, WEI_PREFIX, self.1)
     }
 }
 

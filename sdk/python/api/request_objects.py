@@ -47,7 +47,7 @@ class FundChannelBody(ApiRequestObject):
         super().__init__(vars())
 
     def post_init(self):
-        self.amount = f"{self.amount:.0f}"
+        self.amount = f"{self.amount:.0f} wei wxHOPR"
 
 
 class GetChannelsBody(ApiRequestObject):

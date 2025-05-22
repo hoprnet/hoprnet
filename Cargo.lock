@@ -5008,6 +5008,7 @@ dependencies = [
  "float-cmp",
  "hex",
  "hex-literal",
+ "lazy_static",
  "primitive-types",
  "regex",
  "serde",

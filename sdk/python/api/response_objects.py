@@ -71,6 +71,13 @@ class Balances(ApiResponseObject):
         "safe_hopr_allowance": "safeHoprAllowance",
     }
 
+    def post_init(self):
+        self.hopr = float(self.hopr.split()[0]) * (10**18)
+        self.native = float(self.native.split()[0]) * (10**18)
+        self.safe_native = float(self.safe_native.split()[0]) * (10**18)
+        self.safe_hopr = float(self.safe_hopr.split()[0]) * (10**18)
+        self.safe_hopr_allowance = float(self.safe_hopr_allowance.split()[0]) * (10**18)
+
 
 class Infos(ApiResponseObject):
     keys = {"hopr_node_safe": "hoprNodeSafe"}
@@ -93,6 +100,7 @@ class Channel(ApiResponseObject):
     }
 
     def post_init(self):
+        self.balance = float(self.balance.split()[0]) * (10**18)
         self.status = ChannelStatus.fromString(self.status)
 
 
@@ -106,6 +114,9 @@ class Ticket(ApiResponseObject):
         "signature": "signature",
         "winn_prob": "winProb",
     }
+
+    def post_init(self):
+        self.amount = float(self.amount.split()[0]) * (10**18)
 
 
 class TicketPrice(ApiResponseObject):
@@ -127,6 +138,12 @@ class TicketStatistics(ApiResponseObject):
         "unredeemed_value": "unredeemedValue",
         "winning_count": "winningCount",
     }
+
+    def post_init(self):
+        self.rejected_value = float(self.rejected_value.split()[0]) * (10**18)
+        self.neglected_value = float(self.neglected_value.split()[0]) * (10**18)
+        self.redeemed_value = float(self.redeemed_value.split()[0]) * (10**18)
+        self.unredeemed_value = float(self.unredeemed_value.split()[0]) * (10**18)
 
 
 class Configuration(ApiResponseObject):
