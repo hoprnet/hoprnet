@@ -480,7 +480,7 @@ mod tests {
         peer_status.ignored = None;
         peer_status.peer_version = Some("1.2.3".into());
         peer_status.multiaddresses = vec![];
-        for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+        for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
 
@@ -544,7 +544,7 @@ mod tests {
                 peer_status.backoff = 1.0;
                 peer_status.ignored = None;
                 peer_status.peer_version = Some("1.2.3".into());
-                for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+                for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
                     peer_status.update_quality(i);
                 }
 
@@ -618,7 +618,7 @@ mod tests {
         peer_status.backoff = 1.0;
         peer_status.ignored = None;
         peer_status.peer_version = Some("1.2.3".into());
-        for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+        for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
 

@@ -495,7 +495,9 @@ mod tests {
         assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
         assert_eq!(8, SessionMessage::<0>::MAX_SEGMENTS_PER_FRAME);
 
-        assert!(SessionMessage::<0>::MAX_MESSAGE_SIZE < 2048);
+        const _: () = {
+            assert!(SessionMessage::<0>::MAX_MESSAGE_SIZE < 2048);
+        };
     }
 
     #[test]

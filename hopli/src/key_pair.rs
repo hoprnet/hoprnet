@@ -489,6 +489,7 @@ impl IdentityFileArgs {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use tempfile::tempdir;
 
     use super::*;
@@ -519,12 +520,9 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "password_create";
-        match create_identity(path, pwd, &Some(String::from("node1"))) {
-            Ok(_) => assert!(true),
-            _ => assert!(false),
-        }
+        assert!(create_identity(path, pwd, &Some(String::from("node1"))).is_ok());
         Ok(())
     }
 
@@ -533,7 +531,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "password";
         let (_, created_id) = create_identity(path, pwd, &None)?;
 
@@ -554,7 +552,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "password";
         let (_, created_id) = create_identity(path, pwd, &None)?;
 
@@ -588,7 +586,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "password";
         let (_, created_id) = create_identity(path, pwd, &None)?;
 
@@ -612,7 +610,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "password";
         let wrong_pwd = "wrong_password";
         create_identity(path, pwd, &None)?;
@@ -628,12 +626,9 @@ mod tests {
     fn read_identities_from_directory_without_id_files() -> anyhow::Result<()> {
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let files = get_files(path, &None);
-        match read_identities(files, "") {
-            Ok(val) => assert_eq!(val.len(), 0),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, "")?.len(), 0);
         Ok(())
     }
 
@@ -642,14 +637,12 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &None);
-        match read_identities(files, pwd) {
-            Ok(val) => assert_eq!(val.len(), 1),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, pwd)?.len(), 1);
+
         Ok(())
     }
 
@@ -658,14 +651,11 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &Some("local".to_string()));
-        match read_identities(files, pwd) {
-            Ok(val) => assert_eq!(val.len(), 1),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, pwd)?.len(), 1);
         Ok(())
     }
 
@@ -674,14 +664,12 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &Some("npm-".to_string()));
-        match read_identities(files, pwd) {
-            Ok(val) => assert_eq!(val.len(), 0),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, pwd)?.len(), 0);
+
         Ok(())
     }
 
@@ -690,15 +678,13 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
 
         let files = get_files(path, &Some("alice".to_string()));
-        match read_identities(files, pwd) {
-            Ok(val) => assert_eq!(val.len(), 0),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, pwd)?.len(), 0);
+
         Ok(())
     }
 
@@ -707,7 +693,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let name = "alice.id";
         let pwd = "e2e-test";
 
@@ -840,7 +826,7 @@ mod tests {
     #[test]
     fn password_args_can_read_env_or_cli_args_in_different_scenarios() -> anyhow::Result<()> {
         let tmp = tempdir()?;
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         create_file(path, None, 2)?;
 
         // possible password args
@@ -920,7 +906,7 @@ mod tests {
     #[test]
     fn pass_get_empty_dir_from_existing_dir() -> anyhow::Result<()> {
         let tmp = tempdir()?;
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         create_file(path, None, 0)?;
 
         let dir_args = IdentityFromDirectoryArgs {
@@ -939,7 +925,7 @@ mod tests {
     #[test]
     fn pass_get_dir_from_existing_dir() -> anyhow::Result<()> {
         let tmp = tempdir()?;
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         create_file(path, None, 4)?;
 
         let dir_args = IdentityFromDirectoryArgs {
@@ -958,7 +944,7 @@ mod tests {
     #[test]
     fn pass_get_path_from_existing_path() -> anyhow::Result<()> {
         let tmp = tempdir()?;
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         create_file(path, None, 4)?;
 
         let id_path = PathBuf::from(format!("{path}/fileid1"));
@@ -983,7 +969,7 @@ mod tests {
 
         // a dir for files
         let tmp = tempdir()?;
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         create_file(path, None, 4)?;
 
         let dir_args = IdentityFromDirectoryArgs {

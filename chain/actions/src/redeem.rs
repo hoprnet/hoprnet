@@ -763,12 +763,9 @@ mod tests {
         )
         .await;
 
-        for unredeemable_index in 0..ticket_from_next_epoch_count {
+        for ticket in tickets.iter().take(ticket_from_next_epoch_count) {
             assert!(
-                actions
-                    .redeem_ticket(tickets[unredeemable_index].clone())
-                    .await
-                    .is_err(),
+                actions.redeem_ticket(ticket.clone()).await.is_err(),
                 "cannot redeem a ticket that's from the next epoch"
             );
         }

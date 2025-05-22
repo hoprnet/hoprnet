@@ -266,10 +266,11 @@ mod tests {
             .join("contracts");
         let network = "anvil-localhost";
         let environment_type = "local";
-        match ensure_environment_and_network_are_set(correct_dir, network, environment_type) {
-            Ok(result) => assert!(result),
-            _ => assert!(false),
-        }
+        assert!(ensure_environment_and_network_are_set(
+            correct_dir,
+            network,
+            environment_type
+        )?);
         Ok(())
     }
 
@@ -305,10 +306,11 @@ mod tests {
             .join("contracts");
         let network = "anvil-localhost";
         let environment_type = "production";
-        match ensure_environment_and_network_are_set(correct_dir, network, environment_type) {
-            Ok(result) => assert!(!result),
-            _ => assert!(false),
-        }
+        assert!(!ensure_environment_and_network_are_set(
+            correct_dir,
+            network,
+            environment_type
+        )?);
         Ok(())
     }
 
