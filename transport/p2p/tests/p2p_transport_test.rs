@@ -36,6 +36,7 @@ pub(crate) struct Interface {
     pub send_msg: Sender<(PeerId, Box<[u8]>)>,
     pub recv_msg: Receiver<(PeerId, Box<[u8]>)>,
 }
+#[allow(clippy::upper_case_acronyms)]
 pub(crate) enum Announcement {
     QUIC,
 }

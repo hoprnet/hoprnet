@@ -375,8 +375,10 @@ mod tests {
     }
 
     async fn basic_network(my_id: &PeerId) -> anyhow::Result<Network<hopr_db_sql::db::HoprDb>> {
-        let mut cfg = NetworkConfig::default();
-        cfg.quality_offline_threshold = 0.6;
+        let cfg = NetworkConfig {
+            quality_offline_threshold: 0.6,
+            ..Default::default()
+        };
         Ok(Network::new(
             *my_id,
             vec![],
@@ -682,7 +684,7 @@ mod tests {
         let peers = basic_network(&me).await?;
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
-        let _ = peers.health();
+        let _ = peers.health().await;
         peers.remove(&peer).await?;
 
         assert_eq!(peers.health().await, Health::Red);
@@ -695,8 +697,10 @@ mod tests {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let mut cfg = NetworkConfig::default();
-        cfg.quality_offline_threshold = 0.6;
+        let cfg = NetworkConfig {
+            quality_offline_threshold: 0.6,
+            ..Default::default()
+        };
 
         let peers = Network::new(
             me,
@@ -723,8 +727,10 @@ mod tests {
         let public = peer;
         let me: PeerId = OffchainKeypair::random().public().into();
 
-        let mut cfg = NetworkConfig::default();
-        cfg.quality_offline_threshold = 0.6;
+        let cfg = NetworkConfig {
+            quality_offline_threshold: 0.6,
+            ..Default::default()
+        };
 
         let peers = Network::new(
             me,
@@ -751,8 +757,10 @@ mod tests {
         let me: PeerId = OffchainKeypair::random().public().into();
         let peer: PeerId = OffchainKeypair::random().public().into();
 
-        let mut cfg = NetworkConfig::default();
-        cfg.quality_offline_threshold = 0.3;
+        let cfg = NetworkConfig {
+            quality_offline_threshold: 0.3,
+            ..Default::default()
+        };
 
         let peers = Network::new(
             me,
@@ -780,8 +788,10 @@ mod tests {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let peer2: PeerId = OffchainKeypair::random().public().into();
 
-        let mut cfg = NetworkConfig::default();
-        cfg.quality_offline_threshold = 0.3;
+        let cfg = NetworkConfig {
+            quality_offline_threshold: 0.3,
+            ..Default::default()
+        };
 
         let peers = Network::new(
             OffchainKeypair::random().public().into(),

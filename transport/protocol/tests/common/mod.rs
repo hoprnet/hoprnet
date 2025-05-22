@@ -73,7 +73,7 @@ pub async fn create_dbs(amount: usize) -> anyhow::Result<Vec<HoprDb>> {
         .collect::<anyhow::Result<Vec<HoprDb>>>()
 }
 
-pub async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()> {
+pub async fn create_minimal_topology(dbs: &mut [HoprDb]) -> anyhow::Result<()> {
     let mut previous_channel: Option<ChannelEntry> = None;
 
     for index in 0..dbs.len() {
@@ -375,7 +375,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
 
     let pseudonym = HoprPseudonym::random();
     let mut sent_packet_count = 0;
-    for i in 0..packet_count {
+    for test_msg in test_msgs.iter().take(packet_count) {
         let sender = MsgSender::new(apis[0].0.clone());
         let routing = ResolvedTransportRouting::Forward {
             pseudonym,
@@ -383,7 +383,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
             return_paths: vec![],
         };
 
-        let awaiter = sender.send_packet(test_msgs[i].clone(), routing).await?;
+        let awaiter = sender.send_packet(test_msg.clone(), routing).await?;
 
         if awaiter
             .consume_and_wait(std::time::Duration::from_millis(500))
