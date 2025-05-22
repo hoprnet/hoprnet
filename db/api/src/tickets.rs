@@ -385,28 +385,16 @@ pub trait HoprDbTicketOperations {
         me: &ChainKeypair,
     ) -> Result<VerifiedTicket>;
 
-    /// Fix next ticket state if its out-of-sync in all this node's channels.
+    /// Fix the next ticket state if it's out-of-sync in all this node's channels.
     async fn fix_channels_next_ticket_state(&self) -> Result<()>;
 }
 
 /// Can contain ticket statistics for a channel or aggregated ticket statistics for all channels.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub struct ChannelTicketStatistics {
     pub winning_tickets: u128,
     pub neglected_value: HoprBalance,
     pub redeemed_value: HoprBalance,
     pub unredeemed_value: HoprBalance,
     pub rejected_value: HoprBalance,
-}
-
-impl Default for ChannelTicketStatistics {
-    fn default() -> Self {
-        Self {
-            winning_tickets: 0,
-            neglected_value: HoprBalance::zero(),
-            redeemed_value: HoprBalance::zero(),
-            unredeemed_value: HoprBalance::zero(),
-            rejected_value: HoprBalance::zero(),
-        }
-    }
 }

@@ -959,7 +959,7 @@ impl Hopr {
 
         // NOTE: after the chain is synced, we can reset tickets which are considered
         // redeemed but on-chain state does not align with that. This implies there was a problem
-        // right when the transaction was sent on-chain. In such cases we simply let it retry and
+        // right when the transaction was sent on-chain. In such cases, we simply let it retry and
         // handle errors appropriately.
         if let Err(e) = self.db.fix_channels_next_ticket_state().await {
             error!(error = %e, "failed to fix channels ticket states");
