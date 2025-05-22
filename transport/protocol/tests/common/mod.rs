@@ -66,13 +66,11 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
 }
 
 pub async fn create_dbs(amount: usize) -> anyhow::Result<Vec<HoprDb>> {
-    Ok(
-        futures::future::join_all((0..amount).map(|i| HoprDb::new_in_memory(PEERS_CHAIN[i].clone())))
-            .await
-            .into_iter()
-            .map(|v| v.map_err(|e| anyhow::anyhow!(e.to_string())))
-            .collect::<anyhow::Result<Vec<HoprDb>>>()?,
-    )
+    futures::future::join_all((0..amount).map(|i| HoprDb::new_in_memory(PEERS_CHAIN[i].clone())))
+        .await
+        .into_iter()
+        .map(|v| v.map_err(|e| anyhow::anyhow!(e.to_string())))
+        .collect::<anyhow::Result<Vec<HoprDb>>>()
 }
 
 pub async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()> {
@@ -93,7 +91,7 @@ pub async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()
                 .insert_account(
                     None,
                     AccountEntry {
-                        public_key: node_key.clone(),
+                        public_key: *node_key,
                         chain_addr: chain_key.to_address(),
                         entry_type: AccountType::Announced {
                             multiaddr: Multiaddr::from_str("/ip4/127.0.0.1/tcp/4444")?,
@@ -354,7 +352,7 @@ pub async fn send_relay_receive_channel_of_n_peers(
     let packet_count = test_msgs.len();
 
     assert!(peer_count >= 3, "invalid peer count given");
-    assert!(test_msgs.len() >= 1, "at least one packet must be given");
+    assert!(!test_msgs.is_empty(), "at least one packet must be given");
 
     const TIMEOUT_SECONDS: std::time::Duration = std::time::Duration::from_secs(10);
 

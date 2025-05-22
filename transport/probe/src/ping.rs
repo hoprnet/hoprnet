@@ -11,8 +11,8 @@ use libp2p_identity::PeerId;
 use tracing::{debug, warn};
 
 use crate::{
-    errors::{ProbeError, Result},
     content::NeighborProbe,
+    errors::{ProbeError, Result},
 };
 
 /// Heartbeat send ping TX type

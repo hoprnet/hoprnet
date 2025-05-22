@@ -1057,7 +1057,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Bob sends the SessionEstablished message
         let alice_mgr_clone = alice_mgr.clone();
@@ -1083,7 +1083,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Alice sends the CloseSession message to initiate closure
         let bob_mgr_clone = bob_mgr.clone();
@@ -1211,7 +1211,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Bob sends the SessionEstablished message
         let alice_mgr_clone = alice_mgr.clone();
@@ -1237,7 +1237,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Alice sends the CloseSession message to initiate closure
         let bob_mgr_clone = bob_mgr.clone();
@@ -1456,7 +1456,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Alice sends the SessionEstablished message (as Bob)
         let alice_mgr_clone = alice_mgr.clone();
@@ -1482,7 +1482,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
@@ -1598,7 +1598,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Bob sends the SessionEstablished message
         let alice_mgr_clone = alice_mgr.clone();

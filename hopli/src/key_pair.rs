@@ -629,6 +629,7 @@ mod tests {
         let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let files = get_files(path, &None);
         assert_eq!(read_identities(files, "")?.len(), 0);
+
         Ok(())
     }
 

@@ -209,7 +209,7 @@ mod tests {
 
         let (stream_rx, stream_tx) = stream.split();
         let (mut tx, rx) = (
-            FramedWrite::new(stream_tx.compat_write(), codec.clone()),
+            FramedWrite::new(stream_tx.compat_write(), codec),
             FramedRead::new(stream_rx.compat(), codec),
         );
         tx.send(value)
