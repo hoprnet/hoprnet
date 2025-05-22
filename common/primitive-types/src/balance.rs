@@ -6,7 +6,7 @@ use std::{
 
 use bigdecimal::{
     BigDecimal,
-    num_bigint::{BigInt, ToBigInt},
+    num_bigint::{BigInt, BigUint, ToBigInt},
 };
 
 use crate::{
@@ -112,15 +112,20 @@ impl<C: Currency> FromStr for Balance<C> {
             value *= BigInt::from(10).pow(C::SCALE as u32);
         }
 
-        let value = U256::from_big_endian(
-            &value
-                .to_bigint()
-                .and_then(|b| b.to_biguint())
-                .expect("conversion to big unsigned integer never fails")
-                .to_bytes_be(),
-        );
+        // This discards any excess fractional digits after 10e-SCALE
+        let biguint_val = value
+            .to_bigint()
+            .and_then(|b| b.to_biguint())
+            .expect("conversion to big unsigned integer never fails");
 
-        Ok(Self(value, C::from_str(&captures[3])?))
+        if biguint_val > BigUint::from_bytes_be(&U256::max_value().to_be_bytes()) {
+            return Err(GeneralError::ParseError("balance value out of bounds".into()));
+        }
+
+        Ok(Self(
+            U256::from_be_bytes(biguint_val.to_bytes_be()),
+            C::from_str(&captures[3])?,
+        ))
     }
 }
 
@@ -309,6 +314,8 @@ pub type XDaiBalance = Balance<XDai>;
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Div;
+
     use super::*;
     use crate::primitives::U256;
 
@@ -357,6 +364,30 @@ mod tests {
         let b2: XDaiBalance = 10.into();
 
         assert_ne!(b1.to_string(), b2.to_string());
+    }
+
+    #[test]
+    fn balance_parsing_should_fail_when_out_of_bounds() {
+        let too_big = primitive_types::U512::from(U256::max_value()) + 1;
+        assert!(HoprBalance::from_str(&format!("{too_big} wei wxHOPR")).is_err());
+
+        let too_big =
+            (primitive_types::U512::from(U256::max_value()) + 1).div(primitive_types::U512::exp10(WxHOPR::SCALE)) + 1;
+        assert!(HoprBalance::from_str(&format!("{too_big} wxHOPR")).is_err());
+    }
+
+    #[test]
+    fn balance_should_discard_excess_fractional_digits() -> anyhow::Result<()> {
+        let balance: HoprBalance = "1.12345678901234567891 wxHOPR".parse()?;
+        assert_eq!("1.123456789012345678 wxHOPR", balance.to_string());
+
+        let balance: HoprBalance = "123.12345678901234567891 wxHOPR".parse()?;
+        assert_eq!("123.123456789012345678 wxHOPR", balance.to_string());
+
+        let balance: HoprBalance = "1.12345678901234567891 wei wxHOPR".parse()?;
+        assert_eq!("0.000000000000000001 wxHOPR", balance.to_string());
+
+        Ok(())
     }
 
     #[test]
