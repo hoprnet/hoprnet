@@ -9,9 +9,6 @@ pub enum ProbeError {
     #[error("error while decoding message data")]
     DecodingError,
 
-    #[error("error in the messaging sub-protocol: {0}")]
-    MessagingError(String),
-
     #[error("peer does not exist")]
     NonExistingPeer,
 

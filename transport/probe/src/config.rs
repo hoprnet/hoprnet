@@ -36,7 +36,7 @@ pub struct ProbeConfig {
 const DEFAULT_MAX_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// The maximum number of parallel probes the heartbeat performs
-const DEFAULT_MAX_PARALLEL_PROBES: usize = 100;
+const DEFAULT_MAX_PARALLEL_PROBES: usize = 50;
 
 /// Delay before repeating probing rounds, must include enough time to traverse NATs
 const DEFAULT_REPEATED_PROBING_DELAY: std::time::Duration = std::time::Duration::from_secs(2);

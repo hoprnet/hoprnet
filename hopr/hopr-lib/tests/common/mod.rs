@@ -1,16 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
 use alloy::{
-    network::Ethereum,
-    node_bindings::AnvilInstance,
-    primitives::U256,
-    rpc::client::RpcClient,
-    transports::http::{Http, ReqwestTransport},
+    network::Ethereum, node_bindings::AnvilInstance, primitives::U256, rpc::client::RpcClient,
+    transports::http::ReqwestTransport,
 };
-use hopr_chain_rpc::{
-    client::{AnvilRpcClient, SnapshotRequestor},
-    transport::ReqwestClient,
-};
+use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
 use hopr_chain_types::{
     ContractAddresses, ContractInstances,
     utils::{
