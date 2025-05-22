@@ -311,6 +311,9 @@ mod tests {
         let balance = HoprBalance::from_str("5 wxHOPR")?;
         assert_eq!(balance.amount(), U256::from(5) * U256::exp10(WxHOPR::SCALE));
 
+        let balance = HoprBalance::from_str("5 wxhopr")?;
+        assert_eq!(balance.amount(), U256::from(5) * U256::exp10(WxHOPR::SCALE));
+
         let balance = HoprBalance::from_str(".5 wxHOPR")?;
         assert_eq!(balance.amount(), U256::from(5) * U256::exp10(WxHOPR::SCALE - 1));
 
@@ -352,6 +355,9 @@ mod tests {
         let balance = HoprBalance::from_str("5 wei wxHOPR")?;
         assert_eq!(balance.amount(), 5.into());
 
+        let balance = HoprBalance::from_str("5 wei wxhopr")?;
+        assert_eq!(balance.amount(), 5.into());
+
         Ok(())
     }
 
@@ -376,6 +382,7 @@ mod tests {
     fn balance_should_have_consistent_display_from_str() -> anyhow::Result<()> {
         let balance_1 = HoprBalance::from(10);
         let balance_2 = HoprBalance::from_str(&balance_1.to_string())?;
+
         assert_eq!(balance_1, balance_2);
 
         Ok(())
@@ -409,6 +416,7 @@ mod tests {
         let sum = vec![HoprBalance::from(1), HoprBalance::from(2), HoprBalance::from(3)]
             .into_iter()
             .sum::<HoprBalance>();
+
         assert_eq!(sum, HoprBalance::from(6));
     }
 }
