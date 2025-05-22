@@ -17,6 +17,7 @@ use tokio::time::sleep;
 use tracing::info;
 
 /// Used for testing. Creates RPC client to the local Anvil instance.
+#[allow(dead_code)]
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,
