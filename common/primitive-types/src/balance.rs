@@ -92,7 +92,7 @@ impl Currency for XDai {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
 pub struct Balance<C: Currency>(U256, C);
 
-const WEI_PREFIX: &'static str = "wei";
+const WEI_PREFIX: &str = "wei";
 
 lazy_static::lazy_static! {
     static ref BALANCE_REGEX: regex::Regex = regex::Regex::new(&format!("^([\\d\\s.]*\\d)\\s+({}[_\\s]?)?([A-Za-z]+)$", WEI_PREFIX)).unwrap();
