@@ -928,7 +928,6 @@ impl Hopr {
             .transport_api
             .run(
                 &self.me_chain,
-                String::from(constants::APP_VERSION),
                 join(&[&self.cfg.db.data, "tbf"])
                     .map_err(|e| HoprLibError::GeneralError(format!("Failed to construct the bloom filter: {e}")))?,
                 transport_output_tx,

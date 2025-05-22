@@ -18,37 +18,56 @@
 
 pub mod config;
 pub mod errors;
-pub mod messaging;
+pub mod content;
 pub mod ping;
 
 pub mod neighbors;
 pub mod store;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Div};
 
 use anyhow::Context;
-use futures::{channel::mpsc::{channel, UnboundedReceiver}, SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt, channel::oneshot::channel, pin_mut};
 use futures_concurrency::stream::StreamExt as _;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::{protocol::HoprDbProtocolOperations, resolver::HoprDbResolverOperations};
 use hopr_internal_types::protocol::HoprPseudonym;
-use hopr_network_types::types::{ResolvedTransportRouting, ValidatedPath};
-use hopr_primitive_types::prelude::Address;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
+use hopr_network_types::types::{ResolvedTransportRouting, SurbMatcher, ValidatedPath};
+use hopr_platform::time::native::current_time;
+use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag};
 use hopr_transport_protocol::processor::{PacketError, PacketSendFinalizer};
 use libp2p_identity::PeerId;
-use messaging::{Message, NeighborProbe};
-use ping::{PingQueryReplier, PingQueryResult};
+
+use crate::{
+    content::{Message, NeighborProbe},
+    ping::PingQueryReplier,
+};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_TIME_TO_PING: SimpleHistogram =
+        SimpleHistogram::new(
+            "hopr_ping_time_sec",
+            "Measures total time it takes to ping a single node (seconds)",
+            vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
+        ).unwrap();
+    static ref METRIC_PING_COUNT: MultiCounter = MultiCounter::new(
+            "hopr_heartbeat_pings_count",
+            "Total number of pings by result",
+            &["success"]
+        ).unwrap();
+}
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, strum::Display)]
 pub enum HoprProbeProcess {
-    #[strum(to_string = "probing queue")]
-    ProbeQueue,
-    #[strum(to_string = "probe rx side")]
-    Rx,
-    #[strum(to_string = "probe tx side")]
-    Tx,
+    #[strum(to_string = "probe emission")]
+    Emit,
+    #[strum(to_string = "probe processing")]
+    Process,
 }
 
 pub struct Probe {
@@ -63,11 +82,13 @@ impl Probe {
     }
 
     /// The main function that assembles and starts the probing process.
-    pub async fn continuous_network_probe<T, U, V, W, Db>(self,
+    pub async fn continuous_network_probe<T, U, V, W, Db, Up>(
+        self,
         api: (T, U),          // lower (tx, rx) channels for sending and receiving messages
         manual_evenets_tx: V, // ping requests from the API
         store: W,             // peer store
         db: Db,               // database for SURB & peer resolution
+        move_up: Up,          // send actual messages from the network
     ) -> HashMap<HoprProbeProcess, hopr_async_runtime::prelude::JoinHandle<()>>
     where
         T: futures::Sink<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
@@ -79,6 +100,7 @@ impl Probe {
         U: futures::Stream<Item = (HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
         W: store::PeerDiscoveryFetch + store::ProbeStatusUpdate + Clone + Send + Sync + 'static,
         V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
+        Up: futures::Sink<(HoprPseudonym, ApplicationData)> + Clone + Send + Sync + 'static,
         Db: HoprDbResolverOperations + HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
     {
         let max_parallel_probes = self.cfg.max_parallel_probes;
@@ -89,18 +111,46 @@ impl Probe {
             .max_capacity(100_000)
             .build();
 
-        let active_probes: moka::future::Cache<(HoprPseudonym, messaging::NeighborProbe), PingQueryReplier> =
-            moka::future::Cache::builder()
-                .time_to_live(self.cfg.timeout)
-                .max_capacity(100_000)
-                .build();
+        // Currently active probes
+        let store_eviction = store.clone();
+        let timeout = self.cfg.timeout;
+        let active_probes: moka::future::Cache<
+            (HoprPseudonym, content::NeighborProbe),
+            (PeerId, std::time::Duration, Option<PingQueryReplier>),
+        > = moka::future::Cache::builder()
+            .time_to_live(timeout)
+            .max_capacity(100_000)
+            .async_eviction_listener(
+                move |_k,
+                      v: (PeerId, std::time::Duration, Option<PingQueryReplier>),
+                      cause|
+                      -> moka::notification::ListenerFuture {
+                    if matches!(cause, moka::notification::RemovalCause::Expired) {
+                        // If the cause of eviction is expiration, the corresponding entry needs to be recorded as a
+                        // failed probe
+                        let store_eviction = store_eviction.clone();
+                        let (peer, _start, _notifier) = v;
 
-        
-        // Link between the sending side and receiving side's network updater
-        let (store_updater_tx, store_updater_rx) = channel::<(
-            PeerId,
-            UnboundedReceiver<PingQueryResult>,
-        )>(1000);
+                        tracing::debug!(%peer, reason = "timeout", "evicting peer's probe");
+                        async move {
+                            store_eviction
+                                .on_finished(
+                                    &peer,
+                                    &Err(crate::errors::ProbeError::Timeout(timeout.as_millis() as u64)),
+                                )
+                                .await;
+
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            METRIC_PING_COUNT.increment(&["false"]);
+                        }
+                        .boxed()
+                    } else {
+                        // If the cause of eviction is not expiration, nothing needs to be done
+                        futures::future::ready(()).boxed()
+                    }
+                },
+            )
+            .build();
 
         let active_probes_rx = active_probes.clone();
         let db_rx = db.clone();
@@ -108,171 +158,149 @@ impl Probe {
 
         let mut processes = HashMap::<HoprProbeProcess, hopr_async_runtime::prelude::JoinHandle<()>>::new();
 
-        // for each peer from the `immediate_peers`
-        // - check if the mapping of peer_id to ResolvedTransportRouting::Forward exists, if not, create it
-        // - map peer_id to stored ResolvedTransportRouting::Forward
-        // - generate a PingQueryReplier
-        // - map (HoprPseudonym, nonce) to a PingQueryReplier
-        // - store the rx side of the PingQueryReplier if needed
-        // - send the nonce and wait for the packet sent response
+        // -- Emit probes --
         let direct_neighbors = neighbors::neighbors_to_probe(store.clone(), self.cfg)
             .map(|peer| (peer, None))
             .merge(manual_evenets_tx.map(|(peer, notifier)| (peer, Some(notifier))));
 
-        processes.insert(HoprProbeProcess::Tx,
-    hopr_async_runtime::prelude::spawn(direct_neighbors
-        .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
-            let db = db.clone();
-            let cache_peer_routing = cache_peer_routing.clone();
-            let active_probes = active_probes.clone();
-            let push_to_network = push_to_network.clone();
-            let mut tx_network_updater = store_updater_tx.clone();
-            let me = self.me;
+        processes.insert(
+            HoprProbeProcess::Emit,
+            hopr_async_runtime::prelude::spawn(direct_neighbors
+                .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
+                    let db = db.clone();
+                    let cache_peer_routing = cache_peer_routing.clone();
+                    let active_probes = active_probes.clone();
+                    let push_to_network = push_to_network.clone();
+                    let me = self.me;
 
-            async move {
-                let result = cache_peer_routing
-                    .try_get_with(peer, async move {
-                        let cp_ofk = OffchainPublicKey::try_from(peer)
-                            .context(format!("failed to convert {peer} to offchain public key"))?;
-                        let cp_address = db
-                            .resolve_chain_key(&cp_ofk)
-                            .await?
-                            .ok_or_else(|| anyhow::anyhow!("Failed to resolve chain key for peer: {peer}"))?;
+                    async move {
+                        let result = cache_peer_routing
+                            .try_get_with(peer, async move {
+                                let cp_ofk = OffchainPublicKey::try_from(peer)
+                                    .context(format!("failed to convert {peer} to offchain public key"))?;
+                                let cp_address = db
+                                    .resolve_chain_key(&cp_ofk)
+                                    .await?
+                                    .ok_or_else(|| anyhow::anyhow!("Failed to resolve chain key for peer: {peer}"))?;
 
-                        Ok::<ResolvedTransportRouting, anyhow::Error>(ResolvedTransportRouting::Forward {
-                            pseudonym: HoprPseudonym::random(),
-                            forward_path: ValidatedPath::direct(cp_ofk.into(), cp_address),
-                            return_paths: vec![ValidatedPath::direct(me.0.into(), me.1)],
-                        })
-                    })
-                    .await;
+                                Ok::<ResolvedTransportRouting, anyhow::Error>(ResolvedTransportRouting::Forward {
+                                    pseudonym: HoprPseudonym::random(),
+                                    forward_path: ValidatedPath::direct(cp_ofk.into(), cp_address),
+                                    return_paths: vec![ValidatedPath::direct(me.0.into(), me.1)],
+                                })
+                            })
+                            .await;
 
-                match result {
-                    Ok(resolved_transport_routing) => {
-                        if let ResolvedTransportRouting::Forward { pseudonym, .. } = &resolved_transport_routing {
-                            let replier = if let Some(notifier) = notifier {
-                                notifier
-                            } else {
-                                let (tx, rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
-                                
-                                if let Err(error) = tx_network_updater
-                                    .send((peer, rx))
-                                    .await {
-                                        tracing::error!(%peer, %error, "failed to send ping query result");
-                                    }
+                        match result {
+                            Ok(ResolvedTransportRouting::Forward { pseudonym, forward_path, return_paths }) => {
+                                let nonce = if let Some(notifier) = &notifier {
+                                    notifier.challenge()
+                                } else {
+                                    NeighborProbe::random_nonce()
+                                };
 
-                                PingQueryReplier::new(tx)
-                            };
+                                let maybe_data: anyhow::Result<ApplicationData> = Message::Probe(nonce).try_into();
+                                match maybe_data {
+                                    Ok(data) => {
+                                        let (packet_sent_tx, packet_sent_rx) = channel::<std::result::Result<(), PacketError>>();
 
-                            let maybe_data: anyhow::Result<ApplicationData> = Message::Probe(replier.challenge()).try_into();
-                            match maybe_data {
-                                Ok(data) => {
-                                    let (packet_sent_tx, packet_sent_rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
-                                    futures::pin_mut!(push_to_network);
-                                    if let Err(_error) = push_to_network.send((data, resolved_transport_routing.clone(), packet_sent_tx.into())).await {
-                                        tracing::error!(%peer, "failed to send message");
-                                    } else {
-                                        if let Err(error) = packet_sent_rx.await {
-                                            tracing::error!(%peer, %error, "failed to receive packet sent response")
+                                        futures::pin_mut!(push_to_network);
+                                        if push_to_network.send((data, ResolvedTransportRouting::Forward { pseudonym, forward_path, return_paths }, packet_sent_tx.into())).await.is_ok() {
+                                            if let Err(error) = packet_sent_rx.await {
+                                                tracing::error!(%peer, %error, "failed to receive packet sent confirmation")
+                                            } else {
+                                                tracing::debug!(%peer, %pseudonym, ?nonce, "waiting a sent probe");
+                                                active_probes
+                                                    .insert((pseudonym, nonce), (peer, current_time().as_unix_timestamp(), notifier))
+                                                    .await;
+                                            }
                                         } else {
-                                            active_probes
-                                                .insert((*pseudonym, replier.challenge()), replier)
-                                                .await;
+                                            tracing::error!(%peer, error = "transport error", "failed to send message");
                                         }
-                                    }
-                                },
-                                Err(error) => tracing::error!(%peer, %error, "failed to convert message into data"),
-                            }
-                        } else {
-                            tracing::error!(%peer, error = "logical error", "resolved transport routing is not forward");
-                        }
-                    },
-                    Err(error) => tracing::error!(%peer, %error, "failed to resolve transport routing"),
-                };
-            }
-        })));
-
-        // read the rx sides of the PingQueryReplier and perform update actions on the network object
-        processes.insert(
-        HoprProbeProcess::Tx,
-        hopr_async_runtime::prelude::spawn(store_updater_rx.for_each(move |(peer, rx)| {
-            let store = store.clone();
-
-            async move {
-                let mut rx = rx;
-
-                if let Some(result) = rx.next().await {
-                    store.on_finished(&peer, &result).await;
-                } else {
-                    tracing::error!(%peer, "failed to receive ping query result, result channel closed before receiving");
-                }
-            }
-        }))
-    );
-
-        // for each (HoprPseudonym, ApplicationData) tuple
-        // - for each ApplicationData check Tag = 0, if not, forward further
-        // - check if the pseudonym is inside my mappings to outgoing peers
-        //   - if yes process response
-        //   - if no, reply to the sender with a Pong
-        processes.insert(
-        HoprProbeProcess::Tx,
-        hopr_async_runtime::prelude::spawn(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, data)| {
-            let active_probes = active_probes_rx.clone();
-            let msg_out = api.0.clone();
-            let db = db_rx.clone();
-
-            async move {
-            if data.application_tag != ReservedTag::Ping as u32 {
-                todo!("receive as data");
-            }
-
-            let pong: anyhow::Result<Message> = data.try_into().context("failed to convert data into message");
-            match pong {
-                Ok(pong) => {
-                    match pong {
-                        Message::Telemetry(_path_telemetry) => {
-                            tracing::debug!(%pseudonym, reason = "feature not implemented", "received telemetry this node originate");
-                        },
-                        Message::Probe(NeighborProbe::Ping(ping)) => {
-                            match db.find_surb(hopr_network_types::types::SurbMatcher::Pseudonym(pseudonym)).await {
-                                Ok((sender_id, surb)) => {
-                                    let (packet_sent_tx, packet_sent_rx) = futures::channel::oneshot::channel::<std::result::Result<(), PacketError>>();
-                                    futures::pin_mut!(msg_out);
-                                    if let Err(_error) = msg_out.send((Message::Probe(NeighborProbe::Pong(ping)).try_into().expect("Pong to message conversion cannot fail"), ResolvedTransportRouting::Return(sender_id, surb), packet_sent_tx.into())).await {
-                                        tracing::error!(%pseudonym, "failed to send message");
-                                    } else {
-                                        if let Err(error) = packet_sent_rx.await {
-                                            tracing::error!(%pseudonym, %error, "failed to receive packet sent response")
-                                        } 
-                                    }
-                                },
-                                Err(error) => tracing::error!(%pseudonym, %error, "failed to get a SURB"),
-                            }
-                        },
-                        Message::Probe(NeighborProbe::Pong(ping)) => {
-                            if let Some(replier) = active_probes.get(&(pseudonym, NeighborProbe::Ping(ping))).await {
-                                replier.notify(NeighborProbe::Pong(ping));
-                            } else {
-                                tracing::warn!(%pseudonym, %ping, "received pong for unknown ping, adversarial injection?");
-                            };
-                        },
+                                    },
+                                    Err(error) => tracing::error!(%peer, %error, "failed to convert message into data"),
+                                }
+                            },
+                            Ok(_) => tracing::error!(%peer, error = "logical error", "resolved transport routing is not forward"),
+                            Err(error) => tracing::error!(%peer, %error, "failed to resolve transport routing"),
+                        };
                     }
-                },
-                Err(error) => {
-                    tracing::error!(%pseudonym, %error, "cannot deserialize message");
-                },
-            }
-        }})),
-    );
+                })
+            )
+        );
 
-        HashMap::<HoprProbeProcess, hopr_async_runtime::prelude::JoinHandle<()>>::new()
+        // -- Process probes --
+        processes.insert(
+            HoprProbeProcess::Process,
+            hopr_async_runtime::prelude::spawn(api.1.for_each_concurrent(None, move |(pseudonym, data)| {
+                let active_probes = active_probes_rx.clone();
+                let push_to_network = api.0.clone();
+                let db = db_rx.clone();
+                let store = store.clone();
+                let move_up = move_up.clone();
+
+                async move {
+                    // TODO: compare only against ping tag, not telemetry that will be occuring on random tags
+                    if data.application_tag != ReservedTag::Ping as u32 {
+                        pin_mut!(move_up);
+                        if move_up.send((pseudonym, data.clone())).await.is_err() {
+                            tracing::error!(%pseudonym, error = "receiver error", "failed to send message up");
+                        }
+                    }
+
+                    let message: anyhow::Result<Message> = data.try_into().context("failed to convert data into message");
+                    match message {
+                        Ok(message) => {
+                            match message {
+                                Message::Telemetry(_path_telemetry) => {
+                                    tracing::warn!(%pseudonym, reason = "feature not implemented", "this node could not originate the telemetry");
+                                },
+                                Message::Probe(NeighborProbe::Ping(ping)) => {
+                                    match db.find_surb(SurbMatcher::Pseudonym(pseudonym)).await {
+                                        Ok((sender_id, surb)) => {
+                                            let (packet_sent_tx, packet_sent_rx) = channel::<std::result::Result<(), PacketError>>();
+
+                                            futures::pin_mut!(push_to_network);
+                                            if push_to_network.send((Message::Probe(NeighborProbe::Pong(ping)).try_into().expect("Pong to message conversion cannot fail"), ResolvedTransportRouting::Return(sender_id, surb), packet_sent_tx.into())).await.is_ok() {
+                                                if let Err(error) = packet_sent_rx.await {
+                                                    tracing::error!(%pseudonym, %error, "failed to receive packet sent response")
+                                                }
+                                            } else {
+                                                tracing::error!(%pseudonym, error = "transport error", "failed to send message");
+                                            }
+                                        },
+                                        Err(error) => tracing::error!(%pseudonym, %error, "failed to get a SURB, cannot send pong back"),
+                                    }
+                                },
+                                Message::Probe(NeighborProbe::Pong(ping)) => {
+                                    if let Some((peer, start, replier)) = active_probes.get(&(pseudonym, NeighborProbe::Ping(ping))).await {
+                                        let latency = current_time()
+                                            .as_unix_timestamp()
+                                            .saturating_sub(start)
+                                            .div(2u32); // RTT -> unidirectional latency
+                                        store.on_finished(&peer, &Ok(latency)).await;
+
+                                        #[cfg(all(feature = "prometheus", not(test)))]
+                                        {
+                                            METRIC_TIME_TO_PING.observe((latency.as_millis() as f64) / 1000.0); // precision for seconds
+                                            METRIC_PING_COUNT.increment(&["true"]);
+                                        }
+
+                                        if let Some(replier) = replier {
+                                            replier.notify(NeighborProbe::Pong(ping))
+                                        };
+                                    } else {
+                                        tracing::warn!(%pseudonym, %ping, possible_reasons="[timeout, adversary}", "received pong for unknown probe");
+                                    };
+                                },
+                            }
+                        },
+                        Err(error) => tracing::error!(%pseudonym, %error, "cannot deserialize message"),
+                    }
+                }
+            }))
+        );
+
+        processes
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO: test that with NeighporProbe and Telemetry at least 1 SURB can be sent as well.
 }

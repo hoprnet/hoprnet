@@ -27,19 +27,16 @@ pub mod proxy;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, OnceLock},
-    time::Duration,
 };
 
 use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
-    FutureExt, SinkExt, StreamExt,
-    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
-    future::{Either, select},
-    pin_mut,
+    SinkExt, StreamExt,
+    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded},
 };
 use helpers::PathPlanner;
-use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
+use hopr_async_runtime::prelude::{JoinHandle, spawn};
 use hopr_crypto_packet::prelude::HoprPacket;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -58,7 +55,6 @@ use hopr_path::{
     PathAddressResolver,
     selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
 };
-use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId};
@@ -72,7 +68,7 @@ use hopr_transport_packet::prelude::*;
 pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use hopr_transport_probe::{
     Probe,
-    ping::{Pinger, Pinging},
+    ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
 pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
@@ -193,7 +189,7 @@ where
     me_address: Address,
     cfg: HoprTransportConfig,
     db: T,
-    ping: Arc<OnceLock<Pinger<network_notifier::ProbeNetworkInteractions<T>>>>,
+    ping: Arc<OnceLock<Pinger>>,
     network: Arc<Network<T>>,
     process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     path_planner: PathPlanner<T, CurrentPathSelector>,
@@ -268,7 +264,6 @@ where
     pub async fn run(
         &self,
         me_onchain: &ChainKeypair,
-        version: String,
         tbf_path: String,
         on_incoming_data: UnboundedSender<ApplicationData>,
         discovery_updates: UnboundedReceiver<PeerDiscovery>,
@@ -488,7 +483,7 @@ where
             outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
         };
 
-        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
+        let (tx_from_protocol, rx_from_protocol) = unbounded::<(HoprPseudonym, ApplicationData)>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -503,11 +498,9 @@ where
         }
 
         // -- network probing
-        let (tx_from_probing, rx_from_probing) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
-        let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
+        let (tx_from_probing, rx_from_probing) = unbounded::<(HoprPseudonym, ApplicationData)>();
 
-        // manual ping
-        let (manual_ping_tx, manual_ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
+        let (manual_ping_tx, manual_ping_rx) = unbounded::<(PeerId, PingQueryReplier)>();
 
         let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
         for (k, v) in probe
@@ -521,12 +514,24 @@ where
                     network_events_tx,
                 ),
                 self.db.clone(),
+                tx_from_probing,
             )
             .await
             .into_iter()
         {
             processes.insert(HoprTransportProcess::Probing(k), v);
         }
+
+        // manual ping
+        self.ping
+            .clone()
+            .set(Pinger::new(
+                PingConfig {
+                    timeout: self.cfg.probe.timeout,
+                },
+                manual_ping_tx,
+            ))
+            .expect("must set the ticket aggregation writer only once");
 
         // -- session management
         let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
@@ -597,45 +602,17 @@ where
             .get()
             .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
-        let timeout = sleep(Duration::from_secs(30)).fuse();
-        let ping = (*pinger).ping(vec![*peer]);
-
-        pin_mut!(timeout, ping);
-
         if let Err(e) = self.network.add(peer, PeerOrigin::ManualPing, vec![]).await {
             error!(error = %e, "Failed to store the peer observation");
         }
 
-        let start = current_time().as_unix_timestamp();
-
-        match select(timeout, ping.next().fuse()).await {
-            Either::Left(_) => {
-                warn!(%peer, "Manual ping to peer timed out");
-                return Err(ProtocolError::Timeout.into());
-            }
-            Either::Right((v, _)) => {
-                match v
-                    .into_iter()
-                    .map(|r| r.map_err(HoprTransportError::Probe))
-                    .collect::<errors::Result<Vec<Duration>>>()
-                {
-                    Ok(d) => info!(%peer, rtt = ?d, "Manual ping succeeded"),
-                    Err(e) => {
-                        error!(%peer, error = %e, "Manual ping failed");
-                        return Err(e);
-                    }
-                }
-            }
-        };
+        let latency = (*pinger).ping(*peer).await?;
 
         let peer_status = self.network.get(peer).await?.ok_or(HoprTransportError::Probe(
             hopr_transport_probe::errors::ProbeError::NonExistingPeer,
         ))?;
 
-        Ok((
-            peer_status.last_seen.as_unix_timestamp().saturating_sub(start),
-            peer_status,
-        ))
+        Ok((latency, peer_status))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]

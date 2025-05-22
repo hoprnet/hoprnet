@@ -50,7 +50,7 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
 
     let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(100);
     let (transport_updates_tx, transport_updates_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
-    let (heartbeat_requests_tx, heartbeat_requests_rx) =
+    let (heartbeat_requests_tx, _heartbeat_requests_rx) =
         futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
     let multiaddress = match announcement {
