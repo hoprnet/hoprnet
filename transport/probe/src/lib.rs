@@ -23,7 +23,7 @@ pub mod ping;
 pub mod neighbors;
 pub mod store;
 
-use std::{collections::HashMap, ops::Div};
+use std::{collections::HashMap, ops::Div, sync::Arc};
 
 use anyhow::Context;
 use futures::{FutureExt, SinkExt, StreamExt, channel::oneshot::channel, pin_mut};
@@ -120,7 +120,7 @@ impl Probe {
             .time_to_live(timeout)
             .max_capacity(100_000)
             .async_eviction_listener(
-                move |_k,
+                move |k: Arc<(HoprPseudonym, NeighborProbe)>,
                       v: (PeerId, std::time::Duration, Option<PingQueryReplier>),
                       cause|
                       -> moka::notification::ListenerFuture {
@@ -130,7 +130,7 @@ impl Probe {
                         let store_eviction = store_eviction.clone();
                         let (peer, _start, _notifier) = v;
 
-                        tracing::debug!(%peer, reason = "timeout", "evicting peer's probe");
+                        tracing::debug!(%peer, pseudonym = %k.0, probe = ?k.1, reason = "timeout", "evicting probe");
                         async move {
                             store_eviction
                                 .on_finished(
@@ -255,10 +255,12 @@ impl Probe {
                                     tracing::warn!(%pseudonym, reason = "feature not implemented", "this node could not originate the telemetry");
                                 },
                                 Message::Probe(NeighborProbe::Ping(ping)) => {
+                                    tracing::debug!(%pseudonym, nonce = %ping, "received ping");
                                     match db.find_surb(SurbMatcher::Pseudonym(pseudonym)).await {
                                         Ok((sender_id, surb)) => {
                                             let (packet_sent_tx, packet_sent_rx) = channel::<std::result::Result<(), PacketError>>();
 
+                                            tracing::debug!(%pseudonym, nonce = %ping, "sending pong");
                                             futures::pin_mut!(push_to_network);
                                             if push_to_network.send((Message::Probe(NeighborProbe::Pong(ping)).try_into().expect("Pong to message conversion cannot fail"), ResolvedTransportRouting::Return(sender_id, surb), packet_sent_tx.into())).await.is_ok() {
                                                 if let Err(error) = packet_sent_rx.await {
@@ -272,6 +274,7 @@ impl Probe {
                                     }
                                 },
                                 Message::Probe(NeighborProbe::Pong(ping)) => {
+                                    tracing::debug!(%pseudonym, nonce = %ping, "received pong");
                                     if let Some((peer, start, replier)) = active_probes.get(&(pseudonym, NeighborProbe::Ping(ping))).await {
                                         let latency = current_time()
                                             .as_unix_timestamp()
