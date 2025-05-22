@@ -17,14 +17,24 @@ use crate::{
 
 /// Represents a general currency - like a token or a coin.
 pub trait Currency: Display + FromStr<Err = GeneralError> + Default + PartialEq + Eq {
-    /// Base unit exponent used for the currency.
-    const SCALE: usize;
     /// Name of the currency.
     const NAME: &'static str;
+
+    /// Base unit exponent used for the currency.
+    const SCALE: usize;
 
     /// Checks if this currency is the same as the one given in the template argument.
     fn is<C: Currency>() -> bool {
         Self::NAME == C::NAME
+    }
+
+    /// Returns `Ok(())` if the given string is equal to the currency name.
+    fn name_matches(s: &str) -> Result<(), GeneralError> {
+        if s.eq_ignore_ascii_case(Self::NAME) {
+            Ok(())
+        } else {
+            Err(GeneralError::ParseError("invalid currency name".into()))
+        }
     }
 }
 
@@ -42,11 +52,7 @@ impl FromStr for WxHOPR {
     type Err = GeneralError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.eq_ignore_ascii_case(Self::NAME) {
-            Ok(Self)
-        } else {
-            Err(GeneralError::ParseError("invalid currency name".into()))
-        }
+        Self::name_matches(s).map(|_| Self)
     }
 }
 
@@ -69,11 +75,7 @@ impl FromStr for XDai {
     type Err = GeneralError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.eq_ignore_ascii_case(Self::NAME) {
-            Ok(Self)
-        } else {
-            Err(GeneralError::ParseError("invalid currency name".into()))
-        }
+        Self::name_matches(s).map(|_| Self)
     }
 }
 
