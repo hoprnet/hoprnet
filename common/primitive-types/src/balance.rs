@@ -22,6 +22,7 @@ pub trait Currency: Display + FromStr<Err = GeneralError> + Default + PartialEq 
     /// Name of the currency.
     const NAME: &'static str;
 
+    /// Checks if this currency is the same as the one given in the template argument.
     fn is<C: Currency>() -> bool {
         Self::NAME == C::NAME
     }
@@ -83,7 +84,7 @@ impl Currency for XDai {
 
 /// Represents a non-negative balance of some [`Currency`].
 ///
-/// The value is internally always stored in `wei`, but always printed in human-readable format.
+/// The value is internally always stored in `wei` but always printed in human-readable format.
 ///
 /// All arithmetic on this type is implicitly saturating at bounds given by [`U256`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
@@ -104,6 +105,9 @@ impl<C: Currency> FromStr for Balance<C> {
             .captures(s)
             .ok_or(GeneralError::ParseError("cannot parse balance".into()))?;
 
+        // Fail-fast if the currency name is not valid
+        let currency = C::from_str(&captures[3])?;
+
         let mut value = BigDecimal::from_str(&captures[1].replace(' ', ""))
             .map_err(|_| GeneralError::ParseError("invalid balance value".into()))?;
 
@@ -122,10 +126,7 @@ impl<C: Currency> FromStr for Balance<C> {
             return Err(GeneralError::ParseError("balance value out of bounds".into()));
         }
 
-        Ok(Self(
-            U256::from_be_bytes(biguint_val.to_bytes_be()),
-            C::from_str(&captures[3])?,
-        ))
+        Ok(Self(U256::from_be_bytes(biguint_val.to_bytes_be()), currency))
     }
 }
 
@@ -364,6 +365,14 @@ mod tests {
         let b2: XDaiBalance = 10.into();
 
         assert_ne!(b1.to_string(), b2.to_string());
+    }
+
+    #[test]
+    fn balance_parsing_should_fail_with_invalid_units() {
+        assert!(HoprBalance::from_str("10").is_err());
+        assert!(HoprBalance::from_str("10 wei").is_err());
+        assert!(HoprBalance::from_str("10 wai wxHOPR").is_err());
+        assert!(HoprBalance::from_str("10 wxxHOPR").is_err());
     }
 
     #[test]
