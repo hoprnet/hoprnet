@@ -1,6 +1,7 @@
 //! This crate contains basic types used throughout the entire HOPR codebase.
 //! Types from this crate are not necessarily specific only to HOPR.
 
+mod balance;
 /// Contains various size-bounded types
 pub mod bounded;
 /// Lists all errors in this crate.
