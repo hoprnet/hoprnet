@@ -620,13 +620,16 @@ mod tests {
         address: Address,
         size: usize,
         block_number: u64,
-        log_index: U256,
+        starting_log_index: u64,
     ) -> anyhow::Result<Vec<SerializableLog>> {
         let mut logs: Vec<SerializableLog> = vec![];
         let block_hash = Hash::create(&[format!("my block hash {block_number}").as_bytes()]);
 
         for i in 0..size {
             let test_multiaddr: Multiaddr = format!("/ip4/1.2.3.4/tcp/{}", 1000 + i).parse()?;
+            let tx_index: u64 = i as u64;
+            let log_index: u64 = starting_log_index + tx_index;
+
             logs.push(SerializableLog {
                 address,
                 block_hash: block_hash.into(),
@@ -638,9 +641,9 @@ mod tests {
                 .abi_encode()
                 .into(),
                 tx_hash: Hash::create(&[format!("my tx hash {i}").as_bytes()]).into(),
-                tx_index: 0,
+                tx_index,
                 block_number,
-                log_index: log_index.as_u64(),
+                log_index,
                 ..Default::default()
             });
         }
@@ -681,7 +684,7 @@ mod tests {
             .return_const(vec![B256::from_slice(topic.as_ref())]);
 
         let head_block = 1000;
-        rpc.expect_block_number().return_once(move || Ok(head_block));
+        rpc.expect_block_number().times(2).returning(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -706,7 +709,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(tokio::test)]
+    #[tokio::test]
     async fn test_indexer_should_check_the_db_for_last_processed_block_and_supply_it_when_found() -> anyhow::Result<()>
     {
         let mut handlers = MockChainLogHandler::new();
@@ -725,7 +728,7 @@ mod tests {
             .return_const(vec![B256::from_slice(topic.as_ref())]);
         db.ensure_logs_origin(vec![(addr, topic)]).await?;
 
-        rpc.expect_block_number().return_once(move || Ok(head_block));
+        rpc.expect_block_number().times(2).returning(move || Ok(head_block));
 
         let (tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -798,16 +801,17 @@ mod tests {
 
         let finalized_block = BlockWithLogs {
             block_id: head_block - 1,
-            logs: BTreeSet::from_iter(build_announcement_logs(*BOB, 4, head_block - 1, U256::from(23u8))?),
+            logs: BTreeSet::from_iter(build_announcement_logs(*BOB, 4, head_block - 1, 23)?),
         };
         let head_allowing_finalization = BlockWithLogs {
             block_id: head_block,
             logs: BTreeSet::new(),
         };
 
+        // called once per block which is finalizable
         handlers
             .expect_collect_block_events()
-            .times(finalized_block.logs.len())
+            .times(2)
             .returning(|_| Ok(vec![]));
 
         assert!(tx.start_send(finalized_block.clone()).is_ok());
@@ -833,8 +837,8 @@ mod tests {
         // Run 1: Fast sync enabled, index empty
         {
             let logs = vec![
-                build_announcement_logs(*BOB, 1, 1, U256::from(1u8))?,
-                build_announcement_logs(*BOB, 1, 2, U256::from(1u8))?,
+                build_announcement_logs(*BOB, 1, 1, 1)?,
+                build_announcement_logs(*BOB, 1, 2, 1)?,
             ]
             .into_iter()
             .flatten()
@@ -913,8 +917,8 @@ mod tests {
         // Run 2: Fast sync enabled, index not empty, resume after 2 logs
         {
             let logs = vec![
-                build_announcement_logs(*BOB, 1, 3, U256::from(1u8))?,
-                build_announcement_logs(*BOB, 1, 4, U256::from(1u8))?,
+                build_announcement_logs(*BOB, 1, 3, 1)?,
+                build_announcement_logs(*BOB, 1, 4, 1)?,
             ]
             .into_iter()
             .flatten()
@@ -1001,7 +1005,7 @@ mod tests {
             .iter()
             .map(|block_id| BlockWithLogs {
                 block_id: *block_id,
-                logs: BTreeSet::from_iter(build_announcement_logs(*ALICE, 1, *block_id, U256::from(23u8)).unwrap()),
+                logs: BTreeSet::from_iter(build_announcement_logs(*ALICE, 1, *block_id, 23).unwrap()),
             })
             .collect();
 
@@ -1083,12 +1087,7 @@ mod tests {
 
         let block = BlockWithLogs {
             block_id: last_processed_block + 1,
-            logs: BTreeSet::from_iter(build_announcement_logs(
-                *ALICE,
-                1,
-                last_processed_block + 1,
-                U256::from(23u8),
-            )?),
+            logs: BTreeSet::from_iter(build_announcement_logs(*ALICE, 1, last_processed_block + 1, 23)?),
         };
 
         tx.start_send(block)?;
