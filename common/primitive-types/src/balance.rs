@@ -89,7 +89,7 @@ impl Currency for XDai {
 /// The value is internally always stored in `wei` but always printed in human-readable format.
 ///
 /// All arithmetic on this type is implicitly saturating at bounds given by [`U256`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, serde::Serialize, serde::Deserialize)]
 pub struct Balance<C: Currency>(U256, C);
 
 const WEI_PREFIX: &str = "wei";
@@ -100,6 +100,13 @@ lazy_static::lazy_static! {
 
 impl<C: Currency> Display for Balance<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.amount_in_base_units(), self.1)
+    }
+}
+
+impl<C: Currency> std::fmt::Debug for Balance<C> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // Intentionally same as Display
         write!(f, "{} {}", self.amount_in_base_units(), self.1)
     }
 }

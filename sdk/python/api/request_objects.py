@@ -40,7 +40,7 @@ class OpenChannelBody(ApiRequestObject):
         super().__init__(vars())
 
     def post_init(self):
-        self.amount = f"{self.amount:.0f} wei wxHOPR"
+        self.amount = f"{float(self.amount):.0f} wxHOPR"
 
 
 class FundChannelBody(ApiRequestObject):
@@ -50,7 +50,7 @@ class FundChannelBody(ApiRequestObject):
         super().__init__(vars())
 
     def post_init(self):
-        self.amount = f"{self.amount:.0f} wei wxHOPR"
+        self.amount = f"{self.amount:.0f} wxHOPR"
 
 
 class GetChannelsBody(ApiRequestObject):
@@ -156,9 +156,5 @@ class SendMessageBody(ApiRequestObject):
 class WithdrawBody(ApiRequestObject):
     keys = {"address": "address", "amount": "amount"}
 
-    def __init__(self, address: str, amount: str, currency: str):
+    def __init__(self, address: str, amount: str):
         super().__init__(vars())
-        self._currency = currency
-
-    def post_init(self):
-        self.amount = f"{self.amount:.0f} wei {self._currency}"

@@ -192,21 +192,21 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
     }
 
     async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>> {
-        let value: [u8; 32] = if C::is::<XDai>() {
-            self.provider.get_balance(address.into()).await?.to_be_bytes()
+        let value = if C::is::<XDai>() {
+            U256::from_be_bytes(self.provider.get_balance(address.into()).await?.to_be_bytes::<32>())
         } else if C::is::<WxHOPR>() {
-            self.contract_instances
+            U256::from_be_bytes(self.contract_instances
                 .token
                 .balanceOf(address.into())
                 .call()
                 .await?
                 ._0
-                .to_be_bytes()
+                .to_be_bytes::<32>())
         } else {
             return Err(RpcError::Other("unknown currency".into()));
         };
 
-        Ok(Balance::<C>::from(U256::from_be_bytes(value)))
+        Ok(Balance::<C>::from(value))
     }
 
     async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability> {

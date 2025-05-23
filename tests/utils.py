@@ -127,7 +127,9 @@ async def check_winning_tickets_count(src: Node, value: int):
 
 
 async def check_safe_balance(src: Node, value: int):
-    while f"{(await src.api.balances()).safe_hopr:.0f}" >= f"{value:.0f}":
+    safe_balance = (await src.api.balances()).safe_hopr
+    while f"{safe_balance:.0f}" > f"{value:.0f}":
+        logging.debug(f"Safe balance: {safe_balance:.0f}, wanted max: {value:.0f}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 

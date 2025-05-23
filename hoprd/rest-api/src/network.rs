@@ -5,22 +5,25 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-
+use serde_with::{serde_as, DisplayFromStr};
+use hopr_lib::HoprBalance;
 use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
+#[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-    "price": "30000000000000000"
+    "price": "0.03 wxHOPR"
 }))]
 #[serde(rename_all = "camelCase")]
 /// Contains the ticket price in HOPR tokens.
 pub(crate) struct TicketPriceResponse {
     /// Price of the ticket in HOPR tokens.
-    #[schema(example = "30000000000000000")]
-    price: String,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "0.03 wxHOPR")]
+    price: HoprBalance,
 }
 
-/// Obtains the current ticket price.
+/// Gets the current ticket price.
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/network/price"),
@@ -43,7 +46,7 @@ pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoR
         Ok(Some(price)) => (
             StatusCode::OK,
             Json(TicketPriceResponse {
-                price: price.to_string(),
+                price,
             }),
         )
             .into_response(),

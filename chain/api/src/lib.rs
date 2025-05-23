@@ -306,8 +306,8 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.db.get_all_channels(None).await?)
     }
 
-    pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
-        Ok(self.db.get_indexer_data(None).await?.ticket_price.map(|b| b.amount()))
+    pub async fn ticket_price(&self) -> errors::Result<Option<HoprBalance>> {
+        Ok(self.db.get_indexer_data(None).await?.ticket_price)
     }
 
     pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {

@@ -124,6 +124,7 @@ class TestIntegrationWithSwarm:
         async with create_channel(swarm7[src], swarm7[dest], funding=ticket_price) as channel:
             balance_before = await swarm7[src].api.balances()
             channel_before = await swarm7[src].api.get_channel(channel.id)
+            logging.debug(f"balance_before: {balance_before}, channel_before: {channel_before}")
 
             assert await swarm7[src].api.fund_channel(channel.id, hopr_amount)
 
@@ -140,8 +141,9 @@ class TestIntegrationWithSwarm:
 
             # Safe allowance can be checked too at this point
             balance_after = await swarm7[src].api.balances()
-            assert balance_before.safe_hopr_allowance - balance_after.safe_hopr_allowance == hopr_amount
+            logging.debug(f"balance_after: {balance_after}")
 
+            assert balance_before.safe_hopr_allowance - balance_after.safe_hopr_allowance == hopr_amount
             await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_before.native), 20.0)
 
     @pytest.mark.asyncio
@@ -339,7 +341,7 @@ class TestIntegrationWithSwarm:
         remaining_attempts = 10
 
         before_balance = int((await swarm7[peer].api.balances()).safe_native)
-        await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "Native")
+        await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "wei xDai")
 
         after_balance = before_balance
         while remaining_attempts > 0:

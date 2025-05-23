@@ -1237,7 +1237,7 @@ impl Hopr {
     }
 
     /// Get ticket price
-    pub async fn get_ticket_price(&self) -> errors::Result<Option<U256>> {
+    pub async fn get_ticket_price(&self) -> errors::Result<Option<HoprBalance>> {
         Ok(self.hopr_chain_api.ticket_price().await?)
     }
 

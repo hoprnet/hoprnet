@@ -338,7 +338,7 @@ class HoprdAPI:
         :param: currency: str
         :return:
         """
-        data = WithdrawBody(receipient, amount, currency)
+        data = WithdrawBody(receipient, amount = f"{amount} {currency}")
         is_ok, _ = await self.__call_api(HTTPMethod.POST, "account/withdraw", data=data)
         return is_ok
 

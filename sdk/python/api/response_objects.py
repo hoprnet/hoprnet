@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from .channelstatus import ChannelStatus
@@ -27,7 +28,7 @@ def _convert(value: Any):
 def _parse_balance_string(balance_str):
     """Parse a balance string with currency units and return the scaled float value in wei"""
     try:
-        return float(balance_str.split()[0]) * (10**18)
+        return float(balance_str.split()[0])
     except (ValueError, AttributeError, IndexError) as e:
         raise ValueError(f"Failed to parse balance string: {balance_str}") from e
 
@@ -130,6 +131,8 @@ class Ticket(ApiResponseObject):
 class TicketPrice(ApiResponseObject):
     keys = {"value": "price"}
 
+    def post_init(self):
+        self.value = _parse_balance_string(self.value)
 
 class TicketProbability(ApiResponseObject):
     keys = {"value": "probability"}
