@@ -188,8 +188,8 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                 || !isValidAddress(currentNetworkDetail.addresses.channelsContractAddress)
         ) {
             // deploy channels contract
-            // set closure time to 1 second if running in local Anvil, otherwise 5 minutes
-            uint256 noticePeriodChannelClosure = currentEnvironmentType == EnvironmentType.LOCAL ? 1 : 5 * 60;
+            // set closure time to 15 seconds if running in local Anvil, otherwise 5 minutes
+            uint256 noticePeriodChannelClosure = currentEnvironmentType == EnvironmentType.LOCAL ? 15 : 5 * 60;
             currentNetworkDetail.addresses.channelsContractAddress = deployCode(
                 "Channels.sol:HoprChannels",
                 abi.encode(
