@@ -50,7 +50,11 @@ def pytest_addoption(parser: pytest.Parser):
 # /tmp/hopr-smoke-test/${SUITE_NAME}/hopr-node_*.log - log file for nodes
 # /tmp/hopr-smoke-test/${SUITE_NAME}/anvil.cfg - anvil configuration file
 # /tmp/hopr-smoke-test/${SUITE_NAME}/anvil.log - anvil configuration file
+def attacking_nodes():
+    return ["1", "2"]
 
+def session_attack_nodes():
+    return ["1", "2", "3"]
 
 def barebone_nodes():
     """Nodes using only the barebones config without any strategies"""
