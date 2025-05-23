@@ -152,6 +152,12 @@ where
         match maybe_channel {
             Some(channel) => {
                 if channel.status == ChannelStatus::Open {
+                    if channel.balance + amount > HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE) {
+                        return Err(InvalidArguments(format!(
+                            "channel balance of {channel} would overflow after funding with {amount}"
+                        )));
+                    }
+
                     info!("initiating funding of {channel} with {amount}");
                     self.tx_sender.send(Action::FundChannel(channel, amount)).await
                 } else {

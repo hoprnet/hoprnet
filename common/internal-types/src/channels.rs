@@ -79,6 +79,9 @@ pub struct ChannelEntry {
 }
 
 impl ChannelEntry {
+    /// Maximum possible balance of a channel: 10^25 wxHOPR
+    pub const MAX_CHANNEL_BALANCE: u128 = 10_u128.pow(25);
+
     pub fn new(
         source: Address,
         destination: Address,

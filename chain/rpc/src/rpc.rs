@@ -195,13 +195,14 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         let value = if C::is::<XDai>() {
             U256::from_be_bytes(self.provider.get_balance(address.into()).await?.to_be_bytes::<32>())
         } else if C::is::<WxHOPR>() {
-            U256::from_be_bytes(self.contract_instances
-                .token
-                .balanceOf(address.into())
-                .call()
-                .await?
-                ._0
-                .to_be_bytes::<32>())
+            U256::from_be_bytes(
+                self.contract_instances
+                    .token
+                    .balanceOf(address.into())
+                    .call()
+                    .await?
+                    .to_be_bytes::<32>(),
+            )
         } else {
             return Err(RpcError::Other("unknown currency".into()));
         };
@@ -227,7 +228,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
             .currentTicketPrice()
             .call()
             .await
-            .map(|v| HoprBalance::from(U256::from_be_bytes(v._0.to_be_bytes::<32>())))?)
+            .map(|v| HoprBalance::from(U256::from_be_bytes(v.to_be_bytes::<32>())))?)
     }
 
     async fn get_eligibility_status(&self, address: Address) -> Result<bool> {

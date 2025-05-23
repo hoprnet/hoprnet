@@ -1,8 +1,7 @@
 use std::{sync::Arc, time::Duration};
 
 use alloy::{
-     node_bindings::AnvilInstance, primitives::U256, rpc::client::RpcClient,
-    transports::http::ReqwestTransport,
+    node_bindings::AnvilInstance, primitives::U256, rpc::client::RpcClient, transports::http::ReqwestTransport,
 };
 use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
 use hopr_chain_types::{

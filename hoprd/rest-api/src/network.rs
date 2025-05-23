@@ -5,8 +5,9 @@ use axum::{
     http::status::StatusCode,
     response::IntoResponse,
 };
-use serde_with::{serde_as, DisplayFromStr};
 use hopr_lib::HoprBalance;
+use serde_with::{DisplayFromStr, serde_as};
+
 use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 #[serde_as]
@@ -43,13 +44,7 @@ pub(super) async fn price(State(state): State<Arc<InternalState>>) -> impl IntoR
     let hopr = state.hopr.clone();
 
     match hopr.get_ticket_price().await {
-        Ok(Some(price)) => (
-            StatusCode::OK,
-            Json(TicketPriceResponse {
-                price,
-            }),
-        )
-            .into_response(),
+        Ok(Some(price)) => (StatusCode::OK, Json(TicketPriceResponse { price })).into_response(),
         Ok(None) => (
             StatusCode::UNPROCESSABLE_ENTITY,
             ApiErrorStatus::UnknownFailure("The ticket price is not available".into()),

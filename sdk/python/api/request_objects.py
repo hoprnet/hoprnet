@@ -1,3 +1,6 @@
+from decimal import Decimal, ROUND_UP
+
+
 class ApiRequestObject:
     def __init__(self, *args, **kwargs):
         if not hasattr(self, "keys"):
@@ -36,21 +39,21 @@ class OpenChannelBody(ApiRequestObject):
         "destination": "destination",
     }
 
-    def __init__(self, amount: str, destination: str):
+    def __init__(self, amount: Decimal, destination: str):
         super().__init__(vars())
 
     def post_init(self):
-        self.amount = f"{float(self.amount):.0f} wxHOPR"
+        self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
 
 
 class FundChannelBody(ApiRequestObject):
     keys = {"amount": "amount"}
 
-    def __init__(self, amount: float):
+    def __init__(self, amount: Decimal):
         super().__init__(vars())
 
     def post_init(self):
-        self.amount = f"{self.amount:.0f} wxHOPR"
+        self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
 
 
 class GetChannelsBody(ApiRequestObject):

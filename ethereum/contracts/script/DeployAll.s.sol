@@ -278,7 +278,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.addresses.ticketPriceOracleContractAddress)
         ) {
-            price = 100 ether;
+            price = 1_000_000_000_000_000; // 0.001 HOPR in test environment
         }
         // deploy contract
         currentNetworkDetail.addresses.ticketPriceOracleContractAddress =

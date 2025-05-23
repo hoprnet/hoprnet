@@ -374,6 +374,12 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
             return Err(InvalidArguments("Cannot fund channel to self".into()));
         }
 
+        if amount.amount() > hopr_primitive_types::prelude::U256::from(ChannelEntry::MAX_CHANNEL_BALANCE) {
+            return Err(InvalidArguments(
+                "Cannot fund channel with amount larger than 96 bits".into(),
+            ));
+        }
+
         let call_data = fundChannelSafeCall {
             selfAddress: self.me.into(),
             account: dest.into(),
