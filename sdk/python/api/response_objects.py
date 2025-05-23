@@ -24,6 +24,14 @@ def _convert(value: Any):
     return value
 
 
+def _parse_balance_string(balance_str):
+    """Parse a balance string with currency units and return the scaled float value in wei"""
+    try:
+        return float(balance_str.split()[0]) * (10**18)
+    except (ValueError, AttributeError, IndexError) as e:
+        raise ValueError(f"Failed to parse balance string: {balance_str}") from e
+
+
 class ApiResponseObject:
     def __init__(self, data: dict):
         for key, value in self.keys.items():
@@ -72,11 +80,11 @@ class Balances(ApiResponseObject):
     }
 
     def post_init(self):
-        self.hopr = float(self.hopr.split()[0]) * (10**18)
-        self.native = float(self.native.split()[0]) * (10**18)
-        self.safe_native = float(self.safe_native.split()[0]) * (10**18)
-        self.safe_hopr = float(self.safe_hopr.split()[0]) * (10**18)
-        self.safe_hopr_allowance = float(self.safe_hopr_allowance.split()[0]) * (10**18)
+        self.hopr = _parse_balance_string(self.hopr)
+        self.native = _parse_balance_string(self.native)
+        self.safe_native = _parse_balance_string(self.safe_native)
+        self.safe_hopr = _parse_balance_string(self.safe_hopr)
+        self.safe_hopr_allowance = _parse_balance_string(self.safe_hopr_allowance)
 
 
 class Infos(ApiResponseObject):
@@ -100,7 +108,7 @@ class Channel(ApiResponseObject):
     }
 
     def post_init(self):
-        self.balance = float(self.balance.split()[0]) * (10**18)
+        self.balance = _parse_balance_string(self.balance)
         self.status = ChannelStatus.fromString(self.status)
 
 
@@ -116,7 +124,7 @@ class Ticket(ApiResponseObject):
     }
 
     def post_init(self):
-        self.amount = float(self.amount.split()[0]) * (10**18)
+        self.amount = _parse_balance_string(self.amount)
 
 
 class TicketPrice(ApiResponseObject):
@@ -140,10 +148,10 @@ class TicketStatistics(ApiResponseObject):
     }
 
     def post_init(self):
-        self.rejected_value = float(self.rejected_value.split()[0]) * (10**18)
-        self.neglected_value = float(self.neglected_value.split()[0]) * (10**18)
-        self.redeemed_value = float(self.redeemed_value.split()[0]) * (10**18)
-        self.unredeemed_value = float(self.unredeemed_value.split()[0]) * (10**18)
+        self.rejected_value = _parse_balance_string(self.rejected_value)
+        self.neglected_value = _parse_balance_string(self.neglected_value)
+        self.redeemed_value = _parse_balance_string(self.redeemed_value)
+        self.unredeemed_value = _parse_balance_string(self.unredeemed_value)
 
 
 class Configuration(ApiResponseObject):

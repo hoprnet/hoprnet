@@ -39,6 +39,9 @@ class OpenChannelBody(ApiRequestObject):
     def __init__(self, amount: str, destination: str):
         super().__init__(vars())
 
+    def post_init(self):
+        self.amount = f"{self.amount:.0f} wei wxHOPR"
+
 
 class FundChannelBody(ApiRequestObject):
     keys = {"amount": "amount"}
@@ -143,25 +146,6 @@ class SessionTargetBody(ApiRequestObject):
         super().__init__(vars())
 
 
-class GetMessagesBody(ApiRequestObject):
-    keys = {
-        "tag": "tag",
-    }
-
-    def __init__(self, tag: int):
-        super().__init__(vars())
-
-
-class PeekAllMessagesBody(ApiRequestObject):
-    keys = {"tag": "tag", "timestamp": "timestamp"}
-
-    def __init__(self, tag: int, timestamp: int = None):
-        if timestamp is None:
-            del timestamp
-
-        super().__init__(vars())
-
-
 class SendMessageBody(ApiRequestObject):
     keys = {"body": "body", "hops": "hops", "path": "path", "destination": "destination", "tag": "tag"}
 
@@ -170,7 +154,11 @@ class SendMessageBody(ApiRequestObject):
 
 
 class WithdrawBody(ApiRequestObject):
-    keys = {"address": "address", "amount": "amount", "currency": "currency"}
+    keys = {"address": "address", "amount": "amount"}
 
     def __init__(self, address: str, amount: str, currency: str):
         super().__init__(vars())
+        self._currency = currency
+
+    def post_init(self):
+        self.amount = f"{self.amount:.0f} wei {self._currency}"

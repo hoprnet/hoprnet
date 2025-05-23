@@ -162,7 +162,7 @@ class HoprdAPI:
         :param: amount: str
         :return: channel id: str | undefined
         """
-        data = OpenChannelBody(amount=f"{amount} wei wxHOPR", destination=destination)
+        data = OpenChannelBody(amount, destination)
 
         is_ok, response = await self.__call_api(HTTPMethod.POST, "channels", data)
         return OpenedChannel(response) if is_ok else None
