@@ -84,7 +84,7 @@ pub use processor::DEFAULT_PRICE_PER_PACKET;
 use processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 pub use timer::execute_on_tick;
-use tracing::{error, trace, warn};
+use tracing::{error, trace, warn, info};
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 const SLOW_OP_MS: u128 = 150;
@@ -197,6 +197,16 @@ where
 
     let msg_processor_read = processor::PacketProcessor::new(db.clone(), packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
+    let no_ack_peer_list: Vec<PeerId> = std::env::var("HOPR_DISABLE_ACK_TO_PEERS")
+        .ok()
+        .map(|s| {
+        s.split(',')
+            .filter_map(|id_str| id_str.trim().parse().ok())
+            .collect()
+        })
+        .unwrap_or_default();
+
+    info!(?no_ack_peer_list, "HOPR_DISABLE_ACK_TO_PEERS");
 
     let msg_to_send_tx = wire_msg.0.clone();
     processes.insert(
@@ -328,7 +338,7 @@ where
                     let mut msg_to_send_tx = wire_msg.0.clone();
                     let db = db.clone();
                     let me = me_for_recv.clone();
-
+                    let no_ack_peers = no_ack_peer_list.clone();
                     async move {
 
                     match packet {
@@ -339,13 +349,38 @@ where
                             ack_key,
                             ..
                         } => {
-                            trace!("acknowledging final packet to {previous_hop}");
-                            let ack = Acknowledgement::new(ack_key, &me);
-                            if let Ok(ack_packet) = db
-                                .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
-                                .await
-                                .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a received message"))
-                                {
+                                let ack = Acknowledgement::new(ack_key, &me);
+                                let previous_hop_peer_id: PeerId = previous_hop.into();
+                                if no_ack_peers.contains(&previous_hop_peer_id) {
+                                    info!(peer = %previous_hop_peer_id, "Not forwarding ack to this peer");
+                                    }
+                                else 
+                                    {
+                                    if let Ok(ack_packet) = db
+                                        .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
+                                        .await
+                                        .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a received message"))
+                                        {
+                                        msg_to_send_tx
+                                            .send((
+                                                ack_packet.next_hop.into(),
+                                                ack_packet.data,
+                                            ))
+                                            .await
+                                            .unwrap_or_else(|_e| {
+                                                error!("Failed to send an acknowledgement for a received packet to the transport layer");
+                                            });
+                                        }
+                                    }
+                                    Some((sender, plain_text))
+                                }
+                                IncomingPacket::Forwarded {
+                                    previous_hop,
+                                    next_hop,
+                                    data,
+                                    ack,
+                                    ..
+                                } => {
                                     msg_to_send_tx
                                         .send((
                                             ack_packet.next_hop.into(),
