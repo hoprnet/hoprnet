@@ -641,8 +641,7 @@ mod tests {
         // Mint 1000 HOPR to Alice
         let _ = hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128)).await;
 
-        // let domain_separator = contract_instances.channels.domainSeparator().call().await?._0;
-        let domain_separator: Hash = contract_instances.channels.domainSeparator().call().await?._0.0.into();
+        let domain_separator: Hash = contract_instances.channels.domainSeparator().call().await?.0.into();
 
         // Open channel Alice -> Bob
         let _ = hopr_chain_types::utils::fund_channel(
@@ -716,8 +715,7 @@ mod tests {
             .token
             .balanceOf(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
             .call()
-            .await?
-            ._0;
+            .await?;
         assert_eq!(balance, U256::from(1000_u128));
 
         // Alice withdraws 100 HOPR (to Bob's address)
@@ -730,8 +728,7 @@ mod tests {
             .token
             .balanceOf(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
             .call()
-            .await?
-            ._0;
+            .await?;
         assert_eq!(balance, U256::from(900_u128));
 
         Ok(())

@@ -3,6 +3,7 @@ mod common;
 use std::time::Duration;
 
 use alloy::primitives::{B256, U256};
+use common::create_rpc_client_to_anvil_with_snapshot;
 use futures::{StreamExt, pin_mut};
 use hex_literal::hex;
 use hopr_async_runtime::prelude::{JoinHandle, cancel_join_handle, sleep, spawn};
@@ -32,9 +33,7 @@ use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use tracing::info;
 
-use crate::common::{
-    NodeSafeConfig, TestChainEnv, create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node,
-};
+use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket(
@@ -228,7 +227,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     sleep((1 + finality) * block_time).await;
 
-    let domain_separator: Hash = (*chain_env.contract_instances.channels.domainSeparator().call().await?._0).into();
+    let domain_separator: Hash = (*chain_env.contract_instances.channels.domainSeparator().call().await?).into();
 
     let rpc_cfg = RpcOperationsConfig {
         chain_id: chain_env.anvil.chain_id(),
