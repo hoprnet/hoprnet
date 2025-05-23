@@ -1490,10 +1490,8 @@ mod tests {
             .await?
             .perform(|_tx| {
                 Box::pin(async move {
-                    for i in 0..TO_REDEEM as usize {
-                        let r = db_clone
-                            .mark_tickets_as((&tickets[i]).into(), TicketMarker::Redeemed)
-                            .await?;
+                    for ticket in tickets.iter().take(TO_REDEEM as usize) {
+                        let r = db_clone.mark_tickets_as(ticket.into(), TicketMarker::Redeemed).await?;
                         assert_eq!(1, r, "must redeem only a single ticket");
                     }
                     Ok::<(), DbSqlError>(())

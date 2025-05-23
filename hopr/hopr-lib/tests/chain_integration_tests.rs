@@ -804,8 +804,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         "alice and bob must be at the same checksum"
     );
 
-    futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| cancel_join_handle(t))).await;
-    futures::future::join_all(bob_node.node_tasks.into_iter().map(|t| cancel_join_handle(t))).await;
+    futures::future::join_all(alice_node.node_tasks.into_iter().map(cancel_join_handle)).await;
+    futures::future::join_all(bob_node.node_tasks.into_iter().map(cancel_join_handle)).await;
 
     Ok(())
 }
