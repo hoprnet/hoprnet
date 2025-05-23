@@ -75,6 +75,8 @@ pub mod HoprNodeStakeFactoryEvents {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `NewHoprNodeStakeModule(address,address)` and selector `0x813d391dc490d6c1dae7d3fdd555f337533d1da2c908c6efd36d4cf557a63206`.
 ```solidity
 event NewHoprNodeStakeModule(address indexed moduleImplementation, address instance);
@@ -189,6 +191,8 @@ event NewHoprNodeStakeModule(address indexed moduleImplementation, address insta
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `NewHoprNodeStakeSafe(address)` and selector `0x8231d169f416b666ae7fa43faa24a18899738075a53f32c97617d173b189e386`.
 ```solidity
 event NewHoprNodeStakeSafe(address instance);
@@ -294,6 +298,8 @@ event NewHoprNodeStakeSafe(address instance);
         }
     };
     ///Container for all the [`HoprNodeStakeFactoryEvents`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprNodeStakeFactoryEventsEvents {
         #[allow(missing_docs)]
         NewHoprNodeStakeModule(NewHoprNodeStakeModule),
@@ -329,7 +335,6 @@ event NewHoprNodeStakeSafe(address instance);
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(
@@ -338,7 +343,6 @@ event NewHoprNodeStakeSafe(address instance);
                     <NewHoprNodeStakeModule as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::NewHoprNodeStakeModule)
                 }
@@ -348,7 +352,6 @@ event NewHoprNodeStakeSafe(address instance);
                     <NewHoprNodeStakeSafe as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::NewHoprNodeStakeSafe)
                 }
@@ -395,14 +398,13 @@ event NewHoprNodeStakeSafe(address instance);
 See the [wrapper's documentation](`HoprNodeStakeFactoryEventsInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprNodeStakeFactoryEventsInstance<T, P, N> {
-        HoprNodeStakeFactoryEventsInstance::<T, P, N>::new(address, provider)
+    ) -> HoprNodeStakeFactoryEventsInstance<P, N> {
+        HoprNodeStakeFactoryEventsInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -411,15 +413,14 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprNodeStakeFactoryEventsInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprNodeStakeFactoryEventsInstance<P, N>>,
     > {
-        HoprNodeStakeFactoryEventsInstance::<T, P, N>::deploy(provider)
+        HoprNodeStakeFactoryEventsInstance::<P, N>::deploy(provider)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -428,11 +429,10 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprNodeStakeFactoryEventsInstance::<T, P, N>::deploy_builder(provider)
+    >(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprNodeStakeFactoryEventsInstance::<P, N>::deploy_builder(provider)
     }
     /**A [`HoprNodeStakeFactoryEvents`](self) instance.
 
@@ -447,16 +447,15 @@ be used to deploy a new instance of the contract.
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
     pub struct HoprNodeStakeFactoryEventsInstance<
-        T,
         P,
         N = alloy_contract::private::Ethereum,
     > {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprNodeStakeFactoryEventsInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprNodeStakeFactoryEventsInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprNodeStakeFactoryEventsInstance")
@@ -467,10 +466,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeStakeFactoryEventsInstance<T, P, N> {
+    > HoprNodeStakeFactoryEventsInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprNodeStakeFactoryEvents`](self) contract instance.
 
 See the [wrapper's documentation](`HoprNodeStakeFactoryEventsInstance`) for more details.*/
@@ -482,7 +480,7 @@ See the [wrapper's documentation](`HoprNodeStakeFactoryEventsInstance`) for more
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -493,7 +491,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         #[inline]
         pub async fn deploy(
             provider: P,
-        ) -> alloy_contract::Result<HoprNodeStakeFactoryEventsInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprNodeStakeFactoryEventsInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -504,7 +502,7 @@ and constructor arguments, if any.
 This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         #[inline]
-        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
+        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 ::core::clone::Clone::clone(&BYTECODE),
@@ -531,26 +529,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprNodeStakeFactoryEventsInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprNodeStakeFactoryEventsInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(
-            self,
-        ) -> HoprNodeStakeFactoryEventsInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprNodeStakeFactoryEventsInstance<P, N> {
             HoprNodeStakeFactoryEventsInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeStakeFactoryEventsInstance<T, P, N> {
+    > HoprNodeStakeFactoryEventsInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -558,36 +553,35 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNodeStakeFactoryEventsInstance<T, P, N> {
+    > HoprNodeStakeFactoryEventsInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`NewHoprNodeStakeModule`] event.
         pub fn NewHoprNodeStakeModule_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, NewHoprNodeStakeModule, N> {
+        ) -> alloy_contract::Event<&P, NewHoprNodeStakeModule, N> {
             self.event_filter::<NewHoprNodeStakeModule>()
         }
         ///Creates a new event filter for the [`NewHoprNodeStakeSafe`] event.
         pub fn NewHoprNodeStakeSafe_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, NewHoprNodeStakeSafe, N> {
+        ) -> alloy_contract::Event<&P, NewHoprNodeStakeSafe, N> {
             self.event_filter::<NewHoprNodeStakeSafe>()
         }
     }

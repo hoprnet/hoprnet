@@ -824,13 +824,15 @@ pub mod HoprNetworkRegistry {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"`\x80`@R4\x80\x15a\0\x10W`\0\x80\xFD[P`\x046\x10a\x01\xC4W`\x005`\xE0\x1C\x80c\x90\x10\xD0|\x11a\0\xF9W\x80c\xCA\x15\xC8s\x11a\0\x97W\x80c\xCF\xB3s_\x11a\0qW\x80c\xCF\xB3s_\x14a\x03\xDAW\x80c\xD5Gt\x1F\x14a\x03\xE2W\x80c\xE3\xD2\xA0q\x14a\x03\xF5W\x80c\xEC\x87b\x1C\x14a\x04\x08W`\0\x80\xFD[\x80c\xCA\x15\xC8s\x14a\x03\xACW\x80c\xCA\xF5\xF5\x01\x14a\x03\xBFW\x80c\xCB\xEB\xAF\xE0\x14a\x03\xD2W`\0\x80\xFD[\x80c\xA0^\x0Fm\x11a\0\xD3W\x80c\xA0^\x0Fm\x14a\x03UW\x80c\xA2\x17\xFD\xDF\x14a\x03hW\x80c\xA5`]\xA5\x14a\x03pW\x80c\xC7\xEC\xAB\x8F\x14a\x03\x83W`\0\x80\xFD[\x80c\x90\x10\xD0|\x14a\x03\x0FW\x80c\x91\xD1HT\x14a\x03:W\x80c\x9C\x7Fd;\x14a\x03MW`\0\x80\xFD[\x80c6V\x8A\xBE\x11a\x01fW\x80cN\xB1\x80\\\x11a\x01@W\x80cN\xB1\x80\\\x14a\x02\xC3W\x80co\xFB\xF9\x88\x14a\x02\xD6W\x80cvY:9\x14a\x02\xE9W\x80c\x8Du;-\x14a\x02\xFCW`\0\x80\xFD[\x80c6V\x8A\xBE\x14a\x02}W\x80c?\xA5\x84W\x14a\x02\x90W\x80cA\xB6Ie\x14a\x02\xB0W`\0\x80\xFD[\x80c'\xB0@\xA1\x11a\x01\xA2W\x80c'\xB0@\xA1\x14a\x02/W\x80c*-\xEE\xE2\x14a\x02DW\x80c,3\xCA\xFB\x14a\x02WW\x80c//\xF1]\x14a\x02jW`\0\x80\xFD[\x80c\x01\xFF\xC9\xA7\x14a\x01\xC9W\x80c#\x8D\xAF\xE0\x14a\x01\xF1W\x80c$\x8A\x9C\xA3\x14a\x01\xFEW[`\0\x80\xFD[a\x01\xDCa\x01\xD76`\x04a\x16+V[a\x04\x1DV[`@Q\x90\x15\x15\x81R` \x01[`@Q\x80\x91\x03\x90\xF3[`\x05Ta\x01\xDC\x90`\xFF\x16\x81V[a\x02!a\x02\x0C6`\x04a\x16UV[`\0\x90\x81R` \x81\x90R`@\x90 `\x01\x01T\x90V[`@Q\x90\x81R` \x01a\x01\xE8V[a\x02Ba\x02=6`\x04a\x16\x8AV[a\x04HV[\0[a\x02!a\x02R6`\x04a\x16\x8AV[a\x04\xABV[a\x02Ba\x02e6`\x04a\x16\xF1V[a\x05]V[a\x02Ba\x02x6`\x04a\x173V[a\x05\xC7V[a\x02Ba\x02\x8B6`\x04a\x173V[a\x05\xF1V[a\x02!a\x02\x9E6`\x04a\x16\x8AV[`\x03` R`\0\x90\x81R`@\x90 T\x81V[a\x02Ba\x02\xBE6`\x04a\x16\xF1V[a\x06tV[a\x01\xDCa\x02\xD16`\x04a\x16\x8AV[a\x07\x97V[a\x01\xDCa\x02\xE46`\x04a\x16\x8AV[a\x07\xE8V[a\x02Ba\x02\xF76`\x04a\x16\xF1V[a\x07\xF3V[a\x02Ba\x03\n6`\x04a\x17_V[a\t\x88V[a\x03\"a\x03\x1D6`\x04a\x17\xCBV[a\x0B\x02V[`@Q`\x01`\x01`\xA0\x1B\x03\x90\x91\x16\x81R` \x01a\x01\xE8V[a\x01\xDCa\x03H6`\x04a\x173V[a\x0B\x1AV[a\x02Ba\x0BCV[a\x02Ba\x03c6`\x04a\x16\xF1V[a\x0BqV[a\x02!`\0\x81V[a\x01\xDCa\x03~6`\x04a\x17\xEDV[a\x0C\xC4V[a\x03\"a\x03\x916`\x04a\x16\x8AV[`\x04` R`\0\x90\x81R`@\x90 T`\x01`\x01`\xA0\x1B\x03\x16\x81V[a\x02!a\x03\xBA6`\x04a\x16UV[a\r\x13V[a\x02Ba\x03\xCD6`\x04a\x18FV[a\r*V[a\x02Ba\x0EDV[a\x02Ba\x0E\xB7V[a\x02Ba\x03\xF06`\x04a\x173V[a\x0F/V[`\x02Ta\x03\"\x90`\x01`\x01`\xA0\x1B\x03\x16\x81V[a\x02!`\0\x80Q` a\x1A\xE6\x839\x81Q\x91R\x81V[`\0`\x01`\x01`\xE0\x1B\x03\x19\x82\x16cZ\x05\x18\x0F`\xE0\x1B\x14\x80a\x04BWPa\x04B\x82a\x0FTV[\x92\x91PPV[`\0\x80Q` a\x1A\xE6\x839\x81Q\x91Ra\x04`\x81a\x0F\x89V[`\x02\x80T`\x01`\x01`\xA0\x1B\x03\x19\x16`\x01`\x01`\xA0\x1B\x03\x84\x16\x90\x81\x17\x90\x91U`@Q\x7F\x8A\xC4\xB2\xEBwI\xF7\\[\x99\xB8\x98\xE5G\xFDa]\xD7\xA4$\xE6\x83V\xEA\x19k}\xAEt-l2\x90`\0\x90\xA2PPV[`\x02T`@QcY\xAA'A`\xE1\x1B\x81R`\x01`\x01`\xA0\x1B\x03\x83\x81\x16`\x04\x83\x01R`\0\x92\x83\x92\x91\x16\x90c\xB3TN\x82\x90`$\x01` `@Q\x80\x83\x03\x81\x86Z\xFA\x15\x80\x15a\x04\xF9W=`\0\x80>=`\0\xFD[PPPP`@Q=`\x1F\x19`\x1F\x82\x01\x16\x82\x01\x80`@RP\x81\x01\x90a\x05\x1D\x91\x90a\x194V[`\x01`\x01`\xA0\x1B\x03\x84\x16`\0\x90\x81R`\x03` R`@\x90 T\x90\x91P\x80\x82\x11\x15a\x05SWa\x05K\x81\x83a\x19cV[\x94\x93PPPPV[P`\0\x93\x92PPPV[`\0\x80Q` a\x1A\xE6\x839\x81Q\x91Ra\x05u\x81a\x0F\x89V[`\0[\x82\x81\x10\x15a\x05\xC1Wa\x05\xAF\x84\x84\x83\x81\x81\x10a\x05\x95Wa\x05\x95a\x19vV[\x90P` \x02\x01` \x81\x01\x90a\x05\xAA\x91\x90a\x16\x8AV[a\x0F\x96V[\x80a\x05\xB9\x81a\x19\x8CV[\x91PPa\x05xV[PPPPV[`\0\x82\x81R` \x81\x90R`@\x90 `\x01\x01Ta\x05\xE2\x81a\x0F\x89V[a\x05\xEC\x83\x83a\x0F\xF3V[PPPV[`\x01`\x01`\xA0\x1B\x03\x81\x163\x14a\x06fW`@QbF\x1B\xCD`\xE5\x1B\x81R` `\x04\x82\x01R`/`$\x82\x01R\x7FAccessControl: can only renounce`D\x82\x01Rn\x1097\xB62\xB9\x9037\xB9\x109\xB2\xB63`\x89\x1B`d\x82\x01R`\x84\x01[`@Q\x80\x91\x03\x90\xFD[a\x06p\x82\x82a\x10\x15V[PPV[`\0\x80Q` a\x1A\xE6\x839\x81Q\x91Ra\x06\x8C\x81a\x0F\x89V[`\0[\x82\x81\x10\x15a\x05\xC1W`\0\x84\x84\x83\x81\x81\x10a\x06\xABWa\x06\xABa\x19vV[\x90P` \x02\x01` \x81\x01\x90a\x06\xC0\x91\x90a\x16\x8AV[`\x01`\x01`\xA0\x1B\x03\x80\x82\x16`\0\x90\x81R`\x04` R`@\x90 T\x91\x92P\x16\x80a\x07\x07W`@Qc\x168y\x15`\xE3\x1B\x81R`\x01`\x01`\xA0\x1B\x03\x83\x16`\x04\x82\x01R`$\x01a\x06]V[`\x01`\x01`\xA0\x1B\x03\x81\x16`\0\x90\x81R`\x03` R`@\x81 \x80T\x91a\x07+\x83a\x19\xA5V[\x90\x91UPP`\x01`\x01`\xA0\x1B\x03\x80\x83\x16`\0\x81\x81R`\x04` R`@\x80\x82 \x80T`\x01`\x01`\xA0\x1B\x03\x19\x16\x90UQ\x91\x92\x84\x16\x91\x7F\x91v\n\x10\x01\xF51\xEC+\xEE\x86\x02\xBEU\xAD+\x11YF^\xDF\xF5\xBB\xCDA\xD2\x07\x03t*MB\x91\x90\xA3PP\x80\x80a\x07\x8F\x90a\x19\x8CV[\x91PPa\x06\x8FV[`\0`\x01`\x01`\xA0\x1B\x03\x82\x16a\x07\xAFWP`\0\x91\x90PV[`\x01`\x01`\xA0\x1B\x03\x80\x83\x16`\0\x90\x81R`\x04` R`@\x90 T\x16\x80a\x07\xD8WP`\0\x92\x91PPV[a\x07\xE1\x81a\x107V[\x93\x92PPPV[`\0a\x04B\x82a\x107V[`\x05T`\xFF\x16a\x08\x16W`@Qc\xC4&8\xBB`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`\0[\x81\x81\x10\x15a\tAW`\0\x83\x83\x83\x81\x81\x10a\x085Wa\x085a\x19vV[\x90P` \x02\x01` \x81\x01\x90a\x08J\x91\x90a\x16\x8AV[`\x01`\x01`\xA0\x1B\x03\x80\x82\x16`\0\x90\x81R`\x04` R`@\x90 T\x91\x92P\x16a\x08r3\x83a\x10\xEDV[`\x01`\x01`\xA0\x1B\x03\x81\x16a\x08\xF8W3`\0\x90\x81R`\x03` R`@\x81 \x80T\x91a\x08\x9B\x83a\x19\x8CV[\x90\x91UPP`\x01`\x01`\xA0\x1B\x03\x82\x16`\0\x81\x81R`\x04` R`@\x80\x82 \x80T`\x01`\x01`\xA0\x1B\x03\x19\x163\x90\x81\x17\x90\x91U\x90Q\x90\x91\x7F\n1\xEE\x9DF\xA8(\x88K\x81\0<\x84\x98\x15n\xA6\xAA\x15\xB9\xB5K\xDD\x0E\xF0\xB53\xD9\xEB\xA5~U\x91\xA3a\t,V[`\x01`\x01`\xA0\x1B\x03\x81\x163\x14a\t,W`@Qc[S;\xA1`\xE0\x1B\x81R`\x01`\x01`\xA0\x1B\x03\x83\x16`\x04\x82\x01R`$\x01a\x06]V[PP\x80\x80a\t9\x90a\x19\x8CV[\x91PPa\x08\x19V[Pa\tK3a\x107V[a\thW`@Qc\x03\xEEoW`\xE2\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`@Q`\x01\x903\x90`\0\x80Q` a\x1B\x06\x839\x81Q\x91R\x90`\0\x90\xA3PPV[`\0\x80Q` a\x1A\xE6\x839\x81Q\x91Ra\t\xA0\x81a\x0F\x89V[\x83\x82\x14a\t\xC0W`@Qc\xED\x88/q`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`\0[\x84\x81\x10\x15a\n\xFAW`\0\x84\x84\x83\x81\x81\x10a\t\xDFWa\t\xDFa\x19vV[\x90P` \x02\x01` \x81\x01\x90a\t\xF4\x91\x90a\x16\x8AV[\x90P`\0\x87\x87\x84\x81\x81\x10a\n\nWa\n\na\x19vV[\x90P` \x02\x01` \x81\x01\x90a\n\x1F\x91\x90a\x16\x8AV[`\x01`\x01`\xA0\x1B\x03\x83\x81\x16`\0\x90\x81R`\x04` R`@\x90 T\x91\x92P\x16\x15a\nfW`@Qc[S;\xA1`\xE0\x1B\x81R`\x01`\x01`\xA0\x1B\x03\x83\x16`\x04\x82\x01R`$\x01a\x06]V[`\x01`\x01`\xA0\x1B\x03\x81\x16`\0\x90\x81R`\x03` R`@\x81 \x80T\x91a\n\x8A\x83a\x19\x8CV[\x90\x91UPP`\x01`\x01`\xA0\x1B\x03\x82\x81\x16`\0\x81\x81R`\x04` R`@\x80\x82 \x80T`\x01`\x01`\xA0\x1B\x03\x19\x16\x94\x86\x16\x94\x85\x17\x90UQ\x91\x92\x91\x7F\x04\xE1\xEA\xA4\xDA\x18\xF7\xE7B\xA4\xED\xBB\xE9\xED\xE3l\xDFu\xF7\x93\xBB\x03\xAB!X\xC0\x87\x7F\x1C\xAF+\x93\x91\x90\xA3PP\x80\x80a\n\xF2\x90a\x19\x8CV[\x91PPa\t\xC3V[PPPPPPV[`\0\x82\x81R`\x01` R`@\x81 a\x07\xE1\x90\x83a\x11\x8FV[`\0\x91\x82R` \x82\x81R`@\x80\x84 `\x01`\x01`\xA0\x1B\x03\x93\x90\x93\x16\x84R\x91\x90R\x90 T`\xFF\x16\x90V[`\x05T`\xFF\x16a\x0BfW`@Qc\xC4&8\xBB`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[a\x0Bo3a\x0F\x96V[V[`\x05T`\xFF\x16a\x0B\x94W`@Qc\xC4&8\xBB`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`\0[\x81\x81\x10\x15a\x0C\xBAW`\0\x83\x83\x83\x81\x81\x10a\x0B\xB3Wa\x0B\xB3a\x19vV[\x90P` \x02\x01` \x81\x01\x90a\x0B\xC8\x91\x90a\x16\x8AV[`\x01`\x01`\xA0\x1B\x03\x80\x82\x16`\0\x90\x81R`\x04` R`@\x90 T\x91\x92P\x16a\x0B\xF03\x83a\x10\xEDV[3`\x01`\x01`\xA0\x1B\x03\x82\x16\x03a\x0CrW3`\0\x90\x81R`\x03` R`@\x81 \x80T\x91a\x0C\x1B\x83a\x19\xA5V[\x90\x91UPP`\x01`\x01`\xA0\x1B\x03\x82\x16`\0\x81\x81R`\x04` R`@\x80\x82 \x80T`\x01`\x01`\xA0\x1B\x03\x19\x16\x90UQ3\x91\x7F\x15\x9A\x8A\xE9H\xFC\xC6\xE7\xF8\xB5I\\\rs\xE9\x15\x98D\n\xF8\xA6(\x17$l\t\xED\xC2\xC2\x8D\xBA\x8A\x91\xA3a\x0C\xA5V[`\x01`\x01`\xA0\x1B\x03\x81\x16\x15a\x0C\xA5W`@Qc\xBFO\xDDs`\xE0\x1B\x81R`\x01`\x01`\xA0\x1B\x03\x83\x16`\x04\x82\x01R`$\x01a\x06]V[PP\x80\x80a\x0C\xB2\x90a\x19\x8CV[\x91PPa\x0B\x97V[Pa\x06p3a\x0F\x96V[`\0`\x01`\x01`\xA0\x1B\x03\x83\x16\x15\x80a\x0C\xE3WP`\x01`\x01`\xA0\x1B\x03\x82\x16\x15[\x15a\x0C\xF0WP`\0a\x04BV[P`\x01`\x01`\xA0\x1B\x03\x91\x82\x16`\0\x90\x81R`\x04` R`@\x90 T\x82\x16\x91\x16\x14\x90V[`\0\x81\x81R`\x01` R`@\x81 a\x04B\x90a\x11\x9BV[`\0\x80Q` a\x1A\xE6\x839\x81Q\x91Ra\rB\x81a\x0F\x89V[\x81Q\x83\x14a\rcW`@Qc\xED\x88/q`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`\0[\x83\x81\x10\x15a\x0E=W\x82\x81\x81Q\x81\x10a\r\x80Wa\r\x80a\x19vV[` \x02` \x01\x01Q\x15a\r\xDEW`\x01\x85\x85\x83\x81\x81\x10a\r\xA1Wa\r\xA1a\x19vV[\x90P` \x02\x01` \x81\x01\x90a\r\xB6\x91\x90a\x16\x8AV[`\x01`\x01`\xA0\x1B\x03\x16`\0\x80Q` a\x1B\x06\x839\x81Q\x91R`@Q`@Q\x80\x91\x03\x90\xA3a\x0E+V[`\0\x85\x85\x83\x81\x81\x10a\r\xF2Wa\r\xF2a\x19vV[\x90P` \x02\x01` \x81\x01\x90a\x0E\x07\x91\x90a\x16\x8AV[`\x01`\x01`\xA0\x1B\x03\x16`\0\x80Q` a\x1B\x06\x839\x81Q\x91R`@Q`@Q\x80\x91\x03\x90\xA3[\x80a\x0E5\x81a\x19\x8CV[\x91PPa\rfV[PPPPPV[`\0\x80Q` a\x1A\xE6\x839\x81Q\x91Ra\x0E\\\x81a\x0F\x89V[`\x05T`\xFF\x16a\x0E\x7FW`@Qc\xC4&8\xBB`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`\x05\x80T`\xFF\x19\x16\x90U`@Q`\0\x90\x7F\x8B\xC8_%\xE3\xE93\x97\x8F\t\x94\x08\xB3\xBB>\xB7c\x0Bv\xF7E_. [\xCB\xC0\xA7\x80\xE1~r\x90\x82\x90\xA2PV[`\0\x80Q` a\x1A\xE6\x839\x81Q\x91Ra\x0E\xCF\x81a\x0F\x89V[`\x05T`\xFF\x16\x15a\x0E\xF3W`@Qc\xED\x1A\x0Cw`\xE0\x1B\x81R`\x04\x01`@Q\x80\x91\x03\x90\xFD[`\x05\x80T`\xFF\x19\x16`\x01\x90\x81\x17\x90\x91U`@Q\x7F\x8B\xC8_%\xE3\xE93\x97\x8F\t\x94\x08\xB3\xBB>\xB7c\x0Bv\xF7E_. [\xCB\xC0\xA7\x80\xE1~r\x90`\0\x90\xA2PV[`\0\x82\x81R` \x81\x90R`@\x90 `\x01\x01Ta\x0FJ\x81a\x0F\x89V[a\x05\xEC\x83\x83a\x10\x15V[`\0`\x01`\x01`\xE0\x1B\x03\x19\x82\x16cye\xDB\x0B`\xE0\x1B\x14\x80a\x04BWPc\x01\xFF\xC9\xA7`\xE0\x1B`\x01`\x01`\xE0\x1B\x03\x19\x83\x16\x14a\x04BV[a\x0F\x93\x813a\x11\xA5V[PV[a\x0F\x9F\x81a\x107V[\x15a\x0F\xCCW`@Q`\x01\x90`\x01`\x01`\xA0\x1B\x03\x83\x16\x90`\0\x80Q` a\x1B\x06\x839\x81Q\x91R\x90`\0\x90\xA3PV[`@Q`\0\x90`\x01`\x01`\xA0\x1B\x03\x83\x16\x90`\0\x80Q` a\x1B\x06\x839\x81Q\x91R\x90\x83\x90\xA3PV[a\x0F\xFD\x82\x82a\x11\xFEV[`\0\x82\x81R`\x01` R`@\x90 a\x05\xEC\x90\x82a\x12\x82V[a\x10\x1F\x82\x82a\x12\x97V[`\0\x82\x81R`\x01` R`@\x90 a\x05\xEC\x90\x82a\x12\xFCV[`\x02T`@QcY\xAA'A`\xE1\x1B\x81R`\x01`\x01`\xA0\x1B\x03\x83\x81\x16`\x04\x83\x01R`\0\x92\x83\x92\x91\x16\x90c\xB3TN\x82\x90`$\x01` `@Q\x80\x83\x03\x81\x86Z\xFA\x15\x80\x15a\x10\x85W=`\0\x80>=`\0\xFD[PPPP`@Q=`\x1F\x19`\x1F\x82\x01\x16\x82\x01\x80`@RP\x81\x01\x90a\x10\xA9\x91\x90a\x194V[\x90P\x80`\0\x03a\x10\xBCWP`\0\x92\x91PPV[`\x01`\x01`\xA0\x1B\x03\x83\x16`\0\x90\x81R`\x03` R`@\x90 T\x81\x10a\x10\xE4WP`\x01\x92\x91PPV[P`\0\x92\x91PPV[`\x02T`@Qc6\x16\xB4\x11`\xE2\x1B\x81R`\x01`\x01`\xA0\x1B\x03\x84\x81\x16`\x04\x83\x01R\x83\x81\x16`$\x83\x01R`\0\x92\x16\x90c\xD8Z\xD0D\x90`D\x01` `@Q\x80\x83\x03\x81\x86Z\xFA\x15\x80\x15a\x11@W=`\0\x80>=`\0\xFD[PPPP`@Q=`\x1F\x19`\x1F\x82\x01\x16\x82\x01\x80`@RP\x81\x01\x90a\x11d\x91\x90a\x19\xBCV[\x90P\x80a\x05\xECW`@Qc\x07AIg`\xE0\x1B\x81R`\x01`\x01`\xA0\x1B\x03\x83\x16`\x04\x82\x01R`$\x01a\x06]V[`\0a\x07\xE1\x83\x83a\x13\x11V[`\0a\x04B\x82T\x90V[a\x11\xAF\x82\x82a\x0B\x1AV[a\x06pWa\x11\xBC\x81a\x13;V[a\x11\xC7\x83` a\x13MV[`@Q` \x01a\x11\xD8\x92\x91\x90a\x19\xFDV[`@\x80Q`\x1F\x19\x81\x84\x03\x01\x81R\x90\x82\x90RbF\x1B\xCD`\xE5\x1B\x82Ra\x06]\x91`\x04\x01a\x1ArV[a\x12\x08\x82\x82a\x0B\x1AV[a\x06pW`\0\x82\x81R` \x81\x81R`@\x80\x83 `\x01`\x01`\xA0\x1B\x03\x85\x16\x84R\x90\x91R\x90 \x80T`\xFF\x19\x16`\x01\x17\x90Ua\x12>3\x90V[`\x01`\x01`\xA0\x1B\x03\x16\x81`\x01`\x01`\xA0\x1B\x03\x16\x83\x7F/\x87\x88\x11~~\xFF\x1D\x82\xE9&\xECyI\x01\xD1|x\x02JP'\t@0E@\xA73eo\r`@Q`@Q\x80\x91\x03\x90\xA4PPV[`\0a\x07\xE1\x83`\x01`\x01`\xA0\x1B\x03\x84\x16a\x14\xE9V[a\x12\xA1\x82\x82a\x0B\x1AV[\x15a\x06pW`\0\x82\x81R` \x81\x81R`@\x80\x83 `\x01`\x01`\xA0\x1B\x03\x85\x16\x80\x85R\x92R\x80\x83 \x80T`\xFF\x19\x16\x90UQ3\x92\x85\x91\x7F\xF69\x1F\\2\xD9\xC6\x9D*G\xEAg\x0BD)t\xB595\xD1\xED\xC7\xFDd\xEB!\xE0G\xA89\x17\x1B\x91\x90\xA4PPV[`\0a\x07\xE1\x83`\x01`\x01`\xA0\x1B\x03\x84\x16a\x158V[`\0\x82`\0\x01\x82\x81T\x81\x10a\x13(Wa\x13(a\x19vV[\x90`\0R` `\0 \x01T\x90P\x92\x91PPV[``a\x04B`\x01`\x01`\xA0\x1B\x03\x83\x16`\x14[```\0a\x13\\\x83`\x02a\x1A\xA5V[a\x13g\x90`\x02a\x1A\xBCV[g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x81\x11\x15a\x13\x7FWa\x13\x7Fa\x18\x17V[`@Q\x90\x80\x82R\x80`\x1F\x01`\x1F\x19\x16` \x01\x82\x01`@R\x80\x15a\x13\xA9W` \x82\x01\x81\x806\x837\x01\x90P[P\x90P`\x03`\xFC\x1B\x81`\0\x81Q\x81\x10a\x13\xC4Wa\x13\xC4a\x19vV[` \x01\x01\x90`\x01`\x01`\xF8\x1B\x03\x19\x16\x90\x81`\0\x1A\x90SP`\x0F`\xFB\x1B\x81`\x01\x81Q\x81\x10a\x13\xF3Wa\x13\xF3a\x19vV[` \x01\x01\x90`\x01`\x01`\xF8\x1B\x03\x19\x16\x90\x81`\0\x1A\x90SP`\0a\x14\x17\x84`\x02a\x1A\xA5V[a\x14\"\x90`\x01a\x1A\xBCV[\x90P[`\x01\x81\x11\x15a\x14\x9AWo\x18\x18\x99\x19\x9A\x1A\x9B\x1B\x9C\x1C\xB0\xB11\xB22\xB3`\x81\x1B\x85`\x0F\x16`\x10\x81\x10a\x14VWa\x14Va\x19vV[\x1A`\xF8\x1B\x82\x82\x81Q\x81\x10a\x14lWa\x14la\x19vV[` \x01\x01\x90`\x01`\x01`\xF8\x1B\x03\x19\x16\x90\x81`\0\x1A\x90SP`\x04\x94\x90\x94\x1C\x93a\x14\x93\x81a\x19\xA5V[\x90Pa\x14%V[P\x83\x15a\x07\xE1W`@QbF\x1B\xCD`\xE5\x1B\x81R` `\x04\x82\x01\x81\x90R`$\x82\x01R\x7FStrings: hex length insufficient`D\x82\x01R`d\x01a\x06]V[`\0\x81\x81R`\x01\x83\x01` R`@\x81 Ta\x150WP\x81T`\x01\x81\x81\x01\x84U`\0\x84\x81R` \x80\x82 \x90\x93\x01\x84\x90U\x84T\x84\x82R\x82\x86\x01\x90\x93R`@\x90 \x91\x90\x91Ua\x04BV[P`\0a\x04BV[`\0\x81\x81R`\x01\x83\x01` R`@\x81 T\x80\x15a\x16!W`\0a\x15\\`\x01\x83a\x19cV[\x85T\x90\x91P`\0\x90a\x15p\x90`\x01\x90a\x19cV[\x90P\x81\x81\x14a\x15\xD5W`\0\x86`\0\x01\x82\x81T\x81\x10a\x15\x90Wa\x15\x90a\x19vV[\x90`\0R` `\0 \x01T\x90P\x80\x87`\0\x01\x84\x81T\x81\x10a\x15\xB3Wa\x15\xB3a\x19vV[`\0\x91\x82R` \x80\x83 \x90\x91\x01\x92\x90\x92U\x91\x82R`\x01\x88\x01\x90R`@\x90 \x83\x90U[\x85T\x86\x90\x80a\x15\xE6Wa\x15\xE6a\x1A\xCFV[`\x01\x90\x03\x81\x81\x90`\0R` `\0 \x01`\0\x90U\x90U\x85`\x01\x01`\0\x86\x81R` \x01\x90\x81R` \x01`\0 `\0\x90U`\x01\x93PPPPa\x04BV[`\0\x91PPa\x04BV[`\0` \x82\x84\x03\x12\x15a\x16=W`\0\x80\xFD[\x815`\x01`\x01`\xE0\x1B\x03\x19\x81\x16\x81\x14a\x07\xE1W`\0\x80\xFD[`\0` \x82\x84\x03\x12\x15a\x16gW`\0\x80\xFD[P5\x91\x90PV[\x805`\x01`\x01`\xA0\x1B\x03\x81\x16\x81\x14a\x16\x85W`\0\x80\xFD[\x91\x90PV[`\0` \x82\x84\x03\x12\x15a\x16\x9CW`\0\x80\xFD[a\x07\xE1\x82a\x16nV[`\0\x80\x83`\x1F\x84\x01\x12a\x16\xB7W`\0\x80\xFD[P\x815g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x81\x11\x15a\x16\xCFW`\0\x80\xFD[` \x83\x01\x91P\x83` \x82`\x05\x1B\x85\x01\x01\x11\x15a\x16\xEAW`\0\x80\xFD[\x92P\x92\x90PV[`\0\x80` \x83\x85\x03\x12\x15a\x17\x04W`\0\x80\xFD[\x825g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x81\x11\x15a\x17\x1BW`\0\x80\xFD[a\x17'\x85\x82\x86\x01a\x16\xA5V[\x90\x96\x90\x95P\x93PPPPV[`\0\x80`@\x83\x85\x03\x12\x15a\x17FW`\0\x80\xFD[\x825\x91Pa\x17V` \x84\x01a\x16nV[\x90P\x92P\x92\x90PV[`\0\x80`\0\x80`@\x85\x87\x03\x12\x15a\x17uW`\0\x80\xFD[\x845g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x80\x82\x11\x15a\x17\x8DW`\0\x80\xFD[a\x17\x99\x88\x83\x89\x01a\x16\xA5V[\x90\x96P\x94P` \x87\x015\x91P\x80\x82\x11\x15a\x17\xB2W`\0\x80\xFD[Pa\x17\xBF\x87\x82\x88\x01a\x16\xA5V[\x95\x98\x94\x97P\x95PPPPV[`\0\x80`@\x83\x85\x03\x12\x15a\x17\xDEW`\0\x80\xFD[PP\x805\x92` \x90\x91\x015\x91PV[`\0\x80`@\x83\x85\x03\x12\x15a\x18\0W`\0\x80\xFD[a\x18\t\x83a\x16nV[\x91Pa\x17V` \x84\x01a\x16nV[cNH{q`\xE0\x1B`\0R`A`\x04R`$`\0\xFD[\x80\x15\x15\x81\x14a\x0F\x93W`\0\x80\xFD[\x805a\x16\x85\x81a\x18-V[`\0\x80`\0`@\x84\x86\x03\x12\x15a\x18[W`\0\x80\xFD[\x835g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x80\x82\x11\x15a\x18sW`\0\x80\xFD[a\x18\x7F\x87\x83\x88\x01a\x16\xA5V[\x90\x95P\x93P` \x91P\x85\x82\x015\x81\x81\x11\x15a\x18\x99W`\0\x80\xFD[\x86\x01`\x1F\x81\x01\x88\x13a\x18\xAAW`\0\x80\xFD[\x805\x82\x81\x11\x15a\x18\xBCWa\x18\xBCa\x18\x17V[\x80`\x05\x1B`@Q`\x1F\x19`?\x83\x01\x16\x81\x01\x81\x81\x10\x86\x82\x11\x17\x15a\x18\xE1Wa\x18\xE1a\x18\x17V[`@R\x91\x82R\x84\x82\x01\x93P\x82\x81\x01\x85\x01\x91\x8A\x83\x11\x15a\x18\xFFW`\0\x80\xFD[\x92\x85\x01\x92[\x82\x84\x10\x15a\x19$Wa\x19\x15\x84a\x18;V[\x85R\x93\x85\x01\x93\x92\x85\x01\x92a\x19\x04V[\x80\x96PPPPPPP\x92P\x92P\x92V[`\0` \x82\x84\x03\x12\x15a\x19FW`\0\x80\xFD[PQ\x91\x90PV[cNH{q`\xE0\x1B`\0R`\x11`\x04R`$`\0\xFD[\x81\x81\x03\x81\x81\x11\x15a\x04BWa\x04Ba\x19MV[cNH{q`\xE0\x1B`\0R`2`\x04R`$`\0\xFD[`\0`\x01\x82\x01a\x19\x9EWa\x19\x9Ea\x19MV[P`\x01\x01\x90V[`\0\x81a\x19\xB4Wa\x19\xB4a\x19MV[P`\0\x19\x01\x90V[`\0` \x82\x84\x03\x12\x15a\x19\xCEW`\0\x80\xFD[\x81Qa\x07\xE1\x81a\x18-V[`\0[\x83\x81\x10\x15a\x19\xF4W\x81\x81\x01Q\x83\x82\x01R` \x01a\x19\xDCV[PP`\0\x91\x01RV[\x7FAccessControl: account \0\0\0\0\0\0\0\0\0\x81R`\0\x83Qa\x1A5\x81`\x17\x85\x01` \x88\x01a\x19\xD9V[p\x01\x03K\x99\x03kK\x9B\x9BKs9\x03\x93{c)`}\x1B`\x17\x91\x84\x01\x91\x82\x01R\x83Qa\x1Af\x81`(\x84\x01` \x88\x01a\x19\xD9V[\x01`(\x01\x94\x93PPPPV[` \x81R`\0\x82Q\x80` \x84\x01Ra\x1A\x91\x81`@\x85\x01` \x87\x01a\x19\xD9V[`\x1F\x01`\x1F\x19\x16\x91\x90\x91\x01`@\x01\x92\x91PPV[\x80\x82\x02\x81\x15\x82\x82\x04\x84\x14\x17a\x04BWa\x04Ba\x19MV[\x80\x82\x01\x80\x82\x11\x15a\x04BWa\x04Ba\x19MV[cNH{q`\xE0\x1B`\0R`1`\x04R`$`\0\xFD\xFE$\x1E\xCF\x16\xD7\x9D\x0F\x8D\xBF\xB9,\xBC\x07\xFE\x17\x84\x04%\x97l\xF0f\x7F\x02/\xE9\x87|\xAA\x83\x1B\x08\xE2\x99O\x8Do`\n\xD4s\xDB\xA8,\n\x89\n\xB7\xAF\xFA\xCB\x86\r3e\xF4t\xBA\xA3\xDC\x04\xA2\xE5W\xA2dipfsX\"\x12 \xEF\xA4.A\xA8\x01\x8Ezx\xD1D\x0FA\\X\x0C\xEB\xAF\xEEu\xB4<\x89B\xFEPg\xDA\xC9\xDC\x19#dsolcC\0\x08\x13\x003",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `ArrayLengthNotMatch()` and selector `0xed882f71`.
 ```solidity
 error ArrayLengthNotMatch();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ArrayLengthNotMatch {}
+    pub struct ArrayLengthNotMatch;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -865,7 +867,7 @@ error ArrayLengthNotMatch();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for ArrayLengthNotMatch {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -886,8 +888,17 @@ error ArrayLengthNotMatch();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `CannotOperateForNode(address)` and selector `0x07414967`.
 ```solidity
 error CannotOperateForNode(address nodeAddress);
@@ -957,15 +968,24 @@ error CannotOperateForNode(address nodeAddress);
                     ),
                 )
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `GloballyDisabledRegistry()` and selector `0xc42638bb`.
 ```solidity
 error GloballyDisabledRegistry();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct GloballyDisabledRegistry {}
+    pub struct GloballyDisabledRegistry;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1002,7 +1022,7 @@ error GloballyDisabledRegistry();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for GloballyDisabledRegistry {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1023,15 +1043,24 @@ error GloballyDisabledRegistry();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `GloballyEnabledRegistry()` and selector `0xed1a0c77`.
 ```solidity
 error GloballyEnabledRegistry();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct GloballyEnabledRegistry {}
+    pub struct GloballyEnabledRegistry;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1066,7 +1095,7 @@ error GloballyEnabledRegistry();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for GloballyEnabledRegistry {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1087,8 +1116,17 @@ error GloballyEnabledRegistry();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `NodeAlreadyRegisterd(address)` and selector `0x5b533ba1`.
 ```solidity
 error NodeAlreadyRegisterd(address nodeAddress);
@@ -1158,8 +1196,17 @@ error NodeAlreadyRegisterd(address nodeAddress);
                     ),
                 )
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `NodeNotYetRegisterd(address)` and selector `0xb1c3c8a8`.
 ```solidity
 error NodeNotYetRegisterd(address nodeAddress);
@@ -1229,8 +1276,17 @@ error NodeNotYetRegisterd(address nodeAddress);
                     ),
                 )
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `NodeRegisterdToOtherAccount(address)` and selector `0xbf4fdd73`.
 ```solidity
 error NodeRegisterdToOtherAccount(address nodeAddress);
@@ -1302,15 +1358,24 @@ error NodeRegisterdToOtherAccount(address nodeAddress);
                     ),
                 )
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `NotEnoughAllowanceToRegisterNode()` and selector `0x0fb9bd5c`.
 ```solidity
 error NotEnoughAllowanceToRegisterNode();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NotEnoughAllowanceToRegisterNode {}
+    pub struct NotEnoughAllowanceToRegisterNode;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1347,7 +1412,7 @@ error NotEnoughAllowanceToRegisterNode();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for NotEnoughAllowanceToRegisterNode {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1368,8 +1433,17 @@ error NotEnoughAllowanceToRegisterNode();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `Deregistered(address,address)` and selector `0x159a8ae948fcc6e7f8b5495c0d73e91598440af8a62817246c09edc2c28dba8a`.
 ```solidity
 event Deregistered(address indexed stakingAccount, address indexed nodeAddress);
@@ -1488,6 +1562,8 @@ event Deregistered(address indexed stakingAccount, address indexed nodeAddress);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `DeregisteredByManager(address,address)` and selector `0x91760a1001f531ec2bee8602be55ad2b1159465edff5bbcd41d20703742a4d42`.
 ```solidity
 event DeregisteredByManager(address indexed stakingAccount, address indexed nodeAddress);
@@ -1606,6 +1682,8 @@ event DeregisteredByManager(address indexed stakingAccount, address indexed node
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `EligibilityUpdated(address,bool)` and selector `0xe2994f8d6f600ad473dba82c0a890ab7affacb860d3365f474baa3dc04a2e557`.
 ```solidity
 event EligibilityUpdated(address indexed stakingAccount, bool indexed eligibility);
@@ -1724,6 +1802,8 @@ event EligibilityUpdated(address indexed stakingAccount, bool indexed eligibilit
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `NetworkRegistryStatusUpdated(bool)` and selector `0x8bc85f25e3e933978f099408b3bb3eb7630b76f7455f2e205bcbc0a780e17e72`.
 ```solidity
 event NetworkRegistryStatusUpdated(bool indexed isEnabled);
@@ -1831,6 +1911,8 @@ event NetworkRegistryStatusUpdated(bool indexed isEnabled);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `Registered(address,address)` and selector `0x0a31ee9d46a828884b81003c8498156ea6aa15b9b54bdd0ef0b533d9eba57e55`.
 ```solidity
 event Registered(address indexed stakingAccount, address indexed nodeAddress);
@@ -1949,6 +2031,8 @@ event Registered(address indexed stakingAccount, address indexed nodeAddress);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RegisteredByManager(address,address)` and selector `0x04e1eaa4da18f7e742a4edbbe9ede36cdf75f793bb03ab2158c0877f1caf2b93`.
 ```solidity
 event RegisteredByManager(address indexed stakingAccount, address indexed nodeAddress);
@@ -2067,6 +2151,8 @@ event RegisteredByManager(address indexed stakingAccount, address indexed nodeAd
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RequirementUpdated(address)` and selector `0x8ac4b2eb7749f75c5b99b898e547fd615dd7a424e68356ea196b7dae742d6c32`.
 ```solidity
 event RequirementUpdated(address indexed requirementImplementation);
@@ -2174,6 +2260,8 @@ event RequirementUpdated(address indexed requirementImplementation);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RoleAdminChanged(bytes32,bytes32,bytes32)` and selector `0xbd79b86ffe0ab8e8776151514217cd7cacd52c909f66475c3af44e129f0b00ff`.
 ```solidity
 event RoleAdminChanged(bytes32 indexed role, bytes32 indexed previousAdminRole, bytes32 indexed newAdminRole);
@@ -2300,6 +2388,8 @@ event RoleAdminChanged(bytes32 indexed role, bytes32 indexed previousAdminRole, 
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RoleGranted(bytes32,address,address)` and selector `0x2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d`.
 ```solidity
 event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
@@ -2426,6 +2516,8 @@ event RoleGranted(bytes32 indexed role, address indexed account, address indexed
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RoleRevoked(bytes32,address,address)` and selector `0xf6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b`.
 ```solidity
 event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
@@ -2643,13 +2735,17 @@ constructor(address _requirementImplementation, address _newOwner, address _mana
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `DEFAULT_ADMIN_ROLE()` and selector `0xa217fddf`.
 ```solidity
 function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct DEFAULT_ADMIN_ROLECall {}
+    pub struct DEFAULT_ADMIN_ROLECall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`DEFAULT_ADMIN_ROLE()`](DEFAULT_ADMIN_ROLECall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2694,7 +2790,7 @@ function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for DEFAULT_ADMIN_ROLECall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2737,7 +2833,7 @@ function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = DEFAULT_ADMIN_ROLEReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2755,24 +2851,48 @@ function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: DEFAULT_ADMIN_ROLEReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: DEFAULT_ADMIN_ROLEReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `MANAGER_ROLE()` and selector `0xec87621c`.
 ```solidity
 function MANAGER_ROLE() external view returns (bytes32);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct MANAGER_ROLECall {}
+    pub struct MANAGER_ROLECall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`MANAGER_ROLE()`](MANAGER_ROLECall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2815,7 +2935,7 @@ function MANAGER_ROLE() external view returns (bytes32);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for MANAGER_ROLECall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2856,7 +2976,7 @@ function MANAGER_ROLE() external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = MANAGER_ROLEReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2874,27 +2994,48 @@ function MANAGER_ROLE() external view returns (bytes32);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: MANAGER_ROLEReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: MANAGER_ROLEReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `countRegisterdNodesPerAccount(address)` and selector `0x3fa58457`.
 ```solidity
 function countRegisterdNodesPerAccount(address) external view returns (uint256);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct countRegisterdNodesPerAccountCall {
-        #[allow(missing_docs)]
-        pub _0: alloy::sol_types::private::Address,
-    }
+    pub struct countRegisterdNodesPerAccountCall(pub alloy::sol_types::private::Address);
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`countRegisterdNodesPerAccount(address)`](countRegisterdNodesPerAccountCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2931,7 +3072,7 @@ function countRegisterdNodesPerAccount(address) external view returns (uint256);
             impl ::core::convert::From<countRegisterdNodesPerAccountCall>
             for UnderlyingRustTuple<'_> {
                 fn from(value: countRegisterdNodesPerAccountCall) -> Self {
-                    (value._0,)
+                    (value.0,)
                 }
             }
             #[automatically_derived]
@@ -2939,7 +3080,7 @@ function countRegisterdNodesPerAccount(address) external view returns (uint256);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for countRegisterdNodesPerAccountCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self { _0: tuple.0 }
+                    Self(tuple.0)
                 }
             }
         }
@@ -2984,7 +3125,7 @@ function countRegisterdNodesPerAccount(address) external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = countRegisterdNodesPerAccountReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3001,29 +3142,51 @@ function countRegisterdNodesPerAccount(address) external view returns (uint256);
             fn tokenize(&self) -> Self::Token<'_> {
                 (
                     <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
-                        &self._0,
+                        &self.0,
                     ),
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: countRegisterdNodesPerAccountReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: countRegisterdNodesPerAccountReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `disableRegistry()` and selector `0xcbebafe0`.
 ```solidity
 function disableRegistry() external;
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct disableRegistryCall {}
+    pub struct disableRegistryCall;
     ///Container type for the return parameters of the [`disableRegistry()`](disableRegistryCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3063,7 +3226,7 @@ function disableRegistry() external;
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for disableRegistryCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3100,6 +3263,13 @@ function disableRegistry() external;
                 }
             }
         }
+        impl disableRegistryReturn {
+            fn _tokenize(
+                &self,
+            ) -> <disableRegistryCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for disableRegistryCall {
             type Parameters<'a> = ();
@@ -3124,24 +3294,36 @@ function disableRegistry() external;
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                disableRegistryReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `enableRegistry()` and selector `0xcfb3735f`.
 ```solidity
 function enableRegistry() external;
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct enableRegistryCall {}
+    pub struct enableRegistryCall;
     ///Container type for the return parameters of the [`enableRegistry()`](enableRegistryCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3181,7 +3363,7 @@ function enableRegistry() external;
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for enableRegistryCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3218,6 +3400,13 @@ function enableRegistry() external;
                 }
             }
         }
+        impl enableRegistryReturn {
+            fn _tokenize(
+                &self,
+            ) -> <enableRegistryCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for enableRegistryCall {
             type Parameters<'a> = ();
@@ -3242,24 +3431,38 @@ function enableRegistry() external;
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                enableRegistryReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `enabled()` and selector `0x238dafe0`.
 ```solidity
 function enabled() external view returns (bool);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct enabledCall {}
+    pub struct enabledCall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`enabled()`](enabledCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3302,7 +3505,7 @@ function enabled() external view returns (bool);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for enabledCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3343,7 +3546,7 @@ function enabled() external view returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = enabledReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3361,17 +3564,39 @@ function enabled() external view returns (bool);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: enabledReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: enabledReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `getRoleAdmin(bytes32)` and selector `0x248a9ca3`.
 ```solidity
 function getRoleAdmin(bytes32 role) external view returns (bytes32);
@@ -3382,6 +3607,8 @@ function getRoleAdmin(bytes32 role) external view returns (bytes32);
         #[allow(missing_docs)]
         pub role: alloy::sol_types::private::FixedBytes<32>,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`getRoleAdmin(bytes32)`](getRoleAdminCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3465,7 +3692,7 @@ function getRoleAdmin(bytes32 role) external view returns (bytes32);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = getRoleAdminReturn;
+            type Return = alloy::sol_types::private::FixedBytes<32>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3487,17 +3714,39 @@ function getRoleAdmin(bytes32 role) external view returns (bytes32);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        32,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: getRoleAdminReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: getRoleAdminReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `getRoleMember(bytes32,uint256)` and selector `0x9010d07c`.
 ```solidity
 function getRoleMember(bytes32 role, uint256 index) external view returns (address);
@@ -3510,6 +3759,8 @@ function getRoleMember(bytes32 role, uint256 index) external view returns (addre
         #[allow(missing_docs)]
         pub index: alloy::sol_types::private::primitives::aliases::U256,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`getRoleMember(bytes32,uint256)`](getRoleMemberCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3605,7 +3856,7 @@ function getRoleMember(bytes32 role, uint256 index) external view returns (addre
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = getRoleMemberReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3630,17 +3881,39 @@ function getRoleMember(bytes32 role, uint256 index) external view returns (addre
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: getRoleMemberReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: getRoleMemberReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `getRoleMemberCount(bytes32)` and selector `0xca15c873`.
 ```solidity
 function getRoleMemberCount(bytes32 role) external view returns (uint256);
@@ -3651,6 +3924,8 @@ function getRoleMemberCount(bytes32 role) external view returns (uint256);
         #[allow(missing_docs)]
         pub role: alloy::sol_types::private::FixedBytes<32>,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`getRoleMemberCount(bytes32)`](getRoleMemberCountCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3740,7 +4015,7 @@ function getRoleMemberCount(bytes32 role) external view returns (uint256);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = getRoleMemberCountReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3762,17 +4037,39 @@ function getRoleMemberCount(bytes32 role) external view returns (uint256);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: getRoleMemberCountReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: getRoleMemberCountReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `grantRole(bytes32,address)` and selector `0x2f2ff15d`.
 ```solidity
 function grantRole(bytes32 role, address account) external;
@@ -3868,6 +4165,13 @@ function grantRole(bytes32 role, address account) external;
                 }
             }
         }
+        impl grantRoleReturn {
+            fn _tokenize(
+                &self,
+            ) -> <grantRoleCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for grantRoleCall {
             type Parameters<'a> = (
@@ -3902,17 +4206,29 @@ function grantRole(bytes32 role, address account) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                grantRoleReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `hasRole(bytes32,address)` and selector `0x91d14854`.
 ```solidity
 function hasRole(bytes32 role, address account) external view returns (bool);
@@ -3925,6 +4241,8 @@ function hasRole(bytes32 role, address account) external view returns (bool);
         #[allow(missing_docs)]
         pub account: alloy::sol_types::private::Address,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`hasRole(bytes32,address)`](hasRoleCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -4020,7 +4338,7 @@ function hasRole(bytes32 role, address account) external view returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = hasRoleReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4045,17 +4363,39 @@ function hasRole(bytes32 role, address account) external view returns (bool);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: hasRoleReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: hasRoleReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `isAccountEligible(address)` and selector `0x6ffbf988`.
 ```solidity
 function isAccountEligible(address stakingAccount) external view returns (bool);
@@ -4066,6 +4406,8 @@ function isAccountEligible(address stakingAccount) external view returns (bool);
         #[allow(missing_docs)]
         pub stakingAccount: alloy::sol_types::private::Address,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`isAccountEligible(address)`](isAccountEligibleCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -4153,7 +4495,7 @@ function isAccountEligible(address stakingAccount) external view returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = isAccountEligibleReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4175,17 +4517,39 @@ function isAccountEligible(address stakingAccount) external view returns (bool);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: isAccountEligibleReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: isAccountEligibleReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `isNodeRegisteredAndEligible(address)` and selector `0x4eb1805c`.
 ```solidity
 function isNodeRegisteredAndEligible(address nodeAddress) external view returns (bool);
@@ -4196,6 +4560,8 @@ function isNodeRegisteredAndEligible(address nodeAddress) external view returns 
         #[allow(missing_docs)]
         pub nodeAddress: alloy::sol_types::private::Address,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`isNodeRegisteredAndEligible(address)`](isNodeRegisteredAndEligibleCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -4283,7 +4649,7 @@ function isNodeRegisteredAndEligible(address nodeAddress) external view returns 
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = isNodeRegisteredAndEligibleReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4305,17 +4671,39 @@ function isNodeRegisteredAndEligible(address nodeAddress) external view returns 
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: isNodeRegisteredAndEligibleReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: isNodeRegisteredAndEligibleReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `isNodeRegisteredByAccount(address,address)` and selector `0xa5605da5`.
 ```solidity
 function isNodeRegisteredByAccount(address nodeAddress, address account) external view returns (bool);
@@ -4328,6 +4716,8 @@ function isNodeRegisteredByAccount(address nodeAddress, address account) externa
         #[allow(missing_docs)]
         pub account: alloy::sol_types::private::Address,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`isNodeRegisteredByAccount(address,address)`](isNodeRegisteredByAccountCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -4427,7 +4817,7 @@ function isNodeRegisteredByAccount(address nodeAddress, address account) externa
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = isNodeRegisteredByAccountReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -4452,17 +4842,39 @@ function isNodeRegisteredByAccount(address nodeAddress, address account) externa
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: isNodeRegisteredByAccountReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: isNodeRegisteredByAccountReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `managerDeregister(address[])` and selector `0x41b64965`.
 ```solidity
 function managerDeregister(address[] memory nodeAddresses) external;
@@ -4557,6 +4969,13 @@ function managerDeregister(address[] memory nodeAddresses) external;
                 }
             }
         }
+        impl managerDeregisterReturn {
+            fn _tokenize(
+                &self,
+            ) -> <managerDeregisterCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for managerDeregisterCall {
             type Parameters<'a> = (
@@ -4587,17 +5006,29 @@ function managerDeregister(address[] memory nodeAddresses) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                managerDeregisterReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `managerForceSync(address[],bool[])` and selector `0xcaf5f501`.
 ```solidity
 function managerForceSync(address[] memory stakingAccounts, bool[] memory eligibilities) external;
@@ -4699,6 +5130,13 @@ function managerForceSync(address[] memory stakingAccounts, bool[] memory eligib
                 }
             }
         }
+        impl managerForceSyncReturn {
+            fn _tokenize(
+                &self,
+            ) -> <managerForceSyncCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for managerForceSyncCall {
             type Parameters<'a> = (
@@ -4733,17 +5171,29 @@ function managerForceSync(address[] memory stakingAccounts, bool[] memory eligib
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                managerForceSyncReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `managerRegister(address[],address[])` and selector `0x8d753b2d`.
 ```solidity
 function managerRegister(address[] memory stakingAccounts, address[] memory nodeAddresses) external;
@@ -4845,6 +5295,13 @@ function managerRegister(address[] memory stakingAccounts, address[] memory node
                 }
             }
         }
+        impl managerRegisterReturn {
+            fn _tokenize(
+                &self,
+            ) -> <managerRegisterCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for managerRegisterCall {
             type Parameters<'a> = (
@@ -4879,17 +5336,29 @@ function managerRegister(address[] memory stakingAccounts, address[] memory node
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                managerRegisterReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `managerSync(address[])` and selector `0x2c33cafb`.
 ```solidity
 function managerSync(address[] memory stakingAccounts) external;
@@ -4980,6 +5449,13 @@ function managerSync(address[] memory stakingAccounts) external;
                 }
             }
         }
+        impl managerSyncReturn {
+            fn _tokenize(
+                &self,
+            ) -> <managerSyncCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for managerSyncCall {
             type Parameters<'a> = (
@@ -5010,17 +5486,29 @@ function managerSync(address[] memory stakingAccounts) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                managerSyncReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `maxAdditionalRegistrations(address)` and selector `0x2a2deee2`.
 ```solidity
 function maxAdditionalRegistrations(address stakingAccount) external view returns (uint256);
@@ -5031,6 +5519,8 @@ function maxAdditionalRegistrations(address stakingAccount) external view return
         #[allow(missing_docs)]
         pub stakingAccount: alloy::sol_types::private::Address,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`maxAdditionalRegistrations(address)`](maxAdditionalRegistrationsCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -5120,7 +5610,7 @@ function maxAdditionalRegistrations(address stakingAccount) external view return
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = maxAdditionalRegistrationsReturn;
+            type Return = alloy::sol_types::private::primitives::aliases::U256;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -5142,27 +5632,48 @@ function maxAdditionalRegistrations(address stakingAccount) external view return
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Uint<
+                        256,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: maxAdditionalRegistrationsReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: maxAdditionalRegistrationsReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `nodeRegisterdToAccount(address)` and selector `0xc7ecab8f`.
 ```solidity
 function nodeRegisterdToAccount(address) external view returns (address);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct nodeRegisterdToAccountCall {
-        #[allow(missing_docs)]
-        pub _0: alloy::sol_types::private::Address,
-    }
+    pub struct nodeRegisterdToAccountCall(pub alloy::sol_types::private::Address);
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`nodeRegisterdToAccount(address)`](nodeRegisterdToAccountCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -5199,7 +5710,7 @@ function nodeRegisterdToAccount(address) external view returns (address);
             impl ::core::convert::From<nodeRegisterdToAccountCall>
             for UnderlyingRustTuple<'_> {
                 fn from(value: nodeRegisterdToAccountCall) -> Self {
-                    (value._0,)
+                    (value.0,)
                 }
             }
             #[automatically_derived]
@@ -5207,7 +5718,7 @@ function nodeRegisterdToAccount(address) external view returns (address);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for nodeRegisterdToAccountCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self { _0: tuple.0 }
+                    Self(tuple.0)
                 }
             }
         }
@@ -5250,7 +5761,7 @@ function nodeRegisterdToAccount(address) external view returns (address);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = nodeRegisterdToAccountReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -5267,22 +5778,44 @@ function nodeRegisterdToAccount(address) external view returns (address);
             fn tokenize(&self) -> Self::Token<'_> {
                 (
                     <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
-                        &self._0,
+                        &self.0,
                     ),
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: nodeRegisterdToAccountReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: nodeRegisterdToAccountReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `renounceRole(bytes32,address)` and selector `0x36568abe`.
 ```solidity
 function renounceRole(bytes32 role, address account) external;
@@ -5378,6 +5911,13 @@ function renounceRole(bytes32 role, address account) external;
                 }
             }
         }
+        impl renounceRoleReturn {
+            fn _tokenize(
+                &self,
+            ) -> <renounceRoleCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for renounceRoleCall {
             type Parameters<'a> = (
@@ -5412,24 +5952,38 @@ function renounceRole(bytes32 role, address account) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                renounceRoleReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `requirementImplementation()` and selector `0xe3d2a071`.
 ```solidity
 function requirementImplementation() external view returns (address);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct requirementImplementationCall {}
+    pub struct requirementImplementationCall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`requirementImplementation()`](requirementImplementationCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -5474,7 +6028,7 @@ function requirementImplementation() external view returns (address);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for requirementImplementationCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -5517,7 +6071,7 @@ function requirementImplementation() external view returns (address);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = requirementImplementationReturn;
+            type Return = alloy::sol_types::private::Address;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Address,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -5535,17 +6089,39 @@ function requirementImplementation() external view returns (address);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: requirementImplementationReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: requirementImplementationReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `revokeRole(bytes32,address)` and selector `0xd547741f`.
 ```solidity
 function revokeRole(bytes32 role, address account) external;
@@ -5641,6 +6217,13 @@ function revokeRole(bytes32 role, address account) external;
                 }
             }
         }
+        impl revokeRoleReturn {
+            fn _tokenize(
+                &self,
+            ) -> <revokeRoleCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for revokeRoleCall {
             type Parameters<'a> = (
@@ -5675,17 +6258,29 @@ function revokeRole(bytes32 role, address account) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                revokeRoleReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `selfDeregister(address[])` and selector `0xa05e0f6d`.
 ```solidity
 function selfDeregister(address[] memory nodeAddresses) external;
@@ -5778,6 +6373,13 @@ function selfDeregister(address[] memory nodeAddresses) external;
                 }
             }
         }
+        impl selfDeregisterReturn {
+            fn _tokenize(
+                &self,
+            ) -> <selfDeregisterCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for selfDeregisterCall {
             type Parameters<'a> = (
@@ -5808,17 +6410,29 @@ function selfDeregister(address[] memory nodeAddresses) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                selfDeregisterReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `selfRegister(address[])` and selector `0x76593a39`.
 ```solidity
 function selfRegister(address[] memory nodeAddresses) external;
@@ -5909,6 +6523,13 @@ function selfRegister(address[] memory nodeAddresses) external;
                 }
             }
         }
+        impl selfRegisterReturn {
+            fn _tokenize(
+                &self,
+            ) -> <selfRegisterCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for selfRegisterCall {
             type Parameters<'a> = (
@@ -5939,24 +6560,36 @@ function selfRegister(address[] memory nodeAddresses) external;
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                selfRegisterReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `selfSync()` and selector `0x9c7f643b`.
 ```solidity
 function selfSync() external;
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct selfSyncCall {}
+    pub struct selfSyncCall;
     ///Container type for the return parameters of the [`selfSync()`](selfSyncCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -5996,7 +6629,7 @@ function selfSync() external;
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for selfSyncCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -6031,6 +6664,13 @@ function selfSync() external;
                 }
             }
         }
+        impl selfSyncReturn {
+            fn _tokenize(
+                &self,
+            ) -> <selfSyncCall as alloy_sol_types::SolCall>::ReturnToken<'_> {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for selfSyncCall {
             type Parameters<'a> = ();
@@ -6055,17 +6695,29 @@ function selfSync() external;
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                selfSyncReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `supportsInterface(bytes4)` and selector `0x01ffc9a7`.
 ```solidity
 function supportsInterface(bytes4 interfaceId) external view returns (bool);
@@ -6076,6 +6728,8 @@ function supportsInterface(bytes4 interfaceId) external view returns (bool);
         #[allow(missing_docs)]
         pub interfaceId: alloy::sol_types::private::FixedBytes<4>,
     }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`supportsInterface(bytes4)`](supportsInterfaceCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -6163,7 +6817,7 @@ function supportsInterface(bytes4 interfaceId) external view returns (bool);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = supportsInterfaceReturn;
+            type Return = bool;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::Bool,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -6185,17 +6839,39 @@ function supportsInterface(bytes4 interfaceId) external view returns (bool);
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::Bool as alloy_sol_types::SolType>::tokenize(
+                        ret,
+                    ),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: supportsInterfaceReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: supportsInterfaceReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `updateRequirementImplementation(address)` and selector `0x27b040a1`.
 ```solidity
 function updateRequirementImplementation(address _requirementImplementation) external;
@@ -6286,6 +6962,15 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 }
             }
         }
+        impl updateRequirementImplementationReturn {
+            fn _tokenize(
+                &self,
+            ) -> <updateRequirementImplementationCall as alloy_sol_types::SolCall>::ReturnToken<
+                '_,
+            > {
+                ()
+            }
+        }
         #[automatically_derived]
         impl alloy_sol_types::SolCall for updateRequirementImplementationCall {
             type Parameters<'a> = (alloy::sol_types::sol_data::Address,);
@@ -6314,18 +6999,30 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 )
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                updateRequirementImplementationReturn::_tokenize(ret)
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(Into::into)
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
                     .map(Into::into)
             }
         }
     };
     ///Container for all the [`HoprNetworkRegistry`](self) function calls.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive()]
     pub enum HoprNetworkRegistryCalls {
         #[allow(missing_docs)]
         DEFAULT_ADMIN_ROLE(DEFAULT_ADMIN_ROLECall),
@@ -6524,20 +7221,16 @@ function updateRequirementImplementation(address _requirementImplementation) ext
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls>] = &[
                 {
                     fn supportsInterface(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <supportsInterfaceCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::supportsInterface)
                     }
@@ -6546,12 +7239,8 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn enabled(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
-                        <enabledCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <enabledCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprNetworkRegistryCalls::enabled)
                     }
                     enabled
@@ -6559,11 +7248,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn getRoleAdmin(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <getRoleAdminCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::getRoleAdmin)
                     }
@@ -6572,11 +7259,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn updateRequirementImplementation(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <updateRequirementImplementationCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNetworkRegistryCalls::updateRequirementImplementation,
@@ -6587,11 +7272,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn maxAdditionalRegistrations(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <maxAdditionalRegistrationsCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::maxAdditionalRegistrations)
                     }
@@ -6600,11 +7283,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn managerSync(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <managerSyncCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::managerSync)
                     }
@@ -6613,12 +7294,8 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn grantRole(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
-                        <grantRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <grantRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprNetworkRegistryCalls::grantRole)
                     }
                     grantRole
@@ -6626,11 +7303,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn renounceRole(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <renounceRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::renounceRole)
                     }
@@ -6639,11 +7314,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn countRegisterdNodesPerAccount(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <countRegisterdNodesPerAccountCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::countRegisterdNodesPerAccount)
                     }
@@ -6652,11 +7325,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn managerDeregister(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <managerDeregisterCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::managerDeregister)
                     }
@@ -6665,11 +7336,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn isNodeRegisteredAndEligible(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <isNodeRegisteredAndEligibleCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::isNodeRegisteredAndEligible)
                     }
@@ -6678,11 +7347,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn isAccountEligible(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <isAccountEligibleCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::isAccountEligible)
                     }
@@ -6691,11 +7358,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn selfRegister(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <selfRegisterCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::selfRegister)
                     }
@@ -6704,11 +7369,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn managerRegister(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <managerRegisterCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::managerRegister)
                     }
@@ -6717,11 +7380,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn getRoleMember(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <getRoleMemberCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::getRoleMember)
                     }
@@ -6730,12 +7391,8 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn hasRole(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
-                        <hasRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <hasRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprNetworkRegistryCalls::hasRole)
                     }
                     hasRole
@@ -6743,12 +7400,8 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn selfSync(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
-                        <selfSyncCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <selfSyncCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
                             .map(HoprNetworkRegistryCalls::selfSync)
                     }
                     selfSync
@@ -6756,11 +7409,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn selfDeregister(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <selfDeregisterCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::selfDeregister)
                     }
@@ -6769,11 +7420,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn DEFAULT_ADMIN_ROLE(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <DEFAULT_ADMIN_ROLECall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::DEFAULT_ADMIN_ROLE)
                     }
@@ -6782,11 +7431,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn isNodeRegisteredByAccount(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <isNodeRegisteredByAccountCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::isNodeRegisteredByAccount)
                     }
@@ -6795,11 +7442,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn nodeRegisterdToAccount(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <nodeRegisterdToAccountCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::nodeRegisterdToAccount)
                     }
@@ -6808,11 +7453,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn getRoleMemberCount(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <getRoleMemberCountCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::getRoleMemberCount)
                     }
@@ -6821,11 +7464,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn managerForceSync(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <managerForceSyncCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::managerForceSync)
                     }
@@ -6834,11 +7475,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn disableRegistry(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <disableRegistryCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::disableRegistry)
                     }
@@ -6847,11 +7486,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn enableRegistry(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <enableRegistryCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::enableRegistry)
                     }
@@ -6860,11 +7497,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn revokeRole(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <revokeRoleCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::revokeRole)
                     }
@@ -6873,11 +7508,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn requirementImplementation(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <requirementImplementationCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::requirementImplementation)
                     }
@@ -6886,11 +7519,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn MANAGER_ROLE(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
                         <MANAGER_ROLECall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryCalls::MANAGER_ROLE)
                     }
@@ -6905,7 +7536,337 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls>] = &[
+                {
+                    fn supportsInterface(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <supportsInterfaceCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::supportsInterface)
+                    }
+                    supportsInterface
+                },
+                {
+                    fn enabled(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <enabledCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::enabled)
+                    }
+                    enabled
+                },
+                {
+                    fn getRoleAdmin(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <getRoleAdminCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::getRoleAdmin)
+                    }
+                    getRoleAdmin
+                },
+                {
+                    fn updateRequirementImplementation(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <updateRequirementImplementationCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNetworkRegistryCalls::updateRequirementImplementation,
+                            )
+                    }
+                    updateRequirementImplementation
+                },
+                {
+                    fn maxAdditionalRegistrations(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <maxAdditionalRegistrationsCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::maxAdditionalRegistrations)
+                    }
+                    maxAdditionalRegistrations
+                },
+                {
+                    fn managerSync(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <managerSyncCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::managerSync)
+                    }
+                    managerSync
+                },
+                {
+                    fn grantRole(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <grantRoleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::grantRole)
+                    }
+                    grantRole
+                },
+                {
+                    fn renounceRole(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <renounceRoleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::renounceRole)
+                    }
+                    renounceRole
+                },
+                {
+                    fn countRegisterdNodesPerAccount(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <countRegisterdNodesPerAccountCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::countRegisterdNodesPerAccount)
+                    }
+                    countRegisterdNodesPerAccount
+                },
+                {
+                    fn managerDeregister(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <managerDeregisterCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::managerDeregister)
+                    }
+                    managerDeregister
+                },
+                {
+                    fn isNodeRegisteredAndEligible(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <isNodeRegisteredAndEligibleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::isNodeRegisteredAndEligible)
+                    }
+                    isNodeRegisteredAndEligible
+                },
+                {
+                    fn isAccountEligible(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <isAccountEligibleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::isAccountEligible)
+                    }
+                    isAccountEligible
+                },
+                {
+                    fn selfRegister(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <selfRegisterCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::selfRegister)
+                    }
+                    selfRegister
+                },
+                {
+                    fn managerRegister(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <managerRegisterCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::managerRegister)
+                    }
+                    managerRegister
+                },
+                {
+                    fn getRoleMember(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <getRoleMemberCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::getRoleMember)
+                    }
+                    getRoleMember
+                },
+                {
+                    fn hasRole(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <hasRoleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::hasRole)
+                    }
+                    hasRole
+                },
+                {
+                    fn selfSync(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <selfSyncCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::selfSync)
+                    }
+                    selfSync
+                },
+                {
+                    fn selfDeregister(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <selfDeregisterCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::selfDeregister)
+                    }
+                    selfDeregister
+                },
+                {
+                    fn DEFAULT_ADMIN_ROLE(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <DEFAULT_ADMIN_ROLECall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::DEFAULT_ADMIN_ROLE)
+                    }
+                    DEFAULT_ADMIN_ROLE
+                },
+                {
+                    fn isNodeRegisteredByAccount(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <isNodeRegisteredByAccountCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::isNodeRegisteredByAccount)
+                    }
+                    isNodeRegisteredByAccount
+                },
+                {
+                    fn nodeRegisterdToAccount(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <nodeRegisterdToAccountCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::nodeRegisterdToAccount)
+                    }
+                    nodeRegisterdToAccount
+                },
+                {
+                    fn getRoleMemberCount(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <getRoleMemberCountCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::getRoleMemberCount)
+                    }
+                    getRoleMemberCount
+                },
+                {
+                    fn managerForceSync(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <managerForceSyncCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::managerForceSync)
+                    }
+                    managerForceSync
+                },
+                {
+                    fn disableRegistry(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <disableRegistryCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::disableRegistry)
+                    }
+                    disableRegistry
+                },
+                {
+                    fn enableRegistry(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <enableRegistryCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::enableRegistry)
+                    }
+                    enableRegistry
+                },
+                {
+                    fn revokeRole(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <revokeRoleCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::revokeRole)
+                    }
+                    revokeRole
+                },
+                {
+                    fn requirementImplementation(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <requirementImplementationCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::requirementImplementation)
+                    }
+                    requirementImplementation
+                },
+                {
+                    fn MANAGER_ROLE(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryCalls> {
+                        <MANAGER_ROLECall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryCalls::MANAGER_ROLE)
+                    }
+                    MANAGER_ROLE
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -7211,6 +8172,8 @@ function updateRequirementImplementation(address _requirementImplementation) ext
         }
     }
     ///Container for all the [`HoprNetworkRegistry`](self) custom errors.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprNetworkRegistryErrors {
         #[allow(missing_docs)]
         ArrayLengthNotMatch(ArrayLengthNotMatch),
@@ -7295,20 +8258,16 @@ function updateRequirementImplementation(address _requirementImplementation) ext
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors>] = &[
                 {
                     fn CannotOperateForNode(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
                         <CannotOperateForNode as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryErrors::CannotOperateForNode)
                     }
@@ -7317,11 +8276,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn NotEnoughAllowanceToRegisterNode(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
                         <NotEnoughAllowanceToRegisterNode as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprNetworkRegistryErrors::NotEnoughAllowanceToRegisterNode,
@@ -7332,11 +8289,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn NodeAlreadyRegisterd(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
                         <NodeAlreadyRegisterd as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryErrors::NodeAlreadyRegisterd)
                     }
@@ -7345,11 +8300,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn NodeNotYetRegisterd(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
                         <NodeNotYetRegisterd as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryErrors::NodeNotYetRegisterd)
                     }
@@ -7358,11 +8311,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn NodeRegisterdToOtherAccount(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
                         <NodeRegisterdToOtherAccount as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryErrors::NodeRegisterdToOtherAccount)
                     }
@@ -7371,11 +8322,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn GloballyDisabledRegistry(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
                         <GloballyDisabledRegistry as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryErrors::GloballyDisabledRegistry)
                     }
@@ -7384,11 +8333,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn GloballyEnabledRegistry(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
                         <GloballyEnabledRegistry as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryErrors::GloballyEnabledRegistry)
                     }
@@ -7397,11 +8344,9 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                 {
                     fn ArrayLengthNotMatch(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
                         <ArrayLengthNotMatch as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprNetworkRegistryErrors::ArrayLengthNotMatch)
                     }
@@ -7416,7 +8361,117 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors>] = &[
+                {
+                    fn CannotOperateForNode(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
+                        <CannotOperateForNode as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryErrors::CannotOperateForNode)
+                    }
+                    CannotOperateForNode
+                },
+                {
+                    fn NotEnoughAllowanceToRegisterNode(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
+                        <NotEnoughAllowanceToRegisterNode as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprNetworkRegistryErrors::NotEnoughAllowanceToRegisterNode,
+                            )
+                    }
+                    NotEnoughAllowanceToRegisterNode
+                },
+                {
+                    fn NodeAlreadyRegisterd(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
+                        <NodeAlreadyRegisterd as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryErrors::NodeAlreadyRegisterd)
+                    }
+                    NodeAlreadyRegisterd
+                },
+                {
+                    fn NodeNotYetRegisterd(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
+                        <NodeNotYetRegisterd as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryErrors::NodeNotYetRegisterd)
+                    }
+                    NodeNotYetRegisterd
+                },
+                {
+                    fn NodeRegisterdToOtherAccount(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
+                        <NodeRegisterdToOtherAccount as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryErrors::NodeRegisterdToOtherAccount)
+                    }
+                    NodeRegisterdToOtherAccount
+                },
+                {
+                    fn GloballyDisabledRegistry(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
+                        <GloballyDisabledRegistry as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryErrors::GloballyDisabledRegistry)
+                    }
+                    GloballyDisabledRegistry
+                },
+                {
+                    fn GloballyEnabledRegistry(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
+                        <GloballyEnabledRegistry as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryErrors::GloballyEnabledRegistry)
+                    }
+                    GloballyEnabledRegistry
+                },
+                {
+                    fn ArrayLengthNotMatch(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprNetworkRegistryErrors> {
+                        <ArrayLengthNotMatch as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprNetworkRegistryErrors::ArrayLengthNotMatch)
+                    }
+                    ArrayLengthNotMatch
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -7518,6 +8573,8 @@ function updateRequirementImplementation(address _requirementImplementation) ext
         }
     }
     ///Container for all the [`HoprNetworkRegistry`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprNetworkRegistryEvents {
         #[allow(missing_docs)]
         Deregistered(Deregistered),
@@ -7608,14 +8665,12 @@ function updateRequirementImplementation(address _requirementImplementation) ext
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(<Deregistered as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <Deregistered as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::Deregistered)
                 }
@@ -7625,7 +8680,6 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     <DeregisteredByManager as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::DeregisteredByManager)
                 }
@@ -7635,7 +8689,6 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     <EligibilityUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::EligibilityUpdated)
                 }
@@ -7645,7 +8698,6 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     <NetworkRegistryStatusUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::NetworkRegistryStatusUpdated)
                 }
@@ -7653,7 +8705,6 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     <Registered as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::Registered)
                 }
@@ -7663,7 +8714,6 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     <RegisteredByManager as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RegisteredByManager)
                 }
@@ -7673,7 +8723,6 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     <RequirementUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RequirementUpdated)
                 }
@@ -7681,7 +8730,6 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     <RoleAdminChanged as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RoleAdminChanged)
                 }
@@ -7689,7 +8737,6 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     <RoleGranted as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RoleGranted)
                 }
@@ -7697,7 +8744,6 @@ function updateRequirementImplementation(address _requirementImplementation) ext
                     <RoleRevoked as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RoleRevoked)
                 }
@@ -7792,14 +8838,13 @@ function updateRequirementImplementation(address _requirementImplementation) ext
 See the [wrapper's documentation](`HoprNetworkRegistryInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprNetworkRegistryInstance<T, P, N> {
-        HoprNetworkRegistryInstance::<T, P, N>::new(address, provider)
+    ) -> HoprNetworkRegistryInstance<P, N> {
+        HoprNetworkRegistryInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -7808,8 +8853,7 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
@@ -7817,10 +8861,9 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         _newOwner: alloy::sol_types::private::Address,
         _manager: alloy::sol_types::private::Address,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprNetworkRegistryInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprNetworkRegistryInstance<P, N>>,
     > {
         HoprNetworkRegistryInstance::<
-            T,
             P,
             N,
         >::deploy(provider, _requirementImplementation, _newOwner, _manager)
@@ -7832,17 +8875,15 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
         _requirementImplementation: alloy::sol_types::private::Address,
         _newOwner: alloy::sol_types::private::Address,
         _manager: alloy::sol_types::private::Address,
-    ) -> alloy_contract::RawCallBuilder<T, P, N> {
+    ) -> alloy_contract::RawCallBuilder<P, N> {
         HoprNetworkRegistryInstance::<
-            T,
             P,
             N,
         >::deploy_builder(provider, _requirementImplementation, _newOwner, _manager)
@@ -7859,13 +8900,13 @@ be used to deploy a new instance of the contract.
 
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
-    pub struct HoprNetworkRegistryInstance<T, P, N = alloy_contract::private::Ethereum> {
+    pub struct HoprNetworkRegistryInstance<P, N = alloy_contract::private::Ethereum> {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprNetworkRegistryInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprNetworkRegistryInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprNetworkRegistryInstance").field(&self.address).finish()
@@ -7874,10 +8915,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNetworkRegistryInstance<T, P, N> {
+    > HoprNetworkRegistryInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprNetworkRegistry`](self) contract instance.
 
 See the [wrapper's documentation](`HoprNetworkRegistryInstance`) for more details.*/
@@ -7889,7 +8929,7 @@ See the [wrapper's documentation](`HoprNetworkRegistryInstance`) for more detail
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -7903,7 +8943,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
             _requirementImplementation: alloy::sol_types::private::Address,
             _newOwner: alloy::sol_types::private::Address,
             _manager: alloy::sol_types::private::Address,
-        ) -> alloy_contract::Result<HoprNetworkRegistryInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprNetworkRegistryInstance<P, N>> {
             let call_builder = Self::deploy_builder(
                 provider,
                 _requirementImplementation,
@@ -7924,7 +8964,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             _requirementImplementation: alloy::sol_types::private::Address,
             _newOwner: alloy::sol_types::private::Address,
             _manager: alloy::sol_types::private::Address,
-        ) -> alloy_contract::RawCallBuilder<T, P, N> {
+        ) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 [
@@ -7962,24 +9002,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprNetworkRegistryInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprNetworkRegistryInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprNetworkRegistryInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprNetworkRegistryInstance<P, N> {
             HoprNetworkRegistryInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNetworkRegistryInstance<T, P, N> {
+    > HoprNetworkRegistryInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -7987,58 +9026,49 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
         ///Creates a new call builder for the [`DEFAULT_ADMIN_ROLE`] function.
         pub fn DEFAULT_ADMIN_ROLE(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, DEFAULT_ADMIN_ROLECall, N> {
-            self.call_builder(&DEFAULT_ADMIN_ROLECall {})
+        ) -> alloy_contract::SolCallBuilder<&P, DEFAULT_ADMIN_ROLECall, N> {
+            self.call_builder(&DEFAULT_ADMIN_ROLECall)
         }
         ///Creates a new call builder for the [`MANAGER_ROLE`] function.
         pub fn MANAGER_ROLE(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, MANAGER_ROLECall, N> {
-            self.call_builder(&MANAGER_ROLECall {})
+        ) -> alloy_contract::SolCallBuilder<&P, MANAGER_ROLECall, N> {
+            self.call_builder(&MANAGER_ROLECall)
         }
         ///Creates a new call builder for the [`countRegisterdNodesPerAccount`] function.
         pub fn countRegisterdNodesPerAccount(
             &self,
             _0: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<
-            T,
-            &P,
-            countRegisterdNodesPerAccountCall,
-            N,
-        > {
-            self.call_builder(
-                &countRegisterdNodesPerAccountCall {
-                    _0,
-                },
-            )
+        ) -> alloy_contract::SolCallBuilder<&P, countRegisterdNodesPerAccountCall, N> {
+            self.call_builder(&countRegisterdNodesPerAccountCall(_0))
         }
         ///Creates a new call builder for the [`disableRegistry`] function.
         pub fn disableRegistry(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, disableRegistryCall, N> {
-            self.call_builder(&disableRegistryCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, disableRegistryCall, N> {
+            self.call_builder(&disableRegistryCall)
         }
         ///Creates a new call builder for the [`enableRegistry`] function.
         pub fn enableRegistry(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, enableRegistryCall, N> {
-            self.call_builder(&enableRegistryCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, enableRegistryCall, N> {
+            self.call_builder(&enableRegistryCall)
         }
         ///Creates a new call builder for the [`enabled`] function.
-        pub fn enabled(&self) -> alloy_contract::SolCallBuilder<T, &P, enabledCall, N> {
-            self.call_builder(&enabledCall {})
+        pub fn enabled(&self) -> alloy_contract::SolCallBuilder<&P, enabledCall, N> {
+            self.call_builder(&enabledCall)
         }
         ///Creates a new call builder for the [`getRoleAdmin`] function.
         pub fn getRoleAdmin(
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, getRoleAdminCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, getRoleAdminCall, N> {
             self.call_builder(&getRoleAdminCall { role })
         }
         ///Creates a new call builder for the [`getRoleMember`] function.
@@ -8046,14 +9076,14 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
             index: alloy::sol_types::private::primitives::aliases::U256,
-        ) -> alloy_contract::SolCallBuilder<T, &P, getRoleMemberCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, getRoleMemberCall, N> {
             self.call_builder(&getRoleMemberCall { role, index })
         }
         ///Creates a new call builder for the [`getRoleMemberCount`] function.
         pub fn getRoleMemberCount(
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, getRoleMemberCountCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, getRoleMemberCountCall, N> {
             self.call_builder(&getRoleMemberCountCall { role })
         }
         ///Creates a new call builder for the [`grantRole`] function.
@@ -8061,7 +9091,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, grantRoleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, grantRoleCall, N> {
             self.call_builder(&grantRoleCall { role, account })
         }
         ///Creates a new call builder for the [`hasRole`] function.
@@ -8069,14 +9099,14 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, hasRoleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, hasRoleCall, N> {
             self.call_builder(&hasRoleCall { role, account })
         }
         ///Creates a new call builder for the [`isAccountEligible`] function.
         pub fn isAccountEligible(
             &self,
             stakingAccount: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, isAccountEligibleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, isAccountEligibleCall, N> {
             self.call_builder(
                 &isAccountEligibleCall {
                     stakingAccount,
@@ -8087,7 +9117,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn isNodeRegisteredAndEligible(
             &self,
             nodeAddress: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, isNodeRegisteredAndEligibleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, isNodeRegisteredAndEligibleCall, N> {
             self.call_builder(
                 &isNodeRegisteredAndEligibleCall {
                     nodeAddress,
@@ -8099,7 +9129,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self,
             nodeAddress: alloy::sol_types::private::Address,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, isNodeRegisteredByAccountCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, isNodeRegisteredByAccountCall, N> {
             self.call_builder(
                 &isNodeRegisteredByAccountCall {
                     nodeAddress,
@@ -8113,7 +9143,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             nodeAddresses: alloy::sol_types::private::Vec<
                 alloy::sol_types::private::Address,
             >,
-        ) -> alloy_contract::SolCallBuilder<T, &P, managerDeregisterCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, managerDeregisterCall, N> {
             self.call_builder(
                 &managerDeregisterCall {
                     nodeAddresses,
@@ -8127,7 +9157,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
                 alloy::sol_types::private::Address,
             >,
             eligibilities: alloy::sol_types::private::Vec<bool>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, managerForceSyncCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, managerForceSyncCall, N> {
             self.call_builder(
                 &managerForceSyncCall {
                     stakingAccounts,
@@ -8144,7 +9174,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             nodeAddresses: alloy::sol_types::private::Vec<
                 alloy::sol_types::private::Address,
             >,
-        ) -> alloy_contract::SolCallBuilder<T, &P, managerRegisterCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, managerRegisterCall, N> {
             self.call_builder(
                 &managerRegisterCall {
                     stakingAccounts,
@@ -8158,14 +9188,14 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             stakingAccounts: alloy::sol_types::private::Vec<
                 alloy::sol_types::private::Address,
             >,
-        ) -> alloy_contract::SolCallBuilder<T, &P, managerSyncCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, managerSyncCall, N> {
             self.call_builder(&managerSyncCall { stakingAccounts })
         }
         ///Creates a new call builder for the [`maxAdditionalRegistrations`] function.
         pub fn maxAdditionalRegistrations(
             &self,
             stakingAccount: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, maxAdditionalRegistrationsCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, maxAdditionalRegistrationsCall, N> {
             self.call_builder(
                 &maxAdditionalRegistrationsCall {
                     stakingAccount,
@@ -8176,29 +9206,29 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn nodeRegisterdToAccount(
             &self,
             _0: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, nodeRegisterdToAccountCall, N> {
-            self.call_builder(&nodeRegisterdToAccountCall { _0 })
+        ) -> alloy_contract::SolCallBuilder<&P, nodeRegisterdToAccountCall, N> {
+            self.call_builder(&nodeRegisterdToAccountCall(_0))
         }
         ///Creates a new call builder for the [`renounceRole`] function.
         pub fn renounceRole(
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, renounceRoleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, renounceRoleCall, N> {
             self.call_builder(&renounceRoleCall { role, account })
         }
         ///Creates a new call builder for the [`requirementImplementation`] function.
         pub fn requirementImplementation(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, requirementImplementationCall, N> {
-            self.call_builder(&requirementImplementationCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, requirementImplementationCall, N> {
+            self.call_builder(&requirementImplementationCall)
         }
         ///Creates a new call builder for the [`revokeRole`] function.
         pub fn revokeRole(
             &self,
             role: alloy::sol_types::private::FixedBytes<32>,
             account: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<T, &P, revokeRoleCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, revokeRoleCall, N> {
             self.call_builder(&revokeRoleCall { role, account })
         }
         ///Creates a new call builder for the [`selfDeregister`] function.
@@ -8207,7 +9237,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             nodeAddresses: alloy::sol_types::private::Vec<
                 alloy::sol_types::private::Address,
             >,
-        ) -> alloy_contract::SolCallBuilder<T, &P, selfDeregisterCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, selfDeregisterCall, N> {
             self.call_builder(
                 &selfDeregisterCall {
                     nodeAddresses,
@@ -8220,20 +9250,18 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             nodeAddresses: alloy::sol_types::private::Vec<
                 alloy::sol_types::private::Address,
             >,
-        ) -> alloy_contract::SolCallBuilder<T, &P, selfRegisterCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, selfRegisterCall, N> {
             self.call_builder(&selfRegisterCall { nodeAddresses })
         }
         ///Creates a new call builder for the [`selfSync`] function.
-        pub fn selfSync(
-            &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, selfSyncCall, N> {
-            self.call_builder(&selfSyncCall {})
+        pub fn selfSync(&self) -> alloy_contract::SolCallBuilder<&P, selfSyncCall, N> {
+            self.call_builder(&selfSyncCall)
         }
         ///Creates a new call builder for the [`supportsInterface`] function.
         pub fn supportsInterface(
             &self,
             interfaceId: alloy::sol_types::private::FixedBytes<4>,
-        ) -> alloy_contract::SolCallBuilder<T, &P, supportsInterfaceCall, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, supportsInterfaceCall, N> {
             self.call_builder(
                 &supportsInterfaceCall {
                     interfaceId,
@@ -8244,12 +9272,7 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn updateRequirementImplementation(
             &self,
             _requirementImplementation: alloy::sol_types::private::Address,
-        ) -> alloy_contract::SolCallBuilder<
-            T,
-            &P,
-            updateRequirementImplementationCall,
-            N,
-        > {
+        ) -> alloy_contract::SolCallBuilder<&P, updateRequirementImplementationCall, N> {
             self.call_builder(
                 &updateRequirementImplementationCall {
                     _requirementImplementation,
@@ -8260,75 +9283,68 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprNetworkRegistryInstance<T, P, N> {
+    > HoprNetworkRegistryInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`Deregistered`] event.
-        pub fn Deregistered_filter(
-            &self,
-        ) -> alloy_contract::Event<T, &P, Deregistered, N> {
+        pub fn Deregistered_filter(&self) -> alloy_contract::Event<&P, Deregistered, N> {
             self.event_filter::<Deregistered>()
         }
         ///Creates a new event filter for the [`DeregisteredByManager`] event.
         pub fn DeregisteredByManager_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, DeregisteredByManager, N> {
+        ) -> alloy_contract::Event<&P, DeregisteredByManager, N> {
             self.event_filter::<DeregisteredByManager>()
         }
         ///Creates a new event filter for the [`EligibilityUpdated`] event.
         pub fn EligibilityUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, EligibilityUpdated, N> {
+        ) -> alloy_contract::Event<&P, EligibilityUpdated, N> {
             self.event_filter::<EligibilityUpdated>()
         }
         ///Creates a new event filter for the [`NetworkRegistryStatusUpdated`] event.
         pub fn NetworkRegistryStatusUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, NetworkRegistryStatusUpdated, N> {
+        ) -> alloy_contract::Event<&P, NetworkRegistryStatusUpdated, N> {
             self.event_filter::<NetworkRegistryStatusUpdated>()
         }
         ///Creates a new event filter for the [`Registered`] event.
-        pub fn Registered_filter(&self) -> alloy_contract::Event<T, &P, Registered, N> {
+        pub fn Registered_filter(&self) -> alloy_contract::Event<&P, Registered, N> {
             self.event_filter::<Registered>()
         }
         ///Creates a new event filter for the [`RegisteredByManager`] event.
         pub fn RegisteredByManager_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RegisteredByManager, N> {
+        ) -> alloy_contract::Event<&P, RegisteredByManager, N> {
             self.event_filter::<RegisteredByManager>()
         }
         ///Creates a new event filter for the [`RequirementUpdated`] event.
         pub fn RequirementUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RequirementUpdated, N> {
+        ) -> alloy_contract::Event<&P, RequirementUpdated, N> {
             self.event_filter::<RequirementUpdated>()
         }
         ///Creates a new event filter for the [`RoleAdminChanged`] event.
         pub fn RoleAdminChanged_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RoleAdminChanged, N> {
+        ) -> alloy_contract::Event<&P, RoleAdminChanged, N> {
             self.event_filter::<RoleAdminChanged>()
         }
         ///Creates a new event filter for the [`RoleGranted`] event.
-        pub fn RoleGranted_filter(
-            &self,
-        ) -> alloy_contract::Event<T, &P, RoleGranted, N> {
+        pub fn RoleGranted_filter(&self) -> alloy_contract::Event<&P, RoleGranted, N> {
             self.event_filter::<RoleGranted>()
         }
         ///Creates a new event filter for the [`RoleRevoked`] event.
-        pub fn RoleRevoked_filter(
-            &self,
-        ) -> alloy_contract::Event<T, &P, RoleRevoked, N> {
+        pub fn RoleRevoked_filter(&self) -> alloy_contract::Event<&P, RoleRevoked, N> {
             self.event_filter::<RoleRevoked>()
         }
     }
