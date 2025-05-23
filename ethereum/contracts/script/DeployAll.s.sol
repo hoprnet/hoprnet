@@ -86,7 +86,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         _deployNetworkRegistry(deployerAddress);
 
         // 3.8. TicketPriceOracle
-        _deployHoprTicketPriceOracle(deployerAddress, 100);
+        _deployHoprTicketPriceOracle(deployerAddress);
 
         // 3.9. WinningProbabilityOracle, with a default value of 1.0
         _deployHoprWinningProbabilityOracle(deployerAddress, WinProb.wrap(type(uint56).max));
@@ -272,15 +272,17 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
     /**
      * @dev deploy ticket price oracle
      */
-    function _deployHoprTicketPriceOracle(address deployerAddress, uint256 price) internal {
+    function _deployHoprTicketPriceOracle(address deployerAddress) internal {
+        uint256 price = 100;
         if (
             currentEnvironmentType == EnvironmentType.LOCAL
                 || !isValidAddress(currentNetworkDetail.addresses.ticketPriceOracleContractAddress)
         ) {
-            // deploy contract
-            currentNetworkDetail.addresses.ticketPriceOracleContractAddress =
-                deployCode("TicketPriceOracle.sol:HoprTicketPriceOracle", abi.encode(deployerAddress, price));
+            price = 100 ether;
         }
+        // deploy contract
+        currentNetworkDetail.addresses.ticketPriceOracleContractAddress =
+            deployCode("TicketPriceOracle.sol:HoprTicketPriceOracle", abi.encode(deployerAddress, price));
     }
 
     /**
