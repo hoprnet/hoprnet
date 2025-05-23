@@ -45,7 +45,7 @@ class Node:
         alias: str,
         api_addr: str = None,
         use_nat: bool = False,
-        env: Optional[dict] = None,
+        extra_env: Optional[dict] = None,
     ):
         # initialized
         self.id = id
@@ -55,7 +55,7 @@ class Node:
         self.network: str = network
         self.identity_path: str = identity_path
         self.use_nat: bool = use_nat
-        self.env: dict = env
+        self.env: dict = extra_env
 
         # optional
         self.cfg_file: str = cfg_file
