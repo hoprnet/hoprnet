@@ -416,6 +416,8 @@ pub mod HoprCapabilityPermissions {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"s\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x000\x14`\x80`@R`\x046\x10`~W`\x005`\xE0\x1C\x80czuq\x15\x11`_W\x80czuq\x15\x14`\xC7W\x80c\x81g\xB6~\x14`\xD4W\x80c\xA0\x86X9\x14`\xE1W\x80c\xB6w\xA4\x0F\x14`\xEEW`\0\x80\xFD[\x80cQ\xD2aK\x14`\x83W\x80c]\xAA\x9E$\x14`\xADW\x80cg\x8A^\xFB\x14`\xBAW[`\0\x80\xFD[`\x90c\x06lF\xB9`\xE1\x1B\x81V[`@Q`\x01`\x01`\xE0\x1B\x03\x19\x90\x91\x16\x81R` \x01`@Q\x80\x91\x03\x90\xF3[`\x90c\xBD\xA6_E`\xE0\x1B\x81V[`\x90cT\xA2\xED\xF5`\xE0\x1B\x81V[`\x90cM\xEC\xDD\xE3`\xE1\x1B\x81V[`\x90ce\x15\x14\xBF`\xE0\x1B\x81V[`\x90c\t^\xA7\xB3`\xE0\x1B\x81V[`\x90c\n\xBE\xC5\x8F`\xE0\x1B\x81V\xFE\xA2dipfsX\"\x12 \xC6&\x98m\xD6\xF3\x03\xC5Q\xE2g\xF4\x1C\xED\x8A<~\xFF\xD4\x9AC j\x04\x8A\x13/\xC6\x88e\xF8LdsolcC\0\x08\x13\x003",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct GranularPermission(u8);
@@ -462,12 +464,12 @@ pub mod HoprCapabilityPermissions {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(value: u8) -> Self {
+            pub const fn from_underlying(value: u8) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(self) -> u8 {
+            pub const fn into_underlying(self) -> u8 {
                 self.0
             }
             /// Return the single encoding of this value, delegating to the
@@ -481,6 +483,18 @@ pub mod HoprCapabilityPermissions {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<u8> for GranularPermission {
+            fn from(value: u8) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<GranularPermission> for u8 {
+            fn from(value: GranularPermission) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -540,6 +554,8 @@ pub mod HoprCapabilityPermissions {
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct Target(alloy::sol_types::private::primitives::aliases::U256);
@@ -587,14 +603,14 @@ pub mod HoprCapabilityPermissions {
             pub const NAME: &'static str = stringify!(@ name);
             /// Convert from the underlying value type.
             #[inline]
-            pub const fn from(
+            pub const fn from_underlying(
                 value: alloy::sol_types::private::primitives::aliases::U256,
             ) -> Self {
                 Self(value)
             }
             /// Return the underlying value.
             #[inline]
-            pub const fn into(
+            pub const fn into_underlying(
                 self,
             ) -> alloy::sol_types::private::primitives::aliases::U256 {
                 self.0
@@ -610,6 +626,20 @@ pub mod HoprCapabilityPermissions {
             #[inline]
             pub fn abi_encode_packed(&self) -> alloy_sol_types::private::Vec<u8> {
                 <Self as alloy_sol_types::SolType>::abi_encode_packed(&self.0)
+            }
+        }
+        #[automatically_derived]
+        impl From<alloy::sol_types::private::primitives::aliases::U256> for Target {
+            fn from(
+                value: alloy::sol_types::private::primitives::aliases::U256,
+            ) -> Self {
+                Self::from_underlying(value)
+            }
+        }
+        #[automatically_derived]
+        impl From<Target> for alloy::sol_types::private::primitives::aliases::U256 {
+            fn from(value: Target) -> Self {
+                value.into_underlying()
             }
         }
         #[automatically_derived]
@@ -669,13 +699,15 @@ pub mod HoprCapabilityPermissions {
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `AddressIsZero()` and selector `0x867915ab`.
 ```solidity
 error AddressIsZero();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct AddressIsZero {}
+    pub struct AddressIsZero;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -710,7 +742,7 @@ error AddressIsZero();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for AddressIsZero {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -731,15 +763,24 @@ error AddressIsZero();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `ArrayTooLong()` and selector `0xbd26cc38`.
 ```solidity
 error ArrayTooLong();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ArrayTooLong {}
+    pub struct ArrayTooLong;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -774,7 +815,7 @@ error ArrayTooLong();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for ArrayTooLong {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -795,15 +836,24 @@ error ArrayTooLong();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `ArraysDifferentLength()` and selector `0x74f4d537`.
 ```solidity
 error ArraysDifferentLength();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ArraysDifferentLength {}
+    pub struct ArraysDifferentLength;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -838,7 +888,7 @@ error ArraysDifferentLength();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for ArraysDifferentLength {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -859,15 +909,24 @@ error ArraysDifferentLength();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `CalldataOutOfBounds()` and selector `0x742638b4`.
 ```solidity
 error CalldataOutOfBounds();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct CalldataOutOfBounds {}
+    pub struct CalldataOutOfBounds;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -902,7 +961,7 @@ error CalldataOutOfBounds();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for CalldataOutOfBounds {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -923,15 +982,24 @@ error CalldataOutOfBounds();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `DefaultPermissionRejected()` and selector `0x58723037`.
 ```solidity
 error DefaultPermissionRejected();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct DefaultPermissionRejected {}
+    pub struct DefaultPermissionRejected;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -968,7 +1036,7 @@ error DefaultPermissionRejected();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for DefaultPermissionRejected {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -989,15 +1057,24 @@ error DefaultPermissionRejected();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `DelegateCallNotAllowed()` and selector `0x0d89438e`.
 ```solidity
 error DelegateCallNotAllowed();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct DelegateCallNotAllowed {}
+    pub struct DelegateCallNotAllowed;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1032,7 +1109,7 @@ error DelegateCallNotAllowed();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for DelegateCallNotAllowed {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1053,15 +1130,24 @@ error DelegateCallNotAllowed();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `FunctionSignatureTooShort()` and selector `0x4684c122`.
 ```solidity
 error FunctionSignatureTooShort();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct FunctionSignatureTooShort {}
+    pub struct FunctionSignatureTooShort;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1098,7 +1184,7 @@ error FunctionSignatureTooShort();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for FunctionSignatureTooShort {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1119,15 +1205,24 @@ error FunctionSignatureTooShort();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `GranularPermissionRejected()` and selector `0x864dd1e7`.
 ```solidity
 error GranularPermissionRejected();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct GranularPermissionRejected {}
+    pub struct GranularPermissionRejected;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1164,7 +1259,7 @@ error GranularPermissionRejected();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for GranularPermissionRejected {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1185,15 +1280,24 @@ error GranularPermissionRejected();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `NoMembership()` and selector `0xfd8e9f28`.
 ```solidity
 error NoMembership();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NoMembership {}
+    pub struct NoMembership;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1228,7 +1332,7 @@ error NoMembership();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NoMembership {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1249,15 +1353,24 @@ error NoMembership();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `NodePermissionRejected()` and selector `0x6eb0315f`.
 ```solidity
 error NodePermissionRejected();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct NodePermissionRejected {}
+    pub struct NodePermissionRejected;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1292,7 +1405,7 @@ error NodePermissionRejected();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for NodePermissionRejected {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1313,15 +1426,24 @@ error NodePermissionRejected();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `ParameterNotAllowed()` and selector `0x31e98246`.
 ```solidity
 error ParameterNotAllowed();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct ParameterNotAllowed {}
+    pub struct ParameterNotAllowed;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1356,7 +1478,7 @@ error ParameterNotAllowed();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for ParameterNotAllowed {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1377,15 +1499,24 @@ error ParameterNotAllowed();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `PermissionNotConfigured()` and selector `0x46ad4588`.
 ```solidity
 error PermissionNotConfigured();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct PermissionNotConfigured {}
+    pub struct PermissionNotConfigured;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1420,7 +1551,7 @@ error PermissionNotConfigured();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for PermissionNotConfigured {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1441,15 +1572,24 @@ error PermissionNotConfigured();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `SendNotAllowed()` and selector `0x09e9cd49`.
 ```solidity
 error SendNotAllowed();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct SendNotAllowed {}
+    pub struct SendNotAllowed;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1484,7 +1624,7 @@ error SendNotAllowed();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for SendNotAllowed {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1505,15 +1645,24 @@ error SendNotAllowed();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `TargetAddressNotAllowed()` and selector `0xef3440ac`.
 ```solidity
 error TargetAddressNotAllowed();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TargetAddressNotAllowed {}
+    pub struct TargetAddressNotAllowed;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1548,7 +1697,7 @@ error TargetAddressNotAllowed();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for TargetAddressNotAllowed {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1569,15 +1718,24 @@ error TargetAddressNotAllowed();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `TargetIsNotScoped()` and selector `0x4a890321`.
 ```solidity
 error TargetIsNotScoped();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TargetIsNotScoped {}
+    pub struct TargetIsNotScoped;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1612,7 +1770,7 @@ error TargetIsNotScoped();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for TargetIsNotScoped {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1633,15 +1791,24 @@ error TargetIsNotScoped();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `TargetIsScoped()` and selector `0xe8c07d2a`.
 ```solidity
 error TargetIsScoped();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct TargetIsScoped {}
+    pub struct TargetIsScoped;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1676,7 +1843,7 @@ error TargetIsScoped();
         #[doc(hidden)]
         impl ::core::convert::From<UnderlyingRustTuple<'_>> for TargetIsScoped {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1697,15 +1864,24 @@ error TargetIsScoped();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Custom error with signature `UnacceptableMultiSendOffset()` and selector `0x7ed11137`.
 ```solidity
 error UnacceptableMultiSendOffset();
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct UnacceptableMultiSendOffset {}
+    pub struct UnacceptableMultiSendOffset;
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -1742,7 +1918,7 @@ error UnacceptableMultiSendOffset();
         impl ::core::convert::From<UnderlyingRustTuple<'_>>
         for UnacceptableMultiSendOffset {
             fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                Self {}
+                Self
             }
         }
         #[automatically_derived]
@@ -1763,8 +1939,17 @@ error UnacceptableMultiSendOffset();
             fn tokenize(&self) -> Self::Token<'_> {
                 ()
             }
+            #[inline]
+            fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
+                <Self::Parameters<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(Self::new)
+            }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RevokedTarget(address)` and selector `0x0dfce1ea4ba1eeba891ffb2a066790fbc293a9e517fe61d49d156a30165f93f3`.
 ```solidity
 event RevokedTarget(address indexed targetAddress);
@@ -1870,6 +2055,8 @@ event RevokedTarget(address indexed targetAddress);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedGranularChannelCapability(address,bytes32,bytes4,uint8)` and selector `0xf2ffd4f09d58d06824188033d3318d06eb957bfb1a8ffed9af78e1f19168b904`.
 ```solidity
 event ScopedGranularChannelCapability(address indexed targetAddress, bytes32 indexed channelId, bytes4 selector, GranularPermission permission);
@@ -2007,6 +2194,8 @@ event ScopedGranularChannelCapability(address indexed targetAddress, bytes32 ind
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedGranularSendCapability(address,address,uint8)` and selector `0x7487530ddff120799505e52b1b19b6933f85a9eeae9220c80a7ad7c429b612ae`.
 ```solidity
 event ScopedGranularSendCapability(address indexed nodeAddress, address indexed recipientAddress, GranularPermission permission);
@@ -2134,6 +2323,8 @@ event ScopedGranularSendCapability(address indexed nodeAddress, address indexed 
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedGranularTokenCapability(address,address,address,bytes4,uint8)` and selector `0xa3df710420b01cc30ff300309abbc7fadd4630d4ab385b0f5a126fb4babe762b`.
 ```solidity
 event ScopedGranularTokenCapability(address indexed nodeAddress, address indexed targetAddress, address indexed recipientAddress, bytes4 selector, GranularPermission permission);
@@ -2278,6 +2469,8 @@ event ScopedGranularTokenCapability(address indexed nodeAddress, address indexed
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedTargetChannels(address,uint256)` and selector `0x5ffb06b0b0e8ad6a8f3c5831d499dfa612d9c9d4dc107bbd66f18f61a6492e71`.
 ```solidity
 event ScopedTargetChannels(address indexed targetAddress, Target target);
@@ -2388,6 +2581,8 @@ event ScopedTargetChannels(address indexed targetAddress, Target target);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedTargetSend(address,uint256)` and selector `0x1ee2791f2caf0e92a9dc32a37a9ea53ab6ac7a6fb8f2d090e53a067d3a43f6ac`.
 ```solidity
 event ScopedTargetSend(address indexed targetAddress, Target target);
@@ -2498,6 +2693,8 @@ event ScopedTargetSend(address indexed targetAddress, Target target);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `ScopedTargetToken(address,uint256)` and selector `0xaaf26bb12aa89ee96bbe19667a6a055727b75d3f6ed7b8b611ef6519180209d6`.
 ```solidity
 event ScopedTargetToken(address indexed targetAddress, Target target);
@@ -2608,13 +2805,17 @@ event ScopedTargetToken(address indexed targetAddress, Target target);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `APPROVE_SELECTOR()` and selector `0xa0865839`.
 ```solidity
 function APPROVE_SELECTOR() external view returns (bytes4);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct APPROVE_SELECTORCall {}
+    pub struct APPROVE_SELECTORCall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`APPROVE_SELECTOR()`](APPROVE_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2659,7 +2860,7 @@ function APPROVE_SELECTOR() external view returns (bytes4);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for APPROVE_SELECTORCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2702,7 +2903,7 @@ function APPROVE_SELECTOR() external view returns (bytes4);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = APPROVE_SELECTORReturn;
+            type Return = alloy::sol_types::private::FixedBytes<4>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<4>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2720,24 +2921,48 @@ function APPROVE_SELECTOR() external view returns (bytes4);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        4,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: APPROVE_SELECTORReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: APPROVE_SELECTORReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `CLOSE_INCOMING_CHANNEL_SELECTOR()` and selector `0x678a5efb`.
 ```solidity
 function CLOSE_INCOMING_CHANNEL_SELECTOR() external view returns (bytes4);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct CLOSE_INCOMING_CHANNEL_SELECTORCall {}
+    pub struct CLOSE_INCOMING_CHANNEL_SELECTORCall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`CLOSE_INCOMING_CHANNEL_SELECTOR()`](CLOSE_INCOMING_CHANNEL_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2782,7 +3007,7 @@ function CLOSE_INCOMING_CHANNEL_SELECTOR() external view returns (bytes4);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for CLOSE_INCOMING_CHANNEL_SELECTORCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2825,7 +3050,7 @@ function CLOSE_INCOMING_CHANNEL_SELECTOR() external view returns (bytes4);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = CLOSE_INCOMING_CHANNEL_SELECTORReturn;
+            type Return = alloy::sol_types::private::FixedBytes<4>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<4>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2843,24 +3068,48 @@ function CLOSE_INCOMING_CHANNEL_SELECTOR() external view returns (bytes4);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        4,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: CLOSE_INCOMING_CHANNEL_SELECTORReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: CLOSE_INCOMING_CHANNEL_SELECTORReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()` and selector `0x8167b67e`.
 ```solidity
 function FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (bytes4);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall {}
+    pub struct FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()`](FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -2905,7 +3154,7 @@ function FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (byt
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -2951,7 +3200,7 @@ function FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (byt
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORReturn;
+            type Return = alloy::sol_types::private::FixedBytes<4>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<4>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -2969,24 +3218,50 @@ function FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (byt
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        4,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORReturn = r
+                            .into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORReturn = r
+                            .into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `FUND_CHANNEL_SELECTOR()` and selector `0xb677a40f`.
 ```solidity
 function FUND_CHANNEL_SELECTOR() external view returns (bytes4);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct FUND_CHANNEL_SELECTORCall {}
+    pub struct FUND_CHANNEL_SELECTORCall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`FUND_CHANNEL_SELECTOR()`](FUND_CHANNEL_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3031,7 +3306,7 @@ function FUND_CHANNEL_SELECTOR() external view returns (bytes4);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for FUND_CHANNEL_SELECTORCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3074,7 +3349,7 @@ function FUND_CHANNEL_SELECTOR() external view returns (bytes4);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = FUND_CHANNEL_SELECTORReturn;
+            type Return = alloy::sol_types::private::FixedBytes<4>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<4>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3092,24 +3367,48 @@ function FUND_CHANNEL_SELECTOR() external view returns (bytes4);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        4,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: FUND_CHANNEL_SELECTORReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: FUND_CHANNEL_SELECTORReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()` and selector `0x5daa9e24`.
 ```solidity
 function INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (bytes4);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall {}
+    pub struct INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR()`](INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3154,7 +3453,7 @@ function INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (byt
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3200,7 +3499,7 @@ function INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (byt
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORReturn;
+            type Return = alloy::sol_types::private::FixedBytes<4>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<4>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3218,24 +3517,50 @@ function INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR() external view returns (byt
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        4,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORReturn = r
+                            .into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORReturn = r
+                            .into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `REDEEM_TICKET_SELECTOR()` and selector `0x51d2614b`.
 ```solidity
 function REDEEM_TICKET_SELECTOR() external view returns (bytes4);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct REDEEM_TICKET_SELECTORCall {}
+    pub struct REDEEM_TICKET_SELECTORCall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`REDEEM_TICKET_SELECTOR()`](REDEEM_TICKET_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3280,7 +3605,7 @@ function REDEEM_TICKET_SELECTOR() external view returns (bytes4);
             impl ::core::convert::From<UnderlyingRustTuple<'_>>
             for REDEEM_TICKET_SELECTORCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3323,7 +3648,7 @@ function REDEEM_TICKET_SELECTOR() external view returns (bytes4);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = REDEEM_TICKET_SELECTORReturn;
+            type Return = alloy::sol_types::private::FixedBytes<4>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<4>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3341,24 +3666,48 @@ function REDEEM_TICKET_SELECTOR() external view returns (bytes4);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        4,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: REDEEM_TICKET_SELECTORReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: REDEEM_TICKET_SELECTORReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Function with signature `SEND_SELECTOR()` and selector `0x7a757115`.
 ```solidity
 function SEND_SELECTOR() external view returns (bytes4);
 ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
-    pub struct SEND_SELECTORCall {}
+    pub struct SEND_SELECTORCall;
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     ///Container type for the return parameters of the [`SEND_SELECTOR()`](SEND_SELECTORCall) function.
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
@@ -3401,7 +3750,7 @@ function SEND_SELECTOR() external view returns (bytes4);
             #[doc(hidden)]
             impl ::core::convert::From<UnderlyingRustTuple<'_>> for SEND_SELECTORCall {
                 fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-                    Self {}
+                    Self
                 }
             }
         }
@@ -3442,7 +3791,7 @@ function SEND_SELECTOR() external view returns (bytes4);
             type Token<'a> = <Self::Parameters<
                 'a,
             > as alloy_sol_types::SolType>::Token<'a>;
-            type Return = SEND_SELECTORReturn;
+            type Return = alloy::sol_types::private::FixedBytes<4>;
             type ReturnTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<4>,);
             type ReturnToken<'a> = <Self::ReturnTuple<
                 'a,
@@ -3460,18 +3809,40 @@ function SEND_SELECTOR() external view returns (bytes4);
                 ()
             }
             #[inline]
-            fn abi_decode_returns(
+            fn tokenize_returns(ret: &Self::Return) -> Self::ReturnToken<'_> {
+                (
+                    <alloy::sol_types::sol_data::FixedBytes<
+                        4,
+                    > as alloy_sol_types::SolType>::tokenize(ret),
+                )
+            }
+            #[inline]
+            fn abi_decode_returns(data: &[u8]) -> alloy_sol_types::Result<Self::Return> {
+                <Self::ReturnTuple<
+                    '_,
+                > as alloy_sol_types::SolType>::abi_decode_sequence(data)
+                    .map(|r| {
+                        let r: SEND_SELECTORReturn = r.into();
+                        r._0
+                    })
+            }
+            #[inline]
+            fn abi_decode_returns_validate(
                 data: &[u8],
-                validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
                 <Self::ReturnTuple<
                     '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                > as alloy_sol_types::SolType>::abi_decode_sequence_validate(data)
+                    .map(|r| {
+                        let r: SEND_SELECTORReturn = r.into();
+                        r._0
+                    })
             }
         }
     };
     ///Container for all the [`HoprCapabilityPermissions`](self) function calls.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive()]
     pub enum HoprCapabilityPermissionsCalls {
         #[allow(missing_docs)]
         APPROVE_SELECTOR(APPROVE_SELECTORCall),
@@ -3554,20 +3925,16 @@ function SEND_SELECTOR() external view returns (bytes4);
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls>] = &[
                 {
                     fn REDEEM_TICKET_SELECTOR(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
                         <REDEEM_TICKET_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsCalls::REDEEM_TICKET_SELECTOR)
                     }
@@ -3576,11 +3943,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
                         <INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprCapabilityPermissionsCalls::INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR,
@@ -3591,11 +3956,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn CLOSE_INCOMING_CHANNEL_SELECTOR(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
                         <CLOSE_INCOMING_CHANNEL_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprCapabilityPermissionsCalls::CLOSE_INCOMING_CHANNEL_SELECTOR,
@@ -3606,11 +3969,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn SEND_SELECTOR(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
                         <SEND_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsCalls::SEND_SELECTOR)
                     }
@@ -3619,11 +3980,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
                         <FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprCapabilityPermissionsCalls::FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR,
@@ -3634,11 +3993,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn APPROVE_SELECTOR(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
                         <APPROVE_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsCalls::APPROVE_SELECTOR)
                     }
@@ -3647,11 +4004,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn FUND_CHANNEL_SELECTOR(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
                         <FUND_CHANNEL_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsCalls::FUND_CHANNEL_SELECTOR)
                     }
@@ -3666,7 +4021,110 @@ function SEND_SELECTOR() external view returns (bytes4);
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls>] = &[
+                {
+                    fn REDEEM_TICKET_SELECTOR(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
+                        <REDEEM_TICKET_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsCalls::REDEEM_TICKET_SELECTOR)
+                    }
+                    REDEEM_TICKET_SELECTOR
+                },
+                {
+                    fn INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
+                        <INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprCapabilityPermissionsCalls::INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR,
+                            )
+                    }
+                    INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR
+                },
+                {
+                    fn CLOSE_INCOMING_CHANNEL_SELECTOR(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
+                        <CLOSE_INCOMING_CHANNEL_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprCapabilityPermissionsCalls::CLOSE_INCOMING_CHANNEL_SELECTOR,
+                            )
+                    }
+                    CLOSE_INCOMING_CHANNEL_SELECTOR
+                },
+                {
+                    fn SEND_SELECTOR(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
+                        <SEND_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsCalls::SEND_SELECTOR)
+                    }
+                    SEND_SELECTOR
+                },
+                {
+                    fn FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
+                        <FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprCapabilityPermissionsCalls::FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR,
+                            )
+                    }
+                    FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR
+                },
+                {
+                    fn APPROVE_SELECTOR(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
+                        <APPROVE_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsCalls::APPROVE_SELECTOR)
+                    }
+                    APPROVE_SELECTOR
+                },
+                {
+                    fn FUND_CHANNEL_SELECTOR(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsCalls> {
+                        <FUND_CHANNEL_SELECTORCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsCalls::FUND_CHANNEL_SELECTOR)
+                    }
+                    FUND_CHANNEL_SELECTOR
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -3757,6 +4215,8 @@ function SEND_SELECTOR() external view returns (bytes4);
         }
     }
     ///Container for all the [`HoprCapabilityPermissions`](self) custom errors.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprCapabilityPermissionsErrors {
         #[allow(missing_docs)]
         AddressIsZero(AddressIsZero),
@@ -3895,20 +4355,16 @@ function SEND_SELECTOR() external view returns (bytes4);
         fn abi_decode_raw(
             selector: [u8; 4],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             static DECODE_SHIMS: &[fn(
                 &[u8],
-                bool,
             ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors>] = &[
                 {
                     fn SendNotAllowed(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <SendNotAllowed as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsErrors::SendNotAllowed)
                     }
@@ -3917,11 +4373,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn DelegateCallNotAllowed(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <DelegateCallNotAllowed as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsErrors::DelegateCallNotAllowed)
                     }
@@ -3930,11 +4384,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn ParameterNotAllowed(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <ParameterNotAllowed as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsErrors::ParameterNotAllowed)
                     }
@@ -3943,11 +4395,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn FunctionSignatureTooShort(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <FunctionSignatureTooShort as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprCapabilityPermissionsErrors::FunctionSignatureTooShort,
@@ -3958,11 +4408,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn PermissionNotConfigured(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <PermissionNotConfigured as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprCapabilityPermissionsErrors::PermissionNotConfigured,
@@ -3973,11 +4421,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn TargetIsNotScoped(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <TargetIsNotScoped as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsErrors::TargetIsNotScoped)
                     }
@@ -3986,11 +4432,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn DefaultPermissionRejected(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <DefaultPermissionRejected as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprCapabilityPermissionsErrors::DefaultPermissionRejected,
@@ -4001,11 +4445,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn NodePermissionRejected(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <NodePermissionRejected as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsErrors::NodePermissionRejected)
                     }
@@ -4014,11 +4456,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn CalldataOutOfBounds(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <CalldataOutOfBounds as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsErrors::CalldataOutOfBounds)
                     }
@@ -4027,11 +4467,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn ArraysDifferentLength(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <ArraysDifferentLength as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsErrors::ArraysDifferentLength)
                     }
@@ -4040,11 +4478,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn UnacceptableMultiSendOffset(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <UnacceptableMultiSendOffset as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprCapabilityPermissionsErrors::UnacceptableMultiSendOffset,
@@ -4055,11 +4491,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn GranularPermissionRejected(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <GranularPermissionRejected as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprCapabilityPermissionsErrors::GranularPermissionRejected,
@@ -4070,11 +4504,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn AddressIsZero(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <AddressIsZero as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsErrors::AddressIsZero)
                     }
@@ -4083,12 +4515,8 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn ArrayTooLong(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
-                        <ArrayTooLong as alloy_sol_types::SolError>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <ArrayTooLong as alloy_sol_types::SolError>::abi_decode_raw(data)
                             .map(HoprCapabilityPermissionsErrors::ArrayTooLong)
                     }
                     ArrayTooLong
@@ -4096,11 +4524,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn TargetIsScoped(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <TargetIsScoped as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(HoprCapabilityPermissionsErrors::TargetIsScoped)
                     }
@@ -4109,11 +4535,9 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn TargetAddressNotAllowed(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
                         <TargetAddressNotAllowed as alloy_sol_types::SolError>::abi_decode_raw(
                                 data,
-                                validate,
                             )
                             .map(
                                 HoprCapabilityPermissionsErrors::TargetAddressNotAllowed,
@@ -4124,11 +4548,226 @@ function SEND_SELECTOR() external view returns (bytes4);
                 {
                     fn NoMembership(
                         data: &[u8],
-                        validate: bool,
                     ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
-                        <NoMembership as alloy_sol_types::SolError>::abi_decode_raw(
+                        <NoMembership as alloy_sol_types::SolError>::abi_decode_raw(data)
+                            .map(HoprCapabilityPermissionsErrors::NoMembership)
+                    }
+                    NoMembership
+                },
+            ];
+            let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
+                return Err(
+                    alloy_sol_types::Error::unknown_selector(
+                        <Self as alloy_sol_types::SolInterface>::NAME,
+                        selector,
+                    ),
+                );
+            };
+            DECODE_SHIMS[idx](data)
+        }
+        #[inline]
+        #[allow(non_snake_case)]
+        fn abi_decode_raw_validate(
+            selector: [u8; 4],
+            data: &[u8],
+        ) -> alloy_sol_types::Result<Self> {
+            static DECODE_VALIDATE_SHIMS: &[fn(
+                &[u8],
+            ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors>] = &[
+                {
+                    fn SendNotAllowed(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <SendNotAllowed as alloy_sol_types::SolError>::abi_decode_raw_validate(
                                 data,
-                                validate,
+                            )
+                            .map(HoprCapabilityPermissionsErrors::SendNotAllowed)
+                    }
+                    SendNotAllowed
+                },
+                {
+                    fn DelegateCallNotAllowed(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <DelegateCallNotAllowed as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsErrors::DelegateCallNotAllowed)
+                    }
+                    DelegateCallNotAllowed
+                },
+                {
+                    fn ParameterNotAllowed(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <ParameterNotAllowed as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsErrors::ParameterNotAllowed)
+                    }
+                    ParameterNotAllowed
+                },
+                {
+                    fn FunctionSignatureTooShort(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <FunctionSignatureTooShort as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprCapabilityPermissionsErrors::FunctionSignatureTooShort,
+                            )
+                    }
+                    FunctionSignatureTooShort
+                },
+                {
+                    fn PermissionNotConfigured(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <PermissionNotConfigured as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprCapabilityPermissionsErrors::PermissionNotConfigured,
+                            )
+                    }
+                    PermissionNotConfigured
+                },
+                {
+                    fn TargetIsNotScoped(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <TargetIsNotScoped as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsErrors::TargetIsNotScoped)
+                    }
+                    TargetIsNotScoped
+                },
+                {
+                    fn DefaultPermissionRejected(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <DefaultPermissionRejected as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprCapabilityPermissionsErrors::DefaultPermissionRejected,
+                            )
+                    }
+                    DefaultPermissionRejected
+                },
+                {
+                    fn NodePermissionRejected(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <NodePermissionRejected as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsErrors::NodePermissionRejected)
+                    }
+                    NodePermissionRejected
+                },
+                {
+                    fn CalldataOutOfBounds(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <CalldataOutOfBounds as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsErrors::CalldataOutOfBounds)
+                    }
+                    CalldataOutOfBounds
+                },
+                {
+                    fn ArraysDifferentLength(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <ArraysDifferentLength as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsErrors::ArraysDifferentLength)
+                    }
+                    ArraysDifferentLength
+                },
+                {
+                    fn UnacceptableMultiSendOffset(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <UnacceptableMultiSendOffset as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprCapabilityPermissionsErrors::UnacceptableMultiSendOffset,
+                            )
+                    }
+                    UnacceptableMultiSendOffset
+                },
+                {
+                    fn GranularPermissionRejected(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <GranularPermissionRejected as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprCapabilityPermissionsErrors::GranularPermissionRejected,
+                            )
+                    }
+                    GranularPermissionRejected
+                },
+                {
+                    fn AddressIsZero(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <AddressIsZero as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsErrors::AddressIsZero)
+                    }
+                    AddressIsZero
+                },
+                {
+                    fn ArrayTooLong(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <ArrayTooLong as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsErrors::ArrayTooLong)
+                    }
+                    ArrayTooLong
+                },
+                {
+                    fn TargetIsScoped(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <TargetIsScoped as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(HoprCapabilityPermissionsErrors::TargetIsScoped)
+                    }
+                    TargetIsScoped
+                },
+                {
+                    fn TargetAddressNotAllowed(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <TargetAddressNotAllowed as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
+                            )
+                            .map(
+                                HoprCapabilityPermissionsErrors::TargetAddressNotAllowed,
+                            )
+                    }
+                    TargetAddressNotAllowed
+                },
+                {
+                    fn NoMembership(
+                        data: &[u8],
+                    ) -> alloy_sol_types::Result<HoprCapabilityPermissionsErrors> {
+                        <NoMembership as alloy_sol_types::SolError>::abi_decode_raw_validate(
+                                data,
                             )
                             .map(HoprCapabilityPermissionsErrors::NoMembership)
                     }
@@ -4143,7 +4782,7 @@ function SEND_SELECTOR() external view returns (bytes4);
                     ),
                 );
             };
-            DECODE_SHIMS[idx](data, validate)
+            DECODE_VALIDATE_SHIMS[idx](data)
         }
         #[inline]
         fn abi_encoded_size(&self) -> usize {
@@ -4338,6 +4977,8 @@ function SEND_SELECTOR() external view returns (bytes4);
         }
     }
     ///Container for all the [`HoprCapabilityPermissions`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprCapabilityPermissionsEvents {
         #[allow(missing_docs)]
         RevokedTarget(RevokedTarget),
@@ -4407,14 +5048,12 @@ function SEND_SELECTOR() external view returns (bytes4);
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(<RevokedTarget as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <RevokedTarget as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RevokedTarget)
                 }
@@ -4424,7 +5063,6 @@ function SEND_SELECTOR() external view returns (bytes4);
                     <ScopedGranularChannelCapability as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ScopedGranularChannelCapability)
                 }
@@ -4434,7 +5072,6 @@ function SEND_SELECTOR() external view returns (bytes4);
                     <ScopedGranularSendCapability as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ScopedGranularSendCapability)
                 }
@@ -4444,7 +5081,6 @@ function SEND_SELECTOR() external view returns (bytes4);
                     <ScopedGranularTokenCapability as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ScopedGranularTokenCapability)
                 }
@@ -4454,7 +5090,6 @@ function SEND_SELECTOR() external view returns (bytes4);
                     <ScopedTargetChannels as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ScopedTargetChannels)
                 }
@@ -4462,7 +5097,6 @@ function SEND_SELECTOR() external view returns (bytes4);
                     <ScopedTargetSend as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ScopedTargetSend)
                 }
@@ -4472,7 +5106,6 @@ function SEND_SELECTOR() external view returns (bytes4);
                     <ScopedTargetToken as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::ScopedTargetToken)
                 }
@@ -4549,14 +5182,13 @@ function SEND_SELECTOR() external view returns (bytes4);
 See the [wrapper's documentation](`HoprCapabilityPermissionsInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprCapabilityPermissionsInstance<T, P, N> {
-        HoprCapabilityPermissionsInstance::<T, P, N>::new(address, provider)
+    ) -> HoprCapabilityPermissionsInstance<P, N> {
+        HoprCapabilityPermissionsInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -4565,15 +5197,14 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprCapabilityPermissionsInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprCapabilityPermissionsInstance<P, N>>,
     > {
-        HoprCapabilityPermissionsInstance::<T, P, N>::deploy(provider)
+        HoprCapabilityPermissionsInstance::<P, N>::deploy(provider)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -4582,11 +5213,10 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprCapabilityPermissionsInstance::<T, P, N>::deploy_builder(provider)
+    >(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprCapabilityPermissionsInstance::<P, N>::deploy_builder(provider)
     }
     /**A [`HoprCapabilityPermissions`](self) instance.
 
@@ -4601,16 +5231,15 @@ be used to deploy a new instance of the contract.
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
     pub struct HoprCapabilityPermissionsInstance<
-        T,
         P,
         N = alloy_contract::private::Ethereum,
     > {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprCapabilityPermissionsInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprCapabilityPermissionsInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprCapabilityPermissionsInstance")
@@ -4621,10 +5250,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprCapabilityPermissionsInstance<T, P, N> {
+    > HoprCapabilityPermissionsInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprCapabilityPermissions`](self) contract instance.
 
 See the [wrapper's documentation](`HoprCapabilityPermissionsInstance`) for more details.*/
@@ -4636,7 +5264,7 @@ See the [wrapper's documentation](`HoprCapabilityPermissionsInstance`) for more 
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -4647,7 +5275,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         #[inline]
         pub async fn deploy(
             provider: P,
-        ) -> alloy_contract::Result<HoprCapabilityPermissionsInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprCapabilityPermissionsInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -4658,7 +5286,7 @@ and constructor arguments, if any.
 This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         #[inline]
-        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
+        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 ::core::clone::Clone::clone(&BYTECODE),
@@ -4685,24 +5313,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprCapabilityPermissionsInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprCapabilityPermissionsInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprCapabilityPermissionsInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprCapabilityPermissionsInstance<P, N> {
             HoprCapabilityPermissionsInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprCapabilityPermissionsInstance<T, P, N> {
+    > HoprCapabilityPermissionsInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -4710,132 +5337,115 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
         ///Creates a new call builder for the [`APPROVE_SELECTOR`] function.
         pub fn APPROVE_SELECTOR(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, APPROVE_SELECTORCall, N> {
-            self.call_builder(&APPROVE_SELECTORCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, APPROVE_SELECTORCall, N> {
+            self.call_builder(&APPROVE_SELECTORCall)
         }
         ///Creates a new call builder for the [`CLOSE_INCOMING_CHANNEL_SELECTOR`] function.
         pub fn CLOSE_INCOMING_CHANNEL_SELECTOR(
             &self,
-        ) -> alloy_contract::SolCallBuilder<
-            T,
-            &P,
-            CLOSE_INCOMING_CHANNEL_SELECTORCall,
-            N,
-        > {
-            self.call_builder(
-                &CLOSE_INCOMING_CHANNEL_SELECTORCall {
-                },
-            )
+        ) -> alloy_contract::SolCallBuilder<&P, CLOSE_INCOMING_CHANNEL_SELECTORCall, N> {
+            self.call_builder(&CLOSE_INCOMING_CHANNEL_SELECTORCall)
         }
         ///Creates a new call builder for the [`FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR`] function.
         pub fn FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTOR(
             &self,
         ) -> alloy_contract::SolCallBuilder<
-            T,
             &P,
             FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall,
             N,
         > {
-            self.call_builder(
-                &FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall {
-                },
-            )
+            self.call_builder(&FINALIZE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall)
         }
         ///Creates a new call builder for the [`FUND_CHANNEL_SELECTOR`] function.
         pub fn FUND_CHANNEL_SELECTOR(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, FUND_CHANNEL_SELECTORCall, N> {
-            self.call_builder(&FUND_CHANNEL_SELECTORCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, FUND_CHANNEL_SELECTORCall, N> {
+            self.call_builder(&FUND_CHANNEL_SELECTORCall)
         }
         ///Creates a new call builder for the [`INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR`] function.
         pub fn INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTOR(
             &self,
         ) -> alloy_contract::SolCallBuilder<
-            T,
             &P,
             INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall,
             N,
         > {
-            self.call_builder(
-                &INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall {
-                },
-            )
+            self.call_builder(&INITIATE_OUTGOING_CHANNEL_CLOSURE_SELECTORCall)
         }
         ///Creates a new call builder for the [`REDEEM_TICKET_SELECTOR`] function.
         pub fn REDEEM_TICKET_SELECTOR(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, REDEEM_TICKET_SELECTORCall, N> {
-            self.call_builder(&REDEEM_TICKET_SELECTORCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, REDEEM_TICKET_SELECTORCall, N> {
+            self.call_builder(&REDEEM_TICKET_SELECTORCall)
         }
         ///Creates a new call builder for the [`SEND_SELECTOR`] function.
         pub fn SEND_SELECTOR(
             &self,
-        ) -> alloy_contract::SolCallBuilder<T, &P, SEND_SELECTORCall, N> {
-            self.call_builder(&SEND_SELECTORCall {})
+        ) -> alloy_contract::SolCallBuilder<&P, SEND_SELECTORCall, N> {
+            self.call_builder(&SEND_SELECTORCall)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprCapabilityPermissionsInstance<T, P, N> {
+    > HoprCapabilityPermissionsInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`RevokedTarget`] event.
         pub fn RevokedTarget_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RevokedTarget, N> {
+        ) -> alloy_contract::Event<&P, RevokedTarget, N> {
             self.event_filter::<RevokedTarget>()
         }
         ///Creates a new event filter for the [`ScopedGranularChannelCapability`] event.
         pub fn ScopedGranularChannelCapability_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ScopedGranularChannelCapability, N> {
+        ) -> alloy_contract::Event<&P, ScopedGranularChannelCapability, N> {
             self.event_filter::<ScopedGranularChannelCapability>()
         }
         ///Creates a new event filter for the [`ScopedGranularSendCapability`] event.
         pub fn ScopedGranularSendCapability_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ScopedGranularSendCapability, N> {
+        ) -> alloy_contract::Event<&P, ScopedGranularSendCapability, N> {
             self.event_filter::<ScopedGranularSendCapability>()
         }
         ///Creates a new event filter for the [`ScopedGranularTokenCapability`] event.
         pub fn ScopedGranularTokenCapability_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ScopedGranularTokenCapability, N> {
+        ) -> alloy_contract::Event<&P, ScopedGranularTokenCapability, N> {
             self.event_filter::<ScopedGranularTokenCapability>()
         }
         ///Creates a new event filter for the [`ScopedTargetChannels`] event.
         pub fn ScopedTargetChannels_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ScopedTargetChannels, N> {
+        ) -> alloy_contract::Event<&P, ScopedTargetChannels, N> {
             self.event_filter::<ScopedTargetChannels>()
         }
         ///Creates a new event filter for the [`ScopedTargetSend`] event.
         pub fn ScopedTargetSend_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ScopedTargetSend, N> {
+        ) -> alloy_contract::Event<&P, ScopedTargetSend, N> {
             self.event_filter::<ScopedTargetSend>()
         }
         ///Creates a new event filter for the [`ScopedTargetToken`] event.
         pub fn ScopedTargetToken_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, ScopedTargetToken, N> {
+        ) -> alloy_contract::Event<&P, ScopedTargetToken, N> {
             self.event_filter::<ScopedTargetToken>()
         }
     }
