@@ -132,7 +132,7 @@ mod tests {
             .await?;
 
         let ma = announce_multiaddr.clone();
-        let pubkey_clone = ALICE_OFFCHAIN.public().clone();
+        let pubkey_clone = *ALICE_OFFCHAIN.public();
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_announce()
@@ -144,7 +144,7 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         let ma = announce_multiaddr.clone();
-        let pk = ALICE_OFFCHAIN.public().clone();
+        let pk = *ALICE_OFFCHAIN.public();
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker
             .expect_register_expectation()
@@ -212,7 +212,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
-        let res = actions.announce(&[announce_multiaddr], &*ALICE_OFFCHAIN).await;
+        let res = actions.announce(&[announce_multiaddr], &ALICE_OFFCHAIN).await;
         assert!(
             matches!(res, Err(ChainActionsError::AlreadyAnnounced)),
             "must not be able to re-announce with same address"
