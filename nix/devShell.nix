@@ -1,23 +1,12 @@
-{
-  pkgs,
-  extraPackages ? [ ],
-  pre-commit-check,
-  solcDefault,
-  ...
-}@args:
+{ pkgs, extraPackages ? [ ], pre-commit-check, solcDefault, ... }@args:
 let
   shellHook = ''
     ${pre-commit-check.shellHook}
   '';
-  packages = [ ];
+  packages = with pkgs; [ cargo-llvm-cov ];
   shellPackages = packages ++ extraPackages;
-  cleanArgs = removeAttrs args [
-    "pre-commit-check"
-  ];
-in
-import ./testShell.nix (
-  cleanArgs
-  // {
-    inherit shellHook shellPackages;
-  }
-)
+  cleanArgs = removeAttrs args [ "pre-commit-check" ];
+in import ./testShell.nix (cleanArgs // {
+  inherit shellHook;
+  extraPackages = shellPackages;
+})
