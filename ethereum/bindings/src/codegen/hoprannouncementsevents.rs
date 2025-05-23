@@ -107,6 +107,8 @@ pub mod HoprAnnouncementsEvents {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `AddressAnnouncement(address,string)` and selector `0xc4df5ba16814838ab2618829d68f8623bb897302f24dbdba2279dbe45adb3d14`.
 ```solidity
 event AddressAnnouncement(address node, string baseMultiaddr);
@@ -221,6 +223,8 @@ event AddressAnnouncement(address node, string baseMultiaddr);
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `KeyBinding(bytes32,bytes32,bytes32,address)` and selector `0xbf49ccd41a4118c7e1e72143bad844e5f6ed12bf60caa642d88d19ca10244c36`.
 ```solidity
 event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_pub_key, address chain_key);
@@ -349,6 +353,8 @@ event KeyBinding(bytes32 ed25519_sig_0, bytes32 ed25519_sig_1, bytes32 ed25519_p
             }
         }
     };
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `RevokeAnnouncement(address)` and selector `0xa4de30a528becadf82649d1395c0e30dd18ae35b5a96ce71e9295bb14bc9f3bc`.
 ```solidity
 event RevokeAnnouncement(address node);
@@ -453,6 +459,8 @@ event RevokeAnnouncement(address node);
         }
     };
     ///Container for all the [`HoprAnnouncementsEvents`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprAnnouncementsEventsEvents {
         #[allow(missing_docs)]
         AddressAnnouncement(AddressAnnouncement),
@@ -494,7 +502,6 @@ event RevokeAnnouncement(address node);
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(
@@ -503,7 +510,6 @@ event RevokeAnnouncement(address node);
                     <AddressAnnouncement as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::AddressAnnouncement)
                 }
@@ -511,7 +517,6 @@ event RevokeAnnouncement(address node);
                     <KeyBinding as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::KeyBinding)
                 }
@@ -521,7 +526,6 @@ event RevokeAnnouncement(address node);
                     <RevokeAnnouncement as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::RevokeAnnouncement)
                 }
@@ -574,14 +578,13 @@ event RevokeAnnouncement(address node);
 See the [wrapper's documentation](`HoprAnnouncementsEventsInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprAnnouncementsEventsInstance<T, P, N> {
-        HoprAnnouncementsEventsInstance::<T, P, N>::new(address, provider)
+    ) -> HoprAnnouncementsEventsInstance<P, N> {
+        HoprAnnouncementsEventsInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -590,15 +593,14 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprAnnouncementsEventsInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprAnnouncementsEventsInstance<P, N>>,
     > {
-        HoprAnnouncementsEventsInstance::<T, P, N>::deploy(provider)
+        HoprAnnouncementsEventsInstance::<P, N>::deploy(provider)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -607,11 +609,10 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprAnnouncementsEventsInstance::<T, P, N>::deploy_builder(provider)
+    >(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprAnnouncementsEventsInstance::<P, N>::deploy_builder(provider)
     }
     /**A [`HoprAnnouncementsEvents`](self) instance.
 
@@ -626,16 +627,15 @@ be used to deploy a new instance of the contract.
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
     pub struct HoprAnnouncementsEventsInstance<
-        T,
         P,
         N = alloy_contract::private::Ethereum,
     > {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprAnnouncementsEventsInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprAnnouncementsEventsInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprAnnouncementsEventsInstance")
@@ -646,10 +646,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprAnnouncementsEventsInstance<T, P, N> {
+    > HoprAnnouncementsEventsInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprAnnouncementsEvents`](self) contract instance.
 
 See the [wrapper's documentation](`HoprAnnouncementsEventsInstance`) for more details.*/
@@ -661,7 +660,7 @@ See the [wrapper's documentation](`HoprAnnouncementsEventsInstance`) for more de
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -672,7 +671,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         #[inline]
         pub async fn deploy(
             provider: P,
-        ) -> alloy_contract::Result<HoprAnnouncementsEventsInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprAnnouncementsEventsInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -683,7 +682,7 @@ and constructor arguments, if any.
 This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         #[inline]
-        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
+        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 ::core::clone::Clone::clone(&BYTECODE),
@@ -710,24 +709,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprAnnouncementsEventsInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprAnnouncementsEventsInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(self) -> HoprAnnouncementsEventsInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprAnnouncementsEventsInstance<P, N> {
             HoprAnnouncementsEventsInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprAnnouncementsEventsInstance<T, P, N> {
+    > HoprAnnouncementsEventsInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -735,40 +733,39 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprAnnouncementsEventsInstance<T, P, N> {
+    > HoprAnnouncementsEventsInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`AddressAnnouncement`] event.
         pub fn AddressAnnouncement_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, AddressAnnouncement, N> {
+        ) -> alloy_contract::Event<&P, AddressAnnouncement, N> {
             self.event_filter::<AddressAnnouncement>()
         }
         ///Creates a new event filter for the [`KeyBinding`] event.
-        pub fn KeyBinding_filter(&self) -> alloy_contract::Event<T, &P, KeyBinding, N> {
+        pub fn KeyBinding_filter(&self) -> alloy_contract::Event<&P, KeyBinding, N> {
             self.event_filter::<KeyBinding>()
         }
         ///Creates a new event filter for the [`RevokeAnnouncement`] event.
         pub fn RevokeAnnouncement_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, RevokeAnnouncement, N> {
+        ) -> alloy_contract::Event<&P, RevokeAnnouncement, N> {
             self.event_filter::<RevokeAnnouncement>()
         }
     }

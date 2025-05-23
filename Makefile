@@ -71,6 +71,7 @@ stress-test-local-swarm: ## run stress tests on a local node swarm
 		--stress-target='{"url": "localhost:3031", "token": "e2e-API-token^^"}'
 
 .PHONY: smart-contract-test
+# Remove `--no-match-test` when https://github.com/foundry-rs/foundry/issues/10586 is fixed
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C ethereum/contracts/ sc-test
 

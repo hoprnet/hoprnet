@@ -153,7 +153,7 @@ impl NetworkProviderArgs {
             .filler(GasFiller)
             .filler(BlobGasFiller)
             .wallet(wallet)
-            .on_client(rpc_client);
+            .connect_client(rpc_client);
 
         Ok(Arc::new(provider))
     }
@@ -179,7 +179,7 @@ impl NetworkProviderArgs {
             .filler(NonceFiller::new(CachedNonceManager::default()))
             .filler(GasFiller)
             .filler(BlobGasFiller)
-            .on_client(rpc_client);
+            .connect_client(rpc_client);
 
         Ok(Arc::new(provider))
     }

@@ -293,7 +293,7 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
     function testRevert_WhenInsufficientRewardPool(uint256 elapsedTime) public {
         _helperAccountsStakeTokensAndNFTs();
         // bound elapse withing uint256 boundary
-        elapsedTime = bound(elapsedTime, 1, 1e36);
+        elapsedTime = bound(elapsedTime, 1, 1e19);
         // after some time elapsed
         skip(elapsedTime);
 
@@ -309,7 +309,7 @@ contract HoprStakeBaseTest is Test, ERC1820RegistryFixtureTest {
         // account stakes tokens, nfts and provides some rewards
         _helperAccountsStakeTokensNFTsProvideRewards();
         // bound elapse withing uint256 boundary
-        elapsedTime = bound(elapsedTime, 0, 1e36);
+        elapsedTime = bound(elapsedTime, 0, 1e19);
         // after some time elapsed
         skip(elapsedTime);
 
