@@ -48,7 +48,7 @@ async def create_channel(src: Node, dest: Node, funding: int, close_from_dest: b
 
             # need to wait some more time until closure time has passed and the
             # closure may be finalized
-            await asyncio.sleep(15)
+            await asyncio.sleep(1)
 
             assert await src.api.close_channel(channel.id)
             await asyncio.wait_for(check_channel_status(src, dest, status=ChannelStatus.Closed), 10.0)
