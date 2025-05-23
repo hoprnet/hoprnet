@@ -1092,6 +1092,38 @@ impl HoprDbTicketOperations for HoprDb {
             .into());
         }
 
+                info!("hopr node dont aggregate={}", std::env::var("HOPR_NODE_DONT_AGGREGATE").unwrap_or_default());
+
+        // do not aggregate tickets for peers listed in HOPR_NODE_DONT_AGGREGATE
+        match std::env::var("HOPR_NODE_DONT_AGGREGATE") {
+            Ok(value) => {
+            let peer_str = destination.to_peerid_str();
+            let dont_aggregate_peers: Vec<String> = value
+                .split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s_val| {
+                s_val.to_string()
+                })
+                .collect();
+            info!("value={value}");
+
+            info!("peer_str={peer_str}");
+
+            if dont_aggregate_peers.contains(&peer_str) {
+                info!(%peer_str, "Ticket aggregation is disabled for this peer as its ID '{}' was found in HOPR_NODE_DONT_AGGREGATE list", peer_str);
+                return Err(DbSqlError::LogicalError(format!(
+                "ticket aggregation for peer {} is disabled by HOPR_NODE_DONT_AGGREGATE",
+                peer_str
+                ))
+                .into());
+            }
+            }
+            Err(_) => {
+                info!("HOPR_NODE_DONT_AGGREGATE is not set");
+            }
+        }
+
         let domain_separator = self
             .get_indexer_data(None)
             .await?
