@@ -1,12 +1,19 @@
-use crate::prelude::protocol::SessionMessage;
-use crate::session::errors::SessionError;
-use crate::session::frame::FrameId;
-use crate::session::frame::SeqNum;
-use crate::session::Segment;
-use futures::{ready, Sink, SinkExt};
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use futures::{Sink, SinkExt, ready};
 use tracing::instrument;
+
+use crate::{
+    prelude::protocol::SessionMessage,
+    session::{
+        Segment,
+        errors::SessionError,
+        frame::{FrameId, SeqNum},
+    },
+};
 
 /// `C` is MTU size, `F` is frame size.
 pub struct Segmenter<const C: usize> {
@@ -190,11 +197,11 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use anyhow::anyhow;
-    use futures::{pin_mut, AsyncWriteExt, StreamExt};
+    use futures::{AsyncWriteExt, StreamExt, pin_mut};
     use futures_time::future::FutureExt;
+
+    use super::*;
 
     #[tokio::test]
     async fn segmenter_should_not_segment_small_data_unless_flushed() -> anyhow::Result<()> {

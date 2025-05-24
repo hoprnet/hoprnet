@@ -1,18 +1,24 @@
-use crate::prelude::errors::SessionError;
-use crate::prelude::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
-use crate::prelude::{FrameId, Segment, SegmentId};
-use crate::session::frame::SeqNum;
-use crate::session::frames::FrameInspector;
-use crate::session::utils::skip_queue::{skip_delay_channel, Skip, SkipDelaySender};
-use crate::session::utils::{
-    next_deadline_with_backoff, searchable_ringbuffer, RetriedFrameId, RingBufferProducer, RingBufferView,
-};
-use futures::channel::mpsc::UnboundedSender;
-use futures::FutureExt;
-use futures::StreamExt;
-use futures_time::stream::StreamExt as TimeStreamExt;
 use std::time::Duration;
+
+use futures::{FutureExt, StreamExt, channel::mpsc::UnboundedSender};
+use futures_time::stream::StreamExt as TimeStreamExt;
 use tracing::Instrument;
+
+use crate::{
+    prelude::{
+        FrameId, Segment, SegmentId,
+        errors::SessionError,
+        protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
+    },
+    session::{
+        frame::SeqNum,
+        frames::FrameInspector,
+        utils::{
+            RetriedFrameId, RingBufferProducer, RingBufferView, next_deadline_with_backoff, searchable_ringbuffer,
+            skip_queue::{Skip, SkipDelaySender, skip_delay_channel},
+        },
+    },
+};
 
 pub struct SocketComponents<const C: usize> {
     pub inspector: Option<FrameInspector>,

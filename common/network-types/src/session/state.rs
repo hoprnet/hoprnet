@@ -1067,10 +1067,11 @@ mod tests {
 
     use super::*;
     use crate::{
-        session::utils::test::{frames_send_and_recv, FaultyNetwork, FaultyNetworkConfig, NetworkStats},
+        session::utils::test::{FaultyNetwork, FaultyNetworkConfig, NetworkStats, frames_send_and_recv},
         utils::DuplexIO,
     };
-    use crate::utils::DuplexIO;
+
+    const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
     const MTU: usize = 466; // MTU used by HOPR
 
@@ -1100,7 +1101,7 @@ mod tests {
             })
             .unzip();
 
-        let (alice_reader, alice_writer) = FaultyNetwork::<MTU>::new(network_cfg, alice_stats).split();
+        let (alice_reader, alice_writer) = FaultyNetwork::<MTU>::new(network_cfg.clone(), alice_stats).split();
         let (bob_reader, bob_writer) = FaultyNetwork::<MTU>::new(network_cfg, bob_stats).split();
 
         let alice_to_bob = SessionSocket::new("alice", DuplexIO(alice_reader, bob_writer), cfg.clone());
@@ -1235,7 +1236,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -1254,7 +1256,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -1284,7 +1287,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[ignore]
@@ -1316,7 +1320,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[ignore]
@@ -1348,7 +1353,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[ignore]
@@ -1379,7 +1385,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[test(tokio::test)]
@@ -1411,7 +1418,8 @@ mod tests {
             true,
             false,
         )
-        .await;
+        .await
+        .unwrap();
 
         assert_eq!(bob_stats.packets_received.load(Ordering::Relaxed), NUM_FRAMES);
         assert_eq!(alice_stats.packets_sent.load(Ordering::Relaxed), NUM_FRAMES);
@@ -1455,7 +1463,8 @@ mod tests {
             true,
             false,
         )
-        .await;
+        .await
+        .unwrap();
 
         assert!(bob_stats.packets_received.load(Ordering::Relaxed) < NUM_FRAMES);
         assert!(alice_stats.packets_sent.load(Ordering::Relaxed) < NUM_FRAMES);

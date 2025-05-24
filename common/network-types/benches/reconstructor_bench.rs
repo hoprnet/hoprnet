@@ -1,13 +1,13 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use futures::{StreamExt, TryStreamExt};
-use rand::{thread_rng, Rng};
-use rayon::prelude::{IndexedParallelIterator, ParallelIterator, ParallelSlice};
-use std::collections::VecDeque;
-use std::time::Duration;
+use std::{collections::VecDeque, time::Duration};
 
-use hopr_network_types::prelude::{frame_reconstructor, Frame, Segment};
-use hopr_network_types::session::utils::test::linear_half_normal_shuffle;
-use hopr_network_types::session::FrameId;
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use futures::{StreamExt, TryStreamExt};
+use hopr_network_types::{
+    prelude::{Frame, Segment, frame_reconstructor},
+    session::{FrameId, utils::test::linear_half_normal_shuffle},
+};
+use rand::{Rng, thread_rng};
+use rayon::prelude::{IndexedParallelIterator, ParallelIterator, ParallelSlice};
 
 async fn send_one_way(segments: &Vec<Segment>) {
     let (r_sink, seq_stream) = frame_reconstructor("bench", Duration::from_secs(5), 8192);

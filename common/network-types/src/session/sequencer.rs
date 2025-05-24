@@ -1,10 +1,13 @@
-use crate::prelude::errors::SessionError;
-use crate::prelude::FrameId;
-use std::collections::BinaryHeap;
-use std::pin::{pin, Pin};
-use std::task::{Context, Poll, Waker};
-use std::time::{Duration, Instant};
+use std::{
+    collections::BinaryHeap,
+    pin::{Pin, pin},
+    task::{Context, Poll, Waker},
+    time::{Duration, Instant},
+};
+
 use tracing::instrument;
+
+use crate::prelude::{FrameId, errors::SessionError};
 
 #[derive(Copy, Clone, Debug)]
 pub struct SequencerConfig {
@@ -196,9 +199,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use futures::{pin_mut, SinkExt, StreamExt, TryStreamExt};
+    use futures::{SinkExt, StreamExt, TryStreamExt, pin_mut};
     use futures_time::future::FutureExt;
+
+    use super::*;
 
     #[test_log::test(tokio::test)]
     async fn sequencer_should_return_entries_in_order() -> anyhow::Result<()> {
@@ -217,7 +221,10 @@ mod tests {
                 .forward(seq_sink),
         );
 
-        let actual: Vec<u32> = seq_stream.try_collect().timeout(futures_time::time::Duration::from_secs(5)).await??;
+        let actual: Vec<u32> = seq_stream
+            .try_collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await??;
 
         expected.sort();
         assert_eq!(expected, actual);
@@ -247,7 +254,10 @@ mod tests {
             seq_sink.close().await
         });
 
-        let actual: Vec<u32> = seq_stream.try_collect().timeout(futures_time::time::Duration::from_secs(5)).await??;
+        let actual: Vec<u32> = seq_stream
+            .try_collect()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await??;
 
         expected.sort();
         assert_eq!(expected, actual);
@@ -294,7 +304,10 @@ mod tests {
         let input_clone = input.clone();
         let jh = hopr_async_runtime::prelude::spawn(async move {
             for v in input_clone {
-                seq_sink.feed(v).delay(futures_time::time::Duration::from_millis(5)).await?;
+                seq_sink
+                    .feed(v)
+                    .delay(futures_time::time::Duration::from_millis(5))
+                    .await?;
             }
             seq_sink.flush().await?;
             seq_sink.close().await
@@ -343,7 +356,7 @@ mod tests {
 
         let input = vec![2u32, 1, 3, 5, 4, 8, 11];
 
-        hopr_async_runtime::prelude::spawn(futures::stream::iter(input.clone()).map(Ok).forward(seq_sink)).await?;
+        hopr_async_runtime::prelude::spawn(futures::stream::iter(input.clone()).map(Ok).forward(seq_sink)).await??;
 
         pin_mut!(seq_stream);
 
@@ -394,12 +407,24 @@ mod tests {
 
         // Full capacity is reached here, but SplitSink has
         // an extra slot, so the 4th will wait in the SplitSink's slot.
-        assert!(seq_sink.send(4u32).timeout(futures_time::time::Duration::from_millis(50)).await.is_err());
+        assert!(
+            seq_sink
+                .send(4u32)
+                .timeout(futures_time::time::Duration::from_millis(50))
+                .await
+                .is_err()
+        );
 
         assert_eq!(Some(1), seq_stream.try_next().await?);
 
         // This inserts 4 into the sequencer and keeps 6 in the slot in the SplitSink
-        assert!(seq_sink.send(6u32).timeout(futures_time::time::Duration::from_millis(50)).await.is_err());
+        assert!(
+            seq_sink
+                .send(6u32)
+                .timeout(futures_time::time::Duration::from_millis(50))
+                .await
+                .is_err()
+        );
 
         assert_eq!(Some(2), seq_stream.try_next().await?);
         assert_eq!(Some(3), seq_stream.try_next().await?);

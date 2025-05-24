@@ -3,12 +3,14 @@ pub mod skip_queue;
 #[cfg(any(feature = "testing", test))]
 pub mod test;
 
-use std::cmp::Ordering;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::{
+    cmp::Ordering,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use futures::StreamExt;
-use rand::prelude::{thread_rng, Distribution};
+use rand::prelude::{Distribution, thread_rng};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 use crate::prelude::FrameId;
@@ -161,6 +163,7 @@ impl RetriedFrameId {
             max_retries,
         }
     }
+
     pub fn next(self) -> Option<Self> {
         if self.retry_count < self.max_retries {
             Some(Self {

@@ -730,8 +730,6 @@ impl Sink<Segment> for FrameReassembler {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
-    use crate::session::utils::test::{linear_half_normal_shuffle, sample_index};
     use std::{
         collections::{HashSet, VecDeque},
         convert::identity,
@@ -746,18 +744,12 @@ pub(crate) mod tests {
     use futures::{Stream, StreamExt, TryStreamExt, pin_mut};
     use hex_literal::hex;
     use lazy_static::lazy_static;
-    use rand::prelude::SliceRandom;
-    use rand::{seq::IteratorRandom, thread_rng, Rng, SeedableRng};
-    use rand::{
-        Rng, SeedableRng,
-        prelude::{Distribution, SliceRandom},
-        seq::IteratorRandom,
-        thread_rng,
-    };
+    use rand::{Rng, SeedableRng, prelude::SliceRandom, seq::IteratorRandom, thread_rng};
     use rand_distr::Normal;
     use rayon::prelude::*;
 
     use super::*;
+    use crate::session::utils::test::{linear_half_normal_shuffle, sample_index};
 
     const MTU: usize = 448;
     const FRAME_COUNT: u32 = 65_535;

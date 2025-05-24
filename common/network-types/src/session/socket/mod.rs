@@ -1,20 +1,29 @@
 mod state;
 
-use futures::StreamExt;
-use futures::{future, pin_mut, FutureExt, TryStreamExt};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use futures::{FutureExt, StreamExt, TryStreamExt, future, pin_mut};
 use futures_concurrency::stream::Merge;
 use state::SocketState;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::Duration;
-use tracing::{instrument, Instrument};
+use tracing::{Instrument, instrument};
 
-use crate::prelude::errors::SessionError;
-use crate::prelude::protocol::{SessionCodec, SessionMessage};
-use crate::prelude::{frame_reconstructor, frame_reconstructor_with_inspector, Frame, Segment};
-use crate::session::frames::FrameInspector;
-use crate::session::segmenter::Segmenter;
-use crate::session::socket::state::{SocketComponents, Stateless};
+use crate::{
+    prelude::{
+        Frame, Segment,
+        errors::SessionError,
+        frame_reconstructor, frame_reconstructor_with_inspector,
+        protocol::{SessionCodec, SessionMessage},
+    },
+    session::{
+        frames::FrameInspector,
+        segmenter::Segmenter,
+        socket::state::{SocketComponents, Stateless},
+    },
+};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, smart_default::SmartDefault)]
 pub struct SessionSocketConfig {
@@ -243,11 +252,11 @@ impl<const C: usize, S: SocketState<C> + 'static> futures::io::AsyncWrite for Se
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hashbrown::HashSet;
-    use crate::session::testing::*;
-    use crate::utils::DuplexIO;
+
+    use super::*;
+    use crate::{session::testing::*, utils::DuplexIO};
 
     const MTU: usize = 466;
 
@@ -281,7 +290,7 @@ mod tests {
             })
             .unzip();
 
-        let (alice_reader, alice_writer) = FaultyNetwork::new(network_cfg, alice_stats).split();
+        let (alice_reader, alice_writer) = FaultyNetwork::new(network_cfg.clone(), alice_stats).split();
         let (bob_reader, bob_writer) = FaultyNetwork::new(network_cfg, bob_stats).split();
 
         (DuplexIO(alice_reader, bob_writer), DuplexIO(bob_reader, alice_writer))
@@ -368,11 +377,15 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn stateless_socket_unidirectional_should_should_skip_missing_frames() -> anyhow::Result<()> {
-        let (alice, bob) = setup_alice_bob(FaultyNetworkConfig {
-            avg_delay: Duration::from_millis(50),
-            ids_to_drop: HashSet::from_iter([0_usize]),
-            ..Default::default()
-        }, None, None);
+        let (alice, bob) = setup_alice_bob(
+            FaultyNetworkConfig {
+                avg_delay: Duration::from_millis(50),
+                ids_to_drop: HashSet::from_iter([0_usize]),
+                ..Default::default()
+            },
+            None,
+            None,
+        );
 
         let bob_cfg = SessionSocketConfig {
             frame_timeout: Duration::from_millis(110),
@@ -390,9 +403,9 @@ mod tests {
         let mut bob_data = vec![0; data.len()];
         bob_socket.read_exact(&mut bob_data).await?;
 
-        assert_eq!(data.len()-452, bob_data.len());
+        assert_eq!(data.len() - 452, bob_data.len());
 
-        //assert_eq!(data[4], *bob_data);
+        // assert_eq!(data[4], *bob_data);
 
         alice_socket.close().await?;
         bob_socket.close().await?;

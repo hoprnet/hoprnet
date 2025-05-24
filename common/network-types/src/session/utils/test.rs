@@ -1,20 +1,24 @@
-use futures::channel::mpsc::UnboundedSender;
-use futures::future::Either;
-use futures::stream::BoxStream;
-use futures::{pin_mut, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, FutureExt, StreamExt};
-use hex_literal::hex;
-use rand::distributions::{Bernoulli, Distribution};
-use rand::prelude::StdRng;
-use rand::{Rng, SeedableRng};
-use rand_distr::Normal;
-use std::collections::VecDeque;
-use std::pin::Pin;
-use std::sync::atomic::AtomicUsize;
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::Duration;
+use std::{
+    collections::VecDeque,
+    convert::identity,
+    pin::Pin,
+    sync::{Arc, atomic::AtomicUsize},
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use anyhow::bail;
+use futures::{
+    AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt, channel::mpsc::UnboundedSender, stream::BoxStream,
+};
 use hashbrown::HashSet;
-use test_log::tracing_subscriber::filter::FilterExt;
+use hex_literal::hex;
+use rand::{
+    Rng, SeedableRng,
+    distributions::{Bernoulli, Distribution},
+    prelude::StdRng,
+};
+use rand_distr::Normal;
 use tracing::instrument;
 
 // Using static RNG seed to make tests reproducible between different runs
@@ -28,7 +32,8 @@ pub async fn frames_send_and_recv<S>(
     timeout: Duration,
     alice_to_bob_only: bool,
     randomized_frame_sizes: bool,
-) where
+) -> anyhow::Result<()>
+where
     S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {
     #[derive(PartialEq, Eq)]
@@ -39,7 +44,7 @@ pub async fn frames_send_and_recv<S>(
     }
 
     let frame_sizes = if randomized_frame_sizes {
-        let norm_dist = rand_distr::Normal::new(frame_size as f64 * 0.75, frame_size as f64 / 4.0).unwrap();
+        let norm_dist = rand_distr::Normal::new(frame_size as f64 * 0.75, frame_size as f64 / 4.0)?;
         StdRng::from_seed(RNG_SEED)
             .sample_iter(norm_dist)
             .map(|s| (s as usize).max(10).min(2 * frame_size))
@@ -76,7 +81,7 @@ pub async fn frames_send_and_recv<S>(
 
             // TODO: fix this so it works properly
             // We cannot close immediately as some ack/resends might be ongoing
-            //socket.close().await.unwrap();
+            // socket.close().await.unwrap();
 
             Ok::<_, std::io::Error>((sent, received))
         }
@@ -99,14 +104,10 @@ pub async fn frames_send_and_recv<S>(
         },
     ));
 
-    let send_recv = futures::future::join(alice_worker, bob_worker);
-    let timeout = tokio::time::sleep(timeout);
+    let send_recv = futures::future::try_join(alice_worker, bob_worker);
 
-    pin_mut!(send_recv);
-    pin_mut!(timeout);
-
-    match futures::future::select(send_recv, timeout).await {
-        Either::Left(((Ok((alice_sent, alice_recv)), Ok((bob_sent, bob_recv))), _)) => {
+    match tokio::time::timeout(timeout, send_recv).await?? {
+        (Ok((alice_sent, alice_recv)), Ok((bob_sent, bob_recv))) => {
             assert_eq!(
                 hex::encode(alice_sent),
                 hex::encode(bob_recv),
@@ -117,10 +118,10 @@ pub async fn frames_send_and_recv<S>(
                 hex::encode(alice_recv),
                 "bob sent must be equal to alice received",
             );
+            Ok(())
         }
-        Either::Left(((Err(e), _), _)) => panic!("alice send recv error: {e}"),
-        Either::Left(((_, Err(e)), _)) => panic!("bob send recv error: {e}"),
-        Either::Right(_) => panic!("timeout"),
+        (Err(e), _) => bail!("alice send recv error: {e}"),
+        (_, Err(e)) => bail!("bob send recv error: {e}"),
     }
 }
 
@@ -282,14 +283,14 @@ impl<const C: usize> FaultyNetwork<'_, C> {
         let bernoulli = Bernoulli::new(1.0 - cfg.fault_prob).unwrap();
         let egress = egress
             .filter(move |_| futures::future::ready(bernoulli.sample(&mut rng)))
-            .then(move |e| {
+            .map(move |e| {
                 let mut avg_delay = cfg.avg_delay;
                 if cfg.mixing_factor > 0 {
                     avg_delay = avg_delay.max(Duration::from_micros(10));
                 }
 
                 let mut rng = StdRng::from_seed(cfg.rng_seed);
-                let wait = rng.gen_range(Duration::ZERO..2*avg_delay);
+                let wait = rng.gen_range(Duration::ZERO..2 * avg_delay);
                 async move {
                     if wait > Duration::ZERO {
                         hopr_async_runtime::prelude::sleep(wait).await;
@@ -299,14 +300,18 @@ impl<const C: usize> FaultyNetwork<'_, C> {
             });
 
         let egress = if cfg.mixing_factor > 0 {
-            egress
-                .buffer_unordered(cfg.mixing_factor)
-                .boxed()
+            egress.buffer_unordered(cfg.mixing_factor).boxed()
         } else {
-            egress.boxed()
+            egress.then(identity).boxed()
         };
 
-        Self { ingress, egress, stats, packet_counter: AtomicUsize::new(0), ids_to_drop: cfg.ids_to_drop }
+        Self {
+            ingress,
+            egress,
+            stats,
+            packet_counter: AtomicUsize::new(0),
+            ids_to_drop: cfg.ids_to_drop,
+        }
     }
 }
 
@@ -335,15 +340,12 @@ pub fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, 
 
 #[cfg(test)]
 mod tests {
+    use futures::io::{AsyncReadExt, AsyncWriteExt};
+
     use super::*;
     use crate::session::utils::test::{FaultyNetwork, FaultyNetworkConfig};
-    use futures::io::{AsyncReadExt, AsyncWriteExt};
-    use std::future::Future;
 
-    fn spawn_single_byte_read_write<C>(
-        channel: C,
-        data: Vec<u8>,
-    ) -> (impl Future<Output = Vec<u8>>, impl Future<Output = Vec<u8>>)
+    async fn spawn_single_byte_read_write<C>(channel: C, data: Vec<u8>) -> anyhow::Result<(Vec<u8>, Vec<u8>)>
     where
         C: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
@@ -373,11 +375,11 @@ mod tests {
             out
         });
 
-        (read, written)
+        Ok(futures::future::try_join(read, written).await?)
     }
 
     #[tokio::test]
-    async fn faulty_network_mixing() {
+    async fn faulty_network_mixing() -> anyhow::Result<()> {
         const MIX_FACTOR: usize = 2;
         const COUNT: usize = 20;
 
@@ -389,8 +391,7 @@ mod tests {
             None,
         );
 
-        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, _) = futures::future::join(read, written).await;
+        let (read, _) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect()).await?;
 
         for (pos, value) in read.into_iter().enumerate() {
             assert!(
@@ -398,10 +399,12 @@ mod tests {
                 "packet must not be off from its position by more than then mixing factor"
             );
         }
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn faulty_network_packet_drop() {
+    async fn faulty_network_packet_drop() -> anyhow::Result<()> {
         const DROP: f64 = 0.3333;
         const COUNT: usize = 20;
 
@@ -413,22 +416,24 @@ mod tests {
             None,
         );
 
-        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, written) = futures::future::join(read, written).await;
+        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect()).await?;
 
         let max_drop = (written.len() as f64 * (1.0 - DROP) - 2.0).floor() as usize;
         assert!(read.len() >= max_drop, "dropped more than {max_drop}: {}", read.len());
+
+        Ok(())
     }
 
     #[tokio::test]
-    async fn faulty_network_reliable() {
+    async fn faulty_network_reliable() -> anyhow::Result<()> {
         const COUNT: usize = 20;
 
         let net = FaultyNetwork::<466>::new(Default::default(), None);
 
-        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect());
-        let (read, written) = futures::future::join(read, written).await;
+        let (read, written) = spawn_single_byte_read_write(net, (0..COUNT as u8).collect()).await?;
 
         assert_eq!(read, written);
+
+        Ok(())
     }
 }

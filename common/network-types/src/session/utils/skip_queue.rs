@@ -1,11 +1,13 @@
+use std::{
+    cmp::Ordering,
+    collections::BTreeSet,
+    pin::Pin,
+    sync::{Arc, atomic::AtomicBool},
+    task::{Context, Poll, Waker},
+    time::{Duration, Instant},
+};
+
 use futures::FutureExt;
-use std::cmp::Ordering;
-use std::collections::BTreeSet;
-use std::pin::Pin;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
-use std::task::{Context, Poll, Waker};
-use std::time::{Duration, Instant};
 
 /// An internal type used by the [`SkipDelayQueue`].
 #[derive(Debug)]
@@ -325,9 +327,9 @@ pub fn skip_delay_channel<T: Ord>() -> (SkipDelaySender<T>, SkipDelayReceiver<T>
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use futures::{SinkExt, StreamExt, pin_mut};
 
-    use futures::{pin_mut, SinkExt, StreamExt};
+    use super::*;
 
     #[test_log::test(tokio::test)]
     async fn skip_delay_queue_should_yield_items() -> anyhow::Result<()> {
@@ -560,7 +562,7 @@ mod tests {
             }
         }
 
-        jh.await?;
+        jh.await??;
         Ok(())
     }
 }

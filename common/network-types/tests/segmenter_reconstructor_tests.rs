@@ -1,7 +1,8 @@
-use futures::{AsyncReadExt, AsyncWriteExt, StreamExt, TryStreamExt};
-use hopr_network_types::prelude::*;
 use std::time::Duration;
+
+use futures::{AsyncReadExt, AsyncWriteExt, StreamExt, TryStreamExt};
 use futures_time::future::FutureExt;
+use hopr_network_types::prelude::*;
 
 #[test_log::test(tokio::test)]
 async fn test_segmenter_reconstructor() -> anyhow::Result<()> {
@@ -28,7 +29,7 @@ async fn test_segmenter_reconstructor() -> anyhow::Result<()> {
     data_in.close().await?;
 
     let data_read = data_read.await???;
-    jh.await?;
+    jh.await??;
 
     assert_eq!(&data_written, data_read.as_slice());
 

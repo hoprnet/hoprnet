@@ -1,13 +1,18 @@
-use crate::prelude::errors::SessionError;
-use crate::prelude::{Frame, Segment};
-use crate::session::frames::{
-    FrameBuilder, FrameDashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry, FrameMapVacantEntry,
+use std::{
+    collections::VecDeque,
+    pin::Pin,
+    task::{Context, Poll, Waker},
+    time::{Duration, Instant},
 };
-use std::collections::VecDeque;
-use std::pin::Pin;
-use std::task::{Context, Poll, Waker};
-use std::time::{Duration, Instant};
+
 use tracing::instrument;
+
+use crate::{
+    prelude::{Frame, Segment, errors::SessionError},
+    session::frames::{
+        FrameBuilder, FrameDashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry, FrameMapVacantEntry,
+    },
+};
 
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
@@ -227,15 +232,12 @@ impl<M: FrameMap> futures::Stream for Reassembler<M> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use futures::{pin_mut, SinkExt, StreamExt, TryStreamExt};
+    use futures::{SinkExt, StreamExt, TryStreamExt, pin_mut};
     use futures_time::future::FutureExt;
     use hex_literal::hex;
-    use rand::prelude::SliceRandom;
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
+    use rand::{SeedableRng, prelude::SliceRandom, rngs::StdRng};
 
+    use super::*;
     use crate::session::frames::FrameHashMap;
 
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
@@ -308,7 +310,9 @@ mod tests {
                         // Delay the very last segment,
                         // so the incomplete frame gets a chance to expire
                         if i == seg_count - 1 {
-                            futures::future::ok(s).delay(futures_time::time::Duration::from_millis(55)).await
+                            futures::future::ok(s)
+                                .delay(futures_time::time::Duration::from_millis(55))
+                                .await
                         } else {
                             Ok(s)
                         }
@@ -317,7 +321,10 @@ mod tests {
                 .forward(r_sink),
         );
 
-        let mut actual = r_stream.collect::<Vec<_>>().timeout(futures_time::time::Duration::from_secs(5)).await?;
+        let mut actual = r_stream
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
 
         assert_eq!(actual.len(), expected.len());
 
@@ -365,7 +372,10 @@ mod tests {
 
         let jh = hopr_async_runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(r_sink));
 
-        let mut actual = r_stream.collect::<Vec<_>>().timeout(futures_time::time::Duration::from_secs(5)).await?;
+        let mut actual = r_stream
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
 
         // Since `forward` closed the sink, even the incomplete Frame 5 should be yielded as error
         assert_eq!(actual.len(), expected.len());
@@ -424,11 +434,13 @@ mod tests {
         r_sink.send(segments[4].clone()).await?;
 
         // Cannot insert more segments until some frames are yielded
-        assert!(r_sink
-            .send(segments[7].clone())
-            .timeout(futures_time::time::Duration::from_millis(50))
-            .await
-            .is_err());
+        assert!(
+            r_sink
+                .send(segments[7].clone())
+                .timeout(futures_time::time::Duration::from_millis(50))
+                .await
+                .is_err()
+        );
 
         // Yield Frame 1
         assert_eq!(Some(expected[0].clone()), r_stream.try_next().await?);
@@ -437,11 +449,13 @@ mod tests {
         r_sink.send(segments[6].clone()).await?;
 
         // Cannot insert more segments until some frames are yielded
-        assert!(r_sink
-            .send(segments[8].clone())
-            .timeout(futures_time::time::Duration::from_millis(50))
-            .await
-            .is_err());
+        assert!(
+            r_sink
+                .send(segments[8].clone())
+                .timeout(futures_time::time::Duration::from_millis(50))
+                .await
+                .is_err()
+        );
 
         // Yield Frame 2
         assert_eq!(Some(expected[1].clone()), r_stream.try_next().await?);

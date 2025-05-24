@@ -49,23 +49,16 @@
 //! frames. There can be at most [`MAX_ACK_FRAMES`](FrameAcknowledgements::MAX_ACK_FRAMES)
 //! per message. If more frames need to be acknowledged, more messages need to be sent.
 //! If the message contains fewer entries, it is padded with zeros (0 is not a valid frame ID).
-//!
-use crate::errors::NetworkTypeError;
-use crate::session::errors::SessionError;
-use crate::session::frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum};
-use asynchronous_codec::BytesMut;
-use bitvec::prelude::BitVec;
-use bytes::{Buf, BufMut};
-use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::{Display, Formatter};
-use std::mem;
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     fmt::{Display, Formatter},
     mem,
 };
+
+use asynchronous_codec::BytesMut;
+use bitvec::prelude::BitVec;
+use bytes::{Buf, BufMut};
 
 use crate::{
     errors::NetworkTypeError,
@@ -402,8 +395,8 @@ impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
 pub struct SessionCodec<const C: usize>;
 
 impl<const C: usize> asynchronous_codec::Encoder for SessionCodec<C> {
-    type Item<'a> = SessionMessage<C>;
     type Error = SessionError;
+    type Item<'a> = SessionMessage<C>;
 
     fn encode(&mut self, item: Self::Item<'_>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let disc = SessionMessageDiscriminants::from(&item) as u8;
@@ -426,8 +419,8 @@ impl<const C: usize> asynchronous_codec::Encoder for SessionCodec<C> {
 }
 
 impl<const C: usize> asynchronous_codec::Decoder for SessionCodec<C> {
-    type Item = SessionMessage<C>;
     type Error = SessionError;
+    type Item = SessionMessage<C>;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         tracing::trace!(msg_len = src.len(), "decoding message");
@@ -807,7 +800,7 @@ mod tests {
         assert!(matches!(iter.next(), Some(Ok(m)) if m == messages[3]));
 
         assert!(iter.next().is_none());
-        //assert!(iter.last_error().is_none());
+        // assert!(iter.last_error().is_none());
         assert!(iter.is_done());
 
         Ok(())
@@ -848,7 +841,7 @@ mod tests {
         let err = iter.next();
         assert!(matches!(err, Some(Err(_))));
         assert!(iter.is_done());
-        //assert!(iter.last_error().is_some());
+        // assert!(iter.last_error().is_some());
 
         assert!(iter.next().is_none());
 

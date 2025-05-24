@@ -1,8 +1,11 @@
-use crate::prelude::errors::SessionError;
-use crate::prelude::{Frame, FrameId, Segment};
-use crate::session::frame::SeqNum;
-use bitvec::prelude::BitVec;
 use std::time::Instant;
+
+use bitvec::prelude::BitVec;
+
+use crate::{
+    prelude::{Frame, FrameId, Segment, errors::SessionError},
+    session::frame::SeqNum,
+};
 
 #[derive(Debug)]
 pub(crate) struct FrameBuilder {
@@ -90,7 +93,7 @@ pub struct FrameInspector(pub(crate) FrameDashMap);
 
 impl FrameInspector {
     pub fn missing_segments(&self, frame_id: &FrameId) -> Option<bitvec::prelude::BitVec> {
-        self.0 .0.get(frame_id).map(|f| f.as_missing())
+        self.0.0.get(frame_id).map(|f| f.as_missing())
     }
 }
 
@@ -277,8 +280,9 @@ impl FrameMap for FrameHashMap {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use bitvec::prelude::*;
+
+    use super::*;
 
     #[test]
     fn frame_builder_should_return_ordered_segments() -> anyhow::Result<()> {

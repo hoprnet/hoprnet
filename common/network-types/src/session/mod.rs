@@ -31,8 +31,7 @@ pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId}
 use frames::{FrameDashMap, FrameHashMap, FrameMap};
 pub use segmenter::Segmenter;
 use tracing::Instrument;
-
-#[cfg(any(test, feature = "testing"))]
+#[cfg(test)]
 pub use utils::test as testing;
 
 fn build_reconstructor<M: FrameMap + Send + 'static>(
@@ -119,12 +118,13 @@ pub fn frame_reconstructor_with_inspector(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::time::Duration;
 
     use futures::{StreamExt, TryStreamExt};
-    use rand::prelude::*;
-    use std::time::Duration;
     use futures_time::future::FutureExt;
+    use rand::prelude::*;
+
+    use super::*;
     use crate::prelude::errors::SessionError;
 
     const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
@@ -185,7 +185,10 @@ mod tests {
 
         let jh = hopr_async_runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(r_sink));
 
-        let actual = seq_stream.collect::<Vec<_>>().timeout(futures_time::time::Duration::from_secs(5)).await?;
+        let actual = seq_stream
+            .collect::<Vec<_>>()
+            .timeout(futures_time::time::Duration::from_secs(5))
+            .await?;
 
         assert_eq!(actual.len(), expected.len());
         for i in 0..expected.len() {
