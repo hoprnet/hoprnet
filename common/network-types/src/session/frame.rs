@@ -118,12 +118,33 @@ pub fn segment(data: &[u8], max_segment_size: usize, frame_id: u32) -> crate::se
 /// Data frame of arbitrary length.
 /// The frame can be segmented into [segments](Segment) and reassembled back
 /// via [FrameReassembler].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Frame {
     /// Identifier of this frame.
     pub frame_id: FrameId,
     /// Frame data.
     pub data: Box<[u8]>,
+}
+
+impl Debug for Frame {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        const DBG_LEN: usize = 16;
+        let excerpt = if self.data.len() > DBG_LEN {
+            format!(
+                "{}..{}",
+                hex::encode(&self.data[0..DBG_LEN / 2]),
+                hex::encode(&self.data[self.data.len() - DBG_LEN / 2..])
+            )
+        } else {
+            hex::encode(&self.data)
+        };
+
+        f.debug_struct("Frame")
+            .field("frame_id", &self.frame_id)
+            .field("len", &self.data.len())
+            .field("data", &excerpt)
+            .finish()
+    }
 }
 
 impl Frame {
@@ -137,6 +158,30 @@ impl Frame {
 impl AsRef<[u8]> for Frame {
     fn as_ref(&self) -> &[u8] {
         &self.data
+    }
+}
+
+impl PartialOrd<Frame> for Frame {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq<FrameId> for Frame {
+    fn eq(&self, other: &FrameId) -> bool {
+        self.frame_id == *other
+    }
+}
+
+impl PartialOrd<FrameId> for Frame {
+    fn partial_cmp(&self, other: &FrameId) -> Option<std::cmp::Ordering> {
+        Some(self.frame_id.cmp(other))
+    }
+}
+
+impl Ord for Frame {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.frame_id.cmp(&other.frame_id)
     }
 }
 
@@ -167,6 +212,18 @@ impl Segment {
     /// Returns the [SegmentId] for this segment.
     pub fn id(&self) -> SegmentId {
         SegmentId(self.frame_id, self.seq_idx)
+    }
+
+    /// Length of the segment data plus header.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        Self::HEADER_SIZE + self.data.len()
+    }
+
+    /// Indicates whether this segment is the last one from the frame.
+    #[inline]
+    pub fn is_last(&self) -> bool {
+        self.seq_idx == self.seq_len - 1
     }
 }
 
@@ -683,20 +740,20 @@ pub(crate) mod tests {
         time::Duration,
     };
 
+    use super::*;
+    use crate::session::utils::test::{linear_half_normal_shuffle, sample_index};
     use async_stream::stream;
     use futures::{Stream, StreamExt, TryStreamExt, pin_mut};
     use hex_literal::hex;
     use lazy_static::lazy_static;
-    use rand::{
-        Rng, SeedableRng,
-        prelude::{Distribution, SliceRandom},
-        seq::IteratorRandom,
-        thread_rng,
-    };
+    use rand::{Rng, SeedableRng, prelude::SliceRandom, seq::IteratorRandom, thread_rng};
+    use rand::prelude::SliceRandom;
+    use rand::{seq::IteratorRandom, thread_rng, Rng, SeedableRng};
     use rand_distr::Normal;
     use rayon::prelude::*;
 
     use super::*;
+    use crate::session::utils::test::{linear_half_normal_shuffle, sample_index};
 
     const MTU: usize = 448;
     const FRAME_COUNT: u32 = 65_535;
@@ -718,29 +775,6 @@ pub(crate) mod tests {
             let mut rng = rand::rngs::StdRng::from_seed(*RAND_SEED);
             linear_half_normal_shuffle(&mut rng, vec, MIXING_FACTOR)
         };
-    }
-
-    /// Sample an index between `0` and `len - 1` using the given distribution and RNG.
-    pub fn sample_index<T: Distribution<f64>, R: Rng>(dist: &mut T, rng: &mut R, len: usize) -> usize {
-        let f: f64 = dist.sample(rng);
-        (f.max(0.0).round() as usize).min(len - 1)
-    }
-
-    /// Shuffles the given `vec` by taking a next element with index `|N(0,factor^2)`|, where
-    /// `N` denotes normal distribution.
-    /// When used on frame segments vector, it will shuffle the segments in a controlled manner;
-    /// such that an entire frame can unlikely swap position with another, if `factor` ~ frame length.
-    fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, factor: f64) -> Vec<T> {
-        if factor == 0.0 || vec.is_empty() {
-            return vec.into(); // no mixing
-        }
-
-        let mut dist = Normal::new(0.0, factor).unwrap();
-        let mut ret = Vec::new();
-        while !vec.is_empty() {
-            ret.push(vec.remove(sample_index(&mut dist, rng, vec.len())).unwrap());
-        }
-        ret
     }
 
     #[ctor::ctor]

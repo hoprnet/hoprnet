@@ -293,11 +293,11 @@ impl<const C: usize> SessionState<C> {
                     Entry::Occupied(e) => {
                         // Receiving a frame segment restarts the retry token for this frame
                         let rt = *e.get();
-                        e.replace_entry(rt.replenish(Instant::now(), self.cfg.backoff_base));
+                        e.replace_entry(rt.replenish());
                     }
                     Entry::Vacant(v) => {
                         // Create the retry token for this frame
-                        v.insert(RetryToken::new(Instant::now(), self.cfg.backoff_base));
+                        v.insert(RetryToken::new(self.cfg.backoff_base));
                     }
                 }
                 trace!(session_id = self.session_id, segment = %id, "received segment pushed");
@@ -443,7 +443,7 @@ impl<const C: usize> SessionState<C> {
                         frame_id = info.frame_id,
                         "frame does not have a retry token"
                     );
-                    v.insert(RetryToken::new(now, self.cfg.backoff_base));
+                    v.insert(RetryToken::from_instant(now, self.cfg.backoff_base));
                     to_retry.push(info);
                 }
             }
@@ -643,7 +643,7 @@ impl<const C: usize> SessionState<C> {
             .await
             .map_err(|e| SessionError::ProcessingError(e.to_string()))?;
         self.outgoing_frame_resends
-            .insert(frame_id, RetryToken::new(Instant::now(), self.cfg.backoff_base));
+            .insert(frame_id, RetryToken::new(self.cfg.backoff_base));
 
         trace!(
             session_id = self.session_id,
@@ -1061,21 +1061,20 @@ mod tests {
         io::{AsyncReadExt, AsyncWriteExt},
         pin_mut,
     };
-    use hex_literal::hex;
     use parameterized::parameterized;
     use rand::{Rng, SeedableRng, rngs::StdRng};
     use test_log::test;
 
     use super::*;
     use crate::{
-        session::utils::{FaultyNetwork, FaultyNetworkConfig, NetworkStats},
+        session::utils::test::{FaultyNetwork, FaultyNetworkConfig, NetworkStats, frames_send_and_recv},
         utils::DuplexIO,
     };
+    use crate::utils::DuplexIO;
+
+    const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
     const MTU: usize = 466; // MTU used by HOPR
-
-    // Using static RNG seed to make tests reproducible between different runs
-    const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
     fn setup_alice_bob(
         cfg: SessionConfig,
@@ -1103,120 +1102,13 @@ mod tests {
             })
             .unzip();
 
-        let (alice_reader, alice_writer) = FaultyNetwork::<MTU>::new(network_cfg, alice_stats).split();
+        let (alice_reader, alice_writer) = FaultyNetwork::<MTU>::new(network_cfg.clone(), alice_stats).split();
         let (bob_reader, bob_writer) = FaultyNetwork::<MTU>::new(network_cfg, bob_stats).split();
 
         let alice_to_bob = SessionSocket::new("alice", DuplexIO(alice_reader, bob_writer), cfg.clone());
         let bob_to_alice = SessionSocket::new("bob", DuplexIO(bob_reader, alice_writer), cfg.clone());
 
         (alice_to_bob, bob_to_alice)
-    }
-
-    async fn send_and_recv<S>(
-        num_frames: usize,
-        frame_size: usize,
-        alice: S,
-        bob: S,
-        timeout: Duration,
-        alice_to_bob_only: bool,
-        randomized_frame_sizes: bool,
-    ) where
-        S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-    {
-        #[derive(PartialEq, Eq)]
-        enum Direction {
-            Send,
-            Recv,
-            Both,
-        }
-
-        let frame_sizes = if randomized_frame_sizes {
-            let norm_dist = rand_distr::Normal::new(frame_size as f64 * 0.75, frame_size as f64 / 4.0).unwrap();
-            StdRng::from_seed(RNG_SEED)
-                .sample_iter(norm_dist)
-                .map(|s| (s as usize).max(10).min(2 * frame_size))
-                .take(num_frames)
-                .collect::<Vec<_>>()
-        } else {
-            std::iter::repeat_n(frame_size, num_frames).collect::<Vec<_>>()
-        };
-
-        let socket_worker = |mut socket: S, d: Direction| {
-            let frame_sizes = frame_sizes.clone();
-            let frame_sizes_total = frame_sizes.iter().sum();
-            async move {
-                let mut received = Vec::with_capacity(frame_sizes_total);
-                let mut sent = Vec::with_capacity(frame_sizes_total);
-
-                if d == Direction::Send || d == Direction::Both {
-                    for frame_size in &frame_sizes {
-                        let mut write = vec![0u8; *frame_size];
-                        hopr_crypto_random::random_fill(&mut write);
-                        let _ = socket.write(&write).await?;
-                        sent.extend(write);
-                    }
-                }
-
-                if d == Direction::Recv || d == Direction::Both {
-                    // Either read everything or timeout trying
-                    while received.len() < frame_sizes_total {
-                        let mut buffer = [0u8; 2048];
-                        let read = socket.read(&mut buffer).await?;
-                        received.extend(buffer.into_iter().take(read));
-                    }
-                }
-
-                // TODO: fix this so it works properly
-                // We cannot close immediately as some ack/resends might be ongoing
-                // socket.close().await.unwrap();
-
-                Ok::<_, std::io::Error>((sent, received))
-            }
-        };
-
-        let alice_worker = tokio::task::spawn(socket_worker(
-            alice,
-            if alice_to_bob_only {
-                Direction::Send
-            } else {
-                Direction::Both
-            },
-        ));
-        let bob_worker = tokio::task::spawn(socket_worker(
-            bob,
-            if alice_to_bob_only {
-                Direction::Recv
-            } else {
-                Direction::Both
-            },
-        ));
-
-        let send_recv = futures::future::join(
-            async move { alice_worker.await.expect("alice should not fail") },
-            async move { bob_worker.await.expect("bob should not fail") },
-        );
-        let timeout = tokio::time::sleep(timeout);
-
-        pin_mut!(send_recv);
-        pin_mut!(timeout);
-
-        match futures::future::select(send_recv, timeout).await {
-            Either::Left(((Ok((alice_sent, alice_recv)), Ok((bob_sent, bob_recv))), _)) => {
-                assert_eq!(
-                    hex::encode(alice_sent),
-                    hex::encode(bob_recv),
-                    "alice sent must be equal to bob received"
-                );
-                assert_eq!(
-                    hex::encode(bob_sent),
-                    hex::encode(alice_recv),
-                    "bob sent must be equal to alice received",
-                );
-            }
-            Either::Left(((Err(e), _), _)) => panic!("alice send recv error: {e}"),
-            Either::Left(((_, Err(e)), _)) => panic!("bob send recv error: {e}"),
-            Either::Right(_) => panic!("timeout"),
-        }
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -1229,7 +1121,7 @@ mod tests {
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, Default::default(), None, None);
 
-        send_and_recv(
+        frames_send_and_recv(
             num_frames,
             frame_size,
             alice_to_bob,
@@ -1238,7 +1130,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -1248,7 +1141,7 @@ mod tests {
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, Default::default(), None, None);
 
-        send_and_recv(
+        frames_send_and_recv(
             num_frames,
             frame_size,
             alice_to_bob,
@@ -1257,7 +1150,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -1278,7 +1172,7 @@ mod tests {
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
 
-        send_and_recv(
+        frames_send_and_recv(
             num_frames,
             frame_size,
             alice_to_bob,
@@ -1287,7 +1181,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[ignore]
@@ -1310,7 +1205,7 @@ mod tests {
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
 
-        send_and_recv(
+        frames_send_and_recv(
             num_frames,
             frame_size,
             alice_to_bob,
@@ -1319,7 +1214,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[ignore]
@@ -1342,7 +1238,7 @@ mod tests {
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
 
-        send_and_recv(
+        frames_send_and_recv(
             num_frames,
             frame_size,
             alice_to_bob,
@@ -1351,7 +1247,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[ignore]
@@ -1373,7 +1270,7 @@ mod tests {
 
         let (alice_to_bob, bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
 
-        send_and_recv(
+        frames_send_and_recv(
             num_frames,
             frame_size,
             alice_to_bob,
@@ -1382,7 +1279,8 @@ mod tests {
             false,
             false,
         )
-        .await;
+        .await
+        .unwrap();
     }
 
     #[test(tokio::test)]
@@ -1405,7 +1303,7 @@ mod tests {
             bob_stats.clone().into(),
         );
 
-        send_and_recv(
+        frames_send_and_recv(
             NUM_FRAMES,
             FRAME_SIZE,
             alice_to_bob,
@@ -1414,7 +1312,8 @@ mod tests {
             true,
             false,
         )
-        .await;
+        .await
+        .unwrap();
 
         assert_eq!(bob_stats.packets_received.load(Ordering::Relaxed), NUM_FRAMES);
         assert_eq!(alice_stats.packets_sent.load(Ordering::Relaxed), NUM_FRAMES);
@@ -1449,7 +1348,7 @@ mod tests {
             bob_stats.clone().into(),
         );
 
-        send_and_recv(
+        frames_send_and_recv(
             NUM_FRAMES,
             FRAME_SIZE,
             alice_to_bob,
@@ -1458,7 +1357,8 @@ mod tests {
             true,
             false,
         )
-        .await;
+        .await
+        .unwrap();
 
         assert!(bob_stats.packets_received.load(Ordering::Relaxed) < NUM_FRAMES);
         assert!(alice_stats.packets_sent.load(Ordering::Relaxed) < NUM_FRAMES);

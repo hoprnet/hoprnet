@@ -14,7 +14,7 @@ use rand::{Rng, thread_rng};
 use utils::{FaultyNetwork, FaultyNetworkConfig};
 
 /// This MTU is based on the current MTU size in HOPR 2.2
-const MTU: usize = 466;
+const MTU: usize = 762;
 
 fn setup_network<const MTU: usize>(
     network_cfg: FaultyNetworkConfig,
