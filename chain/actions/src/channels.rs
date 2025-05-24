@@ -30,7 +30,7 @@ use crate::{
     errors::{
         ChainActionsError::{
             BalanceTooLow, ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, ClosureTimeHasNotElapsed,
-            InvalidArguments, InvalidState, NotEnoughAllowance, PeerAccessDenied,
+            InvalidArguments, InvalidChannelStake, InvalidState, NotEnoughAllowance, PeerAccessDenied,
         },
         Result,
     },
@@ -81,14 +81,18 @@ where
                 Box::pin(async move {
                     let allowance = db_clone.get_safe_hopr_allowance(Some(tx)).await?;
                     debug!(%allowance, "current staking safe allowance");
-                    if allowance.lt(&amount) {
+                    if allowance < amount {
                         return Err(NotEnoughAllowance);
                     }
 
                     let hopr_balance = db_clone.get_safe_hopr_balance(Some(tx)).await?;
                     debug!(balance = %hopr_balance, "current Safe HOPR balance");
-                    if hopr_balance.lt(&amount) {
+                    if hopr_balance < amount {
                         return Err(BalanceTooLow);
+                    }
+
+                    if HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE) < amount {
+                        return Err(InvalidChannelStake);
                     }
 
                     if db_clone.get_indexer_data(Some(tx)).await?.nr_enabled
@@ -153,9 +157,7 @@ where
             Some(channel) => {
                 if channel.status == ChannelStatus::Open {
                     if channel.balance + amount > HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE) {
-                        return Err(InvalidArguments(format!(
-                            "channel balance of {channel} would overflow after funding with {amount}"
-                        )));
+                        return Err(InvalidChannelStake);
                     }
 
                     info!("initiating funding of {channel} with {amount}");
@@ -242,7 +244,7 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_db_sql::{
         HoprDbGeneralModelOperations, api::info::DomainSeparator, channels::HoprDbChannelOperations, db::HoprDb,
-        info::HoprDbInfoOperations,
+        errors::DbSqlError, info::HoprDbInfoOperations,
     };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
@@ -270,28 +272,42 @@ mod tests {
         static ref BOB: Address = BOB_KP.public().to_address();
     }
 
+    async fn init_db(
+        db: &HoprDb,
+        safe_balance: HoprBalance,
+        safe_allowance: HoprBalance,
+        channel: Option<ChannelEntry>,
+    ) -> anyhow::Result<()> {
+        let db_clone = db.clone();
+        Ok(db
+            .begin_transaction()
+            .await?
+            .perform(|tx| {
+                Box::pin(async move {
+                    db_clone.set_safe_hopr_allowance(Some(tx), safe_allowance).await?;
+                    db_clone.set_safe_hopr_balance(Some(tx), safe_balance).await?;
+                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
+                    db_clone
+                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
+                        .await?;
+
+                    if let Some(channel) = channel {
+                        db_clone.upsert_channel(Some(tx), channel).await?;
+                    }
+
+                    Ok::<_, DbSqlError>(())
+                })
+            })
+            .await?)
+    }
+
     #[tokio::test]
     async fn test_open_channel() -> anyhow::Result<()> {
         let stake: HoprBalance = 10_u32.into();
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone
-                        .set_safe_hopr_allowance(Some(tx), 10_000_000_u64.into())
-                        .await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), None).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -343,23 +359,7 @@ mod tests {
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone
-                        .set_safe_hopr_allowance(Some(tx), 10_000_000_u64.into())
-                        .await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await?;
-                    db_clone.upsert_channel(Some(tx), channel).await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(channel)).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -390,22 +390,7 @@ mod tests {
         let stake = 10_u32.into();
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone
-                        .set_safe_hopr_allowance(Some(tx), 10_000_000_u64.into())
-                        .await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -431,24 +416,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_should_not_open_channel_with_too_big_stake() -> anyhow::Result<()> {
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        init_db(&db, U256::max_value().into(), U256::max_value().into(), None).await?;
+
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
+
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+
+        assert!(
+            matches!(
+                actions
+                    .open_channel(*BOB, (ChannelEntry::MAX_CHANNEL_BALANCE + 1).into())
+                    .await
+                    .err()
+                    .expect("should be an error"),
+                ChainActionsError::InvalidChannelStake
+            ),
+            "should not create channel with too big stake"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_should_not_open_if_not_enough_allowance() -> anyhow::Result<()> {
         let stake = 10_000_u32.into();
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.set_safe_hopr_allowance(Some(tx), 1_000_u64.into()).await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 1_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -478,22 +478,7 @@ mod tests {
         let stake = 10_000_u32.into();
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone
-                        .set_safe_hopr_allowance(Some(tx), 10_000_000_u64.into())
-                        .await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 1_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await
-                })
-            })
-            .await?;
+        init_db(&db, 1_u64.into(), 10_000_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -525,23 +510,7 @@ mod tests {
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone
-                        .set_safe_hopr_allowance(Some(tx), 10_000_000_u64.into())
-                        .await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await?;
-                    db_clone.upsert_channel(Some(tx), channel).await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(channel.clone())).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -585,26 +554,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_fund_channel_should_not_over_fund() -> anyhow::Result<()> {
+        let channel = ChannelEntry::new(
+            *ALICE,
+            *BOB,
+            HoprBalance::from(ChannelEntry::MAX_CHANNEL_BALANCE),
+            U256::zero(),
+            ChannelStatus::Open,
+            U256::zero(),
+        );
+
+        let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        init_db(
+            &db,
+            U256::max_value().into(),
+            U256::max_value().into(),
+            Some(channel.clone()),
+        )
+        .await?;
+
+        let tx_queue = ActionQueue::new(
+            db.clone(),
+            MockActionState::new(),
+            MockTransactionExecutor::new(),
+            Default::default(),
+        );
+
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_queue.new_sender());
+
+        assert!(
+            matches!(
+                actions
+                    .fund_channel(channel.get_id(), 1.into())
+                    .await
+                    .err()
+                    .expect("should be an error"),
+                ChainActionsError::InvalidChannelStake
+            ),
+            "should fail channel stake is too high"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_should_not_fund_nonexistent_channel() -> anyhow::Result<()> {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone
-                        .set_safe_hopr_allowance(Some(tx), 10_000_000_u64.into())
-                        .await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -634,20 +631,7 @@ mod tests {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.set_safe_hopr_allowance(Some(tx), 1_000_u64.into()).await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 1_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -677,20 +661,7 @@ mod tests {
         let channel_id = generate_channel_id(&*ALICE, &*BOB);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.set_safe_hopr_allowance(Some(tx), 100_000_u64.into()).await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 1_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await
-                })
-            })
-            .await?;
+        init_db(&db, 1_u64.into(), 100_000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -723,21 +694,7 @@ mod tests {
         let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.set_safe_hopr_allowance(Some(tx), 1_000_u64.into()).await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await?;
-                    db_clone.upsert_channel(Some(tx), channel).await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel.clone())).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -834,21 +791,7 @@ mod tests {
         let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.set_safe_hopr_allowance(Some(tx), 1_000_u64.into()).await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await?;
-                    db_clone.upsert_channel(Some(tx), channel).await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel.clone())).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -909,21 +852,7 @@ mod tests {
         );
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.set_safe_hopr_allowance(Some(tx), 1_000_u64.into()).await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await?;
-                    db_clone.upsert_channel(Some(tx), channel).await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel.clone())).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -951,20 +880,7 @@ mod tests {
     #[tokio::test]
     async fn test_should_not_close_nonexistent_channel() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.set_safe_hopr_allowance(Some(tx), 1_000_u64.into()).await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), None).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -994,21 +910,7 @@ mod tests {
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        let db_clone = db.clone();
-        db.begin_transaction()
-            .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    db_clone.set_safe_hopr_allowance(Some(tx), 1_000_u64.into()).await?;
-                    db_clone.set_safe_hopr_balance(Some(tx), 5_000_000_u64.into()).await?;
-                    db_clone.set_network_registry_enabled(Some(tx), false).await?;
-                    db_clone
-                        .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
-                        .await?;
-                    db_clone.upsert_channel(Some(tx), channel).await
-                })
-            })
-            .await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel.clone())).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
