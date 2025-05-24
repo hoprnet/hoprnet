@@ -702,7 +702,7 @@ impl TryFrom<&[u8]> for Ticket {
             // Validate the boundaries of the parsed values
             TicketBuilder::default()
                 .channel_id(channel_id)
-                .amount(amount)
+                .amount(U256::from_big_endian(&amount))
                 .index(u64::from_be_bytes(index))
                 .index_offset(u32::from_be_bytes(index_offset))
                 .channel_epoch(u32::from_be_bytes(channel_epoch))
@@ -1160,8 +1160,8 @@ pub mod tests {
 
     #[test]
     pub fn test_win_prob_approx_eq() -> anyhow::Result<()> {
-        let wp_0 = WinningProbability::try_from(&hex!("0020C49BBFFFFF"))?;
-        let wp_1 = WinningProbability::try_from(&hex!("0020C49BA5E34F"))?;
+        let wp_0 = WinningProbability(hex!("0020C49BBFFFFF"));
+        let wp_1 = WinningProbability(hex!("0020C49BA5E34F"));
 
         assert_ne!(wp_0.as_ref(), wp_1.as_ref());
         assert_eq!(wp_0, wp_1.as_f64());

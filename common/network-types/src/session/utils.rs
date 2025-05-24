@@ -240,7 +240,7 @@ mod tests {
         let written = tokio::task::spawn(async move {
             let mut out = Vec::with_capacity(len);
             for byte in data {
-                send.write(&[byte]).await.unwrap();
+                let _ = send.write(&[byte]).await.unwrap();
                 out.push(byte);
             }
             send.close().await.unwrap();

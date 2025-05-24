@@ -266,10 +266,11 @@ mod tests {
             .join("contracts");
         let network = "anvil-localhost";
         let environment_type = "local";
-        match ensure_environment_and_network_are_set(correct_dir, network, environment_type) {
-            Ok(result) => assert!(result),
-            _ => assert!(false),
-        }
+        assert!(ensure_environment_and_network_are_set(
+            correct_dir,
+            network,
+            environment_type
+        )?);
         Ok(())
     }
 
@@ -305,10 +306,11 @@ mod tests {
             .join("contracts");
         let network = "anvil-localhost";
         let environment_type = "production";
-        match ensure_environment_and_network_are_set(correct_dir, network, environment_type) {
-            Ok(result) => assert!(!result),
-            _ => assert!(false),
-        }
+        assert!(!ensure_environment_and_network_are_set(
+            correct_dir,
+            network,
+            environment_type
+        )?);
         Ok(())
     }
 
@@ -323,7 +325,7 @@ mod tests {
         let network_provider_args = NetworkProviderArgs {
             network: "anvil-localhost".into(),
             contracts_root: Some("../ethereum/contracts".into()),
-            provider_url: anvil.endpoint().into(),
+            provider_url: anvil.endpoint(),
         };
 
         let provider = network_provider_args.get_provider_with_signer(&chain_key).await?;
@@ -344,7 +346,7 @@ mod tests {
         let network_provider_args = NetworkProviderArgs {
             network: "anvil-localhost".into(),
             contracts_root: None,
-            provider_url: anvil.endpoint().into(),
+            provider_url: anvil.endpoint(),
         };
 
         let provider = network_provider_args.get_provider_with_signer(&chain_key).await?;

@@ -594,11 +594,9 @@ mod tests {
                     acked_tickets.len() as u64,
                     "invalid number of tickets to aggregate"
                 );
-                alice.writer().receive_aggregation_request(
-                    bob_packet_key,
-                    acked_tickets.into_iter().map(TransferableWinningTicket::from).collect(),
-                    (),
-                )?;
+                alice
+                    .writer()
+                    .receive_aggregation_request(bob_packet_key, acked_tickets.into_iter().collect(), ())?;
             }
             _ => panic!("unexpected action happened while sending agg request by Bob"),
         };
@@ -716,11 +714,9 @@ mod tests {
                     acked_tickets.len() as u64,
                     "invalid number of tickets to aggregate"
                 );
-                alice.writer().receive_aggregation_request(
-                    bob_packet_key,
-                    acked_tickets.into_iter().map(TransferableWinningTicket::from).collect(),
-                    (),
-                )?;
+                alice
+                    .writer()
+                    .receive_aggregation_request(bob_packet_key, acked_tickets.into_iter().collect(), ())?;
             }
             _ => panic!("unexpected action happened while sending agg request by Bob"),
         };
@@ -757,10 +753,10 @@ mod tests {
             stored_acked_tickets[19].verified_ticket().is_aggregated(),
             "last ticket must be the aggregated one"
         );
-        for i in 0..19 {
+        for (i, stored_acked_ticket) in stored_acked_tickets.iter().enumerate().take(19) {
             assert_eq!(
                 AcknowledgedTicketStatus::Untouched,
-                stored_acked_tickets[i].status,
+                stored_acked_ticket.status,
                 "ticket #{i} must be untouched"
             );
         }
