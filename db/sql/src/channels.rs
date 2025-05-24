@@ -188,7 +188,7 @@ impl HoprDbChannelOperations for HoprDb {
         if let Some(channel_epoch) = epoch.try_as_ref() {
             self.caches
                 .unrealized_value
-                .invalidate(&(channel_id, channel_epoch.as_slice().into()))
+                .invalidate(&(channel_id, U256::from_big_endian(channel_epoch.as_slice())))
                 .await;
         }
 

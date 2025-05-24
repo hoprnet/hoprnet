@@ -628,7 +628,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_fund_if_not_enough_allowance() -> anyhow::Result<()> {
-        let channel_id = generate_channel_id(&*ALICE, &*BOB);
+        let channel_id = generate_channel_id(&ALICE, &BOB);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 1_000_u64.into(), None).await?;
@@ -658,7 +658,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_fund_if_not_enough_balance() -> anyhow::Result<()> {
-        let channel_id = generate_channel_id(&*ALICE, &*BOB);
+        let channel_id = generate_channel_id(&ALICE, &BOB);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 1_u64.into(), 100_000_u64.into(), None).await?;

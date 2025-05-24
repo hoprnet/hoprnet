@@ -1462,7 +1462,7 @@ mod tests {
             .value(U256::from(100))
             .transaction_type(2);
 
-        let receipt = provider.send_transaction(tx.into()).await?.get_receipt().await?;
+        let receipt = provider.send_transaction(tx).await?.get_receipt().await?;
 
         m.assert();
         assert_eq!(receipt.gas_used, 21000);
@@ -1510,7 +1510,7 @@ mod tests {
             .with_value(U256::from(100))
             .with_gas_price(1000000000);
 
-        let receipt = provider.send_transaction(tx.into()).await?.get_receipt().await?;
+        let receipt = provider.send_transaction(tx).await?.get_receipt().await?;
 
         m.assert();
         assert_eq!(receipt.gas_used, 21000);

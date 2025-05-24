@@ -1388,7 +1388,7 @@ mod tests {
         // .map_err(|e| ContractError::MiddlewareError { e })?;
 
         // only deploy contracts when needed
-        if code.len() == 0 {
+        if code.is_empty() {
             debug!("deploying safe code");
             // Deploy Safe diamond deployment proxy singleton
             let safe_diamond_proxy_address = {
@@ -1466,8 +1466,7 @@ mod tests {
         deploy_multicall3_for_testing(client.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(instances.token, vec![kp_address.into()]).await?;
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, vec![kp_address]).await?;
         assert_eq!(native_balance.len(), 1, "invalid native balance lens");
         assert_eq!(token_balance.len(), 1, "invalid token balance lens");
         assert_eq!(native_balance[0].to::<u64>(), 0u64, "wrong native balance");
@@ -1501,10 +1500,7 @@ mod tests {
         let encoded_minter_role = keccak256(b"MINTER_ROLE");
         instances
             .token
-            .grantRole(
-                encoded_minter_role.clone(),
-                contract_deployer.public().to_address().into(),
-            )
+            .grantRole(encoded_minter_role, contract_deployer.public().to_address().into())
             .send()
             .await?
             .watch()
@@ -1513,10 +1509,7 @@ mod tests {
         // test the deployer has minter role now
         let check_minter_role = instances
             .token
-            .hasRole(
-                encoded_minter_role.clone(),
-                contract_deployer.public().to_address().into(),
-            )
+            .hasRole(encoded_minter_role, contract_deployer.public().to_address().into())
             .call()
             .await?;
         assert!(check_minter_role, "deployer does not have minter role yet");
@@ -1526,8 +1519,7 @@ mod tests {
             transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone()).await?;
 
         assert_eq!(native_balance.len(), 4, "invalid native balance lens");
         assert_eq!(token_balance.len(), 4, "invalid token balance lens");
@@ -1545,7 +1537,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_transfer_or_mint_tokens_in_anvil_with_one_recipient() -> anyhow::Result<()> {
-        let addresses: Vec<Address> = vec![get_random_address_for_testing().into()];
+        let addresses: Vec<Address> = vec![get_random_address_for_testing()];
         let desired_amount = vec![U256::from(42)];
 
         // launch local anvil instance
@@ -1563,10 +1555,7 @@ mod tests {
         let encoded_minter_role = keccak256(b"MINTER_ROLE");
         instances
             .token
-            .grantRole(
-                encoded_minter_role.clone(),
-                contract_deployer.public().to_address().into(),
-            )
+            .grantRole(encoded_minter_role, contract_deployer.public().to_address().into())
             .send()
             .await?
             .watch()
@@ -1575,10 +1564,7 @@ mod tests {
         // test the deployer has minter role now
         let check_minter_role = instances
             .token
-            .hasRole(
-                encoded_minter_role.clone(),
-                contract_deployer.public().to_address().into(),
-            )
+            .hasRole(encoded_minter_role, contract_deployer.public().to_address().into())
             .call()
             .await?;
         assert!(check_minter_role, "deployer does not have minter role yet");
@@ -1588,8 +1574,7 @@ mod tests {
             transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone()).await?;
         assert_eq!(native_balance.len(), 1, "invalid native balance lens");
         assert_eq!(token_balance.len(), 1, "invalid token balance lens");
         for (i, amount) in desired_amount.iter().enumerate() {
@@ -1625,8 +1610,7 @@ mod tests {
             transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone()).await?;
         assert_eq!(native_balance.len(), 0, "invalid native balance lens");
         assert_eq!(token_balance.len(), 0, "invalid token balance lens");
         // for (i, amount) in desired_amount.iter().enumerate() {
@@ -1645,7 +1629,7 @@ mod tests {
     async fn test_transfer_native_tokens_in_anvil_with_multicall() -> anyhow::Result<()> {
         let mut addresses: Vec<Address> = Vec::new();
         for _ in 0..4 {
-            addresses.push(get_random_address_for_testing().into());
+            addresses.push(get_random_address_for_testing());
         }
         let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
 
@@ -1665,8 +1649,7 @@ mod tests {
             transfer_native_tokens(client.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone()).await?;
         assert_eq!(native_balance.len(), 4, "invalid native balance lens");
         assert_eq!(token_balance.len(), 4, "invalid token balance lens");
         for (i, amount) in desired_amount.iter().enumerate() {
@@ -1686,8 +1669,8 @@ mod tests {
         let mut safe_addresses: Vec<Address> = Vec::new();
         let mut node_addresses: Vec<Address> = Vec::new();
         for _ in 0..4 {
-            safe_addresses.push(get_random_address_for_testing().into());
-            node_addresses.push(get_random_address_for_testing().into());
+            safe_addresses.push(get_random_address_for_testing());
+            node_addresses.push(get_random_address_for_testing());
         }
 
         // launch local anvil instance
@@ -1748,7 +1731,7 @@ mod tests {
     async fn test_deploy_proxy() -> anyhow::Result<()> {
         let prediction = deploy_proxy(
             address!("41675c099f32341bf84bfc5382af534df5c7461a"),
-            hex!("09e458584ce79e57b65cb303dc136c5d53e17b676599b9b7bc03815e0eef5172").into(),
+            hex!("09e458584ce79e57b65cb303dc136c5d53e17b676599b9b7bc03815e0eef5172"),
             Address::from_str(SAFE_SAFEPROXYFACTORY_ADDRESS)?,
         )?;
 
@@ -2111,7 +2094,7 @@ mod tests {
 
         let mut node_addresses: Vec<Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(get_random_address_for_testing().into());
+            node_addresses.push(get_random_address_for_testing());
         }
 
         // launch local anvil instance
@@ -2169,7 +2152,7 @@ mod tests {
 
         let mut node_addresses: Vec<Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(get_random_address_for_testing().into());
+            node_addresses.push(get_random_address_for_testing());
         }
 
         // launch local anvil instance
@@ -2253,7 +2236,7 @@ mod tests {
 
         let mut node_addresses: Vec<Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(get_random_address_for_testing().into());
+            node_addresses.push(get_random_address_for_testing());
         }
 
         // launch local anvil instance
@@ -2326,7 +2309,7 @@ mod tests {
 
         let mut node_addresses: Vec<Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(get_random_address_for_testing().into());
+            node_addresses.push(get_random_address_for_testing());
         }
 
         // launch local anvil instance
@@ -2367,11 +2350,11 @@ mod tests {
 
         debug_node_safe_module_setup_main(
             instances.token.clone(),
-            &node_module.address(),
+            node_module.address(),
             &node_addresses[0],
-            &safe.address(),
-            &instances.channels.address(),
-            &instances.announcements.address(),
+            safe.address(),
+            instances.channels.address(),
+            instances.announcements.address(),
         )
         .await?;
         Ok(())

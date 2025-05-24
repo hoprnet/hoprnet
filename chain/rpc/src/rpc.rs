@@ -313,7 +313,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         match self.node_module.tryGetTarget(target.into()).call().await {
             Ok(returned_result) => Ok(returned_result
                 ._0
-                .then_some(returned_result._1.to_be_bytes_vec().as_slice().into())),
+                .then_some(U256::from_big_endian(returned_result._1.to_be_bytes_vec().as_slice()))),
             Err(e) => Err(e.into()),
         }
     }
@@ -444,7 +444,7 @@ mod tests {
             .with_to(*MULTICALL3_DEPLOYER_ADDRESS)
             .with_value(U256::from(ETH_VALUE_FOR_MULTICALL3_DEPLOYER));
 
-        provider.send_transaction(tx.into()).await?.watch().await?;
+        provider.send_transaction(tx).await?.watch().await?;
 
         provider
             .send_raw_transaction(MULTICALL3_DEPLOY_CODE.as_ref())
@@ -574,7 +574,7 @@ mod tests {
             .transport(transport_client.clone(), transport_client.guess_local());
 
         // Wait until contracts deployments are final
-        sleep((1 + cfg.finality.clone()) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg.clone())?;
 
