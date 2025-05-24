@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["Balance","WxHOPR","XDai"],"trait":["Currency"],"type":["HoprBalance","XDaiBalance"]};
