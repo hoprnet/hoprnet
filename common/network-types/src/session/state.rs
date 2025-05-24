@@ -1070,6 +1070,7 @@ mod tests {
         session::utils::test::{FaultyNetwork, FaultyNetworkConfig, NetworkStats, frames_send_and_recv},
         utils::DuplexIO,
     };
+    use crate::utils::DuplexIO;
 
     const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
@@ -1108,113 +1109,6 @@ mod tests {
         let bob_to_alice = SessionSocket::new("bob", DuplexIO(bob_reader, alice_writer), cfg.clone());
 
         (alice_to_bob, bob_to_alice)
-    }
-
-    async fn send_and_recv<S>(
-        num_frames: usize,
-        frame_size: usize,
-        alice: S,
-        bob: S,
-        timeout: Duration,
-        alice_to_bob_only: bool,
-        randomized_frame_sizes: bool,
-    ) where
-        S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
-    {
-        #[derive(PartialEq, Eq)]
-        enum Direction {
-            Send,
-            Recv,
-            Both,
-        }
-
-        let frame_sizes = if randomized_frame_sizes {
-            let norm_dist = rand_distr::Normal::new(frame_size as f64 * 0.75, frame_size as f64 / 4.0).unwrap();
-            StdRng::from_seed(RNG_SEED)
-                .sample_iter(norm_dist)
-                .map(|s| (s as usize).max(10).min(2 * frame_size))
-                .take(num_frames)
-                .collect::<Vec<_>>()
-        } else {
-            std::iter::repeat_n(frame_size, num_frames).collect::<Vec<_>>()
-        };
-
-        let socket_worker = |mut socket: S, d: Direction| {
-            let frame_sizes = frame_sizes.clone();
-            let frame_sizes_total = frame_sizes.iter().sum();
-            async move {
-                let mut received = Vec::with_capacity(frame_sizes_total);
-                let mut sent = Vec::with_capacity(frame_sizes_total);
-
-                if d == Direction::Send || d == Direction::Both {
-                    for frame_size in &frame_sizes {
-                        let mut write = vec![0u8; *frame_size];
-                        hopr_crypto_random::random_fill(&mut write);
-                        let _ = socket.write(&write).await?;
-                        sent.extend(write);
-                    }
-                }
-
-                if d == Direction::Recv || d == Direction::Both {
-                    // Either read everything or timeout trying
-                    while received.len() < frame_sizes_total {
-                        let mut buffer = [0u8; 2048];
-                        let read = socket.read(&mut buffer).await?;
-                        received.extend(buffer.into_iter().take(read));
-                    }
-                }
-
-                // TODO: fix this so it works properly
-                // We cannot close immediately as some ack/resends might be ongoing
-                // socket.close().await.unwrap();
-
-                Ok::<_, std::io::Error>((sent, received))
-            }
-        };
-
-        let alice_worker = tokio::task::spawn(socket_worker(
-            alice,
-            if alice_to_bob_only {
-                Direction::Send
-            } else {
-                Direction::Both
-            },
-        ));
-        let bob_worker = tokio::task::spawn(socket_worker(
-            bob,
-            if alice_to_bob_only {
-                Direction::Recv
-            } else {
-                Direction::Both
-            },
-        ));
-
-        let send_recv = futures::future::join(
-            async move { alice_worker.await.expect("alice should not fail") },
-            async move { bob_worker.await.expect("bob should not fail") },
-        );
-        let timeout = tokio::time::sleep(timeout);
-
-        pin_mut!(send_recv);
-        pin_mut!(timeout);
-
-        match futures::future::select(send_recv, timeout).await {
-            Either::Left(((Ok((alice_sent, alice_recv)), Ok((bob_sent, bob_recv))), _)) => {
-                assert_eq!(
-                    hex::encode(alice_sent),
-                    hex::encode(bob_recv),
-                    "alice sent must be equal to bob received"
-                );
-                assert_eq!(
-                    hex::encode(bob_sent),
-                    hex::encode(alice_recv),
-                    "bob sent must be equal to alice received",
-                );
-            }
-            Either::Left(((Err(e), _), _)) => panic!("alice send recv error: {e}"),
-            Either::Left(((_, Err(e)), _)) => panic!("bob send recv error: {e}"),
-            Either::Right(_) => panic!("timeout"),
-        }
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
