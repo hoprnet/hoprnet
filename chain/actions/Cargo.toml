@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-actions"
-version = "0.7.4"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "High-level Core-Ethereum functions that translate to on-chain transactions"
@@ -25,10 +25,14 @@ prometheus = [
 ]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = [
+  "essentials",
+  "json-rpc",
+  "node-bindings",
+] }
 async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
-ethers = { workspace = true, default-features = false }
 futures = { workspace = true }
 futures-timer = { workspace = true }
 lazy_static = { workspace = true }
@@ -54,5 +58,6 @@ anyhow = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
 tokio = { workspace = true }
+test-log = { workspace = true }
 
 hopr-crypto-random = { workspace = true }

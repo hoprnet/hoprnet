@@ -205,7 +205,7 @@ jobs:
           done
 
       - name: Create Release
-        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         with:
           body_path: docs/changelog/changelog.md
           prerelease: ${{ steps.setup.outputs.prerelease }}
@@ -293,6 +293,33 @@ jobs:
     with:
       branch: ${{ github.event.pull_request.base.ref }}
       type: merge
+
+  notify_failure:
+    name: Notify in Zulip on merge pipeline failure
+    needs:
+      - cleanup_actions
+      - build_docker
+      - cache_deps
+      - load_test
+      - build_dappnode
+      - build_pluto
+      - docs
+      - bencher
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify failed merge pipeline
+        uses: zulip/github-actions-zulip/send-message@e4c8f27c732ba9bd98ac6be0583096dea82feea5 # v1.0.2
+        with:
+          api-key: ${{ secrets.ZULIP_API_KEY }}
+          email: ${{ secrets.ZULIP_EMAIL }}
+          organization-url: "https://hopr.zulipchat.com"
+          type: "stream"
+          to: "HOPRd"
+          topic: "Core"
+          content: |
+            The merge pipeline failed for pull request [#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}](https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }})
+
 
   notify:
     name: Notify Changes

@@ -1,5 +1,6 @@
-use crate::BackendType;
 use sea_orm_migration::prelude::*;
+
+use crate::BackendType;
 
 #[derive(DeriveMigrationName)]
 #[allow(dead_code)] // backend type not supported yet but added for future compatibility

@@ -1,8 +1,6 @@
 use libp2p_identity::PeerId;
 
-use crate::errors::CryptoError;
-use crate::keypairs::OffchainKeypair;
-use crate::types::OffchainPublicKey;
+use crate::{errors::CryptoError, keypairs::OffchainKeypair, types::OffchainPublicKey};
 
 /// Performs randomized encryption of the given data, so that
 /// only the recipient with the given `peer_id` can [decrypt it](unseal_data).
@@ -30,10 +28,12 @@ pub fn unseal_data(data: &[u8], keypair: &OffchainKeypair) -> crate::errors::Res
 
 #[cfg(test)]
 mod tests {
+    use std::ops::Not;
+
+    use hex_literal::hex;
+
     use super::*;
     use crate::keypairs::Keypair;
-    use hex_literal::hex;
-    use std::ops::Not;
 
     #[test]
     fn seal_unseal_should_be_identity() -> anyhow::Result<()> {

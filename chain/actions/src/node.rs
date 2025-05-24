@@ -10,31 +10,36 @@
 //!
 //! All necessary pre-requisites are checked by the implementation before the respective [Action] is submitted
 //! to the [ActionQueue](crate::action_queue::ActionQueue).
+
 use async_trait::async_trait;
 use hopr_chain_types::actions::Action;
-use hopr_crypto_types::keypairs::OffchainKeypair;
-use hopr_crypto_types::prelude::Keypair;
+use hopr_crypto_types::{keypairs::OffchainKeypair, prelude::Keypair};
 use hopr_db_sql::accounts::HoprDbAccountOperations;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use multiaddr::Multiaddr;
 use tracing::info;
 
-use crate::action_queue::PendingAction;
-use crate::errors::{
-    ChainActionsError::{AlreadyAnnounced, InvalidArguments},
-    Result,
+use crate::{
+    ChainActions,
+    action_queue::PendingAction,
+    errors::{
+        ChainActionsError::{AlreadyAnnounced, InvalidArguments},
+        Result,
+    },
 };
-use crate::ChainActions;
 
-/// Contains all on-chain calls specific to HOPR node itself.
+/// Contains all on-chain calls specific to the HOPR node itself.
 #[async_trait]
 pub trait NodeActions {
     /// Withdraws the specified `amount` of tokens to the given `recipient`.
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction>;
+    async fn withdraw(&self, recipient: Address, amount: HoprBalance) -> Result<PendingAction>;
+
+    /// Withdraws the specified `amount` of native coins to the given `recipient`.
+    async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> Result<PendingAction>;
 
     /// Announces node on-chain with key binding.
-    /// The operation should also check if such announcement has not been already made on-chain.
+    /// The operation should also check if such an announcement has not been already made on-chain.
     async fn announce(&self, multiaddrs: &[Multiaddr], offchain_key: &OffchainKeypair) -> Result<PendingAction>;
 
     /// Registers the safe address with the node
@@ -47,15 +52,23 @@ where
     Db: HoprDbAccountOperations + Clone + Send + Sync + std::fmt::Debug,
 {
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<PendingAction> {
-        if amount.eq(&amount.of_same("0")) {
-            return Err(InvalidArguments("cannot withdraw zero amount".into()));
+    async fn withdraw(&self, recipient: Address, amount: HoprBalance) -> Result<PendingAction> {
+        if !amount.is_zero() {
+            info!(%amount, %recipient, "initiating withdrawal");
+            self.tx_sender.send(Action::Withdraw(recipient, amount)).await
+        } else {
+            Err(InvalidArguments("cannot withdraw zero amount".into()))
         }
+    }
 
-        // TODO: should we check native/token balance here before withdrawing ?
-
-        info!(%amount, %recipient, "initiating withdrawal");
-        self.tx_sender.send(Action::Withdraw(recipient, amount)).await
+    #[tracing::instrument(level = "debug", skip(self))]
+    async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> Result<PendingAction> {
+        if !amount.is_zero() {
+            info!(%amount, %recipient, "initiating native withdrawal");
+            self.tx_sender.send(Action::WithdrawNative(recipient, amount)).await
+        } else {
+            Err(InvalidArguments("cannot withdraw zero amount".into()))
+        }
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -88,24 +101,30 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
-    use crate::action_state::MockActionState;
-    use crate::errors::ChainActionsError;
-    use crate::node::NodeActions;
-    use crate::ChainActions;
+    use std::str::FromStr;
+
     use futures::FutureExt;
     use hex_literal::hex;
-    use hopr_chain_types::actions::Action;
-    use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
+    use hopr_chain_types::{
+        actions::Action,
+        chain_events::{ChainEventType, SignificantChainEvent},
+    };
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::accounts::HoprDbAccountOperations;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::{api::info::DomainSeparator, info::HoprDbInfoOperations};
+    use hopr_db_sql::{
+        accounts::HoprDbAccountOperations, api::info::DomainSeparator, db::HoprDb, info::HoprDbInfoOperations,
+    };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use multiaddr::Multiaddr;
-    use std::str::FromStr;
+
+    use crate::{
+        ChainActions,
+        action_queue::{ActionQueue, MockTransactionExecutor},
+        action_state::MockActionState,
+        errors::ChainActionsError,
+        node::NodeActions,
+    };
 
     lazy_static::lazy_static! {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -125,7 +144,7 @@ mod tests {
             .await?;
 
         let ma = announce_multiaddr.clone();
-        let pubkey_clone = ALICE_OFFCHAIN.public().clone();
+        let pubkey_clone = *ALICE_OFFCHAIN.public();
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
             .expect_announce()
@@ -137,7 +156,7 @@ mod tests {
             .returning(move |_| Ok(random_hash));
 
         let ma = announce_multiaddr.clone();
-        let pk = ALICE_OFFCHAIN.public().clone();
+        let pk = *ALICE_OFFCHAIN.public();
         let mut indexer_action_tracker = MockActionState::new();
         indexer_action_tracker
             .expect_register_expectation()
@@ -205,7 +224,7 @@ mod tests {
 
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
-        let res = actions.announce(&[announce_multiaddr], &*ALICE_OFFCHAIN).await;
+        let res = actions.announce(&[announce_multiaddr], &ALICE_OFFCHAIN).await;
         assert!(
             matches!(res, Err(ChainActionsError::AlreadyAnnounced)),
             "must not be able to re-announce with same address"
@@ -216,7 +235,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_withdraw() -> anyhow::Result<()> {
-        let stake = Balance::new(10_u32, BalanceType::HOPR);
+        let stake = HoprBalance::from(10_u32);
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
@@ -273,7 +292,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .withdraw(*BOB, Balance::zero(BalanceType::HOPR))
+                    .withdraw(*BOB, HoprBalance::zero())
                     .await
                     .err()
                     .expect("must be error"),

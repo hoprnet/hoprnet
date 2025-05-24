@@ -1,8 +1,7 @@
 #[path = "../tests/common/mod.rs"]
 mod common;
-use common::{create_dbs, create_minimal_topology, random_packets_of_count, resolve_mock_path, PEERS, PEERS_CHAIN};
-
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use common::{PEERS, PEERS_CHAIN, create_dbs, create_minimal_topology, random_packets_of_count, resolve_mock_path};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::StreamExt;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
@@ -58,11 +57,12 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                             ResolvedTransportRouting,
                             PacketSendFinalizer,
                         )>();
-                        let (api_recv_tx, _api_recv_rx) = futures::channel::mpsc::unbounded::<ApplicationData>();
+                        let (api_recv_tx, _api_recv_rx) =
+                            futures::channel::mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
 
                         let cfg = PacketInteractionConfig {
                             packet_keypair: (&PEERS[TESTED_PEER_ID]).clone(),
-                            outgoing_ticket_win_prob: Some(1.0),
+                            outgoing_ticket_win_prob: Some(WinningProbability::ALWAYS),
                             outgoing_ticket_price: Some(Balance::new(1, BalanceType::HOPR)),
                         };
 

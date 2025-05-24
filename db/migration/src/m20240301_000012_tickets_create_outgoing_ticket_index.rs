@@ -1,5 +1,6 @@
-use crate::BackendType;
 use sea_orm_migration::prelude::*;
+
+use crate::BackendType;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration(pub crate::BackendType);

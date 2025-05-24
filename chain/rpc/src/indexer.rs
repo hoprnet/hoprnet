@@ -7,20 +7,22 @@
 //! historical blockchain data.
 //!
 //! For details on the Indexer see the `chain-indexer` crate.
+use std::pin::Pin;
+
+use alloy::{providers::Provider, rpc::types::Filter};
 use async_stream::stream;
 use async_trait::async_trait;
-use ethers::providers::{JsonRpcClient, Middleware};
-use futures::stream::BoxStream;
-use futures::{Stream, StreamExt};
-use std::pin::Pin;
-use tracing::{debug, error, trace, warn};
-
-use crate::errors::{Result, RpcError, RpcError::FilterIsEmpty};
-use crate::rpc::RpcOperations;
-use crate::{BlockWithLogs, HoprIndexerRpcOperations, HttpRequestor, Log, LogFilter};
-
+use futures::{Stream, StreamExt, stream::BoxStream};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
+use tracing::{debug, error, trace, warn};
+
+use crate::{
+    BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter,
+    errors::{Result, RpcError, RpcError::FilterIsEmpty},
+    rpc::RpcOperations,
+    transport::HttpRequestor,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -32,23 +34,16 @@ lazy_static::lazy_static! {
 }
 
 /// Splits the range between `from_block` and `to_block` (inclusive)
-/// to chunks of maximum size `max_chunk_size` and creates [ethers::types::Filter] for each chunk
+/// to chunks of maximum size `max_chunk_size` and creates [alloy::rpc::types::Filter] for each chunk
 /// using the given [LogFilter].
-fn split_range<'a>(
-    filter: LogFilter,
-    from_block: u64,
-    to_block: u64,
-    max_chunk_size: u64,
-) -> BoxStream<'a, ethers::types::Filter> {
+fn split_range<'a>(filter: LogFilter, from_block: u64, to_block: u64, max_chunk_size: u64) -> BoxStream<'a, Filter> {
     assert!(from_block <= to_block, "invalid block range");
     assert!(max_chunk_size > 0, "chunk size must be greater than 0");
 
     futures::stream::unfold((from_block, to_block), move |(start, to)| {
         if start <= to {
             let end = to_block.min(start + max_chunk_size - 1);
-            let filter = ethers::types::Filter::from(filter.clone())
-                .from_block(start)
-                .to_block(end);
+            let filter = Filter::from(filter.clone()).from_block(start).to_block(end);
             futures::future::ready(Some((filter, (end + 1, to))))
         } else {
             futures::future::ready(None)
@@ -57,7 +52,8 @@ fn split_range<'a>(
     .boxed()
 }
 
-impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R> {
+// impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R> {
+impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
     /// Retrieves logs in the given range (`from_block` and `to_block` are inclusive).
     fn stream_logs(&self, filter: LogFilter, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
         let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
@@ -93,7 +89,7 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R>
             })
             .flat_map(|result| {
                 futures::stream::iter(match result {
-                    Ok(logs) => logs.into_iter().map(|log| Ok(Log::from(log))).collect::<Vec<_>>(),
+                    Ok(logs) => logs.into_iter().map(|log| Ok(Log::try_from(log)?)).collect::<Vec<_>>(),
                     Err(e) => vec![Err(RpcError::from(e))],
                 })
             })
@@ -102,7 +98,7 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R>
 }
 
 #[async_trait]
-impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprIndexerRpcOperations for RpcOperations<P, R> {
+impl<R: HttpRequestor + 'static + Clone> HoprIndexerRpcOperations for RpcOperations<R> {
     async fn block_number(&self) -> Result<u64> {
         self.get_block_number().await
     }
@@ -225,42 +221,51 @@ impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> HoprIndexerRpcOpera
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
-    use ethers::contract::EthEvent;
-    use futures::StreamExt;
     use std::time::Duration;
+
+    use alloy::{
+        primitives::U256,
+        rpc::{client::ClientBuilder, types::Filter},
+        sol_types::SolEvent,
+        transports::{http::ReqwestTransport, layers::RetryBackoffLayer},
+    };
+    use anyhow::Context;
+    use futures::StreamExt;
+    use hopr_async_runtime::prelude::{sleep, spawn};
+    use hopr_bindings::{
+        hoprchannelsevents::HoprChannelsEvents::{ChannelBalanceIncreased, ChannelOpened},
+        hoprtoken::HoprToken::{Approval, Transfer},
+    };
+    use hopr_chain_types::{ContractAddresses, ContractInstances};
+    use hopr_crypto_types::{
+        keypairs::{ChainKeypair, Keypair},
+        types::Hash,
+    };
     use tokio::time::timeout;
     use tracing::debug;
 
-    use hopr_async_runtime::prelude::{sleep, spawn};
-    use hopr_bindings::hopr_channels::*;
-    use hopr_bindings::hopr_token::{ApprovalFilter, TransferFilter};
-    use hopr_chain_types::{ContractAddresses, ContractInstances};
-    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+    use crate::{
+        BlockWithLogs, HoprIndexerRpcOperations, LogFilter,
+        client::create_rpc_client_to_anvil,
+        errors::RpcError,
+        indexer::split_range,
+        rpc::{RpcOperations, RpcOperationsConfig},
+    };
 
-    use crate::client::reqwest_client::ReqwestRequestor;
-    use crate::client::{create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy};
-    use crate::errors::RpcError;
-    use crate::indexer::split_range;
-    use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
-
-    fn filter_bounds(filter: &ethers::types::Filter) -> anyhow::Result<(u64, u64)> {
+    fn filter_bounds(filter: &Filter) -> anyhow::Result<(u64, u64)> {
         Ok((
             filter
                 .block_option
                 .get_from_block()
                 .context("a value should be present")?
                 .as_number()
-                .context("a value should be convertible")?
-                .as_u64(),
+                .context("a value should be convertible")?,
             filter
                 .block_option
                 .get_to_block()
                 .context("a value should be present")?
                 .as_number()
-                .context("a value should be convertible")?
-                .as_u64(),
+                .context("a value should be convertible")?,
         ))
     }
 
@@ -304,11 +309,11 @@ mod tests {
         let anvil = hopr_chain_types::utils::create_anvil(Some(expected_block_time));
         let chain_key_0 = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref())?;
 
-        let client = JsonRpcProviderClient::new(
-            &anvil.endpoint(),
-            ReqwestRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
+
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new(2, 100, 100))
+            .transport(transport_client.clone(), transport_client.guess_local());
 
         let cfg = RpcOperationsConfig {
             finality: 2,
@@ -320,7 +325,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
         let b1 = rpc.block_number().await?;
 
@@ -345,15 +350,23 @@ mod tests {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
         let tokens_minted_at =
-            hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+            hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128))
+                .await?
+                .unwrap();
         debug!("tokens were minted at block {tokens_minted_at}");
 
         let contract_addrs = ContractAddresses::from(&contract_instances);
+
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
+
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new(2, 100, 100))
+            .transport(transport_client.clone(), transport_client.guess_local());
 
         let cfg = RpcOperationsConfig {
             tx_polling_interval: Duration::from_millis(10),
@@ -363,24 +376,18 @@ mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(
-            &anvil.endpoint(),
-            ReqwestRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
-
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.token, contract_addrs.channels],
             topics: vec![
-                TransferFilter::signature().into(),
-                ApprovalFilter::signature().into(),
-                ChannelOpenedFilter::signature().into(),
-                ChannelBalanceIncreasedFilter::signature().into(),
+                Hash::from(Approval::SIGNATURE_HASH.0),
+                Hash::from(Transfer::SIGNATURE_HASH.0),
+                Hash::from(ChannelOpened::SIGNATURE_HASH.0),
+                Hash::from(ChannelBalanceIncreased::SIGNATURE_HASH.0),
             ],
         };
 
@@ -393,18 +400,17 @@ mod tests {
             Ok::<_, RpcError>(
                 rpc.try_stream_logs(1, log_filter)?
                     .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
-                    .take(1)
-                    .collect::<Vec<BlockWithLogs>>()
+                    .next()
                     .await,
             )
         });
 
         // Spawn channel funding
-        hopr_chain_types::utils::fund_channel(
+        let _ = hopr_chain_types::utils::fund_channel(
             chain_key_1.public().to_address(),
             contract_instances.token,
             contract_instances.channels,
-            1_u128.into(),
+            U256::from(1_u128),
         )
         .await;
 
@@ -412,31 +418,37 @@ mod tests {
             .await???;
 
         // The last block must contain all 4 events
-        let last_block_logs = retrieved_logs.last().context("a log should be present")?.clone().logs;
-        let channel_open_filter = ChannelOpenedFilter::signature();
-        let channel_balance_filter = ChannelBalanceIncreasedFilter::signature();
-        let approval_filter = ApprovalFilter::signature();
-        let transfer_filter = TransferFilter::signature();
+        let last_block_logs = retrieved_logs
+            .into_iter()
+            .next_back()
+            .context("a log should be present")?
+            .clone()
+            .logs;
+
+        let channel_open_filter = ChannelOpened::SIGNATURE_HASH;
+        let channel_balance_filter = ChannelBalanceIncreased::SIGNATURE_HASH;
+        let approval_filter = Approval::SIGNATURE_HASH;
+        let transfer_filter = Transfer::SIGNATURE_HASH;
 
         debug!(
             "channel_open_filter: {:?} - {:?}",
             channel_open_filter,
-            channel_open_filter.as_ref().to_vec()
+            channel_open_filter.0.to_vec()
         );
         debug!(
             "channel_balance_filter: {:?} - {:?}",
             channel_balance_filter,
-            channel_balance_filter.as_ref().to_vec()
+            channel_balance_filter.0.to_vec()
         );
         debug!(
             "approval_filter: {:?} - {:?}",
             approval_filter,
-            approval_filter.as_ref().to_vec()
+            approval_filter.0.to_vec()
         );
         debug!(
             "transfer_filter: {:?} - {:?}",
             transfer_filter,
-            transfer_filter.as_ref().to_vec()
+            transfer_filter.0.to_vec()
         );
         debug!("logs: {:#?}", last_block_logs);
 
@@ -469,8 +481,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel(
-    ) -> anyhow::Result<()> {
+    async fn test_try_stream_logs_should_contain_only_channel_logs_when_filtered_on_funding_channel()
+    -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let expected_block_time = Duration::from_secs(1);
@@ -481,12 +493,14 @@ mod tests {
 
         // Deploy contracts
         let contract_instances = {
-            let client = create_rpc_client_to_anvil(ReqwestRequestor::default(), &anvil, &chain_key_0);
+            let client = create_rpc_client_to_anvil(&anvil, &chain_key_0);
             ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
         let tokens_minted_at =
-            hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), 1000_u128.into()).await;
+            hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128))
+                .await?
+                .unwrap();
         debug!("tokens were minted at block {tokens_minted_at}");
 
         let contract_addrs = ContractAddresses::from(&contract_instances);
@@ -500,22 +514,22 @@ mod tests {
             ..RpcOperationsConfig::default()
         };
 
-        let client = JsonRpcProviderClient::new(
-            &anvil.endpoint(),
-            ReqwestRequestor::default(),
-            SimpleJsonRpcRetryPolicy::default(),
-        );
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
+
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new(2, 100, 100))
+            .transport(transport_client.clone(), transport_client.guess_local());
 
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(client, ReqwestRequestor::default(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
         let log_filter = LogFilter {
             address: vec![contract_addrs.channels],
             topics: vec![
-                ChannelOpenedFilter::signature().into(),
-                ChannelBalanceIncreasedFilter::signature().into(),
+                Hash::from(ChannelOpened::SIGNATURE_HASH.0),
+                Hash::from(ChannelBalanceIncreased::SIGNATURE_HASH.0),
             ],
         };
 
@@ -528,6 +542,7 @@ mod tests {
             Ok::<_, RpcError>(
                 rpc.try_stream_logs(1, log_filter)?
                     .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
+                    // .next()
                     .take(1)
                     .collect::<Vec<BlockWithLogs>>()
                     .await,
@@ -535,11 +550,11 @@ mod tests {
         });
 
         // Spawn channel funding
-        hopr_chain_types::utils::fund_channel(
+        let _ = hopr_chain_types::utils::fund_channel(
             chain_key_1.public().to_address(),
             contract_instances.token,
             contract_instances.channels,
-            1_u128.into(),
+            U256::from(1_u128),
         )
         .await;
 
@@ -552,8 +567,9 @@ mod tests {
             .context("a value should be present")?
             .clone()
             .logs;
-        let channel_open_filter: [u8; 32] = ChannelOpenedFilter::signature().into();
-        let channel_balance_filter: [u8; 32] = ChannelBalanceIncreasedFilter::signature().into();
+
+        let channel_open_filter: [u8; 32] = ChannelOpened::SIGNATURE_HASH.0;
+        let channel_balance_filter: [u8; 32] = ChannelBalanceIncreased::SIGNATURE_HASH.0;
 
         assert!(
             last_block_logs

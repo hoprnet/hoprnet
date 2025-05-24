@@ -1,11 +1,12 @@
 use async_trait::async_trait;
 use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_db_api::errors::DbError;
-use hopr_db_api::{errors::Result, resolver::HoprDbResolverOperations};
+use hopr_db_api::{
+    errors::{DbError, Result},
+    resolver::HoprDbResolverOperations,
+};
 use hopr_primitive_types::primitives::Address;
 
-use crate::accounts::HoprDbAccountOperations;
-use crate::db::HoprDb;
+use crate::{accounts::HoprDbAccountOperations, db::HoprDb};
 
 #[async_trait]
 impl HoprDbResolverOperations for HoprDb {
@@ -30,11 +31,12 @@ impl HoprDbResolverOperations for HoprDb {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use hopr_crypto_types::prelude::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_internal_types::account::{AccountEntry, AccountType};
     use hopr_primitive_types::prelude::ToHex;
     use sea_orm::{EntityTrait, Set};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_get_offchain_key_should_return_nothing_if_a_mapping_to_chain_key_does_not_exist() -> anyhow::Result<()>

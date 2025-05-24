@@ -1,10 +1,10 @@
+use std::sync::Arc;
+
 use hopr_crypto_packet::errors::TicketValidationError;
 use hopr_crypto_types::{prelude::CryptoError, types::Hash};
 use hopr_db_entity::errors::DbEntityError;
-use hopr_internal_types::errors::CoreTypesError;
-use hopr_internal_types::tickets::Ticket;
+use hopr_internal_types::{errors::CoreTypesError, tickets::Ticket};
 use sea_orm::TransactionError;
-use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -20,9 +20,6 @@ pub enum DbSqlError {
 
     #[error("list of logs is empty")]
     EmptyLogsList,
-
-    #[error("no surb available for the given pseudonym")]
-    NoSurbAvailable,
 
     #[error("log status could not be updated")]
     UpdateLogStatusError,

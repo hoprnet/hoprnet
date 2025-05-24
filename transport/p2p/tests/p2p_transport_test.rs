@@ -5,17 +5,16 @@ use std::{
 
 use anyhow::Context;
 use futures::{
-    channel::mpsc::{Receiver, Sender},
     SinkExt, StreamExt,
+    channel::mpsc::{Receiver, Sender},
 };
-use lazy_static::lazy_static;
-use libp2p::{Multiaddr, PeerId};
-
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_platform::time::native::current_time;
 use hopr_transport_network::{network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_transport_p2p::HoprSwarm;
-use hopr_transport_protocol::{config::ProtocolConfig, PeerDiscovery};
+use hopr_transport_protocol::{PeerDiscovery, config::ProtocolConfig};
+use lazy_static::lazy_static;
+use libp2p::{Multiaddr, PeerId};
 
 pub fn random_free_local_ipv4_port() -> Option<u16> {
     let socket = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0);
@@ -123,13 +122,12 @@ impl Drop for SelfClosingJoinHandle {
     }
 }
 
+use hopr_crypto_packet::prelude::HoprPacket;
 use more_asserts::assert_gt;
 use tokio::{
-    task::{spawn, JoinHandle},
+    task::{JoinHandle, spawn},
     time::{sleep, timeout},
 };
-
-use hopr_crypto_packet::prelude::HoprPacket;
 
 #[ignore]
 #[tokio::test]

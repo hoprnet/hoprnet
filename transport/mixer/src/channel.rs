@@ -1,22 +1,22 @@
-use futures::{FutureExt, SinkExt, Stream, StreamExt};
-use futures_timer::Delay;
 use std::{
     cmp::Reverse,
     collections::BinaryHeap,
     future::poll_fn,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     task::Poll,
     time::Duration,
 };
+
+use futures::{FutureExt, SinkExt, Stream, StreamExt};
+use futures_timer::Delay;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::SimpleGauge;
 use tracing::{error, trace};
 
 use crate::{config::MixerConfig, data::DelayedData};
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleGauge;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -330,9 +330,8 @@ mod tests {
         let elapsed = start.elapsed()?;
 
         assert!(elapsed < MAXIMUM_SINGLE_DELAY_DURATION + PROCESSING_LEEWAY);
-        Ok(assert!(
-            elapsed > Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-        ))
+        assert!(elapsed > Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS));
+        Ok(())
     }
 
     #[tokio::test]
@@ -355,9 +354,8 @@ mod tests {
         let elapsed = start.elapsed()?;
 
         assert!(elapsed < MAXIMUM_SINGLE_DELAY_DURATION + PROCESSING_LEEWAY);
-        Ok(assert!(
-            elapsed > Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-        ))
+        assert!(elapsed > Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS));
+        Ok(())
     }
 
     #[tokio::test]
@@ -407,7 +405,8 @@ mod tests {
         .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
-        Ok(assert_ne!(input, mixed_output))
+        assert_ne!(input, mixed_output);
+        Ok(())
     }
 
     #[tokio::test]
@@ -431,7 +430,8 @@ mod tests {
         .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
-        Ok(assert_ne!(input, mixed_output))
+        assert_ne!(input, mixed_output);
+        Ok(())
     }
 
     #[tokio::test]
@@ -456,7 +456,8 @@ mod tests {
         .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
-        Ok(assert_ne!(input, mixed_output))
+        assert_ne!(input, mixed_output);
+        Ok(())
     }
 
     #[tokio::test]
@@ -483,6 +484,8 @@ mod tests {
         .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
-        Ok(assert_eq!(input, mixed_output))
+        assert_eq!(input, mixed_output);
+
+        Ok(())
     }
 }

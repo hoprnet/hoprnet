@@ -1,12 +1,15 @@
+use std::fmt::{Display, Formatter};
+
 use bloomfilter::Bloom;
-use hopr_crypto_random::{random_bytes, Randomizable};
+use hopr_crypto_random::{Randomizable, random_bytes};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::fmt::{Display, Formatter};
 use tracing::warn;
 
-use crate::errors::{CoreTypesError, Result};
-use crate::prelude::UnacknowledgedTicket;
+use crate::{
+    errors::{CoreTypesError, Result},
+    prelude::UnacknowledgedTicket,
+};
 
 /// Number of intermediate hops: 3 relayers and 1 destination
 pub const INTERMEDIATE_HOPS: usize = 3;
@@ -17,12 +20,6 @@ pub const DEFAULT_MINIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0;
 /// Default maximum incoming ticket winning probability, above which tickets will not be accepted
 /// due to privacy.
 pub const DEFAULT_MAXIMUM_INCOMING_TICKET_WIN_PROB: f64 = 1.0; // TODO: change this in 3.0
-
-/// Default ticket winning probability that will be printed on outgoing tickets
-pub const DEFAULT_OUTGOING_TICKET_WIN_PROB: f64 = 1.0;
-
-/// The lowest possible ticket-winning probability due to SC representation limit.
-pub const LOWEST_POSSIBLE_WINNING_PROB: f64 = 0.00000001;
 
 /// Tags are currently 16-bit unsigned integers
 pub type Tag = u16;
@@ -180,12 +177,11 @@ impl<'de> serde::Deserialize<'de> for SerializableBloomWrapper {
 }
 
 impl TagBloomFilter {
-    // Allowed false positive rate. This amounts to 0.001% chance
-    const FALSE_POSITIVE_RATE: f64 = 0.00001_f64;
-
     // The default maximum number of packet tags this Bloom filter can hold.
     // After these many packets, the Bloom filter resets and packet replays are possible.
     const DEFAULT_MAX_ITEMS: usize = 10_000_000;
+    // Allowed false positive rate. This amounts to 0.001% chance
+    const FALSE_POSITIVE_RATE: f64 = 0.00001_f64;
 
     /// Returns the current number of items in this Bloom filter.
     pub fn count(&self) -> usize {
@@ -292,7 +288,9 @@ impl Display for ApplicationData {
 }
 
 impl ApplicationData {
-    const TAG_SIZE: usize = size_of::<Tag>(); // minimum size
+    const TAG_SIZE: usize = size_of::<Tag>();
+
+    // minimum size
 
     pub fn from_bytes(data: &[u8]) -> hopr_primitive_types::errors::Result<Self> {
         if data.len() >= Self::TAG_SIZE {

@@ -1,6 +1,6 @@
-use hopr_primitive_types::prelude::Balance;
+use hopr_primitive_types::prelude::HoprBalance;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{DisplayFromStr, serde_as};
 use validator::Validate;
 
 /// Configuration of the P2P protocols.
@@ -14,8 +14,11 @@ pub struct ProtocolConfig {
     pub outgoing_ticket_winning_prob: Option<f64>,
     #[serde_as(as = "Option<DisplayFromStr>")]
     /// Possible override of the network outgoing ticket price.
-    pub outgoing_ticket_price: Option<Balance>,
+    pub outgoing_ticket_price: Option<HoprBalance>,
     /// `heartbeat` protocol config
     #[serde(default)]
     pub heartbeat: crate::heartbeat::config::HeartbeatProtocolConfig,
+    /// auto-nat server port
+    #[serde(default)]
+    pub autonat_port: Option<u16>,
 }

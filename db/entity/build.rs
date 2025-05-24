@@ -1,7 +1,9 @@
 //! Creates a build specification for the ORM codegen.
 
-use std::env::{self, temp_dir};
-use std::path::Path;
+use std::{
+    env::{self, temp_dir},
+    path::Path,
+};
 
 use anyhow::Context;
 use clap::Parser;

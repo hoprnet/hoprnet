@@ -1,22 +1,21 @@
-use std::collections::hash_set::HashSet;
-use std::time::{Duration, SystemTime};
+use std::{
+    collections::hash_set::HashSet,
+    time::{Duration, SystemTime},
+};
 
 use futures::StreamExt;
-use libp2p_identity::PeerId;
-
-use multiaddr::Multiaddr;
-use tracing::debug;
-
 pub use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin, PeerSelector, PeerStatus, Stats};
 use hopr_platform::time::native::current_time;
-
-use crate::config::NetworkConfig;
-
+use libp2p_identity::PeerId;
+use multiaddr::Multiaddr;
+use tracing::debug;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
     hopr_primitive_types::prelude::*,
 };
+
+use crate::config::NetworkConfig;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -354,14 +353,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::network::{Health, Network, NetworkConfig, NetworkTriggeredEvent, PeerOrigin};
+    use std::{ops::Add, time::Duration};
+
     use anyhow::Context;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
     use libp2p_identity::PeerId;
-    use std::ops::Add;
-    use std::time::Duration;
+
+    use crate::network::{Health, Network, NetworkConfig, NetworkTriggeredEvent, PeerOrigin};
 
     #[test]
     fn test_network_health_should_serialize_to_a_proper_string() {
@@ -545,8 +545,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time(
-    ) -> anyhow::Result<()> {
+    async fn test_network_should_ignore_a_peer_that_has_reached_lower_thresholds_a_specified_amount_of_time()
+    -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
 
@@ -606,8 +606,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_network_peer_should_be_listed_for_the_ping_if_last_recorded_later_than_reference(
-    ) -> anyhow::Result<()> {
+    async fn test_network_peer_should_be_listed_for_the_ping_if_last_recorded_later_than_reference()
+    -> anyhow::Result<()> {
         let first: PeerId = OffchainKeypair::random().public().into();
         let second: PeerId = OffchainKeypair::random().public().into();
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -717,8 +717,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_network_should_close_connection_to_peer_once_it_reaches_the_lowest_possible_quality(
-    ) -> anyhow::Result<()> {
+    async fn test_network_should_close_connection_to_peer_once_it_reaches_the_lowest_possible_quality()
+    -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let public = peer;
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -746,8 +746,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public(
-    ) -> anyhow::Result<()> {
+    async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_i_am_public()
+    -> anyhow::Result<()> {
         let me: PeerId = OffchainKeypair::random().public().into();
         let peer: PeerId = OffchainKeypair::random().public().into();
 
@@ -775,8 +775,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_another_high_quality_non_public(
-    ) -> anyhow::Result<()> {
+    async fn test_network_should_be_healthy_when_a_public_peer_is_pingable_with_high_quality_and_another_high_quality_non_public()
+    -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let peer2: PeerId = OffchainKeypair::random().public().into();
 

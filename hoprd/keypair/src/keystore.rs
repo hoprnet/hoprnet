@@ -1,7 +1,7 @@
 // Highly inspired by https://github.com/roynalnaruto/eth-keystore-rs
 
 use hex::{FromHex, ToHex};
-use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::Deserializer, ser::Serializer};
 use uuid::Uuid;
 
 #[derive(Debug, Deserialize, Serialize)]

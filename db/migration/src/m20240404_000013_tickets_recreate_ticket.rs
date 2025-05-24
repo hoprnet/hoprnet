@@ -63,18 +63,18 @@ impl MigrationTrait for Migration {
                             .on_update(ForeignKeyAction::Restrict),
                     )
                     // TODO: is it possible to have to foreign keys between same tables ?
-                    /*.foreign_key(
-                        ForeignKey::create()
-                            .name("fk_ticket_issuer_channel_source")
-                            .from_tbl(Ticket::Table)
-                            .from_col(Ticket::ChannelId)
-                            .from_col(Ticket::Issuer)
-                            .to_tbl(Channel::Table)
-                            .to_col(Channel::ChannelId)
-                            .to_col(Channel::Source)
-                            .on_delete(ForeignKeyAction::Cascade)
-                            .on_update(ForeignKeyAction::Restrict),
-                    )*/
+                    // .foreign_key(
+                    // ForeignKey::create()
+                    // .name("fk_ticket_issuer_channel_source")
+                    // .from_tbl(Ticket::Table)
+                    // .from_col(Ticket::ChannelId)
+                    // .from_col(Ticket::Issuer)
+                    // .to_tbl(Channel::Table)
+                    // .to_col(Channel::ChannelId)
+                    // .to_col(Channel::Source)
+                    // .on_delete(ForeignKeyAction::Cascade)
+                    // .on_update(ForeignKeyAction::Restrict),
+                    // )
                     .to_owned()
             })
             .await?;

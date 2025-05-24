@@ -1,11 +1,9 @@
-use sea_orm::Set;
-
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use sea_orm::Set;
 
-use crate::errors::DbEntityError;
-use crate::ticket;
+use crate::{errors::DbEntityError, ticket};
 
 impl TryFrom<&ticket::Model> for AcknowledgedTicket {
     type Error = DbEntityError;
@@ -18,7 +16,7 @@ impl TryFrom<&ticket::Model> for AcknowledgedTicket {
             .amount(U256::from_be_bytes(&value.amount))
             .index(U256::from_be_bytes(&value.index).as_u64())
             .index_offset(value.index_offset as u32)
-            .win_prob_encoded(
+            .win_prob(
                 value
                     .winning_probability
                     .as_slice()

@@ -37,6 +37,11 @@ prometheus = [
 ]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = [
+  "essentials",
+  "json-rpc",
+  "node-bindings",
+] }
 async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
@@ -76,12 +81,12 @@ hopr-transport = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-ethers = { workspace = true }
 hex-literal = { workspace = true }
 serde_yaml = { workspace = true }
 tracing-test = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+url = { workspace = true }
 
 hopr-crypto-types = { workspace = true }
 hopr-crypto-random = { workspace = true }

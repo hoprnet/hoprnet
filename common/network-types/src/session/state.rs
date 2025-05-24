@@ -85,36 +85,42 @@
 //! during [SessionSocket] construction.
 //!
 //! **For diagrams of individual retransmission situations, see the docs on the [`SessionSocket`] object.**
+use std::{
+    collections::{BTreeSet, HashSet},
+    fmt::{Debug, Display},
+    future::Future,
+    pin::Pin,
+    sync::{
+        Arc,
+        atomic::{AtomicU32, Ordering},
+    },
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
+
 use crossbeam_queue::ArrayQueue;
 use crossbeam_skiplist::SkipMap;
-use dashmap::mapref::entry::Entry;
-use dashmap::DashMap;
-use futures::channel::mpsc::UnboundedSender;
-use futures::future::BoxFuture;
+use dashmap::{DashMap, mapref::entry::Entry};
 use futures::{
-    pin_mut, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
+    AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
+    channel::mpsc::UnboundedSender, future::BoxFuture, pin_mut,
 };
 use governor::Quota;
+use hopr_async_runtime::prelude::spawn;
 use smart_default::SmartDefault;
-use std::collections::{BTreeSet, HashSet};
-use std::fmt::{Debug, Display};
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
 use tracing::{debug, error, trace, warn};
 
-use hopr_async_runtime::prelude::spawn;
-
-use crate::errors::NetworkTypeError;
-use crate::prelude::protocol::SessionMessageIter;
-use crate::session::errors::SessionError;
-use crate::session::frame::{segment, FrameId, FrameReassembler, Segment, SegmentId};
-use crate::session::protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage};
-use crate::session::utils::{RetryResult, RetryToken};
-use crate::utils::AsyncReadStreamer;
+use crate::{
+    errors::NetworkTypeError,
+    prelude::protocol::SessionMessageIter,
+    session::{
+        errors::SessionError,
+        frame::{FrameId, FrameReassembler, Segment, SegmentId, segment},
+        protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
+        utils::{RetryResult, RetryToken},
+    },
+    utils::AsyncReadStreamer,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -146,7 +152,8 @@ impl SessionFeature {
     ///
     /// These include:
     /// - [`SessionFeature::AcknowledgeFrames`]
-    /// - ACK-based ([`SessionFeature::RetransmitFrames`]) and NACK-based ([`SessionFeature::RequestIncompleteFrames`]) retransmission
+    /// - ACK-based ([`SessionFeature::RetransmitFrames`]) and NACK-based ([`SessionFeature::RequestIncompleteFrames`])
+    ///   retransmission
     /// - Frame buffering (no [`SessionFeature::NoDelay`])
     fn default_features() -> Vec<SessionFeature> {
         vec![
@@ -270,12 +277,18 @@ where
 }
 
 impl<const C: usize> SessionState<C> {
+    /// Maximum size of a frame, which is determined by the maximum number of possible segments.
+    const MAX_WRITE_SIZE: usize = SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME * Self::PAYLOAD_CAPACITY;
+    /// How much space for payload there is in a single packet.
+    const PAYLOAD_CAPACITY: usize = C - SessionMessage::<C>::SEGMENT_OVERHEAD;
+
     fn consume_segment(&mut self, segment: Segment) -> crate::errors::Result<()> {
         let id = segment.id();
 
+        trace!(session_id = self.session_id, segment = %id, "received segment");
+
         match self.frame_reassembler.push_segment(segment) {
             Ok(_) => {
-                trace!(session_id = self.session_id, segment = %id, "RECEIVED: segment");
                 match self.incoming_frame_retries.entry(id.0) {
                     Entry::Occupied(e) => {
                         // Receiving a frame segment restarts the retry token for this frame
@@ -287,6 +300,7 @@ impl<const C: usize> SessionState<C> {
                         v.insert(RetryToken::new(self.cfg.backoff_base));
                     }
                 }
+                trace!(session_id = self.session_id, segment = %id, "received segment pushed");
             }
             // The error here is intentionally not propagated
             Err(e) => warn!(session_id = self.session_id, ?id, error = %e, "segment not pushed"),
@@ -299,7 +313,7 @@ impl<const C: usize> SessionState<C> {
         trace!(
             session_id = self.session_id,
             count_of_segments = request.len(),
-            "RECEIVED: request",
+            "received request",
         );
 
         let mut count = 0;
@@ -340,7 +354,7 @@ impl<const C: usize> SessionState<C> {
         trace!(
             session_id = self.session_id,
             count = acked.len(),
-            "RECEIVED: acknowledgement frames",
+            "received acknowledgement frames",
         );
 
         for frame_id in acked {
@@ -470,8 +484,8 @@ impl<const C: usize> SessionState<C> {
     /// If `acknowledged_frames_buffer` is non-zero, the buffer behaves like a ring buffer,
     /// which means if this method is not called sufficiently often, the oldest acknowledged
     /// frame IDs will be discarded.
-    /// Single [message](SessionMessage::Acknowledge) can accommodate up to [`FrameAcknowledgements::MAX_ACK_FRAMES`] frame IDs, so
-    /// this method sends as many messages as needed.
+    /// Single [message](SessionMessage::Acknowledge) can accommodate up to [`FrameAcknowledgements::MAX_ACK_FRAMES`]
+    /// frame IDs, so this method sends as many messages as needed.
     async fn acknowledge_segments(&mut self) -> crate::errors::Result<usize> {
         let mut len = 0;
         let mut msgs = 0;
@@ -586,18 +600,11 @@ impl<const C: usize> SessionState<C> {
 
         trace!(
             session_id = self.session_id,
-            count,
-            "AUTO-RETRANSMIT BATCH COMPLETE: re-sent segments",
+            count, "AUTO-RETRANSMIT BATCH COMPLETE: re-sent segments",
         );
 
         Ok(count)
     }
-
-    /// How much space for payload there is in a single packet.
-    const PAYLOAD_CAPACITY: usize = C - SessionMessage::<C>::SEGMENT_OVERHEAD;
-
-    /// Maximum size of a frame, which is determined by the maximum number of possible segments.
-    const MAX_WRITE_SIZE: usize = SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME * Self::PAYLOAD_CAPACITY;
 
     /// Segments the `data` and sends them as (possibly multiple) [`SessionMessage::Segment`].
     /// Therefore, this method sends as many messages as needed after the data was segmented.
@@ -640,9 +647,7 @@ impl<const C: usize> SessionState<C> {
 
         trace!(
             session_id = self.session_id,
-            frame_id,
-            count,
-            "FRAME SEND COMPLETE: sent segments",
+            frame_id, count, "FRAME SEND COMPLETE: sent segments",
         );
 
         Ok(())
@@ -652,7 +657,6 @@ impl<const C: usize> SessionState<C> {
     /// - [`SessionState::acknowledge_segments`]
     /// - [`SessionState::request_missing_segments`]
     /// - [`SessionState::retransmit_unacknowledged_frames`]
-    ///
     async fn state_loop(&mut self) -> crate::errors::Result<()> {
         // Rate limiter for reassembler evictions:
         // tries to evict 10 times before a frame expires
@@ -773,7 +777,7 @@ impl<const C: usize> Sink<SessionMessage<C>> for SessionState<C> {
 /// See the module docs for details on retransmission.
 ///
 /// # Retransmission driven by the Receiver
-///```mermaid
+/// ```mermaid
 /// sequenceDiagram
 ///     Note over Sender,Receiver: Frame 1
 ///     rect rgb(191, 223, 255)
@@ -788,7 +792,7 @@ impl<const C: usize> Sink<SessionMessage<C>> for SessionState<C> {
 ///     Note left of Sender: Frame 1 dropped from buffer
 ///     end
 ///     Note over Sender,Receiver: Frame 1 delivered
-///```
+/// ```
 ///
 /// # Retransmission driven by the Sender
 /// ```mermaid
@@ -864,11 +868,10 @@ pub struct SessionSocket<const C: usize> {
 }
 
 impl<const C: usize> SessionSocket<C> {
-    /// Payload capacity is MTU minus the sizes of the Session protocol headers.
-    pub const PAYLOAD_CAPACITY: usize = SessionState::<C>::PAYLOAD_CAPACITY;
-
     /// Maximum number of bytes that can be written in a single `poll_write` to the Session.
     pub const MAX_WRITE_SIZE: usize = SessionState::<C>::MAX_WRITE_SIZE;
+    /// Payload capacity is MTU minus the sizes of the Session protocol headers.
+    pub const PAYLOAD_CAPACITY: usize = SessionState::<C>::PAYLOAD_CAPACITY;
 
     /// Create a new socket over the given underlying `transport` that binds the communicating parties.
     /// A human-readable session `id` also must be supplied.
@@ -1051,15 +1054,22 @@ impl<const C: usize> AsyncRead for SessionSocket<C> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::iter::Extend;
 
-    use futures::future::Either;
-    use futures::io::{AsyncReadExt, AsyncWriteExt};
-    use futures::pin_mut;
+    use futures::{
+        future::Either,
+        io::{AsyncReadExt, AsyncWriteExt},
+        pin_mut,
+    };
     use parameterized::parameterized;
+    use rand::{Rng, SeedableRng, rngs::StdRng};
     use test_log::test;
 
-    use crate::session::utils::test::{frames_send_and_recv, FaultyNetwork, FaultyNetworkConfig, NetworkStats};
+    use super::*;
+    use crate::{
+        session::utils::test::{frames_send_and_recv, FaultyNetwork, FaultyNetworkConfig, NetworkStats},
+        utils::DuplexIO,
+    };
     use crate::utils::DuplexIO;
 
     const MTU: usize = 466; // MTU used by HOPR
@@ -1097,6 +1107,113 @@ mod tests {
         let bob_to_alice = SessionSocket::new("bob", DuplexIO(bob_reader, alice_writer), cfg.clone());
 
         (alice_to_bob, bob_to_alice)
+    }
+
+    async fn send_and_recv<S>(
+        num_frames: usize,
+        frame_size: usize,
+        alice: S,
+        bob: S,
+        timeout: Duration,
+        alice_to_bob_only: bool,
+        randomized_frame_sizes: bool,
+    ) where
+        S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
+    {
+        #[derive(PartialEq, Eq)]
+        enum Direction {
+            Send,
+            Recv,
+            Both,
+        }
+
+        let frame_sizes = if randomized_frame_sizes {
+            let norm_dist = rand_distr::Normal::new(frame_size as f64 * 0.75, frame_size as f64 / 4.0).unwrap();
+            StdRng::from_seed(RNG_SEED)
+                .sample_iter(norm_dist)
+                .map(|s| (s as usize).max(10).min(2 * frame_size))
+                .take(num_frames)
+                .collect::<Vec<_>>()
+        } else {
+            std::iter::repeat_n(frame_size, num_frames).collect::<Vec<_>>()
+        };
+
+        let socket_worker = |mut socket: S, d: Direction| {
+            let frame_sizes = frame_sizes.clone();
+            let frame_sizes_total = frame_sizes.iter().sum();
+            async move {
+                let mut received = Vec::with_capacity(frame_sizes_total);
+                let mut sent = Vec::with_capacity(frame_sizes_total);
+
+                if d == Direction::Send || d == Direction::Both {
+                    for frame_size in &frame_sizes {
+                        let mut write = vec![0u8; *frame_size];
+                        hopr_crypto_random::random_fill(&mut write);
+                        let _ = socket.write(&write).await?;
+                        sent.extend(write);
+                    }
+                }
+
+                if d == Direction::Recv || d == Direction::Both {
+                    // Either read everything or timeout trying
+                    while received.len() < frame_sizes_total {
+                        let mut buffer = [0u8; 2048];
+                        let read = socket.read(&mut buffer).await?;
+                        received.extend(buffer.into_iter().take(read));
+                    }
+                }
+
+                // TODO: fix this so it works properly
+                // We cannot close immediately as some ack/resends might be ongoing
+                // socket.close().await.unwrap();
+
+                Ok::<_, std::io::Error>((sent, received))
+            }
+        };
+
+        let alice_worker = tokio::task::spawn(socket_worker(
+            alice,
+            if alice_to_bob_only {
+                Direction::Send
+            } else {
+                Direction::Both
+            },
+        ));
+        let bob_worker = tokio::task::spawn(socket_worker(
+            bob,
+            if alice_to_bob_only {
+                Direction::Recv
+            } else {
+                Direction::Both
+            },
+        ));
+
+        let send_recv = futures::future::join(
+            async move { alice_worker.await.expect("alice should not fail") },
+            async move { bob_worker.await.expect("bob should not fail") },
+        );
+        let timeout = tokio::time::sleep(timeout);
+
+        pin_mut!(send_recv);
+        pin_mut!(timeout);
+
+        match futures::future::select(send_recv, timeout).await {
+            Either::Left(((Ok((alice_sent, alice_recv)), Ok((bob_sent, bob_recv))), _)) => {
+                assert_eq!(
+                    hex::encode(alice_sent),
+                    hex::encode(bob_recv),
+                    "alice sent must be equal to bob received"
+                );
+                assert_eq!(
+                    hex::encode(bob_sent),
+                    hex::encode(alice_recv),
+                    "bob sent must be equal to alice received",
+                );
+            }
+            Either::Left(((Err(e), _), _)) => panic!("alice send recv error: {e}"),
+            Either::Left(((_, Err(e)), _)) => panic!("bob send recv error: {e}"),
+            Either::Right(_) => panic!("timeout"),
+        }
     }
 
     #[parameterized(num_frames = {10, 100, 1000}, frame_size = {1500, 1500, 1500})]
@@ -1354,7 +1471,7 @@ mod tests {
     }
 
     #[test(tokio::test)]
-    async fn receiving_on_disconnected_network_should_timeout() {
+    async fn receiving_on_disconnected_network_should_timeout() -> anyhow::Result<()> {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
             rto_base_receiver: Duration::from_millis(300),
@@ -1371,7 +1488,7 @@ mod tests {
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
         let data = b"will not be delivered!";
 
-        alice_to_bob.write(data.as_ref()).await.unwrap();
+        alice_to_bob.write(data.as_ref()).await?;
 
         let mut out = vec![0u8; data.len()];
         let f1 = bob_to_alice.read_exact(&mut out);
@@ -1383,10 +1500,12 @@ mod tests {
             Either::Left(_) => panic!("should timeout: {:?}", out),
             Either::Right(_) => {}
         }
+
+        Ok(())
     }
 
     #[test(tokio::test)]
-    async fn single_frame_resend_should_be_resent_on_unreliable_network() {
+    async fn single_frame_resend_should_be_resent_on_unreliable_network() -> anyhow::Result<()> {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
             rto_base_receiver: Duration::from_millis(300),
@@ -1403,7 +1522,7 @@ mod tests {
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
         let data = b"will be re-delivered!";
 
-        alice_to_bob.write(data.as_ref()).await.unwrap();
+        alice_to_bob.write(data.as_ref()).await?;
 
         let mut out = vec![0u8; data.len()];
         let f1 = bob_to_alice.read_exact(&mut out);
@@ -1415,5 +1534,7 @@ mod tests {
             Either::Left(_) => {}
             Either::Right(_) => panic!("timeout"),
         }
+
+        Ok(())
     }
 }

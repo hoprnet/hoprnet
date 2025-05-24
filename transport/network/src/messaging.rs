@@ -1,11 +1,9 @@
 use hopr_crypto_random::random_fill;
 use hopr_crypto_types::prelude::blake3_hash;
-use hopr_primitive_types::errors::GeneralError;
-use hopr_primitive_types::prelude::BytesEncodable;
+use hopr_primitive_types::{errors::GeneralError, prelude::BytesEncodable};
 use serde::{Deserialize, Serialize};
 
-use crate::errors::NetworkingError::MessagingError;
-use crate::errors::Result;
+use crate::errors::{NetworkingError::MessagingError, Result};
 
 /// Size of the nonce in the Ping sub protocol
 pub const PING_PONG_NONCE_SIZE: usize = 16;
@@ -118,9 +116,13 @@ impl BytesEncodable<PING_MESSAGE_LEN> for PingMessage {}
 
 #[cfg(test)]
 mod tests {
-    use crate::messaging::ControlMessage::{Ping, Pong};
-    use crate::messaging::{ControlMessage, PingMessage};
     use hopr_primitive_types::prelude::BytesEncodable;
+
+    use crate::messaging::{
+        ControlMessage,
+        ControlMessage::{Ping, Pong},
+        PingMessage,
+    };
 
     #[test]
     fn test_ping_pong_roundtrip() {

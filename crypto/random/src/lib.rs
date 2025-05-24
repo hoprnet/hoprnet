@@ -6,7 +6,6 @@
 
 use generic_array::{ArrayLength, GenericArray};
 use rand::CryptoRng;
-
 pub use rand::{Rng, RngCore};
 
 /// Maximum random integer that can be generated.
