@@ -332,7 +332,7 @@ mod tests {
         tests::{ADDRESSES, PATH_ADDRS},
     };
 
-    fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: Balance) -> ChannelEntry {
+    fn create_channel(src: Address, dst: Address, status: ChannelStatus, stake: HoprBalance) -> ChannelEntry {
         ChannelEntry::new(src, dst, stake, U256::zero(), status, U256::zero())
     }
 
@@ -392,11 +392,9 @@ mod tests {
                 src,
                 dest,
                 ChannelStatus::Open,
-                Balance::new(
-                    U256::from_str(stake_caps.get(1).unwrap().as_str())
-                        .expect("failed to create U256 from given stake"),
-                    BalanceType::HOPR,
-                ),
+                U256::from_str(stake_caps.get(1).unwrap().as_str())
+                    .expect("failed to create U256 from given stake")
+                    .into(),
             ));
 
             graph.update_node_score(

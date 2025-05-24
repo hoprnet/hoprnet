@@ -39,7 +39,7 @@ use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboa
 async fn generate_the_first_ack_ticket(
     myself: &ChainNode,
     counterparty: &ChainKeypair,
-    price: Balance,
+    price: HoprBalance,
     domain_separator: Hash,
 ) -> anyhow::Result<()> {
     let hk1 = HalfKey::try_from(hex!("16e1d5a405315958b7db2d70ed797d858c9e6ba979783cf5110c13e0200ab0d0").as_ref())?;
@@ -404,7 +404,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     );
 
     // Open channel (from Alice to Bob) with 1 HOPR
-    let initial_channel_funds = BalanceType::HOPR.balance(1);
+    let initial_channel_funds = HoprBalance::from(1);
     let confirmation = alice_node
         .actions
         .open_channel(bob_chain_key.public().to_address(), initial_channel_funds)
@@ -448,8 +448,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         "channel must have the correct balance"
     );
 
-    // Fund the channel from Alice to Bob with additional 99 HOPR
-    let funding_amount = BalanceType::HOPR.balance(99);
+    // Fund the channel from Alice to Bob with an additional 99 HOPR
+    let funding_amount = HoprBalance::from(99);
     let confirmation = alice_node
         .actions
         .fund_channel(channel_alice_bob.get_id(), funding_amount)
@@ -511,7 +511,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     );
 
     // Bob fund channel with 100 HOPR
-    let incoming_funding_amount = BalanceType::HOPR.balance(100);
+    let incoming_funding_amount = HoprBalance::from(100);
 
     let confirmation = bob_node
         .actions
@@ -551,7 +551,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("db call should not fail")
         .expect("should contain a channel to Bob");
 
-    let ticket_price = Balance::new(1, BalanceType::HOPR);
+    let ticket_price = HoprBalance::from(1);
 
     // Create a ticket from Alice in Bob's DB
     generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, domain_separator).await?;

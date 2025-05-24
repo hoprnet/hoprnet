@@ -33,18 +33,18 @@ pub struct AutoFundingStrategyConfig {
     ///
     /// Default is 1 wxHOPR
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("1000000000000000000", BalanceType::HOPR))]
-    pub min_stake_threshold: Balance,
+    #[default(HoprBalance::new_base(1))]
+    pub min_stake_threshold: HoprBalance,
 
     /// Funding amount.
     ///
     /// Defaults to 10 wxHOPR.
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
-    pub funding_amount: Balance,
+    #[default(HoprBalance::new_base(10))]
+    pub funding_amount: HoprBalance,
 }
 
-/// The `AutoFundingStrategy` automatically funds channel that
+/// The `AutoFundingStrategy` automatically funds a channel that
 /// dropped it's staked balance below the configured threshold.
 pub struct AutoFundingStrategy<A: ChannelActions> {
     hopr_chain_actions: A,
@@ -140,8 +140,8 @@ mod tests {
         ChannelAct { }
         #[async_trait]
         impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn open_channel(&self, destination: Address, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
             async fn close_channel(
                 &self,
                 counterparty: Address,
@@ -151,7 +151,7 @@ mod tests {
         }
     }
 
-    fn mock_action_confirmation(channel: ChannelEntry, balance: Balance) -> ActionConfirmation {
+    fn mock_action_confirmation(channel: ChannelEntry, balance: HoprBalance) -> ActionConfirmation {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         ActionConfirmation {
             tx_hash: random_hash,
@@ -162,13 +162,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_auto_funding_strategy() -> anyhow::Result<()> {
-        let stake_limit = Balance::new(7_u32, BalanceType::HOPR);
-        let fund_amount = Balance::new(5_u32, BalanceType::HOPR);
+        let stake_limit = HoprBalance::from(7_u32);
+        let fund_amount = HoprBalance::from(5_u32);
 
         let c1 = ChannelEntry::new(
             *ALICE,
             *BOB,
-            Balance::new(10_u32, BalanceType::HOPR),
+            10_u32.into(),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -177,7 +177,7 @@ mod tests {
         let c2 = ChannelEntry::new(
             *BOB,
             *CHRIS,
-            Balance::new(5_u32, BalanceType::HOPR),
+            5_u32.into(),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -186,7 +186,7 @@ mod tests {
         let c3 = ChannelEntry::new(
             *CHRIS,
             *DAVE,
-            Balance::new(5_u32, BalanceType::HOPR),
+            5_u32.into(),
             0_u32.into(),
             ChannelStatus::PendingToClose(std::time::SystemTime::now()),
             0_u32.into(),
@@ -210,7 +210,7 @@ mod tests {
             &c1,
             ChannelDirection::Outgoing,
             ChannelChange::CurrentBalance {
-                left: Balance::zero(BalanceType::HOPR),
+                left: HoprBalance::zero(),
                 right: c1.balance,
             },
         )
@@ -220,7 +220,7 @@ mod tests {
             &c2,
             ChannelDirection::Outgoing,
             ChannelChange::CurrentBalance {
-                left: Balance::zero(BalanceType::HOPR),
+                left: HoprBalance::zero(),
                 right: c2.balance,
             },
         )
@@ -230,7 +230,7 @@ mod tests {
             &c3,
             ChannelDirection::Outgoing,
             ChannelChange::CurrentBalance {
-                left: Balance::zero(BalanceType::HOPR),
+                left: HoprBalance::zero(),
                 right: c3.balance,
             },
         )

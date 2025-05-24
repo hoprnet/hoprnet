@@ -264,7 +264,7 @@ pub(crate) fn check_ticket_win(
 pub struct TicketBuilder {
     channel_id: Option<Hash>,
     amount: Option<U256>,
-    balance: Option<Balance>,
+    balance: Option<HoprBalance>,
     #[default = 0]
     index: u64,
     #[default = 1]
@@ -326,7 +326,7 @@ impl TicketBuilder {
     /// Sets the ticket amount as HOPR balance.
     /// This or [TicketBuilder::amount] must be set and be less or equal to 10^25.
     #[must_use]
-    pub fn balance(mut self, balance: Balance) -> Self {
+    pub fn balance(mut self, balance: HoprBalance) -> Self {
         self.balance = Some(balance);
         self.amount = None;
         self
@@ -388,12 +388,8 @@ impl TicketBuilder {
     /// was set.
     pub fn build(self) -> errors::Result<Ticket> {
         let amount = match (self.amount, self.balance) {
-            (Some(amount), None) if amount.lt(&10_u128.pow(25).into()) => BalanceType::HOPR.balance(amount),
-            (None, Some(balance))
-                if balance.balance_type() == BalanceType::HOPR && balance.amount().lt(&10_u128.pow(25).into()) =>
-            {
-                balance
-            }
+            (Some(amount), None) if amount.lt(&10_u128.pow(25).into()) => HoprBalance::from(amount),
+            (None, Some(balance)) if balance.amount().lt(&10_u128.pow(25).into()) => balance,
             (None, None) => return Err(InvalidInputData("missing ticket amount".into())),
             (Some(_), Some(_)) => {
                 return Err(InvalidInputData(
@@ -510,7 +506,7 @@ pub struct Ticket {
     pub channel_id: Hash,
     /// Amount of HOPR tokens this ticket is worth.
     /// Always between 0 and 2^92.
-    pub amount: Balance, // 92 bits
+    pub amount: HoprBalance, // 92 bits
     /// Ticket index.
     /// Always between 0 and 2^48.
     pub index: u64, // 48 bits
@@ -556,11 +552,7 @@ impl Display for Ticket {
         write!(
             f,
             "ticket #{}, amount {}, offset {}, epoch {} in channel {}",
-            self.index,
-            self.amount.to_formatted_string(),
-            self.index_offset,
-            self.channel_epoch,
-            self.channel_id
+            self.index, self.amount, self.index_offset, self.channel_epoch, self.channel_id
         )
     }
 }
@@ -1105,7 +1097,7 @@ pub mod tests {
     };
     use hopr_primitive_types::{
         prelude::UnitaryFloatOps,
-        primitives::{Address, BalanceType, EthereumChallenge, U256},
+        primitives::{Address, EthereumChallenge, U256},
     };
 
     use super::*;
@@ -1222,7 +1214,7 @@ pub mod tests {
     pub fn test_ticket_serialize_deserialize() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
             .win_prob(1.0.try_into()?)
@@ -1245,7 +1237,7 @@ pub mod tests {
     pub fn test_ticket_serialize_deserialize_serde() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
             .win_prob(1.0.try_into()?)
@@ -1268,7 +1260,7 @@ pub mod tests {
     pub fn test_ticket_sign_verify() -> anyhow::Result<()> {
         let initial_ticket = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
             .win_prob(1.0.try_into()?)
@@ -1391,7 +1383,7 @@ pub mod tests {
 
         let verified = TicketBuilder::default()
             .direction(&ALICE.public().to_address(), &BOB.public().to_address())
-            .balance(BalanceType::HOPR.one())
+            .balance(1.into())
             .index(0)
             .index_offset(1)
             .win_prob(1.0.try_into()?)

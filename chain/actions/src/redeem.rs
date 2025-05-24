@@ -326,7 +326,7 @@ mod tests {
                     let channel = ChannelEntry::new(
                         ckp.public().to_address(),
                         ALICE.public().to_address(),
-                        Balance::zero(BalanceType::HOPR),
+                        0.into(),
                         U256::zero(),
                         ChannelStatus::Open,
                         channel_epoch.into(),

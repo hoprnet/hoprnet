@@ -14,7 +14,7 @@
         "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
       },
       "environment_type": "local",
-      "indexer_start_block_number": 5
+      "indexer_start_block_number": 6
     },
     "anvil-localhost2": {
       "addresses": {
@@ -30,7 +30,7 @@
         "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef"
       },
       "environment_type": "local",
-      "indexer_start_block_number": 5
+      "indexer_start_block_number": 6
     },
     "rotsee": {
       "environment_type": "staging",

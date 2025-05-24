@@ -10,9 +10,9 @@ use crate::errors::TicketValidationError;
 pub fn validate_unacknowledged_ticket(
     ticket: Ticket,
     channel: &ChannelEntry,
-    min_ticket_amount: Balance,
+    min_ticket_amount: HoprBalance,
     required_win_prob: WinningProbability,
-    unrealized_balance: Balance,
+    unrealized_balance: HoprBalance,
     domain_separator: &Hash,
 ) -> Result<VerifiedTicket, TicketValidationError> {
     debug!(source = %channel.source, %ticket, "validating unacknowledged ticket");
@@ -124,7 +124,7 @@ mod tests {
         ChannelEntry::new(
             SENDER_PRIV_KEY.public().to_address(),
             TARGET_PRIV_KEY.public().to_address(),
-            Balance::new(100_u64, BalanceType::HOPR),
+            100.into(),
             U256::zero(),
             ChannelStatus::Open,
             U256::one(),
@@ -136,12 +136,12 @@ mod tests {
         let ticket = create_valid_ticket()?;
         let channel = create_channel_entry();
 
-        let more_than_ticket_balance = ticket.amount.add(&Balance::new(U256::from(500u128), BalanceType::HOPR));
+        let more_than_ticket_balance = ticket.amount.add(500);
 
         let ret = validate_unacknowledged_ticket(
             ticket,
             &channel,
-            Balance::new(1_u64, BalanceType::HOPR),
+            1.into(),
             1.0.try_into()?,
             more_than_ticket_balance,
             &Hash::default(),
@@ -160,9 +160,9 @@ mod tests {
         let ret = validate_unacknowledged_ticket(
             ticket,
             &channel,
-            Balance::new(1_u64, BalanceType::HOPR),
+            1.into(),
             1.0f64.try_into()?,
-            Balance::zero(BalanceType::HOPR),
+            0.into(),
             &Hash::default(),
         );
 
@@ -176,14 +176,8 @@ mod tests {
         let ticket = create_valid_ticket()?;
         let channel = create_channel_entry();
 
-        let ret = validate_unacknowledged_ticket(
-            ticket,
-            &channel,
-            Balance::new(2_u64, BalanceType::HOPR),
-            1.0.try_into()?,
-            Balance::zero(BalanceType::HOPR),
-            &Hash::default(),
-        );
+        let ret =
+            validate_unacknowledged_ticket(ticket, &channel, 2.into(), 1.0.try_into()?, 0.into(), &Hash::default());
 
         assert!(ret.is_err());
 
@@ -201,14 +195,8 @@ mod tests {
 
         let channel = create_channel_entry();
 
-        let ret = validate_unacknowledged_ticket(
-            ticket,
-            &channel,
-            Balance::new(1_u64, BalanceType::HOPR),
-            1.0.try_into()?,
-            Balance::zero(BalanceType::HOPR),
-            &Hash::default(),
-        );
+        let ret =
+            validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());
 
         assert!(ret.is_err());
 
@@ -221,14 +209,8 @@ mod tests {
         let mut channel = create_channel_entry();
         channel.status = ChannelStatus::Closed;
 
-        let ret = validate_unacknowledged_ticket(
-            ticket,
-            &channel,
-            Balance::new(1_u64, BalanceType::HOPR),
-            1.0.try_into()?,
-            Balance::zero(BalanceType::HOPR),
-            &Hash::default(),
-        );
+        let ret =
+            validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());
 
         assert!(ret.is_err());
 
@@ -246,14 +228,8 @@ mod tests {
 
         let channel = create_channel_entry();
 
-        let ret = validate_unacknowledged_ticket(
-            ticket,
-            &channel,
-            Balance::new(1_u64, BalanceType::HOPR),
-            1.0.try_into()?,
-            Balance::zero(BalanceType::HOPR),
-            &Hash::default(),
-        );
+        let ret =
+            validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());
 
         assert!(ret.is_err());
 
@@ -264,17 +240,11 @@ mod tests {
     async fn test_ticket_validation_fail_if_does_not_have_funds() -> anyhow::Result<()> {
         let ticket = create_valid_ticket()?;
         let mut channel = create_channel_entry();
-        channel.balance = Balance::zero(BalanceType::HOPR);
+        channel.balance = 0.into();
         channel.channel_epoch = U256::from(ticket.channel_epoch);
 
-        let ret = validate_unacknowledged_ticket(
-            ticket,
-            &channel,
-            Balance::new(1_u64, BalanceType::HOPR),
-            1.0.try_into()?,
-            Balance::zero(BalanceType::HOPR),
-            &Hash::default(),
-        );
+        let ret =
+            validate_unacknowledged_ticket(ticket, &channel, 1.into(), 1.0.try_into()?, 0.into(), &Hash::default());
 
         assert!(ret.is_err());
 

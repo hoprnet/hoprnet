@@ -2,6 +2,7 @@ import asyncio
 import logging
 import random
 import re
+from decimal import Decimal
 
 import pytest
 
@@ -73,8 +74,8 @@ class TestIntegrationWithSwarm:
             addr = await node.api.addresses()
             assert re.match("^0x[0-9a-fA-F]{40}$", addr.native) is not None
             balances = await node.api.balances()
-            assert int(balances.native) > 0
-            assert int(balances.safe_hopr) > 0
+            assert balances.native > 0
+            assert balances.safe_hopr > 0
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src, dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
@@ -130,12 +131,13 @@ class TestIntegrationWithSwarm:
         self, src: str, dest: str, swarm7: dict[str, Node]
     ):
         # convert HOPR to weiHOPR
-        hopr_amount = OPEN_CHANNEL_FUNDING_VALUE_HOPR * 1e18
+        hopr_amount = OPEN_CHANNEL_FUNDING_VALUE_HOPR
         ticket_price = await get_ticket_price(swarm7[src])
 
         async with create_channel(swarm7[src], swarm7[dest], funding=ticket_price) as channel:
             balance_before = await swarm7[src].api.balances()
             channel_before = await swarm7[src].api.get_channel(channel.id)
+            logging.debug(f"balance_before: {balance_before}, channel_before: {channel_before}")
 
             assert await swarm7[src].api.fund_channel(channel.id, hopr_amount)
 
@@ -152,8 +154,9 @@ class TestIntegrationWithSwarm:
 
             # Safe allowance can be checked too at this point
             balance_after = await swarm7[src].api.balances()
-            assert balance_before.safe_hopr_allowance - balance_after.safe_hopr_allowance == hopr_amount
+            logging.debug(f"balance_after: {balance_after}")
 
+            assert balance_before.safe_hopr_allowance - balance_after.safe_hopr_allowance == hopr_amount
             await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_before.native), 20.0)
 
         await assert_channel_statuses(swarm7[src].api)
@@ -338,26 +341,19 @@ class TestIntegrationWithSwarm:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_native_withdraw(self, peer, swarm7: dict[str, Node]):
-        amount = "9876"
-        remaining_attempts = 10
+        before_balance = (await swarm7[peer].api.balances()).native
+        assert before_balance > 0
 
-        before_balance = int((await swarm7[peer].api.balances()).safe_native)
-        await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "Native")
+        # Withdraw some native balance into the Safe address
+        amount = before_balance / 10
+        await swarm7[peer].api.withdraw(amount, swarm7[peer].safe_address, "xDai")
 
-        after_balance = before_balance
-        while remaining_attempts > 0:
-            after_balance = int((await swarm7[peer].api.balances()).safe_native)
-            if after_balance != before_balance:
-                break
-            await asyncio.sleep(0.5)
-            remaining_attempts -= 1
-
-        assert after_balance - before_balance == int(amount)
+        await asyncio.wait_for(check_native_balance_below(swarm7[peer], before_balance - amount), 120.0)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
     async def test_hoprd_check_ticket_price_is_default(self, peer, swarm7: dict[str, Node]):
         price = await swarm7[peer].api.ticket_price()
 
-        assert isinstance(price.value, int)
+        assert isinstance(price.value, Decimal)
         assert price.value > 0

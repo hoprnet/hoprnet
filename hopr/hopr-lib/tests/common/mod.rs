@@ -32,7 +32,7 @@ pub fn create_rpc_client_to_anvil_with_snapshot(
         .transport(transport_client.clone(), transport_client.guess_local())
 }
 
-/// Used for testing. Creates RPC client to the local Anvil instance.
+/// Used for testing. Creates an RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_provider_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,
