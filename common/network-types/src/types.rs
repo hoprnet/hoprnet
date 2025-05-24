@@ -8,7 +8,7 @@ use hickory_resolver::{AsyncResolver, name_server::ConnectionProvider};
 use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_path::ValidatedPath;
+pub use hopr_path::ValidatedPath;
 use hopr_primitive_types::{
     bounded::{BoundedSize, BoundedVec},
     prelude::Address,

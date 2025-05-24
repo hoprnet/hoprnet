@@ -4,7 +4,7 @@ use futures::StreamExt;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_lib::SendMsg;
+use hopr_lib::{ApplicationData, SendMsg};
 use hopr_network_types::prelude::{protocol::SessionMessage, *};
 use hopr_primitive_types::prelude::Address;
 use hopr_transport::{Session, SessionId, TransportSessionError};

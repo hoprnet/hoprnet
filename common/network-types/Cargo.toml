@@ -82,6 +82,8 @@ tokio-util = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
 
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]
 
 [[bench]]
 name = "session"

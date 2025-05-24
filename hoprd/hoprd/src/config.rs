@@ -185,15 +185,9 @@ impl HoprdConfig {
             cfg.api.host.port = x
         };
 
-        // heartbeat
-        if let Some(x) = cli_args.heartbeat_interval {
-            cfg.hopr.heartbeat.interval = std::time::Duration::from_secs(x)
-        };
-        if let Some(x) = cli_args.heartbeat_threshold {
-            cfg.hopr.heartbeat.threshold = std::time::Duration::from_secs(x)
-        };
-        if let Some(x) = cli_args.heartbeat_variance {
-            cfg.hopr.heartbeat.variance = std::time::Duration::from_secs(x)
+        // probe
+        if let Some(x) = cli_args.probe_recheck_threshold {
+            cfg.hopr.probe.recheck_threshold = std::time::Duration::from_secs(x)
         };
 
         // network options

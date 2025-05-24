@@ -12,9 +12,10 @@ use futures::{
 };
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
-use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
+use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
+use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
@@ -61,6 +62,7 @@ pub struct SessionManagerConfig {
     /// This is due to the reserved range by the Start sub-protocol.
     ///
     /// Default is 16..1024.
+    #[doc(hidden)]
     #[default(_code = "16..1024")]
     pub session_tag_range: Range<Tag>,
 
@@ -696,6 +698,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         data: ApplicationData,
     ) -> crate::errors::Result<DispatchResult> {
         if (0..self.cfg.session_tag_range.start).contains(&data.application_tag) {
+            // TODO(20250520): modify range to have start from another distinct lower value
             trace!(tag = data.application_tag, "dispatching Start protocol message");
             return self
                 .handle_start_protocol_message(pseudonym, data)
@@ -756,7 +759,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                             None => hopr_crypto_random::random_integer(
                                 self.cfg.session_tag_range.start as u64,
                                 Some(self.cfg.session_tag_range.end as u64),
-                            ) as u16,
+                            ) as Tag,
                         };
                         SessionId::new(next_tag, pseudonym)
                     },
@@ -1054,7 +1057,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Bob sends the SessionEstablished message
         let alice_mgr_clone = alice_mgr.clone();
@@ -1080,7 +1083,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Alice sends the CloseSession message to initiate closure
         let bob_mgr_clone = bob_mgr.clone();
@@ -1208,7 +1211,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Bob sends the SessionEstablished message
         let alice_mgr_clone = alice_mgr.clone();
@@ -1234,7 +1237,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Alice sends the CloseSession message to initiate closure
         let bob_mgr_clone = bob_mgr.clone();
@@ -1453,7 +1456,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Alice sends the SessionEstablished message (as Bob)
         let alice_mgr_clone = alice_mgr.clone();
@@ -1479,7 +1482,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
@@ -1595,7 +1598,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Bob sends the SessionEstablished message
         let alice_mgr_clone = alice_mgr.clone();
