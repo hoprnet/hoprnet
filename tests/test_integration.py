@@ -31,6 +31,18 @@ from .utils import (
 )
 
 
+async def assert_channel_statuses(api):
+    open_channels = await api.all_channels(include_closed=False)
+    open_and_closed_channels = await api.all_channels(include_closed=True)
+
+    assert len(open_and_closed_channels.all) > 0, "More than 0 channels are present"
+    assert len(open_and_closed_channels.all) >= len(open_channels.all), "Open and closed channels should be present"
+
+    assert all(
+        c.status in [ChannelStatus.Closed, ChannelStatus.PendingToClose] for c in open_and_closed_channels.all
+    ), "All channels must be closed or closing"
+
+
 @pytest.mark.usefixtures("swarm7_reset")
 class TestIntegrationWithSwarm:
     # NOTE: this test is first, ensuring that all tests following it have ensured connectivity and
@@ -147,6 +159,8 @@ class TestIntegrationWithSwarm:
             assert balance_before.safe_hopr_allowance - balance_after.safe_hopr_allowance == hopr_amount
             await asyncio.wait_for(check_native_balance_below(swarm7[src], balance_before.native), 20.0)
 
+        await assert_channel_statuses(swarm7[src].api)
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
@@ -180,6 +194,8 @@ class TestIntegrationWithSwarm:
         await swarm7[mid].api.reset_tickets_statistics()
 
         assert count_metrics(await swarm7[mid].api.metrics()) == 0
+
+        await assert_channel_statuses(swarm7[src].api)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -248,6 +264,8 @@ class TestIntegrationWithSwarm:
                 assert await swarm7[mid].api.tickets_redeem()
                 await asyncio.wait_for(check_all_tickets_redeemed(swarm7[mid]), 30.0)
 
+        await assert_channel_statuses(swarm7[src].api)
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
     async def test_hoprd_should_be_able_to_open_and_close_channel_without_tickets(
@@ -257,6 +275,8 @@ class TestIntegrationWithSwarm:
             # the context manager handles opening and closing of the channel with verification,
             # using counter-party address
             assert True
+
+        await assert_channel_statuses(swarm7[src].api)
 
     # generate a 1-hop route with a node using strategies in the middle
     @pytest.mark.asyncio
@@ -316,24 +336,7 @@ class TestIntegrationWithSwarm:
 
             await asyncio.wait_for(check_aggregate_and_redeem_tickets(swarm7[mid]), 60.0)
 
-    # FIXME: This test depends on side-effects and cannot be run on its own. It
-    # should be redesigned.
-    @pytest.mark.asyncio
-    async def test_hoprd_sanity_check_channel_status(self, swarm7: dict[str, Node]):
-        """
-        The bash integration-test.sh opens and closes channels that can be visible inside this test scope
-        """
-        alice_api = swarm7["1"].api
-
-        open_channels = await alice_api.all_channels(include_closed=False)
-        open_and_closed_channels = await alice_api.all_channels(include_closed=True)
-
-        assert len(open_and_closed_channels.all) >= len(open_channels.all), "Open and closed channels should be present"
-
-        statuses = [c.status for c in open_and_closed_channels.all]
-        assert (
-            ChannelStatus.Closed in statuses or ChannelStatus.PendingToClose in statuses
-        ), "Closed channels should be present"
+        await assert_channel_statuses(swarm7[src].api)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("peer", random.sample(barebone_nodes(), 1))
