@@ -565,13 +565,7 @@ mod tests {
         );
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(
-            &db,
-            U256::max_value().into(),
-            U256::max_value().into(),
-            Some(channel),
-        )
-        .await?;
+        init_db(&db, U256::max_value().into(), U256::max_value().into(), Some(channel)).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
