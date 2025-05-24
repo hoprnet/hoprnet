@@ -510,7 +510,7 @@ mod tests {
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(channel.clone())).await?;
+        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(channel)).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -569,7 +569,7 @@ mod tests {
             &db,
             U256::max_value().into(),
             U256::max_value().into(),
-            Some(channel.clone()),
+            Some(channel),
         )
         .await?;
 
@@ -598,7 +598,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_should_not_fund_nonexistent_channel() -> anyhow::Result<()> {
-        let channel_id = generate_channel_id(&*ALICE, &*BOB);
+        let channel_id = generate_channel_id(&ALICE, &BOB);
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
         init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), None).await?;
@@ -694,7 +694,7 @@ mod tests {
         let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel.clone())).await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -791,7 +791,7 @@ mod tests {
         let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel.clone())).await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -852,7 +852,7 @@ mod tests {
         );
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel.clone())).await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -910,7 +910,7 @@ mod tests {
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel.clone())).await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
