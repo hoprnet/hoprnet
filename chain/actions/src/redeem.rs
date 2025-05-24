@@ -473,7 +473,7 @@ mod tests {
 
         // Tickets with index 0 will be skipped, as that is already past
         channel_from_bob.ticket_index = 1_u32.into();
-        db.upsert_channel(None, channel_from_bob.clone()).await?;
+        db.upsert_channel(None, channel_from_bob).await?;
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
@@ -763,12 +763,9 @@ mod tests {
         )
         .await;
 
-        for unredeemable_index in 0..ticket_from_next_epoch_count {
+        for ticket in tickets.iter().take(ticket_from_next_epoch_count) {
             assert!(
-                actions
-                    .redeem_ticket(tickets[unredeemable_index].clone())
-                    .await
-                    .is_err(),
+                actions.redeem_ticket(ticket.clone()).await.is_err(),
                 "cannot redeem a ticket that's from the next epoch"
             );
         }
@@ -838,7 +835,7 @@ mod tests {
         let (mut channel_from_bob, tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 1u32).await?;
 
         channel_from_bob.ticket_index = 2_u32.into();
-        db.upsert_channel(None, channel_from_bob.clone()).await?;
+        db.upsert_channel(None, channel_from_bob).await?;
 
         let ticket = tickets.into_iter().next().unwrap();
 
