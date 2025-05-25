@@ -1,11 +1,220 @@
-use std::time::Instant;
-
-use bitvec::prelude::BitVec;
-
-use crate::{
-    prelude::{Frame, FrameId, Segment, errors::SessionError},
-    session::frame::SeqNum,
+use std::{
+    cmp::Ordering,
+    fmt::{Debug, Display, Formatter},
+    mem,
+    time::Instant,
 };
+
+use bitvec::{
+    BitArr,
+    prelude::{BitVec, Lsb0},
+};
+
+use crate::prelude::errors::SessionError;
+
+/// ID of a [Frame].
+pub type FrameId = u32;
+/// Type representing the sequence numbers in a [Frame].
+pub type SeqNum = u8;
+
+/// Convenience type that identifies a segment within a frame.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
+pub struct SegmentId(pub FrameId, pub SeqNum);
+
+impl From<&Segment> for SegmentId {
+    fn from(value: &Segment) -> Self {
+        value.id()
+    }
+}
+
+impl Display for SegmentId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "seg({},{})", self.0, self.1)
+    }
+}
+
+/// Data frame of arbitrary length.
+/// The frame can be segmented into [segments](Segment) and reassembled back
+/// via [FrameReassembler].
+#[derive(Clone, PartialEq, Eq)]
+pub struct Frame {
+    /// Identifier of this frame.
+    pub frame_id: FrameId,
+    /// Frame data.
+    pub data: Box<[u8]>,
+}
+
+impl Debug for Frame {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        const DBG_LEN: usize = 16;
+        let excerpt = if self.data.len() > DBG_LEN {
+            format!(
+                "{}..{}",
+                hex::encode(&self.data[0..DBG_LEN / 2]),
+                hex::encode(&self.data[self.data.len() - DBG_LEN / 2..])
+            )
+        } else {
+            hex::encode(&self.data)
+        };
+
+        f.debug_struct("Frame")
+            .field("frame_id", &self.frame_id)
+            .field("len", &self.data.len())
+            .field("data", &excerpt)
+            .finish()
+    }
+}
+
+impl AsRef<[u8]> for Frame {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+/// Wrapper for [`Frame`] that implements comparison and total ordering based on [`FrameId`].
+#[derive(Clone)]
+pub struct OrderedFrame(pub Frame);
+
+impl Eq for OrderedFrame {}
+
+impl PartialEq<Self> for OrderedFrame {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.frame_id == other.0.frame_id
+    }
+}
+
+impl PartialEq<FrameId> for OrderedFrame {
+    fn eq(&self, other: &FrameId) -> bool {
+        self.0.frame_id == *other
+    }
+}
+
+impl PartialOrd<Self> for OrderedFrame {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialOrd<FrameId> for OrderedFrame {
+    fn partial_cmp(&self, other: &FrameId) -> Option<Ordering> {
+        Some(self.0.frame_id.cmp(other))
+    }
+}
+
+impl Ord for OrderedFrame {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.frame_id.cmp(&other.0.frame_id)
+    }
+}
+
+impl From<Frame> for OrderedFrame {
+    fn from(value: Frame) -> Self {
+        Self(value)
+    }
+}
+
+impl From<OrderedFrame> for Frame {
+    fn from(value: OrderedFrame) -> Self {
+        value.0
+    }
+}
+
+/// Represents a frame segment.
+/// Besides the data, a segment carries information about the total number of
+/// segments in the original frame, its index within the frame and
+/// ID of that frame.
+#[derive(Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), derive(serde::Deserialize))]
+pub struct Segment {
+    /// ID of the [Frame] this segment belongs to.
+    pub frame_id: FrameId,
+    /// Index of this segment within the segment sequence.
+    pub seq_idx: SeqNum,
+    /// Total number of segments within this segment sequence.
+    pub seq_len: SeqNum,
+    /// Data in this segment.
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes"))]
+    pub data: Box<[u8]>,
+}
+
+impl Segment {
+    /// Size of the segment header.
+    pub const HEADER_SIZE: usize = mem::size_of::<FrameId>() + 2 * mem::size_of::<SeqNum>();
+    /// The minimum size of a segment: [`Segment::HEADER_SIZE`] + 1 byte of data.
+    pub const MINIMUM_SIZE: usize = Self::HEADER_SIZE + 1;
+
+    /// Returns the [SegmentId] for this segment.
+    pub fn id(&self) -> SegmentId {
+        SegmentId(self.frame_id, self.seq_idx)
+    }
+
+    /// Length of the segment data plus header.
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        Self::HEADER_SIZE + self.data.len()
+    }
+
+    /// Indicates whether this segment is the last one from the frame.
+    #[inline]
+    pub fn is_last(&self) -> bool {
+        self.seq_idx == self.seq_len - 1
+    }
+}
+
+impl Debug for Segment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Segment")
+            .field("frame_id", &self.frame_id)
+            .field("seq_id", &self.seq_idx)
+            .field("seq_len", &self.seq_len)
+            .field("data", &hex::encode(&self.data))
+            .finish()
+    }
+}
+
+impl PartialOrd<Segment> for Segment {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Segment {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.frame_id.cmp(&other.frame_id) {
+            std::cmp::Ordering::Equal => self.seq_idx.cmp(&other.seq_idx),
+            cmp => cmp,
+        }
+    }
+}
+
+impl From<Segment> for Vec<u8> {
+    fn from(value: Segment) -> Self {
+        let mut ret = Vec::with_capacity(Segment::HEADER_SIZE + value.data.len());
+        ret.extend_from_slice(value.frame_id.to_be_bytes().as_ref());
+        ret.extend_from_slice(value.seq_idx.to_be_bytes().as_ref());
+        ret.extend_from_slice(value.seq_len.to_be_bytes().as_ref());
+        ret.extend_from_slice(value.data.as_ref());
+        ret
+    }
+}
+
+impl TryFrom<&[u8]> for Segment {
+    type Error = SessionError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let (header, data) = value.split_at(Self::HEADER_SIZE);
+        let segment = Segment {
+            frame_id: FrameId::from_be_bytes(header[0..4].try_into().map_err(|_| SessionError::InvalidSegment)?),
+            seq_idx: SeqNum::from_be_bytes(header[4..5].try_into().map_err(|_| SessionError::InvalidSegment)?),
+            seq_len: SeqNum::from_be_bytes(header[5..6].try_into().map_err(|_| SessionError::InvalidSegment)?),
+            data: data.into(),
+        };
+        (segment.frame_id > 0 && segment.seq_idx < segment.seq_len)
+            .then_some(segment)
+            .ok_or(SessionError::InvalidSegment)
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct FrameBuilder {
@@ -73,7 +282,7 @@ impl FrameBuilder {
         Ok(())
     }
 
-    pub fn as_missing(&self) -> BitVec {
+    pub fn as_missing(&self) -> BitVec<u8> {
         self.segments.iter().map(Option::is_none).collect()
     }
 
@@ -92,7 +301,7 @@ impl FrameBuilder {
 pub struct FrameInspector(pub(crate) FrameDashMap);
 
 impl FrameInspector {
-    pub fn missing_segments(&self, frame_id: &FrameId) -> Option<bitvec::prelude::BitVec> {
+    pub fn missing_segments(&self, frame_id: &FrameId) -> Option<BitVec<u8>> {
         self.0.0.get(frame_id).map(|f| f.as_missing())
     }
 }

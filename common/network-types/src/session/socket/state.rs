@@ -1,22 +1,17 @@
 use std::time::Duration;
 
+use bitvec::{BitArr, prelude::Lsb0};
 use futures::{FutureExt, StreamExt, channel::mpsc::UnboundedSender};
 use futures_time::stream::StreamExt as TimeStreamExt;
 use tracing::Instrument;
 
-use crate::{
-    prelude::{
-        FrameId, Segment, SegmentId,
-        errors::SessionError,
-        protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
-    },
-    session::{
-        frame::SeqNum,
-        frames::FrameInspector,
-        utils::{
-            RetriedFrameId, RingBufferProducer, RingBufferView, next_deadline_with_backoff, searchable_ringbuffer,
-            skip_queue::{Skip, SkipDelaySender, skip_delay_channel},
-        },
+use crate::session::{
+    errors::SessionError,
+    frames::{FrameId, FrameInspector, Segment, SegmentId, SeqNum},
+    protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
+    utils::{
+        RetriedFrameId, RingBufferProducer, RingBufferView, next_deadline_with_backoff, searchable_ringbuffer,
+        skip_queue::{Skip, SkipDelaySender, skip_delay_channel},
     },
 };
 
@@ -154,7 +149,95 @@ struct AcknowledgementStateContext<const C: usize> {
     ctl_tx: UnboundedSender<SessionMessage<C>>,
 }
 
+#[cfg_attr(doc, aquamarine::aquamarine)]
 /// Represents a Session socket state is able to process acknowledgements.
+///
+/// # Retransmission driven by the Receiver
+/// ```mermaid
+/// sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver->>Sender: Request Segment 3 of Frame 1
+///     Sender->>Receiver: Segment 3/3 of Frame 1
+///     Receiver->>Sender: Acknowledge Frame 1
+///     Note left of Sender: Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 delivered
+/// ```
+///
+/// # Retransmission driven by the Sender
+/// ```mermaid
+/// sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver--xSender: Request Segment 3 of Frame 1
+///     Note left of Sender: RTO_BASE_SENDER elapsed
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender->>Receiver: Segment 3/3 of Frame 1
+///     Receiver->>Sender: Acknowledge Frame 1
+///     Note left of Sender: Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 delivered
+/// ```
+///
+/// # Sender-Receiver retransmission handover
+///
+/// ```mermaid
+///    sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender--xReceiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver->>Sender: Request Segments 2,3 of Frame 1
+///     Note left of Sender: RTO_BASE_SENDER cancelled
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver--xSender: Request Segments 3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver->>Sender: Request Segments 3 of Frame 1
+///     Sender->>Receiver: Segment 3/3 of Frame 1
+///     Receiver->>Sender: Acknowledge Frame 1
+///     Note left of Sender: Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 delivered
+/// ```
+///
+/// # Retransmission failure
+///
+/// ```mermaid
+///    sequenceDiagram
+///     Note over Sender,Receiver: Frame 1
+///     rect rgb(191, 223, 255)
+///     Note left of Sender: Frame 1 in buffer
+///     Sender->>Receiver: Segment 1/3 of Frame 1
+///     Sender->>Receiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note right of Receiver: RTO_BASE_RECEIVER elapsed
+///     Receiver--xSender: Request Segment 3 of Frame 1
+///     Note left of Sender: RTO_BASE_SENDER elapsed
+///     Sender--xReceiver: Segment 1/3 of Frame 1
+///     Sender--xReceiver: Segment 2/3 of Frame 1
+///     Sender--xReceiver: Segment 3/3 of Frame 1
+///     Note left of Sender: FRAME_MAX_AGE elapsed<br/>Frame 1 dropped from buffer
+///     Note right of Receiver: FRAME_MAX_AGE elapsed<br/>Frame 1 dropped from buffer
+///     end
+///     Note over Sender,Receiver: Frame 1 never delivered
+/// ```
 #[derive(Clone)]
 pub struct AcknowledgementState<const C: usize> {
     id: String,
@@ -171,6 +254,8 @@ impl<const C: usize> AcknowledgementState<C> {
         }
     }
 }
+
+type MissingSegments = BitArr!(for 1, in u8, Lsb0);
 
 impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     fn session_id(&self) -> &str {
@@ -224,7 +309,13 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                                 tracing::debug!(frame_id, ?retry_at, "next resend request of incoming frame segments");
                             }
                         }
-                        futures::future::ready(Some((frame_id, missing_segments)))
+
+                        if let Ok(missing_segments) = MissingSegments::try_from(missing_segments.as_bitslice()) {
+                            futures::future::ready(Some((frame_id, missing_segments)))
+                        } else {
+                            tracing::error!(frame_id, "frame has more missing segments than allowed");
+                            futures::future::ready(None)
+                        }
                     } else {
                         tracing::debug!(frame_id, "no more missing segments in frame");
                         futures::future::ready(None)
@@ -241,7 +332,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             );
         }
 
-        // Send out Frame Acknowledgements chunked as a Control messages
+        // Send out Frame Acknowledgements chunked as Control messages
         let ctl_tx_clone = context.ctl_tx.clone();
         let ack_delay = self.cfg.acknowledgement_delay;
         hopr_async_runtime::prelude::spawn(

@@ -7,10 +7,11 @@ use std::{
 
 use tracing::instrument;
 
-use crate::{
-    prelude::{Frame, Segment, errors::SessionError},
-    session::frames::{
-        FrameBuilder, FrameDashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry, FrameMapVacantEntry,
+use crate::session::{
+    errors::SessionError,
+    frames::{
+        Frame, FrameBuilder, FrameDashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry,
+        FrameMapVacantEntry, Segment,
     },
 };
 
@@ -71,7 +72,7 @@ impl<M: FrameMap> Reassembler<M> {
 }
 
 impl Reassembler<FrameDashMap> {
-    pub fn inspect(&self) -> FrameInspector {
+    pub fn new_inspector(&self) -> FrameInspector {
         FrameInspector(self.incomplete_frames.clone())
     }
 }
@@ -238,7 +239,7 @@ mod tests {
     use rand::{SeedableRng, prelude::SliceRandom, rngs::StdRng};
 
     use super::*;
-    use crate::session::frames::FrameHashMap;
+    use crate::session::{frames::FrameHashMap, processing::segment};
 
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
@@ -258,7 +259,7 @@ mod tests {
         let mut segments = expected
             .iter()
             .cloned()
-            .flat_map(|f| f.segment(22).unwrap())
+            .flat_map(|f| segment(f.data, 22, f.frame_id).unwrap())
             .collect::<Vec<_>>();
 
         let mut rng = StdRng::from_seed(RNG_SEED);
@@ -273,7 +274,7 @@ mod tests {
 
         assert_eq!(actual.len(), expected.len());
 
-        actual.sort();
+        actual.sort_by(|a, b| a.frame_id.cmp(&b.frame_id));
         assert_eq!(actual, expected);
 
         let _ = jh.await?;
@@ -294,7 +295,7 @@ mod tests {
         let mut segments = expected
             .iter()
             .cloned()
-            .flat_map(|f| f.segment(22).unwrap())
+            .flat_map(|f| segment(f.data, 22, f.frame_id).unwrap())
             .filter(|s| s.frame_id != 2 || s.seq_idx != 1)
             .collect::<Vec<_>>();
 
@@ -363,7 +364,7 @@ mod tests {
         let mut segments = expected
             .iter()
             .cloned()
-            .flat_map(|f| f.segment(22).unwrap())
+            .flat_map(|f| segment(f.data, 22, f.frame_id).unwrap())
             .filter(|s| s.frame_id != 5 || s.seq_idx != 2)
             .collect::<Vec<_>>();
 
@@ -418,7 +419,7 @@ mod tests {
         let segments = expected
             .iter()
             .cloned()
-            .flat_map(|f| f.segment(20).unwrap())
+            .flat_map(|f| segment(f.data, 22, f.frame_id).unwrap())
             .collect::<Vec<_>>();
 
         // Frame 1
@@ -493,7 +494,7 @@ mod tests {
         let segments = expected
             .iter()
             .cloned()
-            .flat_map(|f| f.segment(20).unwrap())
+            .flat_map(|f| segment(f.data, 22, f.frame_id).unwrap())
             .collect::<Vec<_>>();
 
         reassembler.send(segments[0].clone()).await?;

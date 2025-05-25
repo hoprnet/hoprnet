@@ -10,82 +10,9 @@ use std::{
 };
 
 use futures::StreamExt;
-use rand::prelude::{Distribution, thread_rng};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 
-use crate::prelude::FrameId;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct RetryToken {
-    pub num_retry: usize,
-    pub started_at: Instant,
-    backoff_base: f64,
-    created_at: Instant,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum RetryResult {
-    Wait(Duration),
-    RetryNow(RetryToken),
-    Expired,
-}
-
-impl RetryToken {
-    pub fn new(backoff_base: f64) -> Self {
-        Self::from_instant(Instant::now(), backoff_base)
-    }
-
-    pub fn from_instant(now: Instant, backoff_base: f64) -> Self {
-        Self {
-            num_retry: 0,
-            started_at: now,
-            created_at: Instant::now(),
-            backoff_base,
-        }
-    }
-
-    pub fn replenish(self) -> Self {
-        Self {
-            num_retry: 0,
-            started_at: Instant::now(),
-            created_at: self.created_at,
-            backoff_base: self.backoff_base,
-        }
-    }
-
-    fn retry_in(&self, base: Duration, max_duration: Duration, jitter_dev: f64) -> Option<Duration> {
-        let jitter_coeff = if jitter_dev > 0.0 {
-            // Should not use jitter with sigma > 0.25
-            rand_distr::Normal::new(1.0, jitter_dev.min(0.25))
-                .unwrap()
-                .sample(&mut thread_rng())
-                .abs()
-        } else {
-            1.0
-        };
-
-        // jitter * base * backoff_base ^ num_retry
-        let duration = base.mul_f64(jitter_coeff * self.backoff_base.powi(self.num_retry as i32));
-        (duration < max_duration).then_some(duration)
-    }
-
-    pub fn check(&self, now: Instant, base: Duration, max: Duration, jitter_dev: f64) -> RetryResult {
-        match self.retry_in(base, max, jitter_dev) {
-            None => RetryResult::Expired,
-            Some(retry_in) if self.started_at + retry_in >= now => RetryResult::Wait(self.started_at + retry_in - now),
-            _ => RetryResult::RetryNow(Self {
-                num_retry: self.num_retry + 1,
-                started_at: self.started_at,
-                backoff_base: self.backoff_base,
-                created_at: self.created_at,
-            }),
-        }
-    }
-
-    pub fn time_since_creation(&self) -> Duration {
-        self.created_at.elapsed()
-    }
-}
+use crate::session::frames::FrameId;
 
 #[derive(Debug)]
 pub(crate) struct RingBufferProducer<T>(futures::channel::mpsc::Sender<T>);
@@ -99,10 +26,6 @@ impl<T> Clone for RingBufferProducer<T> {
 impl<T> RingBufferProducer<T> {
     pub fn push(&mut self, item: T) -> bool {
         self.0.try_send(item).is_ok()
-    }
-
-    pub fn is_open(&self) -> bool {
-        !self.0.is_closed()
     }
 }
 

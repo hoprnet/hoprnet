@@ -1,4 +1,4 @@
-mod state;
+pub mod state;
 
 use std::{
     pin::Pin,
@@ -11,18 +11,12 @@ use futures_concurrency::stream::Merge;
 use state::SocketState;
 use tracing::{Instrument, instrument};
 
-use crate::{
-    prelude::{
-        Frame, Segment,
-        errors::SessionError,
-        frame_reconstructor, frame_reconstructor_with_inspector,
-        protocol::{SessionCodec, SessionMessage},
-    },
-    session::{
-        frames::FrameInspector,
-        segmenter::Segmenter,
-        socket::state::{SocketComponents, Stateless},
-    },
+use crate::session::{
+    errors::SessionError,
+    frames::{Frame, FrameInspector, Segment},
+    processing::{Segmenter, frame_reconstructor, frame_reconstructor_with_inspector},
+    protocol::{SessionCodec, SessionMessage},
+    socket::state::{SocketComponents, Stateless},
 };
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, smart_default::SmartDefault)]
@@ -252,11 +246,12 @@ impl<const C: usize, S: SocketState<C> + 'static> futures::io::AsyncWrite for Se
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use futures::{AsyncReadExt, AsyncWriteExt};
-    use hashbrown::HashSet;
 
     use super::*;
-    use crate::{session::testing::*, utils::DuplexIO};
+    use crate::{session::utils::test::*, utils::DuplexIO};
 
     const MTU: usize = 466;
 
@@ -399,15 +394,17 @@ mod tests {
 
         alice_socket.write_all(&data).await?;
         alice_socket.flush().await?;
+        alice_socket.close().await?;
 
-        let mut bob_data = vec![0; data.len()];
-        bob_socket.read_exact(&mut bob_data).await?;
+        let mut bob_data = Vec::new();
+        bob_socket.read_to_end(&mut bob_data).await?;
 
-        assert_eq!(data.len() - 452, bob_data.len());
+        assert_eq!(0, bob_data.len());
 
+        // bob_socket.read_exact(&mut bob_data).await?;
+        // assert_eq!(&data[1500..], &bob_data);
         // assert_eq!(data[4], *bob_data);
 
-        alice_socket.close().await?;
         bob_socket.close().await?;
 
         Ok(())

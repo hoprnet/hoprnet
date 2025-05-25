@@ -7,7 +7,7 @@ use std::{
 
 use tracing::instrument;
 
-use crate::prelude::{FrameId, errors::SessionError};
+use crate::session::{errors::SessionError, frames::FrameId};
 
 #[derive(Copy, Clone, Debug)]
 pub struct SequencerConfig {

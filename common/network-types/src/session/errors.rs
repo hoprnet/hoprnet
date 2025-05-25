@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::prelude::FrameId;
+use crate::session::frames::FrameId;
 
 #[derive(Error, Debug)]
 pub enum SessionError {

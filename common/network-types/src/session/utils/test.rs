@@ -1,5 +1,5 @@
 use std::{
-    collections::VecDeque,
+    collections::{HashSet, VecDeque},
     convert::identity,
     pin::Pin,
     sync::{Arc, atomic::AtomicUsize},
@@ -11,7 +11,6 @@ use anyhow::bail;
 use futures::{
     AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, StreamExt, channel::mpsc::UnboundedSender, stream::BoxStream,
 };
-use hashbrown::HashSet;
 use hex_literal::hex;
 use rand::{
     Rng, SeedableRng,
@@ -290,7 +289,11 @@ impl<const C: usize> FaultyNetwork<'_, C> {
                 }
 
                 let mut rng = StdRng::from_seed(cfg.rng_seed);
-                let wait = rng.gen_range(Duration::ZERO..2 * avg_delay);
+                let wait = if !avg_delay.is_zero() {
+                    rng.gen_range(Duration::ZERO..2 * avg_delay)
+                } else {
+                    Duration::ZERO
+                };
                 async move {
                     if wait > Duration::ZERO {
                         hopr_async_runtime::prelude::sleep(wait).await;

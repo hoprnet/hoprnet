@@ -60,6 +60,7 @@ smart-default = { workspace = true }
 socket2 = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
+test-log = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true, features = ["net", "io"] }
 tracing = { workspace = true }

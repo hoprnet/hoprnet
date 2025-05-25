@@ -6,13 +6,10 @@ use std::{
 use futures::{Sink, SinkExt, ready};
 use tracing::instrument;
 
-use crate::{
-    prelude::protocol::SessionMessage,
-    session::{
-        Segment,
-        errors::SessionError,
-        frame::{FrameId, SeqNum},
-    },
+use crate::session::{
+    errors::SessionError,
+    frames::{FrameId, Segment, SeqNum},
+    protocol::SessionMessage,
 };
 
 /// `C` is MTU size, `F` is frame size.
@@ -202,6 +199,7 @@ mod tests {
     use futures_time::future::FutureExt;
 
     use super::*;
+    use crate::session::processing::segment;
 
     #[tokio::test]
     async fn segmenter_should_not_segment_small_data_unless_flushed() -> anyhow::Result<()> {
@@ -256,15 +254,37 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn segmenter_full_frame_segmentation_must_be_consistent() -> anyhow::Result<()> {
+        const SEG_SIZE: usize = 510;
+        const FRAME_SIZE: usize = 1500;
+
+        let (mut writer, segments) = Segmenter::<SEG_SIZE>::new(FRAME_SIZE, 1024);
+
+        let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
+
+        writer.write_all(&data).await?;
+        writer.close().await?;
+
+        // Segmenter already takes into account the SessionMessage overhead
+        let expected = segment(&data, SEG_SIZE - SessionMessage::<SEG_SIZE>::SEGMENT_OVERHEAD, 1)?;
+        let actual = segments.collect::<Vec<_>>().await;
+
+        assert_eq!(expected, actual);
+
+        Ok(())
+    }
+
     #[test_log::test(tokio::test)]
     async fn segmenter_should_segment_complete_frame_with_misaligned_mtu() -> anyhow::Result<()> {
         const MTU: usize = 462;
         const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
+        const FRAME_SIZE: usize = 1500;
 
-        let (mut writer, segments) = Segmenter::<MTU>::new(1500, 1024);
+        let (mut writer, segments) = Segmenter::<MTU>::new(FRAME_SIZE, 1024);
 
         let mut offset = 0;
-        let data = hopr_crypto_random::random_bytes::<1500>();
+        let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
 
         while offset < data.len() {
             let written = writer.write(&data[offset..]).await?;
@@ -277,11 +297,11 @@ mod tests {
 
         pin_mut!(segments);
 
-        for i in 0..(1500 / MTU) {
+        for i in 0..(FRAME_SIZE / MTU) {
             let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
             assert_eq!(1, seg.frame_id);
             assert_eq!(i as SeqNum, seg.seq_idx);
-            assert_eq!(((1500 / SMTU) + 1) as SeqNum, seg.seq_len);
+            assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_len);
             assert_eq!(SMTU, seg.data.len());
             assert_eq!(&data[i * SMTU..i * SMTU + SMTU], seg.data.as_ref());
         }
@@ -289,9 +309,9 @@ mod tests {
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
         assert_eq!(1, seg.frame_id);
         assert_eq!(3, seg.seq_idx);
-        assert_eq!(((1500 / SMTU) + 1) as SeqNum, seg.seq_len);
-        assert_eq!(1500 % SMTU, seg.data.len());
-        assert_eq!(&data[1500 - 1500 % SMTU..], seg.data.as_ref());
+        assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_len);
+        assert_eq!(FRAME_SIZE % SMTU, seg.data.len());
+        assert_eq!(&data[FRAME_SIZE - FRAME_SIZE % SMTU..], seg.data.as_ref());
 
         assert_eq!(None, segments.next().await);
         Ok(())
