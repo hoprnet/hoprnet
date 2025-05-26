@@ -145,7 +145,7 @@ Options:
           Set host IP to which the API server will bind [env: HOPRD_API_HOST=]
       --apiPort <PORT>
           Set port to which the API server will bind [env: HOPRD_API_PORT=]
-      --default-session-listen-host <DEFAULT_SESSION_LISTEN_HOST>
+      --defaultSessionListenHost <DEFAULT_SESSION_LISTEN_HOST>
           Default Session listening host for Session IP forwarding [env: HOPRD_DEFAULT_SESSION_LISTEN_HOST=]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]

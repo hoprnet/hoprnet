@@ -116,7 +116,7 @@ pub struct CliArgs {
     pub api_port: Option<u16>,
 
     #[arg(
-        long,
+        long = "defaultSessionListenHost",
         env = "HOPRD_DEFAULT_SESSION_LISTEN_HOST",
         help = "Default Session listening host for Session IP forwarding",
         value_parser = ValueParser::new(parse_host),

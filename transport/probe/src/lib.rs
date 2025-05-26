@@ -125,8 +125,7 @@ impl Probe {
                       cause|
                       -> moka::notification::ListenerFuture {
                     if matches!(cause, moka::notification::RemovalCause::Expired) {
-                        // If the cause of eviction is expiration, the corresponding entry needs to be recorded as a
-                        // failed probe
+                        // If the eviction cause is expiration => record as a failed probe
                         let store_eviction = store_eviction.clone();
                         let (peer, _start, _notifier) = v;
 
@@ -144,7 +143,7 @@ impl Probe {
                         }
                         .boxed()
                     } else {
-                        // If the cause of eviction is not expiration, nothing needs to be done
+                        // If the eviction cause is not expiration, nothing needs to be done
                         futures::future::ready(()).boxed()
                     }
                 },
