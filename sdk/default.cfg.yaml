@@ -22,6 +22,7 @@ hopr:
       - !AutoRedeeming
         redeem_only_aggregated: true
         minimum_redeem_ticket_value: "0 wxHOPR"
+  protocol:
     outgoing_ticket_winning_prob: 1.0
 session_ip_forwarding:
   use_target_allow_list: false
