@@ -5,29 +5,30 @@
 //! using a [TransactionExecutor](crate::action_queue::TransactionExecutor).
 //!
 //! There are two main implementations:
-//! - [BasicPayloadGenerator] which implements generation of a direct EIP1559 transaction payload. This is currently
-//!   not used by a HOPR node.
-//! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the
-//!   SAFE transaction. This is currently the main mode of HOPR node operation.
-//!
+//! - [BasicPayloadGenerator] which implements generation of a direct EIP1559 transaction payload. This is currently not
+//!   used by a HOPR node.
+//! - [SafePayloadGenerator] which implements generation of a payload that embeds the transaction data into the SAFE
+//!   transaction. This is currently the main mode of HOPR node operation.
 
-use alloy::network::TransactionBuilder;
-use alloy::primitives::aliases::U96;
-use alloy::primitives::aliases::{U24, U48, U56};
-use alloy::primitives::{B256, U256};
-use alloy::rpc::types::TransactionRequest;
-use alloy::sol_types::SolCall;
-
+use alloy::{
+    network::TransactionBuilder,
+    primitives::{
+        B256, U256,
+        aliases::{U24, U48, U56, U96},
+    },
+    rpc::types::TransactionRequest,
+    sol_types::SolCall,
+};
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{
         announceCall, announceSafeCall, bindKeysAnnounceCall, bindKeysAnnounceSafeCall,
     },
     hoprchannels::{
         HoprChannels::{
-            closeIncomingChannelCall, closeIncomingChannelSafeCall, finalizeOutgoingChannelClosureCall,
-            finalizeOutgoingChannelClosureSafeCall, fundChannelCall, fundChannelSafeCall,
-            initiateOutgoingChannelClosureCall, initiateOutgoingChannelClosureSafeCall, redeemTicketCall,
-            redeemTicketSafeCall, RedeemableTicket as OnChainRedeemableTicket, TicketData,
+            RedeemableTicket as OnChainRedeemableTicket, TicketData, closeIncomingChannelCall,
+            closeIncomingChannelSafeCall, finalizeOutgoingChannelClosureCall, finalizeOutgoingChannelClosureSafeCall,
+            fundChannelCall, fundChannelSafeCall, initiateOutgoingChannelClosureCall,
+            initiateOutgoingChannelClosureSafeCall, redeemTicketCall, redeemTicketSafeCall,
         },
         HoprCrypto::{CompactSignature, VRFParameters},
     },
@@ -747,7 +748,7 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
         Ok(OnChainRedeemableTicket {
             data: TicketData {
                 channelId: B256::from_slice(off_chain.verified_ticket().channel_id.as_ref()),
-                amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), // Extract only the last 12 bytes (lowest 96 bits)
+                amount: U96::from_be_slice(&off_chain.verified_ticket().amount.amount().to_be_bytes()[32 - 12..]), /* Extract only the last 12 bytes (lowest 96 bits) */
                 ticketIndex: U48::from_be_slice(&off_chain.verified_ticket().index.to_be_bytes()[8 - 6..]),
                 indexOffset: off_chain.verified_ticket().index_offset,
                 epoch: U24::from_be_slice(&off_chain.verified_ticket().channel_epoch.to_be_bytes()[4 - 3..]),
@@ -766,19 +767,19 @@ pub fn convert_acknowledged_ticket(off_chain: &RedeemableTicket) -> Result<OnCha
 
 #[cfg(test)]
 mod tests {
-    use super::{BasicPayloadGenerator, PayloadGenerator};
+    use std::str::FromStr;
 
     use alloy::{primitives::U256, providers::Provider};
     use anyhow::Context;
     use hex_literal::hex;
-    use multiaddr::Multiaddr;
-    use std::str::FromStr;
-
     use hopr_chain_rpc::client::create_rpc_client_to_anvil;
     use hopr_chain_types::ContractInstances;
     use hopr_crypto_types::prelude::*;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::{Balance, BalanceType};
+    use multiaddr::Multiaddr;
+
+    use super::{BasicPayloadGenerator, PayloadGenerator};
 
     const PRIVATE_KEY: [u8; 32] = hex!("c14b8faa0a9b8a5fa4453664996f23a7e7de606d42297d723fc4a794f375e260");
     const RESPONSE_TO_CHALLENGE: [u8; 32] = hex!("b58f99c83ae0e7dd6a69f755305b38c7610c7687d2931ff3f70103f8f92b90bb");
@@ -815,12 +816,14 @@ mod tests {
         let ad_reannounce = AnnouncementData::new(test_multiaddr_reannounce, None)?;
         let reannounce_tx = generator.announce(ad_reannounce)?;
 
-        assert!(client
-            .send_transaction(reannounce_tx)
-            .await?
-            .get_receipt()
-            .await?
-            .status());
+        assert!(
+            client
+                .send_transaction(reannounce_tx)
+                .await?
+                .get_receipt()
+                .await?
+                .status()
+        );
 
         Ok(())
     }
@@ -838,8 +841,7 @@ mod tests {
         // Mint 1000 HOPR to Alice
         let _ = hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128)).await;
 
-        // let domain_separator = contract_instances.channels.domainSeparator().call().await?._0;
-        let domain_separator: Hash = contract_instances.channels.domainSeparator().call().await?._0.0.into();
+        let domain_separator: Hash = contract_instances.channels.domainSeparator().call().await?.0.into();
 
         // Open channel Alice -> Bob
         let _ = hopr_chain_types::utils::fund_channel(
@@ -882,12 +884,14 @@ mod tests {
         let redeem_ticket_tx = generator.redeem_ticket(acked_ticket)?;
         let client = create_rpc_client_to_anvil(&anvil, &chain_key_bob);
 
-        assert!(client
-            .send_transaction(redeem_ticket_tx)
-            .await?
-            .get_receipt()
-            .await?
-            .status());
+        assert!(
+            client
+                .send_transaction(redeem_ticket_tx)
+                .await?
+                .get_receipt()
+                .await?
+                .status()
+        );
 
         Ok(())
     }
@@ -911,8 +915,7 @@ mod tests {
             .token
             .balanceOf(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
             .call()
-            .await?
-            ._0;
+            .await?;
         assert_eq!(balance, U256::from(1000_u128));
 
         // Alice withdraws 100 HOPR (to Bob's address)
@@ -931,8 +934,7 @@ mod tests {
             .token
             .balanceOf(hopr_primitive_types::primitives::Address::from(&chain_key_alice).into())
             .call()
-            .await?
-            ._0;
+            .await?;
         assert_eq!(balance, U256::from(900_u128));
 
         Ok(())

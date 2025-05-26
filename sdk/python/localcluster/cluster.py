@@ -31,9 +31,9 @@ class Cluster:
         index = 1
 
         for network_name, params in config["networks"].items():
-            for alias, node in params["nodes"].items():
+            for node in params["nodes"]:
                 self.nodes[str(index)] = Node.fromConfig(
-                    index, alias, node, config["defaults"], network_name, use_nat, exposed, base_port
+                    index, node, config["defaults"], network_name, use_nat, exposed, base_port
                 )
                 index += 1
 
@@ -84,7 +84,6 @@ class Cluster:
         logging.info("Retrieve nodes addresses and peer ids")
         for node in self.nodes.values():
             if addresses := await node.api.addresses():
-                node.peer_id = addresses.hopr
                 node.address = addresses.native
             else:
                 raise RuntimeError(f"Node {node} did not return addresses")
@@ -93,10 +92,10 @@ class Cluster:
         # peer_connection_timeout = 2 * GLOBAL_TIMEOUT
         # logging.info(f"Waiting up to {peer_connection_timeout}s for nodes to connect to all peers")
 
-        # tasks = []
-        # for node in self.nodes.values():
-        #     required_peers = [n.peer_id for n in self.nodes.values() if n != node and n.network == node.network]
-        #     tasks.append(asyncio.create_task(node.all_peers_connected(required_peers)))
+        tasks = []
+        for node in self.nodes.values():
+            required_peers = [n.address for n in self.nodes.values() if n != node and n.network == node.network]
+            tasks.append(asyncio.create_task(node.all_peers_connected(required_peers)))
 
         # try:
         #     await asyncio.wait_for(asyncio.gather(*tasks), peer_connection_timeout)
@@ -177,18 +176,11 @@ class Cluster:
         for node in self.node.values():
             node.get_safe_and_module_addresses()
 
-    async def alias_peers(self):
-        logging.info("Aliasing every other node")
-        aliases_dict = {node.peer_id: node.alias for node in self.nodes.values()}
-
-        for node in self.nodes.values():
-            await node.alias_peers(aliases_dict)
-
     async def connect_peers(self):
         logging.info("Creating a channel to every other node")
-        peer_ids = [node.peer_id for node in self.nodes.values()]
+        addresses = [node.address for node in self.nodes.values()]
 
-        tasks = [node.connect_peers(peer_ids) for node in self.nodes.values()]
+        tasks = [node.connect_peers(addresses) for node in self.nodes.values()]
         await asyncio.gather(*tasks)
 
     async def links(self):

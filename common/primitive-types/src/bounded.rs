@@ -1,5 +1,6 @@
-use crate::prelude::GeneralError;
 use std::fmt::{Display, Formatter};
+
+use crate::prelude::GeneralError;
 
 /// Unsigned integer (`usize`) that has an explicit upper bound.
 /// Trying to convert an integer that's above this bound will fail.
@@ -7,10 +8,10 @@ use std::fmt::{Display, Formatter};
 pub struct BoundedSize<const B: usize>(usize);
 
 impl<const B: usize> BoundedSize<B> {
-    /// Minimum value - evaluates to 0.
-    pub const MIN: Self = Self(0);
     /// Maximum value - evaluates to `B`.
     pub const MAX: Self = Self(B);
+    /// Minimum value - evaluates to 0.
+    pub const MIN: Self = Self(0);
 }
 
 impl<const B: usize> TryFrom<u8> for BoundedSize<B> {
@@ -161,8 +162,8 @@ impl<T, const N: usize> TryFrom<Vec<T>> for BoundedVec<T, N> {
 }
 
 impl<T, const N: usize> IntoIterator for BoundedVec<T, N> {
-    type Item = T;
     type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = T;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()

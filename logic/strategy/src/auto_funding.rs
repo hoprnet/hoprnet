@@ -1,25 +1,23 @@
 //! ## Auto Funding Strategy
-//! This strategy listens for channel state change events to check whether a channel has dropped below `min_stake_threshold` HOPR.
-//! If this happens, the strategy issues a **fund channel** transaction to re-stake the channel with `funding_amount` HOPR.
+//! This strategy listens for channel state change events to check whether a channel has dropped below
+//! `min_stake_threshold` HOPR. If this happens, the strategy issues a **fund channel** transaction to re-stake the
+//! channel with `funding_amount` HOPR.
 //!
 //! For details on default parameters see [AutoFundingStrategyConfig].
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
+
+use async_trait::async_trait;
+use hopr_chain_actions::channels::ChannelActions;
+use hopr_internal_types::prelude::*;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::SimpleCounter;
+use hopr_primitive_types::prelude::*;
+use serde::{Deserialize, Serialize};
+use serde_with::{DisplayFromStr, serde_as};
 use tracing::info;
 use validator::Validate;
 
-use hopr_chain_actions::channels::ChannelActions;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-
-use crate::errors::StrategyError::CriteriaNotSatisfied;
-use crate::strategy::SingularStrategy;
-use crate::Strategy;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleCounter;
+use crate::{Strategy, errors::StrategyError::CriteriaNotSatisfied, strategy::SingularStrategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -112,20 +110,24 @@ impl<A: ChannelActions + Send + Sync> SingularStrategy for AutoFundingStrategy<A
 
 #[cfg(test)]
 mod tests {
-    use crate::auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig};
-    use crate::strategy::SingularStrategy;
     use async_trait::async_trait;
-    use futures::{future::ok, FutureExt};
+    use futures::{FutureExt, future::ok};
     use hex_literal::hex;
-    use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use hopr_chain_actions::channels::ChannelActions;
-    use hopr_chain_types::actions::Action;
-    use hopr_chain_types::chain_events::ChainEventType;
+    use hopr_chain_actions::{
+        action_queue::{ActionConfirmation, PendingAction},
+        channels::ChannelActions,
+    };
+    use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
+
+    use crate::{
+        auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
+        strategy::SingularStrategy,
+    };
 
     lazy_static::lazy_static! {
         static ref ALICE: Address = hex!("18f8ae833c85c51fbeba29cef9fbfb53b3bad950").into();

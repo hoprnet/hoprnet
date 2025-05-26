@@ -9,7 +9,6 @@ import pytest
 
 from sdk.python.localcluster.constants import (
     ANVIL_CONFIG_FILE,
-    IDENTITY_PREFIX,
     CONTRACTS_ADDRESSES,
     CONTRACTS_DIR,
     MAIN_DIR,
@@ -60,8 +59,6 @@ def faucet(private_key: str, hopr_amount: str, native_amount: str, base_port: in
         "faucet",
         "--network",
         NETWORK,
-        "--address",
-        node_addr,
         "--contracts-root",
         CONTRACTS_DIR,
         "--hopr-amount",

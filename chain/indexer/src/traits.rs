@@ -1,6 +1,5 @@
 use alloy::primitives::B256;
 use async_trait::async_trait;
-
 use hopr_chain_rpc::BlockWithLogs;
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_primitive_types::prelude::*;

@@ -1,25 +1,23 @@
+use std::{
+    fmt::{Display, Formatter},
+    ops::Sub,
+    time::Duration,
+};
+
 use async_trait::async_trait;
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use futures::{StreamExt, stream::FuturesUnordered};
+use hopr_chain_actions::channels::ChannelActions;
+use hopr_db_sql::{accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations};
+use hopr_internal_types::prelude::*;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::SimpleCounter;
+use hopr_platform::time::native::current_time;
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
-use std::fmt::{Display, Formatter};
-use std::ops::Sub;
-use std::time::Duration;
+use serde_with::{DurationSeconds, serde_as};
 use tracing::{debug, error, info};
 use validator::Validate;
 
-use hopr_chain_actions::channels::ChannelActions;
-use hopr_db_sql::accounts::HoprDbAccountOperations;
-use hopr_db_sql::channels::HoprDbChannelOperations;
-use hopr_internal_types::prelude::*;
-use hopr_platform::time::native::current_time;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleCounter;
-
-use crate::strategy::SingularStrategy;
-use crate::{errors, Strategy};
+use crate::{Strategy, errors, strategy::SingularStrategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -135,22 +133,20 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use futures::future::ok;
-    use futures::FutureExt;
+    use std::{ops::Add, time::SystemTime};
+
+    use futures::{FutureExt, future::ok};
     use hex_literal::hex;
     use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use hopr_chain_types::actions::Action;
-    use hopr_chain_types::chain_events::ChainEventType;
+    use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::HoprDbGeneralModelOperations;
+    use hopr_db_sql::{HoprDbGeneralModelOperations, db::HoprDb};
     use hopr_primitive_types::prelude::*;
     use lazy_static::lazy_static;
     use mockall::mock;
-    use std::ops::Add;
-    use std::time::SystemTime;
+
+    use super::*;
 
     lazy_static! {
         static ref ALICE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(

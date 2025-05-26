@@ -1,5 +1,4 @@
 import asyncio
-import socket
 import itertools
 import logging
 import os
@@ -105,7 +104,7 @@ async def swarm7(request, base_port):
         cluster.clean_up()
         anvil.kill()
     except RuntimeError:
-        pytest.fail(f"Failed to bring up the cluster")
+        pytest.fail("Failed to bring up the cluster")
 
 
 @pytest.fixture(scope="function")
@@ -117,11 +116,6 @@ async def swarm7_reset(swarm7: dict[str, Node]):
         await asyncio.gather(*[node.api.reset_tickets_statistics() for node in swarm7.values()])
     except Exception as e:
         logging.error(f"Error resetting tickets statistics in teardown: {e}")
-
-    try:
-        await asyncio.gather(*[node.api.messages_pop_all(None) for node in swarm7.values()])
-    except Exception as e:
-        logging.error(f"Error popping all messages in teardown: {e}")
 
 
 def to_ws_url(host, port, args: list[tuple[str, str]]):

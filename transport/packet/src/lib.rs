@@ -2,10 +2,9 @@
 
 use std::fmt::Debug;
 
-use libp2p_identity::PeerId;
-
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_internal_types::protocol::Acknowledgement;
+use libp2p_identity::PeerId;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DataBytes(Box<[u8]>);

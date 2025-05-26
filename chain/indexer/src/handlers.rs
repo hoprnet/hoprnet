@@ -1,13 +1,13 @@
-use alloy::primitives::B256;
-use alloy::sol_types::SolEventInterface;
-use async_trait::async_trait;
-use std::cmp::Ordering;
-use std::fmt::Formatter;
-use std::ops::{Add, Sub};
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
-use tracing::{debug, error, info, trace, warn};
+use std::{
+    cmp::Ordering,
+    fmt::Formatter,
+    ops::{Add, Sub},
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
+use alloy::{primitives::B256, sol_types::SolEventInterface};
+use async_trait::async_trait;
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::HoprAnnouncementsEvents, hoprchannels::HoprChannels::HoprChannelsEvents,
     hoprnetworkregistry::HoprNetworkRegistry::HoprNetworkRegistryEvents,
@@ -17,18 +17,24 @@ use hopr_bindings::{
     hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::HoprWinningProbabilityOracleEvents,
 };
 use hopr_chain_rpc::{BlockWithLogs, Log};
-use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent};
-use hopr_chain_types::ContractAddresses;
-use hopr_crypto_types::keypairs::ChainKeypair;
-use hopr_crypto_types::prelude::{Hash, Keypair};
-use hopr_crypto_types::types::OffchainSignature;
-use hopr_db_sql::api::info::DomainSeparator;
-use hopr_db_sql::api::tickets::TicketSelector;
-use hopr_db_sql::errors::DbSqlError;
-use hopr_db_sql::prelude::TicketMarker;
-use hopr_db_sql::{HoprDbAllOperations, OpenTransaction};
+use hopr_chain_types::{
+    ContractAddresses,
+    chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent},
+};
+use hopr_crypto_types::{
+    keypairs::ChainKeypair,
+    prelude::{Hash, Keypair},
+    types::OffchainSignature,
+};
+use hopr_db_sql::{
+    HoprDbAllOperations, OpenTransaction,
+    api::{info::DomainSeparator, tickets::TicketSelector},
+    errors::DbSqlError,
+    prelude::TicketMarker,
+};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use tracing::{debug, error, info, trace, warn};
 
 use crate::errors::{CoreEthereumIndexerError, Result};
 
@@ -46,7 +52,6 @@ lazy_static::lazy_static! {
 ///
 /// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
 /// and passed on to this object that handles event-specific actions for each on-chain operation.
-///
 #[derive(Clone)]
 pub struct ContractEventHandlers<Db: Clone> {
     /// channels, announcements, network_registry, token: contract addresses
@@ -161,7 +166,7 @@ where
                 let node_address: Address = revocation.node.into();
                 match self.db.delete_all_announcements(Some(tx), node_address).await {
                     Err(DbSqlError::MissingAccount) => {
-                        return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding)
+                        return Err(CoreEthereumIndexerError::RevocationBeforeKeyBinding);
                     }
                     Err(e) => return Err(e.into()),
                     _ => {}
@@ -365,8 +370,10 @@ where
                                 .await?
                                 .into_iter()
                                 .filter(|ticket| {
-                                    // The ticket that has been redeemed at this point has: index + index_offset - 1 == new_ticket_index - 1
-                                    // Since unaggregated tickets have index_offset = 1, for the unagg case this leads to: index == new_ticket_index - 1
+                                    // The ticket that has been redeemed at this point has: index + index_offset - 1 ==
+                                    // new_ticket_index - 1 Since unaggregated
+                                    // tickets have index_offset = 1, for the unagg case this leads to: index ==
+                                    // new_ticket_index - 1
                                     let ticket_idx = ticket.verified_ticket().index;
                                     let ticket_off = ticket.verified_ticket().index_offset as u64;
 
@@ -737,7 +744,11 @@ where
                                 TicketMarker::Rejected,
                             )
                             .await?;
-                        info!(count = num_rejected, "unredeemed tickets were rejected, because the minimum winning probability has been increased");
+                        info!(
+                            count = num_rejected,
+                            "unredeemed tickets were rejected, because the minimum winning probability has been \
+                             increased"
+                        );
                     }
                 }
             }
@@ -794,28 +805,28 @@ where
 
         if log.address.eq(&self.addresses.announcements) {
             let bn = log.block_number as u32;
-            let event = HoprAnnouncementsEvents::decode_log(&primitive_log, true)?;
+            let event = HoprAnnouncementsEvents::decode_log(&primitive_log)?;
             self.on_announcement_event(tx, event.data, bn).await
         } else if log.address.eq(&self.addresses.channels) {
-            let event = HoprChannelsEvents::decode_log(&primitive_log, true)?;
+            let event = HoprChannelsEvents::decode_log(&primitive_log)?;
             self.on_channel_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.network_registry) {
-            let event = HoprNetworkRegistryEvents::decode_log(&primitive_log, true)?;
+            let event = HoprNetworkRegistryEvents::decode_log(&primitive_log)?;
             self.on_network_registry_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.token) {
-            let event = HoprTokenEvents::decode_log(&primitive_log, true)?;
+            let event = HoprTokenEvents::decode_log(&primitive_log)?;
             self.on_token_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.safe_registry) {
-            let event = HoprNodeSafeRegistryEvents::decode_log(&primitive_log, true)?;
+            let event = HoprNodeSafeRegistryEvents::decode_log(&primitive_log)?;
             self.on_node_safe_registry_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.module_implementation) {
-            let event = HoprNodeManagementModuleEvents::decode_log(&primitive_log, true)?;
+            let event = HoprNodeManagementModuleEvents::decode_log(&primitive_log)?;
             self.on_node_management_module_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.price_oracle) {
-            let event = HoprTicketPriceOracleEvents::decode_log(&primitive_log, true)?;
+            let event = HoprTicketPriceOracleEvents::decode_log(&primitive_log)?;
             self.on_ticket_price_oracle_event(tx, event.data).await
         } else if log.address.eq(&self.addresses.win_prob_oracle) {
-            let event = HoprWinningProbabilityOracleEvents::decode_log(&primitive_log, true)?;
+            let event = HoprWinningProbabilityOracleEvents::decode_log(&primitive_log)?;
             self.on_ticket_winning_probability_oracle_event(tx, event.data).await
         } else {
             #[cfg(all(feature = "prometheus", not(test)))]
@@ -907,32 +918,39 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::ContractEventHandlers;
+    use std::{
+        sync::{Arc, atomic::Ordering},
+        time::SystemTime,
+    };
 
-    use alloy::dyn_abi::DynSolValue;
-    use alloy::primitives::{Address as AlloyAddress, U256};
-    use alloy::sol_types::{SolEvent, SolValue};
-    use anyhow::{anyhow, Context};
+    use alloy::{
+        dyn_abi::DynSolValue,
+        primitives::{Address as AlloyAddress, U256},
+        sol_types::{SolEvent, SolValue},
+    };
+    use anyhow::{Context, anyhow};
     use hex_literal::hex;
-    use multiaddr::Multiaddr;
-    use primitive_types::H256;
-    use std::sync::atomic::Ordering;
-    use std::sync::Arc;
-    use std::time::SystemTime;
-
-    use hopr_chain_types::chain_events::{ChainEventType, NetworkRegistryStatus};
-    use hopr_chain_types::ContractAddresses;
+    use hopr_chain_types::{
+        ContractAddresses,
+        chain_events::{ChainEventType, NetworkRegistryStatus},
+    };
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::accounts::{ChainOrPacketKey, HoprDbAccountOperations};
-    use hopr_db_sql::api::{info::DomainSeparator, tickets::HoprDbTicketOperations};
-    use hopr_db_sql::channels::HoprDbChannelOperations;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::info::HoprDbInfoOperations;
-    use hopr_db_sql::prelude::HoprDbResolverOperations;
-    use hopr_db_sql::registry::HoprDbRegistryOperations;
-    use hopr_db_sql::{HoprDbAllOperations, HoprDbGeneralModelOperations};
+    use hopr_db_sql::{
+        HoprDbAllOperations, HoprDbGeneralModelOperations,
+        accounts::{ChainOrPacketKey, HoprDbAccountOperations},
+        api::{info::DomainSeparator, tickets::HoprDbTicketOperations},
+        channels::HoprDbChannelOperations,
+        db::HoprDb,
+        info::HoprDbInfoOperations,
+        prelude::HoprDbResolverOperations,
+        registry::HoprDbRegistryOperations,
+    };
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
+    use multiaddr::Multiaddr;
+    use primitive_types::H256;
+
+    use super::ContractEventHandlers;
 
     lazy_static::lazy_static! {
         static ref SELF_PRIV_KEY: OffchainKeypair = OffchainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");

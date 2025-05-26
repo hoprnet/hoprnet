@@ -1,20 +1,20 @@
-use futures::{future::BoxFuture, pin_mut, Sink, SinkExt, StreamExt, TryStreamExt};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use std::sync::{Arc, OnceLock};
-use tracing::{debug, error};
 
+use futures::{Sink, SinkExt, StreamExt, TryStreamExt, future::BoxFuture, pin_mut};
 use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::tickets::TicketSelector;
 use hopr_db_entity::ticket;
-use hopr_internal_types::prelude::AcknowledgedTicketStatus;
-use hopr_internal_types::tickets::AcknowledgedTicket;
-use hopr_primitive_types::prelude::ToHex;
-use hopr_primitive_types::primitives::{Balance, BalanceType};
+use hopr_internal_types::{prelude::AcknowledgedTicketStatus, tickets::AcknowledgedTicket};
+use hopr_primitive_types::{
+    prelude::ToHex,
+    primitives::{Balance, BalanceType},
+};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
+use tracing::{debug, error};
 
-use crate::cache::HoprDbCaches;
-use crate::prelude::DbSqlError;
-use crate::tickets::WrappedTicketSelector;
-use crate::{errors::Result, OpenTransaction};
+use crate::{
+    OpenTransaction, cache::HoprDbCaches, errors::Result, prelude::DbSqlError, tickets::WrappedTicketSelector,
+};
 
 /// Functionality related to locking and structural improvements to the underlying SQLite database
 ///
@@ -111,7 +111,8 @@ impl TicketManager {
                                             // Update the ticket winning count in the statistics
                                             if let Some(model) = hopr_db_entity::ticket_statistics::Entity::find()
                                                 .filter(
-                                                    hopr_db_entity::ticket_statistics::Column::ChannelId.eq(channel_id.clone()),
+                                                    hopr_db_entity::ticket_statistics::Column::ChannelId
+                                                        .eq(channel_id.clone()),
                                                 )
                                                 .one(tx.as_ref())
                                                 .await?
@@ -135,10 +136,14 @@ impl TicketManager {
                                             let start_idx = ack_ticket.verified_ticket().index;
                                             let offset = ack_ticket.verified_ticket().index_offset as u64;
 
-                                            // Replace all BeingAggregated tickets with aggregated index range in this channel
-                                            let selector = TicketSelector::new(ack_ticket.verified_ticket().channel_id, ack_ticket.verified_ticket().channel_epoch)
-                                                .with_index_range(start_idx..start_idx + offset)
-                                                .with_state(AcknowledgedTicketStatus::BeingAggregated);
+                                            // Replace all BeingAggregated tickets with aggregated index range in this
+                                            // channel
+                                            let selector = TicketSelector::new(
+                                                ack_ticket.verified_ticket().channel_id,
+                                                ack_ticket.verified_ticket().channel_epoch,
+                                            )
+                                            .with_index_range(start_idx..start_idx + offset)
+                                            .with_state(AcknowledgedTicketStatus::BeingAggregated);
 
                                             let deleted = ticket::Entity::delete_many()
                                                 .filter(WrappedTicketSelector::from(selector))
@@ -147,7 +152,8 @@ impl TicketManager {
 
                                             if deleted.rows_affected > offset {
                                                 return Err(DbSqlError::LogicalError(format!(
-                                                    "deleted ticket count ({}) must not be more than the ticket index offset {offset}",
+                                                    "deleted ticket count ({}) must not be more than the ticket index \
+                                                     offset {offset}",
                                                     deleted.rows_affected,
                                                 )));
                                             }
@@ -319,10 +325,9 @@ mod tests {
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 
-    use crate::accounts::HoprDbAccountOperations;
-    use crate::channels::HoprDbChannelOperations;
-    use crate::db::HoprDb;
-    use crate::info::HoprDbInfoOperations;
+    use crate::{
+        accounts::HoprDbAccountOperations, channels::HoprDbChannelOperations, db::HoprDb, info::HoprDbInfoOperations,
+    };
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be valid");

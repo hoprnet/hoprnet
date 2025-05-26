@@ -30,13 +30,6 @@ class ApiRequestObject:
         pass
 
 
-class SetAliasBody(ApiRequestObject):
-    keys = {"alias": "alias", "destination": "destination"}
-
-    def __init__(self, alias: str, destination: str):
-        super().__init__(vars())
-
-
 class OpenChannelBody(ApiRequestObject):
     keys = {
         "amount": "amount",

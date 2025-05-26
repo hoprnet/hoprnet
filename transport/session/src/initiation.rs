@@ -1,11 +1,10 @@
 //! This module defines the Start sub-protocol used for HOPR Session initiation and management.
 
-use hopr_internal_types::prelude::ApplicationData;
 use std::collections::HashSet;
 
-use crate::errors::TransportSessionError;
-use crate::types::SessionTarget;
-use crate::Capability;
+use hopr_internal_types::prelude::ApplicationData;
+
+use crate::{Capability, errors::TransportSessionError, types::SessionTarget};
 
 /// Challenge that identifies a Start initiation protocol message.
 pub type StartChallenge = u64;
@@ -208,12 +207,12 @@ impl<T> TryFrom<ApplicationData> for StartProtocol<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::{HoprPseudonym, Tag};
     use hopr_network_types::prelude::SealedHost;
 
+    use super::*;
     use crate::SessionId;
 
     #[cfg(feature = "serde")]
@@ -231,6 +230,24 @@ mod tests {
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_message_start_session_message_should_allow_for_at_least_one_surb() -> anyhow::Result<()> {
+        let msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:1234".parse()?)),
+            capabilities: Default::default(),
+        });
+
+        let len = msg.encode()?.1.len();
+        assert!(
+            HoprPacket::max_surbs_with_message(len) >= 1,
+            "KeepAlive message size ({}) must allow for at least 1 SURBs in packet",
+            len,
+        );
+
         Ok(())
     }
 

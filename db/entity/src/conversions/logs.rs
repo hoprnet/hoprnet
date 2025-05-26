@@ -1,10 +1,8 @@
-use sea_orm::Set;
-
 use hopr_crypto_types::types::Hash;
 use hopr_primitive_types::prelude::*;
+use sea_orm::Set;
 
-use crate::errors::DbEntityError;
-use crate::{log, log_status};
+use crate::{errors::DbEntityError, log, log_status};
 
 impl From<SerializableLog> for log::ActiveModel {
     fn from(value: SerializableLog) -> Self {

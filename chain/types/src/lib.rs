@@ -4,8 +4,6 @@ use alloy::{
     contract::Result as ContractResult, network::TransactionBuilder, primitives, rpc::types::TransactionRequest,
 };
 use constants::{ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER};
-use serde::{Deserialize, Serialize};
-
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{self, HoprAnnouncementsInstance},
     hoprchannels::HoprChannels::{self, HoprChannelsInstance},
@@ -21,9 +19,9 @@ use hopr_bindings::{
     hoprtoken::HoprToken::{self, HoprTokenInstance},
     hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::{self, HoprWinningProbabilityOracleInstance},
 };
-
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_primitive_types::primitives::Address;
+use serde::{Deserialize, Serialize};
 
 pub mod actions;
 pub mod chain_events;
@@ -59,8 +57,8 @@ pub struct ContractAddresses {
 
 #[derive(Debug, Clone)]
 pub enum NetworkRegistryProxy<P> {
-    Dummy(HoprDummyProxyForNetworkRegistryInstance<(), P>),
-    Safe(HoprSafeProxyForNetworkRegistryInstance<(), P>),
+    Dummy(HoprDummyProxyForNetworkRegistryInstance<P>),
+    Safe(HoprSafeProxyForNetworkRegistryInstance<P>),
 }
 
 impl<P> NetworkRegistryProxy<P>
@@ -78,16 +76,16 @@ where
 /// Holds instances to contracts.
 #[derive(Debug)]
 pub struct ContractInstances<P> {
-    pub token: HoprTokenInstance<(), P>,
-    pub channels: HoprChannelsInstance<(), P>,
-    pub announcements: HoprAnnouncementsInstance<(), P>,
-    pub network_registry: HoprNetworkRegistryInstance<(), P>,
+    pub token: HoprTokenInstance<P>,
+    pub channels: HoprChannelsInstance<P>,
+    pub announcements: HoprAnnouncementsInstance<P>,
+    pub network_registry: HoprNetworkRegistryInstance<P>,
     pub network_registry_proxy: NetworkRegistryProxy<P>,
-    pub safe_registry: HoprNodeSafeRegistryInstance<(), P>,
-    pub price_oracle: HoprTicketPriceOracleInstance<(), P>,
-    pub win_prob_oracle: HoprWinningProbabilityOracleInstance<(), P>,
-    pub stake_factory: HoprNodeStakeFactoryInstance<(), P>,
-    pub module_implementation: HoprNodeManagementModuleInstance<(), P>,
+    pub safe_registry: HoprNodeSafeRegistryInstance<P>,
+    pub price_oracle: HoprTicketPriceOracleInstance<P>,
+    pub win_prob_oracle: HoprWinningProbabilityOracleInstance<P>,
+    pub stake_factory: HoprNodeStakeFactoryInstance<P>,
+    pub module_implementation: HoprNodeManagementModuleInstance<P>,
 }
 
 impl<P> ContractInstances<P>
@@ -162,7 +160,8 @@ where
         let win_prob_oracle = HoprWinningProbabilityOracle::deploy(
             provider.clone(),
             self_address,
-            primitives::aliases::U56::from(0xFFFFFFFFFFFFFF_u64), // 0xFFFFFFFFFFFFFF in hex or 72057594037927935 in decimal values
+            primitives::aliases::U56::from(0xFFFFFFFFFFFFFF_u64), /* 0xFFFFFFFFFFFFFF in hex or 72057594037927935 in
+                                                                   * decimal values */
         )
         .await?;
         let token = HoprToken::deploy(provider.clone()).await?;

@@ -20,39 +20,42 @@ pub mod constants;
 /// Lists all errors thrown from this library.
 pub mod errors;
 
-use async_lock::RwLock;
-use futures::{
-    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    Stream, StreamExt,
-};
-use std::ops::Deref;
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
+    ops::Deref,
     path::PathBuf,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
     time::Duration,
 };
-use tracing::{debug, error, info, trace, warn};
 
+use async_lock::RwLock;
 use errors::{HoprLibError, HoprStatusError};
-use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
+use futures::{
+    Stream, StreamExt,
+    channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded},
+};
+use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
+pub use hopr_chain_actions::errors::ChainActionsError;
 use hopr_chain_actions::{
     action_state::{ActionState, IndexerActionTracker},
     channels::ChannelActions,
     node::NodeActions,
     redeem::TicketRedeemActions,
 };
+pub use hopr_chain_api::config::{
+    Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
+};
 use hopr_chain_api::{
-    can_register_with_safe, config::ChainNetworkConfig, errors::HoprChainError, wait_for_funds, HoprChain,
-    HoprChainProcess, SignificantChainEvent,
+    HoprChain, HoprChainProcess, SignificantChainEvent, can_register_with_safe, config::ChainNetworkConfig,
+    errors::HoprChainError, wait_for_funds,
 };
 use hopr_chain_rpc::HoprRpcOperations;
-use hopr_chain_types::chain_events::ChainEventType;
-use hopr_chain_types::ContractAddresses;
+use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{
+    HoprDbAllOperations, HoprDbGeneralModelOperations,
     accounts::HoprDbAccountOperations,
     api::{info::SafeInfo, resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations},
     channels::HoprDbChannelOperations,
@@ -60,47 +63,41 @@ use hopr_db_sql::{
     info::{HoprDbInfoOperations, IndexerStateInfo},
     prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
     registry::HoprDbRegistryOperations,
-    HoprDbAllOperations, HoprDbGeneralModelOperations,
 };
+pub use hopr_internal_types::prelude::*;
+pub use hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions};
+pub use hopr_path::channel_graph::GraphExportConfig;
 use hopr_path::channel_graph::{ChannelGraph, ChannelGraphConfig, NodeScoreUpdate};
 use hopr_platform::file::native::{join, remove_dir_all};
+pub use hopr_primitive_types::prelude::*;
+pub use hopr_strategy::Strategy;
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
-use hopr_transport::{
-    execute_on_tick, ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession,
-    OffchainKeypair, PeerDiscovery, PeerStatus,
-};
-pub use {
-    hopr_chain_actions::errors::ChainActionsError,
-    hopr_chain_api::config::{
-        Addresses as NetworkContractAddresses, EnvironmentType, Network as ChainNetwork, ProtocolsConfig,
-    },
-    hopr_internal_types::prelude::*,
-    hopr_network_types::prelude::{DestinationRouting, IpProtocol, RoutingOptions},
-    hopr_path::channel_graph::GraphExportConfig,
-    hopr_primitive_types::prelude::*,
-    hopr_strategy::Strategy,
-    hopr_transport::{
-        config::{looks_like_domain, HostConfig, HostType},
-        constants::RESERVED_TAG_UPPER_LIMIT,
-        errors::{HoprTransportError, NetworkingError, ProtocolError},
-        HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-        OffchainKeypair as HoprOffchainKeypair, PeerId, SendMsg, ServiceId, Session as HoprSession, SessionCapability,
-        SessionClientConfig, SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig, TicketStatistics,
-        SESSION_PAYLOAD_SIZE, SESSION_USABLE_MTU_SIZE,
-    },
-};
-
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
-
-use crate::config::SafeModule;
-use crate::constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE};
-
+use hopr_transport::{
+    ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession, OffchainKeypair,
+    PeerDiscovery, PeerStatus, execute_on_tick,
+};
+pub use hopr_transport::{
+    HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
+    OffchainKeypair as HoprOffchainKeypair, PeerId, SESSION_PAYLOAD_SIZE, SendMsg, ServiceId, Session as HoprSession,
+    SessionCapability, SessionClientConfig, SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig,
+    TicketStatistics, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
+    config::{HostConfig, HostType, looks_like_domain},
+    constants::RESERVED_TAG_UPPER_LIMIT,
+    errors::{HoprTransportError, NetworkingError, ProtocolError},
+};
+use tracing::{debug, error, info, trace, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
 use {
     hopr_metrics::metrics::{MultiGauge, SimpleGauge},
     hopr_platform::time::native::current_time,
     std::str::FromStr,
+};
+
+use crate::{
+    config::SafeModule,
+    constants::{MIN_NATIVE_BALANCE, ONBOARDING_INFORMATION_INTERVAL, SUGGESTED_NATIVE_BALANCE},
 };
 
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -206,9 +203,10 @@ impl From<HoprTransportProcess> for HoprLibProcesses {
 /// the individual components, and creates a filtered output stream that is fed into
 /// the transport layer swarm.
 ///
-/// * `event_stream` - represents the events generated by the indexer.
-///   If the Indexer is not synced, it will not generate any events.
-/// * `preloading_event_stream` - a stream used by the components to preload the data from the objects (db, channel graph...)
+/// * `event_stream` - represents the events generated by the indexer. If the Indexer is not synced, it will not
+///   generate any events.
+/// * `preloading_event_stream` - a stream used by the components to preload the data from the objects (db, channel
+///   graph...)
 #[allow(clippy::too_many_arguments)]
 pub async fn chain_events_to_transport_events<StreamIn, Db>(
     event_stream: StreamIn,
@@ -661,7 +659,8 @@ impl Hopr {
         let configured_ticket_price = self.cfg.protocol.outgoing_ticket_price;
         if configured_ticket_price.is_some_and(|c| c < network_min_ticket_price) {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
-                "configured outgoing ticket price is lower than the network minimum ticket price: {configured_ticket_price:?} < {network_min_ticket_price}"
+                "configured outgoing ticket price is lower than the network minimum ticket price: \
+                 {configured_ticket_price:?} < {network_min_ticket_price}"
             ))));
         }
 
@@ -675,7 +674,8 @@ impl Hopr {
                 .is_some_and(|c| c.approx_cmp(&network_min_win_prob).is_lt())
         {
             return Err(HoprLibError::ChainApi(HoprChainError::Api(format!(
-                "configured outgoing ticket winning probability is lower than the network minimum winning probability: {configured_win_prob:?} < {network_min_win_prob}"
+                "configured outgoing ticket winning probability is lower than the network minimum winning \
+                 probability: {configured_win_prob:?} < {network_min_win_prob}"
             ))));
         }
 
@@ -959,7 +959,7 @@ impl Hopr {
             ))),
         );
 
-        // NOTE: after the chain is synched we can reset tickets which are considered
+        // NOTE: after the chain is synced, we can reset tickets which are considered
         // redeemed but on-chain state does not align with that. This implies there was a problem
         // right when the transaction was sent on-chain. In such cases we simply let it retry and
         // handle errors appropriately.

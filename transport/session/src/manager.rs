@@ -1,24 +1,29 @@
-use futures::channel::mpsc::UnboundedSender;
-use futures::future::{AbortHandle, Either};
-use futures::{pin_mut, FutureExt, StreamExt, TryStreamExt};
+use std::{
+    ops::Range,
+    sync::{Arc, OnceLock, atomic::AtomicU64},
+    time::Duration,
+};
+
+use futures::{
+    FutureExt, StreamExt, TryStreamExt,
+    channel::mpsc::UnboundedSender,
+    future::{AbortHandle, Either},
+    pin_mut,
+};
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
-use std::ops::Range;
-use std::sync::atomic::AtomicU64;
-use std::sync::{Arc, OnceLock};
-use std::time::Duration;
 use tracing::{debug, error, info, trace, warn};
 
-use crate::balancer::{RateController, RateLimitExt, SurbBalancer, SurbFlowController};
-use crate::errors::{SessionManagerError, TransportSessionError};
-use crate::initiation::{
-    StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol,
+use crate::{
+    IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget,
+    balancer::{RateController, RateLimitExt, SurbBalancer, SurbFlowController},
+    errors::{SessionManagerError, TransportSessionError},
+    initiation::{StartChallenge, StartErrorReason, StartErrorType, StartEstablished, StartInitiation, StartProtocol},
+    traits::SendMsg,
 };
-use crate::traits::SendMsg;
-use crate::{IncomingSession, Session, SessionClientConfig, SessionId, SessionTarget};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -264,7 +269,6 @@ impl<T: SendMsg + Send + Sync> SendMsg for CountingSendMsg<T> {
 /// a desired target level of SURBs at the Session counterparty is set. According to measured
 /// inflow and outflow of SURBS to/from the counterparty, the production of non-organic SURBs
 /// through keep-alive messages (sent to counterparty) is controlled to maintain that target level.
-///
 pub struct SessionManager<S> {
     session_initiations: SessionInitiationCache,
     session_notifiers: Arc<OnceLock<(UnboundedSender<IncomingSession>, UnboundedSender<SessionId>)>>,
@@ -493,7 +497,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         };
 
         // Send the Session initiation message
-        trace!(challenge, %pseudonym, "sending new session request");
+        info!(challenge, %pseudonym, %destination, "new session request");
         msg_sender
             .send_message(start_session_msg.try_into()?, forward_routing.clone())
             .await?;
@@ -953,20 +957,17 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use crate::types::SessionTarget;
-    use crate::Capability;
     use anyhow::anyhow;
     use futures::AsyncWriteExt;
     use hopr_crypto_random::Randomizable;
-    use hopr_crypto_types::keypairs::ChainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
+    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
     use hopr_primitive_types::prelude::Address;
-
-    use crate::balancer::SurbBalancerConfig;
-    use crate::initiation::StartProtocolDiscriminants;
     use tokio::time::timeout;
+
+    use super::*;
+    use crate::{
+        Capability, balancer::SurbBalancerConfig, initiation::StartProtocolDiscriminants, types::SessionTarget,
+    };
 
     mockall::mock! {
         MsgSender {}

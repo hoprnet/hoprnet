@@ -11,7 +11,7 @@ import string
 import subprocess
 import threading
 import time
-from contextlib import AsyncExitStack, contextmanager
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from enum import Enum
 from functools import partial
@@ -26,14 +26,18 @@ from cryptography.x509.oid import NameOID
 
 from sdk.python.api.protocol import Protocol
 from sdk.python.api.request_objects import SessionCapabilitiesBody
-from sdk.python.api.response_objects import Session
-from sdk.python.localcluster.constants import MAIN_DIR, TICKET_PRICE_PER_HOP
+from sdk.python.localcluster.constants import MAIN_DIR
 from sdk.python.localcluster.node import Node
 
-from .conftest import barebone_nodes, random_distinct_pairs_from
-from .utils import PARAMETERIZED_SAMPLE_SIZE, create_channel, shuffled
+from .conftest import barebone_nodes
+from .utils import (
+    HoprSession,
+    basic_send_and_receive_packets_over_single_route,
+    create_bidirectional_channels_for_route,
+    get_ticket_price,
+    make_routes,
+)
 
-HOPR_SESSION_MAX_PAYLOAD_SIZE = 762
 STANDARD_MTU_SIZE = 1500
 DOWNLOAD_FILE_SIZE = 800
 
@@ -235,460 +239,182 @@ def run_https_server(served_text_content):
 @pytest.mark.usefixtures("swarm7_reset")
 class TestSessionWithSwarm:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-    async def test_session_communication_with_a_tcp_echo_server(self, src: str, dest: str, swarm7: dict[str, Node]):
-        packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-        expected = [f"{i}".ljust(STANDARD_MTU_SIZE) for i in range(packet_count)]
-
-        assert [len(x) for x in expected] == packet_count * [STANDARD_MTU_SIZE]
-
-        src_peer = swarm7[src]
-        dest_peer = swarm7[dest]
-
-        actual = ""
-        with EchoServer(SocketType.TCP, STANDARD_MTU_SIZE) as server:
-            # socket.listen does not listen immediately and needs some time to be working
-            # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
-            await asyncio.sleep(1.0)
-
-            session = await src_peer.api.session_client(
-                dest_peer.peer_id,
-                forward_path={"Hops": 0},
-                return_path={"Hops": 0},
-                protocol=Protocol.TCP,
-                target=f"localhost:{server.port}",
-                capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
-            )
-
-            assert session.port is not None, "Failed to open session"
-            assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
-
-            with connect_socket(SocketType.TCP, session.port) as s:
-                s.settimeout(20)
-                total_sent = 0
-                for message in expected:
-                    total_sent = total_sent + s.send(message.encode())
-
-                while total_sent > 0:
-                    chunk = s.recv(min(STANDARD_MTU_SIZE, total_sent))
-                    total_sent = total_sent - len(chunk)
-                    actual = actual + chunk.decode()
-
-        assert await src_peer.api.session_close_client(session) is True
-        assert await src_peer.api.session_list_clients(Protocol.TCP) == []
-
-        assert "".join(expected) == actual
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "route",
-        [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
-        # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
-    )
+    @pytest.mark.parametrize("route", make_routes([0, 1], barebone_nodes()))
     async def test_session_communication_over_n_hop_with_a_tcp_echo_server(self, route, swarm7: dict[str, Node]):
+        ticket_price = await get_ticket_price(swarm7[route[0]])
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-        expected = [f"{i}".ljust(STANDARD_MTU_SIZE) for i in range(packet_count)]
         surb_pre_buffer = 6000
 
-        assert [len(x) for x in expected] == packet_count * [STANDARD_MTU_SIZE]
+        expected = [f"{i}".ljust(STANDARD_MTU_SIZE) for i in range(packet_count)]
+        actual = ""
 
-        src_peer = swarm7[route[0]]
-        dest_peer = swarm7[route[-1]]
-        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
-        ret_path = fwd_path[::-1]
-
-        async with AsyncExitStack() as channels:
-            channels_to = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]],
-                        swarm7[route[i + 1]],
-                        funding=20 * (surb_pre_buffer + packet_count) * TICKET_PRICE_PER_HOP,
-                    )
-                )
-                for i in range(len(route) - 1)
-            ]
-            channels_back = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]], swarm7[route[i - 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP
-                    )
-                )
-                for i in reversed(range(1, len(route)))
-            ]
-
-            await asyncio.gather(*(channels_to + channels_back))
-
-            actual = ""
+        async with create_bidirectional_channels_for_route(
+            [swarm7[hop] for hop in route],
+            20 * (surb_pre_buffer + packet_count) * ticket_price,
+            20 * packet_count * ticket_price,
+        ):
             with EchoServer(SocketType.TCP, STANDARD_MTU_SIZE) as server:
                 # socket.listen does not listen immediately and needs some time to be working
                 # otherwise a `ConnectionRefusedError: [Errno 61] Connection refused` will be encountered
                 await asyncio.sleep(1.0)
 
-                session = await src_peer.api.session_client(
-                    dest_peer.peer_id,
-                    forward_path={"IntermediatePath": fwd_path},
-                    return_path={"IntermediatePath": ret_path},
-                    protocol=Protocol.TCP,
-                    target=f"localhost:{server.port}",
+                # Session uses Response buffer
+                async with HoprSession(
+                    Protocol.TCP,
+                    src=swarm7[route[0]],
+                    dest=swarm7[route[-1]],
+                    fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
+                    return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
                     capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
-                )
+                    target_port=server.port,
+                ) as session:
+                    assert len(await swarm7[route[0]].api.session_list_clients(Protocol.TCP)) == 1
 
-                assert session.port is not None, "Failed to open session"
-                assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
+                    logging.debug(f"Session opened - sending {len(expected)} packets")
+                    with session.client_socket() as sock:
+                        sock.settimeout(20)
+                        total_sent = 0
+                        for message in expected:
+                            total_sent = total_sent + sock.send(message.encode())
 
-                with connect_socket(SocketType.TCP, session.port) as s:
-                    s.settimeout(20)
-                    total_sent = 0
-                    for message in expected:
-                        total_sent = total_sent + s.send(message.encode())
+                        while total_sent > 0:
+                            chunk = sock.recv(min(STANDARD_MTU_SIZE, total_sent))
+                            total_sent = total_sent - len(chunk)
+                            actual = actual + chunk.decode()
+                        logging.debug(f"received: {len(actual)}")
 
-                    while total_sent > 0:
-                        chunk = s.recv(min(STANDARD_MTU_SIZE, total_sent))
-                        total_sent = total_sent - len(chunk)
-                        actual = actual + chunk.decode()
-
-            assert await src_peer.api.session_close_client(session) is True
-            assert await src_peer.api.session_list_clients(Protocol.TCP) == []
-
-            assert "".join(expected) == actual
+                assert await swarm7[route[0]].api.session_list_clients(Protocol.TCP) == []
+                assert "".join(expected) == actual
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-    async def test_session_communication_with_a_udp_echo_server(self, src: str, dest: str, swarm7: dict[str, Node]):
+    @pytest.mark.parametrize("route", make_routes([0, 1], barebone_nodes()))
+    async def test_session_communication_over_n_hop_with_a_udp_echo_server(self, route, swarm7: dict[str, Node]):
         packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-        expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
+        ticket_price = await get_ticket_price(swarm7[route[0]])
 
-        assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
+        assert await swarm7[route[0]].api.session_list_clients(Protocol.UDP) == []
 
-        src_peer = swarm7[src]
-        dest_peer = swarm7[dest]
-
-        actual = []
-        with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE) as server:
-            await asyncio.sleep(1.0)
-
-            session = await src_peer.api.session_client(
-                dest_peer.peer_id,
-                forward_path={"Hops": 0},
-                return_path={"Hops": 0},
-                protocol=Protocol.UDP,
-                target=f"localhost:{server.port}",
+        async with create_bidirectional_channels_for_route(
+            [swarm7[hop] for hop in route],
+            (packet_count + 2) * ticket_price,
+            (packet_count + 2) * ticket_price,
+        ):
+            await basic_send_and_receive_packets_over_single_route(
+                packet_count,
+                [swarm7[hop] for hop in route],
             )
 
-            assert session.port is not None, "Failed to open session"
-            assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
-            # logging.info(f"session to {server.port} opened successfully")
+        assert await swarm7[route[0]].api.session_list_clients(Protocol.UDP) == []
 
-            addr = ("127.0.0.1", session.port)
-            with connect_socket(SocketType.UDP, None) as s:
-                s.settimeout(20)
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("route", make_routes([0], barebone_nodes()))
+    async def test_session_communication_with_udp_loopback_service(self, route, swarm7: dict[str, Node]):
+        packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
+
+        async with HoprSession(
+            Protocol.UDP,
+            src=swarm7[route[0]],
+            dest=swarm7[route[-1]],
+            fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
+            return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
+            loopback=True,
+            use_response_buffer=None,
+        ) as session:
+            assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
+
+            # Leave some space for SURBs in the packet, because no response buffer is used
+            packet_len = int(session.mtu / 2)
+            expected = [f"{i}".ljust(packet_len) for i in range(packet_count)]
+            actual = []
+            with session.client_socket() as sock:
+                sock.settimeout(20)
                 total_sent = 0
                 for message in expected:
-                    total_sent = total_sent + s.sendto(message.encode(), addr)
+                    total_sent = total_sent + sock.sendto(message.encode(), ("127.0.0.1", session.listen_port))
                     # UDP has no flow-control, so we must insert an artificial gap
                     await asyncio.sleep(0.01)
 
+                logging.debug(f"total sent: {total_sent}")
+
+                # Receiving data on the same socket, because it is a loopback
                 while total_sent > 0:
-                    chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
+                    chunk, _ = sock.recvfrom(min(packet_len, total_sent))
                     total_sent = total_sent - len(chunk)
+                    logging.debug(f"received: {len(chunk)}, remaining: {total_sent}")
+
                     # Adapt for situations when data arrive completely unordered (also within the buffer)
                     actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
 
-        expected = [msg.strip() for msg in expected]
-
-        actual.sort()
-        expected.sort()
-
-        assert await src_peer.api.session_close_client(session) is True
-        assert await src_peer.api.session_list_clients(Protocol.UDP) == []
-
-        assert actual == expected
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-    async def test_session_communication_with_udp_loopback_service(self, src: str, dest: str, swarm7: dict[str, Node]):
-        packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-        expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
-
-        assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
-
-        src_peer = swarm7[src]
-        dest_peer = swarm7[dest]
-
-        actual = []
-
-        # Service 0 session will loop back all the data at Exit back to the Entry
-        # Therefore, we do not need the Echo service here
-        session: Session | None = await src_peer.api.session_client(
-            dest_peer.peer_id,
-            forward_path={"Hops": 0},
-            return_path={"Hops": 0},
-            protocol=Protocol.UDP,
-            target="0",
-            service=True,
-        )
-
-        assert session.port is not None, "Failed to open session"
-        assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
-        # logging.info(f"session to {dst_sock_port} opened successfully")
-
-        addr = ("127.0.0.1", session.port)
-        with connect_socket(SocketType.UDP, None) as s:
-            s.settimeout(20)
-            total_sent = 0
-            for message in expected:
-                total_sent = total_sent + s.sendto(message.encode(), addr)
-                # UDP has no flow-control, so we must insert an artificial gap
-                await asyncio.sleep(0.01)
-
-            logging.debug(f"total sent: {total_sent}")
-            while total_sent > 0:
-                chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
-                total_sent = total_sent - len(chunk)
-                logging.debug(f"received: {len(chunk)}, remaining: {total_sent}")
-
-                # Adapt for situations when data arrive completely unordered (also within the buffer)
-                actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
-
-        expected = [msg.strip() for msg in expected]
-
-        actual.sort()
-        expected.sort()
-
-        assert await src_peer.api.session_close_client(session)
-        assert await src_peer.api.session_list_clients(Protocol.UDP) == []
-
-        assert actual == expected
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "route",
-        [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
-        # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
-    )
-    async def test_session_communication_over_n_hop_with_a_udp_echo_server(self, route, swarm7: dict[str, Node]):
-        packet_count = 100 if os.getenv("CI", default="false") == "false" else 50
-        expected = [f"{i}".rjust(HOPR_SESSION_MAX_PAYLOAD_SIZE) for i in range(packet_count)]
-        surb_pre_buffer = 6000
-
-        assert [len(x) for x in expected] == packet_count * [HOPR_SESSION_MAX_PAYLOAD_SIZE]
-
-        src_peer = swarm7[route[0]]
-        dest_peer = swarm7[route[-1]]
-        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
-        ret_path = fwd_path[::-1]
-
-        async with AsyncExitStack() as channels:
-            channels_to = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]],
-                        swarm7[route[i + 1]],
-                        funding=(surb_pre_buffer + packet_count) * TICKET_PRICE_PER_HOP,
-                    )
-                )
-                for i in range(len(route) - 1)
-            ]
-            channels_back = [
-                channels.enter_async_context(
-                    create_channel(swarm7[route[i]], swarm7[route[i - 1]], funding=packet_count * TICKET_PRICE_PER_HOP)
-                )
-                for i in reversed(range(1, len(route)))
-            ]
-
-            await asyncio.gather(*(channels_to + channels_back))
-
-            actual = []
-            with EchoServer(SocketType.UDP, HOPR_SESSION_MAX_PAYLOAD_SIZE) as server:
-                await asyncio.sleep(1.0)
-
-                session = await src_peer.api.session_client(
-                    dest_peer.peer_id,
-                    forward_path={"IntermediatePath": fwd_path},
-                    return_path={"IntermediatePath": ret_path},
-                    protocol=Protocol.UDP,
-                    target=f"localhost:{server.port}",
-                )
-
-                assert session.port is not None, "Failed to open session"
-                assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
-                # logging.info(f"session to {server.port} opened successfully")
-
-                addr = ("127.0.0.1", session.port)
-                with connect_socket(SocketType.UDP, None) as s:
-                    s.settimeout(20)
-                    total_sent = 0
-                    for message in expected:
-                        total_sent = total_sent + s.sendto(message.encode(), addr)
-                        # UDP has no flow-control, so we must insert an artificial gap
-                        await asyncio.sleep(0.01)
-
-                    while total_sent > 0:
-                        chunk, _ = s.recvfrom(min(HOPR_SESSION_MAX_PAYLOAD_SIZE, total_sent))
-                        total_sent = total_sent - len(chunk)
-                        # Adapt for situations when data arrive completely unordered (also within the buffer)
-                        actual.extend([m for m in re.split(r"\s+", chunk.decode().strip()) if len(m) > 0])
-
-            expected = [msg.strip() for msg in expected]
+                expected = [msg.strip() for msg in expected]
 
             actual.sort()
             expected.sort()
-
-            assert await src_peer.api.session_close_client(session) is True
-            assert await src_peer.api.session_list_clients(Protocol.UDP) == []
-
             assert actual == expected
 
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("src,dest", random_distinct_pairs_from(barebone_nodes(), count=PARAMETERIZED_SAMPLE_SIZE))
-    async def test_session_communication_with_an_https_server(self, src: str, dest: str, swarm7: dict[str, Node]):
-        src_peer = swarm7[src]
-        dest_peer = swarm7[dest]
-
-        # Generate random text content to be served
-        expected = "".join(random.choices(string.ascii_letters + string.digits, k=DOWNLOAD_FILE_SIZE))
-
-        with run_https_server(expected) as dst_sock_port:
-            session = await src_peer.api.session_client(
-                dest_peer.peer_id,
-                forward_path={"Hops": 0},
-                return_path={"Hops": 0},
-                protocol=Protocol.TCP,
-                target=f"localhost:{dst_sock_port}",
-                sealed_target=True,
-                capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
-            )
-            assert session.port is not None, "Failed to open session"
-            assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
-
-            response = fetch_data(f"https://localhost:{session.port}/random.txt")
-
-            assert await src_peer.api.session_close_client(session) is True
-            assert await src_peer.api.session_list_clients(Protocol.TCP) == []
-
-            assert response is not None
-            assert response.text == expected
+        assert await swarm7[route[0]].api.session_list_clients(Protocol.UDP) == []
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "route",
-        [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
-        # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
-    )
+    @pytest.mark.parametrize("route", make_routes([0, 1], barebone_nodes()))
     async def test_session_communication_over_n_hop_with_an_https_server(self, route, swarm7: dict[str, Node]):
-        src_peer = swarm7[route[0]]
-        dest_peer = swarm7[route[-1]]
-        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
-        ret_path = fwd_path[::-1]
+        ticket_price = await get_ticket_price(swarm7[route[0]])
         surb_pre_buffer = 6000
 
-        async with AsyncExitStack() as channels:
-            channels_to = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]],
-                        swarm7[route[i + 1]],
-                        funding=100 * (surb_pre_buffer + DOWNLOAD_FILE_SIZE) * TICKET_PRICE_PER_HOP,
-                    )
-                )
-                for i in range(len(route) - 1)
-            ]
-            channels_back = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]], swarm7[route[i - 1]], funding=100 * DOWNLOAD_FILE_SIZE * TICKET_PRICE_PER_HOP
-                    )
-                )
-                for i in reversed(range(1, len(route)))
-            ]
-
-            await asyncio.gather(*(channels_to + channels_back))
-
+        async with create_bidirectional_channels_for_route(
+            [swarm7[hop] for hop in route],
+            100 * (surb_pre_buffer + DOWNLOAD_FILE_SIZE) * ticket_price,
+            100 * DOWNLOAD_FILE_SIZE * ticket_price,
+        ):
             # Generate random text content to be served
             expected = "".join(random.choices(string.ascii_letters + string.digits, k=DOWNLOAD_FILE_SIZE))
 
+            # Session uses Response buffer
             with run_https_server(expected) as dst_sock_port:
-                session = await src_peer.api.session_client(
-                    dest_peer.peer_id,
-                    forward_path={"IntermediatePath": fwd_path},
-                    return_path={"IntermediatePath": ret_path},
-                    protocol=Protocol.TCP,
-                    target=f"localhost:{dst_sock_port}",
+                async with HoprSession(
+                    Protocol.TCP,
+                    src=swarm7[route[0]],
+                    dest=swarm7[route[-1]],
+                    fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
+                    return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
                     capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
-                )
-                assert session.port is not None, "Failed to open session"
-                assert len(await src_peer.api.session_list_clients(Protocol.TCP)) == 1
+                    target_port=dst_sock_port,
+                ) as session:
+                    assert len(await swarm7[route[0]].api.session_list_clients(Protocol.TCP)) == 1
+                    response = fetch_data(f"https://localhost:{session.listen_port}/random.txt")
+                    assert response is not None
+                    assert response.text == expected
 
-                response = fetch_data(f"https://localhost:{session.port}/random.txt")
-
-                assert await src_peer.api.session_close_client(session) is True
-                assert await src_peer.api.session_list_clients(Protocol.TCP) == []
-
-                assert response is not None
-                assert response.text == expected
+            assert await swarm7[route[0]].api.session_list_clients(Protocol.TCP) == []
 
     @pytest.mark.skipif(
-        os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL") is None, reason="Wireguard tunnel with for hoprnet running"
+        os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL_SERVER_PORT") is None,
+        reason="Wireguard tunnel with for hoprnet running",
     )
     @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "route",
-        [barebone_nodes()[:3]],
-        # [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
-        # + [shuffled(nodes())[:5] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
-    )
+    @pytest.mark.parametrize("route", make_routes([1], barebone_nodes()))
     async def test_session_with_wireguard_tunnel(self, route, swarm7: dict[str, Node]):
+        ticket_price = await get_ticket_price(swarm7[route[0]])
         packet_count = 10_000_000
-        wireguard_tunnel = os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL")
-
-        src_peer = swarm7[route[0]]
-        dest_peer = swarm7[route[-1]]
-        fwd_path = [swarm7[node].peer_id for node in route[1:-1]]
-        ret_path = fwd_path[::-1]
+        wireguard_tunnel_port = os.environ.get("HOPR_TEST_RUNNING_WIREGUARD_TUNNEL_SERVER_PORT")
 
         logging.info(f"Opening channels for route '{route}'")
 
-        async with AsyncExitStack() as channels:
-            channels_to = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]], swarm7[route[i + 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP
-                    )
-                )
-                for i in range(len(route) - 1)
-            ]
-            channels_back = [
-                channels.enter_async_context(
-                    create_channel(
-                        swarm7[route[i]], swarm7[route[i - 1]], funding=20 * packet_count * TICKET_PRICE_PER_HOP
-                    )
-                )
-                for i in reversed(range(1, len(route)))
-            ]
-
-            await asyncio.gather(*(channels_to + channels_back))
-
-            # sleep to wait for the socket to be active
-            await asyncio.sleep(1.0)
-
+        async with create_bidirectional_channels_for_route(
+            [swarm7[hop] for hop in route], packet_count * ticket_price, packet_count * ticket_price
+        ):
             logging.info(f"Opening session for route '{route}'")
-
-            session = await src_peer.api.session_client(
-                dest_peer.peer_id,
-                forward_path={"IntermediatePath": fwd_path},
-                return_path={"IntermediatePath": ret_path},
-                protocol=Protocol.UDP,
-                target=wireguard_tunnel,
-                listen_on="127.0.0.1:60006",
+            async with HoprSession(
+                Protocol.UDP,
+                src=swarm7[route[0]],
+                dest=swarm7[route[-1]],
+                fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
+                return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
                 capabilities=SessionCapabilitiesBody(segmentation=True),
-                response_buffer="5 MB",
-            )
+                use_response_buffer="5 MiB",
+                target_port=int(wireguard_tunnel_port),
+            ) as session:
+                assert len(await swarm7[route[0]].api.session_list_clients(Protocol.UDP)) == 1
 
-            assert session.port is not None, "Failed to open session"
-            assert len(await src_peer.api.session_list_clients(Protocol.UDP)) == 1
+                logging.info(f"Test ready for execution @ listen port {session.listen_port}")
 
-            logging.info("Test ready for execution")
-
-            # TODO: Placeholder for actual test
-            await asyncio.sleep(3600)
+                # TODO: Placeholder for actual test
+                await asyncio.sleep(3600)

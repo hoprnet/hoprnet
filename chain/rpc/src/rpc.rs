@@ -2,43 +2,43 @@
 //!
 //! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
 //! [RpcOperations] type, which is the main API exposed by this crate.
+use std::{sync::Arc, time::Duration};
+
+use SafeSingleton::SafeSingletonInstance;
 use alloy::{
     network::EthereumWallet,
     providers::{
+        CallItemBuilder, Identity, PendingTransaction, Provider, ProviderBuilder, RootProvider,
         fillers::{
             BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
-        CallItemBuilder, Identity, PendingTransaction, Provider, ProviderBuilder, RootProvider,
     },
-    rpc::types::Block,
-    rpc::{client::RpcClient, types::TransactionRequest},
+    rpc::{
+        client::RpcClient,
+        types::{Block, TransactionRequest},
+    },
     signers::local::PrivateKeySigner,
     sol,
 };
 use async_trait::async_trait;
-use primitive_types::U256;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::debug;
-use url::Url;
-use validator::Validate;
-
 use hopr_bindings::hoprnodemanagementmodule::HoprNodeManagementModule::{self, HoprNodeManagementModuleInstance};
 use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
 use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
 use hopr_internal_types::prelude::{EncodedWinProb, WinningProbability};
 use hopr_primitive_types::prelude::*;
-
-use SafeSingleton::SafeSingletonInstance;
+use primitive_types::U256;
+use serde::{Deserialize, Serialize};
+use tracing::debug;
+use url::Url;
+use validator::Validate;
 
 // use crate::middleware::GnosisScan;
 use crate::{
+    HoprRpcOperations, NodeSafeModuleStatus,
     client::GasOracleFiller,
     errors::{Result, RpcError},
     transport::HttpRequestor,
-    HoprRpcOperations, NodeSafeModuleStatus,
 };
 
 // define basic safe abi
@@ -131,8 +131,8 @@ pub struct RpcOperations<R: HttpRequestor + 'static + Clone> {
     pub(crate) provider: Arc<HoprProvider<R>>,
     pub(crate) cfg: RpcOperationsConfig,
     contract_instances: Arc<ContractInstances<HoprProvider<R>>>,
-    node_module: HoprNodeManagementModuleInstance<(), HoprProvider<R>>,
-    node_safe: SafeSingletonInstance<(), HoprProvider<R>>,
+    node_module: HoprNodeManagementModuleInstance<HoprProvider<R>>,
+    node_safe: SafeSingletonInstance<HoprProvider<R>>,
 }
 
 impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
@@ -153,7 +153,7 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
             .filler(GasFiller)
             .filler(GasOracleFiller::new(requestor.clone(), cfg.gas_oracle_url.clone()))
             .filler(BlobGasFiller)
-            .on_client(rpc_client);
+            .connect_client(rpc_client);
 
         debug!("{:?}", cfg.contract_addrs);
 
@@ -203,7 +203,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                 Ok(Balance::new(native.to_be_bytes(), BalanceType::Native))
             }
             BalanceType::HOPR => match self.contract_instances.token.balanceOf(address.into()).call().await {
-                Ok(token_balance) => Ok(Balance::new(token_balance._0.to_be_bytes(), BalanceType::HOPR)),
+                Ok(token_balance) => Ok(Balance::new(token_balance.to_be_bytes(), BalanceType::HOPR)),
                 Err(e) => Err(e.into()),
             },
         }
@@ -213,7 +213,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         match self.contract_instances.win_prob_oracle.currentWinProb().call().await {
             Ok(encoded_win_prob) => {
                 let mut encoded: EncodedWinProb = Default::default();
-                encoded.copy_from_slice(&encoded_win_prob._0.to_be_bytes_vec());
+                encoded.copy_from_slice(&encoded_win_prob.to_be_bytes_vec());
                 Ok(encoded.into())
             }
             Err(e) => Err(e.into()),
@@ -222,7 +222,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
 
     async fn get_minimum_network_ticket_price(&self) -> Result<Balance> {
         match self.contract_instances.price_oracle.currentTicketPrice().call().await {
-            Ok(ticket_price) => Ok(BalanceType::HOPR.balance(ticket_price._0.to_be_bytes_vec().as_slice())),
+            Ok(ticket_price) => Ok(BalanceType::HOPR.balance(ticket_price.to_be_bytes_vec().as_slice())),
             Err(e) => Err(e.into()),
         }
     }
@@ -259,11 +259,9 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                     multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
                 (
                     max_allowed_registration
-                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-                        ._0,
+                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?,
                     node_registered_to_account
-                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-                        ._0,
+                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?,
                     quick_check,
                 )
             }
@@ -278,19 +276,16 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                 let (stake_threshold, node_registered_to_account, quick_check) =
                     multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
                 (
-                    stake_threshold
-                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-                        ._0,
+                    stake_threshold.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?,
                     node_registered_to_account
-                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-                        ._0,
+                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?,
                     quick_check,
                 )
             }
         };
 
         match &quick_check {
-            Ok(eligiblity_quick_check) => return Ok(eligiblity_quick_check._0),
+            Ok(eligibility_quick_check) => return Ok(*eligibility_quick_check),
             Err(e) => {
                 // check in details what is the failure message
                 // The "division by zero" error is caused by the self-registration,
@@ -327,14 +322,14 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
             .call()
             .await
         {
-            Ok(returned_result) => Ok(returned_result._0.into()),
+            Ok(returned_result) => Ok(returned_result.into()),
             Err(e) => Err(e.into()),
         }
     }
 
     async fn get_module_target_address(&self) -> Result<Address> {
         match self.node_module.owner().call().await {
-            Ok(returned_result) => Ok(returned_result._0.into()),
+            Ok(returned_result) => Ok(returned_result.into()),
             Err(e) => Err(e.into()),
         }
     }
@@ -348,7 +343,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
             .call()
             .await
         {
-            Ok(returned_result) => Ok(Duration::from_secs(returned_result._0.into())),
+            Ok(returned_result) => Ok(Duration::from_secs(returned_result.into())),
             Err(e) => Err(e.into()),
         }
     }
@@ -366,17 +361,14 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
 
         let (node_in_module_inclusion, module_safe_enabling, safe_of_module_ownership) =
             multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
-        let is_node_included_in_module = node_in_module_inclusion
-            .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-            ._0;
-        let is_module_enabled_in_safe = module_safe_enabling
-            .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-            ._0;
+        let is_node_included_in_module =
+            node_in_module_inclusion.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?;
+        let is_module_enabled_in_safe =
+            module_safe_enabling.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?;
         let is_safe_owner_of_module = self.cfg.safe_address.eq(&safe_of_module_ownership
             .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-            ._0
             .0
-             .0
+            .0
             .into());
 
         Ok(NodeSafeModuleStatus {
@@ -401,27 +393,28 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
 
 #[cfg(test)]
 mod tests {
-    use crate::client::{create_rpc_client_to_anvil, AnvilRpcClient};
-    use crate::errors::Result;
-    use crate::rpc::{RpcOperations, RpcOperationsConfig};
-    use crate::{HoprRpcOperations, PendingTransaction};
-    use alloy::network::{Ethereum, TransactionBuilder};
-    use alloy::primitives::{address, U256};
-    use alloy::providers::Provider;
-    use alloy::rpc::client::ClientBuilder;
-    use alloy::rpc::types::TransactionRequest;
-    use alloy::transports::http::ReqwestTransport;
-    use alloy::transports::layers::RetryBackoffLayer;
-    use hex_literal::hex;
-    use hopr_chain_types::utils::create_native_transfer;
-    use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
-    use primitive_types::H160;
-    use std::sync::Arc;
-    use std::time::Duration;
+    use std::{sync::Arc, time::Duration};
 
+    use alloy::{
+        network::{Ethereum, TransactionBuilder},
+        primitives::{U256, address},
+        providers::Provider,
+        rpc::{client::ClientBuilder, types::TransactionRequest},
+        transports::{http::ReqwestTransport, layers::RetryBackoffLayer},
+    };
+    use hex_literal::hex;
     use hopr_async_runtime::prelude::sleep;
+    use hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy, utils::create_native_transfer};
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_primitive_types::prelude::*;
+    use primitive_types::H160;
+
+    use crate::{
+        HoprRpcOperations, PendingTransaction,
+        client::{AnvilRpcClient, create_rpc_client_to_anvil},
+        errors::Result,
+        rpc::{RpcOperations, RpcOperationsConfig},
+    };
 
     lazy_static::lazy_static! {
         static ref RANDY: Address = hex!("762614a5ed652457a2f1cdb8006380530c26ae6a").into();
@@ -714,13 +707,12 @@ mod tests {
             deploy_multicall3_to_anvil(&client.clone()).await?;
 
             let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<
-                (),
                 Arc<AnvilRpcClient>,
-                Ethereum,
             >(&instances, client.clone(), &chain_key_0)
             .await?;
 
-            // deploy a module and safe instance and add node into the module. The module is enabled by default in the safe
+            // deploy a module and safe instance and add node into the module. The module is enabled by default in the
+            // safe
             (instances, module, safe)
         };
 
@@ -808,13 +800,12 @@ mod tests {
             deploy_multicall3_to_anvil(&client.clone()).await?;
 
             let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<
-                (),
                 Arc<AnvilRpcClient>,
-                Ethereum,
             >(&instances, client.clone(), &chain_key_0)
             .await?;
 
-            // deploy a module and safe instance and add node into the module. The module is enabled by default in the safe
+            // deploy a module and safe instance and add node into the module. The module is enabled by default in the
+            // safe
             (instances, module, safe)
         };
 

@@ -1,26 +1,27 @@
-use futures::{select, Stream, StreamExt};
-use hopr_transport_network::messaging::ControlMessage;
-use libp2p::autonat;
-use libp2p::swarm::SwarmEvent;
-use libp2p::swarm::{dial_opts::DialOpts, NetworkInfo};
-use libp2p::{multiaddr::Protocol, request_response::OutboundRequestId, request_response::ResponseChannel};
-use std::net::Ipv4Addr;
-use std::num::NonZeroU8;
-use tracing::{debug, error, info, trace, warn};
+use std::{net::Ipv4Addr, num::NonZeroU8};
 
+use futures::{Stream, StreamExt, select};
 use hopr_internal_types::prelude::*;
-use hopr_transport_identity::{
-    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
-    Multiaddr, PeerId,
-};
-use hopr_transport_network::{network::NetworkTriggeredEvent, ping::PingQueryReplier};
-use hopr_transport_protocol::{config::ProtocolConfig, PeerDiscovery};
-
-use crate::{constants, errors::Result, HoprNetworkBehavior};
-use crate::{HoprNetworkBehaviorEvent, Ping, Pong, HOPR_HEARTBEAT_PROTOCOL_V_0_2_0};
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
+use hopr_transport_identity::{
+    Multiaddr, PeerId,
+    multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
+};
+use hopr_transport_network::{messaging::ControlMessage, network::NetworkTriggeredEvent, ping::PingQueryReplier};
+use hopr_transport_protocol::{PeerDiscovery, config::ProtocolConfig};
+use libp2p::{
+    autonat,
+    multiaddr::Protocol,
+    request_response::{OutboundRequestId, ResponseChannel},
+    swarm::{NetworkInfo, SwarmEvent, dial_opts::DialOpts},
+};
+use tracing::{debug, error, info, trace, warn};
+
+use crate::{
+    HOPR_HEARTBEAT_PROTOCOL_V_0_2_0, HoprNetworkBehavior, HoprNetworkBehaviorEvent, Ping, Pong, constants,
+    errors::Result,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -417,6 +418,7 @@ impl HoprSwarm {
             }
         }
     }
+
     pub fn dial_nat_server(&mut self, addresses: Vec<Multiaddr>) {
         // let dial_opts = DialOpts::peer_id(PeerId::random())
         //     .addresses(addresses)

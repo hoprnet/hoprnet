@@ -2,45 +2,43 @@
 //!
 //! This strategy can stack multiple above strategies (called sub-strategies in this context) into one.
 //! Once a strategy event is triggered, it is executed sequentially on the sub-strategies one by one.
-//! The strategy can be configured to not call the next sub-strategy event if the sub-strategy currently being executed failed,
-//! which is done by setting the `on_fail_continue` flag.
+//! The strategy can be configured to not call the next sub-strategy event if the sub-strategy currently being executed
+//! failed, which is done by setting the `on_fail_continue` flag.
 //!
 //! Hence, the sub-strategy chain then can behave as a logical AND (`on_fail_continue` = `false`) execution chain
 //! or logical OR (`on_fail_continue` = `true`) execution chain.
 //!
 //! A Multi Strategy can also contain another Multi Strategy as a sub-strategy if `allow_recursive` flag is set.
 //! However, this recursion is always allowed up to 2 levels only.
-//! Along with the `on_fail_continue` value, the recursive feature allows constructing more complex logical strategy chains.
+//! Along with the `on_fail_continue` value, the recursive feature allows constructing more complex logical strategy
+//! chains.
 //!
 //! The MultiStrategy can also observe channels being `PendingToClose` and running out of closure grace period,
-//! and if this happens, it will issue automatically the final close transaction, which transitions the state to `Closed`.
-//! This can be controlled by the `finalize_channel_closure` parameter.
+//! and if this happens, it will issue automatically the final close transaction, which transitions the state to
+//! `Closed`. This can be controlled by the `finalize_channel_closure` parameter.
 //!
 //! For details on default parameters see [MultiStrategyConfig].
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Debug, Display, Formatter},
     sync::Arc,
 };
-use tracing::{error, warn};
-use validator::Validate;
 
+use async_trait::async_trait;
 use hopr_chain_actions::ChainActions;
+use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_transport_ticket_aggregation::TicketAggregatorTrait;
-
-use crate::aggregating::AggregatingStrategy;
-use crate::auto_funding::AutoFundingStrategy;
-use crate::auto_redeeming::AutoRedeemingStrategy;
-use crate::channel_finalizer::ClosureFinalizerStrategy;
-use crate::errors::Result;
-use crate::promiscuous::PromiscuousStrategy;
-use crate::Strategy;
-
-use hopr_db_sql::HoprDbAllOperations;
+use serde::{Deserialize, Serialize};
+use tracing::{error, warn};
+use validator::Validate;
 #[cfg(all(feature = "prometheus", not(test)))]
 use {hopr_metrics::metrics::MultiGauge, strum::VariantNames};
+
+use crate::{
+    Strategy, aggregating::AggregatingStrategy, auto_funding::AutoFundingStrategy,
+    auto_redeeming::AutoRedeemingStrategy, channel_finalizer::ClosureFinalizerStrategy, errors::Result,
+    promiscuous::PromiscuousStrategy,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -275,9 +273,12 @@ impl Display for MockSingularStrategy {
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::StrategyError::Other;
-    use crate::strategy::{MockSingularStrategy, MultiStrategy, MultiStrategyConfig, SingularStrategy};
     use mockall::Sequence;
+
+    use crate::{
+        errors::StrategyError::Other,
+        strategy::{MockSingularStrategy, MultiStrategy, MultiStrategyConfig, SingularStrategy},
+    };
 
     #[tokio::test]
     async fn test_multi_strategy_logical_or_flow() -> anyhow::Result<()> {

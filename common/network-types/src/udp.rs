@@ -1,13 +1,17 @@
-use crate::utils::SocketAddrStr;
-use futures::{pin_mut, ready, FutureExt, Sink, SinkExt};
-use std::fmt::Debug;
-use std::io::ErrorKind;
-use std::num::NonZeroUsize;
-use std::pin::Pin;
-use std::sync::{Arc, OnceLock};
-use std::task::{Context, Poll};
+use std::{
+    fmt::Debug,
+    io::ErrorKind,
+    num::NonZeroUsize,
+    pin::Pin,
+    sync::{Arc, OnceLock},
+    task::{Context, Poll},
+};
+
+use futures::{FutureExt, Sink, SinkExt, pin_mut, ready};
 use tokio::net::UdpSocket;
 use tracing::{debug, error, trace, warn};
+
+use crate::utils::SocketAddrStr;
 
 type BoxIoSink<T> = Box<dyn Sink<T, Error = std::io::Error> + Send + Unpin>;
 
@@ -78,13 +82,15 @@ pub enum ForeignDataMode {
 ///
 /// **NOTE**: This is a Linux-specific optimization, and it will have no effect on other systems.
 ///
-/// - If some [`Specific`](UdpStreamParallelism::Specific) value `n` > 0 is given, the [`ConnectedUdpStream`] will bind `n` sockets.
-/// - If [`Auto`](UdpStreamParallelism::Auto) is given, the number of sockets bound by [`ConnectedUdpStream`] is determined by [`std::thread::available_parallelism`].
+/// - If some [`Specific`](UdpStreamParallelism::Specific) value `n` > 0 is given, the [`ConnectedUdpStream`] will bind
+///   `n` sockets.
+/// - If [`Auto`](UdpStreamParallelism::Auto) is given, the number of sockets bound by [`ConnectedUdpStream`] is
+///   determined by [`std::thread::available_parallelism`].
 ///
 /// The default is `Specific(1)`.
 ///
-/// Always use [`into_num_tasks`](UdpStreamParallelism::into_num_tasks) or [`split_evenly_with`](UdpStreamParallelism::split_evenly_with)
-/// to determine the correct number of sockets to spawn.
+/// Always use [`into_num_tasks`](UdpStreamParallelism::into_num_tasks) or
+/// [`split_evenly_with`](UdpStreamParallelism::split_evenly_with) to determine the correct number of sockets to spawn.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum UdpStreamParallelism {
     /// Bind as many sender or receiver sockets as given by [`std::thread::available_parallelism`].
@@ -262,9 +268,10 @@ impl UdpStreamBuilder {
 
     /// Builds the [`ConnectedUdpStream`] with UDP socket(s) bound to `bind_addr`.
     ///
-    /// The number of RX sockets bound is determined by [receiver parallelism](UdpStreamBuilder::with_receiver_parallelism),
-    /// and similarly, the number of TX sockets bound is determined by [sender parallelism](UdpStreamBuilder::with_sender_parallelism).
-    /// On non-Linux platforms, only a single receiver and sender will be bound, regardless of the above.
+    /// The number of RX sockets bound is determined by [receiver
+    /// parallelism](UdpStreamBuilder::with_receiver_parallelism), and similarly, the number of TX sockets bound is
+    /// determined by [sender parallelism](UdpStreamBuilder::with_sender_parallelism). On non-Linux platforms, only
+    /// a single receiver and sender will be bound, regardless of the above.
     ///
     /// The returned instance is always ready to receive data.
     /// It is also ready to send data
@@ -331,7 +338,7 @@ impl UdpStreamBuilder {
                         Some(addr) if addr != socket_bound_addr => {
                             return Err(std::io::Error::other(format!(
                                 "inconsistent binding address {addr} != {socket_bound_addr} on socket id {sock_id}"
-                            )))
+                            )));
                         }
                         _ => {}
                     }
@@ -668,12 +675,15 @@ impl tokio::io::AsyncWrite for ConnectedUdpStream {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::Context;
     use futures::future::Either;
     use parameterized::parameterized;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::UdpSocket;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::UdpSocket,
+    };
+
+    use super::*;
 
     #[parameterized(parallelism = {None, Some(2), Some(0)})]
     #[parameterized_macro(tokio::test)]
