@@ -37,7 +37,7 @@ use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
 use hopr_network_types::types::{ResolvedTransportRouting, SurbMatcher, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag};
+use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 use hopr_transport_protocol::processor::{PacketError, PacketSendFinalizer};
 use libp2p_identity::PeerId;
 
@@ -238,8 +238,8 @@ impl Probe {
                 let move_up = move_up.clone();
 
                 async move {
-                    // TODO: compare only against ping tag, not telemetry that will be occuring on random tags
-                    if data.application_tag != ReservedTag::Ping as u32 {
+                    // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occuring on random tags
+                    if data.application_tag != Tag::from(ReservedTag::Ping) {
                         pin_mut!(move_up);
                         if move_up.send((pseudonym, data.clone())).await.is_err() {
                             tracing::error!(%pseudonym, error = "receiver error", "failed to send message up");

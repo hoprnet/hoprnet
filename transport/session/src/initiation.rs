@@ -125,7 +125,7 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
             return Err(TransportSessionError::Tag);
         }
 
-        match StartProtocolDiscriminants::from_repr(tag as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
+        match StartProtocolDiscriminants::from_repr(tag.0 as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
             StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(
                 bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
@@ -226,7 +226,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::StartSession as Tag + 1, tag);
+        assert_eq!(Tag(StartProtocolDiscriminants::StartSession as u64 + 1), tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -261,7 +261,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::SessionEstablished as Tag + 1, tag);
+        assert_eq!(Tag(StartProtocolDiscriminants::SessionEstablished as u64 + 1), tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -278,7 +278,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::SessionError as Tag + 1, tag);
+        assert_eq!(Tag(StartProtocolDiscriminants::SessionError as u64 + 1), tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -292,7 +292,7 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::CloseSession(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::CloseSession as Tag + 1, tag);
+        assert_eq!(Tag(StartProtocolDiscriminants::CloseSession as u64 + 1), tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -306,7 +306,7 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::KeepAlive(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::KeepAlive as Tag + 1, tag);
+        assert_eq!(Tag(StartProtocolDiscriminants::KeepAlive as u64 + 1), tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 

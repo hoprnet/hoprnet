@@ -1,18 +1,105 @@
-use std::{fmt::Formatter, ops::Range};
+use std::{
+    fmt::Formatter,
+    ops::{Add, Range, Sub},
+};
 
-use crate::prelude::TagRangeExt;
-
-/// Tags are represented as 4 bytes.
+/// Tags are represented as 6 bytes.
 ///
-/// 2^32 should provide enough range for all use cases.
-pub type Tag = u32;
+/// 2 ^ 48 should offer enough space to even avoid collisions and tag attacks.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Tag(pub u64);
 
-impl TagRangeExt for Tag {
-    const USABLE_RANGE: Range<Tag> = ReservedTag::UPPER_BOUND..CustomTag::UPPER_BOUND;
+impl Tag {
+    pub const MAX: Tag = Tag(u64::MAX);
+    pub const SIZE: usize = size_of::<u64>();
+    pub const USABLE_RANGE: Range<Tag> = ReservedTag::UPPER_BOUND..CustomTag::UPPER_BOUND;
+
+    pub const fn new(tag: u64) -> Self {
+        Self(tag)
+    }
+
+    pub fn from_be_bytes(bytes: [u8; Self::SIZE]) -> Self {
+        Self(u64::from_be_bytes(bytes))
+    }
+
+    pub fn to_be_bytes(&self) -> [u8; Self::SIZE] {
+        self.0.to_be_bytes()
+    }
+}
+
+impl serde::Serialize for Tag {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u64(self.0)
+    }
+}
+
+impl<'a> serde::Deserialize<'a> for Tag {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'a>,
+    {
+        let value = u64::deserialize(deserializer)?;
+        Ok(Self(value))
+    }
+}
+
+impl Add for Tag {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        Self(self.0 + other.0)
+    }
+}
+
+impl Sub for Tag {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self::Output {
+        Self(self.0 - other.0)
+    }
+}
+
+impl std::fmt::Display for Tag {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Tag({})", self.0)
+    }
+}
+
+impl From<u64> for Tag {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
+
+impl From<u32> for Tag {
+    fn from(value: u32) -> Self {
+        Self(value as u64)
+    }
+}
+
+impl From<u8> for Tag {
+    fn from(value: u8) -> Self {
+        Self(value as u64)
+    }
+}
+
+impl PartialEq<u64> for Tag {
+    fn eq(&self, other: &u64) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialOrd<u64> for Tag {
+    fn partial_cmp(&self, other: &u64) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(other)
+    }
 }
 
 /// Resolved tag type with translated tag annotation.
-#[repr(u32)]
+#[repr(u64)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ResolvedTag {
     Reserved(ReservedTag),
@@ -31,7 +118,7 @@ impl From<ResolvedTag> for Tag {
 impl From<Tag> for ResolvedTag {
     fn from(tag: Tag) -> Self {
         if tag < ReservedTag::UPPER_BOUND {
-            match tag {
+            match tag.0 {
                 0 => ResolvedTag::Reserved(ReservedTag::Ping),
                 1 => ResolvedTag::Reserved(ReservedTag::SessionInit),
                 _ => ResolvedTag::Reserved(ReservedTag::Undefined),
@@ -43,7 +130,7 @@ impl From<Tag> for ResolvedTag {
 }
 
 /// List of all reserved application tags for the protocol.
-#[repr(u32)]
+#[repr(u64)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 
 pub enum ReservedTag {
@@ -52,17 +139,17 @@ pub enum ReservedTag {
     /// Opening a new session.
     SessionInit = 1,
     /// Undefined catch all.
-    Undefined = Self::UPPER_BOUND - 1,
+    Undefined = Self::UPPER_BOUND.0 - 1,
 }
 
 impl ReservedTag {
     /// The upper limit value for the session reserved tag range.
-    pub const UPPER_BOUND: Tag = 1 << 4; // 16
+    pub const UPPER_BOUND: Tag = Tag(1 << 4); // 16
 }
 
 impl From<ReservedTag> for Tag {
     fn from(tag: ReservedTag) -> Self {
-        tag as Tag
+        Self(tag as u64)
     }
 }
 
@@ -70,7 +157,7 @@ impl From<ReservedTag> for Tag {
 pub struct CustomTag(Tag);
 
 impl CustomTag {
-    pub const UPPER_BOUND: Tag = u32::MAX as Tag;
+    pub const UPPER_BOUND: Tag = Tag(u64::MAX);
 }
 
 impl From<CustomTag> for Tag {
@@ -159,15 +246,15 @@ mod tests {
 
     #[test]
     fn test_application_data() -> anyhow::Result<()> {
-        let ad_1 = ApplicationData::new(10, &[0_u8, 1_u8]);
+        let ad_1 = ApplicationData::new(10u64.into(), &[0_u8, 1_u8]);
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(0, &[]);
+        let ad_1 = ApplicationData::new(0u64.into(), &[]);
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(10, &[0_u8, 1_u8]);
+        let ad_1 = ApplicationData::new(10u64.into(), &[0_u8, 1_u8]);
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
