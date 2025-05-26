@@ -255,12 +255,12 @@ impl Probe {
                                     tracing::warn!(%pseudonym, reason = "feature not implemented", "this node could not originate the telemetry");
                                 },
                                 Message::Probe(NeighborProbe::Ping(ping)) => {
-                                    tracing::debug!(%pseudonym, nonce = %ping, "received ping");
+                                    tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
                                     match db.find_surb(SurbMatcher::Pseudonym(pseudonym)).await {
                                         Ok((sender_id, surb)) => {
                                             let (packet_sent_tx, packet_sent_rx) = channel::<std::result::Result<(), PacketError>>();
 
-                                            tracing::debug!(%pseudonym, nonce = %ping, "sending pong");
+                                            tracing::debug!(%pseudonym, nonce = hex::encode(ping), "sending pong");
                                             futures::pin_mut!(push_to_network);
                                             if push_to_network.send((Message::Probe(NeighborProbe::Pong(ping)).try_into().expect("Pong to message conversion cannot fail"), ResolvedTransportRouting::Return(sender_id, surb), packet_sent_tx.into())).await.is_ok() {
                                                 if let Err(error) = packet_sent_rx.await {
@@ -274,7 +274,7 @@ impl Probe {
                                     }
                                 },
                                 Message::Probe(NeighborProbe::Pong(ping)) => {
-                                    tracing::debug!(%pseudonym, nonce = %ping, "received pong");
+                                    tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received pong");
                                     if let Some((peer, start, replier)) = active_probes.get(&(pseudonym, NeighborProbe::Ping(ping))).await {
                                         let latency = current_time()
                                             .as_unix_timestamp()
@@ -292,7 +292,7 @@ impl Probe {
                                             replier.notify(NeighborProbe::Pong(ping))
                                         };
                                     } else {
-                                        tracing::warn!(%pseudonym, %ping, possible_reasons="[timeout, adversary}", "received pong for unknown probe");
+                                        tracing::warn!(%pseudonym, nonce = hex::encode(ping), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
                                     };
                                 },
                             }

@@ -5259,6 +5259,7 @@ dependencies = [
  "bitcode",
  "futures",
  "futures-concurrency",
+ "hex",
  "hopr-async-runtime",
  "hopr-crypto-random",
  "hopr-crypto-types",

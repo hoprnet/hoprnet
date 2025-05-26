@@ -5,15 +5,18 @@ use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum NeighborProbe {
     /// Ping message with a random nonce
-    Ping(u128),
+    Ping([u8; Self::SIZE]),
     /// Pong message repliying to a specific nonce
-    Pong(u128),
+    Pong([u8; Self::SIZE]),
 }
 
 impl NeighborProbe {
+    pub const SIZE: usize = 32;
+
     /// Returns the nonce of the message
     pub fn random_nonce() -> Self {
-        Self::Ping(rand::random::<u128>())
+        const SIZE: usize = NeighborProbe::SIZE;
+        Self::Ping(hopr_crypto_random::random_bytes::<SIZE>())
     }
 
     pub fn is_complement_to(&self, other: Self) -> bool {
@@ -25,7 +28,16 @@ impl NeighborProbe {
     }
 }
 
-impl From<NeighborProbe> for u128 {
+impl std::fmt::Display for NeighborProbe {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NeighborProbe::Ping(nonce) => write!(f, "Ping({})", hex::encode(nonce)),
+            NeighborProbe::Pong(nonce) => write!(f, "Pong({})", hex::encode(nonce)),
+        }
+    }
+}
+
+impl From<NeighborProbe> for [u8; NeighborProbe::SIZE] {
     fn from(probe: NeighborProbe) -> Self {
         match probe {
             NeighborProbe::Ping(nonce) | NeighborProbe::Pong(nonce) => nonce,
@@ -93,10 +105,7 @@ mod tests {
     #[test]
     fn check_for_complement_works_for_ping_and_pong_with_the_same_nonce() {
         let ping = NeighborProbe::random_nonce();
-        let pong = {
-            let ping: u128 = ping.into();
-            NeighborProbe::Pong(ping)
-        };
+        let pong = { NeighborProbe::Pong(ping.into()) };
 
         assert!(ping.is_complement_to(pong));
     }
@@ -105,8 +114,9 @@ mod tests {
     fn check_for_complement_fails_for_ping_and_pong_with_different_nonce() {
         let ping = NeighborProbe::random_nonce();
         let pong = {
-            let ping: u128 = ping.into();
-            NeighborProbe::Pong(ping + 1)
+            let mut other: [u8; NeighborProbe::SIZE] = ping.into();
+            other[0] = other[0].wrapping_add(1); // Modify the first byte to ensure it's different
+            NeighborProbe::Pong(other)
         };
 
         assert!(!ping.is_complement_to(pong));

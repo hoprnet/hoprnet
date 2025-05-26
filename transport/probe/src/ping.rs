@@ -160,8 +160,8 @@ mod tests {
         let replier = PingQueryReplier::new(tx);
         let challenge = replier.challenge.1;
 
-        let wrong: u128 = challenge.into();
-        let wrong = wrong + 1u128;
+        let mut wrong: [u8; NeighborProbe::SIZE] = challenge.into();
+        wrong[0] = wrong[0].wrapping_add(1); // Modify the first byte to ensure it's different
 
         replier.notify(NeighborProbe::Pong(wrong));
 

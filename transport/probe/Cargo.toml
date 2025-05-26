@@ -23,6 +23,7 @@ async-trait = { workspace = true }
 bitcode = { version = "0.6.6", features = ["serde"] }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
+hex = { workspace = true }
 libp2p-identity = { workspace = true }
 moka = { workspace = true, features = ["future"] }
 rand = { workspace = true }
