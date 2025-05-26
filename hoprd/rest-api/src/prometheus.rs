@@ -20,7 +20,7 @@ lazy_static::lazy_static! {
     )
     .unwrap();
     static ref METRIC_API_LAST_TIME: SimpleGauge = SimpleGauge::new(
-        "hopr_last_time",
+        "hopr_http_api_last_used_time",
         "The unix timestamp in seconds at which any API endpoint was last fetched"
     ).unwrap();
 
