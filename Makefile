@@ -29,35 +29,14 @@ init: ## initialize repository (idempotent operation)
 		ln -sf "../../$${gh}" .git/hooks/; \
 	done
 
-.PHONY: deps
-deps: ## Installs dependencies for local setup
-	if [[ ! "${name}" =~ nix-shell* ]]; then \
-		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
-	fi
-	# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
-	mkdir -p .cargo/bin
-
-.PHONY: build
-build: ## build all packages
-	$(cargo) build
-
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 	$(MAKE) -C docs/yellowpaper
-
-.PHONY: build-docs
-build-docs: ## build typedocs, Rest API docs
-	echo "Deprecated"
 
 .PHONY: install
 install:
 	$(cargo) install --path hopli
 	$(cargo) install --path hoprd/hoprd
-
-.PHONY: clean
-clean: # Cleanup build directories
-	cargo clean
-	find ethereum/bindings/src -type f ! -name "lib.rs" -delete
 
 .PHONY: test
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
@@ -202,14 +181,6 @@ endif
 		--identity-from-path "${id_path}" \
 		--contracts-root "./ethereum/contracts" \
 		--manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-
-.PHONY: docker-build-local
-docker-build-local: ## build Docker images locally, or single image if image= is set
-ifeq ($(image),)
-	./scripts/build-docker.sh --local --force
-else
-	./scripts/build-docker.sh --local --force -i $(image)
-endif
 
 .PHONY: request-funds
 request-funds: ensure-environment-and-network-are-set
