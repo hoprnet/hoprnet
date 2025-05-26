@@ -41,6 +41,7 @@ use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 use hopr_transport_protocol::processor::{PacketError, PacketSendFinalizer};
 use libp2p_identity::PeerId;
 
+pub use crate::config::ProbeConfig;
 use crate::{
     content::{Message, NeighborProbe},
     ping::PingQueryReplier,
@@ -259,14 +260,14 @@ impl Probe {
                                         Ok((sender_id, surb)) => {
                                             let (packet_sent_tx, packet_sent_rx) = channel::<std::result::Result<(), PacketError>>();
 
-                                            tracing::debug!(%pseudonym, nonce = hex::encode(ping), "sending pong");
                                             futures::pin_mut!(push_to_network);
+                                            tracing::debug!(%pseudonym, nonce = hex::encode(ping), "sending pong");
                                             if push_to_network.send((Message::Probe(NeighborProbe::Pong(ping)).try_into().expect("Pong to message conversion cannot fail"), ResolvedTransportRouting::Return(sender_id, surb), packet_sent_tx.into())).await.is_ok() {
                                                 if let Err(error) = packet_sent_rx.await {
-                                                    tracing::error!(%pseudonym, %error, "failed to receive packet sent response")
+                                                    tracing::error!(%pseudonym, %error, "failed to receive pong sent confirmation")
                                                 }
                                             } else {
-                                                tracing::error!(%pseudonym, error = "transport error", "failed to send message");
+                                                tracing::error!(%pseudonym, error = "transport error", "failed to send pong");
                                             }
                                         },
                                         Err(error) => tracing::error!(%pseudonym, %error, "failed to get a SURB, cannot send pong back"),
