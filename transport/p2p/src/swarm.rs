@@ -300,6 +300,7 @@ impl HoprSwarm {
                     SwarmEvent::NewExternalAddrOfPeer {
                         peer_id, address
                     } => {
+                        swarm.add_peer_address(peer_id, address.clone());
                         trace!(transport="libp2p", peer = %peer_id, multiaddress = %address, "New peer stored in swarm")
                     },
                     _ => trace!(transport="libp2p", "Unsupported enum option detected")

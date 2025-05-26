@@ -10,7 +10,11 @@ use hopr_transport_network::network::NetworkTriggeredEvent;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     Multiaddr, PeerId,
-    swarm::{CloseConnection, NetworkBehaviour, ToSwarm, dial_opts::DialOpts, dummy::ConnectionHandler},
+    core::Endpoint,
+    swarm::{
+        CloseConnection, ConnectionDenied, ConnectionId, NetworkBehaviour, ToSwarm, dial_opts::DialOpts,
+        dummy::ConnectionHandler,
+    },
 };
 use tracing::debug;
 
@@ -85,6 +89,26 @@ impl NetworkBehaviour for Behaviour {
         }
     }
 
+    fn handle_pending_outbound_connection(
+        &mut self,
+        _connection_id: ConnectionId,
+        _maybe_peer: Option<PeerId>,
+        _addresses: &[Multiaddr],
+        _effective_role: Endpoint,
+    ) -> Result<Vec<Multiaddr>, ConnectionDenied> {
+        if let Some(peer) = _maybe_peer {
+            if self.allowed_peers.contains(&peer) {
+                // inject the multiaddress of the peer for possible dial usage by stream protocols
+                return Ok(self.all_peers.get(&peer).map_or(vec![], |addr| vec![addr.clone()]));
+            } else {
+                return Err(libp2p::swarm::ConnectionDenied::new(crate::errors::P2PError::Logic(
+                    format!("Connection to '{peer}' is not allowed"),
+                )));
+            }
+        }
+        Ok(vec![])
+    }
+
     fn handle_established_outbound_connection(
         &mut self,
         _connection_id: libp2p::swarm::ConnectionId,
@@ -151,12 +175,12 @@ impl NetworkBehaviour for Behaviour {
             Some(DiscoveryInput::NetworkUpdate(event)) => match event {
                 NetworkTriggeredEvent::CloseConnection(peer) => {
                     debug!(peer = %peer, "p2p - discovery - Closing connection (reason: low ping connection quality");
-                    if self.is_peer_connected(&peer) {
-                        self.pending_events.push_back(ToSwarm::CloseConnection {
-                            peer_id: peer,
-                            connection: CloseConnection::default(),
-                        });
-                    }
+                    // if self.is_peer_connected(&peer) {
+                    //     self.pending_events.push_back(ToSwarm::CloseConnection {
+                    //         peer_id: peer,
+                    //         connection: CloseConnection::default(),
+                    //     });
+                    // }
                 }
                 NetworkTriggeredEvent::UpdateQuality(_, _) => {}
             },

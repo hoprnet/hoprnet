@@ -2990,7 +2990,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "nanorand",
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -3076,7 +3076,7 @@ dependencies = [
  "diatomic-waker",
  "futures-core",
  "pin-project-lite",
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -6145,7 +6145,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 dependencies = [
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -6163,8 +6163,7 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 [[package]]
 name = "libp2p"
 version = "0.55.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b72dc443ddd0254cb49a794ed6b6728400ee446a0f7ab4a07d0209ee98de20e9"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "bytes",
  "either",
@@ -6194,8 +6193,7 @@ dependencies = [
 [[package]]
 name = "libp2p-allow-block-list"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38944b7cb981cc93f2f0fb411ff82d0e983bd226fbcc8d559639a3a73236568b"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "libp2p-core",
  "libp2p-identity",
@@ -6205,8 +6203,7 @@ dependencies = [
 [[package]]
 name = "libp2p-autonat"
 version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e297bfc6cabb70c6180707f8fa05661b77ecb9cb67e8e8e1c469301358fa21d0"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "async-trait",
  "asynchronous-codec",
@@ -6230,8 +6227,7 @@ dependencies = [
 [[package]]
 name = "libp2p-connection-limits"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efe9323175a17caa8a2ed4feaf8a548eeef5e0b72d03840a0eab4bcb0210ce1c"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "libp2p-core",
  "libp2p-identity",
@@ -6241,8 +6237,7 @@ dependencies = [
 [[package]]
 name = "libp2p-core"
 version = "0.43.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "193c75710ba43f7504ad8f58a62ca0615b1d7e572cb0f1780bc607252c39e9ef"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "either",
  "fnv",
@@ -6260,15 +6255,14 @@ dependencies = [
  "rw-stream-sink",
  "thiserror 2.0.12",
  "tracing",
- "unsigned-varint 0.8.0",
+ "unsigned-varint",
  "web-time",
 ]
 
 [[package]]
 name = "libp2p-dns"
 version = "0.43.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b780a1150214155b0ed1cdf09fbd2e1b0442604f9146a431d1b21d23eef7bd7"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "async-trait",
  "futures",
@@ -6302,8 +6296,7 @@ dependencies = [
 [[package]]
 name = "libp2p-mdns"
 version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11d0ba095e1175d797540e16b62e7576846b883cb5046d4159086837b36846cc"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "futures",
  "hickory-proto 0.25.0-alpha.5",
@@ -6321,8 +6314,7 @@ dependencies = [
 [[package]]
 name = "libp2p-noise"
 version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afcc133e0f3cea07acde6eb8a9665cb11b600bd61110b010593a0210b8153b16"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "asynchronous-codec",
  "bytes",
@@ -6345,8 +6337,7 @@ dependencies = [
 [[package]]
 name = "libp2p-quic"
 version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41432a159b00424a0abaa2c80d786cddff81055ac24aa127e0cf375f7858d880"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "futures",
  "futures-timer",
@@ -6356,7 +6347,7 @@ dependencies = [
  "libp2p-tls",
  "quinn",
  "rand 0.8.5",
- "ring",
+ "ring 0.17.14",
  "rustls",
  "socket2 0.5.10",
  "thiserror 2.0.12",
@@ -6367,8 +6358,7 @@ dependencies = [
 [[package]]
 name = "libp2p-request-response"
 version = "0.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "548fe44a80ff275d400f1b26b090d441d83ef73efabbeb6415f4ce37e5aed865"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "async-trait",
  "futures",
@@ -6384,8 +6374,7 @@ dependencies = [
 [[package]]
 name = "libp2p-stream"
 version = "0.3.0-alpha"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "826716f1ee125895f1fb44911413cba023485b552ff96c7a2159bd037ac619bb"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "futures",
  "libp2p-core",
@@ -6398,8 +6387,7 @@ dependencies = [
 [[package]]
 name = "libp2p-swarm"
 version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "803399b4b6f68adb85e63ab573ac568154b193e9a640f03e0f2890eabbcb37f8"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "either",
  "fnv",
@@ -6421,11 +6409,9 @@ dependencies = [
 [[package]]
 name = "libp2p-swarm-derive"
 version = "0.35.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "206e0aa0ebe004d778d79fb0966aa0de996c19894e2c0605ba2f8524dd4443d8"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "heck 0.5.0",
- "proc-macro2",
  "quote",
  "syn 2.0.101",
 ]
@@ -6433,8 +6419,7 @@ dependencies = [
 [[package]]
 name = "libp2p-tcp"
 version = "0.43.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65346fb4d36035b23fec4e7be4c320436ba53537ce9b6be1d1db1f70c905cad0"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "futures",
  "futures-timer",
@@ -6448,16 +6433,15 @@ dependencies = [
 
 [[package]]
 name = "libp2p-tls"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42bbf5084fb44133267ad4caaa72a253d68d709edd2ed1cf9b42431a8ead8fd5"
+version = "0.6.0"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "futures",
  "futures-rustls",
  "libp2p-core",
  "libp2p-identity",
  "rcgen",
- "ring",
+ "ring 0.17.14",
  "rustls",
  "rustls-webpki 0.101.7",
  "thiserror 2.0.12",
@@ -6468,8 +6452,7 @@ dependencies = [
 [[package]]
 name = "libp2p-upnp"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d457b9ecceb66e7199f049926fad447f1f17f040e8d29d690c086b4cab8ed14a"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "futures",
  "futures-timer",
@@ -6483,8 +6466,7 @@ dependencies = [
 [[package]]
 name = "libp2p-yamux"
 version = "0.47.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f15df094914eb4af272acf9adaa9e287baa269943f32ea348ba29cfb9bfc60d8"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "either",
  "futures",
@@ -6824,7 +6806,7 @@ dependencies = [
  "percent-encoding",
  "serde",
  "static_assertions",
- "unsigned-varint 0.8.0",
+ "unsigned-varint",
  "url",
 ]
 
@@ -6846,21 +6828,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b430e7953c29dd6a09afc29ff0bb69c6e306329ee6794700aee27b76a1aea8d"
 dependencies = [
  "core2",
- "unsigned-varint 0.8.0",
+ "unsigned-varint",
 ]
 
 [[package]]
 name = "multistream-select"
 version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea0df8e5eec2298a62b326ee4f0d7fe1a6b90a09dfcf9df37b38f947a8c42f19"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "bytes",
  "futures",
- "log",
  "pin-project",
  "smallvec",
- "unsigned-varint 0.7.2",
+ "tracing",
+ "unsigned-varint",
 ]
 
 [[package]]
@@ -7950,14 +7931,13 @@ dependencies = [
 [[package]]
 name = "quick-protobuf-codec"
 version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15a0580ab32b169745d7a39db2ba969226ca16738931be152a3209b409de2474"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "asynchronous-codec",
  "bytes",
  "quick-protobuf",
- "thiserror 1.0.69",
- "unsigned-varint 0.8.0",
+ "thiserror 2.0.12",
+ "unsigned-varint",
 ]
 
 [[package]]
@@ -7991,7 +7971,7 @@ dependencies = [
  "getrandom 0.3.3",
  "lru-slab",
  "rand 0.9.1",
- "ring",
+ "ring 0.17.14",
  "rustc-hash",
  "rustls",
  "rustls-pki-types",
@@ -8149,13 +8129,12 @@ dependencies = [
 
 [[package]]
 name = "rcgen"
-version = "0.13.2"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75e669e5202259b5314d1ea5397316ad400819437857b90861765f24c4cf80a2"
+checksum = "52c4f3084aa3bc7dfbba4eff4fab2a54db4324965d8872ab933565e6fbd83bc6"
 dependencies = [
  "pem",
- "ring",
- "rustls-pki-types",
+ "ring 0.16.20",
  "time",
  "yasna",
 ]
@@ -8285,6 +8264,21 @@ dependencies = [
 
 [[package]]
 name = "ring"
+version = "0.16.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3053cf52e236a3ed746dfc745aa9cacf1b791d846bdaf412f60a8d7d6e17c8fc"
+dependencies = [
+ "cc",
+ "libc",
+ "once_cell",
+ "spin 0.5.2",
+ "untrusted 0.7.1",
+ "web-sys",
+ "winapi",
+]
+
+[[package]]
+name = "ring"
 version = "0.17.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7"
@@ -8293,7 +8287,7 @@ dependencies = [
  "cfg-if",
  "getrandom 0.2.16",
  "libc",
- "untrusted",
+ "untrusted 0.9.0",
  "windows-sys 0.52.0",
 ]
 
@@ -8587,7 +8581,7 @@ checksum = "730944ca083c1c233a75c09f199e973ca499344a2b7ba9e755c457e86fb4a321"
 dependencies = [
  "log",
  "once_cell",
- "ring",
+ "ring 0.17.14",
  "rustls-pki-types",
  "rustls-webpki 0.103.3",
  "subtle",
@@ -8631,8 +8625,8 @@ version = "0.101.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b6275d1ee7a1cd780b64aca7726599a1dbc893b1e64144529e55c3c2f745765"
 dependencies = [
- "ring",
- "untrusted",
+ "ring 0.17.14",
+ "untrusted 0.9.0",
 ]
 
 [[package]]
@@ -8641,9 +8635,9 @@ version = "0.103.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4a72fe2bcf7a6ac6fd7d0b9e5cb68aeb7d4c0a0271730218b3e92d43b4eb435"
 dependencies = [
- "ring",
+ "ring 0.17.14",
  "rustls-pki-types",
- "untrusted",
+ "untrusted 0.9.0",
 ]
 
 [[package]]
@@ -8667,8 +8661,7 @@ dependencies = [
 [[package]]
 name = "rw-stream-sink"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8c9026ff5d2f23da5e45bbc283f156383001bfb09c4e44256d02c1a685fe9a1"
+source = "git+https://github.com/hoprnet/rust-libp2p.git?branch=kauki%2Flibp2p-stream%2Fimprove-configurability-of-dial-opts#e70d5f88cc61d106a65ffff43a9929b853bff8d1"
 dependencies = [
  "futures",
  "pin-project",
@@ -9349,7 +9342,7 @@ dependencies = [
  "chacha20poly1305",
  "curve25519-dalek",
  "rand_core 0.6.4",
- "ring",
+ "ring 0.17.14",
  "rustc_version 0.4.1",
  "sha2",
  "subtle",
@@ -9374,6 +9367,12 @@ dependencies = [
  "libc",
  "windows-sys 0.52.0",
 ]
+
+[[package]]
+name = "spin"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
 name = "spin"
@@ -10423,15 +10422,15 @@ checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
 
 [[package]]
 name = "unsigned-varint"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6889a77d49f1f013504cec6bf97a2c730394adedaeb1deb5ea08949a50541105"
-
-[[package]]
-name = "unsigned-varint"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eb066959b24b5196ae73cb057f45598450d2c5f71460e98c49b738086eff9c06"
+
+[[package]]
+name = "untrusted"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "untrusted"

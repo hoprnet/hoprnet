@@ -91,8 +91,8 @@ impl hopr_transport_protocol::stream::BidirectionalStreamControl for HoprStreamP
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "HoprNetworkBehaviorEvent")]
 pub struct HoprNetworkBehavior {
-    streams: libp2p_stream::Behaviour,
     discovery: behavior::discovery::Behaviour,
+    streams: libp2p_stream::Behaviour,
     pub autonat_client: autonat::v2::client::Behaviour,
     pub autonat_server: autonat::v2::server::Behaviour,
 }
@@ -111,7 +111,14 @@ impl HoprNetworkBehavior {
         U: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         Self {
-            streams: libp2p_stream::Behaviour::new(),
+            streams: libp2p_stream::Behaviour::new().with_dial_opts(|peer: PeerId| {
+                // The following dial options will rely on an external behavior-based discovery mechanism to provide the addresses needed.
+                libp2p::swarm::dial_opts::DialOpts::peer_id(peer)
+                    .condition(libp2p::swarm::dial_opts::PeerCondition::DisconnectedAndNotDialing)
+                    .addresses(vec![])
+                    .extend_addresses_through_behaviour()
+                    .build()
+            }),
             discovery: behavior::discovery::Behaviour::new(me, network_events, onchain_events),
             autonat_client: autonat::v2::client::Behaviour::new(
                 OsRng,
