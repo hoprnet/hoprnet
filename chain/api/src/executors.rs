@@ -124,7 +124,11 @@ where
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn fund_channel(&self, destination: Address, balance: Balance) -> hopr_chain_actions::errors::Result<Hash> {
+    async fn fund_channel(
+        &self,
+        destination: Address,
+        balance: HoprBalance,
+    ) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.fund_channel(destination, balance)?;
         Ok(self.client.post_transaction(payload).await?)
     }
@@ -169,7 +173,11 @@ where
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> hopr_chain_actions::errors::Result<Hash> {
+    async fn withdraw<Cr: Currency + Send>(
+        &self,
+        recipient: Address,
+        amount: Balance<Cr>,
+    ) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.transfer(recipient, amount)?;
 
         // Withdraw transaction is out-of-band from Indexer, so its confirmation

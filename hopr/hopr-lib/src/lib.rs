@@ -548,35 +548,38 @@ impl Hopr {
         self.cfg.chain.network.clone()
     }
 
-    pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
-        Ok(self.hopr_chain_api.get_balance(balance_type).await?)
+    pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
+        Ok(self.hopr_chain_api.get_balance().await?)
     }
 
     pub async fn get_eligibility_status(&self) -> errors::Result<bool> {
         Ok(self.hopr_chain_api.get_eligibility_status().await?)
     }
 
-    pub async fn get_safe_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
+    pub async fn get_safe_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
         let safe_balance = self
             .hopr_chain_api
-            .get_safe_balance(self.cfg.safe_module.safe_address, balance_type)
+            .get_safe_balance(self.cfg.safe_module.safe_address)
             .await?;
 
-        if balance_type == BalanceType::HOPR {
+        if WxHOPR::is::<C>() {
             let my_db = self.db.clone();
+            let amount = safe_balance.amount();
             self.db
                 .begin_transaction()
                 .await?
                 .perform(|tx| {
                     Box::pin(async move {
                         let db_safe_balance = my_db.get_safe_hopr_balance(Some(tx)).await?;
-                        if safe_balance != db_safe_balance {
+                        if amount != db_safe_balance.amount() {
                             warn!(
                                 %db_safe_balance,
-                                %safe_balance,
+                                %amount,
                                 "Safe balance in the DB mismatches on chain balance"
                             );
-                            my_db.set_safe_hopr_balance(Some(tx), safe_balance).await?;
+                            my_db
+                                .set_safe_hopr_balance(Some(tx), HoprBalance::new_base(amount))
+                                .await?;
                         }
                         Ok::<_, DbSqlError>(())
                     })
@@ -617,7 +620,7 @@ impl Hopr {
         )?;
 
         info!(
-            address = %self.me_onchain(), minimum_balance = %Balance::new_from_str(SUGGESTED_NATIVE_BALANCE, BalanceType::Native),
+            address = %self.me_onchain(), minimum_balance = %*SUGGESTED_NATIVE_BALANCE,
             "Node is not started, please fund this node",
         );
 
@@ -625,7 +628,7 @@ impl Hopr {
 
         wait_for_funds(
             self.me_onchain(),
-            Balance::new_from_str(MIN_NATIVE_BALANCE, BalanceType::Native),
+            *MIN_NATIVE_BALANCE,
             Duration::from_secs(200),
             self.hopr_chain_api.rpc(),
         )
@@ -635,9 +638,8 @@ impl Hopr {
 
         self.state.store(HoprState::Initializing, Ordering::Relaxed);
 
-        let balance = self.get_balance(BalanceType::Native).await?;
-
-        let minimum_balance = Balance::new_from_str(constants::MIN_NATIVE_BALANCE, BalanceType::Native);
+        let balance: XDaiBalance = self.get_balance().await?;
+        let minimum_balance = *constants::MIN_NATIVE_BALANCE;
 
         info!(
             address = %self.hopr_chain_api.me_onchain(),
@@ -961,7 +963,7 @@ impl Hopr {
 
         // NOTE: after the chain is synced, we can reset tickets which are considered
         // redeemed but on-chain state does not align with that. This implies there was a problem
-        // right when the transaction was sent on-chain. In such cases we simply let it retry and
+        // right when the transaction was sent on-chain. In such cases, we simply let it retry and
         // handle errors appropriately.
         if let Err(e) = self.db.fix_channels_next_ticket_state().await {
             error!(error = %e, "failed to fix channels ticket states");
@@ -1239,7 +1241,7 @@ impl Hopr {
     }
 
     /// Get ticket price
-    pub async fn get_ticket_price(&self) -> errors::Result<Option<U256>> {
+    pub async fn get_ticket_price(&self) -> errors::Result<Option<HoprBalance>> {
         Ok(self.hopr_chain_api.ticket_price().await?)
     }
 
@@ -1287,14 +1289,14 @@ impl Hopr {
     }
 
     /// Current safe allowance balance
-    pub async fn safe_allowance(&self) -> errors::Result<Balance> {
+    pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {
         Ok(self.hopr_chain_api.safe_allowance().await?)
     }
 
     /// Withdraw on-chain assets to a given address
     /// @param recipient the account where the assets should be transferred to
     /// @param amount how many tokens to be transferred
-    pub async fn withdraw(&self, recipient: Address, amount: Balance) -> errors::Result<Hash> {
+    pub async fn withdraw_tokens(&self, recipient: Address, amount: HoprBalance) -> errors::Result<Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self
@@ -1306,13 +1308,28 @@ impl Hopr {
             .tx_hash)
     }
 
-    pub async fn open_channel(&self, destination: &Address, amount: &Balance) -> errors::Result<OpenChannelResult> {
+    /// Withdraw on-chain native assets to a given address
+    /// @param recipient the account where the assets should be transferred to
+    /// @param amount how many tokens to be transferred
+    pub async fn withdraw_native(&self, recipient: Address, amount: XDaiBalance) -> errors::Result<Hash> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
+        Ok(self
+            .hopr_chain_api
+            .actions_ref()
+            .withdraw_native(recipient, amount)
+            .await?
+            .await?
+            .tx_hash)
+    }
+
+    pub async fn open_channel(&self, destination: &Address, amount: HoprBalance) -> errors::Result<OpenChannelResult> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         let awaiter = self
             .hopr_chain_api
             .actions_ref()
-            .open_channel(*destination, *amount)
+            .open_channel(*destination, amount)
             .await?;
 
         let channel_id = generate_channel_id(&self.hopr_chain_api.me_onchain(), destination);
@@ -1322,13 +1339,13 @@ impl Hopr {
         })?)
     }
 
-    pub async fn fund_channel(&self, channel_id: &Hash, amount: &Balance) -> errors::Result<Hash> {
+    pub async fn fund_channel(&self, channel_id: &Hash, amount: HoprBalance) -> errors::Result<Hash> {
         self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
 
         Ok(self
             .hopr_chain_api
             .actions_ref()
-            .fund_channel(*channel_id, *amount)
+            .fund_channel(*channel_id, amount)
             .await?
             .await
             .map(|confirm| confirm.tx_hash)?)

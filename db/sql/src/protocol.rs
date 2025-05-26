@@ -53,7 +53,7 @@ impl HoprDb {
         mut fwd: HoprForwardedPacket,
         me: &ChainKeypair,
         outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: Balance,
+        outgoing_ticket_price: HoprBalance,
     ) -> std::result::Result<HoprForwardedPacket, DbSqlError> {
         let previous_hop_addr = self.resolve_chain_key(&fwd.previous_hop).await?.ok_or_else(|| {
             DbSqlError::LogicalError(format!(
@@ -294,7 +294,7 @@ impl HoprDbProtocolOperations for HoprDb {
             .map(|data| data.minimum_incoming_ticket_winning_prob)?)
     }
 
-    async fn get_network_ticket_price(&self) -> Result<Balance> {
+    async fn get_network_ticket_price(&self) -> Result<HoprBalance> {
         Ok(self.get_indexer_data(None).await.and_then(|data| {
             data.ticket_price
                 .ok_or(DbSqlError::LogicalError("missing ticket price".into()))
@@ -383,7 +383,7 @@ impl HoprDbProtocolOperations for HoprDb {
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: Balance,
+        outgoing_ticket_price: HoprBalance,
     ) -> Result<OutgoingPacket> {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
@@ -500,7 +500,7 @@ impl HoprDbProtocolOperations for HoprDb {
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: Balance,
+        outgoing_ticket_price: HoprBalance,
     ) -> Result<Option<IncomingPacket>> {
         let offchain_keypair = pkt_keypair.clone();
         let myself = self.clone();
@@ -606,10 +606,10 @@ impl HoprDb {
         destination: Address,
         current_path_pos: u8,
         winning_prob: WinningProbability,
-        ticket_price: Balance,
+        ticket_price: HoprBalance,
     ) -> crate::errors::Result<TicketBuilder> {
         // The next ticket is worth: price * remaining hop count / winning probability
-        let amount = Balance::new(
+        let amount = HoprBalance::from(
             ticket_price
                 .amount()
                 .mul(U256::from(current_path_pos - 1))
@@ -619,7 +619,6 @@ impl HoprDb {
                         "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
                     ))
                 })?,
-            BalanceType::HOPR,
         );
 
         if channel.balance.lt(&amount) {

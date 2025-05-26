@@ -66,7 +66,7 @@ lazy_static::lazy_static! {
 #[derive(Clone, Debug, PartialEq, Default)]
 struct ChannelDecision {
     to_close: Vec<ChannelEntry>,
-    to_open: Vec<(Address, Balance)>,
+    to_open: Vec<(Address, HoprBalance)>,
 }
 
 impl ChannelDecision {
@@ -78,7 +78,7 @@ impl ChannelDecision {
         self.to_close.push(entry);
     }
 
-    pub fn add_to_open(&mut self, address: Address, balance: Balance) {
+    pub fn add_to_open(&mut self, address: Address, balance: HoprBalance) {
         self.to_open.push((address, balance));
     }
 
@@ -86,7 +86,7 @@ impl ChannelDecision {
         &self.to_close
     }
 
-    pub fn get_to_open(&self) -> &Vec<(Address, Balance)> {
+    pub fn get_to_open(&self) -> &Vec<(Address, HoprBalance)> {
         &self.to_open
     }
 }
@@ -103,13 +103,13 @@ impl Display for ChannelDecision {
 }
 
 #[inline]
-fn default_new_channel_stake() -> Balance {
-    Balance::new_from_str("10000000000000000000", BalanceType::HOPR)
+fn default_new_channel_stake() -> HoprBalance {
+    HoprBalance::new_base(10)
 }
 
 #[inline]
-fn default_min_safe_balance() -> Balance {
-    Balance::new_from_str("1000000000000000000000", BalanceType::HOPR)
+fn default_min_safe_balance() -> HoprBalance {
+    HoprBalance::new_base(1000)
 }
 
 #[inline]
@@ -178,7 +178,7 @@ pub struct PromiscuousStrategyConfig {
     #[serde_as(as = "DisplayFromStr")]
     #[serde(default = "default_new_channel_stake")]
     #[default(default_new_channel_stake())]
-    pub new_channel_stake: Balance,
+    pub new_channel_stake: HoprBalance,
 
     /// Minimum token balance of the node's Safe.
     /// When reached, the strategy will not open any new channels.
@@ -187,7 +187,7 @@ pub struct PromiscuousStrategyConfig {
     #[serde_as(as = "DisplayFromStr")]
     #[serde(default = "default_min_safe_balance")]
     #[default(default_min_safe_balance())]
-    pub minimum_safe_balance: Balance,
+    pub minimum_safe_balance: HoprBalance,
 
     /// The maximum number of opened channels the strategy should maintain.
     ///
@@ -690,8 +690,8 @@ mod tests {
         ChannelAct { }
         #[async_trait]
         impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn open_channel(&self, destination: Address, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
             async fn close_channel(
                 &self,
                 counterparty: Address,
@@ -707,7 +707,7 @@ mod tests {
         }
     }
 
-    async fn mock_channel(db: HoprDb, dst: Address, balance: Balance) -> anyhow::Result<ChannelEntry> {
+    async fn mock_channel(db: HoprDb, dst: Address, balance: HoprBalance) -> anyhow::Result<ChannelEntry> {
         let channel = ChannelEntry::new(
             PEERS[0].0,
             dst,
@@ -742,7 +742,7 @@ mod tests {
         Ok(())
     }
 
-    async fn init_db(db: HoprDb, node_balance: Balance) -> anyhow::Result<()> {
+    async fn init_db(db: HoprDb, node_balance: HoprBalance) -> anyhow::Result<()> {
         db.begin_transaction()
             .await?
             .perform(|tx| {
@@ -778,7 +778,7 @@ mod tests {
         }
     }
 
-    fn mock_action_confirmation_opening(address: Address, balance: Balance) -> ActionConfirmation {
+    fn mock_action_confirmation_opening(address: Address, balance: HoprBalance) -> ActionConfirmation {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         ActionConfirmation {
             tx_hash: random_hash,
@@ -812,12 +812,12 @@ mod tests {
 
         let qualities_that_alice_sees = vec![0.7, 0.9, 0.8, 0.98, 0.1, 0.3, 0.1, 0.2, 1.0];
 
-        init_db(db.clone(), BalanceType::HOPR.balance(1000)).await?;
+        init_db(db.clone(), 1000.into()).await?;
         prepare_network(db.clone(), qualities_that_alice_sees).await?;
 
-        mock_channel(db.clone(), PEERS[1].0, BalanceType::HOPR.balance(10)).await?;
-        mock_channel(db.clone(), PEERS[2].0, BalanceType::HOPR.balance(10)).await?;
-        let for_closing = mock_channel(db.clone(), PEERS[5].0, BalanceType::HOPR.balance(10)).await?;
+        mock_channel(db.clone(), PEERS[1].0, 10.into()).await?;
+        mock_channel(db.clone(), PEERS[2].0, 10.into()).await?;
+        let for_closing = mock_channel(db.clone(), PEERS[5].0, 10.into()).await?;
 
         // Peer 3 has an accepted pre-release version
         let mut status_3 = db
@@ -839,8 +839,8 @@ mod tests {
             max_channels: Some(3),
             network_quality_open_threshold: 0.5,
             network_quality_close_threshold: 0.3,
-            new_channel_stake: BalanceType::HOPR.balance(10),
-            minimum_safe_balance: BalanceType::HOPR.balance(50),
+            new_channel_stake: 10.into(),
+            minimum_safe_balance: 50.into(),
             minimum_peer_version: ">=2.2.0".parse()?,
             initial_delay: Duration::ZERO,
             ..Default::default()

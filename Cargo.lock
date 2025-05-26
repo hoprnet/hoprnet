@@ -5006,14 +5006,16 @@ dependencies = [
 
 [[package]]
 name = "hopr-primitive-types"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "alloy",
  "anyhow",
+ "bigdecimal",
  "chrono",
  "float-cmp",
  "hex",
  "hex-literal",
+ "lazy_static",
  "primitive-types",
  "regex",
  "serde",

@@ -164,8 +164,8 @@ mod tests {
         ChannelAct { }
         #[async_trait]
         impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn open_channel(&self, destination: Address, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
             async fn close_channel(
                 &self,
                 counterparty: Address,
@@ -197,20 +197,13 @@ mod tests {
         let max_closure_overdue = Duration::from_secs(600);
 
         // Should leave this channel opened
-        let c_open = ChannelEntry::new(
-            *ALICE,
-            *BOB,
-            BalanceType::HOPR.balance(10),
-            0.into(),
-            ChannelStatus::Open,
-            0.into(),
-        );
+        let c_open = ChannelEntry::new(*ALICE, *BOB, 10.into(), 0.into(), ChannelStatus::Open, 0.into());
 
         // Should leave this unfinalized, because the channel closure period has not yet elapsed
         let c_pending = ChannelEntry::new(
             *ALICE,
             *CHARLIE,
-            BalanceType::HOPR.balance(10),
+            10.into(),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(60))),
             0.into(),
@@ -220,7 +213,7 @@ mod tests {
         let c_pending_elapsed = ChannelEntry::new(
             *ALICE,
             *DAVE,
-            BalanceType::HOPR.balance(10),
+            10.into(),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(60))),
             0.into(),
@@ -230,7 +223,7 @@ mod tests {
         let c_pending_overdue = ChannelEntry::new(
             *ALICE,
             *EUGENE,
-            BalanceType::HOPR.balance(10),
+            10.into(),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().sub(max_closure_overdue * 2)),
             0.into(),

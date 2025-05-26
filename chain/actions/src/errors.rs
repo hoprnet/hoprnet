@@ -36,6 +36,9 @@ pub enum ChainActionsError {
     #[error("balance is too low to perform the operation")]
     BalanceTooLow,
 
+    #[error("channel stake is too low or too high")]
+    InvalidChannelStake,
+
     #[error("no channel to be closed")]
     NoChannelToClose,
 

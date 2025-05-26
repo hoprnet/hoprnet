@@ -16,6 +16,7 @@ use tokio::time::sleep;
 use tracing::info;
 
 /// Used for testing. Creates RPC client to the local Anvil instance.
+#[allow(dead_code)]
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,
@@ -26,13 +27,12 @@ pub fn create_rpc_client_to_anvil_with_snapshot(
 
     let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
-    let rpc_client = ClientBuilder::default()
+    ClientBuilder::default()
         .layer(SnapshotRequestorLayer::from_requestor(snapshot_requestor))
-        .transport(transport_client.clone(), transport_client.guess_local());
-    rpc_client
+        .transport(transport_client.clone(), transport_client.guess_local())
 }
 
-/// Used for testing. Creates RPC client to the local Anvil instance.
+/// Used for testing. Creates an RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_provider_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,

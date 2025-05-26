@@ -23,11 +23,11 @@ pub enum Action {
     /// Redeem the given acknowledged ticket.
     RedeemTicket(RedeemableTicket),
 
-    /// Open channel to the given destination with the given stake
-    OpenChannel(Address, Balance),
+    /// Open a channel to the given destination with the given stake
+    OpenChannel(Address, HoprBalance),
 
     /// Fund channel with the given ID and amount
-    FundChannel(ChannelEntry, Balance),
+    FundChannel(ChannelEntry, HoprBalance),
 
     /// Close channel with the given source and destination
     CloseChannel(ChannelEntry, ChannelDirection),
@@ -35,13 +35,16 @@ pub enum Action {
     /// Close multiple channels in the same direction at once
     CloseChannels(Vec<ChannelEntry>, ChannelDirection, ChannelStatus),
 
-    /// Withdraw given balance to the given address
-    Withdraw(Address, Balance),
+    /// Withdraw the given balance to the given address
+    Withdraw(Address, HoprBalance),
+
+    /// Withdraw the given native balance to the given address
+    WithdrawNative(Address, XDaiBalance),
 
     /// Announce node on-chain
     Announce(AnnouncementData),
 
-    /// Register safe address with this node
+    /// Register a safe address with this node
     RegisterSafe(Address),
 }
 
@@ -68,6 +71,9 @@ impl Display for Action {
                 status
             ),
             Action::Withdraw(destination, amount) => write!(f, "withdraw action of {amount} to {destination}"),
+            Action::WithdrawNative(destination, amount) => {
+                write!(f, "withdraw native action of {amount} to {destination}")
+            }
             Action::Announce(data) => write!(f, "announce action of {}", data.multiaddress()),
             Action::RegisterSafe(safe_address) => write!(f, "register safe action {safe_address}"),
         }

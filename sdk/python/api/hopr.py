@@ -2,6 +2,7 @@ import asyncio
 import base64
 import logging
 import random
+from decimal import Decimal, ROUND_UP
 from typing import Optional
 
 import aiohttp
@@ -158,11 +159,11 @@ class HoprdAPI:
         is_ok, response = await self.__call_api(HTTPMethod.GET, "account/balances")
         return Balances(response) if is_ok else None
 
-    async def open_channel(self, destination: str, amount: str) -> Optional[OpenedChannel]:
+    async def open_channel(self, destination: str, amount: Decimal) -> Optional[OpenedChannel]:
         """
         Opens a channel with the given peer_address and amount.
         :param: peer_address: str
-        :param: amount: str
+        :param: amount: Decimal
         :return: channel id: str | undefined
         """
         data = OpenChannelBody(amount, destination)
@@ -170,7 +171,7 @@ class HoprdAPI:
         is_ok, response = await self.__call_api(HTTPMethod.POST, "channels", data)
         return OpenedChannel(response) if is_ok else None
 
-    async def fund_channel(self, channel_id: str, amount: float) -> bool:
+    async def fund_channel(self, channel_id: str, amount: Decimal) -> bool:
         """
         Funds a given channel.
         :param: channel_id: str
@@ -349,7 +350,7 @@ class HoprdAPI:
         :param: currency: str
         :return:
         """
-        data = WithdrawBody(receipient, amount, currency)
+        data = WithdrawBody(receipient, amount=f"{amount} {currency}")
         is_ok, _ = await self.__call_api(HTTPMethod.POST, "account/withdraw", data=data)
         return is_ok
 
