@@ -4,43 +4,43 @@ pub mod config;
 pub mod errors;
 pub mod executors;
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::{debug, error, info, warn};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
+use alloy::{
+    rpc::{client::ClientBuilder, types::TransactionRequest},
+    transports::{
+        http::{Http, ReqwestTransport},
+        layers::RetryBackoffLayer,
+    },
+};
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
-use hopr_chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
-use hopr_chain_actions::action_state::IndexerActionTracker;
-use hopr_chain_actions::payload::SafePayloadGenerator;
-use hopr_chain_actions::ChainActions;
-use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use hopr_chain_rpc::client::SimpleJsonRpcRetryPolicy;
-use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
-use hopr_chain_rpc::HoprRpcOperations;
-pub use hopr_chain_types::chain_events::SignificantChainEvent;
+use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
+use hopr_chain_actions::{
+    ChainActions,
+    action_queue::{ActionQueue, ActionQueueConfig},
+    action_state::IndexerActionTracker,
+    payload::SafePayloadGenerator,
+};
+use hopr_chain_indexer::{IndexerConfig, block::Indexer, handlers::ContractEventHandlers};
+use hopr_chain_rpc::{
+    HoprRpcOperations,
+    client::DefaultRetryPolicy,
+    rpc::{RpcOperations, RpcOperationsConfig},
+    transport::ReqwestClient,
+};
 use hopr_chain_types::ContractAddresses;
+pub use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::HoprDbAllOperations;
-use hopr_internal_types::account::AccountEntry;
 pub use hopr_internal_types::channels::ChannelEntry;
-use hopr_internal_types::prelude::ChannelDirection;
-use hopr_internal_types::tickets::WinningProbability;
+use hopr_internal_types::{account::AccountEntry, prelude::ChannelDirection, tickets::WinningProbability};
 use hopr_primitive_types::prelude::*;
+use tracing::{debug, error, info, warn};
 
 use crate::errors::{HoprChainError, Result};
 
-// Both features could be enabled during testing; therefore, we only use tokio when its
-// exclusively enabled.
-#[cfg(feature = "runtime-tokio")]
-pub type DefaultHttpRequestor = hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
-
-/// The default JSON RPC provider client
-///
-/// TODO: Should be an internal type, `hopr_lib::chain` must be moved to this package
-pub type JsonRpcClient = hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpRequestor, SimpleJsonRpcRetryPolicy>;
+pub type DefaultHttpRequestor = hopr_chain_rpc::transport::ReqwestClient;
 
 /// Checks whether the node can be registered with the Safe in the NodeSafeRegistry
 pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
@@ -77,7 +77,7 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
 /// This is done by querying the RPC provider for balance with backoff until `max_delay` argument.
 pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     address: Address,
-    min_balance: Balance,
+    min_balance: XDaiBalance,
     max_delay: Duration,
     rpc: &Rpc,
 ) -> Result<()> {
@@ -85,7 +85,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     let mut current_delay = Duration::from_secs(2).min(max_delay);
 
     while current_delay <= max_delay {
-        match rpc.get_balance(address, min_balance.balance_type()).await {
+        match rpc.get_balance(address).await {
             Ok(current_balance) => {
                 info!(balance = %current_balance, "balance status");
                 if current_balance.ge(&min_balance) {
@@ -105,6 +105,11 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     Err(HoprChainError::Api("timeout waiting for funds".into()))
 }
 
+fn build_transport_client(url: &str) -> Result<Http<ReqwestClient>> {
+    let parsed_url = url::Url::parse(url).unwrap_or_else(|_| panic!("failed to parse URL: {}", url));
+    Ok(ReqwestTransport::new(parsed_url))
+}
+
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum HoprChainProcess {
     Indexer,
@@ -115,13 +120,8 @@ type ActionQueueType<T> = ActionQueue<
     T,
     IndexerActionTracker,
     EthereumTransactionExecutor<
-        hopr_chain_rpc::TypedTransaction,
-        RpcEthereumClient<
-            RpcOperations<
-                hopr_chain_rpc::client::JsonRpcProviderClient<DefaultHttpRequestor, SimpleJsonRpcRetryPolicy>,
-                DefaultHttpRequestor,
-            >,
-        >,
+        TransactionRequest,
+        RpcEthereumClient<RpcOperations<DefaultHttpRequestor>>,
         SafePayloadGenerator,
     >,
 >;
@@ -143,7 +143,7 @@ pub struct HoprChain<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::De
     hopr_chain_actions: ChainActions<T>,
     action_queue: ActionQueueType<T>,
     action_state: Arc<IndexerActionTracker>,
-    rpc_operations: RpcOperations<JsonRpcClient, DefaultHttpRequestor>,
+    rpc_operations: RpcOperations<DefaultHttpRequestor>,
 }
 
 impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> HoprChain<T> {
@@ -159,18 +159,16 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         safe_address: Address,
         indexer_cfg: IndexerConfig,
         indexer_events_tx: async_channel::Sender<SignificantChainEvent>,
-    ) -> Self {
+    ) -> Result<Self> {
         // TODO: extract this from the global config type
         let mut rpc_http_config = hopr_chain_rpc::HttpPostRequestorConfig::default();
         if let Some(max_rpc_req) = chain_config.max_requests_per_sec {
             rpc_http_config.max_requests_per_sec = Some(max_rpc_req); // override the default if set
         }
 
-        // TODO: extract this from the global config type
-        let rpc_http_retry_policy = SimpleJsonRpcRetryPolicy {
-            min_retries: Some(2),
-            ..SimpleJsonRpcRetryPolicy::default()
-        };
+        // TODO(#7140): replace this DefaultRetryPolicy with a custom one that computes backoff with the number of
+        // retries
+        let rpc_http_retry_policy = DefaultRetryPolicy::default();
 
         // TODO: extract this from the global config type
         let rpc_cfg = RpcOperationsConfig {
@@ -193,14 +191,13 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
         // --- Configs done ---
 
-        let requestor = DefaultHttpRequestor::new(rpc_http_config);
+        let transport_client = build_transport_client(&chain_config.chain.default_provider)?;
 
-        // Build JSON RPC client
-        let rpc_client = JsonRpcClient::new(
-            &chain_config.chain.default_provider,
-            requestor.clone(),
-            rpc_http_retry_policy,
-        );
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new_with_policy(2, 100, 100, rpc_http_retry_policy))
+            .transport(transport_client.clone(), transport_client.guess_local());
+
+        let requestor = DefaultHttpRequestor::new();
 
         // Build RPC operations
         let rpc_operations =
@@ -226,7 +223,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         // Instantiate Chain Actions
         let hopr_chain_actions = ChainActions::new(&me_onchain, db.clone(), action_sender);
 
-        Self {
+        Ok(Self {
             me_onchain,
             safe_address,
             contract_addresses,
@@ -237,7 +234,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             action_queue,
             action_state,
             rpc_operations,
-        }
+        })
     }
 
     /// Execute all processes of the [`HoprChain`] object.
@@ -309,11 +306,11 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.db.get_all_channels(None).await?)
     }
 
-    pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
-        Ok(self.db.get_indexer_data(None).await?.ticket_price.map(|b| b.amount()))
+    pub async fn ticket_price(&self) -> errors::Result<Option<HoprBalance>> {
+        Ok(self.db.get_indexer_data(None).await?.ticket_price)
     }
 
-    pub async fn safe_allowance(&self) -> errors::Result<Balance> {
+    pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {
         Ok(self.db.get_safe_hopr_allowance(None).await?)
     }
 
@@ -325,16 +322,16 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         &mut self.hopr_chain_actions
     }
 
-    pub fn rpc(&self) -> &RpcOperations<JsonRpcClient, DefaultHttpRequestor> {
+    pub fn rpc(&self) -> &RpcOperations<DefaultHttpRequestor> {
         &self.rpc_operations
     }
 
-    pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
-        Ok(self.rpc_operations.get_balance(self.me_onchain(), balance_type).await?)
+    pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
+        Ok(self.rpc_operations.get_balance(self.me_onchain()).await?)
     }
 
-    pub async fn get_safe_balance(&self, safe_address: Address, balance_type: BalanceType) -> errors::Result<Balance> {
-        Ok(self.rpc_operations.get_balance(safe_address, balance_type).await?)
+    pub async fn get_safe_balance<C: Currency + Send>(&self, safe_address: Address) -> errors::Result<Balance<C>> {
+        Ok(self.rpc_operations.get_balance(safe_address).await?)
     }
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
@@ -349,7 +346,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.rpc_operations.get_minimum_network_winning_probability().await?)
     }
 
-    pub async fn get_minimum_ticket_price(&self) -> errors::Result<Balance> {
+    pub async fn get_minimum_ticket_price(&self) -> errors::Result<HoprBalance> {
         Ok(self.rpc_operations.get_minimum_network_ticket_price().await?)
     }
 }

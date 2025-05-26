@@ -11,10 +11,10 @@ from .cluster import Cluster
 from .constants import (
     ANVIL_CONFIG_FILE,
     ANVIL_FOLDER,
+    BASE_PORT,
     CONTRACTS_ADDRESSES,
     MAIN_DIR,
     NETWORK,
-    PORT_BASE,
     logging,
 )
 from .snapshot import Snapshot
@@ -24,7 +24,13 @@ random.seed(SEED)
 
 
 async def bringup(
-    config: str, test_mode: bool = False, fully_connected: bool = False, use_nat: bool = False, exposed: bool = False, extra_env: Optional[dict] = None
+    config: str,
+    test_mode: bool = False,
+    fully_connected: bool = False,
+    use_nat: bool = False,
+    exposed: bool = False,
+    base_port: int = BASE_PORT,
+    extra_env: Optional[dict] = None
 ) -> Optional[Tuple[Cluster, Anvil]]:
     logging.info(f"Using the random seed: {SEED}")
 
@@ -35,10 +41,14 @@ async def bringup(
     with open(config, "r") as f:
         config = yaml.safe_load(f)
 
-    cluster = Cluster(config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, extra_env)
-    anvil = Anvil(ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"))
+    cluster = Cluster(
+        config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port, extra_env
+    )
+    anvil = Anvil(
+        ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"), base_port
+    )
 
-    snapshot = Snapshot(PORT_BASE, MAIN_DIR, cluster)
+    snapshot = Snapshot(base_port, MAIN_DIR, cluster)
 
     # STOP OLD LOCAL ANVIL SERVER
     anvil.kill()
@@ -71,7 +81,7 @@ async def bringup(
         # delay to ensure anvil is stopped and state file closed
         await asyncio.sleep(1)
 
-        snapshot.create(ANVIL_FOLDER.joinpath("anvil.state.json"))
+        snapshot.create()
 
     snapshot.reuse()
 
@@ -91,14 +101,12 @@ async def bringup(
         logging.error(f"Timeout error: {e}")
         return cluster, anvil
     except RuntimeError as e:
-        logging.error(f"Runtime error: {e}")
-        return cluster, anvil
+        cluster.clean_up()
+        anvil.kill()
+        raise e
 
-    if not test_mode:
-        await cluster.alias_peers()
-
-        if fully_connected:
-            await cluster.connect_peers()
+    if not test_mode and fully_connected:
+        await cluster.connect_peers()
 
     logging.info("All nodes ready")
 

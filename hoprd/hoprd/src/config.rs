@@ -1,18 +1,18 @@
-use std::collections::HashSet;
-use std::net::{IpAddr, SocketAddr};
-use std::str::FromStr;
-use std::time::Duration;
+use std::{
+    collections::HashSet,
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    time::Duration,
+};
 
+use hopr_lib::{Address, HostConfig, HostType, ProtocolsConfig, config::HoprLibConfig};
+use hopr_platform::file::native::read_to_string;
+use hoprd_api::config::{Api, Auth};
 use proc_macro_regex::regex;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tracing::debug;
 use validator::{Validate, ValidationError};
-
-use hopr_lib::{config::HoprLibConfig, Address, HostConfig, HostType, ProtocolsConfig};
-use hopr_platform::file::native::read_to_string;
-use hoprd_api::config::{Api, Auth};
-use hoprd_inbox::config::MessageInboxConfiguration;
 
 use crate::errors::HoprdError;
 
@@ -93,7 +93,6 @@ impl std::fmt::Debug for Identity {
 ///
 /// An always up-to-date config YAML example can be found in [example_cfg.yaml](https://github.com/hoprnet/hoprnet/tree/master/hoprd/hoprd/example_cfg.yaml)
 /// which is always in the root of this crate.
-///
 #[derive(Debug, Default, Serialize, Deserialize, Validate, Clone, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct HoprdConfig {
@@ -105,10 +104,6 @@ pub struct HoprdConfig {
     #[validate(nested)]
     #[serde(default)]
     pub identity: Identity,
-    /// Configuration of the underlying database engine
-    #[validate(nested)]
-    #[serde(default)]
-    pub inbox: MessageInboxConfiguration,
     /// Configuration relevant for the API of the node
     #[validate(nested)]
     #[serde(default)]
@@ -169,11 +164,6 @@ impl HoprdConfig {
         }
         if cli_args.force_init > 0 {
             cfg.hopr.db.force_initialize = true;
-        }
-
-        // inbox
-        if let Some(x) = cli_args.inbox_capacity {
-            cfg.inbox.capacity = x;
         }
 
         // api
@@ -404,12 +394,14 @@ pub struct SessionIpForwardingConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::io::{Read, Write};
+
     use anyhow::Context;
     use clap::{Args, Command, FromArgMatches};
     use hopr_lib::HostType;
-    use std::io::{Read, Write};
     use tempfile::NamedTempFile;
+
+    use super::*;
 
     pub fn example_cfg() -> anyhow::Result<HoprdConfig> {
         let chain = hopr_lib::config::Chain {
@@ -430,8 +422,8 @@ mod tests {
                               "module_implementation": "0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0",
                               "node_safe_registry": "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82",
                               "ticket_price_oracle": "0x7a2088a1bFc9d81c55368AE168C2C02570cB814F",
-                              "winning_probability_oracle": "0x959922bE3CAee4b8Cd9a407cc3ac1C251C2007B1",
-                              "announcements": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+                              "winning_probability_oracle": "0x09635F643e140090A9A8Dcd712eD6285858ceBef",
+                              "announcements": "0xc5a5C42992dECbae36851359345FE25997F5C42d",
                               "node_stake_v2_factory": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e"
                             },
                             "confirmations": 2,

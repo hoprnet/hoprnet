@@ -1,11 +1,10 @@
 //! This module defines the Start sub-protocol used for HOPR Session initiation and management.
 
-use hopr_internal_types::prelude::ApplicationData;
 use std::collections::HashSet;
 
-use crate::errors::TransportSessionError;
-use crate::types::SessionTarget;
-use crate::Capability;
+use hopr_internal_types::prelude::ApplicationData;
+
+use crate::{Capability, errors::TransportSessionError, types::SessionTarget};
 
 /// Challenge that identifies a Start initiation protocol message.
 pub type StartChallenge = u64;
@@ -76,8 +75,8 @@ pub struct StartEstablished<T> {
 ///     Note left of Entry: Failure
 ///     end
 /// ```
+// Do not implement Serialize,Deserialize -> enforce serialization via encode/decode
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
-// #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))] -- enforce serialization via encode/decode
 #[strum_discriminants(vis(pub(crate)))]
 #[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
 pub enum StartProtocol<T> {
@@ -93,24 +92,27 @@ pub enum StartProtocol<T> {
     KeepAlive(T),
 }
 
-const SESSION_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
-    .with_little_endian()
-    .with_variable_int_encoding();
-
+// TODO: implement this without Serde, see #7145
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
+    const SESSION_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+        .with_little_endian()
+        .with_variable_int_encoding();
+
     /// Serialize the message into a message tag and message data.
     /// Data is serialized using `bincode`.
     pub fn encode(self) -> crate::errors::Result<(u16, Box<[u8]>)> {
         let disc = StartProtocolDiscriminants::from(&self) as u8 + 1;
         let inner = match self {
-            StartProtocol::StartSession(init) => bincode::serde::encode_to_vec(&init, SESSION_BINCODE_CONFIGURATION),
-            StartProtocol::SessionEstablished(est) => {
-                bincode::serde::encode_to_vec(&est, SESSION_BINCODE_CONFIGURATION)
+            StartProtocol::StartSession(init) => {
+                bincode::serde::encode_to_vec(&init, Self::SESSION_BINCODE_CONFIGURATION)
             }
-            StartProtocol::SessionError(err) => bincode::serde::encode_to_vec(err, SESSION_BINCODE_CONFIGURATION),
-            StartProtocol::CloseSession(id) => bincode::serde::encode_to_vec(&id, SESSION_BINCODE_CONFIGURATION),
-            StartProtocol::KeepAlive(id) => bincode::serde::encode_to_vec(&id, SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::SessionEstablished(est) => {
+                bincode::serde::encode_to_vec(&est, Self::SESSION_BINCODE_CONFIGURATION)
+            }
+            StartProtocol::SessionError(err) => bincode::serde::encode_to_vec(err, Self::SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::CloseSession(id) => bincode::serde::encode_to_vec(&id, Self::SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::KeepAlive(id) => bincode::serde::encode_to_vec(&id, Self::SESSION_BINCODE_CONFIGURATION),
         }?;
 
         Ok((disc as u16, inner.into_boxed_slice()))
@@ -125,24 +127,41 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
 
         match StartProtocolDiscriminants::from_repr(tag as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
             StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(
-                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                    .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::SessionEstablished => Ok(StartProtocol::SessionEstablished(
-                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                    .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(
-                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                    .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(
-                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                    .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::KeepAlive => Ok(StartProtocol::KeepAlive(
-                bincode::serde::borrow_decode_from_slice(data, SESSION_BINCODE_CONFIGURATION).map(|(v, _bytes)| v)?,
+                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                    .map(|(v, _bytes)| v)?,
             )),
         }
     }
 }
 
+#[cfg(not(feature = "serde"))]
+impl<T> StartProtocol<T> {
+    pub fn encode(self) -> crate::errors::Result<(u16, Box<[u8]>)> {
+        unimplemented!()
+    }
+
+    pub fn decode(_tag: u16, _data: &[u8]) -> crate::errors::Result<Self> {
+        unimplemented!()
+    }
+}
+
+#[cfg(feature = "serde")]
 impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<StartProtocol<T>> for ApplicationData {
     type Error = TransportSessionError;
 
@@ -155,7 +174,30 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<StartProtoc
     }
 }
 
+#[cfg(not(feature = "serde"))]
+impl<T> TryFrom<StartProtocol<T>> for ApplicationData {
+    type Error = TransportSessionError;
+
+    fn try_from(value: StartProtocol<T>) -> Result<Self, Self::Error> {
+        let (application_tag, plain_text) = value.encode()?;
+        Ok(ApplicationData {
+            application_tag,
+            plain_text,
+        })
+    }
+}
+
+#[cfg(feature = "serde")]
 impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<ApplicationData> for StartProtocol<T> {
+    type Error = TransportSessionError;
+
+    fn try_from(value: ApplicationData) -> Result<Self, Self::Error> {
+        Self::decode(value.application_tag, &value.plain_text)
+    }
+}
+
+#[cfg(not(feature = "serde"))]
+impl<T> TryFrom<ApplicationData> for StartProtocol<T> {
     type Error = TransportSessionError;
 
     fn try_from(value: ApplicationData) -> Result<Self, Self::Error> {
@@ -165,12 +207,12 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> TryFrom<Application
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::{HoprPseudonym, Tag};
     use hopr_network_types::prelude::SealedHost;
 
+    use super::*;
     use crate::SessionId;
 
     #[cfg(feature = "serde")]
@@ -188,6 +230,24 @@ mod tests {
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
         assert_eq!(msg_1, msg_2);
+        Ok(())
+    }
+
+    #[test]
+    fn start_protocol_message_start_session_message_should_allow_for_at_least_one_surb() -> anyhow::Result<()> {
+        let msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
+            challenge: 0,
+            target: SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:1234".parse()?)),
+            capabilities: Default::default(),
+        });
+
+        let len = msg.encode()?.1.len();
+        assert!(
+            HoprPacket::max_surbs_with_message(len) >= 1,
+            "KeepAlive message size ({}) must allow for at least 1 SURBs in packet",
+            len,
+        );
+
         Ok(())
     }
 

@@ -1,6 +1,6 @@
 [package]
 name = "hoprd-api"
-version = "3.13.1"
+version = "4.0.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "API enabling developers to interact with a hoprd node programatically through HTTP REST API."
@@ -34,11 +34,6 @@ either = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }
-libp2p-identity = { workspace = true, features = [
-  "peerid",
-  "ed25519",
-  "serde",
-] }
 regex = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -65,8 +60,6 @@ validator = { workspace = true }
 hopr-async-runtime = { workspace = true, features = ["runtime-tokio"] }
 hopr-lib = { workspace = true, features = ["runtime-tokio", "session-client"] }
 hopr-db-api = { workspace = true }
-hoprd-db-api = { workspace = true }
-hoprd-inbox = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
 hopr-metrics = { workspace = true, optional = true }
@@ -74,4 +67,4 @@ hopr-metrics = { workspace = true, optional = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 hopr-transport-session = { workspace = true }
-oas3 = "0.13.1"
+oas3 = "0.16.0"

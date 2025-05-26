@@ -1,26 +1,26 @@
-use async_lock::RwLock;
-use futures::channel::mpsc::Sender;
-use futures::stream::FuturesUnordered;
-use futures::TryStreamExt;
 use std::sync::{Arc, OnceLock};
-use tracing::trace;
 
-use crate::errors::HoprTransportError;
+use async_lock::RwLock;
+use futures::{TryStreamExt, channel::mpsc::Sender, stream::FuturesUnordered};
 use hopr_chain_types::chain_events::NetworkRegistryStatus;
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_types::crypto_traits::Randomizable;
-use hopr_db_sql::api::prelude::DbError;
-use hopr_db_sql::HoprDbAllOperations;
+use hopr_db_sql::{HoprDbAllOperations, api::prelude::DbError};
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::{ResolvedTransportRouting, RoutingOptions};
-use hopr_network_types::types::DestinationRouting;
-use hopr_path::{selectors::PathSelector, ChainPath, PathAddressResolver, ValidatedPath};
-use hopr_primitive_types::primitives::Address;
+use hopr_network_types::{
+    prelude::{ResolvedTransportRouting, RoutingOptions},
+    types::DestinationRouting,
+};
+use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, selectors::PathSelector};
+use hopr_primitive_types::{prelude::HoprBalance, primitives::Address};
 use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
     traits::SendMsg,
 };
+use tracing::trace;
+
+use crate::errors::HoprTransportError;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -50,10 +50,10 @@ impl From<NetworkRegistryStatus> for PeerEligibility {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
     pub winning_count: u128,
-    pub unredeemed_value: hopr_primitive_types::primitives::Balance,
-    pub redeemed_value: hopr_primitive_types::primitives::Balance,
-    pub neglected_value: hopr_primitive_types::primitives::Balance,
-    pub rejected_value: hopr_primitive_types::primitives::Balance,
+    pub unredeemed_value: HoprBalance,
+    pub redeemed_value: HoprBalance,
+    pub neglected_value: HoprBalance,
+    pub rejected_value: HoprBalance,
 }
 
 #[derive(Clone)]
@@ -235,7 +235,10 @@ where
             .map_err(|_| TransportSessionError::Closed)?
             .consume_and_wait(crate::constants::PACKET_QUEUE_TIMEOUT_MILLISECONDS)
             .await
-            .map_err(|_e| TransportSessionError::Timeout)?;
+            .map_err(|error| {
+                tracing::error!(%error, "packet send error");
+                TransportSessionError::Timeout
+            })?;
 
         trace!("packet sent to the outgoing queue");
 

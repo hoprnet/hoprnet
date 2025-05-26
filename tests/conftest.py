@@ -9,6 +9,7 @@ from subprocess import PIPE, STDOUT, CalledProcessError, Popen
 
 import pytest
 
+from .find_port import find_available_port_block
 from sdk.python import localcluster
 from sdk.python.localcluster.constants import PWD
 from sdk.python.localcluster.node import Node
@@ -88,21 +89,46 @@ def config_to_yaml(request):
         request.config.cache.set("yaml_config", yaml_config)
 
 @pytest.fixture(scope="function")
-async def swarm3(request):
+async def swarm3(request, base_port):
+
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
+    extra_env_configs = None
 
-    # load cache created by autouse fixture config_to_yaml
-    extra_params = request.config.cache.get("yaml_config", None)
-    if extra_params is not None:
-        extra_params = yaml.safe_load(extra_params)
+    yaml_config_str = request.config.cache.get("yaml_config", None)
+
+    if yaml_config_str is not None:
+        loaded_node_configs = yaml.safe_load(yaml_config_str)
         request.config.cache.set("yaml_config", None)
+        extra_env_configs = [{} for _ in range(6)]
+        if loaded_node_configs:
+            for idx, (key, value) in enumerate(loaded_node_configs.items()):
+                if key.startswith("local"):
+                    index = int(key[5:]) - 1
+                    if 0 <= index < len(extra_env_configs):
+                        if isinstance(value, dict):
+                            extra_env_configs[index] = value
+                        elif value is None:
+                            extra_env_configs[index] = {}
+                else:
+                    extra_env_configs[index] = {}
 
-    cluster, anvil = await localcluster.bringup(params_path, test_mode=True, fully_connected=False, use_nat=True, extra_env=extra_params)
+    try:
+        cluster, anvil = await localcluster.bringup(
+            params_path,
+            test_mode=True,
+            fully_connected=False,
+            use_nat=True,
+            base_port=base_port,
+            extra_env=extra_env_configs  # Pass the processed configs
+        )
 
-    yield cluster.nodes
+        yield cluster.nodes
 
-    cluster.clean_up()
-    anvil.kill()
+        cluster.clean_up()
+        anvil.kill()
+    except RuntimeError:
+        pytest.fail("Failed to bring up the cluster")
+
 
 @pytest.fixture(scope="function")
 async def swarm3_reset(request):
@@ -111,14 +137,34 @@ async def swarm3_reset(request):
     yield
 
 @pytest.fixture(scope="session")
-async def swarm7(request):
+async def base_port(request):
+    base_port_env = os.environ.get("HOPR_SMOKETEST_BASE_PORT")
+
+    if base_port_env is None:
+        base_port = find_available_port_block(3000, 4000, 30)
+    else:
+        base_port = int(base_port_env)
+
+    if base_port is None:
+        pytest.fail("No available base port found")
+    logging.info(f"Using base port: {base_port}")
+    yield base_port
+
+
+@pytest.fixture(scope="session")
+async def swarm7(request, base_port):
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
-    cluster, anvil = await localcluster.bringup(params_path, test_mode=True, fully_connected=False, use_nat=True)
+    try:
+        cluster, anvil = await localcluster.bringup(
+            params_path, test_mode=True, fully_connected=False, use_nat=True, base_port=base_port
+        )
 
-    yield cluster.nodes
+        yield cluster.nodes
 
-    cluster.clean_up()
-    anvil.kill()
+        cluster.clean_up()
+        anvil.kill()
+    except RuntimeError:
+        pytest.fail("Failed to bring up the cluster")
 
 
 @pytest.fixture(scope="function")
@@ -130,11 +176,6 @@ async def swarm7_reset(swarm7: dict[str, Node]):
         await asyncio.gather(*[node.api.reset_tickets_statistics() for node in swarm7.values()])
     except Exception as e:
         logging.error(f"Error resetting tickets statistics in teardown: {e}")
-
-    try:
-        await asyncio.gather(*[node.api.messages_pop_all(None) for node in swarm7.values()])
-    except Exception as e:
-        logging.error(f"Error popping all messages in teardown: {e}")
 
 
 def to_ws_url(host, port, args: list[tuple[str, str]]):

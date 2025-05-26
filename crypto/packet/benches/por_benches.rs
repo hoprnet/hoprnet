@@ -6,13 +6,11 @@ mod errors;
 #[path = "../src/por.rs"]
 mod por;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::HoprSphinxSuite;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_sphinx::prelude::{SharedSecret, SphinxSuite};
-use hopr_crypto_types::keypairs::Keypair;
-use hopr_crypto_types::prelude::OffchainKeypair;
-
+use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use por::{generate_proof_of_relay, pre_verify};
 
 const SAMPLE_SIZE: usize = 100_000;
@@ -26,7 +24,7 @@ pub fn por_creation_bench(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
             let secrets = HoprSphinxSuite::new_shared_keys(
                 &(0..=hop)
-                    .map(|_| OffchainKeypair::random().public().clone())
+                    .map(|_| *OffchainKeypair::random().public())
                     .collect::<Vec<_>>(),
             )
             .unwrap()

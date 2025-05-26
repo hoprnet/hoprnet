@@ -1,20 +1,17 @@
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::{StreamExt, TryStreamExt};
-use sea_orm::ActiveValue::Set;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
-
+use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::*;
-use hopr_db_entity::channel;
-use hopr_db_entity::conversions::channels::ChannelStatusUpdate;
-use hopr_db_entity::prelude::Channel;
+use hopr_db_entity::{channel, conversions::channels::ChannelStatusUpdate, prelude::Channel};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 
-use crate::cache::ChannelParties;
-use crate::db::HoprDb;
-use crate::errors::{DbSqlError, Result};
-use crate::{HoprDbGeneralModelOperations, OptTx};
+use crate::{
+    HoprDbGeneralModelOperations, OptTx,
+    cache::ChannelParties,
+    db::HoprDb,
+    errors::{DbSqlError, Result},
+};
 
 /// API for editing [ChannelEntry] in the DB.
 pub struct ChannelEditor {
@@ -30,8 +27,7 @@ impl ChannelEditor {
     }
 
     /// Change the HOPR balance of the channel.
-    pub fn change_balance(mut self, balance: Balance) -> Self {
-        assert_eq!(BalanceType::HOPR, balance.balance_type());
+    pub fn change_balance(mut self, balance: HoprBalance) -> Self {
         self.model.balance = Set(balance.amount().to_be_bytes().to_vec());
         self
     }
@@ -192,7 +188,7 @@ impl HoprDbChannelOperations for HoprDb {
         if let Some(channel_epoch) = epoch.try_as_ref() {
             self.caches
                 .unrealized_value
-                .invalidate(&(channel_id, channel_epoch.as_slice().into()))
+                .invalidate(&(channel_id, U256::from_big_endian(channel_epoch.as_slice())))
                 .await;
         }
 
@@ -334,7 +330,7 @@ impl HoprDbChannelOperations for HoprDb {
 
         self.caches.src_dst_to_channel.invalidate(&parties).await;
 
-        // Finally invalidate any unrealized values from the cache.
+        // Finally, invalidate any unrealized values from the cache.
         // This might be a no-op if the channel was not in the cache
         // like for channels that are not ours.
         let channel_id = channel_entry.get_id();
@@ -350,16 +346,16 @@ impl HoprDbChannelOperations for HoprDb {
 
 #[cfg(test)]
 mod tests {
-    use crate::channels::HoprDbChannelOperations;
-    use crate::db::HoprDb;
-    use crate::HoprDbGeneralModelOperations;
     use anyhow::Context;
     use hopr_crypto_random::random_bytes;
-    use hopr_crypto_types::keypairs::ChainKeypair;
-    use hopr_crypto_types::prelude::Keypair;
-    use hopr_internal_types::channels::ChannelStatus;
-    use hopr_internal_types::prelude::{ChannelDirection, ChannelEntry};
-    use hopr_primitive_types::prelude::{Address, BalanceType};
+    use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
+    use hopr_internal_types::{
+        channels::ChannelStatus,
+        prelude::{ChannelDirection, ChannelEntry},
+    };
+    use hopr_primitive_types::prelude::Address;
+
+    use crate::{HoprDbGeneralModelOperations, channels::HoprDbChannelOperations, db::HoprDb};
 
     #[tokio::test]
     async fn test_insert_get_by_id() -> anyhow::Result<()> {
@@ -368,7 +364,7 @@ mod tests {
         let ce = ChannelEntry::new(
             Address::default(),
             Address::default(),
-            BalanceType::HOPR.zero(),
+            0.into(),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -392,14 +388,7 @@ mod tests {
         let a = Address::from(random_bytes());
         let b = Address::from(random_bytes());
 
-        let ce = ChannelEntry::new(
-            a,
-            b,
-            BalanceType::HOPR.zero(),
-            0_u32.into(),
-            ChannelStatus::Open,
-            0_u32.into(),
-        );
+        let ce = ChannelEntry::new(a, b, 0.into(), 0_u32.into(), ChannelStatus::Open, 0_u32.into());
 
         db.upsert_channel(None, ce).await?;
         let from_db = db
@@ -436,7 +425,7 @@ mod tests {
         let ce = ChannelEntry::new(
             Address::default(),
             expected_destination,
-            BalanceType::HOPR.zero(),
+            0.into(),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -465,7 +454,7 @@ mod tests {
         let ce_1 = ChannelEntry::new(
             addr_1,
             addr_2,
-            BalanceType::HOPR.zero(),
+            0.into(),
             1_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -474,7 +463,7 @@ mod tests {
         let ce_2 = ChannelEntry::new(
             addr_2,
             addr_1,
-            BalanceType::HOPR.zero(),
+            0.into(),
             2_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),

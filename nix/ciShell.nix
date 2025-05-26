@@ -1,6 +1,7 @@
-{ pkgs
-, extraPackages ? [ ]
-, ...
+{
+  pkgs,
+  extraPackages ? [ ],
+  ...
 }@args:
 let
   mkShell = import ./mkShell.nix { };
@@ -22,12 +23,16 @@ let
     dive
 
     uv
+    python313
   ];
   shellPackages = packages ++ extraPackages;
   cleanArgs = removeAttrs args [
     "extraPackages"
   ];
 in
-mkShell (cleanArgs // {
-  inherit shellPackages;
-})
+mkShell (
+  cleanArgs
+  // {
+    inherit shellPackages;
+  }
+)

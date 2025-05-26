@@ -1,5 +1,4 @@
-use sea_orm_migration::prelude::*;
-use sea_orm_migration::sea_orm::prelude::ChronoDateTimeUtc;
+use sea_orm_migration::{prelude::*, sea_orm::prelude::ChronoDateTimeUtc};
 
 pub(crate) fn peers_table() -> TableCreateStatement {
     Table::create()

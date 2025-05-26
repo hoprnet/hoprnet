@@ -1,24 +1,28 @@
-use futures::{pin_mut, StreamExt};
-use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_internal_types::prelude::{HoprPseudonym, Tag};
-use hopr_internal_types::protocol::ApplicationData;
-use hopr_network_types::prelude::{DestinationRouting, SealedHost};
-use hopr_network_types::session::state::{SessionConfig, SessionSocket};
-use std::collections::HashSet;
-use std::fmt::{Debug, Formatter};
-use std::hash::{Hash, Hasher};
-use std::task::Context;
-use std::time::Duration;
 use std::{
-    fmt::Display,
+    collections::HashSet,
+    fmt::{Debug, Display, Formatter},
+    hash::{Hash, Hasher},
     io::{Error, ErrorKind},
     pin::Pin,
     sync::Arc,
-    task::Poll,
+    task::{Context, Poll},
+    time::Duration,
 };
+
+use futures::{StreamExt, pin_mut};
+use hopr_crypto_packet::prelude::HoprPacket;
+use hopr_internal_types::{
+    prelude::{HoprPseudonym, Tag},
+    protocol::ApplicationData,
+};
+use hopr_network_types::{
+    prelude::{DestinationRouting, SealedHost},
+    session::state::{SessionConfig, SessionSocket},
+};
+use hopr_primitive_types::prelude::BytesRepresentable;
 use tracing::{debug, error};
 
-use crate::{errors::TransportSessionError, traits::SendMsg, Capability};
+use crate::{Capability, errors::TransportSessionError, traits::SendMsg};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -31,23 +35,39 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-// Enough to fit Ed25519 peer IDs and 2-byte tag number
-const MAX_SESSION_ID_STR_LEN: usize = 64;
+/// Calculates the maximum number of decimal digits needed to represent an N-byte unsigned integer.
+///
+/// The calculation is based on the formula: ⌈8n × log_10(2)⌉
+/// where n is the number of bytes.
+const fn max_decimal_digits_for_n_bytes(n: usize) -> usize {
+    // log_10(2) = 0.301029995664 multiplied by 1 000 000 to work with integers in a const function
+    const LOG10_2_SCALED: u64 = 301030;
+    const SCALE: u64 = 1_000_000;
 
-/// Unique ID of a specific session.
+    // 8n * log_10(2) scaled
+    let scaled = 8 * n as u64 * LOG10_2_SCALED;
+
+    scaled.div_ceil(SCALE) as usize
+}
+
+// Enough to fit HoprPseudonym in hex (with 0x prefix), delimiter and tag number
+const MAX_SESSION_ID_STR_LEN: usize =
+    2 + 2 * HoprPseudonym::SIZE + 1 + max_decimal_digits_for_n_bytes(size_of::<Tag>());
+
+/// Unique ID of a specific Session in a certain direction.
 ///
 /// Simple wrapper around the maximum range of the port like session unique identifier.
-/// It is a simple combination of an application tag and a peer id that will in future be
-/// replaced by a more robust session id representation.
+/// It is a simple combination of an application tag for the Session and
+/// a [`HoprPseudonym`].
 #[derive(Clone, Copy)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SessionId {
     tag: Tag,
     pseudonym: HoprPseudonym,
     // Since this SessionId is commonly represented as a string,
     // we cache its string representation here.
-    // Also by using a statically allocated ArrayString, we allow the SessionId to remain Copy.
+    // Also, by using a statically allocated ArrayString, we allow the SessionId to remain Copy.
     // This representation is possibly truncated to MAX_SESSION_ID_STR_LEN.
+    // This member is always computed and is therefore not serialized.
     cached: arrayvec::ArrayString<MAX_SESSION_ID_STR_LEN>,
 }
 
@@ -76,15 +96,98 @@ impl SessionId {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for SessionId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("SessionId", 2)?;
+        state.serialize_field("tag", &self.tag)?;
+        state.serialize_field("pseudonym", &self.pseudonym)?;
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for SessionId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de;
+
+        #[derive(serde::Deserialize)]
+        #[serde(field_identifier, rename_all = "lowercase")]
+        enum Field {
+            Tag,
+            Pseudonym,
+        }
+
+        struct SessionIdVisitor;
+
+        impl<'de> de::Visitor<'de> for SessionIdVisitor {
+            type Value = SessionId;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct SessionId")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<SessionId, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                Ok(SessionId::new(
+                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?,
+                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
+                ))
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<SessionId, V::Error>
+            where
+                V: de::MapAccess<'de>,
+            {
+                let mut tag = None;
+                let mut pseudonym = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Tag => {
+                            if tag.is_some() {
+                                return Err(de::Error::duplicate_field("tx_tag"));
+                            }
+                            tag = Some(map.next_value()?);
+                        }
+                        Field::Pseudonym => {
+                            if pseudonym.is_some() {
+                                return Err(de::Error::duplicate_field("pseudonym"));
+                            }
+                            pseudonym = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                Ok(SessionId::new(
+                    tag.ok_or_else(|| de::Error::missing_field("tag"))?,
+                    pseudonym.ok_or_else(|| de::Error::missing_field("pseudonym"))?,
+                ))
+            }
+        }
+
+        const FIELDS: &[&str] = &["tag", "pseudonym"];
+        deserializer.deserialize_struct("SessionId", FIELDS, SessionIdVisitor)
+    }
+}
+
 impl Display for SessionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.cached)
+        write!(f, "{}", self.as_str())
     }
 }
 
 impl Debug for SessionId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.cached)
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -103,8 +206,9 @@ impl Hash for SessionId {
     }
 }
 
-/// Inner MTU size of what the HOPR packet can tag as payload
-pub const SESSION_USABLE_MTU_SIZE: usize = HoprPacket::PAYLOAD_SIZE - size_of::<Tag>();
+/// Payload capacity of a HOPR packet usable by the Session protocol.
+// TODO: Move this into ApplicationData
+pub const USABLE_PAYLOAD_CAPACITY_FOR_SESSION: usize = HoprPacket::PAYLOAD_SIZE - size_of::<Tag>();
 
 /// Helper trait to allow Box aliasing
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
@@ -192,7 +296,11 @@ impl Session {
 
             Self {
                 id,
-                inner: Box::pin(SessionSocket::<SESSION_USABLE_MTU_SIZE>::new(id, inner_session, cfg)),
+                inner: Box::pin(SessionSocket::<USABLE_PAYLOAD_CAPACITY_FOR_SESSION>::new(
+                    id,
+                    inner_session,
+                    cfg,
+                )),
                 routing,
                 capabilities,
                 on_close,
@@ -380,9 +488,11 @@ impl futures::AsyncWrite for InnerSession {
         self.tx_buffer.clear();
         self.tx_bytes = 0;
 
-        for i in 0..(buf.len() / SESSION_USABLE_MTU_SIZE + ((buf.len() % SESSION_USABLE_MTU_SIZE != 0) as usize)) {
-            let start = i * SESSION_USABLE_MTU_SIZE;
-            let end = ((i + 1) * SESSION_USABLE_MTU_SIZE).min(buf.len());
+        for i in 0..(buf.len() / USABLE_PAYLOAD_CAPACITY_FOR_SESSION
+            + ((buf.len() % USABLE_PAYLOAD_CAPACITY_FOR_SESSION != 0) as usize))
+        {
+            let start = i * USABLE_PAYLOAD_CAPACITY_FOR_SESSION;
+            let end = ((i + 1) * USABLE_PAYLOAD_CAPACITY_FOR_SESSION).min(buf.len());
 
             let payload = ApplicationData::new(tag, &buf[start..end]);
             let sender = self.tx.clone();
@@ -494,12 +604,10 @@ where
 {
     // We can always read as much as possible from the Session and then write it to the Stream.
     // There are two possibilities for the opposite direction:
-    // 1) If Session protocol is used for segmentation,
-    //    we need to buffer up data at MAX_WRITE_SIZE.
-    // 2) Otherwise, the bare session implements chunking, therefore,
-    //    data can be written with arbitrary sizes.
+    // 1) If Session protocol is used for segmentation, we need to buffer up data at MAX_WRITE_SIZE.
+    // 2) Otherwise, the bare session implements chunking, therefore, data can be written with arbitrary sizes.
     let into_session_len = if session.capabilities().contains(&Capability::Segmentation) {
-        max_buffer.min(SessionSocket::<SESSION_USABLE_MTU_SIZE>::MAX_WRITE_SIZE)
+        max_buffer.min(SessionSocket::<USABLE_PAYLOAD_CAPACITY_FOR_SESSION>::MAX_WRITE_SIZE)
     } else {
         max_buffer
     };
@@ -518,13 +626,45 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::traits::MockSendMsg;
     use futures::{AsyncReadExt, AsyncWriteExt};
     use hopr_crypto_random::Randomizable;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use hopr_network_types::prelude::{RoutingOptions, SurbMatcher};
     use hopr_primitive_types::prelude::Address;
+
+    use super::*;
+    use crate::traits::MockSendMsg;
+
+    #[test]
+    fn test_max_decimal_digits_for_n_bytes() {
+        assert_eq!(3, max_decimal_digits_for_n_bytes(size_of::<u8>()));
+        assert_eq!(5, max_decimal_digits_for_n_bytes(size_of::<u16>()));
+        assert_eq!(10, max_decimal_digits_for_n_bytes(size_of::<u32>()));
+        assert_eq!(20, max_decimal_digits_for_n_bytes(size_of::<u64>()));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn session_id_should_serialize_and_deserialize_correctly() -> anyhow::Result<()> {
+        const SESSION_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+            .with_little_endian()
+            .with_variable_int_encoding();
+
+        let pseudonym = HoprPseudonym::random();
+        let tag = 1234;
+
+        let session_id_1 = SessionId::new(tag, pseudonym);
+        let data = bincode::serde::encode_to_vec(session_id_1, SESSION_BINCODE_CONFIGURATION)?;
+        let session_id_2: SessionId = bincode::serde::decode_from_slice(&data, SESSION_BINCODE_CONFIGURATION)?.0;
+
+        assert_eq!(tag, session_id_2.tag());
+        assert_eq!(pseudonym, *session_id_2.pseudonym());
+
+        assert_eq!(session_id_1.as_str(), session_id_2.as_str());
+        assert_eq!(session_id_1, session_id_2);
+
+        Ok(())
+    }
 
     #[test]
     fn session_should_identify_with_its_own_id() -> anyhow::Result<()> {
@@ -676,9 +816,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size(
-    ) -> anyhow::Result<()> {
-        const TO_SEND: usize = SESSION_USABLE_MTU_SIZE * 2 + 10;
+    async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size()
+    -> anyhow::Result<()> {
+        const TO_SEND: usize = USABLE_PAYLOAD_CAPACITY_FOR_SESSION * 2 + 10;
 
         let addr: Address = (&ChainKeypair::random()).into();
         let id = SessionId::new(1, HoprPseudonym::random());

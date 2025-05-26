@@ -6,16 +6,23 @@ pub mod errors;
 /// Implements different path selectors in the [ChannelGraph](crate::channel_graph::ChannelGraph).
 pub mod selectors;
 
+use std::{
+    fmt::{Display, Formatter},
+    hash::Hash,
+    ops::Deref,
+};
+
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::fmt::{Display, Formatter};
-use std::hash::Hash;
-use std::ops::Deref;
 
-use crate::channel_graph::ChannelGraph;
-use crate::errors::PathError;
-use crate::errors::PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid};
+use crate::{
+    channel_graph::ChannelGraph,
+    errors::{
+        PathError,
+        PathError::{ChannelNotOpened, InvalidPeer, LoopsNotAllowed, MissingChannel, PathNotValid},
+    },
+};
 
 /// Represents a type that determines a hop on a [`Path`].
 #[allow(clippy::large_enum_variant)] // TODO: use CompactOffchainPublicKey
@@ -125,8 +132,8 @@ impl Deref for TransportPath {
 }
 
 impl IntoIterator for TransportPath {
-    type Item = OffchainPublicKey;
     type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = OffchainPublicKey;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -211,8 +218,8 @@ impl From<ChainPath> for ChannelPath {
 }
 
 impl IntoIterator for ChainPath {
-    type Item = Address;
     type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = Address;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -341,8 +348,8 @@ impl Deref for ValidatedPath {
 }
 
 impl IntoIterator for ValidatedPath {
-    type Item = OffchainPublicKey;
     type IntoIter = std::vec::IntoIter<Self::Item>;
+    type Item = OffchainPublicKey;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -363,7 +370,7 @@ impl Display for ValidatedPath {
         write!(
             f,
             "validated path [{}]",
-            self.1 .0.iter().map(|p| p.to_hex()).collect::<Vec<String>>().join(", ")
+            self.1.0.iter().map(|p| p.to_hex()).collect::<Vec<String>>().join(", ")
         )
     }
 }
@@ -372,17 +379,20 @@ impl NonEmptyPath<OffchainPublicKey> for ValidatedPath {}
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
+    use std::{
+        iter,
+        ops::Add,
+        str::FromStr,
+        time::{Duration, SystemTime},
+    };
 
-    use anyhow::{ensure, Context};
+    use anyhow::{Context, ensure};
     use async_trait::async_trait;
     use hex_literal::hex;
     use hopr_internal_types::channels::ChannelEntry;
     use parameterized::parameterized;
-    use std::iter;
-    use std::ops::Add;
-    use std::str::FromStr;
-    use std::time::{Duration, SystemTime};
+
+    use super::*;
 
     lazy_static::lazy_static! {
         pub static ref PATH_ADDRS: bimap::BiMap<OffchainPublicKey, Address> = bimap::BiMap::from_iter([
@@ -414,14 +424,7 @@ pub(crate) mod tests {
     }
 
     pub fn dummy_channel(src: Address, dst: Address, status: ChannelStatus) -> ChannelEntry {
-        ChannelEntry::new(
-            src,
-            dst,
-            Balance::new_from_str("1", BalanceType::HOPR),
-            1u32.into(),
-            status,
-            1u32.into(),
-        )
+        ChannelEntry::new(src, dst, 1.into(), 1u32.into(), status, 1u32.into())
     }
 
     fn create_graph_and_resolver_entries(me: Address) -> (ChannelGraph, Vec<(OffchainPublicKey, Address)>) {

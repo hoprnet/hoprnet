@@ -1,15 +1,22 @@
+use std::{
+    fmt::{Debug, Formatter},
+    marker::PhantomData,
+    num::NonZeroUsize,
+};
+
 use hopr_crypto_random::random_fill;
-use hopr_crypto_types::crypto_traits::{StreamCipher, StreamCipherSeek, UniversalHash};
-use hopr_crypto_types::prelude::*;
-use hopr_crypto_types::types::Pseudonym;
+use hopr_crypto_types::{
+    crypto_traits::{StreamCipher, StreamCipherSeek, UniversalHash},
+    prelude::*,
+    types::Pseudonym,
+};
 use hopr_primitive_types::prelude::*;
-use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
-use std::num::NonZeroUsize;
 use typenum::Unsigned;
 
-use crate::derivation::{generate_key, generate_key_iv};
-use crate::shared_keys::SharedSecret;
+use crate::{
+    derivation::{generate_key, generate_key_iv},
+    shared_keys::SharedSecret,
+};
 
 /// Current version of the header
 const SPHINX_HEADER_VERSION: u8 = 1;
@@ -307,7 +314,7 @@ impl<H: SphinxHeaderSpec> RoutingInfo<H> {
 
                 // Each public key identifier must have an equal length
                 let key_ident = path[inverted_idx + 1].as_ref();
-                if key_ident.len() != H::KEY_ID_SIZE.into() {
+                if key_ident.len() != H::KEY_ID_SIZE.get() {
                     return Err(CryptoError::InvalidParameterSize {
                         name: "path[..]",
                         expected: H::KEY_ID_SIZE.into(),
@@ -475,14 +482,12 @@ pub fn forward_header<H: SphinxHeaderSpec>(
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::*;
-
-    use crate::shared_keys::SphinxSuite;
-    use crate::tests::*;
     use hopr_crypto_random::Randomizable;
-    use hopr_crypto_types::crypto_traits::BlockSizeUser;
-    use hopr_crypto_types::keypairs::OffchainKeypair;
+    use hopr_crypto_types::{crypto_traits::BlockSizeUser, keypairs::OffchainKeypair};
     use parameterized::parameterized;
+
+    use super::*;
+    use crate::{shared_keys::SphinxSuite, tests::*};
 
     #[test]
     fn test_filler_generate_verify() -> anyhow::Result<()> {

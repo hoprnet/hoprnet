@@ -6,17 +6,20 @@
 //! requires one to implement the `SphinxSuite` trait.
 //!
 //! The trait requires having the following building blocks:
-//! - elliptic curve group ([GroupElement](shared_keys::GroupElement)) and corresponding the scalar type ([Scalar](shared_keys::Scalar))
-//! - type representing public and private keypair and their conversion to [Scalar](shared_keys::Scalar)
-//!   and [GroupElement](shared_keys::GroupElement) (by the means of the corresponding `From` trait implementation)
+//! - elliptic curve group ([GroupElement](shared_keys::GroupElement)) and corresponding the scalar type
+//!   ([Scalar](shared_keys::Scalar))
+//! - type representing public and private keypair and their conversion to [Scalar](shared_keys::Scalar) and
+//!   [GroupElement](shared_keys::GroupElement) (by the means of the corresponding `From` trait implementation)
 //!
 //! Currently, there are the following [SphinxSuite](crate::shared_keys::SphinxSuite) implementations:
 //! - `Secp256k1Suite`: deprecated, used in previous HOPR versions
 //! - `Ed25519Suite`: simple implementation using Ed25519, used for testing
-//! - [X25519Suite](crate::ec_groups::X25519Suite) currently used, implemented using the Curve25519 Montgomery curve for faster computation
+//! - [X25519Suite](crate::ec_groups::X25519Suite) currently used, implemented using the Curve25519 Montgomery curve for
+//!   faster computation
 //!
 //! The implementation can be easily extended for different elliptic curves (or even arithmetic multiplicative groups).
-//! In particular, as soon as there is a way to represent `Ed448` PeerIDs, it would be easy to create e.g., an `X448Suite`.
+//! In particular, as soon as there is a way to represent `Ed448` PeerIDs, it would be easy to create e.g., an
+//! `X448Suite`.
 
 /// Contains simple key derivation functions for different purposes
 mod derivation;
@@ -34,23 +37,24 @@ mod shared_keys;
 mod surb;
 
 pub mod prelude {
-    pub use crate::ec_groups::*;
-    pub use crate::packet::{
-        ForwardedMetaPacket, KeyIdMapper, MetaPacket, MetaPacketRouting, PaddedPayload, PartialPacket,
+    pub use crate::{
+        ec_groups::*,
+        packet::{ForwardedMetaPacket, KeyIdMapper, MetaPacket, MetaPacketRouting, PaddedPayload, PartialPacket},
+        routing::SphinxHeaderSpec,
+        shared_keys::{SharedKeys, SharedSecret, SphinxSuite},
+        surb::*,
     };
-    pub use crate::routing::SphinxHeaderSpec;
-    pub use crate::shared_keys::{SharedKeys, SharedSecret, SphinxSuite};
-    pub use crate::surb::*;
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::marker::PhantomData;
-    use std::num::{NonZero, NonZeroUsize};
+    use std::{
+        marker::PhantomData,
+        num::{NonZero, NonZeroUsize},
+    };
 
     use hopr_crypto_types::prelude::*;
-    use hopr_primitive_types::errors::GeneralError;
-    use hopr_primitive_types::prelude::*;
+    use hopr_primitive_types::{errors::GeneralError, prelude::*};
 
     use crate::routing::SphinxHeaderSpec;
 
@@ -89,13 +93,14 @@ pub(crate) mod tests {
     where
         K: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = GeneralError> + BytesRepresentable + Clone,
     {
-        const MAX_HOPS: NonZeroUsize = NonZero::new(HOPS).unwrap();
         type KeyId = K;
+        type PRG = ChaCha20;
+        type PacketReceiverData = SimplePseudonym;
         type Pseudonym = SimplePseudonym;
         type RelayerData = WrappedBytes<RELAYER_DATA>;
-        type PacketReceiverData = SimplePseudonym;
         type SurbReceiverData = WrappedBytes<53>;
-        type PRG = ChaCha20;
         type UH = Poly1305;
+
+        const MAX_HOPS: NonZeroUsize = NonZero::new(HOPS).unwrap();
     }
 }

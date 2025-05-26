@@ -12,27 +12,29 @@ from .constants import (
     NETWORK,
     NODE_NAME_PREFIX,
     PASSWORD,
-    PORT_BASE,
     PWD,
     logging,
 )
 from .node import Node
 
-GLOBAL_TIMEOUT = 90
+GLOBAL_TIMEOUT = 200
 
 
 class Cluster:
-    def __init__(self, config: dict, anvil_config: Path, protocol_config: Path, use_nat: bool, exposed: bool, extra_env: Optional[dict] = None):
+    def __init__(
+        self, config: dict, anvil_config: Path, protocol_config: Path, use_nat: bool, exposed: bool, base_port: int, extra_env: Optional[dict] = None
+    ):
         self.anvil_config = anvil_config
         self.protocol_config = protocol_config
         self.use_nat = use_nat
+        self.base_port = base_port
         self.nodes: dict[str, Node] = {}
         index = 1
 
         for network_name, params in config["networks"].items():
-            for alias, node in params["nodes"].items():
+            for node in params["nodes"]:
                 self.nodes[str(index)] = Node.fromConfig(
-                    index, alias, node, config["defaults"], network_name, use_nat, exposed, extra_env.get(alias, {}) if extra_env else {}
+                    index, node, config["defaults"], network_name, use_nat, exposed, base_port, extra_env[index-1] if extra_env else {}
                 )
                 index += 1
 
@@ -83,7 +85,6 @@ class Cluster:
         logging.info("Retrieve nodes addresses and peer ids")
         for node in self.nodes.values():
             if addresses := await node.api.addresses():
-                node.peer_id = addresses.hopr
                 node.address = addresses.native
             else:
                 raise RuntimeError(f"Node {node} did not return addresses")
@@ -94,7 +95,7 @@ class Cluster:
 
         tasks = []
         for node in self.nodes.values():
-            required_peers = [n.peer_id for n in self.nodes.values() if n != node and n.network == node.network]
+            required_peers = [n.address for n in self.nodes.values() if n != node and n.network == node.network]
             tasks.append(asyncio.create_task(node.all_peers_connected(required_peers)))
 
         try:
@@ -130,7 +131,7 @@ class Cluster:
                 "--native-amount",
                 "10.0",
                 "--provider-url",
-                f"http://127.0.0.1:{PORT_BASE}",
+                f"http://127.0.0.1:{self.base_port}",
             ],
             env=os.environ | custom_env,
             check=True,
@@ -176,18 +177,11 @@ class Cluster:
         for node in self.node.values():
             node.get_safe_and_module_addresses()
 
-    async def alias_peers(self):
-        logging.info("Aliasing every other node")
-        aliases_dict = {node.peer_id: node.alias for node in self.nodes.values()}
-
-        for node in self.nodes.values():
-            await node.alias_peers(aliases_dict)
-
     async def connect_peers(self):
         logging.info("Creating a channel to every other node")
-        peer_ids = [node.peer_id for node in self.nodes.values()]
+        addresses = [node.address for node in self.nodes.values()]
 
-        tasks = [node.connect_peers(peer_ids) for node in self.nodes.values()]
+        tasks = [node.connect_peers(addresses) for node in self.nodes.values()]
         await asyncio.gather(*tasks)
 
     async def links(self):

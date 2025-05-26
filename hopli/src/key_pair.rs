@@ -1,24 +1,26 @@
 //! This module contains struct definition,  utility functions around private keys, password, and keystores.
 //!
-//! Keystore file is often referred as HOPR node identity file, which is an encrypted private key for an Ethereum wallet.
-//! This identity file uses password (received from [PasswordArgs]) for encryption.
+//! Keystore file is often referred as HOPR node identity file, which is an encrypted private key for an Ethereum
+//! wallet. This identity file uses password (received from [PasswordArgs]) for encryption.
 //!
 //! Location of identity files can be provided with [IdentityFileArgs].
 //!
 //! This module also contains definition of argument for private key, defined in [PrivateKeyArgs].
 
-use crate::utils::HelperErrors;
-use clap::{Parser, ValueHint};
-use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
-use hopr_primitive_types::primitives::Address;
-use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use std::{
     collections::HashMap,
     env, fs,
     path::{Path, PathBuf},
 };
+
+use clap::{Parser, ValueHint};
+use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+use hopr_primitive_types::primitives::Address;
+use hoprd_keypair::key_pair::{HoprKeys, IdentityRetrievalModes};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+use crate::utils::HelperErrors;
 
 pub fn read_identity(file: &Path, password: &str) -> Result<(String, HoprKeys), HelperErrors> {
     let file_str = file
@@ -166,7 +168,8 @@ pub trait ArgEnvReader<T, K> {
 /// Arguments for private key.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct PrivateKeyArgs {
-    /// Either provide a private key as argument or as a specific environment variable, e.g. `PRIVATE_KEY`, `MANAGER_PRIVATE_KEY`
+    /// Either provide a private key as argument or as a specific environment variable, e.g. `PRIVATE_KEY`,
+    /// `MANAGER_PRIVATE_KEY`
     #[clap(
         long,
         short = 'k',
@@ -220,7 +223,8 @@ impl ArgEnvReader<ChainKeypair, String> for PrivateKeyArgs {
 /// Arguments for private key.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct ManagerPrivateKeyArgs {
-    /// Either provide a private key as argument or as a specific environment variable, e.g. `PRIVATE_KEY`, `MANAGER_PRIVATE_KEY`
+    /// Either provide a private key as argument or as a specific environment variable, e.g. `PRIVATE_KEY`,
+    /// `MANAGER_PRIVATE_KEY`
     #[clap(
         long,
         short = 'q',
@@ -485,8 +489,10 @@ impl IdentityFileArgs {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use anyhow::Context;
     use tempfile::tempdir;
+
+    use super::*;
 
     const DUMMY_PRIVATE_KEY: &str = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
     const SPECIAL_ENV_KEY: &str = "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
@@ -498,7 +504,7 @@ mod tests {
         };
         let key = private_key_args.read_default()?;
 
-        let ref_decoded_value = hex::decode(&DUMMY_PRIVATE_KEY)?;
+        let ref_decoded_value = hex::decode(DUMMY_PRIVATE_KEY)?;
         println!("ref_decoded_value {:?}", ref_decoded_value);
 
         assert_eq!(
@@ -514,12 +520,9 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "password_create";
-        match create_identity(path, pwd, &Some(String::from("node1"))) {
-            Ok(_) => assert!(true),
-            _ => assert!(false),
-        }
+        assert!(create_identity(path, pwd, &Some(String::from("node1"))).is_ok());
         Ok(())
     }
 
@@ -528,7 +531,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "password";
         let (_, created_id) = create_identity(path, pwd, &None)?;
 
@@ -536,7 +539,7 @@ mod tests {
         let files = get_files(path, &None);
         assert_eq!(files.len(), 1, "must have one identity file");
 
-        let read_id = read_identity(files[0].as_path(), &pwd)?;
+        let read_id = read_identity(files[0].as_path(), pwd)?;
         assert_eq!(
             read_id.1.chain_key.public().0.to_address(),
             created_id.chain_key.public().0.to_address()
@@ -549,7 +552,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "password";
         let (_, created_id) = create_identity(path, pwd, &None)?;
 
@@ -559,7 +562,7 @@ mod tests {
         let address = created_id.chain_key.public().0.to_address();
 
         let new_pwd = "supersecured";
-        let (_, returned_key) = update_identity_password(created_id, &files[0].as_path(), new_pwd)?;
+        let (_, returned_key) = update_identity_password(created_id, files[0].as_path(), new_pwd)?;
 
         // check the returned value
         assert_eq!(
@@ -569,7 +572,7 @@ mod tests {
         );
 
         // check the read value
-        let (_, read_id) = read_identity(files[0].as_path(), &new_pwd)?;
+        let (_, read_id) = read_identity(files[0].as_path(), new_pwd)?;
         assert_eq!(
             read_id.chain_key.public().0.to_address(),
             address,
@@ -583,13 +586,13 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "password";
         let (_, created_id) = create_identity(path, pwd, &None)?;
 
         // created and the read id is identical
         let files = get_files(path, &None);
-        let read_id = read_identities(files, &pwd.to_string())?;
+        let read_id = read_identities(files, pwd)?;
         assert_eq!(read_id.len(), 1);
         assert_eq!(
             read_id.values().next().unwrap().chain_key.public().0.to_address(),
@@ -607,12 +610,12 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "password";
         let wrong_pwd = "wrong_password";
         create_identity(path, pwd, &None)?;
         let files = get_files(path, &None);
-        match read_identities(files, &wrong_pwd.to_string()) {
+        match read_identities(files, wrong_pwd) {
             Ok(val) => assert_eq!(val.len(), 0),
             _ => assert!(false),
         }
@@ -623,12 +626,9 @@ mod tests {
     fn read_identities_from_directory_without_id_files() -> anyhow::Result<()> {
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let files = get_files(path, &None);
-        match read_identities(files, &"".to_string()) {
-            Ok(val) => assert_eq!(val.len(), 0),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, "")?.len(), 0);
         Ok(())
     }
 
@@ -637,14 +637,12 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &None);
-        match read_identities(files, &pwd.to_string()) {
-            Ok(val) => assert_eq!(val.len(), 1),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, pwd)?.len(), 1);
+
         Ok(())
     }
 
@@ -653,14 +651,11 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &Some("local".to_string()));
-        match read_identities(files, &pwd.to_string()) {
-            Ok(val) => assert_eq!(val.len(), 1),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, pwd)?.len(), 1);
         Ok(())
     }
 
@@ -669,14 +664,12 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
         let files = get_files(path, &Some("npm-".to_string()));
-        match read_identities(files, &pwd.to_string()) {
-            Ok(val) => assert_eq!(val.len(), 0),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, pwd)?.len(), 0);
+
         Ok(())
     }
 
@@ -685,15 +678,13 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let pwd = "local";
         create_identity(path, pwd, &Some("local-alice".into()))?;
 
         let files = get_files(path, &Some("alice".to_string()));
-        match read_identities(files, &pwd.to_string()) {
-            Ok(val) => assert_eq!(val.len(), 0),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, pwd)?.len(), 0);
+
         Ok(())
     }
 
@@ -702,12 +693,12 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
         let tmp = tempdir()?;
 
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let name = "alice.id";
         let pwd = "e2e-test";
 
         let weak_crypto_alice_keystore = r#"{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"6084fab56497402930d0833fbc17e7ea"},"ciphertext":"50c0cf2537d7bc0ab6dbb7909d21d3da6445e5bd2cb1236de7efbab33302ddf1dd6a0393c986f8c111fe73a22f36af88858d79d23882a5f991713cb798172069d060f28c680afc28743e8842e8e849ebc21209825e23465afcee52a49f9c4f6734061f91a45b4cc8fbd6b4c95cc4c1b487f0007ed88a1b46b5ebdda616013b3f7ba465f97352b9412e69e6690cee0330c0b25bcf5fc3cdf12e4167336997920df9d6b7d816943ab3817481b9","kdf":"scrypt","kdfparams":{"dklen":32,"n":2,"p":1,"r":8,"salt":"46e30c2d74ba04b881e99fb276ae6a970974499f6abe286a00a69ba774ace095"},"mac":"70dccb366e8ddde13ebeef9a6f35bbc1333176cff3d33a72c925ce23753b34f4"},"id":"b5babdf4-da20-4cc1-9484-58ea24f1b3ae","version":3}"#;
-        //let alice_peer_id = "16Uiu2HAmUYnGY3USo8iy13SBFW7m5BMQvC4NETu1fGTdoB86piw7";
+        // let alice_peer_id = "16Uiu2HAmUYnGY3USo8iy13SBFW7m5BMQvC4NETu1fGTdoB86piw7";
         let alice_address = "0x838d3c1d2ff5c576d7b270aaaaaa67e619217aac";
 
         // create dir if not exist.
@@ -716,7 +707,7 @@ mod tests {
         fs::write(PathBuf::from(path).join(name), weak_crypto_alice_keystore.as_bytes())?;
 
         let files = get_files(path, &None);
-        let val = read_identities(files, &pwd.to_string())?;
+        let val = read_identities(files, pwd)?;
         assert_eq!(val.len(), 1);
         assert_eq!(
             val.values()
@@ -835,7 +826,7 @@ mod tests {
     #[test]
     fn password_args_can_read_env_or_cli_args_in_different_scenarios() -> anyhow::Result<()> {
         let tmp = tempdir()?;
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         create_file(path, None, 2)?;
 
         // possible password args
@@ -850,7 +841,7 @@ mod tests {
             new_password_path: None,
         };
         // let file_path = PathBuf::from(path).join("fileid2");
-        fs::write(&PathBuf::from(path).join("fileid2"), "supersound")?;
+        fs::write(PathBuf::from(path).join("fileid2"), "supersound")?;
 
         // test new_password_path
         env::set_var("NEW_IDENTITY_PASSWORD", "ultraviolet");
@@ -915,7 +906,7 @@ mod tests {
     #[test]
     fn pass_get_empty_dir_from_existing_dir() -> anyhow::Result<()> {
         let tmp = tempdir()?;
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         create_file(path, None, 0)?;
 
         let dir_args = IdentityFromDirectoryArgs {
@@ -934,7 +925,7 @@ mod tests {
     #[test]
     fn pass_get_dir_from_existing_dir() -> anyhow::Result<()> {
         let tmp = tempdir()?;
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         create_file(path, None, 4)?;
 
         let dir_args = IdentityFromDirectoryArgs {
@@ -953,7 +944,7 @@ mod tests {
     #[test]
     fn pass_get_path_from_existing_path() -> anyhow::Result<()> {
         let tmp = tempdir()?;
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         create_file(path, None, 4)?;
 
         let id_path = PathBuf::from(format!("{path}/fileid1"));
@@ -978,7 +969,7 @@ mod tests {
 
         // a dir for files
         let tmp = tempdir()?;
-        let path = tmp.path().to_str().unwrap();
+        let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         create_file(path, None, 4)?;
 
         let dir_args = IdentityFromDirectoryArgs {

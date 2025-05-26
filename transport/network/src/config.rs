@@ -1,7 +1,8 @@
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
-use smart_default::SmartDefault;
 use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
+use serde_with::{DurationSeconds, serde_as};
+use smart_default::SmartDefault;
 use validator::Validate;
 
 /// Network quality threshold since which a node is considered
@@ -140,11 +141,7 @@ impl Validate for NetworkConfig {
             );
         }
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
     }
 }
 

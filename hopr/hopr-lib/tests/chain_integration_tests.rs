@@ -1,38 +1,45 @@
 mod common;
 
-use futures::{pin_mut, StreamExt};
-use hex_literal::hex;
 use std::time::Duration;
-use tracing::info;
 
-use hopr_async_runtime::prelude::{cancel_join_handle, sleep, spawn, JoinHandle};
-use hopr_chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
-use hopr_chain_actions::action_state::{ActionState, IndexerActionTracker};
-use hopr_chain_actions::channels::ChannelActions;
-use hopr_chain_actions::node::NodeActions;
-use hopr_chain_actions::payload::SafePayloadGenerator;
-use hopr_chain_actions::redeem::TicketRedeemActions;
-use hopr_chain_actions::ChainActions;
-use hopr_chain_api::executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use hopr_chain_rpc::client::reqwest_client::ReqwestRequestor;
-use hopr_chain_rpc::client::{JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor};
-use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
-use hopr_chain_types::chain_events::ChainEventType;
-use hopr_chain_types::utils::create_anvil;
+use alloy::primitives::{B256, U256};
+use common::create_rpc_client_to_anvil_with_snapshot;
+use futures::{StreamExt, pin_mut};
+use hex_literal::hex;
+use hopr_async_runtime::prelude::{JoinHandle, cancel_join_handle, sleep, spawn};
+use hopr_chain_actions::{
+    ChainActions,
+    action_queue::{ActionQueue, ActionQueueConfig},
+    action_state::{ActionState, IndexerActionTracker},
+    channels::ChannelActions,
+    node::NodeActions,
+    payload::SafePayloadGenerator,
+    redeem::TicketRedeemActions,
+};
+use hopr_chain_api::{
+    DefaultHttpRequestor,
+    executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig},
+};
+use hopr_chain_indexer::{IndexerConfig, block::Indexer, handlers::ContractEventHandlers};
+use hopr_chain_rpc::{
+    client::SnapshotRequestor,
+    rpc::{RpcOperations, RpcOperationsConfig},
+};
+use hopr_chain_types::{chain_events::ChainEventType, utils::create_anvil};
 use hopr_crypto_types::prelude::*;
 use hopr_db_sql::{api::info::DomainSeparator, prelude::*};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
+use tracing::info;
 
-use crate::common::{deploy_test_environment, onboard_node, NodeSafeConfig, Requestor, TestChainEnv};
+use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket(
     myself: &ChainNode,
     counterparty: &ChainKeypair,
-    price: Balance,
+    price: HoprBalance,
     domain_separator: Hash,
 ) -> anyhow::Result<()> {
     let hk1 = HalfKey::try_from(hex!("16e1d5a405315958b7db2d70ed797d858c9e6ba979783cf5110c13e0200ab0d0").as_ref())?;
@@ -58,7 +65,7 @@ async fn generate_the_first_ack_ticket(
     Ok(())
 }
 
-type TestRpc = RpcOperations<JsonRpcProviderClient<Requestor, SimpleJsonRpcRetryPolicy>, Requestor>;
+type TestRpc = RpcOperations<DefaultHttpRequestor>;
 
 struct ChainNode {
     chain_key: ChainKeypair,
@@ -73,8 +80,8 @@ struct ChainNode {
 async fn start_node_chain_logic(
     chain_key: &ChainKeypair,
     offchain_key: &OffchainKeypair,
-    requestor_in: Requestor,
-    requestor_out: Requestor,
+    requestor_in: SnapshotRequestor,
+    requestor_out: SnapshotRequestor,
     chain_env: &TestChainEnv,
     safe_cfg: NodeSafeConfig,
     mut rpc_cfg: RpcOperationsConfig,
@@ -99,21 +106,13 @@ async fn start_node_chain_logic(
     rpc_cfg.safe_address = safe_cfg.safe_address;
     rpc_cfg.module_address = safe_cfg.module_address;
 
-    let json_rpc_client = JsonRpcProviderClient::new(
-        &chain_env.anvil.endpoint(),
-        requestor_in.clone(),
-        SimpleJsonRpcRetryPolicy::default(),
-    );
+    let http_requestor_in = DefaultHttpRequestor::new();
+    let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_in.clone(), &chain_env.anvil);
+    let rpc_ops_in = RpcOperations::new(json_rpc_client, http_requestor_in.clone(), chain_key, rpc_cfg.clone())?;
 
-    let rpc_ops_in = RpcOperations::new(json_rpc_client, requestor_in, chain_key, rpc_cfg.clone())?;
-
-    let json_rpc_client = JsonRpcProviderClient::new(
-        &chain_env.anvil.endpoint(),
-        requestor_out.clone(),
-        SimpleJsonRpcRetryPolicy::default(),
-    );
-
-    let rpc_ops_out = RpcOperations::new(json_rpc_client, requestor_out.clone(), chain_key, rpc_cfg)?;
+    let http_requestor_out = DefaultHttpRequestor::new();
+    let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_out.clone(), &chain_env.anvil);
+    let rpc_ops_out = RpcOperations::new(json_rpc_client, http_requestor_out.clone(), chain_key, rpc_cfg.clone())?;
 
     // Transaction executor
     let eth_client = RpcEthereumClient::new(rpc_ops_out, RpcEthereumClientConfig::default());
@@ -141,7 +140,7 @@ async fn start_node_chain_logic(
 
         while let Some(sce) = rx.next().await {
             let _ = action_state.match_and_resolve(&sce).await;
-            //debug!("{:?}: expectations resolved {:?}", sce, res);
+            // debug!("{:?}: expectations resolved {:?}", sce, res);
         }
     }));
 
@@ -193,26 +192,26 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         tracing::warn!("snapshot based tests require fixed RNG")
     }
 
-    let requestor_base = SnapshotRequestor::new(ReqwestRequestor::default(), SNAPSHOT_BASE)
+    let requestor_base = SnapshotRequestor::new(SNAPSHOT_BASE)
         .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
         .load(true)
         .await;
-    let requestor_alice_rx = SnapshotRequestor::new(ReqwestRequestor::default(), SNAPSHOT_ALICE_RX)
-        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
-        .with_aggresive_save()
-        .load(true)
-        .await;
-    let requestor_alice_tx = SnapshotRequestor::new(ReqwestRequestor::default(), SNAPSHOT_ALICE_TX)
+    let requestor_alice_rx = SnapshotRequestor::new(SNAPSHOT_ALICE_RX)
         .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
         .with_aggresive_save()
         .load(true)
         .await;
-    let requestor_bob_rx = SnapshotRequestor::new(ReqwestRequestor::default(), SNAPSHOT_BOB_RX)
+    let requestor_alice_tx = SnapshotRequestor::new(SNAPSHOT_ALICE_TX)
         .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
         .with_aggresive_save()
         .load(true)
         .await;
-    let requestor_bob_tx = SnapshotRequestor::new(ReqwestRequestor::default(), SNAPSHOT_BOB_TX)
+    let requestor_bob_rx = SnapshotRequestor::new(SNAPSHOT_BOB_RX)
+        .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
+        .with_aggresive_save()
+        .load(true)
+        .await;
+    let requestor_bob_tx = SnapshotRequestor::new(SNAPSHOT_BOB_TX)
         .with_ignore_snapshot(!hopr_crypto_random::is_rng_fixed())
         .with_aggresive_save()
         .load(true)
@@ -223,18 +222,12 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     let chain_env = deploy_test_environment(requestor_base, block_time, finality).await;
 
     let mut safe_cfgs = [NodeSafeConfig::default(); 2];
-    safe_cfgs[0] = onboard_node(&chain_env, &alice_chain_key, 10_u32.into(), 10_000_u32.into()).await;
-    safe_cfgs[1] = onboard_node(&chain_env, &bob_chain_key, 10_u32.into(), 10_000_u32.into()).await;
+    safe_cfgs[0] = onboard_node(&chain_env, &alice_chain_key, U256::from(10_u32), U256::from(10_000_u32)).await;
+    safe_cfgs[1] = onboard_node(&chain_env, &bob_chain_key, U256::from(10_u32), U256::from(10_000_u32)).await;
 
     sleep((1 + finality) * block_time).await;
 
-    let domain_separator: Hash = chain_env
-        .contract_instances
-        .channels
-        .domain_separator()
-        .call()
-        .await?
-        .into();
+    let domain_separator: Hash = (*chain_env.contract_instances.channels.domainSeparator().call().await?).into();
 
     let rpc_cfg = RpcOperationsConfig {
         chain_id: chain_env.anvil.chain_id(),
@@ -411,7 +404,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     );
 
     // Open channel (from Alice to Bob) with 1 HOPR
-    let initial_channel_funds = BalanceType::HOPR.balance(1);
+    let initial_channel_funds = HoprBalance::from(1);
     let confirmation = alice_node
         .actions
         .open_channel(bob_chain_key.public().to_address(), initial_channel_funds)
@@ -451,12 +444,12 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     assert_eq!(ChannelStatus::Open, channel_alice_bob.status, "channel must be opened");
     assert_eq!(
         U256::from(1),
-        channel_alice_bob.balance.amount(),
+        U256::from_be_bytes(channel_alice_bob.balance.amount().to_be_bytes()),
         "channel must have the correct balance"
     );
 
-    // Fund the channel from Alice to Bob with additional 99 HOPR
-    let funding_amount = BalanceType::HOPR.balance(99);
+    // Fund the channel from Alice to Bob with an additional 99 HOPR
+    let funding_amount = HoprBalance::from(99);
     let confirmation = alice_node
         .actions
         .fund_channel(channel_alice_bob.get_id(), funding_amount)
@@ -518,7 +511,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     );
 
     // Bob fund channel with 100 HOPR
-    let incoming_funding_amount = BalanceType::HOPR.balance(100);
+    let incoming_funding_amount = HoprBalance::from(100);
 
     let confirmation = bob_node
         .actions
@@ -558,7 +551,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("db call should not fail")
         .expect("should contain a channel to Bob");
 
-    let ticket_price = Balance::new(1, BalanceType::HOPR);
+    let ticket_price = HoprBalance::from(1);
 
     // Create a ticket from Alice in Bob's DB
     generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, domain_separator).await?;
@@ -586,32 +579,36 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("db call should not fail")
         .expect("should contain a channel from Bob");
 
-    let (on_chain_channel_bob_alice_balance, _, _, _, _) = chain_env
+    let on_chain_channel_bob_alice_balance = chain_env
         .contract_instances
         .channels
-        .channels(channel_bob_alice.get_id().into())
+        .channels(B256::from_slice(channel_bob_alice.get_id().as_ref()))
         .call()
-        .await?;
-    let (on_chain_channel_alice_bob_balance, _, _, _, _) = chain_env
+        .await?
+        .balance;
+    let on_chain_channel_alice_bob_balance = chain_env
         .contract_instances
         .channels
-        .channels(channel_alice_bob.get_id().into())
+        .channels(B256::from_slice(channel_alice_bob.get_id().as_ref()))
         .call()
-        .await?;
+        .await?
+        .balance;
 
     assert_eq!(
-        channel_alice_bob.balance.amount(),
-        on_chain_channel_alice_bob_balance.into(),
+        U256::from_be_bytes(channel_alice_bob.balance.amount().to_be_bytes()),
+        on_chain_channel_alice_bob_balance.to::<U256>(),
         "channel alice->bob balance (before ticket redemption) must match"
     );
 
     assert_eq!(
-        100, on_chain_channel_alice_bob_balance,
+        U256::from(100_u32),
+        on_chain_channel_alice_bob_balance.to::<U256>(),
         "channel alice->bob balance (before ticket redemption) must be 100"
     );
 
     assert_eq!(
-        100, on_chain_channel_bob_alice_balance,
+        U256::from(100_u32),
+        on_chain_channel_bob_alice_balance.to::<U256>(),
         "channel bob->alice balance (before ticket redemption) must be 100"
     );
 
@@ -688,36 +685,47 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("db call should not fail")
         .expect("should contain a channel from Alice");
 
-    let (on_chain_channel_bob_alice_balance, _, _, _, _) = chain_env
+    let on_chain_channel_bob_alice_balance = chain_env
         .contract_instances
         .channels
-        .channels(channel_bob_alice.get_id().into())
+        .channels(B256::from_slice(channel_bob_alice.get_id().as_ref())) // .channels(channel_bob_alice.get_id().into())
         .call()
-        .await?;
+        .await?
+        .balance;
 
-    let (on_chain_channel_alice_bob_balance, _, _, _, _) = chain_env
+    let on_chain_channel_alice_bob_balance = chain_env
         .contract_instances
         .channels
-        .channels(channel_alice_bob.get_id().into())
+        .channels(B256::from_slice(channel_alice_bob.get_id().as_ref()))
+        // .channels(channel_alice_bob.get_id().into())
         .call()
-        .await?;
+        .await?
+        .balance;
 
     assert_eq!(
-        channel_alice_bob.balance.amount(),
-        on_chain_channel_alice_bob_balance.into(),
+        U256::from_be_bytes(channel_alice_bob.balance.amount().to_be_bytes()),
+        on_chain_channel_alice_bob_balance.to::<U256>(),
+        // channel_alice_bob.balance.amount().to_be_bytes(),
+        // on_chain_channel_alice_bob_balance.to_be_bytes(),
         "channel alice->bob balance (after ticket redemption) must match"
     );
-
     assert_eq!(
-        channel_alice_bob_balance_before_redeem - ticket_price,
-        BalanceType::HOPR.balance(on_chain_channel_alice_bob_balance),
+        U256::from_be_bytes(
+            (channel_alice_bob_balance_before_redeem - ticket_price)
+                .amount()
+                .to_be_bytes()
+        ),
+        on_chain_channel_alice_bob_balance.to::<U256>(),
         "channel alice->bob balance (after ticket redemption) must be decreased"
     );
-
     // Channel balances were the same on both channels before redeeming
     assert_eq!(
-        channel_alice_bob_balance_before_redeem + ticket_price,
-        BalanceType::HOPR.balance(on_chain_channel_bob_alice_balance),
+        U256::from_be_bytes(
+            (channel_alice_bob_balance_before_redeem + ticket_price)
+                .amount()
+                .to_be_bytes()
+        ),
+        on_chain_channel_bob_alice_balance.to::<U256>(),
         "channel bob->alice balance (after ticket redemption) must be increase"
     );
 
@@ -796,8 +804,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         "alice and bob must be at the same checksum"
     );
 
-    futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| cancel_join_handle(t))).await;
-    futures::future::join_all(bob_node.node_tasks.into_iter().map(|t| cancel_join_handle(t))).await;
+    futures::future::join_all(alice_node.node_tasks.into_iter().map(cancel_join_handle)).await;
+    futures::future::join_all(bob_node.node_tasks.into_iter().map(cancel_join_handle)).await;
 
     Ok(())
 }

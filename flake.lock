@@ -95,17 +95,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1727428214,
-        "narHash": "sha256-bTVooXVEFBGeq8oFRrezf0TzM8sN+MIVKtNTD6L+GqU=",
-        "owner": "shazow",
+        "lastModified": 1747840881,
+        "narHash": "sha256-5qXoSkkfz5cFRVIQ/p/mNKaJjRmhaKgQymHUfziWj1g=",
+        "owner": "hoprnet",
         "repo": "foundry.nix",
-        "rev": "e4c79767b4d2e51179d1975a9f0553ef30d82711",
+        "rev": "f6de4e0a8d66a4bbe124fbf48807e4d7ef1412b3",
         "type": "github"
       },
       "original": {
-        "owner": "shazow",
+        "owner": "hoprnet",
+        "ref": "tb/202505-add-xz",
         "repo": "foundry.nix",
-        "rev": "e4c79767b4d2e51179d1975a9f0553ef30d82711",
         "type": "github"
       }
     },
@@ -189,11 +189,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1743906877,
-        "narHash": "sha256-Thah1oU8Vy0gs9bh5QhNcQh1iuQiowMnZPbrkURonZA=",
+        "lastModified": 1747622321,
+        "narHash": "sha256-W0dYIWgsUu6rvOJRtKLhKskkv0VhQhJYGNIq+gGUc8g=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "9d00c6b69408dd40d067603012938d9fbe95cfcd",
+        "rev": "bd030fd9983f7fddf87be1c64aa3064c8afa24c4",
         "type": "github"
       },
       "original": {

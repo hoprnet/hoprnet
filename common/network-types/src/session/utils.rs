@@ -1,14 +1,18 @@
-use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use std::{
+    pin::Pin,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
 
-use futures::channel::mpsc::UnboundedSender;
-use futures::stream::BoxStream;
-use futures::{AsyncRead, AsyncWrite, StreamExt};
-use rand::distributions::Bernoulli;
-use rand::prelude::{thread_rng, Distribution, Rng, SeedableRng, StdRng};
+use futures::{AsyncRead, AsyncWrite, StreamExt, channel::mpsc::UnboundedSender, stream::BoxStream};
+use rand::{
+    distributions::Bernoulli,
+    prelude::{Distribution, Rng, SeedableRng, StdRng, thread_rng},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct RetryToken {
@@ -200,10 +204,12 @@ impl<const C: usize> FaultyNetwork<'_, C> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use futures::io::{AsyncReadExt, AsyncWriteExt};
     use std::future::Future;
+
+    use futures::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::task::JoinError;
+
+    use super::*;
 
     fn spawn_single_byte_read_write<C>(
         channel: C,
@@ -234,7 +240,7 @@ mod tests {
         let written = tokio::task::spawn(async move {
             let mut out = Vec::with_capacity(len);
             for byte in data {
-                send.write(&[byte]).await.unwrap();
+                let _ = send.write(&[byte]).await.unwrap();
                 out.push(byte);
             }
             send.close().await.unwrap();

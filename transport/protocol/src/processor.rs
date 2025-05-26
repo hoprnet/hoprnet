@@ -1,17 +1,16 @@
-use futures::{future::Either, SinkExt};
-use futures::{pin_mut, Sink};
-use tracing::error;
-
+use futures::{Sink, SinkExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::sleep;
-use hopr_crypto_packet::errors::PacketError;
-use hopr_crypto_packet::errors::{PacketError::TransportError, Result};
+use hopr_crypto_packet::errors::{PacketError, PacketError::TransportError, Result};
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::prelude::HoprDbProtocolOperations;
-use hopr_db_api::protocol::{IncomingPacket, OutgoingPacket};
+use hopr_db_api::{
+    prelude::HoprDbProtocolOperations,
+    protocol::{IncomingPacket, OutgoingPacket},
+};
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_identity::PeerId;
+use tracing::error;
 
 lazy_static::lazy_static! {
     /// Fixed price per packet to 0.01 HOPR
@@ -110,7 +109,7 @@ where
 
     // NOTE: as opposed to the winning probability, the ticket price does not have
     // a reasonable default and therefore the operation fails
-    async fn determine_actual_outgoing_ticket_price(&self) -> Result<Balance> {
+    async fn determine_actual_outgoing_ticket_price(&self) -> Result<HoprBalance> {
         // This operation hits the cache unless the new value is fetched for the first time
         let network_ticket_price =
             self.db.get_network_ticket_price().await.map_err(|e| {
@@ -236,20 +235,21 @@ where
 pub struct PacketInteractionConfig {
     pub packet_keypair: OffchainKeypair,
     pub outgoing_ticket_win_prob: Option<WinningProbability>,
-    pub outgoing_ticket_price: Option<Balance>,
+    pub outgoing_ticket_price: Option<HoprBalance>,
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::time::Duration;
 
     use anyhow::Context;
     use futures::StreamExt;
     use hopr_crypto_random::Randomizable;
     use hopr_internal_types::prelude::HoprPseudonym;
     use hopr_path::ValidatedPath;
-    use std::time::Duration;
     use tokio::time::timeout;
+
+    use super::*;
 
     #[tokio::test]
     pub async fn packet_send_finalizer_is_triggered() {
@@ -300,11 +300,13 @@ mod tests {
             finalizer.finalize(Ok(()))
         });
 
-        assert!(result
-            .context("Awaiter must be present")?
-            .consume_and_wait(Duration::from_millis(10))
-            .await
-            .is_ok());
+        assert!(
+            result
+                .context("Awaiter must be present")?
+                .consume_and_wait(Duration::from_millis(10))
+                .await
+                .is_ok()
+        );
 
         Ok(())
     }

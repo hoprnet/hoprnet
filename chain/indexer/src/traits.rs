@@ -1,6 +1,5 @@
+use alloy::primitives::B256;
 use async_trait::async_trait;
-use ethers::types::TxHash;
-
 use hopr_chain_rpc::BlockWithLogs;
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_primitive_types::prelude::*;
@@ -11,7 +10,7 @@ use crate::errors::Result;
 pub trait ChainLogHandler {
     fn contract_addresses(&self) -> Vec<Address>;
 
-    fn contract_address_topics(&self, contract: Address) -> Vec<TxHash>;
+    fn contract_address_topics(&self, contract: Address) -> Vec<B256>;
 
     async fn collect_block_events(&self, block_with_logs: BlockWithLogs) -> Result<Vec<SignificantChainEvent>>;
 }
@@ -39,7 +38,7 @@ mock! {
     #[async_trait]
     impl ChainLogHandler for ChainLogHandler {
         fn contract_addresses(&self) -> Vec<Address>;
-        fn contract_address_topics(&self, contract: Address) -> Vec<TxHash>;
+        fn contract_address_topics(&self, contract: Address) -> Vec<B256>;
         async fn collect_block_events(&self, block_with_logs: BlockWithLogs) -> Result<Vec<SignificantChainEvent>>;
     }
 }

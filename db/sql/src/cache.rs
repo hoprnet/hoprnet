@@ -1,18 +1,27 @@
-use crate::errors::DbSqlError;
+use std::{
+    sync::{Arc, Mutex, atomic::AtomicU64},
+    time::Duration,
+};
+
 use dashmap::{DashMap, Entry};
-use hopr_crypto_packet::prelude::{HoprSenderId, HoprSurbId};
-use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener};
+use hopr_crypto_packet::{
+    HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener,
+    prelude::{HoprSenderId, HoprSurbId},
+};
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::info::{IndexerData, SafeInfo};
-use hopr_db_api::prelude::DbError;
+use hopr_db_api::{
+    info::{IndexerData, SafeInfo},
+    prelude::DbError,
+};
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::{Address, Balance, KeyIdent, U256};
-use moka::future::Cache;
-use moka::Expiry;
+use hopr_primitive_types::{
+    balance::HoprBalance,
+    prelude::{Address, KeyIdent, U256},
+};
+use moka::{Expiry, future::Cache};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
-use std::sync::atomic::AtomicU64;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+
+use crate::errors::DbSqlError;
 
 /// Lists all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for the long term.
@@ -115,7 +124,7 @@ pub struct HoprDbCaches {
     pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
     // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
     // include tickets from other epochs
-    pub(crate) unrealized_value: Cache<(Hash, U256), Balance>,
+    pub(crate) unrealized_value: Cache<(Hash, U256), HoprBalance>,
     pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
     pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
     pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,

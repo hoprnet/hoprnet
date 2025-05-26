@@ -1,5 +1,6 @@
-use crate::initiation::StartErrorReason;
 use thiserror::Error;
+
+use crate::initiation::StartErrorReason;
 
 /// Enumeration of errors thrown from this library.
 #[derive(Error, Debug)]
@@ -13,9 +14,11 @@ pub enum TransportSessionError {
     #[error("incorrect data size")]
     PayloadSize,
 
+    #[cfg(feature = "serde")]
     #[error("serializer encoding error: {0}")]
     SerializerEncoding(#[from] bincode::error::EncodeError),
 
+    #[cfg(feature = "serde")]
     #[error("serializer decoding error: {0}")]
     SerializerDecoding(#[from] bincode::error::DecodeError),
 
@@ -52,6 +55,8 @@ pub enum SessionManagerError {
     AlreadyStarted,
     #[error("all challenge slots are occupied")]
     NoChallengeSlots,
+    #[error("loopback sessions are not allowed")]
+    Loopback,
     #[error("non-specific session manager error: {0}")]
     Other(String),
 }

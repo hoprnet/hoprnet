@@ -4,10 +4,7 @@ use anyhow::Context;
 use async_trait::async_trait;
 use futures::{SinkExt, StreamExt};
 use hex_literal::hex;
-use hopr_crypto_random::{random_bytes, random_integer, Randomizable};
-use lazy_static::lazy_static;
-use libp2p::{Multiaddr, PeerId};
-
+use hopr_crypto_random::{Randomizable, random_bytes, random_integer};
 use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
     types::{Hash, OffchainPublicKey},
@@ -18,14 +15,15 @@ use hopr_db_sql::{
 };
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
-use hopr_path::errors::PathError;
-use hopr_path::{channel_graph::ChannelGraph, ChainPath, Path, PathAddressResolver, ValidatedPath};
+use hopr_path::{ChainPath, Path, PathAddressResolver, ValidatedPath, channel_graph::ChannelGraph, errors::PathError};
 use hopr_primitive_types::prelude::*;
 use hopr_transport_mixer::config::MixerConfig;
 use hopr_transport_protocol::{
-    processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
     DEFAULT_PRICE_PER_PACKET,
+    processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer},
 };
+use lazy_static::lazy_static;
+use libp2p::{Multiaddr, PeerId};
 use tokio::time::timeout;
 use tracing::debug;
 
@@ -59,10 +57,7 @@ fn create_dummy_channel(from: Address, to: Address) -> ChannelEntry {
     ChannelEntry::new(
         from,
         to,
-        Balance::new(
-            U256::from(1234u64) * U256::from(*DEFAULT_PRICE_PER_PACKET),
-            BalanceType::HOPR,
-        ),
+        (U256::from(1234u64) * U256::from(*DEFAULT_PRICE_PER_PACKET)).into(),
         U256::zero(),
         ChannelStatus::Open,
         U256::zero(),
@@ -87,9 +82,7 @@ pub async fn create_minimal_topology(dbs: &mut Vec<HoprDb>) -> anyhow::Result<()
             .set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
 
-        dbs[index]
-            .update_ticket_price(None, Balance::new(100u128, BalanceType::HOPR))
-            .await?;
+        dbs[index].update_ticket_price(None, 100.into()).await?;
 
         // Link all the node keys and chain keys from the simulated announcements
         for i in 0..PEERS.len() {
@@ -198,7 +191,7 @@ pub async fn peer_setup_for(
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: opk.clone(),
             outgoing_ticket_win_prob: Some(WinningProbability::ALWAYS),
-            outgoing_ticket_price: Some(BalanceType::HOPR.balance(100)),
+            outgoing_ticket_price: Some(100.into()),
         };
 
         db.start_ticket_processing(Some(received_ack_tickets_tx))?;
@@ -324,7 +317,7 @@ pub async fn resolve_mock_path(
         let c = ChannelEntry::new(
             last_addr,
             *addr,
-            Balance::new(1000_u32, BalanceType::HOPR),
+            1000.into(),
             0u32.into(),
             ChannelStatus::Open,
             0u32.into(),

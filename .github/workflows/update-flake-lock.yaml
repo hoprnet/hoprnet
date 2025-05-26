@@ -7,10 +7,10 @@ env:
 on:
   workflow_dispatch: # allows manual triggering
   schedule:
-    - cron: '0 0 * * 0' # runs weekly on Sunday at 00:00
+    - cron: "0 0 * * 0" # runs weekly on Sunday at 00:00
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: write
 
@@ -49,7 +49,7 @@ jobs:
           persist-credentials: false
 
       - name: Update flake.lock
-        uses: DeterminateSystems/update-flake-lock@a2bbe0274e3a0c4194390a1e445f734c597ebc37 # v24
+        uses: DeterminateSystems/update-flake-lock@428c2b58a4b7414dabd372acb6a03dba1084d3ab # v25
         id: update
         with:
           pr-title: "chore(nix): update flake.lock"

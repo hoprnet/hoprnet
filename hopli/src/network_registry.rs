@@ -1,12 +1,12 @@
-//! This module contains arguments and functions to interact with the Network Registry contract for a privileged account.
-//! To participate in the HOPR network, a node must be included in the network registry contract.
-//! Nodes and the staking account (Safe) that manages them should be registered as a pair in the Network registry contrat.
-//! Nodes and safes can be registered by either a manager or by the staking account itself.
+//! This module contains arguments and functions to interact with the Network Registry contract for a privileged
+//! account. To participate in the HOPR network, a node must be included in the network registry contract.
+//! Nodes and the staking account (Safe) that manages them should be registered as a pair in the Network registry
+//! contrat. Nodes and safes can be registered by either a manager or by the staking account itself.
 //!
 //! Note the currently only manager wallet can register node-safe pairs. Node runners cannot self-register their nodes.
 //!
-//! A manager (i.e. an account with `MANAGER_ROLE` role), can perform the following actions with `hopli network-registry`,
-//! by specifying the subcommand:
+//! A manager (i.e. an account with `MANAGER_ROLE` role), can perform the following actions with `hopli
+//! network-registry`, by specifying the subcommand:
 //! A manager account can register nodes and safes with `manager-regsiter`
 //! A manager account can deregister nodes with `manager-deregsiter`
 //! A manager account can set eligibility of staking accounts with `manager-force-sync`
@@ -44,21 +44,22 @@
 //!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 //!     --provider-url "http://localhost:8545"
 //! ```
-use crate::key_pair::ArgEnvReader;
+use std::str::FromStr;
+
+use alloy::primitives::Address;
+use clap::Parser;
+use hopr_bindings::hoprnetworkregistry::HoprNetworkRegistry;
+use tracing::info;
+
 use crate::{
     environment_config::NetworkProviderArgs,
-    key_pair::{IdentityFileArgs, PrivateKeyArgs},
+    key_pair::{ArgEnvReader, IdentityFileArgs, PrivateKeyArgs},
     methods::{
         deregister_nodes_from_network_registry, force_sync_safes_on_network_registry,
         register_safes_and_nodes_on_network_registry,
     },
     utils::{Cmd, HelperErrors},
 };
-use clap::Parser;
-use ethers::types::H160;
-use hopr_bindings::hopr_network_registry::HoprNetworkRegistry;
-use std::str::FromStr;
-use tracing::info;
 
 /// CLI arguments for `hopli network-registry`
 #[derive(Clone, Debug, Parser)]
@@ -154,7 +155,8 @@ pub enum NetworkRegistrySubcommands {
 }
 
 impl NetworkRegistrySubcommands {
-    /// Execute command to register a node and its staking account (safe) with manager privilege and make the safe eligible.
+    /// Execute command to register a node and its staking account (safe) with manager privilege and make the safe
+    /// eligible.
     ///
     /// Manager wallet registers nodes with associated staking accounts
     pub async fn execute_manager_register(
@@ -165,13 +167,13 @@ impl NetworkRegistrySubcommands {
         private_key: PrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
-        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        let mut node_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = node_address {
             node_eth_addresses.extend(
                 addresses
                     .split(',')
                     .map(|addr| {
-                        H160::from_str(addr)
+                        Address::from_str(addr)
                             .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -183,13 +185,19 @@ impl NetworkRegistrySubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
                 .into_iter()
-                .map(H160::from),
+                .map(Address::from),
         );
 
         // read all the safe addresses
-        let mut safe_eth_addresses: Vec<H160> = Vec::new();
+        let mut safe_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = safe_address {
-            safe_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+            safe_eth_addresses.extend(
+                addresses
+                    .split(',')
+                    .map(Address::from_str)
+                    .collect::<Result<Vec<Address>, _>>()
+                    .map_err(HelperErrors::FromHexError)?,
+            );
         }
 
         // Read the private key from arguments or the "MANAGER_PRIVATE_KEY" environment variable
@@ -199,8 +207,10 @@ impl NetworkRegistrySubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_network_registry =
-            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
+        let hopr_network_registry = HoprNetworkRegistry::new(
+            contract_addresses.addresses.network_registry.into(),
+            rpc_provider.clone(),
+        );
 
         // get registered safe of all the nodes
         // check if any of the node has been registered to a different address than the given safe address.
@@ -228,13 +238,13 @@ impl NetworkRegistrySubcommands {
         private_key: PrivateKeyArgs,
     ) -> Result<(), HelperErrors> {
         // read all the node addresses
-        let mut node_eth_addresses: Vec<H160> = Vec::new();
+        let mut node_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = node_address {
             node_eth_addresses.extend(
                 addresses
                     .split(',')
                     .map(|addr| {
-                        H160::from_str(addr)
+                        Address::from_str(addr)
                             .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))
                     })
                     .collect::<Result<Vec<_>, _>>()?,
@@ -246,7 +256,7 @@ impl NetworkRegistrySubcommands {
                 .to_addresses()
                 .map_err(|e| HelperErrors::InvalidAddress(format!("Invalid node address: {:?}", e)))?
                 .into_iter()
-                .map(H160::from),
+                .map(Address::from),
         );
         info!(
             "Will deregister {:?} nodes from the network registry",
@@ -260,8 +270,10 @@ impl NetworkRegistrySubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_network_registry =
-            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
+        let hopr_network_registry = HoprNetworkRegistry::new(
+            contract_addresses.addresses.network_registry.into(),
+            rpc_provider.clone(),
+        );
 
         // deregister all the given nodes from the network registry
         let removed_pairs_num =
@@ -284,9 +296,15 @@ impl NetworkRegistrySubcommands {
         eligibility: Option<bool>,
     ) -> Result<(), HelperErrors> {
         // read all the safe addresses
-        let mut safe_eth_addresses: Vec<H160> = Vec::new();
+        let mut safe_eth_addresses: Vec<Address> = Vec::new();
         if let Some(addresses) = safe_address {
-            safe_eth_addresses.extend(addresses.split(',').map(|addr| H160::from_str(addr).unwrap()));
+            safe_eth_addresses.extend(
+                addresses
+                    .split(',')
+                    .map(Address::from_str)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(HelperErrors::FromHexError)?,
+            );
         }
 
         info!(
@@ -301,8 +319,10 @@ impl NetworkRegistrySubcommands {
         let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
         let contract_addresses = network_provider.get_network_details_from_name()?;
 
-        let hopr_network_registry =
-            HoprNetworkRegistry::new(contract_addresses.addresses.network_registry, rpc_provider.clone());
+        let hopr_network_registry = HoprNetworkRegistry::new(
+            contract_addresses.addresses.network_registry.into(),
+            rpc_provider.clone(),
+        );
 
         // deregister all the given nodes from the network registry
         match eligibility {
