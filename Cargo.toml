@@ -111,14 +111,14 @@ k256 = { version = "0.13.4", features = [
   "serde",
 ] }
 lazy_static = "1.5.0"
-libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "kauki/libp2p-stream/improve-configurability-of-dial-opts" }
+libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", rev = "c921ca6573d1edb734a81f41a95736d2a01c5632" } # branch = "kauki/libp2p-stream/improve-configurability-of-dial-opts"
 # libp2p = { version = "0.55.0" }
 libp2p-identity = { version = "0.2.11", features = [
   "peerid",
   "ed25519",
   "rand",
 ] }
-libp2p-stream = { git = "https://github.com/hoprnet/rust-libp2p.git", branch = "kauki/libp2p-stream/improve-configurability-of-dial-opts" }
+libp2p-stream = { git = "https://github.com/hoprnet/rust-libp2p.git", rev = "c921ca6573d1edb734a81f41a95736d2a01c5632" } # branch = "kauki/libp2p-stream/improve-configurability-of-dial-opts"
 # libp2p-stream = { version = "0.3.0-alpha" }
 mockall = "0.13.1"
 mockito = "1.7.0"

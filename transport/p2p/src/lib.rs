@@ -111,7 +111,7 @@ impl HoprNetworkBehavior {
         U: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         Self {
-            streams: libp2p_stream::Behaviour::new().with_dial_opts(|peer: PeerId| {
+            streams: libp2p_stream::Behaviour::new().with_default_dial_opts(|peer: PeerId| {
                 // The following dial options will rely on an external behavior-based discovery mechanism to provide the
                 // addresses needed.
                 libp2p::swarm::dial_opts::DialOpts::peer_id(peer)
