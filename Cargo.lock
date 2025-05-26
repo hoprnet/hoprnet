@@ -5047,7 +5047,6 @@ dependencies = [
  "serde",
  "serde_bytes",
  "sha3",
- "strum 0.27.1",
  "thiserror 2.0.12",
 ]
 
@@ -5466,7 +5465,6 @@ dependencies = [
  "oas3",
  "regex",
  "serde",
- "serde_json",
  "serde_with",
  "smart-default",
  "strum 0.27.1",
