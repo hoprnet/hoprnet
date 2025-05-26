@@ -128,6 +128,14 @@ impl NetworkBehaviour for Behaviour {
 
     fn on_swarm_event(&mut self, event: libp2p::swarm::FromSwarm) {
         match event {
+            libp2p::swarm::FromSwarm::NewExternalAddrOfPeer(record) => {
+                if self.allowed_peers.contains(&record.peer_id) {
+                    debug!(peer = %record.peer_id, address = %record.addr, "p2p - discovery - New external address of peer");
+                    self.all_peers.insert(record.peer_id, record.addr.clone());
+                } else {
+                    debug!(peer = %record.peer_id, "p2p - discovery - New external address of peer is not allowed");
+                }
+            }
             libp2p::swarm::FromSwarm::ConnectionEstablished(data) => {
                 *self.connected_peers.entry(data.peer_id).or_insert(0) += 1
             }
@@ -174,13 +182,13 @@ impl NetworkBehaviour for Behaviour {
         let poll_result = self.events.poll_next_unpin(cx).map(|e| match e {
             Some(DiscoveryInput::NetworkUpdate(event)) => match event {
                 NetworkTriggeredEvent::CloseConnection(peer) => {
-                    debug!(peer = %peer, "p2p - discovery - Closing connection (reason: low ping connection quality");
-                    // if self.is_peer_connected(&peer) {
-                    //     self.pending_events.push_back(ToSwarm::CloseConnection {
-                    //         peer_id: peer,
-                    //         connection: CloseConnection::default(),
-                    //     });
-                    // }
+                    if self.is_peer_connected(&peer) {
+                        self.pending_events.push_back(ToSwarm::CloseConnection {
+                            peer_id: peer,
+                            connection: CloseConnection::default(),
+                        });
+                        debug!(peer = %peer, "p2p - discovery - Closing connection (reason: low ping connection quality");
+                    }
                 }
                 NetworkTriggeredEvent::UpdateQuality(_, _) => {}
             },
@@ -201,11 +209,11 @@ impl NetworkBehaviour for Behaviour {
                     self.allowed_peers.remove(&peer);
 
                     if self.is_peer_connected(&peer) {
-                        debug!(peer = %peer, "p2p - discovery - Requesting disconnect due to ban");
                         self.pending_events.push_back(ToSwarm::CloseConnection {
                             peer_id: peer,
                             connection: CloseConnection::default(),
                         });
+                        debug!(peer = %peer, "p2p - discovery - Requesting disconnect due to ban");
                     }
                 }
                 PeerDiscovery::Announce(peer, multiaddresses) => {
