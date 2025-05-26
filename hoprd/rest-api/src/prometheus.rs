@@ -1,6 +1,8 @@
 use axum::{extract::Request, middleware::Next, response::Response};
+use hopr_lib::AsUnixTimestamp;
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, MultiHistogram};
+use hopr_metrics::metrics::{MultiCounter, MultiHistogram, SimpleGauge};
+use hopr_platform::time::native::current_time;
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -17,6 +19,10 @@ lazy_static::lazy_static! {
         &["endpoint", "method"]
     )
     .unwrap();
+    static ref METRIC_API_LAST_TIME: SimpleGauge = SimpleGauge::new(
+        "hopr_last_time",
+        "The unix timestamp in seconds at which any API endpoint was last fetched"
+    ).unwrap();
 
     // Matches Ed25519-based peer IDs and channel IDs (Keccak256 hashes)
     static ref ID_REGEX: regex::Regex = regex::Regex::new(r"(0x[0-9A-Fa-f]{64})|(12D3KooW[A-z0-9]{44})").unwrap();
@@ -44,6 +50,9 @@ pub(crate) async fn record(
         METRIC_COUNT_API_CALLS.increment(&[&path, method.as_str(), &status.to_string()]);
         METRIC_COUNT_API_CALLS_TIMING.observe(&[&path, method.as_str()], response_duration.as_secs_f64());
     }
+
+    // Set for any API call
+    METRIC_API_LAST_TIME.set(current_time().as_unix_timestamp().as_secs_f64());
 
     response
 }

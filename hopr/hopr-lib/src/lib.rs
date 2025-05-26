@@ -103,7 +103,7 @@ use crate::{
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PROCESS_START_TIME: SimpleGauge = SimpleGauge::new(
-        "hopr_up",
+        "hopr_start_time",
         "The unix timestamp in seconds at which the process was started"
     ).unwrap();
     static ref METRIC_HOPR_LIB_VERSION: MultiGauge = MultiGauge::new(
@@ -722,7 +722,10 @@ impl Hopr {
                 .await
                 .unwrap_or(false)
             {
-                info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.", my_ethereum_address.to_hex());
+                info!(
+                    "Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.",
+                    my_ethereum_address.to_hex()
+                );
 
                 sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 
