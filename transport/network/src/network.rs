@@ -369,9 +369,11 @@ mod tests {
     }
 
     #[test]
-    fn test_network_health_should_deserialize_from_proper_string() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_network_health_should_deserialize_from_proper_string() -> anyhow::Result<()> {
         let parsed: Health = "Orange".parse()?;
-        Ok(assert_eq!(parsed, Health::Orange))
+        assert_eq!(parsed, Health::Orange);
+
+        Ok(())
     }
 
     async fn basic_network(my_id: &PeerId) -> anyhow::Result<Network<hopr_db_sql::db::HoprDb>> {

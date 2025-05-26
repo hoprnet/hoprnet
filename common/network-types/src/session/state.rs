@@ -1491,7 +1491,7 @@ mod tests {
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
         let data = b"will not be delivered!";
 
-        alice_to_bob.write(data.as_ref()).await?;
+        let _ = alice_to_bob.write(data.as_ref()).await?;
 
         let mut out = vec![0u8; data.len()];
         let f1 = bob_to_alice.read_exact(&mut out);
@@ -1525,7 +1525,7 @@ mod tests {
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
         let data = b"will be re-delivered!";
 
-        alice_to_bob.write(data.as_ref()).await?;
+        let _ = alice_to_bob.write(data.as_ref()).await?;
 
         let mut out = vec![0u8; data.len()];
         let f1 = bob_to_alice.read_exact(&mut out);

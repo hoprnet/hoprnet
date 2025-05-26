@@ -8,7 +8,7 @@ use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::keypairs::Keypair;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
-use hopr_primitive_types::prelude::{Balance, BalanceType};
+use hopr_primitive_types::prelude::HoprBalance;
 use hopr_transport_packet::prelude::ApplicationData;
 use hopr_transport_protocol::processor::{MsgSender, PacketInteractionConfig, PacketSendFinalizer};
 use libp2p::PeerId;
@@ -64,7 +64,7 @@ pub fn protocol_throughput_sender(c: &mut Criterion) {
                         let cfg = PacketInteractionConfig {
                             packet_keypair: PEERS[TESTED_PEER_ID].clone(),
                             outgoing_ticket_win_prob: Some(WinningProbability::ALWAYS),
-                            outgoing_ticket_price: Some(Balance::new(1, BalanceType::HOPR)),
+                            outgoing_ticket_price: Some(HoprBalance::from(1)),
                         };
 
                         let processes = hopr_transport_protocol::run_msg_ack_protocol(
