@@ -710,18 +710,21 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                 .handle_start_protocol_message(pseudonym, data)
                 .await
                 .map(|_| DispatchResult::Processed);
-        } else {
+        } else if self.cfg.session_tag_range.contains(&data.application_tag) {
             let session_id = SessionId::new(data.application_tag, pseudonym);
 
-            if let Some(session_data) = self.sessions.get(&session_id).await {
+            return if let Some(session_data) = self.sessions.get(&session_id).await {
                 trace!(?session_id, "received data for a registered session");
 
-                return Ok(session_data
+                Ok(session_data
                     .session_tx
                     .unbounded_send(data.plain_text)
                     .map(|_| DispatchResult::Processed)
-                    .map_err(|e| SessionManagerError::Other(e.to_string()))?);
-            }
+                    .map_err(|e| SessionManagerError::Other(e.to_string()))?)
+            } else {
+                error!(%session_id, "received data from an unestablished session");
+                Err(TransportSessionError::UnknownData)
+            };
         }
 
         trace!(%data.application_tag, "received data not associated with session protocol or any existing session");
