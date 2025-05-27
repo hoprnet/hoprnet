@@ -15,7 +15,7 @@ on:
       - ready_for_review
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 concurrency:
