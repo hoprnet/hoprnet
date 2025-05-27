@@ -4,7 +4,7 @@ hopr:
   probe:
     timeout: 5
     max_parallel_probes: 10
-    recheck_threshold: 2
+    recheck_threshold: 5
   network_options:
     # ignore for shorter than heartbeat cycle
     ignore_timeframe: 1

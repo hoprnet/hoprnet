@@ -130,7 +130,7 @@ impl Probe {
                         let store_eviction = store_eviction.clone();
                         let (peer, _start, _notifier) = v;
 
-                        tracing::debug!(%peer, pseudonym = %k.0, probe = ?k.1, reason = "timeout", "evicting probe");
+                        tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "evicting probe");
                         async move {
                             store_eviction
                                 .on_finished(
