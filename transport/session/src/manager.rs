@@ -15,7 +15,7 @@ use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
@@ -703,7 +703,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         pseudonym: HoprPseudonym,
         data: ApplicationData,
     ) -> crate::errors::Result<DispatchResult> {
-        if ReservedTag::SessionInit as u64 == data.application_tag.0 {
+        if (0..self.cfg.session_tag_range.start.0).contains(&data.application_tag.0) {
             // This is a Start protocol message, so we handle it
             trace!(tag = data.application_tag.0, "dispatching Start protocol message");
             return self

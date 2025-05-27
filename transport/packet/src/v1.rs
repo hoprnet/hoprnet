@@ -119,8 +119,8 @@ impl From<Tag> for ResolvedTag {
     fn from(tag: Tag) -> Self {
         if tag < ReservedTag::UPPER_BOUND {
             match tag.0 {
-                0 => ResolvedTag::Reserved(ReservedTag::Ping),
-                1 => ResolvedTag::Reserved(ReservedTag::SessionInit),
+                x if x == ReservedTag::SessionInit as u64 => ResolvedTag::Reserved(ReservedTag::SessionInit),
+                x if x == ReservedTag::Ping as u64 => ResolvedTag::Reserved(ReservedTag::Ping),
                 _ => ResolvedTag::Reserved(ReservedTag::Undefined),
             }
         } else {
@@ -134,10 +134,10 @@ impl From<Tag> for ResolvedTag {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 
 pub enum ReservedTag {
-    /// Ping traffic for 0-hop detection.
-    Ping = 0,
     /// Opening a new session.
-    SessionInit = 1,
+    SessionInit = 0,
+    /// Ping traffic for 0-hop detection.
+    Ping = 14,
     /// Undefined catch all.
     Undefined = Self::UPPER_BOUND.0 - 1,
 }
