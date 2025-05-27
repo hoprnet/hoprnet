@@ -2,7 +2,7 @@
 #################################################################################
 # Pipeline to add labels to pull requests in the hoprnet repository.
 #################################################################################
-name: Add label
+name: Label
 
 on:
   pull_request_target:
