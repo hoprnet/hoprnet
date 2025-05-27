@@ -43,20 +43,20 @@ jobs:
           # Safely get branch name without template injection
           if [[ "${EVENT_NAME}" == "pull_request" ]]; then
             echo "The workflow is triggered by other pipeline"
-            repo_branch=${REPO_BRANCH}
+            source_repo=${SOURCE_REPO}
             source_branch=${SOURCE_BRANCH}
           else
             echo "The workflow is triggered manually"
-            repo_branch=${GITHUB_REPOSITORY}
+            source_repo=${GITHUB_REPOSITORY}
             source_branch=${GITHUB_REF_NAME}
           fi
-          echo "repo_branch=${repo_branch}" | tee -a $GITHUB_OUTPUT
+          echo "source_repo=${source_repo}" | tee -a $GITHUB_OUTPUT
           echo "source_branch=${source_branch}" | tee -a $GITHUB_OUTPUT
-          FORMATTED_BRANCH=$(echo "$BRANCH_NAME" | sed 's/\//-/g')
+          FORMATTED_BRANCH=$(echo "$source_branch" | sed 's/\//-/g')
           echo "FORMATTED_BRANCH=$FORMATTED_BRANCH" | tee -a $GITHUB_OUTPUT
         env:
           EVENT_NAME: ${{ github.event_name }}
-          REPO_BRANCH: ${{ inputs.source_repo }}
+          SOURCE_REPO: ${{ inputs.source_repo }}
           SOURCE_BRANCH: ${{ inputs.source_branch }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -64,7 +64,7 @@ jobs:
       - name: Checkout hoprnet repository
         uses: actions/checkout@v4
         with:
-          repository: ${{ steps.vars.outputs.repo_branch }}
+          repository: ${{ steps.vars.outputs.source_repo }}
           ref: ${{ steps.vars.outputs.source_branch }}
           persist-credentials: false
 
