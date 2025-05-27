@@ -130,9 +130,10 @@ where
                 .await;
 
             if let Some(mut cached) = cached {
-                cached.send(msg).await.unwrap_or_else(|e| {
-                    tracing::error!(peer = %peer_id, error = %e, "Error sending message to peer");
-                });
+                if let Err(error) = cached.send(msg).await {
+                    tracing::error!(peer = %peer_id, %error, "Error sending message to peer");
+                    cache.invalidate(&peer_id).await;
+                }
             } else {
                 tracing::error!(peer = %peer_id, "Error sending message to peer: the stream failed to be created and cached");
             }
