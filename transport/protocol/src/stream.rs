@@ -29,7 +29,7 @@ where
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
     <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
-    <C as Decoder>::Item: Send + 'static,
+    <C as Decoder>::Item: Clone + Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
 {
     let (tx_out, rx_out) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(10_000);
@@ -89,6 +89,15 @@ where
 
         async move {
             let cache = cache.clone();
+
+            if let Some(mut cached) = cache.get(&peer_id).await {
+                if let Err(error) = cached.send(msg.clone()).await {
+                    tracing::error!(peer = %peer_id, %error, "Error sending message to peer from the cached connection");
+                    cache.invalidate(&peer_id).await;
+                } else {
+                    return;
+                }
+            }
 
             let cached = cache
                 .optionally_get_with(peer_id, async move {
