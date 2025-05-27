@@ -276,14 +276,14 @@ jobs:
       source_branch: ${{ github.event.pull_request.base.ref }}
       publish: true
 
-  bencher:
-    name: Benchmarks
-    uses: ./.github/workflows/bencher.yaml
-    secrets: inherit
-    with:
-      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
-      source_branch: ${{ github.event.pull_request.base.ref }}
-      type: merge
+  # bencher:
+  #   name: Benchmarks
+  #   uses: ./.github/workflows/bencher.yaml
+  #   secrets: inherit
+  #   with:
+  #     source_repo: ${{ github.event.pull_request.base.repo.full_name }}
+  #     source_branch: ${{ github.event.pull_request.base.ref }}
+  #     type: merge
 
   notify_failure:
     name: Notify in Zulip on merge pipeline failure
