@@ -10,7 +10,7 @@
 name: Merge
 
 on:
-  pull_request:
+  pull_request_target:
     types:
       - closed
       # - synchronize
@@ -73,12 +73,14 @@ jobs:
         package:
           - hopli
           - hoprd
+          - hopr-pluto
     name: Build ${{ matrix.package }}
     # only run build and tag if the PR is merged, not if its closed
     if: github.event.pull_request.merged == true
     uses: ./.github/workflows/build-docker.yaml
     with:
-      branch: ${{ github.event.pull_request.base.ref }}
+      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
+      source_branch: ${{ github.event.pull_request.base.ref }}
       package: ${{ matrix.package }}
       production: true
     secrets: inherit
@@ -88,7 +90,8 @@ jobs:
     if: github.event.pull_request.merged == true
     uses: ./.github/workflows/cache-deps.yaml
     with:
-      branch: ${{ github.event.pull_request.base.ref }}
+      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
+      source_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
 
   load_test:
@@ -249,7 +252,7 @@ jobs:
     uses: ./.github/workflows/open-release.yaml
     with:
       release_type: ${{ vars.NEXT_RELEASE_TYPE }}
-      base_branch: ${{ github.event.pull_request.base.ref }}
+      source_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
 
   build_dappnode:
@@ -259,24 +262,9 @@ jobs:
       - create_release
     uses: ./.github/workflows/generate-dappnode-pr.yaml
     with:
-      base_branch: ${{ github.event.pull_request.base.ref }}
+      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
+      source_branch: ${{ github.event.pull_request.base.ref }}
     secrets: inherit
-
-  build_pluto:
-    strategy:
-      matrix:
-        package:
-          - hopr-pluto
-    name: Build ${{ matrix.package }}
-    # only run build and tag if the PR is merged, not if its closed
-    if: github.event.pull_request.merged == true
-    uses: ./.github/workflows/build-docker.yaml
-    with:
-      branch: ${{ github.event.pull_request.base.ref }}
-      package: ${{ matrix.package }}
-      production: true
-    secrets: inherit
-
   docs:
     name: Docs
     needs:
@@ -284,6 +272,8 @@ jobs:
     uses: ./.github/workflows/build-docs.yaml
     secrets: inherit
     with:
+      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
+      source_branch: ${{ github.event.pull_request.base.ref }}
       publish: true
 
   bencher:
@@ -291,7 +281,8 @@ jobs:
     uses: ./.github/workflows/bencher.yaml
     secrets: inherit
     with:
-      branch: ${{ github.event.pull_request.base.ref }}
+      source_repo: ${{ github.event.pull_request.base.repo.full_name }}
+      source_branch: ${{ github.event.pull_request.base.ref }}
       type: merge
 
   notify_failure:
@@ -302,9 +293,8 @@ jobs:
       - cache_deps
       - load_test
       - build_dappnode
-      - build_pluto
       - docs
-      - bencher
+      # - bencher
     if: ${{ failure() }}
     runs-on: ubuntu-latest
     steps:
@@ -319,7 +309,6 @@ jobs:
           topic: "Core"
           content: |
             The merge pipeline failed for pull request [#${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}](https://github.com/hoprnet/hoprnet/pull/${{ github.event.pull_request.number }})
-
 
   notify:
     name: Notify Changes

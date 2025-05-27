@@ -73,5 +73,5 @@ jobs:
     uses: ./.github/workflows/open-release.yaml
     with:
       release_type: Patch
-      base_branch: "release/${{ github.event.inputs.tag_release_name }}"
+      source_branch: "release/${{ github.event.inputs.tag_release_name }}"
     secrets: inherit

@@ -13,7 +13,6 @@ jobs:
   smart-contract-bindings:
     runs-on: self-hosted-hoprnet-big
     timeout-minutes: 60
-    if: github.event.pull_request.draft == false
     env:
       needs_nix_setup: true
     steps:

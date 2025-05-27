@@ -11,7 +11,7 @@ env:
 on:
   merge_group:
     types: [checks_requested]
-  pull_request:
+  pull_request_target:
     types:
       - synchronize
       - ready_for_review
@@ -28,7 +28,6 @@ jobs:
     name: Linter
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 30
-    if: github.event.pull_request.draft == false
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
