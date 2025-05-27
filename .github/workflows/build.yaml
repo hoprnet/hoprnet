@@ -1,7 +1,7 @@
 ---
-#################################################################################
+################################################################################
 # Main pipeline to build hoprnet artifacts
-#################################################################################
+################################################################################
 name: Build
 
 on:
@@ -91,11 +91,3 @@ jobs:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
       publish: false
-
-  zizmor:
-    name: Zizmor
-    uses: ./.github/workflows/zizmor.yaml
-    with:
-      source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-      source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
-    secrets: inherit
