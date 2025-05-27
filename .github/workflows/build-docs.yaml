@@ -27,12 +27,10 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write # for peaceiris/actions-gh-pages to push pages branch
 
 jobs:
   rust:
-    permissions:
-      contents: write # for peaceiris/actions-gh-pages to push pages branch
     name: Rust docs
     # big runner is needed because building docs involves building Rust code
     runs-on: self-hosted-hoprnet-bigger
