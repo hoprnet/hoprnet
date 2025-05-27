@@ -4,6 +4,7 @@ import random
 import re
 import socket
 from contextlib import asynccontextmanager, contextmanager
+from decimal import Decimal
 from typing import Optional
 
 from sdk.python.api import Protocol
@@ -32,8 +33,8 @@ def make_routes(routes_with_hops: list[int], nodes: list[Node]):
 
 
 @asynccontextmanager
-async def create_channel(src: Node, dest: Node, funding: int, close_from_dest: bool = True, use_peer_id: bool = False):
-    channel = await src.api.open_channel(dest.peer_id if use_peer_id else dest.address, str(int(funding)))
+async def create_channel(src: Node, dest: Node, funding: Decimal, close_from_dest: bool = True):
+    channel = await src.api.open_channel(dest.address, funding)
     assert channel is not None
     await asyncio.wait_for(check_channel_status(src, dest, status=ChannelStatus.Open), 10.0)
     try:
@@ -57,18 +58,14 @@ async def create_channel(src: Node, dest: Node, funding: int, close_from_dest: b
 async def get_channel(src: Node, dest: Node, include_closed=False):
     all_channels = await src.api.all_channels(include_closed=include_closed)
 
-    channels = [
-        oc for oc in all_channels.all if oc.source_address == src.address and oc.destination_address == dest.address
-    ]
+    channels = [oc for oc in all_channels.all if oc.source == src.address and oc.destination == dest.address]
 
     return channels[0] if len(channels) > 0 else None
 
 
 async def get_channel_seen_from_dst(src: Node, dest: Node, include_closed=False):
     open_channels = await dest.api.all_channels(include_closed)
-    channels = [
-        oc for oc in open_channels.all if oc.source_address == src.address and oc.destination_address == dest.address
-    ]
+    channels = [oc for oc in open_channels.all if oc.source == src.address and oc.destination == dest.address]
 
     return channels[0] if len(channels) > 0 else None
 
@@ -98,7 +95,7 @@ async def check_outgoing_channel_closed(src: Node, channel_id: str):
             await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_rejected_tickets_value(src: Node, value: int):
+async def check_rejected_tickets_value(src: Node, value: Decimal):
     current = (await src.api.get_tickets_statistics()).rejected_value
     while current < value:
         logging.debug(f"Rejected tickets value: {current}, wanted min: {value}")
@@ -106,7 +103,7 @@ async def check_rejected_tickets_value(src: Node, value: int):
         current = (await src.api.get_tickets_statistics()).rejected_value
 
 
-async def check_unredeemed_tickets_value_max(src: Node, value: int):
+async def check_unredeemed_tickets_value_max(src: Node, value: Decimal):
     current = (await src.api.get_tickets_statistics()).unredeemed_value
     while current > value:
         logging.debug(f"Unredeemed tickets value: {current}, wanted max: {value}")
@@ -114,7 +111,7 @@ async def check_unredeemed_tickets_value_max(src: Node, value: int):
         current = (await src.api.get_tickets_statistics()).unredeemed_value
 
 
-async def check_unredeemed_tickets_value(src: Node, value: int):
+async def check_unredeemed_tickets_value(src: Node, value: Decimal):
     current = (await src.api.get_tickets_statistics()).unredeemed_value
     while current < value:
         logging.debug(f"Unredeemed tickets value: {current}, wanted min: {value}")
@@ -130,12 +127,14 @@ async def check_winning_tickets_count(src: Node, value: int):
         current = (await src.api.get_tickets_statistics()).winning_count
 
 
-async def check_safe_balance(src: Node, value: int):
-    while f"{(await src.api.balances()).safe_hopr:.0f}" >= f"{value:.0f}":
+async def check_safe_balance(src: Node, value: Decimal):
+    safe_balance = (await src.api.balances()).safe_hopr
+    while f"{safe_balance:.0f}" > f"{value:.0f}":
+        logging.debug(f"Safe balance: {safe_balance:.0f}, wanted max: {value:.0f}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_native_balance_below(src: Node, value: int):
+async def check_native_balance_below(src: Node, value: Decimal):
     while (await src.api.balances()).native >= value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
@@ -161,7 +160,7 @@ async def get_ticket_price(src: Node):
 
 
 class RouteBidirectionalChannels:
-    def __init__(self, route: list[Node], funding_fwd: int, funding_return: int):
+    def __init__(self, route: list[Node], funding_fwd: Decimal, funding_return: Decimal):
         assert len(route) >= 2
         self._fwd_channels = []
         self._ret_channels = []
@@ -178,7 +177,7 @@ class RouteBidirectionalChannels:
                 + f"{self._route[i+1].address} with {self._funding_fwd * remaining} HOPR"
             )
             fwd_channel = await self._route[i].api.open_channel(
-                self._route[i + 1].address, str(int(self._funding_fwd * remaining))
+                self._route[i + 1].address, self._funding_fwd * remaining
             )
             assert fwd_channel is not None
 
@@ -188,7 +187,7 @@ class RouteBidirectionalChannels:
                 + f"{self._route[ri-1].address} with {self._funding_return * remaining} HOPR"
             )
             ret_channel = await self._route[ri].api.open_channel(
-                self._route[ri - 1].address, str(int(self._funding_return * remaining))
+                self._route[ri - 1].address, self._funding_return * remaining
             )
             assert ret_channel is not None
 
@@ -269,7 +268,7 @@ class RouteBidirectionalChannels:
         return self._ret_channels
 
 
-def create_bidirectional_channels_for_route(route: list[Node], funding_fwd: int, funding_return: int):
+def create_bidirectional_channels_for_route(route: list[Node], funding_fwd: Decimal, funding_return: Decimal):
     return RouteBidirectionalChannels(route, funding_fwd, funding_return)
 
 
@@ -325,7 +324,7 @@ class HoprSession:
             resp_buffer = self._use_response_buffer
 
         self._session = await self._src.api.session_client(
-            self._dest.peer_id,
+            self._dest.address,
             forward_path=self._fwd_path,
             return_path=self._return_path,
             protocol=self._proto,
@@ -336,20 +335,20 @@ class HoprSession:
         )
         if self._session is None:
             raise Exception(
-                f"Failed to open session {self._src.peer_id} -> " + f"{self._dest.peer_id} on {self._proto.name}"
+                f"Failed to open session {self._src.address} -> " + f"{self._dest.address} on {self._proto.name}"
             )
 
         logging.debug(
-            f"Session opened {self._src.peer_id}:{self._session.port} ->"
-            + f"{self._dest.peer_id}:{self._target_port} on {self._proto.name}"
+            f"Session opened {self._src.address}:{self._session.port} ->"
+            + f"{self._dest.address}:{self._target_port} on {self._proto.name}"
         )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         if self._session is not None and await self._src.api.session_close_client(self._session) is True:
             logging.debug(
-                f"Session closed {self._src.peer_id}:{self._session.port} ->"
-                + f"{self._dest.peer_id}:{self._target_port} on {self._proto.name}"
+                f"Session closed {self._src.address}:{self._session.port} ->"
+                + f"{self._dest.address}:{self._target_port} on {self._proto.name}"
             )
             self._session = None
             self._target_port = 0
@@ -466,6 +465,6 @@ async def basic_send_and_receive_packets_over_single_route(msg_count: int, route
         msg_count,
         src=route[0],
         dest=route[-1],
-        fwd_path={"IntermediatePath": [n.peer_id for n in route[1:-1]]},
-        return_path={"IntermediatePath": [n.peer_id for n in route[-2:0:-1]]},
+        fwd_path={"IntermediatePath": [n.address for n in route[1:-1]]},
+        return_path={"IntermediatePath": [n.address for n in route[-2:0:-1]]},
     )

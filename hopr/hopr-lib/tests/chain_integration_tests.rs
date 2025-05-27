@@ -3,6 +3,7 @@ mod common;
 use std::time::Duration;
 
 use alloy::primitives::{B256, U256};
+use common::create_rpc_client_to_anvil_with_snapshot;
 use futures::{StreamExt, pin_mut};
 use hex_literal::hex;
 use hopr_async_runtime::prelude::{JoinHandle, cancel_join_handle, sleep, spawn};
@@ -32,15 +33,13 @@ use hopr_primitive_types::prelude::*;
 use hopr_transport::{ChainKeypair, Hash, Keypair, Multiaddr, OffchainKeypair};
 use tracing::info;
 
-use crate::common::{
-    NodeSafeConfig, TestChainEnv, create_rpc_client_to_anvil_with_snapshot, deploy_test_environment, onboard_node,
-};
+use crate::common::{NodeSafeConfig, TestChainEnv, deploy_test_environment, onboard_node};
 
 // Helper function to generate the first acked ticket (channel_epoch 1, index 0, offset 0) of win prob 100%
 async fn generate_the_first_ack_ticket(
     myself: &ChainNode,
     counterparty: &ChainKeypair,
-    price: Balance,
+    price: HoprBalance,
     domain_separator: Hash,
 ) -> anyhow::Result<()> {
     let hk1 = HalfKey::try_from(hex!("16e1d5a405315958b7db2d70ed797d858c9e6ba979783cf5110c13e0200ab0d0").as_ref())?;
@@ -228,7 +227,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
 
     sleep((1 + finality) * block_time).await;
 
-    let domain_separator: Hash = (*chain_env.contract_instances.channels.domainSeparator().call().await?._0).into();
+    let domain_separator: Hash = (*chain_env.contract_instances.channels.domainSeparator().call().await?).into();
 
     let rpc_cfg = RpcOperationsConfig {
         chain_id: chain_env.anvil.chain_id(),
@@ -405,7 +404,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     );
 
     // Open channel (from Alice to Bob) with 1 HOPR
-    let initial_channel_funds = BalanceType::HOPR.balance(1);
+    let initial_channel_funds = HoprBalance::from(1);
     let confirmation = alice_node
         .actions
         .open_channel(bob_chain_key.public().to_address(), initial_channel_funds)
@@ -449,8 +448,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         "channel must have the correct balance"
     );
 
-    // Fund the channel from Alice to Bob with additional 99 HOPR
-    let funding_amount = BalanceType::HOPR.balance(99);
+    // Fund the channel from Alice to Bob with an additional 99 HOPR
+    let funding_amount = HoprBalance::from(99);
     let confirmation = alice_node
         .actions
         .fund_channel(channel_alice_bob.get_id(), funding_amount)
@@ -512,7 +511,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     );
 
     // Bob fund channel with 100 HOPR
-    let incoming_funding_amount = BalanceType::HOPR.balance(100);
+    let incoming_funding_amount = HoprBalance::from(100);
 
     let confirmation = bob_node
         .actions
@@ -552,7 +551,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         .expect("db call should not fail")
         .expect("should contain a channel to Bob");
 
-    let ticket_price = Balance::new(1, BalanceType::HOPR);
+    let ticket_price = HoprBalance::from(1);
 
     // Create a ticket from Alice in Bob's DB
     generate_the_first_ack_ticket(&bob_node, &alice_chain_key, ticket_price, domain_separator).await?;
@@ -805,8 +804,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         "alice and bob must be at the same checksum"
     );
 
-    futures::future::join_all(alice_node.node_tasks.into_iter().map(|t| cancel_join_handle(t))).await;
-    futures::future::join_all(bob_node.node_tasks.into_iter().map(|t| cancel_join_handle(t))).await;
+    futures::future::join_all(alice_node.node_tasks.into_iter().map(cancel_join_handle)).await;
+    futures::future::join_all(bob_node.node_tasks.into_iter().map(cancel_join_handle)).await;
 
     Ok(())
 }

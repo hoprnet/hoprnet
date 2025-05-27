@@ -1,3 +1,5 @@
+import logging
+from decimal import Decimal
 from typing import Any
 
 from .channelstatus import ChannelStatus
@@ -22,6 +24,14 @@ def _convert(value: Any):
             return int(value)
 
     return value
+
+
+def _parse_balance_string(balance_str):
+    """Parse a balance string with currency units and return the amount as a big decimal"""
+    try:
+        return Decimal(balance_str.split()[0])
+    except (ValueError, AttributeError, IndexError) as e:
+        raise ValueError(f"Failed to parse balance string: {balance_str}") from e
 
 
 class ApiResponseObject:
@@ -59,7 +69,7 @@ class ApiResponseObject:
 
 
 class Addresses(ApiResponseObject):
-    keys = {"hopr": "hopr", "native": "native"}
+    keys = {"native": "native"}
 
 
 class Balances(ApiResponseObject):
@@ -71,13 +81,20 @@ class Balances(ApiResponseObject):
         "safe_hopr_allowance": "safeHoprAllowance",
     }
 
+    def post_init(self):
+        self.hopr = _parse_balance_string(self.hopr)
+        self.native = _parse_balance_string(self.native)
+        self.safe_native = _parse_balance_string(self.safe_native)
+        self.safe_hopr = _parse_balance_string(self.safe_hopr)
+        self.safe_hopr_allowance = _parse_balance_string(self.safe_hopr_allowance)
+
 
 class Infos(ApiResponseObject):
     keys = {"hopr_node_safe": "hoprNodeSafe"}
 
 
 class ConnectedPeer(ApiResponseObject):
-    keys = {"address": "peerAddress", "peer_id": "peerId", "version": "reportedVersion", "quality": "quality"}
+    keys = {"address": "address", "version": "reportedVersion", "quality": "quality"}
 
 
 class Channel(ApiResponseObject):
@@ -86,15 +103,14 @@ class Channel(ApiResponseObject):
         "channel_epoch": "channelEpoch",
         "id": "channelId",
         "closure_time": "closureTime",
-        "destination_address": "destinationAddress",
-        "destination_peer_id": "destinationPeerId",
-        "source_address": "sourceAddress",
-        "source_peer_id": "sourcePeerId",
+        "destination": "destination",
+        "source": "source",
         "status": "status",
         "ticket_index": "ticketIndex",
     }
 
     def post_init(self):
+        self.balance = _parse_balance_string(self.balance)
         self.status = ChannelStatus.fromString(self.status)
 
 
@@ -109,9 +125,15 @@ class Ticket(ApiResponseObject):
         "winn_prob": "winProb",
     }
 
+    def post_init(self):
+        self.amount = _parse_balance_string(self.amount)
+
 
 class TicketPrice(ApiResponseObject):
     keys = {"value": "price"}
+
+    def post_init(self):
+        self.value = _parse_balance_string(self.value)
 
 
 class TicketProbability(ApiResponseObject):
@@ -129,6 +151,12 @@ class TicketStatistics(ApiResponseObject):
         "unredeemed_value": "unredeemedValue",
         "winning_count": "winningCount",
     }
+
+    def post_init(self):
+        self.rejected_value = _parse_balance_string(self.rejected_value)
+        self.neglected_value = _parse_balance_string(self.neglected_value)
+        self.redeemed_value = _parse_balance_string(self.redeemed_value)
+        self.unredeemed_value = _parse_balance_string(self.unredeemed_value)
 
 
 class Configuration(ApiResponseObject):

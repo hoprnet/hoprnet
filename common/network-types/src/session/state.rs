@@ -285,9 +285,10 @@ impl<const C: usize> SessionState<C> {
     fn consume_segment(&mut self, segment: Segment) -> crate::errors::Result<()> {
         let id = segment.id();
 
+        trace!(session_id = self.session_id, segment = %id, "received segment");
+
         match self.frame_reassembler.push_segment(segment) {
             Ok(_) => {
-                trace!(session_id = self.session_id, segment = %id, "RECEIVED: segment");
                 match self.incoming_frame_retries.entry(id.0) {
                     Entry::Occupied(e) => {
                         // Receiving a frame segment restarts the retry token for this frame
@@ -299,6 +300,7 @@ impl<const C: usize> SessionState<C> {
                         v.insert(RetryToken::new(Instant::now(), self.cfg.backoff_base));
                     }
                 }
+                trace!(session_id = self.session_id, segment = %id, "received segment pushed");
             }
             // The error here is intentionally not propagated
             Err(e) => warn!(session_id = self.session_id, ?id, error = %e, "segment not pushed"),
@@ -311,7 +313,7 @@ impl<const C: usize> SessionState<C> {
         trace!(
             session_id = self.session_id,
             count_of_segments = request.len(),
-            "RECEIVED: request",
+            "received request",
         );
 
         let mut count = 0;
@@ -352,7 +354,7 @@ impl<const C: usize> SessionState<C> {
         trace!(
             session_id = self.session_id,
             count = acked.len(),
-            "RECEIVED: acknowledgement frames",
+            "received acknowledgement frames",
         );
 
         for frame_id in acked {
@@ -1136,7 +1138,7 @@ mod tests {
                 .take(num_frames)
                 .collect::<Vec<_>>()
         } else {
-            std::iter::repeat(frame_size).take(num_frames).collect::<Vec<_>>()
+            std::iter::repeat_n(frame_size, num_frames).collect::<Vec<_>>()
         };
 
         let socket_worker = |mut socket: S, d: Direction| {
@@ -1150,7 +1152,7 @@ mod tests {
                     for frame_size in &frame_sizes {
                         let mut write = vec![0u8; *frame_size];
                         hopr_crypto_random::random_fill(&mut write);
-                        socket.write(&write).await?;
+                        let _ = socket.write(&write).await?;
                         sent.extend(write);
                     }
                 }
@@ -1472,7 +1474,7 @@ mod tests {
     }
 
     #[test(tokio::test)]
-    async fn receiving_on_disconnected_network_should_timeout() {
+    async fn receiving_on_disconnected_network_should_timeout() -> anyhow::Result<()> {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
             rto_base_receiver: Duration::from_millis(300),
@@ -1489,7 +1491,7 @@ mod tests {
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
         let data = b"will not be delivered!";
 
-        alice_to_bob.write(data.as_ref()).await.unwrap();
+        alice_to_bob.write(data.as_ref()).await?;
 
         let mut out = vec![0u8; data.len()];
         let f1 = bob_to_alice.read_exact(&mut out);
@@ -1501,10 +1503,12 @@ mod tests {
             Either::Left(_) => panic!("should timeout: {:?}", out),
             Either::Right(_) => {}
         }
+
+        Ok(())
     }
 
     #[test(tokio::test)]
-    async fn single_frame_resend_should_be_resent_on_unreliable_network() {
+    async fn single_frame_resend_should_be_resent_on_unreliable_network() -> anyhow::Result<()> {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
             rto_base_receiver: Duration::from_millis(300),
@@ -1521,7 +1525,7 @@ mod tests {
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
         let data = b"will be re-delivered!";
 
-        alice_to_bob.write(data.as_ref()).await.unwrap();
+        alice_to_bob.write(data.as_ref()).await?;
 
         let mut out = vec![0u8; data.len()];
         let f1 = bob_to_alice.read_exact(&mut out);
@@ -1533,5 +1537,7 @@ mod tests {
             Either::Left(_) => {}
             Either::Right(_) => panic!("timeout"),
         }
+
+        Ok(())
     }
 }

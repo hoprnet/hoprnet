@@ -164,7 +164,7 @@ pub(crate) fn filter_satisfying_ticket_models(
     let channel_id = channel_entry.get_id();
 
     let mut to_be_aggregated = Vec::with_capacity(models.len());
-    let mut total_balance = BalanceType::HOPR.zero();
+    let mut total_balance = HoprBalance::zero();
 
     for m in models {
         let ticket_wp: WinningProbability = m
@@ -181,13 +181,13 @@ pub(crate) fn filter_satisfying_ticket_models(
             continue;
         }
 
-        let to_add = BalanceType::HOPR.balance_bytes(&m.amount);
+        let to_add = HoprBalance::from_be_bytes(&m.amount);
 
         // Do a balance check to be sure not to aggregate more than the current channel stake
-        total_balance = total_balance + to_add;
+        total_balance += to_add;
         if total_balance.gt(&channel_entry.balance) {
-            // Remove last sub-balance which led to the overflow before breaking out of the loop.
-            total_balance = total_balance - to_add;
+            // Remove the last sub-balance which led to the overflow before breaking out of the loop.
+            total_balance -= to_add;
             break;
         }
 
@@ -256,7 +256,11 @@ pub(crate) async fn find_stats_for_channel(
 }
 
 impl HoprDb {
-    async fn get_tickets_value_int<'a>(&'a self, tx: OptTx<'a>, selector: TicketSelector) -> Result<(usize, Balance)> {
+    async fn get_tickets_value_int<'a>(
+        &'a self,
+        tx: OptTx<'a>,
+        selector: TicketSelector,
+    ) -> Result<(usize, HoprBalance)> {
         let selector: WrappedTicketSelector = selector.into();
         Ok(self
             .nest_transaction_in_db(tx, TargetDb::Tickets)
@@ -269,8 +273,8 @@ impl HoprDb {
                         .await
                         .map_err(DbSqlError::from)?
                         .map_err(DbSqlError::from)
-                        .try_fold((0_usize, BalanceType::HOPR.zero()), |(count, value), t| async move {
-                            Ok((count + 1, value + BalanceType::HOPR.balance_bytes(t.amount)))
+                        .try_fold((0_usize, HoprBalance::zero()), |(count, value), t| async move {
+                            Ok((count + 1, value + HoprBalance::from_be_bytes(t.amount)))
                         })
                         .await
                 })
@@ -384,7 +388,7 @@ impl HoprDbTicketOperations for HoprDb {
                                             .unrealized_value
                                             .get(&(*channel_id, *epoch))
                                             .await
-                                            .unwrap_or(Balance::zero(BalanceType::HOPR));
+                                            .unwrap_or_default();
 
                                         METRIC_HOPR_TICKETS_INCOMING_STATISTICS.set(
                                             &[&channel, "unredeemed"],
@@ -547,12 +551,12 @@ impl HoprDbTicketOperations for HoprDb {
                                 .await?
                                 .into_iter()
                                 .fold(ChannelTicketStatistics::default(), |mut acc, stats| {
-                                    let neglected_value = BalanceType::HOPR.balance_bytes(stats.neglected_value);
-                                    acc.neglected_value = acc.neglected_value + neglected_value;
-                                    let redeemed_value = BalanceType::HOPR.balance_bytes(stats.redeemed_value);
-                                    acc.redeemed_value = acc.redeemed_value + redeemed_value;
-                                    let rejected_value = BalanceType::HOPR.balance_bytes(stats.rejected_value);
-                                    acc.rejected_value = acc.rejected_value + rejected_value;
+                                    let neglected_value = HoprBalance::from_be_bytes(stats.neglected_value);
+                                    acc.neglected_value += neglected_value;
+                                    let redeemed_value = HoprBalance::from_be_bytes(stats.redeemed_value);
+                                    acc.redeemed_value += redeemed_value;
+                                    let rejected_value = HoprBalance::from_be_bytes(stats.rejected_value);
+                                    acc.rejected_value += rejected_value;
                                     acc.winning_tickets += stats.winning_tickets as u128;
 
                                     #[cfg(all(feature = "prometheus", not(test)))]
@@ -576,7 +580,7 @@ impl HoprDbTicketOperations for HoprDb {
                                     acc
                                 });
 
-                            all_stats.unredeemed_value = BalanceType::HOPR.balance(unredeemed_value);
+                            all_stats.unredeemed_value = unredeemed_value.into();
 
                             Ok::<_, DbSqlError>(all_stats)
                         })
@@ -606,10 +610,10 @@ impl HoprDbTicketOperations for HoprDb {
 
                             Ok::<_, DbSqlError>(ChannelTicketStatistics {
                                 winning_tickets: stats.winning_tickets as u128,
-                                neglected_value: BalanceType::HOPR.balance_bytes(stats.neglected_value),
-                                redeemed_value: BalanceType::HOPR.balance_bytes(stats.redeemed_value),
-                                unredeemed_value: BalanceType::HOPR.balance(unredeemed_value),
-                                rejected_value: BalanceType::HOPR.balance_bytes(stats.rejected_value),
+                                neglected_value: HoprBalance::from_be_bytes(stats.neglected_value),
+                                redeemed_value: HoprBalance::from_be_bytes(stats.redeemed_value),
+                                unredeemed_value: unredeemed_value.into(),
+                                rejected_value: HoprBalance::from_be_bytes(stats.rejected_value),
                             })
                         })
                     })
@@ -654,7 +658,7 @@ impl HoprDbTicketOperations for HoprDb {
         Ok(res?)
     }
 
-    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, Balance)> {
+    async fn get_tickets_value(&self, selector: TicketSelector) -> Result<(usize, HoprBalance)> {
         self.get_tickets_value_int(None, selector).await
     }
 
@@ -1043,10 +1047,10 @@ impl HoprDbTicketOperations for HoprDb {
 
         let stored_value = acknowledged_tickets
             .iter()
-            .map(|m| BalanceType::HOPR.balance_bytes(&m.amount))
-            .fold(Balance::zero(BalanceType::HOPR), |acc, amount| acc.add(amount));
+            .map(|m| HoprBalance::from_be_bytes(&m.amount))
+            .sum();
 
-        // The value of received ticket can be higher (profit for us) but not lower
+        // The value of a received ticket can be higher (profit for us) but not lower
         if aggregated_ticket.verified_ticket().amount.lt(&stored_value) {
             error!(channel = %channel_id, "Aggregated ticket value in channel is lower than sum of stored tickets");
             return Err(DbSqlError::LogicalError("Value of received aggregated ticket is too low".into()).into());
@@ -1157,7 +1161,7 @@ impl HoprDbTicketOperations for HoprDb {
         let channel_epoch = channel_entry.channel_epoch.as_u32();
         let channel_id = channel_entry.get_id();
 
-        let mut final_value = Balance::zero(BalanceType::HOPR);
+        let mut final_value = HoprBalance::zero();
 
         // Validate all received tickets and turn them into RedeemableTickets
         let verified_tickets = acked_tickets
@@ -1201,7 +1205,7 @@ impl HoprDbTicketOperations for HoprDb {
                 .into());
             }
 
-            final_value = final_value.add(&acked_ticket.verified_ticket().amount);
+            final_value += acked_ticket.verified_ticket().amount;
             if final_value.gt(&channel_balance) {
                 return Err(DbSqlError::LogicalError(format!(
                     "ticket amount to aggregate {final_value} is greater than the balance {channel_balance} of \
@@ -1398,7 +1402,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             channel_ticket_index.unwrap_or(0u32).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -1468,12 +1472,12 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
-            BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
+            HoprBalance::from(TICKET_VALUE * COUNT_TICKETS),
             stats.unredeemed_value,
             "unredeemed balance must match"
         );
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             stats.redeemed_value,
             "there must be 0 redeemed value"
         );
@@ -1490,10 +1494,8 @@ mod tests {
             .await?
             .perform(|_tx| {
                 Box::pin(async move {
-                    for i in 0..TO_REDEEM as usize {
-                        let r = db_clone
-                            .mark_tickets_as((&tickets[i]).into(), TicketMarker::Redeemed)
-                            .await?;
+                    for ticket in tickets.iter().take(TO_REDEEM as usize) {
+                        let r = db_clone.mark_tickets_as(ticket.into(), TicketMarker::Redeemed).await?;
                         assert_eq!(1, r, "must redeem only a single ticket");
                     }
                     Ok::<(), DbSqlError>(())
@@ -1503,12 +1505,12 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
-            BalanceType::HOPR.balance(TICKET_VALUE * (COUNT_TICKETS - TO_REDEEM)),
+            HoprBalance::from(TICKET_VALUE * (COUNT_TICKETS - TO_REDEEM)),
             stats.unredeemed_value,
             "unredeemed balance must match"
         );
         assert_eq!(
-            BalanceType::HOPR.balance(TICKET_VALUE * TO_REDEEM),
+            HoprBalance::from(TICKET_VALUE * TO_REDEEM),
             stats.redeemed_value,
             "there must be a redeemed value"
         );
@@ -1560,12 +1562,12 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
-            BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
+            HoprBalance::from(TICKET_VALUE * COUNT_TICKETS),
             stats.unredeemed_value,
             "unredeemed balance must match"
         );
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             stats.neglected_value,
             "there must be 0 redeemed value"
         );
@@ -1580,12 +1582,12 @@ mod tests {
 
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             stats.unredeemed_value,
             "unredeemed balance must be zero"
         );
         assert_eq!(
-            BalanceType::HOPR.balance(TICKET_VALUE * COUNT_TICKETS),
+            HoprBalance::from(TICKET_VALUE * COUNT_TICKETS),
             stats.neglected_value,
             "there must be a neglected value"
         );
@@ -1607,7 +1609,7 @@ mod tests {
         let ticket = ticket.pop().context("ticket should be present")?.ticket;
 
         let stats = db.get_ticket_statistics(None).await?;
-        assert_eq!(BalanceType::HOPR.zero(), stats.rejected_value);
+        assert_eq!(HoprBalance::zero(), stats.rejected_value);
         assert_eq!(
             stats,
             db.get_ticket_statistics(Some(*CHANNEL_ID)).await?,
@@ -1732,7 +1734,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             0.into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -1764,7 +1766,7 @@ mod tests {
         let channel_1 = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             0.into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -1775,7 +1777,7 @@ mod tests {
         let channel_2 = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             0.into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -1808,8 +1810,8 @@ mod tests {
         assert_eq!(value, stats_1.unredeemed_value);
         assert_eq!(value, stats_2.unredeemed_value);
 
-        assert_eq!(BalanceType::HOPR.zero(), stats_1.neglected_value);
-        assert_eq!(BalanceType::HOPR.zero(), stats_2.neglected_value);
+        assert_eq!(HoprBalance::zero(), stats_1.neglected_value);
+        assert_eq!(HoprBalance::zero(), stats_2.neglected_value);
 
         assert_eq!(stats_1, stats_2);
 
@@ -1829,10 +1831,10 @@ mod tests {
             )))
             .await?;
 
-        assert_eq!(BalanceType::HOPR.zero(), stats_1.unredeemed_value);
+        assert_eq!(HoprBalance::zero(), stats_1.unredeemed_value);
         assert_eq!(value, stats_1.neglected_value);
 
-        assert_eq!(BalanceType::HOPR.zero(), stats_2.neglected_value);
+        assert_eq!(HoprBalance::zero(), stats_2.neglected_value);
 
         Ok(())
     }
@@ -1998,7 +2000,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             2.into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2026,7 +2028,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             2.into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2055,7 +2057,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100),
+            100.into(),
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2097,7 +2099,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100),
+            100.into(),
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2131,7 +2133,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100),
+            100.into(),
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2164,7 +2166,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100),
+            100.into(),
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2195,7 +2197,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100),
+            100.into(),
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2226,7 +2228,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100),
+            100.into(),
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2257,7 +2259,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100),
+            100.into(),
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2288,7 +2290,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100),
+            100.into(),
             (TICKET_COUNT + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2317,7 +2319,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(100),
+            100.into(),
             2.into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -2493,7 +2495,7 @@ mod tests {
 
         let existing_channel_with_multiple_tickets = channel.get_id();
         let stats = db.get_ticket_statistics(Some(channel.get_id())).await?;
-        assert_eq!(stats.neglected_value, BalanceType::HOPR.zero());
+        assert_eq!(stats.neglected_value, HoprBalance::zero());
 
         let actual = db
             .prepare_aggregation_in_channel(&existing_channel_with_multiple_tickets, Default::default())
@@ -2888,7 +2890,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(120))),
             4_u32.into(),
@@ -2903,9 +2905,7 @@ mod tests {
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        let sum_value = tickets
-            .iter()
-            .fold(BalanceType::HOPR.zero(), |acc, x| acc + x.ticket.amount);
+        let sum_value = tickets.iter().fold(HoprBalance::zero(), |acc, x| acc + x.ticket.amount);
         let min_idx = tickets
             .iter()
             .map(|t| t.ticket.index)
@@ -2975,7 +2975,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(120))),
             4_u32.into(),
@@ -2998,9 +2998,7 @@ mod tests {
                 .and_then(|v| Ok(v.into_transferable(&ALICE, &Hash::default())?))?,
         );
 
-        let sum_value = tickets
-            .iter()
-            .fold(BalanceType::HOPR.zero(), |acc, x| acc + x.ticket.amount);
+        let sum_value = tickets.iter().fold(HoprBalance::zero(), |acc, x| acc + x.ticket.amount);
         let min_idx = tickets
             .iter()
             .map(|t| t.ticket.index)
@@ -3081,7 +3079,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(120))),
             4_u32.into(),
@@ -3115,7 +3113,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Closed,
             4_u32.into(),
@@ -3144,7 +3142,7 @@ mod tests {
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -3173,7 +3171,7 @@ mod tests {
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -3205,7 +3203,7 @@ mod tests {
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            100.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             3_u32.into(),
@@ -3234,7 +3232,7 @@ mod tests {
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             3_u32.into(),
@@ -3265,7 +3263,7 @@ mod tests {
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             3_u32.into(),
@@ -3281,7 +3279,7 @@ mod tests {
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         // Modify the ticket and do not sign it
-        tickets[1].ticket.amount = Balance::new(TICKET_VALUE - 10, BalanceType::HOPR);
+        tickets[1].ticket.amount = (TICKET_VALUE - 10).into();
 
         db.aggregate_tickets(*ALICE_OFFCHAIN.public(), tickets.clone(), &BOB)
             .await
@@ -3297,7 +3295,7 @@ mod tests {
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             3_u32.into(),
@@ -3326,7 +3324,7 @@ mod tests {
         let channel = ChannelEntry::new(
             ALICE.public().to_address(),
             BOB.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             (COUNT_TICKETS + 1).into(),
             ChannelStatus::Open,
             3_u32.into(),
@@ -3368,12 +3366,12 @@ mod tests {
             .expect("must not fail");
 
         let stats = db.get_ticket_statistics(None).await.expect("must not fail");
-        assert_ne!(stats.redeemed_value, BalanceType::HOPR.zero());
+        assert_ne!(stats.redeemed_value, HoprBalance::zero());
 
         db.reset_ticket_statistics().await.expect("must not fail");
 
         let stats = db.get_ticket_statistics(None).await.expect("must not fail");
-        assert_eq!(stats.redeemed_value, BalanceType::HOPR.zero());
+        assert_eq!(stats.redeemed_value, HoprBalance::zero());
 
         Ok(())
     }

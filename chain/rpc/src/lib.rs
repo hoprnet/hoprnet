@@ -285,7 +285,7 @@ pub trait HoprRpcOperations {
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>>;
 
     /// Retrieves the node's account balance of the given type.
-    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
+    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>>;
 
     /// Retrieves the minimum incoming ticket winning probability by directly
     /// calling the network's winning probability oracle.
@@ -293,7 +293,7 @@ pub trait HoprRpcOperations {
 
     /// Retrieves the minimum ticket prices by directly calling the network's
     /// ticket price oracle.
-    async fn get_minimum_network_ticket_price(&self) -> Result<Balance>;
+    async fn get_minimum_network_ticket_price(&self) -> Result<HoprBalance>;
 
     /// Retrieves the node's eligibility status
     async fn get_eligibility_status(&self, address: Address) -> Result<bool>;

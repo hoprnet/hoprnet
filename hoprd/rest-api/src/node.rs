@@ -8,7 +8,6 @@ use axum::{
 use futures::{StreamExt, stream::FuturesUnordered};
 use hopr_crypto_types::prelude::Hash;
 use hopr_lib::{Address, AsUnixTimestamp, GraphExportConfig, Health, Multiaddr};
-use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -107,8 +106,7 @@ pub(crate) struct HeartbeatInfo {
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(example = json!({
-    "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
-    "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     "multiaddr": "/ip4/178.12.1.9/tcp/19092",
     "heartbeats": {
         "sent": 10,
@@ -123,12 +121,9 @@ pub(crate) struct HeartbeatInfo {
 }))]
 /// All information about a known peer.
 pub(crate) struct PeerInfo {
-    #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String, example = "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA")]
-    peer_id: PeerId,
     #[serde(serialize_with = "option_checksum_address_serializer")]
     #[schema(value_type = Option<String>, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
-    peer_address: Option<Address>,
+    address: Option<Address>,
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = Option<String>, example = "/ip4/178.12.1.9/tcp/19092")]
     multiaddr: Option<Multiaddr>,
@@ -154,19 +149,15 @@ pub(crate) struct PeerInfo {
 #[serde_as]
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-    "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
-    "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+    "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
     "multiaddr": "/ip4/178.12.1.9/tcp/19092"
 }))]
 #[serde(rename_all = "camelCase")]
 /// Represents a peer that has been announced on-chain.
 pub(crate) struct AnnouncedPeer {
-    #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String, example = "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA")]
-    peer_id: PeerId,
     #[serde(serialize_with = "checksum_address_serializer")]
     #[schema(value_type = String, example = "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe")]
-    peer_address: Address,
+    address: Address,
     #[serde_as(as = "Option<DisplayFromStr>")]
     #[schema(value_type = Option<String>, example = "/ip4/178.12.1.9/tcp/19092")]
     multiaddr: Option<Multiaddr>,
@@ -176,8 +167,7 @@ pub(crate) struct AnnouncedPeer {
 #[serde(rename_all = "camelCase")]
 #[schema(example = json!({
     "connected": [{
-        "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
-        "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+        "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
         "multiaddr": "/ip4/178.12.1.9/tcp/19092",
         "heartbeats": {
             "sent": 10,
@@ -191,16 +181,14 @@ pub(crate) struct AnnouncedPeer {
         "reportedVersion": "2.1.0"
     }],
     "announced": [{
-        "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
-        "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+        "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
         "multiaddr": "/ip4/178.12.1.9/tcp/19092"
     }]
 }))]
 /// All connected and announced peers.
 pub(crate) struct NodePeersResponse {
     #[schema(example = json!([{
-        "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
-        "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+        "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
         "multiaddr": "/ip4/178.12.1.9/tcp/19092",
         "heartbeats": {
             "sent": 10,
@@ -215,8 +203,7 @@ pub(crate) struct NodePeersResponse {
     }]))]
     connected: Vec<PeerInfo>,
     #[schema(example = json!([{
-        "peerId": "12D3KooWRWeaTozREYHzWTbuCYskdYhED1MXpDwTrmccwzFrd2mEA",
-        "peerAddress": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
+        "address": "0xb4ce7e6e36ac8b01a974725d5ba730af2b156fbe",
         "multiaddr": "/ip4/178.12.1.9/tcp/19092"
     }]))]
     announced: Vec<AnnouncedPeer>,
@@ -281,12 +268,11 @@ pub(super) async fn peers(
                 // WARNING: Only in Providence and Saint-Louis are all peers public
                 let multiaddresses = hopr.network_observed_multiaddresses(&peer_id).await;
 
-                Some((address, peer_id, multiaddresses, info))
+                Some((address, multiaddresses, info))
             }
         })
-        .map(|(address, peer_id, mas, info)| PeerInfo {
-            peer_id,
-            peer_address: address,
+        .map(|(address, mas, info)| PeerInfo {
+            address,
             multiaddr: mas.first().cloned(),
             heartbeats: HeartbeatInfo {
                 sent: info.heartbeats_sent,
@@ -308,8 +294,7 @@ pub(super) async fn peers(
         .into_iter()
         .map(|announced| async move {
             AnnouncedPeer {
-                peer_id: announced.public_key.into(),
-                peer_address: announced.chain_addr,
+                address: announced.chain_addr,
                 multiaddr: announced.get_multiaddr(),
             }
         })
@@ -326,7 +311,10 @@ pub(super) async fn peers(
 }
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::gather_all_metrics as collect_hopr_metrics;
+fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
+    hopr_metrics::metrics::gather_all_metrics()
+        .map_err(|_| ApiErrorStatus::UnknownFailure("Failed to gather metrics".into()))
+}
 
 #[cfg(any(not(feature = "prometheus"), test))]
 fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
@@ -352,7 +340,7 @@ fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
 pub(super) async fn metrics() -> impl IntoResponse {
     match collect_hopr_metrics() {
         Ok(metrics) => (StatusCode::OK, metrics).into_response(),
-        Err(error) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response(),
+        Err(error) => (StatusCode::UNPROCESSABLE_ENTITY, error).into_response(),
     }
 }
 

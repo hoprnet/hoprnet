@@ -14,15 +14,15 @@ hopr:
     execution_interval: 1
     strategies:
       - !AutoFunding
-        funding_amount: "10000000000000000000 HOPR"
-        min_stake_threshold: "1000000000000000000 HOPR"
+        funding_amount: "10 wxHOPR"
+        min_stake_threshold: "1 wxHOPR"
       - !Aggregating
         aggregation_threshold: 100
         unrealized_balance_ratio: 0.9
         aggregate_on_channel_close: true
       - !AutoRedeeming
         redeem_only_aggregated: true
-        minimum_redeem_ticket_value: "0 HOPR"
+        minimum_redeem_ticket_value: "0 wxHOPR"
   protocol:
     heartbeat:
       timeout: 5

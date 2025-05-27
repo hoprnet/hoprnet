@@ -61,6 +61,8 @@ pub mod HoprTicketPriceOracleEvents {
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
         b"",
     );
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Default, Debug, PartialEq, Eq, Hash)]
     /**Event with signature `TicketPriceUpdated(uint256,uint256)` and selector `0xd4c5e06b1ae097ba02372652a7adaa6e4a8e00be527497a3ad0ebc3f761ef3fb`.
 ```solidity
 event TicketPriceUpdated(uint256, uint256);
@@ -173,6 +175,8 @@ event TicketPriceUpdated(uint256, uint256);
         }
     };
     ///Container for all the [`HoprTicketPriceOracleEvents`](self) events.
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Debug, PartialEq, Eq, Hash)]
     pub enum HoprTicketPriceOracleEventsEvents {
         #[allow(missing_docs)]
         TicketPriceUpdated(TicketPriceUpdated),
@@ -200,7 +204,6 @@ event TicketPriceUpdated(uint256, uint256);
         fn decode_raw_log(
             topics: &[alloy_sol_types::Word],
             data: &[u8],
-            validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
                 Some(
@@ -209,7 +212,6 @@ event TicketPriceUpdated(uint256, uint256);
                     <TicketPriceUpdated as alloy_sol_types::SolEvent>::decode_raw_log(
                             topics,
                             data,
-                            validate,
                         )
                         .map(Self::TicketPriceUpdated)
                 }
@@ -250,14 +252,13 @@ event TicketPriceUpdated(uint256, uint256);
 See the [wrapper's documentation](`HoprTicketPriceOracleEventsInstance`) for more details.*/
     #[inline]
     pub const fn new<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         address: alloy_sol_types::private::Address,
         provider: P,
-    ) -> HoprTicketPriceOracleEventsInstance<T, P, N> {
-        HoprTicketPriceOracleEventsInstance::<T, P, N>::new(address, provider)
+    ) -> HoprTicketPriceOracleEventsInstance<P, N> {
+        HoprTicketPriceOracleEventsInstance::<P, N>::new(address, provider)
     }
     /**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -266,15 +267,14 @@ Returns a new instance of the contract, if the deployment was successful.
 For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
     #[inline]
     pub fn deploy<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
     >(
         provider: P,
     ) -> impl ::core::future::Future<
-        Output = alloy_contract::Result<HoprTicketPriceOracleEventsInstance<T, P, N>>,
+        Output = alloy_contract::Result<HoprTicketPriceOracleEventsInstance<P, N>>,
     > {
-        HoprTicketPriceOracleEventsInstance::<T, P, N>::deploy(provider)
+        HoprTicketPriceOracleEventsInstance::<P, N>::deploy(provider)
     }
     /**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 and constructor arguments, if any.
@@ -283,11 +283,10 @@ This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
     #[inline]
     pub fn deploy_builder<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    >(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
-        HoprTicketPriceOracleEventsInstance::<T, P, N>::deploy_builder(provider)
+    >(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+        HoprTicketPriceOracleEventsInstance::<P, N>::deploy_builder(provider)
     }
     /**A [`HoprTicketPriceOracleEvents`](self) instance.
 
@@ -302,16 +301,15 @@ be used to deploy a new instance of the contract.
 See the [module-level documentation](self) for all the available methods.*/
     #[derive(Clone)]
     pub struct HoprTicketPriceOracleEventsInstance<
-        T,
         P,
         N = alloy_contract::private::Ethereum,
     > {
         address: alloy_sol_types::private::Address,
         provider: P,
-        _network_transport: ::core::marker::PhantomData<(N, T)>,
+        _network: ::core::marker::PhantomData<N>,
     }
     #[automatically_derived]
-    impl<T, P, N> ::core::fmt::Debug for HoprTicketPriceOracleEventsInstance<T, P, N> {
+    impl<P, N> ::core::fmt::Debug for HoprTicketPriceOracleEventsInstance<P, N> {
         #[inline]
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             f.debug_tuple("HoprTicketPriceOracleEventsInstance")
@@ -322,10 +320,9 @@ See the [module-level documentation](self) for all the available methods.*/
     /// Instantiation and getters/setters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprTicketPriceOracleEventsInstance<T, P, N> {
+    > HoprTicketPriceOracleEventsInstance<P, N> {
         /**Creates a new wrapper around an on-chain [`HoprTicketPriceOracleEvents`](self) contract instance.
 
 See the [wrapper's documentation](`HoprTicketPriceOracleEventsInstance`) for more details.*/
@@ -337,7 +334,7 @@ See the [wrapper's documentation](`HoprTicketPriceOracleEventsInstance`) for mor
             Self {
                 address,
                 provider,
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
         /**Deploys this contract using the given `provider` and constructor arguments, if any.
@@ -348,7 +345,7 @@ For more fine-grained control over the deployment process, use [`deploy_builder`
         #[inline]
         pub async fn deploy(
             provider: P,
-        ) -> alloy_contract::Result<HoprTicketPriceOracleEventsInstance<T, P, N>> {
+        ) -> alloy_contract::Result<HoprTicketPriceOracleEventsInstance<P, N>> {
             let call_builder = Self::deploy_builder(provider);
             let contract_address = call_builder.deploy().await?;
             Ok(Self::new(contract_address, call_builder.provider))
@@ -359,7 +356,7 @@ and constructor arguments, if any.
 This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         #[inline]
-        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<T, P, N> {
+        pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
             alloy_contract::RawCallBuilder::new_raw_deploy(
                 provider,
                 ::core::clone::Clone::clone(&BYTECODE),
@@ -386,26 +383,23 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
             &self.provider
         }
     }
-    impl<T, P: ::core::clone::Clone, N> HoprTicketPriceOracleEventsInstance<T, &P, N> {
+    impl<P: ::core::clone::Clone, N> HoprTicketPriceOracleEventsInstance<&P, N> {
         /// Clones the provider and returns a new instance with the cloned provider.
         #[inline]
-        pub fn with_cloned_provider(
-            self,
-        ) -> HoprTicketPriceOracleEventsInstance<T, P, N> {
+        pub fn with_cloned_provider(self) -> HoprTicketPriceOracleEventsInstance<P, N> {
             HoprTicketPriceOracleEventsInstance {
                 address: self.address,
                 provider: ::core::clone::Clone::clone(&self.provider),
-                _network_transport: ::core::marker::PhantomData,
+                _network: ::core::marker::PhantomData,
             }
         }
     }
     /// Function calls.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprTicketPriceOracleEventsInstance<T, P, N> {
+    > HoprTicketPriceOracleEventsInstance<P, N> {
         /// Creates a new call builder using this contract instance's provider and address.
         ///
         /// Note that the call can be any function call, not just those defined in this
@@ -413,30 +407,29 @@ the bytecode concatenated with the constructor's ABI-encoded arguments.*/
         pub fn call_builder<C: alloy_sol_types::SolCall>(
             &self,
             call: &C,
-        ) -> alloy_contract::SolCallBuilder<T, &P, C, N> {
+        ) -> alloy_contract::SolCallBuilder<&P, C, N> {
             alloy_contract::SolCallBuilder::new_sol(&self.provider, &self.address, call)
         }
     }
     /// Event filters.
     #[automatically_derived]
     impl<
-        T: alloy_contract::private::Transport + ::core::clone::Clone,
-        P: alloy_contract::private::Provider<T, N>,
+        P: alloy_contract::private::Provider<N>,
         N: alloy_contract::private::Network,
-    > HoprTicketPriceOracleEventsInstance<T, P, N> {
+    > HoprTicketPriceOracleEventsInstance<P, N> {
         /// Creates a new event filter using this contract instance's provider and address.
         ///
         /// Note that the type can be any event, not just those defined in this contract.
         /// Prefer using the other methods for building type-safe event filters.
         pub fn event_filter<E: alloy_sol_types::SolEvent>(
             &self,
-        ) -> alloy_contract::Event<T, &P, E, N> {
+        ) -> alloy_contract::Event<&P, E, N> {
             alloy_contract::Event::new_sol(&self.provider, &self.address)
         }
         ///Creates a new event filter for the [`TicketPriceUpdated`] event.
         pub fn TicketPriceUpdated_filter(
             &self,
-        ) -> alloy_contract::Event<T, &P, TicketPriceUpdated, N> {
+        ) -> alloy_contract::Event<&P, TicketPriceUpdated, N> {
             self.event_filter::<TicketPriceUpdated>()
         }
     }

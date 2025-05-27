@@ -43,7 +43,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "0.12.6", default-features = false, features = [
+alloy = { version = "1.0.4", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -56,7 +56,7 @@ aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
 async-channel = "2.3.1"
 async-lock = "3.4.0"
-async-signal = "0.2.10"
+async-signal = "0.2.11"
 async-std = { version = "1.13.1", features = ["attributes", "unstable"] }
 async-std-resolver = { version = "0.24.4" }
 async-stream = "0.3.6"
@@ -67,6 +67,7 @@ axum = { version = "0.8.4", features = ["ws", "http2"] }
 axum-extra = { version = "0.10.1", features = ["query"] }
 backon = { version = "1.5.0", default-features = false }
 base64 = "0.22.1"
+bigdecimal = "0.4.8"
 bimap = "0.6.3"
 bincode = { version = "2.0.1", features = ["serde"] }
 bitvec = "1.0.1"
@@ -169,8 +170,8 @@ serial_test = "3.2.0"
 sha3 = "0.10.8"
 signal-hook = "0.3.18"
 smart-default = "0.7.1"
-socket2 = "0.5.9"
-sqlx = { version = "0.8.5", default-features = false, features = [
+socket2 = "0.5.10"
+sqlx = { version = "0.8.6", default-features = false, features = [
   "sqlite",
   "macros",
   "migrate",
@@ -180,7 +181,7 @@ subtle = "2.6.1"
 tempfile = "3.20.0"
 test-log = { version = "0.2.17", features = ["trace"] }
 thiserror = "2.0.12"
-tokio = { version = "1.45.0", features = [
+tokio = { version = "1.45.1", features = [
   "rt-multi-thread",
   "macros",
   "tracing",
@@ -201,7 +202,7 @@ tracing-subscriber = { version = "0.3.19", features = [
 ] }
 tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 typenum = "1.18.0"
-uuid = { version = "1.16.0" }
+uuid = { version = "1.17.0" }
 url = { version = "2.5.4", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }

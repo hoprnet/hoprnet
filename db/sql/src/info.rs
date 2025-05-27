@@ -63,16 +63,16 @@ pub trait HoprDbInfoOperations {
     async fn clear_index_db<'a>(&'a self, tx: OptTx<'a>) -> Result<()>;
 
     /// Gets node's Safe balance of HOPR tokens.
-    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
+    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<HoprBalance>;
 
     /// Sets node's Safe balance of HOPR tokens.
-    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()>;
+    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: HoprBalance) -> Result<()>;
 
     /// Gets node's Safe allowance of HOPR tokens.
-    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance>;
+    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<HoprBalance>;
 
     /// Sets node's Safe allowance of HOPR tokens.
-    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()>;
+    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: HoprBalance) -> Result<()>;
 
     /// Gets node's Safe addresses info.
     async fn get_safe_info<'a>(&'a self, tx: OptTx<'a>) -> Result<Option<SafeInfo>>;
@@ -103,7 +103,7 @@ pub trait HoprDbInfoOperations {
     /// Updates the ticket price.
     /// To retrieve the stored ticket price, use [`HoprDbInfoOperations::get_indexer_data`],
     /// note that this setter should invalidate the cache.
-    async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()>;
+    async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: HoprBalance) -> Result<()>;
 
     /// Gets the indexer state info.
     async fn get_indexer_state_info<'a>(&'a self, tx: OptTx<'a>) -> Result<IndexerStateInfo>;
@@ -187,7 +187,7 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
+    async fn get_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>) -> Result<HoprBalance> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -196,13 +196,13 @@ impl HoprDbInfoOperations for HoprDb {
                         .one(tx.as_ref())
                         .await?
                         .ok_or(MissingFixedTableEntry("node_info".into()))
-                        .map(|m| BalanceType::HOPR.balance_bytes(m.safe_balance))
+                        .map(|m| HoprBalance::from_be_bytes(m.safe_balance))
                 })
             })
             .await
     }
 
-    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: Balance) -> Result<()> {
+    async fn set_safe_hopr_balance<'a>(&'a self, tx: OptTx<'a>, new_balance: HoprBalance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -210,7 +210,7 @@ impl HoprDbInfoOperations for HoprDb {
                     Ok::<_, DbSqlError>(
                         node_info::ActiveModel {
                             id: Set(SINGULAR_TABLE_FIXED_ID),
-                            safe_balance: Set(new_balance.amount().to_be_bytes().into()),
+                            safe_balance: Set(new_balance.to_be_bytes().into()),
                             ..Default::default()
                         }
                         .update(tx.as_ref()) // DB is primed in the migration, so only update is needed
@@ -223,7 +223,7 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<Balance> {
+    async fn get_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>) -> Result<HoprBalance> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -232,13 +232,13 @@ impl HoprDbInfoOperations for HoprDb {
                         .one(tx.as_ref())
                         .await?
                         .ok_or(MissingFixedTableEntry("node_info".into()))
-                        .map(|m| BalanceType::HOPR.balance_bytes(m.safe_allowance))
+                        .map(|m| HoprBalance::from_be_bytes(m.safe_allowance))
                 })
             })
             .await
     }
 
-    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: Balance) -> Result<()> {
+    async fn set_safe_hopr_allowance<'a>(&'a self, tx: OptTx<'a>, new_allowance: HoprBalance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
@@ -358,7 +358,7 @@ impl HoprDbInfoOperations for HoprDb {
                                     ledger_dst,
                                     safe_registry_dst,
                                     channels_dst,
-                                    ticket_price: model.ticket_price.map(|p| BalanceType::HOPR.balance_bytes(p)),
+                                    ticket_price: model.ticket_price.map(HoprBalance::from_be_bytes),
                                     minimum_incoming_ticket_winning_prob: (model.min_incoming_ticket_win_prob as f64)
                                         .try_into()?,
                                     nr_enabled: model.network_registry_enabled,
@@ -438,14 +438,14 @@ impl HoprDbInfoOperations for HoprDb {
         Ok(())
     }
 
-    async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: Balance) -> Result<()> {
+    async fn update_ticket_price<'a>(&'a self, tx: OptTx<'a>, price: HoprBalance) -> Result<()> {
         self.nest_transaction(tx)
             .await?
             .perform(|tx| {
                 Box::pin(async move {
                     chain_info::ActiveModel {
                         id: Set(SINGULAR_TABLE_FIXED_ID),
-                        ticket_price: Set(Some(price.amount().to_be_bytes().into())),
+                        ticket_price: Set(Some(price.to_be_bytes().into())),
                         ..Default::default()
                     }
                     .update(tx.as_ref())
@@ -588,7 +588,7 @@ impl HoprDbInfoOperations for HoprDb {
 mod tests {
     use hex_literal::hex;
     use hopr_crypto_types::{keypairs::ChainKeypair, prelude::Keypair};
-    use hopr_primitive_types::prelude::{Address, BalanceType};
+    use hopr_primitive_types::{balance::HoprBalance, prelude::Address};
 
     use crate::{
         db::HoprDb,
@@ -605,12 +605,12 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             db.get_safe_hopr_balance(None).await?,
             "balance must be 0"
         );
 
-        let balance = BalanceType::HOPR.balance(10_000);
+        let balance = HoprBalance::from(10_000);
         db.set_safe_hopr_balance(None, balance).await?;
 
         assert_eq!(
@@ -626,12 +626,12 @@ mod tests {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
         assert_eq!(
-            BalanceType::HOPR.zero(),
+            HoprBalance::zero(),
             db.get_safe_hopr_allowance(None).await?,
             "balance must be 0"
         );
 
-        let balance = BalanceType::HOPR.balance(10_000);
+        let balance = HoprBalance::from(10_000);
         db.set_safe_hopr_allowance(None, balance).await?;
 
         assert_eq!(
@@ -650,7 +650,7 @@ mod tests {
         let data = db.get_indexer_data(None).await?;
         assert_eq!(data.ticket_price, None);
 
-        let price = BalanceType::HOPR.balance(10);
+        let price = HoprBalance::from(10);
         db.update_ticket_price(None, price).await?;
 
         db.set_minimum_incoming_ticket_win_prob(None, 0.5.try_into()?).await?;

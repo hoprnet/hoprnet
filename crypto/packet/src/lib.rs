@@ -122,6 +122,8 @@ mod tests {
 
     #[test]
     fn max_surbs_per_packet_must_be_at_least_2() {
-        assert!(HoprPacket::MAX_SURBS_IN_PACKET >= 2);
+        const _: () = {
+            assert!(HoprPacket::MAX_SURBS_IN_PACKET >= 2);
+        };
     }
 }

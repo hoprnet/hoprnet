@@ -57,9 +57,9 @@ pub enum ChainEventType {
     /// Channel closure has been finalized.
     ChannelClosed(ChannelEntry),
     /// Channel balance has increased by an amount.
-    ChannelBalanceIncreased(ChannelEntry, Balance),
+    ChannelBalanceIncreased(ChannelEntry, HoprBalance),
     /// Channel balance has decreased by an amount.
-    ChannelBalanceDecreased(ChannelEntry, Balance),
+    ChannelBalanceDecreased(ChannelEntry, HoprBalance),
     /// Ticket has been redeemed on a channel.
     /// If the channel is a node's own, it also contains the ticket that has been redeemed.
     TicketRedeemed(ChannelEntry, Option<AcknowledgedTicket>),

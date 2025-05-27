@@ -11,7 +11,6 @@ mod preconditions;
 mod prometheus;
 mod session;
 mod tickets;
-mod types;
 
 pub(crate) mod env {
     /// Name of the environment variable specifying automatic port range selection for Sessions.

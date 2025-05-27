@@ -107,7 +107,7 @@ hopr:
         # If set, all tickets will be redeemed on channel closure.
         redeem_all_on_close: true
         # Sets the minimum value of a ticket to be able to redeem it.
-        minimum_redeem_ticket_value: "90000000000000000 HOPR"
+        minimum_redeem_ticket_value: "0.09 wxHOPR"
         #
         ############################################
         #
@@ -119,10 +119,10 @@ hopr:
         #
         # Amount to automatically fund a channel that dropped
         # below the threshold
-        # funding_amount: "10000000000000000000 HOPR"
+        # funding_amount: "10 wxHOPR"
         #
         # Auto funding threshold
-        # min_stake_threshold: "1000000000000000000 HOPR"
+        # min_stake_threshold: "1 wxHOPR"
         #
         ############################################
         #
@@ -144,10 +144,10 @@ hopr:
         # minimum_peer_pings: 50
         #
         # # A stake of tokens that should be allocated to a channel opened by the strategy.
-        # new_channel_stake: "10000000000000000000 HOPR"
+        # new_channel_stake: "10 wHOPR"
         #
         # # Minimum token balance of the node. When reached, the strategy will not open any new channels.
-        # minimum_safe_balance: "1000000000000000000000 HOPR"
+        # minimum_safe_balance: "1000 wxHOPR"
         #
         # # If set, the strategy will aggressively close channels (even with peers above the `network_quality_threshold`)
         # # if the number of opened outgoing channels (regardless if opened by the strategy or manually) exceeds the

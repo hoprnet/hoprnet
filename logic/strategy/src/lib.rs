@@ -39,6 +39,8 @@
 //!       aggregation_threshold: 1000
 //! ```
 
+use std::str::FromStr;
+
 use hopr_primitive_types::prelude::*;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, VariantNames};
@@ -105,7 +107,7 @@ pub fn hopr_default_strategies() -> MultiStrategyConfig {
             AutoRedeeming(AutoRedeemingStrategyConfig {
                 redeem_only_aggregated: true,
                 redeem_all_on_close: true,
-                minimum_redeem_ticket_value: Balance::new_from_str("90000000000000000", BalanceType::HOPR),
+                minimum_redeem_ticket_value: HoprBalance::from_str("0.09 wxHOPR").unwrap(),
             }),
         ],
     }

@@ -2,6 +2,7 @@ import asyncio
 import base64
 import logging
 import random
+from decimal import Decimal, ROUND_UP
 from typing import Optional
 
 import aiohttp
@@ -53,21 +54,21 @@ def getlogger():
 log = getlogger()
 
 
-def seal_with_peerid(peer_id: str, plain_text: bytes, random_padding_len: int = 0) -> bytes:
+def seal_with_address(address: str, plain_text: bytes, random_padding_len: int = 0) -> bytes:
     """
-    This function takes a PeerID and plaintext data as inputs,
-    extracts the Ed25519 public key corresponding to the PeerID,
+    This function takes an Address and plaintext data as inputs,
+    extracts the Ed25519 public key corresponding to the Address,
     converts it to a Curve25519 key (for encryption),
     and returns a sealed box of the input plaintext encrypted using that public key.
     If specified, it also adds random padding with `@` character to the plaintext.
     This can be done to obscure the length of the plaintext.
     """
     try:
-        # Step 1: Decode the PeerID from base58
-        decoded_peer_id = base58.b58decode(peer_id)
+        # Step 1: Decode the Address from base58
+        decoded_address = base58.b58decode(address)
 
         # Step 2: Extract the public key (skip the multicodec prefix)
-        ed25519_pubkey = decoded_peer_id[6:]
+        ed25519_pubkey = decoded_address[6:]
 
         # Step 3: Convert the Ed25519 public key to a Curve25519 public key for encryption
         curve25519_pubkey = nacl.bindings.crypto_sign_ed25519_pk_to_curve25519(ed25519_pubkey)
@@ -155,11 +156,11 @@ class HoprdAPI:
         is_ok, response = await self.__call_api(HTTPMethod.GET, "account/balances")
         return Balances(response) if is_ok else None
 
-    async def open_channel(self, destination: str, amount: str) -> Optional[OpenedChannel]:
+    async def open_channel(self, destination: str, amount: Decimal) -> Optional[OpenedChannel]:
         """
         Opens a channel with the given peer_address and amount.
         :param: peer_address: str
-        :param: amount: str
+        :param: amount: Decimal
         :return: channel id: str | undefined
         """
         data = OpenChannelBody(amount, destination)
@@ -167,7 +168,7 @@ class HoprdAPI:
         is_ok, response = await self.__call_api(HTTPMethod.POST, "channels", data)
         return OpenedChannel(response) if is_ok else None
 
-    async def fund_channel(self, channel_id: str, amount: float) -> bool:
+    async def fund_channel(self, channel_id: str, amount: Decimal) -> bool:
         """
         Funds a given channel.
         :param: channel_id: str
@@ -338,7 +339,7 @@ class HoprdAPI:
         :param: currency: str
         :return:
         """
-        data = WithdrawBody(receipient, amount, currency)
+        data = WithdrawBody(receipient, amount=f"{amount} {currency}")
         is_ok, _ = await self.__call_api(HTTPMethod.POST, "account/withdraw", data=data)
         return is_ok
 
@@ -387,7 +388,7 @@ class HoprdAPI:
     ) -> Optional[Session]:
         """
         Creates a new client session returning the given session listening host & port over TCP or UDP.
-        :param destination: PeerID of the recipient
+        :param destination: Address of the recipient
         :param forward_path: Forward routing options for the session.
         :param return_path: Return routing options for the session.
         :param protocol: Protocol (UDP or TCP)
@@ -400,7 +401,7 @@ class HoprdAPI:
         :return: Session
         """
         actual_target = (
-            {"Sealed": base64.b64encode(seal_with_peerid(destination, bytes(target, "utf-8"), 50)).decode("ascii")}
+            {"Sealed": base64.b64encode(seal_with_address(destination, bytes(target, "utf-8"), 50)).decode("ascii")}
             if sealed_target
             else {"Service": int(target)}
             if service

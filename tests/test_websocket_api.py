@@ -30,7 +30,7 @@ class TestWebsocketWithSwarm:
                 url = to_ws_url(
                     swarm7[src].host_addr,
                     swarm7[src].api_port,
-                    args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
+                    args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].address}")],
                 )
                 ws.connect(url)
             except websocket.WebSocketBadStatusException as e:
@@ -47,7 +47,7 @@ class TestWebsocketWithSwarm:
                 url = to_ws_url(
                     swarm7[src].host_addr,
                     swarm7[src].api_port,
-                    args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
+                    args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].address}")],
                 )
                 ws.connect(url, header={"X-Auth-Token": "InvAliD_toKeN"})
             except websocket.WebSocketBadStatusException as e:
@@ -64,7 +64,7 @@ class TestWebsocketWithSwarm:
                 url = to_ws_url(
                     swarm7[src].host_addr,
                     swarm7[src].api_port,
-                    args=[("apiToken", "InvAlid_Token")] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
+                    args=[("apiToken", "InvAlid_Token")] + DEFAULT_ARGS + [("destination", f"{swarm7[dest].address}")],
                 )
                 ws.connect(url)
             except websocket.WebSocketBadStatusException as e:
@@ -81,7 +81,7 @@ class TestWebsocketWithSwarm:
                 url = to_ws_url(
                     swarm7[src].host_addr,
                     swarm7[src].api_port,
-                    args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
+                    args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].address}")],
                 )
                 ws.connect(url, header={"Authorization": "Bearer InvAliD_toKeN"})
             except websocket.WebSocketBadStatusException as e:
@@ -97,7 +97,7 @@ class TestWebsocketWithSwarm:
             url = to_ws_url(
                 swarm7[src].host_addr,
                 swarm7[src].api_port,
-                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
+                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].address}")],
             )
             ws.connect(url, header={"X-Auth-Token": swarm7[src].api_token})
 
@@ -117,7 +117,7 @@ class TestWebsocketWithSwarm:
                 swarm7[src].api_port,
                 args=[("apiToken", swarm7[src].api_token)]
                 + DEFAULT_ARGS
-                + [("destination", f"{swarm7[dest].peer_id}")],
+                + [("destination", f"{swarm7[dest].address}")],
             )
             ws.connect(url)
 
@@ -131,7 +131,7 @@ class TestWebsocketWithSwarm:
             url = to_ws_url(
                 swarm7[src].host_addr,
                 swarm7[src].api_port,
-                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
+                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].address}")],
             )
             ws.connect(url, header={"Authorization": "Bearer " + swarm7[src].api_token})
 
@@ -146,7 +146,7 @@ class TestWebsocketWithSwarm:
             url = to_ws_url(
                 swarm7[src].host_addr,
                 f"{swarm7[src].api_port}/defIniteLY_InVAliD_paTh",
-                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].peer_id}")],
+                args=DEFAULT_ARGS + [("destination", f"{swarm7[dest].address}")],
             )
             ws.connect(url, header={"X-Auth-Token": swarm7[src].api_token})
         except websocket.WebSocketBadStatusException as e:
@@ -166,12 +166,12 @@ class TestWebsocketWithSwarm:
                     swarm7[src].api_port,
                     args=[("target", f"127.0.0.1:{server.port}")]
                     + DEFAULT_ARGS
-                    + [("destination", f"{swarm7[dest].peer_id}")],
+                    + [("destination", f"{swarm7[dest].address}")],
                 ),
                 additional_headers=[("X-Auth-Token", swarm7[src].api_token)],
             ) as ws:
                 for i in range(message_target_count):
-                    body = f"hello msg #{i} from peer {swarm7[src].peer_id} to peer {swarm7[dest].peer_id}"
+                    body = f"hello msg #{i} from peer {swarm7[src].address} to peer {swarm7[dest].address}"
 
                     await ws.send(body.encode())
 
