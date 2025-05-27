@@ -275,7 +275,7 @@ impl Probe {
                                 },
                                 Message::Probe(NeighborProbe::Pong(ping)) => {
                                     tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received pong");
-                                    if let Some((peer, start, replier)) = active_probes.get(&(pseudonym, NeighborProbe::Ping(ping))).await {
+                                    if let Some((peer, start, replier)) = active_probes.remove(&(pseudonym, NeighborProbe::Ping(ping))).await {
                                         let latency = current_time()
                                             .as_unix_timestamp()
                                             .saturating_sub(start)
