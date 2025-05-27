@@ -2,11 +2,9 @@
 #################################################################################
 # Pipeline to add labels to pull requests in the hoprnet repository.
 #################################################################################
-name: Build
+name: Add label
 
 on:
-  merge_group:
-    types: [checks_requested]
   pull_request_target:
     types:
       - opened
