@@ -128,14 +128,6 @@ impl NetworkBehaviour for Behaviour {
 
     fn on_swarm_event(&mut self, event: libp2p::swarm::FromSwarm) {
         match event {
-            libp2p::swarm::FromSwarm::NewExternalAddrOfPeer(record) => {
-                if self.allowed_peers.contains(&record.peer_id) {
-                    debug!(peer = %record.peer_id, address = %record.addr, "p2p - discovery - New external address of peer");
-                    self.all_peers.insert(record.peer_id, record.addr.clone());
-                } else {
-                    debug!(peer = %record.peer_id, "p2p - discovery - New external address of peer is not allowed");
-                }
-            }
             libp2p::swarm::FromSwarm::ConnectionEstablished(data) => {
                 *self.connected_peers.entry(data.peer_id).or_insert(0) += 1
             }
