@@ -208,7 +208,7 @@ impl Probe {
                                             if let Err(error) = packet_sent_rx.await {
                                                 tracing::error!(%peer, %error, "failed to receive packet sent confirmation")
                                             } else {
-                                                tracing::debug!(%peer, %pseudonym, ?nonce, "waiting for a sent probe");
+                                                tracing::debug!(%peer, %pseudonym, %nonce, "waiting for a sent probe");
                                                 active_probes
                                                     .insert((pseudonym, nonce), (peer, current_time().as_unix_timestamp(), notifier))
                                                     .await;
