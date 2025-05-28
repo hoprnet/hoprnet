@@ -508,7 +508,7 @@ where
 
         let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
         for (k, v) in probe
-            .continuous_network_probe(
+            .continuously_scan(
                 (external_msg_send, rx_from_protocol),
                 manual_ping_rx,
                 network_notifier::ProbeNetworkInteractions::new(
