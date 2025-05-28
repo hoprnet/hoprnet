@@ -726,7 +726,10 @@ impl Hopr {
                 .await
                 .unwrap_or(false)
             {
-                info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.", my_ethereum_address.to_hex());
+                info!(
+                    "Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.",
+                    my_ethereum_address.to_hex()
+                );
 
                 sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 
@@ -1362,7 +1365,7 @@ impl Hopr {
         let confirmation = self
             .hopr_chain_api
             .actions_ref()
-            .close_channel(*counterparty, direction, redeem_before_close)
+            .close_channel_by_counterparty(*counterparty, direction, redeem_before_close)
             .await?
             .await?;
 
@@ -1413,7 +1416,7 @@ impl Hopr {
         let confirmation = self
             .hopr_chain_api
             .actions_ref()
-            .close_multiple_channels(direction, status, redeem_before_close)
+            .close_channel_by_status(direction, status, redeem_before_close)
             .await?
             .await?;
 

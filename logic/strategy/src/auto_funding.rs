@@ -142,13 +142,13 @@ mod tests {
         impl ChannelActions for ChannelAct {
             async fn open_channel(&self, destination: Address, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
             async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn close_channel(
+            async fn close_channel_by_counterparty(
                 &self,
                 counterparty: Address,
                 direction: ChannelDirection,
                 redeem_before_close: bool,
             ) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn close_multiple_channels(
+            async fn close_channel_by_status(
                 &self,
                 direction: ChannelDirection,
                 status: ChannelStatus,

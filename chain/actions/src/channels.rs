@@ -49,15 +49,15 @@ pub trait ChannelActions {
 
     /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that
     /// channel, in case the `direction` is [`ChannelDirection::Incoming`].
-    async fn close_channel(
+    async fn close_channel_by_counterparty(
         &self,
         counterparty: Address,
         direction: ChannelDirection,
         redeem_before_close: bool,
     ) -> Result<PendingAction>;
 
-    /// Closes all channels in the given direction. Optionally can issue redeeming of all tickets in those channels.
-    async fn close_multiple_channels(
+    /// Closes all channels, or those of a specific direction when given. Optionally can issue redeeming of all tickets in those channels.
+    async fn close_channel_by_status(
         &self,
         direction: ChannelDirection,
         status: ChannelStatus,
@@ -180,7 +180,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn close_channel(
+    async fn close_channel_by_counterparty(
         &self,
         counterparty: Address,
         direction: ChannelDirection,
@@ -209,7 +209,9 @@ where
                         match remaining_closure_time {
                             Some(Duration::ZERO) => {
                                 info!(%channel, %direction, "initiating finalization of channel closure");
-                                self.tx_sender.send(Action::CloseChannel(channel, direction)).await
+                                self.tx_sender
+                                    .send(Action::CloseChannel(vec![channel], direction, channel.status))
+                                    .await
                             }
                             _ => Err(ClosureTimeHasNotElapsed(
                                 channel
@@ -228,7 +230,9 @@ where
                         }
 
                         info!(%channel, ?direction, "initiating channel closure");
-                        self.tx_sender.send(Action::CloseChannel(channel, direction)).await
+                        self.tx_sender
+                            .send(Action::CloseChannel(vec![channel], direction, channel.status))
+                            .await
                     }
                 }
             }
@@ -237,7 +241,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn close_multiple_channels(
+    async fn close_channel_by_status(
         &self,
         direction: ChannelDirection,
         status: ChannelStatus,
@@ -248,32 +252,27 @@ where
             .get_channels_via(None, direction, &self.self_address())
             .await?
             .into_iter()
-            .filter(|channel| matches!(channel.status, ChannelStatus::PendingToClose(_) | ChannelStatus::Open))
-            .collect::<Vec<_>>();
-
-        debug!(?direction, %status, "found channels to close");
-
-        // For outgoing channels, filter out channels that are in pending to close state but not ready to be finalized
-        let channels = channels
-            .into_iter()
             .filter(|channel| match channel.status {
-                ChannelStatus::PendingToClose(closure_time) if channel.source == self.self_address() => {
-                    let remaining_closure_time = channel.remaining_closure_time(closure_time);
-                    info!(%channel, ?remaining_closure_time, "remaining closure time update for a channel");
-                    remaining_closure_time == Some(Duration::ZERO)
+                ChannelStatus::Open if channel.status == status => true,
+                ChannelStatus::PendingToClose(closure_time) if channel.status == status => {
+                    if channel.source == self.self_address() {
+                        let remaining = channel.remaining_closure_time(closure_time);
+                        info!(%channel, ?remaining, "remaining closure time update for a channel");
+                        remaining == Some(Duration::ZERO)
+                    } else {
+                        true
+                    }
                 }
-                _ => true,
+                _ => false,
             })
             .collect::<Vec<_>>();
 
+        debug!(?channels, ?direction, ?status, "found channels to close");
+
         if channels.is_empty() {
+            debug!(?direction, "no channels to close");
             return Err(NoChannelToClose);
         }
-
-        debug!(
-            ?channels,
-            "found channels to close after checking the remaining closure time"
-        );
 
         if redeem_before_close {
             // TODO: trigger aggregation
@@ -286,9 +285,12 @@ where
         }
 
         info!(?channels, ?direction, "sending channel closure requests");
-        self.tx_sender
-            .send(Action::CloseChannels(channels, direction, status))
-            .await
+
+        // depending on the number of channels, we can call either CloseChannel or CloseChannels
+        return self
+            .tx_sender
+            .send(Action::CloseChannel(channels, direction, status))
+            .await;
     }
 }
 #[cfg(test)]
@@ -773,14 +775,14 @@ mod tests {
             .expect_initiate_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dsts: &Vec<Address>| dsts.len() == 1 && dsts[0].eq(&BOB))
             .returning(move |_| Ok(random_hash));
 
         tx_exec
             .expect_finalize_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dsts: &Vec<Address>| dsts.len() == 1 && dsts[0].eq(&BOB))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -818,13 +820,13 @@ mod tests {
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .close_channel_by_counterparty(*BOB, ChannelDirection::Outgoing, false)
             .await?
             .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
-            matches!(tx_res.action, Action::CloseChannel(_, _)),
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
             "must be close channel action"
         );
         assert!(
@@ -838,13 +840,13 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .close_channel_by_counterparty(*BOB, ChannelDirection::Outgoing, false)
             .await?
             .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
-            matches!(tx_res.action, Action::CloseChannel(_, _)),
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
             "must be close channel action"
         );
         assert!(
@@ -870,7 +872,7 @@ mod tests {
             .expect_close_incoming_channel()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dsts: &Vec<Address>| dsts.len() == 1 && dsts[0].eq(&BOB))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -893,13 +895,13 @@ mod tests {
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Incoming, false)
+            .close_channel_by_counterparty(*BOB, ChannelDirection::Incoming, false)
             .await?
             .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
-            matches!(tx_res.action, Action::CloseChannel(_, _)),
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
             "must be close channel action"
         );
         assert!(
@@ -937,7 +939,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel_by_counterparty(*BOB, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -964,7 +966,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel_by_counterparty(*BOB, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -995,7 +997,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel_by_counterparty(*BOB, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -1028,17 +1030,17 @@ mod tests {
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
         tx_exec
-            .expect_initiate_multiple_outgoing_channels_closure()
+            .expect_initiate_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dsts| vec![*BOB, *EVE].eq(dsts))
+            .withf(move |dsts: &Vec<Address>| vec![*BOB, *EVE].eq(dsts))
             .returning(move |_| Ok(random_hash));
 
         tx_exec
-            .expect_finalize_multiple_outgoing_channels_closure()
+            .expect_finalize_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dsts| vec![*BOB, *EVE].eq(dsts))
+            .withf(move |dsts: &Vec<Address>| vec![*BOB, *EVE].eq(dsts))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -1081,13 +1083,13 @@ mod tests {
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_multiple_channels(ChannelDirection::Outgoing, ChannelStatus::Open, false)
+            .close_channel_by_status(ChannelDirection::Outgoing, ChannelStatus::Open, false)
             .await?
             .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
-            matches!(tx_res.action, Action::CloseChannels(_, _, _)),
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
             "must be close channel action"
         );
         assert!(
@@ -1103,7 +1105,7 @@ mod tests {
         db.upsert_channel(None, channel_alice_eve).await?;
 
         let tx_res = actions
-            .close_multiple_channels(
+            .close_channel_by_status(
                 ChannelDirection::Outgoing,
                 ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10))),
                 false,
@@ -1113,7 +1115,7 @@ mod tests {
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
-            matches!(tx_res.action, Action::CloseChannels(_, _, _)),
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
             "must be close channel action"
         );
         assert!(
@@ -1143,10 +1145,10 @@ mod tests {
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
         tx_exec
-            .expect_close_multiple_incoming_channels()
+            .expect_close_incoming_channel()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dsts| vec![*BOB, *EVE].eq(dsts))
+            .withf(move |dsts: &Vec<Address>| vec![*BOB, *EVE].eq(dsts))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -1189,13 +1191,13 @@ mod tests {
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_multiple_channels(ChannelDirection::Incoming, ChannelStatus::Open, false)
+            .close_channel_by_status(ChannelDirection::Incoming, ChannelStatus::Open, false)
             .await?
             .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
-            matches!(tx_res.action, Action::CloseChannels(_, _, _)),
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
             "must be close channel action"
         );
         assert!(

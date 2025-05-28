@@ -109,7 +109,7 @@ where
                 info!(channel = %channel_cpy, "channel closure finalizer: finalizing closure");
                 match self
                     .hopr_chain_actions
-                    .close_channel(channel_cpy.destination, ChannelDirection::Outgoing, false)
+                    .close_channel_by_counterparty(channel_cpy.destination, ChannelDirection::Outgoing, false)
                     .await
                 {
                     Ok(_) => {
@@ -166,13 +166,13 @@ mod tests {
         impl ChannelActions for ChannelAct {
             async fn open_channel(&self, destination: Address, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
             async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn close_channel(
+            async fn close_channel_by_counterparty(
                 &self,
                 counterparty: Address,
                 direction: ChannelDirection,
                 redeem_before_close: bool,
             ) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn close_multiple_channels(
+            async fn close_channel_by_status(
                 &self,
                 direction: ChannelDirection,
                 status: ChannelStatus,
@@ -186,7 +186,7 @@ mod tests {
         ActionConfirmation {
             tx_hash: random_hash,
             event: Some(ChainEventType::ChannelClosureInitiated(channel)),
-            action: Action::CloseChannel(channel, ChannelDirection::Outgoing),
+            action: Action::CloseChannel(vec![channel], ChannelDirection::Outgoing, channel.status),
         }
     }
 
@@ -244,7 +244,7 @@ mod tests {
 
         let mut actions = MockChannelAct::new();
         actions
-            .expect_close_channel()
+            .expect_close_channel_by_counterparty()
             .once()
             .withf(|addr, dir, _| DAVE.eq(addr) && ChannelDirection::Outgoing.eq(dir))
             .return_once(move |_, _, _| Ok(ok(mock_action_confirmation_closure(c_pending_elapsed)).boxed()));

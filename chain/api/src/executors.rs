@@ -133,43 +133,27 @@ where
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn initiate_outgoing_channel_closure(&self, dst: Address) -> hopr_chain_actions::errors::Result<Hash> {
-        let payload = self.payload_generator.initiate_outgoing_channel_closure(dst)?;
-        Ok(self.client.post_transaction(payload).await?)
-    }
-
-    async fn initiate_multiple_outgoing_channels_closure(
+    async fn initiate_outgoing_channel_closure<S: IntoIterator<Item = Address> + Send>(
         &self,
-        dsts: Vec<Address>,
+        dst: S,
     ) -> hopr_chain_actions::errors::Result<Hash> {
-        let payload = self
-            .payload_generator
-            .initiate_multiple_outgoing_channels_closure(dsts)?;
+        let payload = self.payload_generator.initiate_outgoing_channel_closure::<S>(dst)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn finalize_outgoing_channel_closure(&self, dst: Address) -> hopr_chain_actions::errors::Result<Hash> {
-        let payload = self.payload_generator.finalize_outgoing_channel_closure(dst)?;
-        Ok(self.client.post_transaction(payload).await?)
-    }
-
-    async fn finalize_multiple_outgoing_channels_closure(
+    async fn finalize_outgoing_channel_closure<S: IntoIterator<Item = Address> + Send>(
         &self,
-        dsts: Vec<Address>,
+        dst: S,
     ) -> hopr_chain_actions::errors::Result<Hash> {
-        let payload = self
-            .payload_generator
-            .finalize_multiple_outgoing_channels_closure(dsts)?;
+        let payload = self.payload_generator.finalize_outgoing_channel_closure::<S>(dst)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn close_incoming_channel(&self, src: Address) -> hopr_chain_actions::errors::Result<Hash> {
-        let payload = self.payload_generator.close_incoming_channel(src)?;
-        Ok(self.client.post_transaction(payload).await?)
-    }
-
-    async fn close_multiple_incoming_channels(&self, srcs: Vec<Address>) -> hopr_chain_actions::errors::Result<Hash> {
-        let payload = self.payload_generator.close_multiple_incoming_channels(srcs)?;
+    async fn close_incoming_channel<S: IntoIterator<Item = Address> + Send>(
+        &self,
+        src: S,
+    ) -> hopr_chain_actions::errors::Result<Hash> {
+        let payload = self.payload_generator.close_incoming_channel::<S>(src)?;
         Ok(self.client.post_transaction(payload).await?)
     }
 
