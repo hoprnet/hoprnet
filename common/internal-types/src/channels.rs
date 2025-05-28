@@ -359,4 +359,19 @@ mod tests {
             ChannelStatus::from_str("PendingToClose").unwrap()
         );
     }
+
+    #[test]
+    fn test_channel_status_from_str_to_string_roundtrip() {
+        // Closed
+        let closed = ChannelStatus::Closed;
+        assert_eq!(ChannelStatus::from_str(&closed.to_string()), Ok(closed));
+
+        // Open
+        let open = ChannelStatus::Open;
+        assert_eq!(ChannelStatus::from_str(&open.to_string()), Ok(open));
+
+        // PendingToClose
+        // From string works, but we cannot compare the time
+        assert!(ChannelStatus::from_str("PendingToClose").is_ok());
+    }
 }
