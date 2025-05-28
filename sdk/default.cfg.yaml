@@ -2,12 +2,12 @@
 hopr:
   # run heartbeats more frequently
   probe:
-    timeout: 5
+    timeout: 1
     max_parallel_probes: 10
-    recheck_threshold: 5
+    recheck_threshold: 1
   network_options:
     # ignore for shorter than heartbeat cycle
-    ignore_timeframe: 1
+    ignore_timeframe: 0
   strategy:
     on_fail_continue: true
     execution_interval: 1
