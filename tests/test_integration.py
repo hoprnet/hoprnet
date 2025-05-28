@@ -323,53 +323,6 @@ class TestIntegrationWithSwarm:
             logging.info(f"Now there are {len(channels)} channels opened")
             assert len(channels) == 0
 
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize(
-        "route",
-        [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
-    )
-    async def test_close_multiple_channels_at_once(self, route, swarm7: dict[str, Node]):
-        src = swarm7[route[0]]
-
-        logging.info(f"Opening channels between {src.peer_id} -> {swarm7[route[1]].peer_id}")
-        logging.info(f"Opening channels between {src.peer_id} -> {swarm7[route[2]].peer_id}")
-        async with AsyncExitStack() as channels:
-            await asyncio.gather(
-                *[
-                    channels.enter_async_context(
-                        create_channel(
-                            src,
-                            swarm7[route[i + 1]],
-                            OPEN_CHANNEL_FUNDING_VALUE_HOPR,
-                            close_from_dest=False,
-                        )
-                    )
-                    for i in range(len(route) - 1)
-                ]
-            )
-
-            logging.info(f"Channels opened")
-            assert len((await src.api.outgoing_channels(include_closed=False)).all) == 2
-
-            logging.info(f"Checked 2 channels are opened")
-            # turn all Open channels to PendingToClose
-            assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
-            logging.info(f"Closed open channels")
-
-            channels = (await src.api.outgoing_channels(include_closed=False)).all
-            logging.info(f"Still 2 channels are opened")
-
-            assert all(c.status == ChannelStatus.PendingToClose for c in channels)
-            logging.info(f"Two channels are in PendingToClose state")
-
-            # turn all PendingToClose channels to Closed
-            assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
-            logging.info(f"Closed PendingToClose channels")
-
-            channels = (await src.api.outgoing_channels(include_closed=False)).all
-            logging.info(f"Now there are {len(channels)} channels opened")
-            assert len(channels) == 0
-
     # generate a 1-hop route with a node using strategies in the middle
     @pytest.mark.asyncio
     @pytest.mark.skip(reason="ticket aggregation is not implemented as a session protocol yet")

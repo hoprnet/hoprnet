@@ -13,6 +13,8 @@
 //! on-chain confirmation of the corresponding operation.
 //! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting
 //! the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent) by the Indexer.
+use std::time::Duration;
+
 use async_trait::async_trait;
 use futures::future::join_all;
 use hopr_chain_types::actions::Action;
@@ -21,7 +23,6 @@ use hopr_db_sql::HoprDbAllOperations;
 use hopr_internal_types::prelude::*;
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
-use std::time::Duration;
 use tracing::{debug, error, info};
 
 use crate::{
@@ -56,7 +57,8 @@ pub trait ChannelActions {
         redeem_before_close: bool,
     ) -> Result<PendingAction>;
 
-    /// Closes all channels, or those of a specific direction when given. Optionally can issue redeeming of all tickets in those channels.
+    /// Closes all channels, or those of a specific direction when given. Optionally can issue redeeming of all tickets
+    /// in those channels.
     async fn close_channel_by_status(
         &self,
         direction: ChannelDirection,
@@ -253,8 +255,8 @@ where
             .await?
             .into_iter()
             .filter(|channel| match channel.status {
-                ChannelStatus::Open if channel.status == status => true,
-                ChannelStatus::PendingToClose(closure_time) if channel.status == status => {
+                ChannelStatus::Open if matches!(status, ChannelStatus::Open) => true,
+                ChannelStatus::PendingToClose(closure_time) if matches!(status, ChannelStatus::PendingToClose(_)) => {
                     if channel.source == self.self_address() {
                         let remaining = channel.remaining_closure_time(closure_time);
                         info!(%channel, ?remaining, "remaining closure time update for a channel");

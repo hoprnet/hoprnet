@@ -494,7 +494,7 @@ pub(crate) struct CloseMultipleBodyRequest {
             content_type = "application/json",
         ),
         responses(
-            (status = 200, description = "Channels closed successfully", body = String),
+            (status = 200, description = "Channels closed successfully", body = CloseMultipleResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 412, description = "The node is not ready."),
             (status = 422, description = "Unknown failure", body = ApiError)
@@ -514,6 +514,7 @@ pub(super) async fn close_multiple_channels(
     let direction = req_body.direction;
     let status = req_body.status;
 
+    // do not redeem tickets
     match hopr.close_multiple_channels(direction, status, false).await {
         Ok(receipt) => (
             StatusCode::OK,
@@ -522,7 +523,7 @@ pub(super) async fn close_multiple_channels(
             }),
         )
             .into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),

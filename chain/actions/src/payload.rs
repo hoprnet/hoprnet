@@ -36,9 +36,7 @@ use hopr_bindings::{
     hoprnodesaferegistry::HoprNodeSafeRegistry::{deregisterNodeBySafeCall, registerSafeByNodeCall},
     hoprtoken::HoprToken::{approveCall, transferCall},
 };
-use hopr_chain_types::ContractAddresses;
-use hopr_chain_types::constants::MULTISEND_CALL_ONLY;
-use hopr_chain_types::utils::MultisendCallOnlyTransaction;
+use hopr_chain_types::{ContractAddresses, constants::MULTISEND_CALL_ONLY, utils::MultisendCallOnlyTransaction};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
@@ -260,8 +258,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
 
                 let tx = TransactionRequest::default()
                     .with_input(tx_payload)
-                    .with_to(MULTISEND_CALL_ONLY)
-                    .with_gas_limit(DEFAULT_TX_GAS);
+                    .with_to(MULTISEND_CALL_ONLY);
                 Ok(tx)
             }
         }
@@ -278,7 +275,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
                 let destination = destinations.into_iter().next().unwrap();
                 if destination.eq(&self.me) {
                     return Err(InvalidArguments(
-                        "Cannot initiate closure of incoming channel to self".into(),
+                        "Cannot initiate closure of outgoing channel from self".into(),
                     ));
                 }
 
@@ -314,8 +311,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
 
                 let tx = TransactionRequest::default()
                     .with_input(tx_payload)
-                    .with_to(MULTISEND_CALL_ONLY)
-                    .with_gas_limit(DEFAULT_TX_GAS);
+                    .with_to(MULTISEND_CALL_ONLY);
                 Ok(tx)
             }
         }
@@ -333,7 +329,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
                 let destination = destinations.into_iter().next().unwrap();
                 if destination.eq(&self.me) {
                     return Err(InvalidArguments(
-                        "Cannot initiate closure of incoming channel to self".into(),
+                        "Cannot finalize closure of outgoing channel from self".into(),
                     ));
                 }
 
@@ -369,8 +365,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
 
                 let tx = TransactionRequest::default()
                     .with_input(tx_payload)
-                    .with_to(MULTISEND_CALL_ONLY)
-                    .with_gas_limit(DEFAULT_TX_GAS);
+                    .with_to(MULTISEND_CALL_ONLY);
                 Ok(tx)
             }
         }
@@ -558,8 +553,7 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
 
                 let tx = TransactionRequest::default()
                     .with_input(multisend_payload(tx_payload))
-                    .with_to(self.module.into())
-                    .with_gas_limit(DEFAULT_TX_GAS);
+                    .with_to(self.module.into());
                 Ok(tx)
             }
         }
@@ -576,7 +570,7 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
                 let destination = destinations.into_iter().next().unwrap();
                 if destination.eq(&self.me) {
                     return Err(InvalidArguments(
-                        "Cannot initiate closure of incoming channel to self".into(),
+                        "Cannot initiate closure of outgoing channel from self".into(),
                     ));
                 }
 
@@ -616,8 +610,7 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
 
                 let tx = TransactionRequest::default()
                     .with_input(multisend_payload(tx_payload))
-                    .with_to(self.module.into())
-                    .with_gas_limit(DEFAULT_TX_GAS);
+                    .with_to(self.module.into());
                 Ok(tx)
             }
         }
@@ -634,7 +627,7 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
                 let destination = destinations.into_iter().next().unwrap();
                 if destination.eq(&self.me) {
                     return Err(InvalidArguments(
-                        "Cannot initiate closure of incoming channel to self".into(),
+                        "Cannot finalize closure of outgoing channel from self".into(),
                     ));
                 }
 
@@ -674,8 +667,7 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
 
                 let tx = TransactionRequest::default()
                     .with_input(multisend_payload(tx_payload))
-                    .with_to(self.module.into())
-                    .with_gas_limit(DEFAULT_TX_GAS);
+                    .with_to(self.module.into());
                 Ok(tx)
             }
         }

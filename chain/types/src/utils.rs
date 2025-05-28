@@ -2,6 +2,8 @@
 //! Chain utilities used for testing.
 //!
 //! This used in unit and integration tests.
+use std::str::FromStr;
+
 use SafeContract::SafeContractInstance;
 use alloy::{
     contract::{Error as ContractError, Result as ContractResult},
@@ -13,9 +15,6 @@ use alloy::{
     sol_types::{SolCall, SolValue},
 };
 use hex_literal::hex;
-use std::str::FromStr;
-use tracing::debug;
-
 use hopr_bindings::{
     hoprchannels::HoprChannels::HoprChannelsInstance,
     hoprnodemanagementmodule::HoprNodeManagementModule,
@@ -24,6 +23,7 @@ use hopr_bindings::{
 };
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::primitives::Address;
+use tracing::debug;
 
 use crate::{
     ContractInstances, constants,

@@ -221,7 +221,7 @@ where
 
                     IndexerExpectation::new(
                         tx_hash,
-                        move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channels[0].get_id()),
+                        move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if channels.iter().any(|c| c.get_id() == r_channel.get_id())),
                     )
                 }
                 ChannelDirection::Outgoing => {
