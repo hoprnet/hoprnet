@@ -23,23 +23,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  audit-pr:
+  audit:
     name: Audit
-    uses: ./.github/workflows/audit-pr.yaml
+    uses: ./.github/workflows/checks-audit.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
     secrets: inherit
   lint:
     name: Lint
-    uses: ./.github/workflows/lint.yaml
+    uses: ./.github/workflows/checks-lint.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
     secrets: inherit
   zizmor:
     name: Zizmor
-    uses: ./.github/workflows/zizmor.yaml
+    uses: ./.github/workflows/checks-zizmor.yaml
     with:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}

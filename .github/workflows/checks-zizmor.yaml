@@ -1,5 +1,8 @@
 ---
-name: Audit
+name: Zizmor
+
+env:
+  needs_nix_setup: false
 
 on:
   merge_group:
@@ -13,10 +16,19 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: ${{ github.ref }}-zizmor
+  cancel-in-progress: true
+
+permissions: {}
+
 jobs:
-  cargo-audit:
-    name: Cargo Audit
-    runs-on: self-hosted-hoprnet-big
+  zizmor:
+    name: Zizmor
+    runs-on: self-hosted-hoprnet-bigger
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
@@ -24,24 +36,34 @@ jobs:
           disable-sudo: true
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
-      - name: Checkout hoprnet repository
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
           repository: ${{ inputs.source_repo }}
           ref: ${{ inputs.source_branch }}
 
       - name: Install Nix
+        if: env.needs_nix_setup == true
         uses: cachix/install-nix-action@526118121621777ccd86f79b04685a9319637641 # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@0fc020193b5a1fa3ac4575aa3a7d3aa6a35435ad # v16
+        if: env.needs_nix_setup == true
         with:
           name: hoprnet
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
         env:
           USER: runner
 
-      - name: Run Audit
-        run: nix run .#audit
+      - name: Run zizmor
+        run: nix develop -L .#ci -c bash -c "zizmor --format sarif . > results.sarif"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3.28.18
+        with:
+          sarif_file: results.sarif
+          category: zizmor
