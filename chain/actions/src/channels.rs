@@ -1170,20 +1170,6 @@ mod tests {
                 .boxed())
             });
 
-        // Due to the limitation in register_expectation,
-        // currently cannot register multiple expectations for the same TX hash
-        indexer_action_tracker
-            .expect_register_expectation()
-            .once()
-            .in_sequence(&mut seq2)
-            .returning(move |_| {
-                Ok(futures::future::ok(SignificantChainEvent {
-                    tx_hash: random_hash,
-                    event_type: ChainEventType::ChannelClosed(channel_bob_alice),
-                })
-                .boxed())
-            });
-
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
         tokio::task::spawn(async move {
