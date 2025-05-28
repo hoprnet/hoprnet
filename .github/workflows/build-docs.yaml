@@ -31,7 +31,7 @@ permissions:
 
 jobs:
   rust:
-    name: Rust docs
+    name: Rust
     # big runner is needed because building docs involves building Rust code
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60

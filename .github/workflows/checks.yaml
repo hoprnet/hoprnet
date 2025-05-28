@@ -30,6 +30,7 @@ jobs:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
     secrets: inherit
+
   lint:
     name: Lint
     uses: ./.github/workflows/checks-lint.yaml
@@ -37,6 +38,7 @@ jobs:
       source_repo: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
       source_branch: ${{ github.event.pull_request.head.ref || github.ref }}
     secrets: inherit
+
   zizmor:
     name: Zizmor
     uses: ./.github/workflows/checks-zizmor.yaml
