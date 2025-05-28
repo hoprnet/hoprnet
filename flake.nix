@@ -8,7 +8,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.20.1";
     # pin it to a version which we are compatible with
-    foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
+    foundry.url = "github:shazow/foundry.nix/d18886cedf2c0c547d050b23abd49b133749e069";
     # use change to add solc 0.8.24
     solc.url = "github:hoprnet/solc.nix/tb/20240129-solc-0.8.24";
     pre-commit.url = "github:cachix/pre-commit-hooks.nix";
