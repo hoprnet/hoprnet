@@ -218,7 +218,7 @@ impl Probe {
         // -- Process probes --
         processes.insert(
             HoprProbeProcess::Process,
-            hopr_async_runtime::prelude::spawn(api.1.for_each_concurrent(None, move |(pseudonym, data)| {
+            hopr_async_runtime::prelude::spawn(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, data)| {
                 let active_probes = active_probes_rx.clone();
                 let push_to_network = Sender { downstream: api.0.clone() };
                 let db = db_rx.clone();
@@ -285,6 +285,7 @@ mod tests {
     use std::{collections::VecDeque, sync::RwLock, time::Duration};
 
     use async_trait::async_trait;
+    use futures::future::BoxFuture;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
 
     use super::*;
@@ -303,6 +304,7 @@ mod tests {
     #[derive(Debug, Clone)]
     pub struct PeerStore {
         get_peers: Arc<RwLock<VecDeque<Vec<PeerId>>>>,
+        #[allow(clippy::type_complexity)]
         on_finished: Arc<RwLock<Vec<(PeerId, crate::errors::Result<Duration>)>>>,
     }
 
@@ -311,7 +313,7 @@ mod tests {
         async fn on_finished(&self, peer: &PeerId, result: &crate::errors::Result<Duration>) {
             let mut on_finished = self.on_finished.write().unwrap();
             on_finished.push((
-                peer.clone(),
+                *peer,
                 match result {
                     Ok(duration) => Ok(*duration),
                     Err(_e) => Err(ProbeError::Timeout(1000)),
@@ -358,135 +360,320 @@ mod tests {
     /// !!! It must never by accessed or invoked, only passed around.
     fn random_memory_violating_surb() -> hopr_db_api::protocol::HoprSurb {
         const SURB_SIZE: usize = std::mem::size_of::<hopr_db_api::protocol::HoprSurb>();
-        let surb = unsafe {
+
+        unsafe {
             std::mem::transmute::<[u8; SURB_SIZE], hopr_db_api::protocol::HoprSurb>(hopr_crypto_random::random_bytes())
+        }
+    }
+
+    struct TestInterface {
+        from_probing_up_rx: futures::channel::mpsc::Receiver<(HoprPseudonym, ApplicationData)>,
+        from_probing_to_network_rx:
+            futures::channel::mpsc::Receiver<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>,
+        from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationData)>,
+        manual_probe_tx: futures::channel::mpsc::Sender<(PeerId, PingQueryReplier)>,
+    }
+
+    async fn test_with_probing<F, Db, St, Fut>(cfg: ProbeConfig, store: St, db: Db, test: F) -> anyhow::Result<()>
+    where
+        Fut: std::future::Future<Output = anyhow::Result<()>>,
+        F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
+        Db: CacheOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+        St: ProbeStatusUpdate + PeerDiscoveryFetch + Clone + Send + Sync + 'static,
+    {
+        let probe = Probe::new((*OFFCHAIN_KEYPAIR.public(), ONCHAIN_KEYPAIR.public().to_address()), cfg);
+
+        let (from_probing_up_tx, from_probing_up_rx) =
+            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationData)>(100);
+
+        let (from_probing_to_network_tx, from_probing_to_network_rx) =
+            futures::channel::mpsc::channel::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>(100);
+
+        let (from_network_to_probing_tx, from_network_to_probing_rx) =
+            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationData)>(100);
+
+        let (manual_probe_tx, manual_probe_rx) = futures::channel::mpsc::channel::<(PeerId, PingQueryReplier)>(100);
+
+        let interface = TestInterface {
+            from_probing_up_rx,
+            from_probing_to_network_rx,
+            from_network_to_probing_tx,
+            manual_probe_tx,
         };
 
-        surb
+        let jhs = probe
+            .continuously_scan(
+                (from_probing_to_network_tx, from_network_to_probing_rx),
+                manual_probe_rx,
+                store,
+                db,
+                from_probing_up_tx,
+            )
+            .await;
+
+        let result = test(interface).await;
+
+        jhs.into_iter().for_each(|(_name, handle)| handle.abort());
+
+        result
+    }
+
+    /// Channel that can drop any probes and concurrently replies to a probe correctly
+    fn concurrent_channel(
+        delay: Option<std::time::Duration>,
+        pass_rate: f64,
+        from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationData)>,
+    ) -> impl Fn((ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)) -> BoxFuture<'static, ()> {
+        debug_assert!((0.0..=1.0).contains(&pass_rate), "Pass rate must be between 0 and 1");
+
+        move |(data, path, finalizer): (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)| -> BoxFuture<'static, ()> {
+            let mut from_network_to_probing_tx = from_network_to_probing_tx.clone();
+
+            Box::pin(async move {
+                if let ResolvedTransportRouting::Forward { pseudonym, .. } = path {
+                    finalizer.finalize(Ok(()));
+
+                    let message: Message = data.try_into().expect("failed to convert data into message");
+                    if let Message::Probe(NeighborProbe::Ping(ping)) = message {
+                        let pong_message = Message::Probe(NeighborProbe::Pong(ping));
+
+                        if let Some(delay) = delay {
+                            // Simulate a delay if specified
+                            tokio::time::sleep(delay).await;
+                        }
+
+                        if rand::Rng::gen_range(&mut rand::thread_rng(), 0.0..=1.0) < pass_rate {
+                            from_network_to_probing_tx
+                                .send((pseudonym, pong_message.try_into().expect("failed to convert pong message into data")))
+                                .await.expect("failed to send pong message");
+                        }
+                    }
+                };
+            })
+        }
     }
 
     #[tokio::test]
     // #[tracing_test::traced_test]
     async fn probe_should_record_value_for_manual_neighbor_probe() -> anyhow::Result<()> {
-        let mut cfg: ProbeConfig = Default::default();
-        cfg.timeout = std::time::Duration::from_millis(5);
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(5),
+            ..Default::default()
+        };
 
-        let probe = Probe::new((*OFFCHAIN_KEYPAIR.public(), ONCHAIN_KEYPAIR.public().to_address()), cfg);
-
-        let (from_probing_up_tx, _from_probing_up_rx) =
-            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationData)>(100);
-
-        let (from_probing_to_network_tx, mut from_probing_to_network_rx) =
-            futures::channel::mpsc::channel::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>(100);
-
-        let (mut from_network_to_probing_tx, from_network_to_probing_rx) =
-            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationData)>(100);
-
-        let (mut manual_probe_tx, manual_probe_rx) = futures::channel::mpsc::channel::<(PeerId, PingQueryReplier)>(100);
-
-        let db = Cache {};
-
-        let stub_store = PeerStore {
+        let store = PeerStore {
             get_peers: Arc::new(RwLock::new(VecDeque::new())),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
 
-        let jhs = probe
-            .continuously_scan(
-                (from_probing_to_network_tx, from_network_to_probing_rx),
-                manual_probe_rx,
-                stub_store,
-                db,
-                from_probing_up_tx,
-            )
-            .await;
+        test_with_probing(cfg, store, Cache {}, move |iface: TestInterface| async move {
+            let mut manual_probe_tx = iface.manual_probe_tx;
+            let from_probing_to_network_rx = iface.from_probing_to_network_rx;
+            let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
-        let (tx, mut rx) = futures::channel::mpsc::unbounded::<std::result::Result<Duration, ProbeError>>();
-        manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
+            let (tx, mut rx) = futures::channel::mpsc::unbounded::<std::result::Result<Duration, ProbeError>>();
+            manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
 
-        let channel: hopr_async_runtime::prelude::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
-            while let Some((data, path, finalizer)) = from_probing_to_network_rx.next().await {
-                if let ResolvedTransportRouting::Forward { pseudonym, .. } = path {
-                    finalizer.finalize(Ok(()));
+            let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
+                from_probing_to_network_rx
+                    .for_each_concurrent(
+                        cfg.max_parallel_probes + 1,
+                        concurrent_channel(None, 1.0f64, from_network_to_probing_tx),
+                    )
+                    .await;
+            });
 
-                    let message: Message = data.try_into().context("failed to convert data into message")?;
-                    if let Message::Probe(NeighborProbe::Ping(ping)) = message {
-                        let pong_message = Message::Probe(NeighborProbe::Pong(ping));
-                        from_network_to_probing_tx
-                            .send((pseudonym, pong_message.try_into()?))
-                            .await?;
-                    }
-                }
-            }
+            let _duration = tokio::time::timeout(std::time::Duration::from_secs(1), rx.next())
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Probe did not return a result in time"))??;
 
             Ok(())
-        });
+        })
+        .await
+    }
 
-        let _duration = tokio::time::timeout(std::time::Duration::from_secs(1), rx.next())
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Probe did not return a result in time"))??;
+    #[tokio::test]
+    // #[tracing_test::traced_test]
+    async fn probe_should_record_failure_on_manual_fail() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(5),
+            ..Default::default()
+        };
 
-        jhs.into_iter().for_each(|(_name, handle)| handle.abort());
-        let _ = channel.await?;
+        let store = PeerStore {
+            get_peers: Arc::new(RwLock::new(VecDeque::new())),
+            on_finished: Arc::new(RwLock::new(Vec::new())),
+        };
+
+        test_with_probing(cfg, store, Cache {}, move |iface: TestInterface| async move {
+            let mut manual_probe_tx = iface.manual_probe_tx;
+            let from_probing_to_network_rx = iface.from_probing_to_network_rx;
+            let from_network_to_probing_tx = iface.from_network_to_probing_tx;
+
+            let (tx, mut rx) = futures::channel::mpsc::unbounded::<std::result::Result<Duration, ProbeError>>();
+            manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
+
+            let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
+                from_probing_to_network_rx
+                    .for_each_concurrent(
+                        cfg.max_parallel_probes + 1,
+                        concurrent_channel(None, 0.0f64, from_network_to_probing_tx),
+                    )
+                    .await;
+            });
+
+            assert!(tokio::time::timeout(cfg.timeout * 2, rx.next()).await.is_err());
+
+            Ok(())
+        })
+        .await
+    }
+
+    #[tokio::test]
+    // #[tracing_test::traced_test]
+    async fn probe_should_record_results_of_successful_automatically_generated_probes() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(20),
+            max_parallel_probes: NEIGHBOURS.len(),
+            ..Default::default()
+        };
+
+        let store = PeerStore {
+            get_peers: Arc::new(RwLock::new({
+                let mut neighbors = VecDeque::new();
+                neighbors.push_back(NEIGHBOURS.clone());
+                neighbors
+            })),
+            on_finished: Arc::new(RwLock::new(Vec::new())),
+        };
+
+        test_with_probing(cfg, store.clone(), Cache {}, move |iface: TestInterface| async move {
+            let from_probing_to_network_rx = iface.from_probing_to_network_rx;
+            let from_network_to_probing_tx = iface.from_network_to_probing_tx;
+
+            let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
+                from_probing_to_network_rx
+                    .for_each_concurrent(
+                        cfg.max_parallel_probes + 1,
+                        concurrent_channel(None, 1.0f64, from_network_to_probing_tx),
+                    )
+                    .await;
+            });
+
+            // wait for the probes to start and finish
+            tokio::time::sleep(cfg.timeout).await;
+
+            Ok(())
+        })
+        .await?;
+
+        assert_eq!(
+            store
+                .on_finished
+                .read()
+                .expect("should be lockable")
+                .iter()
+                .filter(|(_peer, result)| result.is_ok())
+                .count(),
+            NEIGHBOURS.len()
+        );
 
         Ok(())
     }
 
     #[tokio::test]
     // #[tracing_test::traced_test]
-    async fn probe_should_record_failure_on_manual_fail() -> anyhow::Result<()> {
-        let mut cfg: ProbeConfig = Default::default();
-        cfg.timeout = std::time::Duration::from_millis(5);
+    async fn probe_should_record_results_of_timed_out_automatically_generated_probes() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(10),
+            max_parallel_probes: NEIGHBOURS.len(),
+            ..Default::default()
+        };
 
-        let probe = Probe::new((*OFFCHAIN_KEYPAIR.public(), ONCHAIN_KEYPAIR.public().to_address()), cfg);
-
-        let (from_probing_up_tx, _from_probing_up_rx) =
-            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationData)>(100);
-
-        let (from_probing_to_network_tx, mut from_probing_to_network_rx) =
-            futures::channel::mpsc::channel::<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>(100);
-
-        let (_from_network_to_probing_tx, from_network_to_probing_rx) =
-            futures::channel::mpsc::channel::<(HoprPseudonym, ApplicationData)>(100);
-
-        let (mut manual_probe_tx, manual_probe_rx) = futures::channel::mpsc::channel::<(PeerId, PingQueryReplier)>(100);
-
-        let db = Cache {};
-
-        let stub_store = PeerStore {
-            get_peers: Arc::new(RwLock::new(VecDeque::new())),
+        let store = PeerStore {
+            get_peers: Arc::new(RwLock::new({
+                let mut neighbors = VecDeque::new();
+                neighbors.push_back(NEIGHBOURS.clone());
+                neighbors
+            })),
             on_finished: Arc::new(RwLock::new(Vec::new())),
         };
 
-        let jhs = probe
-            .continuously_scan(
-                (from_probing_to_network_tx, from_network_to_probing_rx),
-                manual_probe_rx,
-                stub_store,
-                db,
-                from_probing_up_tx,
-            )
-            .await;
+        let timeout = cfg.timeout * 2;
 
-        let (tx, mut rx) = futures::channel::mpsc::unbounded::<std::result::Result<Duration, ProbeError>>();
-        manual_probe_tx.send((NEIGHBOURS[0], PingQueryReplier::new(tx))).await?;
+        test_with_probing(cfg, store.clone(), Cache {}, move |iface: TestInterface| async move {
+            let from_probing_to_network_rx = iface.from_probing_to_network_rx;
+            let from_network_to_probing_tx = iface.from_network_to_probing_tx;
 
-        let channel: hopr_async_runtime::prelude::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
-            while let Some((_data, path, finalizer)) = from_probing_to_network_rx.next().await {
-                if let ResolvedTransportRouting::Forward { .. } = path {
-                    finalizer.finalize(Err(PacketError::MissingDomainSeparator));
-                    // Simulate a failure to sent a manual probe
-                }
-            }
+            let _jh: hopr_async_runtime::prelude::JoinHandle<()> = tokio::spawn(async move {
+                from_probing_to_network_rx
+                    .for_each_concurrent(
+                        cfg.max_parallel_probes + 1,
+                        concurrent_channel(Some(timeout), 1.0f64, from_network_to_probing_tx),
+                    )
+                    .await;
+            });
+
+            // wait for the probes to start and finish
+            tokio::time::sleep(timeout * 2).await;
 
             Ok(())
-        });
+        })
+        .await?;
 
-        assert!(tokio::time::timeout(cfg.timeout * 2, rx.next()).await.is_err());
-
-        jhs.into_iter().for_each(|(_name, handle)| handle.abort());
-        let _ = channel.await?;
+        assert_eq!(
+            store
+                .on_finished
+                .read()
+                .expect("should be lockable")
+                .iter()
+                .filter(|(_peer, result)| result.is_err())
+                .count(),
+            NEIGHBOURS.len()
+        );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    // #[tracing_test::traced_test]
+    async fn probe_should_pass_through_non_associated_tags() -> anyhow::Result<()> {
+        let cfg = ProbeConfig {
+            timeout: std::time::Duration::from_millis(20),
+            ..Default::default()
+        };
+
+        let store = PeerStore {
+            get_peers: Arc::new(RwLock::new({
+                let mut neighbors = VecDeque::new();
+                neighbors.push_back(NEIGHBOURS.clone());
+                neighbors
+            })),
+            on_finished: Arc::new(RwLock::new(Vec::new())),
+        };
+
+        test_with_probing(cfg, store.clone(), Cache {}, move |iface: TestInterface| async move {
+            let mut from_network_to_probing_tx = iface.from_network_to_probing_tx;
+            let mut from_probing_up_rx = iface.from_probing_up_rx;
+
+            let expected_data = ApplicationData {
+                application_tag: Tag::MAX,
+                plain_text: b"Hello, this is a test message!".to_vec().into_boxed_slice(),
+            };
+
+            from_network_to_probing_tx
+                .send((HoprPseudonym::random(), expected_data.clone()))
+                .await?;
+
+            let actual = tokio::time::timeout(cfg.timeout, from_probing_up_rx.next())
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Did not return any data in time"))?
+                .1;
+
+            assert_eq!(actual, expected_data);
+
+            Ok(())
+        })
+        .await
     }
 }
