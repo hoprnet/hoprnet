@@ -59,6 +59,15 @@ pub enum Message {
     Probe(NeighborProbe),
 }
 
+impl std::fmt::Display for Message {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Message::Telemetry(telemetry) => write!(f, "Telemetry({:?})", telemetry),
+            Message::Probe(probe) => write!(f, "Probe({})", probe),
+        }
+    }
+}
+
 impl TryFrom<Message> for ApplicationData {
     type Error = anyhow::Error;
 

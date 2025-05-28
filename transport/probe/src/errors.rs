@@ -14,6 +14,9 @@ pub enum ProbeError {
 
     #[error("error while pinging peer {0}: {1}")]
     PingerError(PeerId, String),
+
+    #[error("error sending probe: {0}")]
+    SendError(String),
 }
 
 pub type Result<T> = core::result::Result<T, ProbeError>;
