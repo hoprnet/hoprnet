@@ -5,7 +5,7 @@ use hopr_metrics::{histogram_start_measure, metrics::SimpleHistogram};
 use libp2p_identity::PeerId;
 use rand::seq::SliceRandom;
 
-use crate::{config::ProbeConfig, store::PeerDiscoveryFetch};
+use crate::{config::ProbeConfig, traits::PeerDiscoveryFetch};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -52,7 +52,7 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
-    use crate::store::MockPeerDiscoveryFetch;
+    use crate::traits::MockPeerDiscoveryFetch;
 
     const TINY_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(20);
 

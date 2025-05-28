@@ -4,16 +4,15 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_sql::api::resolver::HoprDbResolverOperations;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
 use hopr_path::channel_graph::ChannelGraph;
 use hopr_transport_network::{
     HoprDbPeersOperations,
     network::{Network, NetworkTriggeredEvent},
 };
-use hopr_transport_probe::store::{PeerDiscoveryFetch, ProbeStatusUpdate};
+use hopr_transport_probe::traits::{PeerDiscoveryFetch, ProbeStatusUpdate};
 use tracing::{debug, error, trace};
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
