@@ -198,7 +198,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut processes: Vec<HoprdProcesses> = Vec::new();
 
     if cfg.api.enable {
-        let node_cfg_str = cfg.as_redacted_string()?;
+        let node_cfg_map: HashMap<String, String> =
+            serde_json::from_str(&cfg.as_redacted_string()?).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
+
         let api_cfg = cfg.api.clone();
 
         let listen_address = match &cfg.api.host.address {
@@ -219,7 +221,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         processes.push(HoprdProcesses::RestApi(spawn(async move {
             if let Err(e) = serve_api(RestApiParameters {
                 listener: api_listener,
-                hoprd_cfg: node_cfg_str,
+                hoprd_cfg: node_cfg_map,
                 cfg: api_cfg,
                 hopr: node_clone,
                 session_listener_sockets,
