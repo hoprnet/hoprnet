@@ -238,7 +238,7 @@ struct WssData(Vec<u8>);
 /// Authentication (if enabled) is done by cookie `X-Auth-Token`.
 ///
 /// Connect to the endpoint by using a WS client. No preview available. Example:
-/// `ws://127.0.0.1:3001/api/v3/session/websocket
+/// `ws://127.0.0.1:3001/api/v4/session/websocket
 #[allow(dead_code)] // not dead code, just for documentation
 #[utoipa::path(
         get,
