@@ -5,7 +5,7 @@ use std::{
 
 /// Tags are represented as 6 bytes.
 ///
-/// 2 ^ 48 should offer enough space to even avoid collisions and tag attacks.
+/// [`u64`] should offer enough space to even avoid collisions and tag attacks.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Tag(pub u64);
 
@@ -178,9 +178,9 @@ pub struct ApplicationData {
 impl ApplicationData {
     pub const PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE - size_of::<Tag>();
 
-    pub fn new(application_tag: Tag, plain_text: &[u8]) -> Self {
+    pub fn new<T: Into<Tag>>(application_tag: T, plain_text: &[u8]) -> Self {
         Self {
-            application_tag,
+            application_tag: application_tag.into(),
             plain_text: plain_text.into(),
         }
     }
@@ -246,15 +246,15 @@ mod tests {
 
     #[test]
     fn test_application_data() -> anyhow::Result<()> {
-        let ad_1 = ApplicationData::new(10u64.into(), &[0_u8, 1_u8]);
+        let ad_1 = ApplicationData::new(10u64, &[0_u8, 1_u8]);
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(0u64.into(), &[]);
+        let ad_1 = ApplicationData::new(0u64, &[]);
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 
-        let ad_1 = ApplicationData::new(10u64.into(), &[0_u8, 1_u8]);
+        let ad_1 = ApplicationData::new(10u64, &[0_u8, 1_u8]);
         let ad_2 = ApplicationData::from_bytes(&ad_1.to_bytes())?;
         assert_eq!(ad_1, ad_2);
 

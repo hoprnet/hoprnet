@@ -19,7 +19,7 @@ pub trait ProbeStatusUpdate {
 /// This trait should eventually disappear as parts of this functionality move closer
 /// to the network layer.
 #[async_trait]
-pub trait CacheOperations {
+pub trait DbOperations {
     /// Attempts to find SURB and its ID given the [`SurbMatcher`].
     async fn find_surb(
         &self,

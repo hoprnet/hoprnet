@@ -1,17 +1,17 @@
 use async_trait::async_trait;
 use hopr_db_api::{protocol::HoprDbProtocolOperations, resolver::HoprDbResolverOperations};
 
-use crate::traits::CacheOperations;
+use crate::traits::DbOperations;
 
 #[derive(Debug, Clone)]
-pub struct CacheProxy<T>
+pub struct DbProxy<T>
 where
     T: HoprDbResolverOperations + HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     db: T,
 }
 
-impl<T> CacheProxy<T>
+impl<T> DbProxy<T>
 where
     T: HoprDbResolverOperations + HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
@@ -21,7 +21,7 @@ where
 }
 
 #[async_trait]
-impl<T> CacheOperations for CacheProxy<T>
+impl<T> DbOperations for DbProxy<T>
 where
     T: HoprDbResolverOperations + HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {

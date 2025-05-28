@@ -20,7 +20,7 @@ use crate::{
     errors::ProbeError,
     neighbors::neighbors_to_probe,
     ping::PingQueryReplier,
-    traits::{CacheOperations, PeerDiscoveryFetch, ProbeStatusUpdate},
+    traits::{DbOperations, PeerDiscoveryFetch, ProbeStatusUpdate},
 };
 
 #[inline(always)]
@@ -106,7 +106,7 @@ impl Probe {
         T::Error: Send,
         U: futures::Stream<Item = (HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
         W: PeerDiscoveryFetch + ProbeStatusUpdate + Clone + Send + Sync + 'static,
-        C: CacheOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+        C: DbOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
         V: futures::Stream<Item = (PeerId, PingQueryReplier)> + Send + Sync + 'static,
         Up: futures::Sink<(HoprPseudonym, ApplicationData)> + Clone + Send + Sync + 'static,
     {
@@ -334,7 +334,7 @@ mod tests {
     pub struct Cache {}
 
     #[async_trait]
-    impl CacheOperations for Cache {
+    impl DbOperations for Cache {
         async fn find_surb(
             &self,
             _matcher: SurbMatcher,
@@ -378,7 +378,7 @@ mod tests {
     where
         Fut: std::future::Future<Output = anyhow::Result<()>>,
         F: Fn(TestInterface) -> Fut + Send + Sync + 'static,
-        Db: CacheOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
+        Db: DbOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
         St: ProbeStatusUpdate + PeerDiscoveryFetch + Clone + Send + Sync + 'static,
     {
         let probe = Probe::new((*OFFCHAIN_KEYPAIR.public(), ONCHAIN_KEYPAIR.public().to_address()), cfg);

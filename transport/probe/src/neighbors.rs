@@ -1,7 +1,5 @@
 use async_stream::stream;
 use futures::Stream;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::{histogram_start_measure, metrics::SimpleHistogram};
 use libp2p_identity::PeerId;
 use rand::seq::SliceRandom;
 
@@ -9,8 +7,8 @@ use crate::{config::ProbeConfig, traits::PeerDiscoveryFetch};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_TIME_TO_PROBE: SimpleHistogram =
-        SimpleHistogram::new(
+    static ref METRIC_TIME_TO_PROBE: hopr_metrics::metrics::SimpleHistogram =
+        hopr_metrics::metrics::SimpleHistogram::new(
             "hopr_probe_round_time_sec",
             "Measures total time in seconds it takes to probe all nodes",
             vec![0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0, 60.0],
@@ -30,7 +28,7 @@ where
             peers.shuffle(&mut rng);    // shuffle peers to randomize order between rounds
 
             #[cfg(all(feature = "prometheus", not(test)))]
-            let probe_round_timer = if peers.is_empty() { None } else { Some(histogram_start_measure!(METRIC_TIME_TO_PROBE)) };
+            let probe_round_timer = if peers.is_empty() { None } else { Some(hopr_metrics::histogram_start_measure!(METRIC_TIME_TO_PROBE)) };
 
             for peer in peers {
                 yield peer;

@@ -67,7 +67,7 @@ use hopr_transport_p2p::{
 use hopr_transport_packet::prelude::*;
 pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use hopr_transport_probe::{
-    CacheProxy, Probe,
+    DbProxy, Probe,
     ping::{PingConfig, Pinger},
 };
 pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
@@ -517,7 +517,7 @@ where
                     self.path_planner.channel_graph(),
                     network_events_tx,
                 ),
-                CacheProxy::new(self.db.clone()),
+                DbProxy::new(self.db.clone()),
                 tx_from_probing,
             )
             .await
