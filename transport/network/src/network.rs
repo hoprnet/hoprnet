@@ -382,6 +382,7 @@ mod tests {
     use hopr_platform::time::native::current_time;
     use hopr_primitive_types::prelude::AsUnixTimestamp;
     use libp2p_identity::PeerId;
+    use more_asserts::*;
 
     use crate::network::{Health, Network, NetworkConfig, NetworkTriggeredEvent, PeerOrigin};
 
