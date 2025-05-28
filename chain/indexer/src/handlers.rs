@@ -786,7 +786,7 @@ where
         Ok(None)
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
+    #[tracing::instrument(level = "debug", skip(self, slog), fields(log=%slog))]
     async fn process_log_event(&self, tx: &OpenTransaction, slog: SerializableLog) -> Result<Option<ChainEventType>> {
         trace!(log = %slog, "log content");
 

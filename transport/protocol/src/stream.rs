@@ -57,13 +57,14 @@ where
         async move {
             let (stream_rx, stream_tx) = stream.split();
             let (send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
+            let cache_internal = cache.clone();
 
             hopr_async_runtime::prelude::spawn(
                 recv.map(Ok)
                     .forward(FramedWrite::new(stream_tx.compat_write(), codec.clone())),
             );
-            hopr_async_runtime::prelude::spawn(
-                FramedRead::new(stream_rx.compat(), codec)
+            hopr_async_runtime::prelude::spawn(async move {
+                if let Err(error) = FramedRead::new(stream_rx.compat(), codec)
                     .filter_map(move |v| async move {
                         match v {
                             Ok(v) => Some((peer_id, v)),
@@ -74,8 +75,13 @@ where
                         }
                     })
                     .map(Ok)
-                    .forward(tx_in),
-            );
+                    .forward(tx_in)
+                    .await
+                {
+                    tracing::error!(peer = %peer_id, %error, "Incoming stream failed on reading");
+                }
+                cache_internal.invalidate(&peer_id).await;
+            });
             cache.insert(peer_id, send).await;
         }
     }));
