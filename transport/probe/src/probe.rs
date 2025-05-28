@@ -7,8 +7,6 @@ use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::{protocol::HoprDbProtocolOperations, resolver::HoprDbResolverOperations};
 use hopr_internal_types::protocol::HoprPseudonym;
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
 use hopr_network_types::types::{ResolvedTransportRouting, SurbMatcher, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
@@ -25,21 +23,6 @@ use crate::{
     ping::PingQueryReplier,
     store,
 };
-
-#[cfg(all(feature = "prometheus", not(test)))]
-lazy_static::lazy_static! {
-    static ref METRIC_TIME_TO_PING: SimpleHistogram =
-        SimpleHistogram::new(
-            "hopr_ping_time_sec",
-            "Measures total time it takes to ping a single node (seconds)",
-            vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
-        ).unwrap();
-    static ref METRIC_PROBE_COUNT: MultiCounter = MultiCounter::new(
-            "hopr_probe_count",
-            "Total number of pings by result",
-            &["success"]
-        ).unwrap();
-}
 
 #[inline(always)]
 fn to_nonce(message: &Message) -> String {
@@ -160,9 +143,6 @@ impl Probe {
                             store
                                 .on_finished(&peer, &Err(ProbeError::Timeout(timeout.as_millis() as u64)))
                                 .await;
-
-                            #[cfg(all(feature = "prometheus", not(test)))]
-                            METRIC_PROBE_COUNT.increment(&["false"]);
                         }
                         .boxed()
                     } else {
@@ -280,12 +260,6 @@ impl Probe {
                                             .saturating_sub(start)
                                             .div(2u32); // RTT -> unidirectional latency
                                         store.on_finished(&peer, &Ok(latency)).await;
-
-                                        #[cfg(all(feature = "prometheus", not(test)))]
-                                        {
-                                            METRIC_TIME_TO_PING.observe((latency.as_millis() as f64) / 1000.0); // precision for seconds
-                                            METRIC_PROBE_COUNT.increment(&["true"]);
-                                        }
 
                                         if let Some(replier) = replier {
                                             replier.notify(NeighborProbe::Pong(ping))

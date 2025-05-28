@@ -12,6 +12,24 @@ use hopr_transport_network::{
 use hopr_transport_probe::store::{PeerDiscoveryFetch, ProbeStatusUpdate};
 use tracing::{debug, error, trace};
 
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
+
+#[cfg(all(feature = "prometheus", not(test)))]
+lazy_static::lazy_static! {
+    static ref METRIC_TIME_TO_PING: SimpleHistogram =
+        SimpleHistogram::new(
+            "hopr_ping_time_sec",
+            "Measures total time it takes to ping a single node (seconds)",
+            vec![0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0],
+        ).unwrap();
+    static ref METRIC_PROBE_COUNT: MultiCounter = MultiCounter::new(
+            "hopr_probe_count",
+            "Total number of pings by result",
+            &["success"]
+        ).unwrap();
+}
+
 /// Implementor of the ping external API.
 ///
 /// Ping requires functionality from external components in order to obtain
@@ -83,8 +101,21 @@ where
         result: &hopr_transport_probe::errors::Result<std::time::Duration>,
     ) {
         let result = match &result {
-            Ok(duration) => Ok(*duration),
-            Err(_) => Err(()),
+            Ok(duration) => {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                {
+                    METRIC_TIME_TO_PING.observe((duration.as_millis() as f64) / 1000.0); // precision for seconds
+                    METRIC_PROBE_COUNT.increment(&["true"]);
+                }
+
+                Ok(*duration)
+            }
+            Err(_) => {
+                #[cfg(all(feature = "prometheus", not(test)))]
+                METRIC_PROBE_COUNT.increment(&["false"]);
+
+                Err(())
+            }
         };
 
         // Update the channel graph
