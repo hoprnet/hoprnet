@@ -237,8 +237,8 @@ struct WssData(Vec<u8>);
 ///
 /// Authentication (if enabled) is done by cookie `X-Auth-Token`.
 ///
-/// Connect to the endpoint by using a WS client. No preview available. Example:
-/// `ws://127.0.0.1:3001/api/v3/session/websocket
+/// Connect to the endpoint by using a WS client. No preview is available. Example:
+/// `ws://127.0.0.1:3001/api/v4/session/websocket`
 #[allow(dead_code)] // not dead code, just for documentation
 #[utoipa::path(
         get,
@@ -1062,7 +1062,7 @@ mod tests {
     -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
-        let session_id = hopr_lib::HoprSessionId::new(4567, HoprPseudonym::random());
+        let session_id = hopr_lib::HoprSessionId::new(hopr_lib::Tag(4567), HoprPseudonym::random());
         let peer: hopr_lib::Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let session = hopr_lib::HoprSession::new(
             session_id,
@@ -1108,7 +1108,7 @@ mod tests {
     -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
-        let session_id = hopr_lib::HoprSessionId::new(4567, HoprPseudonym::random());
+        let session_id = hopr_lib::HoprSessionId::new(hopr_lib::Tag(4567), HoprPseudonym::random());
         let peer: hopr_lib::Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let session = hopr_lib::HoprSession::new(
             session_id,

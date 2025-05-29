@@ -186,15 +186,11 @@ impl IntoEndian<32> for U256 {
     }
 
     fn to_le_bytes(self) -> [u8; 32] {
-        let mut ret = [0u8; 32];
-        self.to_little_endian(&mut ret);
-        ret
+        self.to_little_endian()
     }
 
     fn to_be_bytes(self) -> [u8; 32] {
-        let mut ret = [0u8; 32];
-        self.to_big_endian(&mut ret);
-        ret
+        self.to_big_endian()
     }
 }
 
@@ -372,7 +368,7 @@ mod tests {
 
     #[test]
     fn address_tests() -> anyhow::Result<()> {
-        let addr_1 = Address::try_from(hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"))?;
+        let addr_1 = Address::from(hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"));
         let addr_2 = Address::try_from(addr_1.as_ref())?;
 
         assert_eq!(addr_1, addr_2, "deserialized address does not match");

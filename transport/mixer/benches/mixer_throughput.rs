@@ -110,16 +110,12 @@ fn send_continuous_stream_load(item: &str, iterations: usize, cfg: MixerConfig) 
     Box::pin(async move {
         let (tx, rx) = futures::channel::mpsc::unbounded();
 
-        let mut rx = rx.then_concurrent(|v| {
-            let cfg = cfg;
+        let mut rx = rx.then_concurrent(|v| async move {
+            let random_delay = cfg.random_delay();
 
-            async move {
-                let random_delay = cfg.random_delay();
+            tokio::time::sleep(random_delay).await;
 
-                tokio::time::sleep(random_delay).await;
-
-                v
-            }
+            v
         });
 
         for _ in 0..iterations {

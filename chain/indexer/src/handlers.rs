@@ -603,7 +603,9 @@ where
                     .await?;
 
                 if node_address == self.chain_key.public().to_address() {
-                    info!("This node has been added to the registry, node activation process continues on: http://hub.hoprnet.org/.");
+                    info!(
+                        "This node has been added to the registry, node activation process continues on: http://hub.hoprnet.org/."
+                    );
                 }
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
@@ -618,7 +620,9 @@ where
                     .await?;
 
                 if node_address == self.chain_key.public().to_address() {
-                    info!("This node has been added to the registry, node can now continue the node activation process on: http://hub.hoprnet.org/.");
+                    info!(
+                        "This node has been added to the registry, node can now continue the node activation process on: http://hub.hoprnet.org/."
+                    );
                 }
 
                 return Ok(Some(ChainEventType::NetworkRegistryUpdate(
@@ -782,7 +786,7 @@ where
         Ok(None)
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
+    #[tracing::instrument(level = "debug", skip(self, slog), fields(log=%slog))]
     async fn process_log_event(&self, tx: &OpenTransaction, slog: SerializableLog) -> Result<Option<ChainEventType>> {
         trace!(log = %slog, "log content");
 
@@ -1304,7 +1308,12 @@ mod tests {
 
         assert!(event_type.is_none(), "token transfer does not have chain event type");
 
-        assert_eq!(db.get_safe_hopr_balance(None).await?, value.to_be_bytes().into());
+        assert_eq!(
+            db.get_safe_hopr_balance(None).await?,
+            HoprBalance::from(primitive_types::U256::from_big_endian(
+                value.to_be_bytes_vec().as_slice()
+            ))
+        );
 
         Ok(())
     }
@@ -1319,7 +1328,13 @@ mod tests {
 
         let encoded_data = (value).abi_encode();
 
-        db.set_safe_hopr_balance(None, value.to_be_bytes().into()).await?;
+        db.set_safe_hopr_balance(
+            None,
+            HoprBalance::from(primitive_types::U256::from_big_endian(
+                value.to_be_bytes_vec().as_slice(),
+            )),
+        )
+        .await?;
 
         let transferred_log = SerializableLog {
             address: handlers.addresses.token,
@@ -1378,16 +1393,16 @@ mod tests {
 
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            U256::from(1000u64).to_be_bytes().into()
+            HoprBalance::from(primitive_types::U256::from(1000u64))
         );
 
         // reduce allowance manually to verify a second time
         let _ = db
-            .set_safe_hopr_allowance(None, U256::from(10u64).to_be_bytes().into())
+            .set_safe_hopr_allowance(None, HoprBalance::from(primitive_types::U256::from(10u64)))
             .await;
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            U256::from(10u64).to_be_bytes().into()
+            HoprBalance::from(primitive_types::U256::from(10u64))
         );
 
         let handlers_clone = handlers.clone();
@@ -1401,7 +1416,7 @@ mod tests {
 
         assert_eq!(
             db.get_safe_hopr_allowance(None).await?,
-            U256::from(1000u64).to_be_bytes().into()
+            HoprBalance::from(primitive_types::U256::from(1000u64))
         );
         Ok(())
     }
@@ -1743,7 +1758,7 @@ mod tests {
 
         db.upsert_channel(None, channel).await?;
 
-        let solidity_balance: HoprBalance = hopr_primitive_types::primitives::U256::from((1u128 << 96) - 1).into();
+        let solidity_balance: HoprBalance = primitive_types::U256::from((1u128 << 96) - 1).into();
         let diff = solidity_balance - channel.balance;
 
         let encoded_data = (solidity_balance.amount().to_be_bytes()).abi_encode();
@@ -1833,7 +1848,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
             *COUNTERPARTY_CHAIN_ADDRESS,
-            U256::from((1u128 << 96) - 1).to_be_bytes().into(),
+            HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1)),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),
@@ -1888,7 +1903,7 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let starting_balance = U256::from((1u128 << 96) - 1).to_be_bytes().into();
+        let starting_balance = HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1));
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -1949,7 +1964,7 @@ mod tests {
 
         let handlers = init_handlers(db.clone());
 
-        let starting_balance = U256::from((1u128 << 96) - 1).to_be_bytes().into();
+        let starting_balance = HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1));
 
         let channel = ChannelEntry::new(
             Address::new(&hex!("B7397C218766eBe6A1A634df523A1a7e412e67eA")),
@@ -2182,7 +2197,7 @@ mod tests {
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
             *SELF_CHAIN_ADDRESS,
-            U256::from((1u128 << 96) - 1).to_be_bytes().into(),
+            HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1)),
             primitive_types::U256::zero(),
             ChannelStatus::Open,
             primitive_types::U256::one(),

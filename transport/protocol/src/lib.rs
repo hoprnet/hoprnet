@@ -56,8 +56,6 @@ pub mod config;
 /// Errors produced by the crate.
 pub mod errors;
 
-/// Bloom filter for the transport layer.
-pub mod bloom;
 // protocols
 /// `heartbeat` p2p protocol
 pub mod heartbeat;
@@ -74,17 +72,16 @@ use futures::{SinkExt, StreamExt};
 use hopr_async_runtime::prelude::spawn;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
-use hopr_internal_types::{
-    prelude::HoprPseudonym,
-    protocol::{Acknowledgement, ApplicationData},
-};
+use hopr_internal_types::{prelude::HoprPseudonym, protocol::Acknowledgement};
 use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
 use hopr_transport_identity::{Multiaddr, PeerId};
-pub use processor::DEFAULT_PRICE_PER_PACKET;
-use processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+use hopr_transport_packet::prelude::ApplicationData;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-pub use timer::execute_on_tick;
 use tracing::{error, trace, warn};
+
+use crate::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+pub use crate::{processor::DEFAULT_PRICE_PER_PACKET, timer::execute_on_tick};
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
 const SLOW_OP_MS: u128 = 150;
@@ -176,7 +173,7 @@ where
     }
 
     let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
-        let tbf = bloom::WrappedTagBloomFilter::new(bloom_filter_persistent_path);
+        let tbf = WrappedTagBloomFilter::new(bloom_filter_persistent_path);
         let tbf_2 = tbf.clone();
         processes.insert(
             ProtocolProcesses::BloomPersist,
@@ -192,7 +189,7 @@ where
         );
         tbf
     } else {
-        bloom::WrappedTagBloomFilter::new("no_tbf".into())
+        WrappedTagBloomFilter::new("no_tbf".into())
     };
 
     let msg_processor_read = processor::PacketProcessor::new(db.clone(), packet_cfg);

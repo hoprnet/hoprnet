@@ -4,6 +4,17 @@ version = "0.2.0"
 description = "Implements basic cryptograpic primitives and cryptography related types"
 edition = "2021"
 
+[features]
+serde = [
+  "dep:serde",
+  "dep:serde_bytes",
+  "curve25519-dalek/serde",
+  "ed25519-dalek/serde",
+  "generic-array/serde",
+  "k256/serde",
+  "libp2p-identity/serde",
+]
+
 [dependencies]
 aes = "0.8.4"
 blake3 = "1.8.2"
@@ -33,18 +44,10 @@ zeroize = { version = "1.8.1", features = ["zeroize_derive"] }
 hopr-crypto-random = { workspace = true }
 hopr-primitive-types = { workspace = true }
 
-[features]
-serde = [
-  "dep:serde",
-  "dep:serde_bytes",
-  "curve25519-dalek/serde",
-  "ed25519-dalek/serde",
-  "generic-array/serde",
-  "k256/serde",
-  "libp2p-identity/serde",
-]
-
 [dev-dependencies]
 anyhow = { workspace = true }
 hex-literal = { workspace = true }
 lazy_static = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]

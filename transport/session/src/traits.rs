@@ -1,5 +1,5 @@
-use hopr_internal_types::protocol::ApplicationData;
 use hopr_network_types::prelude::DestinationRouting;
+use hopr_transport_packet::prelude::ApplicationData;
 
 use crate::errors::TransportSessionError;
 

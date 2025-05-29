@@ -2,7 +2,7 @@ use hopr_primitive_types::prelude::*;
 pub use hopr_strategy::StrategyConfig;
 use hopr_transport::config::SessionGlobalConfig;
 pub use hopr_transport::config::{
-    HeartbeatConfig, HostConfig, HostType, NetworkConfig, ProtocolConfig, TransportConfig, validate_external_host,
+    HostConfig, HostType, NetworkConfig, ProbeConfig, ProtocolConfig, TransportConfig, validate_external_host,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
@@ -129,7 +129,7 @@ pub struct HoprLibConfig {
     /// Configuration of the protocol heartbeat mechanism
     #[validate(nested)]
     #[serde(default)]
-    pub heartbeat: HeartbeatConfig,
+    pub probe: ProbeConfig,
     /// Configuration of network properties
     #[validate(nested)]
     #[serde(default)]

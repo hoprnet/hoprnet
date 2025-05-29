@@ -84,7 +84,7 @@ pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> im
 pub(crate) struct NodePeersQueryRequest {
     #[serde(default)]
     #[schema(required = false, example = 0.7)]
-    /// Minimum peer quality to be include in the response.
+    /// Minimum peer quality to be included in the response.
     quality: f64,
 }
 

@@ -27,18 +27,16 @@ pub mod proxy;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, OnceLock},
-    time::Duration,
 };
 
 use async_lock::RwLock;
 use constants::MAXIMUM_MSG_OUTGOING_BUFFER_SIZE;
 use futures::{
-    FutureExt, SinkExt, StreamExt,
-    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender},
-    future::{Either, select},
-    pin_mut,
+    SinkExt, StreamExt,
+    channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded},
 };
-use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
+use helpers::PathPlanner;
+use hopr_async_runtime::prelude::{JoinHandle, spawn};
 use hopr_crypto_packet::prelude::HoprPacket;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -57,20 +55,22 @@ use hopr_path::{
     PathAddressResolver,
     selectors::dfs::{DfsPathSelector, DfsPathSelectorConfig, RandomizedEdgeWeighting},
 };
-use hopr_platform::time::native::current_time;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId};
 use hopr_transport_mixer::MixerConfig;
 pub use hopr_transport_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus};
-use hopr_transport_network::{
-    heartbeat::Heartbeat,
-    ping::{PingConfig, PingQueryReplier, Pinger, Pinging},
-};
 use hopr_transport_p2p::{
     HoprSwarm,
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
 };
+use hopr_transport_packet::prelude::*;
+pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
+use hopr_transport_probe::{
+    DbProxy, Probe,
+    ping::{PingConfig, Pinger},
+};
+pub use hopr_transport_probe::{errors::ProbeError, ping::PingQueryReplier};
 pub use hopr_transport_protocol::{PeerDiscovery, execute_on_tick};
 use hopr_transport_protocol::{
     errors::ProtocolError,
@@ -97,13 +97,9 @@ pub use crate::{
     config::HoprTransportConfig,
     helpers::{PeerEligibility, TicketStatistics},
 };
-use crate::{
-    constants::{
-        RESERVED_SESSION_TAG_UPPER_LIMIT, RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT, SESSION_INITIATION_TIMEOUT_BASE,
-    },
-    errors::HoprTransportError,
-    helpers::PathPlanner,
-};
+use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError};
+
+pub const USABLE_TAG_RANGE: std::ops::Range<Tag> = Tag::USABLE_RANGE;
 
 #[cfg(any(
     all(feature = "mixer-channel", feature = "mixer-stream"),
@@ -124,8 +120,8 @@ pub enum HoprTransportProcess {
     Protocol(hopr_transport_protocol::ProtocolProcesses),
     #[strum(to_string = "session manager sub-process #{0}")]
     SessionsManagement(usize),
-    #[strum(to_string = "protocol [HOPR [heartbeat]]")]
-    Heartbeat,
+    #[strum(to_string = "network probing sub-process: {0}")]
+    Probing(hopr_transport_probe::HoprProbeProcess),
 }
 
 #[derive(Debug, Clone)]
@@ -190,9 +186,10 @@ where
 {
     me: OffchainKeypair,
     me_peerid: PeerId, // Cache to avoid an expensive conversion: OffchainPublicKey -> PeerId
+    me_address: Address,
     cfg: HoprTransportConfig,
     db: T,
-    ping: Arc<OnceLock<Pinger<network_notifier::PingExternalInteractions<T>>>>,
+    ping: Arc<OnceLock<Pinger>>,
     network: Arc<Network<T>>,
     process_packet_send: Arc<OnceLock<MsgSender<Sender<SendMsgInput>>>>,
     path_planner: PathPlanner<T, CurrentPathSelector>,
@@ -222,6 +219,7 @@ where
         Self {
             me: me.clone(),
             me_peerid,
+            me_address: me_chain_addr,
             ping: Arc::new(OnceLock::new()),
             network: Arc::new(Network::new(
                 me_peerid,
@@ -247,7 +245,10 @@ where
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             smgr: SessionManager::new(SessionManagerConfig {
-                session_tag_range: RESERVED_SUBPROTOCOL_TAG_UPPER_LIMIT..RESERVED_SESSION_TAG_UPPER_LIMIT,
+                // TODO(v3.1): Use the entire range of tags properly
+                //
+                // session_tag_range: Tag::USABLE_RANGE,
+                session_tag_range: (Tag(16)..Tag(65535)),
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
@@ -266,7 +267,6 @@ where
     pub async fn run(
         &self,
         me_onchain: &ChainKeypair,
-        version: String,
         tbf_path: String,
         on_incoming_data: UnboundedSender<ApplicationData>,
         discovery_updates: UnboundedReceiver<PeerDiscovery>,
@@ -382,34 +382,6 @@ where
 
         let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
 
-        // network event processing channel
-        let (network_events_tx, network_events_rx) =
-            mpsc::channel::<NetworkTriggeredEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
-
-        // manual ping
-        let (ping_tx, ping_rx) = mpsc::unbounded::<(PeerId, PingQueryReplier)>();
-
-        let ping_cfg = PingConfig {
-            timeout: self.cfg.protocol.heartbeat.timeout,
-            max_parallel_pings: self.cfg.heartbeat.max_parallel_probes,
-        };
-
-        let ping: Pinger<network_notifier::PingExternalInteractions<T>> = Pinger::new(
-            ping_cfg,
-            ping_tx.clone(),
-            network_notifier::PingExternalInteractions::new(
-                self.network.clone(),
-                self.db.clone(),
-                self.path_planner.channel_graph(),
-                network_events_tx,
-            ),
-        );
-
-        self.ping
-            .clone()
-            .set(ping)
-            .expect("must set the ping executor only once");
-
         let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), me_onchain);
         let tkt_agg_writer = ticket_agg_proc.writer();
 
@@ -420,7 +392,7 @@ where
 
         self.process_packet_send
             .clone()
-            .set(MsgSender::new(external_msg_send))
+            .set(MsgSender::new(external_msg_send.clone()))
             .expect("must set the packet processing writer only once");
 
         self.process_ticket_aggregate
@@ -428,46 +400,9 @@ where
             .set(tkt_agg_writer.clone())
             .expect("must set the ticket aggregation writer only once");
 
-        // heartbeat
-        let mut heartbeat = Heartbeat::new(
-            self.cfg.heartbeat,
-            self.ping
-                .get()
-                .expect("Ping should be initialized at this point")
-                .clone(),
-            hopr_transport_network::heartbeat::HeartbeatExternalInteractions::new(self.network.clone()),
-            Box::new(|dur| Box::pin(sleep(dur))),
-        );
+        // -- transport medium
+        let mixer_cfg = build_mixer_cfg_from_env();
 
-        // initiate the transport layer
-        let mixer_cfg = MixerConfig {
-            min_delay: std::time::Duration::from_millis(
-                std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
-                    .map(|v| {
-                        v.trim()
-                            .parse::<u64>()
-                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-                    })
-                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
-            ),
-            delay_range: std::time::Duration::from_millis(
-                std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
-                    .map(|v| {
-                        v.trim()
-                            .parse::<u64>()
-                            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
-                    })
-                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
-            ),
-            capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
-                .map(|v| {
-                    v.trim()
-                        .parse::<usize>()
-                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
-                })
-                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
-            ..MixerConfig::default()
-        };
         #[cfg(feature = "mixer-channel")]
         let (mixing_channel_tx, mixing_channel_rx) = hopr_transport_mixer::channel::<(PeerId, Box<[u8]>)>(mixer_cfg);
 
@@ -504,13 +439,14 @@ where
             (tx, rx)
         };
 
+        let (network_events_tx, network_events_rx) =
+            mpsc::channel::<NetworkTriggeredEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
+
         let mut transport_layer = HoprSwarm::new(
             (&self.me).into(),
             network_events_rx,
             discovery_updates,
-            ping_rx,
             self.my_multiaddresses.clone(),
-            self.cfg.protocol,
         )
         .await;
 
@@ -536,9 +472,9 @@ where
         let _mixing_process_before_sending_out =
             hopr_async_runtime::prelude::spawn(mixing_channel_rx.map(Ok).forward(wire_msg_tx));
 
-        processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run(version)));
+        processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run()));
 
-        // initiate the msg-ack protocol stack over the wire transport
+        // -- msg-ack protocol over the wire transport
         let packet_cfg = PacketInteractionConfig {
             packet_keypair: self.me.clone(),
             outgoing_ticket_win_prob: self
@@ -550,7 +486,7 @@ where
             outgoing_ticket_price: self.cfg.protocol.outgoing_ticket_price,
         };
 
-        let (tx_from_protocol, rx_from_protocol) = mpsc::unbounded::<(HoprPseudonym, ApplicationData)>();
+        let (tx_from_protocol, rx_from_protocol) = unbounded::<(HoprPseudonym, ApplicationData)>();
         for (k, v) in hopr_transport_protocol::run_msg_ack_protocol(
             packet_cfg,
             self.db.clone(),
@@ -564,8 +500,44 @@ where
             processes.insert(HoprTransportProcess::Protocol(k), v);
         }
 
-        let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
+        // -- network probing
+        let (tx_from_probing, rx_from_probing) = unbounded::<(HoprPseudonym, ApplicationData)>();
 
+        let (manual_ping_tx, manual_ping_rx) = unbounded::<(PeerId, PingQueryReplier)>();
+
+        let probe = Probe::new((*self.me.public(), self.me_address), self.cfg.probe);
+        for (k, v) in probe
+            .continuously_scan(
+                (external_msg_send, rx_from_protocol),
+                manual_ping_rx,
+                network_notifier::ProbeNetworkInteractions::new(
+                    self.network.clone(),
+                    self.db.clone(),
+                    self.path_planner.channel_graph(),
+                    network_events_tx,
+                ),
+                DbProxy::new(self.db.clone()),
+                tx_from_probing,
+            )
+            .await
+            .into_iter()
+        {
+            processes.insert(HoprTransportProcess::Probing(k), v);
+        }
+
+        // manual ping
+        self.ping
+            .clone()
+            .set(Pinger::new(
+                PingConfig {
+                    timeout: self.cfg.probe.timeout,
+                },
+                manual_ping_tx,
+            ))
+            .expect("must set the ticket aggregation writer only once");
+
+        // -- session management
+        let msg_sender = helpers::MessageSender::new(self.process_packet_send.clone(), self.path_planner.clone());
         self.smgr
             .start(msg_sender, on_incoming_session)
             .expect("failed to start session manager")
@@ -580,7 +552,7 @@ where
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
             spawn(async move {
-                let _the_process_should_not_end = StreamExt::filter_map(rx_from_protocol, |(pseudonym, data)| {
+                let _the_process_should_not_end = StreamExt::filter_map(rx_from_probing, |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {
                         match smgr.dispatch_message(pseudonym, data).await {
@@ -602,17 +574,6 @@ where
                 .map(Ok)
                 .forward(on_incoming_data)
                 .await;
-            }),
-        );
-
-        // initiate the network telemetry
-        let half_the_hearbeat_interval = self.cfg.heartbeat.interval / 4;
-        processes.insert(
-            HoprTransportProcess::Heartbeat,
-            spawn(async move {
-                // present to make sure that the heartbeat does not start immediately
-                hopr_async_runtime::prelude::sleep(half_the_hearbeat_interval).await;
-                heartbeat.heartbeat_loop().await
             }),
         );
 
@@ -644,45 +605,17 @@ where
             .get()
             .ok_or_else(|| HoprTransportError::Api("ping processing is not yet initialized".into()))?;
 
-        let timeout = sleep(Duration::from_secs(30)).fuse();
-        let ping = (*pinger).ping(vec![*peer]);
-
-        pin_mut!(timeout, ping);
-
         if let Err(e) = self.network.add(peer, PeerOrigin::ManualPing, vec![]).await {
             error!(error = %e, "Failed to store the peer observation");
         }
 
-        let start = current_time().as_unix_timestamp();
+        let latency = (*pinger).ping(*peer).await?;
 
-        match select(timeout, ping.next().fuse()).await {
-            Either::Left(_) => {
-                warn!(%peer, "Manual ping to peer timed out");
-                return Err(ProtocolError::Timeout.into());
-            }
-            Either::Right((v, _)) => {
-                match v
-                    .into_iter()
-                    .map(|r| r.map_err(HoprTransportError::NetworkError))
-                    .collect::<errors::Result<Vec<Duration>>>()
-                {
-                    Ok(d) => info!(%peer, rtt = ?d, "Manual ping succeeded"),
-                    Err(e) => {
-                        error!(%peer, error = %e, "Manual ping failed");
-                        return Err(e);
-                    }
-                }
-            }
-        };
-
-        let peer_status = self.network.get(peer).await?.ok_or(HoprTransportError::NetworkError(
-            errors::NetworkingError::NonExistingPeer,
+        let peer_status = self.network.get(peer).await?.ok_or(HoprTransportError::Probe(
+            hopr_transport_probe::errors::ProbeError::NonExistingPeer,
         ))?;
 
-        Ok((
-            peer_status.last_seen.as_unix_timestamp().saturating_sub(start),
-            peer_status,
-        ))
+        Ok((latency, peer_status))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -702,10 +635,12 @@ where
         routing: DestinationRouting,
         application_tag: Tag,
     ) -> errors::Result<()> {
-        // The send_message logic will be entirely removed in 3.0
-        if application_tag < RESERVED_SESSION_TAG_UPPER_LIMIT {
+        let tag: ResolvedTag = application_tag.into();
+
+        if let ResolvedTag::Reserved(reserved_tag) = tag {
             return Err(HoprTransportError::Api(format!(
-                "Application tag must not be lower than {RESERVED_SESSION_TAG_UPPER_LIMIT}"
+                "Application tag must not from range: {:?}, but was {reserved_tag:?}",
+                Tag::USABLE_RANGE
             )));
         }
 
@@ -944,4 +879,38 @@ where
             .map(|v| v.ticket.leak())
             .collect())
     }
+}
+
+fn build_mixer_cfg_from_env() -> MixerConfig {
+    let mixer_cfg = MixerConfig {
+        min_delay: std::time::Duration::from_millis(
+            std::env::var("HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS")
+                .map(|v| {
+                    v.trim()
+                        .parse::<u64>()
+                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
+                })
+                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS),
+        ),
+        delay_range: std::time::Duration::from_millis(
+            std::env::var("HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS")
+                .map(|v| {
+                    v.trim()
+                        .parse::<u64>()
+                        .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS)
+                })
+                .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_DEFAULT_DELAY_RANGE_IN_MS),
+        ),
+        capacity: std::env::var("HOPR_INTERNAL_MIXER_CAPACITY")
+            .map(|v| {
+                v.trim()
+                    .parse::<usize>()
+                    .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY)
+            })
+            .unwrap_or(hopr_transport_mixer::config::HOPR_MIXER_CAPACITY),
+        ..MixerConfig::default()
+    };
+    debug!(?mixer_cfg, "Mixer configuration");
+
+    mixer_cfg
 }

@@ -615,10 +615,8 @@ mod tests {
         let wrong_pwd = "wrong_password";
         create_identity(path, pwd, &None)?;
         let files = get_files(path, &None);
-        match read_identities(files, wrong_pwd) {
-            Ok(val) => assert_eq!(val.len(), 0),
-            _ => assert!(false),
-        }
+        assert_eq!(read_identities(files, wrong_pwd)?.len(), 0);
+
         Ok(())
     }
 
@@ -629,6 +627,7 @@ mod tests {
         let path = tmp.path().to_str().context("should produce a valid tmp path string")?;
         let files = get_files(path, &None);
         assert_eq!(read_identities(files, "")?.len(), 0);
+
         Ok(())
     }
 

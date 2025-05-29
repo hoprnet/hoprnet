@@ -98,7 +98,7 @@ class HoprdAPI:
     def __init__(self, url: str, token: str):
         self.host = url
         self.headers = {"Authorization": f"Bearer {token}"}
-        self.prefix = "/api/v3/"
+        self.prefix = "/api/v4/"
 
     @property
     def log_prefix(cls) -> str:
