@@ -4,17 +4,11 @@ use hopr_db_api::{protocol::HoprDbProtocolOperations, resolver::HoprDbResolverOp
 use crate::traits::DbOperations;
 
 #[derive(Debug, Clone)]
-pub struct DbProxy<T>
-where
-    T: HoprDbResolverOperations + HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
-{
+pub struct DbProxy<T> {
     db: T,
 }
 
-impl<T> DbProxy<T>
-where
-    T: HoprDbResolverOperations + HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
-{
+impl<T> DbProxy<T> {
     pub fn new(db: T) -> Self {
         Self { db }
     }

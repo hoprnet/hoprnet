@@ -41,10 +41,7 @@ fn to_pseudonym(path: &ResolvedTransportRouting) -> HoprPseudonym {
 }
 
 #[derive(Clone, Debug)]
-struct Sender<T>
-where
-    T: futures::Sink<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)> + Clone + Send + Sync + 'static,
-{
+struct Sender<T> {
     downstream: T,
 }
 
@@ -77,6 +74,10 @@ where
     }
 }
 
+/// Probe functionality builder.
+///
+/// The builder holds information about this node's own addresses and the configuration for the probing process. It is
+/// then used to construct the probing process itself.
 pub struct Probe {
     /// Own addresses for self reference and surb creation.
     me: (OffchainPublicKey, Address),

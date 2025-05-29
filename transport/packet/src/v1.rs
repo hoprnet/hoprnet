@@ -9,9 +9,11 @@ use std::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Tag(pub u64);
 
+/// The tag appended to the application data packet to identify the application target.
 impl Tag {
     pub const MAX: Tag = Tag(u64::MAX);
     pub const SIZE: usize = size_of::<u64>();
+    /// Tag range usable by external applications of the library.
     pub const USABLE_RANGE: Range<Tag> = ReservedTag::UPPER_BOUND..CustomTag::UPPER_BOUND;
 
     pub const fn new(tag: u64) -> Self {
@@ -99,6 +101,8 @@ impl PartialOrd<u64> for Tag {
 }
 
 /// Resolved tag type with translated tag annotation.
+///
+/// The resolved tag covers the entire range of tags and a tag is always representable by it.
 #[repr(u64)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ResolvedTag {
@@ -153,6 +157,7 @@ impl From<ReservedTag> for Tag {
     }
 }
 
+/// Tags used for application data labeling only.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CustomTag(Tag);
 
