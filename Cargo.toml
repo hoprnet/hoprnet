@@ -45,14 +45,14 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "1.0.4", default-features = false, features = [
+alloy = { version = "=1.0.4", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
   "contract",
   "k256",
   "std",
-] }
+] } # pinned to 1.0.4 due to many breaking changes in patch releases
 anyhow = "1.0.98"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
@@ -67,7 +67,7 @@ asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 atomic_enum = "0.3.0"
 axum = { version = "0.8.4", features = ["ws", "http2"] }
 axum-extra = { version = "0.10.1", features = ["query"] }
-backon = { version = "1.5.0", default-features = false }
+backon = { version = "1.5.1", default-features = false }
 base64 = "0.22.1"
 bigdecimal = "0.4.8"
 bimap = "0.6.3"
@@ -79,7 +79,7 @@ cbor4ii = { version = "1.0.0" }
 cfg_eval = "0.1.2"
 cfg-if = "1.0.0"
 chrono = { version = "0.4.41", default-features = false }
-clap = { version = "4.5.38", features = ["derive", "env", "string"] }
+clap = { version = "4.5.39", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.6.0", features = ["async_tokio", "html_reports"] }
@@ -111,14 +111,14 @@ k256 = { version = "0.13.4", features = [
   "serde",
 ] }
 lazy_static = "1.5.0"
-libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", rev = "c921ca6573d1edb734a81f41a95736d2a01c5632" } # branch = "kauki/libp2p-stream/improve-configurability-of-dial-opts"
+libp2p = { git = "https://github.com/hoprnet/rust-libp2p.git", rev = "f62c373344636151a3d2062dd7b256036e901519" } # branch = "kauki/libp2p-stream/improve-configurability-of-dial-opts"
 # libp2p = { version = "0.55.0" }
 libp2p-identity = { version = "0.2.11", features = [
   "peerid",
   "ed25519",
   "rand",
 ] }
-libp2p-stream = { git = "https://github.com/hoprnet/rust-libp2p.git", rev = "c921ca6573d1edb734a81f41a95736d2a01c5632" } # branch = "kauki/libp2p-stream/improve-configurability-of-dial-opts"
+libp2p-stream = { git = "https://github.com/hoprnet/rust-libp2p.git", rev = "f62c373344636151a3d2062dd7b256036e901519" } # branch = "kauki/libp2p-stream/improve-configurability-of-dial-opts"
 # libp2p-stream = { version = "0.3.0-alpha" }
 mockall = "0.13.1"
 mockito = "1.7.0"
@@ -140,18 +140,18 @@ rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference 
 rand_distr = "0.4.3" # ignored in renovate, cannot be updated, dependencies reference old ones
 rayon = "1.10.0"
 regex = "1.11.1"
-reqwest = { version = "0.12.15", features = ["json"] }
+reqwest = { version = "0.12.18", features = ["json"] }
 ringbuffer = "0.15.0"
 rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
-sea-orm = { version = "1.1.11", features = [ # ?
+sea-orm = { version = "1.1.12", features = [ # ?
   "sqlx-sqlite",
   "with-chrono",
   "debug-print",
 ] }
-sea-orm-cli = { version = "1.1.11", features = ["codegen"] }
-sea-orm-migration = { version = "1.1.11", features = [
+sea-orm-cli = { version = "1.1.12", features = ["codegen"] }
+sea-orm-migration = { version = "1.1.12", features = [
   "sqlx-sqlite",
   "with-chrono",
 ] }
