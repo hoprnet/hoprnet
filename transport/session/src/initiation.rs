@@ -76,6 +76,7 @@ pub struct StartEstablished<T> {
 ///     end
 /// ```
 // Do not implement Serialize,Deserialize -> enforce serialization via encode/decode
+// TODO(v3.0): use a single dedicated tag and use this object as a payload instead
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub(crate)))]
 #[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
@@ -92,6 +93,12 @@ pub enum StartProtocol<T> {
     KeepAlive(T),
 }
 
+impl<T> From<&StartProtocol<T>> for Tag {
+    fn from(value: &StartProtocol<T>) -> Self {
+        (StartProtocolDiscriminants::from(value) as u64).into()
+    }
+}
+
 // TODO: implement this without Serde, see #7145
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
@@ -102,7 +109,7 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
     /// Serialize the message into a message tag and message data.
     /// Data is serialized using `bincode`.
     pub fn encode(self) -> crate::errors::Result<(Tag, Box<[u8]>)> {
-        let disc = StartProtocolDiscriminants::from(&self) as u8 + 1;
+        let disc = StartProtocolDiscriminants::from(&self) as u8;
         let inner = match self {
             StartProtocol::StartSession(init) => {
                 bincode::serde::encode_to_vec(&init, Self::SESSION_BINCODE_CONFIGURATION)
@@ -121,11 +128,7 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
     /// Deserialize the message from message tag and message data.
     /// Data is deserialized using `bincode`.
     pub fn decode(tag: Tag, data: &[u8]) -> crate::errors::Result<Self> {
-        if tag == 0 {
-            return Err(TransportSessionError::Tag);
-        }
-
-        match StartProtocolDiscriminants::from_repr(tag.0 as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
+        match StartProtocolDiscriminants::from_repr(tag.as_u64() as u8).ok_or(TransportSessionError::PayloadSize)? {
             StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(
                 bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
@@ -226,7 +229,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(Tag(StartProtocolDiscriminants::StartSession as u64 + 1), tag);
+        let expected: Tag = (StartProtocolDiscriminants::StartSession as u64).into();
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -261,7 +265,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(Tag(StartProtocolDiscriminants::SessionEstablished as u64 + 1), tag);
+        let expected: Tag = (StartProtocolDiscriminants::SessionEstablished as u64).into();
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -278,7 +283,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(Tag(StartProtocolDiscriminants::SessionError as u64 + 1), tag);
+        let expected: Tag = (StartProtocolDiscriminants::SessionError as u64).into();
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -292,7 +298,8 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::CloseSession(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(Tag(StartProtocolDiscriminants::CloseSession as u64 + 1), tag);
+        let expected: Tag = (StartProtocolDiscriminants::CloseSession as u64).into();
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -306,7 +313,8 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::KeepAlive(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(Tag(StartProtocolDiscriminants::KeepAlive as u64 + 1), tag);
+        let expected: Tag = (StartProtocolDiscriminants::KeepAlive as u64).into();
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -333,7 +341,7 @@ mod tests {
 
         let msg = StartProtocol::SessionEstablished(StartEstablished {
             orig_challenge: StartChallenge::MAX,
-            session_id: SessionId::new(Tag::MAX, HoprPseudonym::random()),
+            session_id: SessionId::new(Tag::MAX.into(), HoprPseudonym::random()),
         });
 
         assert!(
@@ -353,14 +361,14 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::CloseSession(SessionId::new(Tag::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::CloseSession(SessionId::new(Tag::MAX.into(), HoprPseudonym::random()));
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "CloseSession must fit within {}",
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX.into(), HoprPseudonym::random()));
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "KeepAlive must fit within {}",
@@ -372,7 +380,7 @@ mod tests {
 
     #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
-        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX.into(), HoprPseudonym::random()));
         let len = msg.encode()?.1.len();
         assert!(
             HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,

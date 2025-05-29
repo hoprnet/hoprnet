@@ -8,9 +8,6 @@ pub enum TransportSessionError {
     #[error("connection timed out")]
     Timeout,
 
-    #[error("application tag from disallowed range")]
-    Tag,
-
     #[error("incorrect data size")]
     PayloadSize,
 

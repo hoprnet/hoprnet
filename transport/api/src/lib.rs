@@ -64,7 +64,6 @@ use hopr_transport_p2p::{
     HoprSwarm,
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
 };
-use hopr_transport_packet::prelude::*;
 pub use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use hopr_transport_probe::{
     DbProxy, Probe,
@@ -99,7 +98,7 @@ pub use crate::{
 };
 use crate::{constants::SESSION_INITIATION_TIMEOUT_BASE, errors::HoprTransportError};
 
-pub const USABLE_TAG_RANGE: std::ops::Range<Tag> = Tag::USABLE_RANGE;
+pub const APPLICATION_TAG_RANGE: std::ops::Range<Tag> = Tag::APPLICATION_TAG_RANGE;
 
 #[cfg(any(
     all(feature = "mixer-channel", feature = "mixer-stream"),
@@ -246,9 +245,7 @@ where
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             smgr: SessionManager::new(SessionManagerConfig {
                 // TODO(v3.1): Use the entire range of tags properly
-                //
-                // session_tag_range: Tag::USABLE_RANGE,
-                session_tag_range: (Tag(16)..Tag(65535)),
+                session_tag_range: (16..65535),
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
@@ -629,18 +626,11 @@ where
     }
 
     #[tracing::instrument(level = "info", skip(self, msg), fields(uuid = uuid::Uuid::new_v4().to_string()))]
-    pub async fn send_message(
-        &self,
-        msg: Box<[u8]>,
-        routing: DestinationRouting,
-        application_tag: Tag,
-    ) -> errors::Result<()> {
-        let tag: ResolvedTag = application_tag.into();
-
-        if let ResolvedTag::Reserved(reserved_tag) = tag {
+    pub async fn send_message(&self, msg: Box<[u8]>, routing: DestinationRouting, tag: Tag) -> errors::Result<()> {
+        if let Tag::Reserved(reserved_tag) = tag {
             return Err(HoprTransportError::Api(format!(
                 "Application tag must not from range: {:?}, but was {reserved_tag:?}",
-                Tag::USABLE_RANGE
+                Tag::APPLICATION_TAG_RANGE
             )));
         }
 
@@ -651,7 +641,7 @@ where
             )));
         }
 
-        let app_data = ApplicationData::new_from_owned(application_tag, msg);
+        let app_data = ApplicationData::new_from_owned(tag, msg);
         let routing = self.path_planner.resolve_routing(app_data.len(), routing).await?;
 
         // Here we do not use msg_sender directly,

@@ -1062,7 +1062,7 @@ mod tests {
     -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
-        let session_id = hopr_lib::HoprSessionId::new(hopr_lib::Tag(4567), HoprPseudonym::random());
+        let session_id = hopr_lib::HoprSessionId::new(4567u64.into(), HoprPseudonym::random());
         let peer: hopr_lib::Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let session = hopr_lib::HoprSession::new(
             session_id,
@@ -1108,7 +1108,7 @@ mod tests {
     -> anyhow::Result<()> {
         let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
 
-        let session_id = hopr_lib::HoprSessionId::new(hopr_lib::Tag(4567), HoprPseudonym::random());
+        let session_id = hopr_lib::HoprSessionId::new(4567u64.into(), HoprPseudonym::random());
         let peer: hopr_lib::Address = "0x5112D584a1C72Fc250176B57aEba5fFbbB287D8F".parse()?;
         let session = hopr_lib::HoprSession::new(
             session_id,
