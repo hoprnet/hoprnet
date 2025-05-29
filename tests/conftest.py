@@ -96,7 +96,7 @@ async def swarm7(request, base_port):
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
     try:
         cluster, anvil = await localcluster.bringup(
-            params_path, test_mode=True, fully_connected=False, use_nat=True, base_port=base_port
+            params_path, test_mode=True, fully_connected=False, use_nat=False, base_port=base_port
         )
 
         yield cluster.nodes

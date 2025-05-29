@@ -1,6 +1,7 @@
 use futures::{Sink, SinkExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::sleep;
-use hopr_crypto_packet::errors::{PacketError, PacketError::TransportError, Result};
+pub use hopr_crypto_packet::errors::PacketError;
+use hopr_crypto_packet::errors::{PacketError::TransportError, Result};
 use hopr_crypto_types::prelude::*;
 use hopr_db_api::{
     prelude::HoprDbProtocolOperations,
@@ -10,6 +11,7 @@ use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::ResolvedTransportRouting;
 use hopr_primitive_types::prelude::*;
 use hopr_transport_identity::PeerId;
+use hopr_transport_packet::prelude::ApplicationData;
 use tracing::error;
 
 lazy_static::lazy_static! {
@@ -271,7 +273,7 @@ mod tests {
 
         let sender = MsgSender::new(tx);
 
-        let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03])?;
+        let expected_data = ApplicationData::from_bytes(&[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09])?;
         let expected_path = ValidatedPath::direct(
             *OffchainKeypair::random().public(),
             ChainKeypair::random().public().to_address(),

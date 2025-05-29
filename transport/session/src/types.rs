@@ -11,15 +11,13 @@ use std::{
 
 use futures::{StreamExt, pin_mut};
 use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_internal_types::{
-    prelude::{HoprPseudonym, Tag},
-    protocol::ApplicationData,
-};
+use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::{
     prelude::{DestinationRouting, SealedHost},
     session::state::{SessionConfig, SessionSocket},
 };
 use hopr_primitive_types::prelude::BytesRepresentable;
+use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, error};
 
 use crate::{Capability, errors::TransportSessionError, traits::SendMsg};
@@ -83,7 +81,7 @@ impl SessionId {
         }
     }
 
-    pub fn tag(&self) -> u16 {
+    pub fn tag(&self) -> Tag {
         self.tag
     }
 
@@ -651,7 +649,7 @@ mod tests {
             .with_variable_int_encoding();
 
         let pseudonym = HoprPseudonym::random();
-        let tag = 1234;
+        let tag: Tag = 1234u64.into();
 
         let session_id_1 = SessionId::new(tag, pseudonym);
         let data = bincode::serde::encode_to_vec(session_id_1, SESSION_BINCODE_CONFIGURATION)?;
@@ -669,7 +667,7 @@ mod tests {
     #[test]
     fn session_should_identify_with_its_own_id() -> anyhow::Result<()> {
         let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64.into(), HoprPseudonym::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
@@ -688,7 +686,7 @@ mod tests {
     #[tokio::test]
     async fn session_should_read_data_in_one_swoop_if_the_buffer_is_sufficiently_large() -> anyhow::Result<()> {
         let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64.into(), HoprPseudonym::random());
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
@@ -720,7 +718,7 @@ mod tests {
     async fn session_should_read_data_in_multiple_rounds_if_the_buffer_is_not_sufficiently_large() -> anyhow::Result<()>
     {
         let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64.into(), HoprPseudonym::random());
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
@@ -757,7 +755,7 @@ mod tests {
     #[tokio::test]
     async fn session_should_write_data_on_forward_path() -> anyhow::Result<()> {
         let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64.into(), HoprPseudonym::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
 
@@ -787,7 +785,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_should_write_data_on_return_path() -> anyhow::Result<()> {
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64.into(), HoprPseudonym::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
 
@@ -821,7 +819,7 @@ mod tests {
         const TO_SEND: usize = USABLE_PAYLOAD_CAPACITY_FOR_SESSION * 2 + 10;
 
         let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64.into(), HoprPseudonym::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
 

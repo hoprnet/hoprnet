@@ -32,25 +32,27 @@ members = [
   "misc/metrics",
   "misc/platform",
   "transport/api",
+  "transport/bloom",
   "transport/identity",
   "transport/mixer",
   "transport/network",
   "transport/packet",
   "transport/p2p",
+  "transport/probe",
   "transport/protocol",
   "transport/session",
   "transport/ticket-aggregation",
 ]
 
 [workspace.dependencies]
-alloy = { version = "1.0.4", default-features = false, features = [
+alloy = { version = "=1.0.4", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
   "contract",
   "k256",
   "std",
-] }
+] } # pinned to 1.0.4 due to many breaking changes in patch releases
 anyhow = "1.0.98"
 aquamarine = "0.6.0"
 arrayvec = { version = "0.7.6", features = ["serde"] }
@@ -65,7 +67,7 @@ asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
 atomic_enum = "0.3.0"
 axum = { version = "0.8.4", features = ["ws", "http2"] }
 axum-extra = { version = "0.10.1", features = ["query"] }
-backon = { version = "1.5.0", default-features = false }
+backon = { version = "1.5.1", default-features = false }
 base64 = "0.22.1"
 bigdecimal = "0.4.8"
 bimap = "0.6.3"
@@ -77,7 +79,7 @@ cbor4ii = { version = "1.0.0" }
 cfg_eval = "0.1.2"
 cfg-if = "1.0.0"
 chrono = { version = "0.4.41", default-features = false }
-clap = { version = "4.5.38", features = ["derive", "env", "string"] }
+clap = { version = "4.5.39", features = ["derive", "env", "string"] }
 const_format = "0.2.34"
 console-subscriber = "0.4.1"
 criterion = { version = "0.6.0", features = ["async_tokio", "html_reports"] }
@@ -129,27 +131,25 @@ tracing-opentelemetry = { version = "0.30.0" }
 temp-env = "0.3.6"
 parameterized = "2.0.0"
 petgraph = { version = "0.8.1", features = ["serde-1"] }
-primitive-types = { version = "0.12.2", features = [ # ignored in renovate, primitive-types 0.13 not compatible with ethers.rs
-  "serde",
-] }
+primitive-types = { version = "0.13.1", features = ["serde"] }
 proc-macro-regex = "~1.1.0"
 prometheus = "0.14.0"
 rand = "0.8.5" # ignored in renovate, cannot be updated, dependencies reference old ones
 rand_distr = "0.4.3" # ignored in renovate, cannot be updated, dependencies reference old ones
 rayon = "1.10.0"
 regex = "1.11.1"
-reqwest = { version = "0.12.15", features = ["json"] }
+reqwest = { version = "0.12.18", features = ["json"] }
 ringbuffer = "0.15.0"
 rpassword = "7.4.0"
 rust-stream-ext-concurrent = "1.0.0"
 scrypt = { version = "0.11.0", default-features = false }
-sea-orm = { version = "1.1.11", features = [ # ?
+sea-orm = { version = "1.1.12", features = [ # ?
   "sqlx-sqlite",
   "with-chrono",
   "debug-print",
 ] }
-sea-orm-cli = { version = "1.1.11", features = ["codegen"] }
-sea-orm-migration = { version = "1.1.11", features = [
+sea-orm-cli = { version = "1.1.12", features = ["codegen"] }
+sea-orm-migration = { version = "1.1.12", features = [
   "sqlx-sqlite",
   "with-chrono",
 ] }
@@ -206,8 +206,6 @@ uuid = { version = "1.17.0" }
 url = { version = "2.5.4", features = ["serde"] }
 validator = { version = "0.20.0", features = ["derive"] }
 vergen-gix = { version = "1.0.9", features = ["build"] }
-void = "1.0.2"
-
 
 hopr-async-runtime = { path = "common/async-runtime" }
 hopr-bindings = { path = "ethereum/bindings", default-features = false }
@@ -236,9 +234,11 @@ hopr-platform = { path = "misc/platform" }
 hopr-primitive-types = { path = "common/primitive-types", default-features = false }
 hopr-strategy = { path = "logic/strategy", default-features = false }
 hopr-transport = { path = "transport/api" }
+hopr-transport-bloom = { path = "transport/bloom" }
 hopr-transport-identity = { path = "transport/identity" }
 hopr-transport-network = { path = "transport/network" }
 hopr-transport-mixer = { path = "transport/mixer" }
+hopr-transport-probe = { path = "transport/probe" }
 hopr-transport-protocol = { path = "transport/protocol" }
 hopr-transport-packet = { path = "transport/packet" }
 hopr-transport-p2p = { path = "transport/p2p" }

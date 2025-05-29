@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use hopr_internal_types::prelude::ApplicationData;
+use hopr_transport_packet::prelude::{ApplicationData, Tag};
 
 use crate::{Capability, errors::TransportSessionError, types::SessionTarget};
 
@@ -101,7 +101,7 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
 
     /// Serialize the message into a message tag and message data.
     /// Data is serialized using `bincode`.
-    pub fn encode(self) -> crate::errors::Result<(u16, Box<[u8]>)> {
+    pub fn encode(self) -> crate::errors::Result<(Tag, Box<[u8]>)> {
         let disc = StartProtocolDiscriminants::from(&self) as u8 + 1;
         let inner = match self {
             StartProtocol::StartSession(init) => {
@@ -115,17 +115,17 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
             StartProtocol::KeepAlive(id) => bincode::serde::encode_to_vec(&id, Self::SESSION_BINCODE_CONFIGURATION),
         }?;
 
-        Ok((disc as u16, inner.into_boxed_slice()))
+        Ok((disc.into(), inner.into_boxed_slice()))
     }
 
     /// Deserialize the message from message tag and message data.
     /// Data is deserialized using `bincode`.
-    pub fn decode(tag: u16, data: &[u8]) -> crate::errors::Result<Self> {
+    pub fn decode(tag: Tag, data: &[u8]) -> crate::errors::Result<Self> {
         if tag == 0 {
             return Err(TransportSessionError::Tag);
         }
 
-        match StartProtocolDiscriminants::from_repr(tag as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
+        match StartProtocolDiscriminants::from_repr(tag.0 as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
             StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(
                 bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
@@ -209,8 +209,9 @@ impl<T> TryFrom<ApplicationData> for StartProtocol<T> {
 mod tests {
     use hopr_crypto_packet::prelude::HoprPacket;
     use hopr_crypto_random::Randomizable;
-    use hopr_internal_types::prelude::{HoprPseudonym, Tag};
+    use hopr_internal_types::prelude::HoprPseudonym;
     use hopr_network_types::prelude::SealedHost;
+    use hopr_transport_packet::prelude::Tag;
 
     use super::*;
     use crate::SessionId;
@@ -225,7 +226,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::StartSession as Tag + 1, tag);
+        assert_eq!(Tag(StartProtocolDiscriminants::StartSession as u64 + 1), tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -260,7 +261,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::SessionEstablished as Tag + 1, tag);
+        assert_eq!(Tag(StartProtocolDiscriminants::SessionEstablished as u64 + 1), tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -277,7 +278,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::SessionError as Tag + 1, tag);
+        assert_eq!(Tag(StartProtocolDiscriminants::SessionError as u64 + 1), tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -291,7 +292,7 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::CloseSession(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::CloseSession as Tag + 1, tag);
+        assert_eq!(Tag(StartProtocolDiscriminants::CloseSession as u64 + 1), tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -305,7 +306,7 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::KeepAlive(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(StartProtocolDiscriminants::KeepAlive as Tag + 1, tag);
+        assert_eq!(Tag(StartProtocolDiscriminants::KeepAlive as u64 + 1), tag);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -332,7 +333,7 @@ mod tests {
 
         let msg = StartProtocol::SessionEstablished(StartEstablished {
             orig_challenge: StartChallenge::MAX,
-            session_id: SessionId::new(u16::MAX, HoprPseudonym::random()),
+            session_id: SessionId::new(Tag::MAX, HoprPseudonym::random()),
         });
 
         assert!(
@@ -352,14 +353,14 @@ mod tests {
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::CloseSession(SessionId::new(u16::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::CloseSession(SessionId::new(Tag::MAX, HoprPseudonym::random()));
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "CloseSession must fit within {}",
             HoprPacket::PAYLOAD_SIZE
         );
 
-        let msg = StartProtocol::KeepAlive(SessionId::new(u16::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX, HoprPseudonym::random()));
         assert!(
             msg.encode()?.1.len() <= HoprPacket::PAYLOAD_SIZE,
             "KeepAlive must fit within {}",
@@ -371,7 +372,7 @@ mod tests {
 
     #[test]
     fn start_protocol_message_keep_alive_message_should_allow_for_maximum_surbs() -> anyhow::Result<()> {
-        let msg = StartProtocol::KeepAlive(SessionId::new(u16::MAX, HoprPseudonym::random()));
+        let msg = StartProtocol::KeepAlive(SessionId::new(Tag::MAX, HoprPseudonym::random()));
         let len = msg.encode()?.1.len();
         assert!(
             HoprPacket::max_surbs_with_message(len) >= HoprPacket::MAX_SURBS_IN_PACKET,
