@@ -56,7 +56,8 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{config::Auth, session::StoredSessionEntry};
 
-pub(crate) const BASE_PATH: &str = "/api/v4";
+pub(crate) const BASE_PATH: &str =
+    const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
 #[derive(Clone)]
 pub(crate) struct AppState {
@@ -72,7 +73,7 @@ pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, StoredSessionEntry
 
 #[derive(Clone)]
 pub(crate) struct InternalState {
-    pub hoprd_cfg: HashMap<String, String>,
+    pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
     pub websocket_active_count: Arc<AtomicU16>,
@@ -178,7 +179,7 @@ impl Modify for SecurityAddon {
 /// Parameters needed to construct the Rest API via [`serve_api`].
 pub struct RestApiParameters {
     pub listener: TcpListener,
-    pub hoprd_cfg: HashMap<String, String>,
+    pub hoprd_cfg: serde_json::Value,
     pub cfg: crate::config::Api,
     pub hopr: Arc<hopr_lib::Hopr>,
     pub session_listener_sockets: ListenerJoinHandles,
@@ -209,7 +210,7 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
 
 #[allow(clippy::too_many_arguments)]
 async fn build_api(
-    hoprd_cfg: HashMap<String, String>,
+    hoprd_cfg: serde_json::Value,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
     open_listeners: ListenerJoinHandles,
