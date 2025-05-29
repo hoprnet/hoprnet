@@ -199,7 +199,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if cfg.api.enable {
         let node_cfg_value =
-            serde_json::to_value(&cfg.clone().into_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
+            serde_json::to_value(cfg.clone().into_redacted()).map_err(|e| HoprdError::ConfigError(e.to_string()))?;
 
         let api_cfg = cfg.api.clone();
 

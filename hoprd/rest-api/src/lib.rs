@@ -56,8 +56,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{config::Auth, session::StoredSessionEntry};
 
-pub(crate) const BASE_PATH: &str =
-    const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
+pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
 #[derive(Clone)]
 pub(crate) struct AppState {

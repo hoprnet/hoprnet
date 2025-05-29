@@ -307,13 +307,11 @@ impl HoprdConfig {
             Auth::None => {}
             Auth::Token(_) => self.api.auth = Auth::Token("<REDACTED>".to_owned()),
         }
-        if self.identity.private_key.is_some() {
-            self.identity.private_key = Some("<REDACTED>".to_owned());
-        }
 
         if self.identity.private_key.is_some() {
             self.identity.private_key = Some("<REDACTED>".to_owned());
         }
+
         "<REDACTED>".clone_into(&mut self.identity.password);
 
         self
