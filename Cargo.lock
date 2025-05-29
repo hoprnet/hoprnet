@@ -5466,6 +5466,7 @@ dependencies = [
  "oas3",
  "regex",
  "serde",
+ "serde_json",
  "serde_with",
  "smart-default",
  "strum 0.27.1",
