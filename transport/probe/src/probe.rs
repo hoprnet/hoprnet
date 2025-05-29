@@ -52,7 +52,7 @@ impl<T> Sender<T>
 where
     T: futures::Sink<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)> + Clone + Send + Sync + 'static,
 {
-    #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym = %to_pseudonym(&path)), err(level = tracing::Level::DEBUG, Display))]
+    #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), err(level = tracing::Level::DEBUG, Display))]
     async fn send_message(self, path: ResolvedTransportRouting, message: Message) -> crate::errors::Result<()> {
         let message: ApplicationData = message
             .try_into()
@@ -78,8 +78,9 @@ where
 }
 
 pub struct Probe {
-    /// Own addresses for self reference and surb creation
+    /// Own addresses for self reference and surb creation.
     me: (OffchainPublicKey, Address),
+    /// Probe configuration.
     cfg: ProbeConfig,
 }
 
@@ -418,13 +419,19 @@ mod tests {
         result
     }
 
+    const NO_PROBE_PASSES: f64 = 0.0;
+    const ALL_PROBES_PASS: f64 = 1.0;
+
     /// Channel that can drop any probes and concurrently replies to a probe correctly
     fn concurrent_channel(
         delay: Option<std::time::Duration>,
         pass_rate: f64,
         from_network_to_probing_tx: futures::channel::mpsc::Sender<(HoprPseudonym, ApplicationData)>,
     ) -> impl Fn((ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)) -> BoxFuture<'static, ()> {
-        debug_assert!((0.0..=1.0).contains(&pass_rate), "Pass rate must be between 0 and 1");
+        debug_assert!(
+            (NO_PROBE_PASSES..=ALL_PROBES_PASS).contains(&pass_rate),
+            "Pass rate must be between {NO_PROBE_PASSES} and {ALL_PROBES_PASS}"
+        );
 
         move |(data, path, finalizer): (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)| -> BoxFuture<'static, ()> {
             let mut from_network_to_probing_tx = from_network_to_probing_tx.clone();
@@ -442,7 +449,7 @@ mod tests {
                             tokio::time::sleep(delay).await;
                         }
 
-                        if rand::Rng::gen_range(&mut rand::thread_rng(), 0.0..=1.0) < pass_rate {
+                        if rand::Rng::gen_range(&mut rand::thread_rng(), NO_PROBE_PASSES..=ALL_PROBES_PASS) < pass_rate {
                             from_network_to_probing_tx
                                 .send((pseudonym, pong_message.try_into().expect("failed to convert pong message into data")))
                                 .await.expect("failed to send pong message");
@@ -478,7 +485,7 @@ mod tests {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
-                        concurrent_channel(None, 1.0f64, from_network_to_probing_tx),
+                        concurrent_channel(None, ALL_PROBES_PASS, from_network_to_probing_tx),
                     )
                     .await;
             });
@@ -517,7 +524,7 @@ mod tests {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
-                        concurrent_channel(None, 0.0f64, from_network_to_probing_tx),
+                        concurrent_channel(None, NO_PROBE_PASSES, from_network_to_probing_tx),
                     )
                     .await;
             });
@@ -555,7 +562,7 @@ mod tests {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
-                        concurrent_channel(None, 1.0f64, from_network_to_probing_tx),
+                        concurrent_channel(None, ALL_PROBES_PASS, from_network_to_probing_tx),
                     )
                     .await;
             });
@@ -609,7 +616,7 @@ mod tests {
                 from_probing_to_network_rx
                     .for_each_concurrent(
                         cfg.max_parallel_probes + 1,
-                        concurrent_channel(Some(timeout), 1.0f64, from_network_to_probing_tx),
+                        concurrent_channel(Some(timeout), ALL_PROBES_PASS, from_network_to_probing_tx),
                     )
                     .await;
             });

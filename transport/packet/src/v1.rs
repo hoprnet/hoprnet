@@ -3,7 +3,7 @@ use std::{
     ops::{Add, Range, Sub},
 };
 
-/// Tags are represented as 6 bytes.
+/// Tags are represented by 8 bytes ([`u64`]`).
 ///
 /// [`u64`] should offer enough space to even avoid collisions and tag attacks.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

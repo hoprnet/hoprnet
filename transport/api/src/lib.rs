@@ -245,11 +245,13 @@ where
             my_multiaddresses,
             process_ticket_aggregate: Arc::new(OnceLock::new()),
             smgr: SessionManager::new(SessionManagerConfig {
-                // TODO(v3.0): Only the relevant non-session IDs should be present here
+                // TODO(v3.1): Use the entire range of tags properly
+                //
+                // session_tag_range: Tag::USABLE_RANGE,
                 session_tag_range: std::ops::Range {
                     start: Tag(16),
                     end: Tag(65535),
-                }, // Tag::USABLE_RANGE,
+                },
                 initiation_timeout_base: SESSION_INITIATION_TIMEOUT_BASE,
                 idle_timeout: cfg.session.idle_timeout,
                 balancer_sampling_interval: cfg.session.balancer_sampling_interval,
