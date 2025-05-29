@@ -119,7 +119,7 @@ async def swarm7_reset(swarm7: dict[str, Node]):
 
 
 def to_ws_url(host, port, args: list[tuple[str, str]]):
-    return f"ws://{host}:{port}/api/v3/session/websocket?" + "&".join(f"{a[0]}={a[1]}" for a in args)
+    return f"ws://{host}:{port}/api/v4/session/websocket?" + "&".join(f"{a[0]}={a[1]}" for a in args)
 
 
 def run_hopli_cmd(cmd: list[str], custom_env):

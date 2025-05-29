@@ -18,7 +18,7 @@ scrape_configs:
           hoprd_peer_id: "Specify the peer ID of the hoprd node"
           hoprd_network: "dufour" # Posible values are dufour, rotsee
           hoprd_address: "Specify the native address of the hoprd node"
-    metrics_path: /api/v3/node/metrics
+    metrics_path: /api/v4/node/metrics
   - job_name: "cadvisor"
     scrape_interval: 10s
     metrics_path: "/metrics"

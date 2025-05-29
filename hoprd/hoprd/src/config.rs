@@ -301,23 +301,25 @@ impl HoprdConfig {
         }
     }
 
-    pub fn as_redacted_string(&self) -> crate::errors::Result<String> {
-        let mut redacted_cfg = self.clone();
-
+    pub fn as_redacted(&self) -> Self {
+        let mut ret = self.clone();
         // redacting sensitive information
-        match &mut redacted_cfg.api.auth {
+        match ret.api.auth {
             Auth::None => {}
-            Auth::Token(_) => redacted_cfg.api.auth = Auth::Token("<REDACTED>".to_owned()),
-        }
-        if redacted_cfg.identity.private_key.is_some() {
-            redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
+            Auth::Token(_) => ret.api.auth = Auth::Token("<REDACTED>".to_owned()),
         }
 
-        if redacted_cfg.identity.private_key.is_some() {
-            redacted_cfg.identity.private_key = Some("<REDACTED>".to_owned());
+        if ret.identity.private_key.is_some() {
+            ret.identity.private_key = Some("<REDACTED>".to_owned());
         }
-        "<REDACTED>".clone_into(&mut redacted_cfg.identity.password);
 
+        "<REDACTED>".clone_into(&mut ret.identity.password);
+
+        ret
+    }
+
+    pub fn as_redacted_string(&self) -> crate::errors::Result<String> {
+        let redacted_cfg = self.as_redacted();
         serde_json::to_string(&redacted_cfg).map_err(|e| crate::errors::HoprdError::SerializationError(e.to_string()))
     }
 }
