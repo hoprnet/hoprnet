@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
+pub use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};

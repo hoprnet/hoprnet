@@ -29,7 +29,7 @@ where
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
     <C as Encoder<<C as Decoder>::Item>>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
     <C as Decoder>::Error: std::fmt::Debug + std::fmt::Display + Send + Sync + 'static,
-    <C as Decoder>::Item: Send + 'static,
+    <C as Decoder>::Item: Clone + Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
 {
     let (tx_out, rx_out) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(10_000);
@@ -57,13 +57,14 @@ where
         async move {
             let (stream_rx, stream_tx) = stream.split();
             let (send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
+            let cache_internal = cache.clone();
 
             hopr_async_runtime::prelude::spawn(
                 recv.map(Ok)
                     .forward(FramedWrite::new(stream_tx.compat_write(), codec.clone())),
             );
-            hopr_async_runtime::prelude::spawn(
-                FramedRead::new(stream_rx.compat(), codec)
+            hopr_async_runtime::prelude::spawn(async move {
+                if let Err(error) = FramedRead::new(stream_rx.compat(), codec)
                     .filter_map(move |v| async move {
                         match v {
                             Ok(v) => Some((peer_id, v)),
@@ -74,8 +75,13 @@ where
                         }
                     })
                     .map(Ok)
-                    .forward(tx_in),
-            );
+                    .forward(tx_in)
+                    .await
+                {
+                    tracing::error!(peer = %peer_id, %error, "Incoming stream failed on reading");
+                }
+                cache_internal.invalidate(&peer_id).await;
+            });
             cache.insert(peer_id, send).await;
         }
     }));
@@ -89,6 +95,15 @@ where
 
         async move {
             let cache = cache.clone();
+
+            if let Some(mut cached) = cache.get(&peer_id).await {
+                if let Err(error) = cached.send(msg.clone()).await {
+                    tracing::error!(peer = %peer_id, %error, "Error sending message to peer from the cached connection");
+                    cache.invalidate(&peer_id).await;
+                } else {
+                    return;
+                }
+            }
 
             let cached = cache
                 .optionally_get_with(peer_id, async move {
@@ -130,9 +145,10 @@ where
                 .await;
 
             if let Some(mut cached) = cached {
-                cached.send(msg).await.unwrap_or_else(|e| {
-                    tracing::error!(peer = %peer_id, error = %e, "Error sending message to peer");
-                });
+                if let Err(error) = cached.send(msg).await {
+                    tracing::error!(peer = %peer_id, %error, "Error sending message to peer");
+                    cache.invalidate(&peer_id).await;
+                }
             } else {
                 tracing::error!(peer = %peer_id, "Error sending message to peer: the stream failed to be created and cached");
             }
@@ -209,7 +225,7 @@ mod tests {
 
         let (stream_rx, stream_tx) = stream.split();
         let (mut tx, rx) = (
-            FramedWrite::new(stream_tx.compat_write(), codec.clone()),
+            FramedWrite::new(stream_tx.compat_write(), codec),
             FramedRead::new(stream_rx.compat(), codec),
         );
         tx.send(value)
