@@ -25,8 +25,8 @@ pub struct SessionSocketConfig {
     pub frame_size: usize,
     #[default(Duration::from_secs(4))]
     pub frame_timeout: Duration,
-    #[default(false)]
-    pub allow_multiple_segments: bool,
+    #[default(0)]
+    pub max_buffered_segments: usize,
     #[default(8192)]
     pub capacity: usize,
 }
@@ -104,9 +104,8 @@ impl<const C: usize, S: SocketState<C> + 'static> SessionSocket<C, S> {
         let mut framed = asynchronous_codec::Framed::new(transport, SessionCodec::<C>);
 
         // Check if we allow sending multiple segments to downstream in a single write
-        if !cfg.allow_multiple_segments {
-            framed.set_send_high_water_mark(C);
-        }
+        // The HWM cannot be 0 bytes
+        framed.set_send_high_water_mark(1.max(cfg.max_buffered_segments * C));
 
         // Downstream transport
         let (packets_out, packets_in) = framed.split();
@@ -391,7 +390,7 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, bob_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-
+        
         alice_socket.write_all(&data).await?;
         alice_socket.flush().await?;
         alice_socket.close().await?;
@@ -399,11 +398,9 @@ mod tests {
         let mut bob_data = Vec::new();
         bob_socket.read_to_end(&mut bob_data).await?;
 
-        assert_eq!(0, bob_data.len());
-
-        // bob_socket.read_exact(&mut bob_data).await?;
-        // assert_eq!(&data[1500..], &bob_data);
-        // assert_eq!(data[4], *bob_data);
+        // The whole first frame is discarded due to the missing first segment
+        assert_eq!(data.len() - 1500, bob_data.len());
+        assert_eq!(&data[1500..], &bob_data);
 
         bob_socket.close().await?;
 

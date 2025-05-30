@@ -63,7 +63,7 @@ impl<const C: usize> Segmenter<C> {
 
             ready!(self.tx.as_mut().poll_ready(cx))?;
 
-            tracing::trace!(frame_id = seg.frame_id, seq_idx = seg.seq_idx, "segment out");
+            tracing::trace!(frame_id = seg.frame_id, seq_idx = seg.seq_idx, seg_len = seg.len(), "segment out");
             self.tx.as_mut().start_send(seg)?;
 
             if self.flush_each_segment {
@@ -122,29 +122,40 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
             return Poll::Ready(Ok(0));
         }
 
-        let len_to_write = buf.len().min(Self::PAYLOAD_CAPACITY - self.seg_buffer.len());
-        self.seg_buffer.extend_from_slice(&buf[..len_to_write]);
-        tracing::trace!(
-            len = len_to_write,
-            remaining = Self::PAYLOAD_CAPACITY - self.seg_buffer.len(),
-            "add segment data"
-        );
+        // Write only that much there is space in the segment or the frame
+        let new_len_in_buffer = buf.len()
+            .min(Self::PAYLOAD_CAPACITY - self.seg_buffer.len())
+            .min(self.frame_size - self.current_frame_len);
 
-        if self.seg_buffer.len() == Self::PAYLOAD_CAPACITY {
-            if self.current_frame_len + len_to_write > self.frame_size {
-                tracing::trace!("frame full");
-                ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
-            }
+        if new_len_in_buffer > 0 {
+            self.seg_buffer.extend_from_slice(&buf[..new_len_in_buffer]);
+            tracing::trace!(
+                buf_len = self.seg_buffer.len(),
+                len = new_len_in_buffer,
+                remaining = Self::PAYLOAD_CAPACITY - self.seg_buffer.len(),
+                "add segment data @ cap {}",
+                Self::PAYLOAD_CAPACITY
+            );
+        }
 
+        // If the chunk finishes the frame, flush it
+        if self.current_frame_len + new_len_in_buffer == self.frame_size {
+            tracing::trace!("frame is complete");
+            self.complete_segment();
+            ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
+        }
+        else if self.seg_buffer.len() == Self::PAYLOAD_CAPACITY {
+            tracing::trace!("segment is complete");
             self.complete_segment();
 
             if self.current_frame_len == self.frame_size {
+                tracing::trace!("frame is complete by the completed segment");
                 ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
             }
         }
 
-        tracing::trace!(len = len_to_write, "ready");
-        Poll::Ready(Ok(len_to_write))
+        tracing::trace!(len = new_len_in_buffer, "ready");
+        Poll::Ready(Ok(new_len_in_buffer))
     }
 
     #[instrument(name = "Segmenter::poll_flush", level = "trace", skip(self, cx))]

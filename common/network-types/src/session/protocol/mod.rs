@@ -159,7 +159,7 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 
 #[cfg(test)]
 mod tests {
-    use bitvec::{bitarr, bitvec, prelude::Lsb0};
+    use bitvec::{bitarr, prelude::Lsb0};
     use hex_literal::hex;
     use rand::{Rng, thread_rng};
 

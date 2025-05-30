@@ -229,7 +229,7 @@ impl<const C: usize> AsyncWrite for FaultyNetwork<'_, C> {
             }
         }
 
-        tracing::trace!("write done");
+        tracing::trace!(len = buf.len(), "wrote bytes");
         Poll::Ready(Ok(buf.len()))
     }
 
