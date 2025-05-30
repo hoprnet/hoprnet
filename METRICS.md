@@ -55,8 +55,8 @@ scrape_configs:
 - `hopr_transport_p2p_opened_connection_count`: Count of the currently active p2p connections as observed from the rust-libp2p events
 - `hopr_http_api_call_count`: Number of different REST API calls and their statuses, keys: `endpoint`, `method`, `status`
 - `hopr_http_api_call_timing_sec`: Timing of different REST API calls in seconds, keys: `endpoint`, `method`, buckets: 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0
-- `hopr_start_time`: The unix timestamp in seconds at which the process was started
 - `hopr_http_api_last_used_time`: The unix timestamp in seconds at which any API endpoint was last fetched
+- `hopr_start_time`: The unix timestamp in seconds at which the process was started
 - `hopr_lib_version`: Executed version of hopr-lib, keys: `version`
 - `hopr_node_addresses`: Node on-chain and off-chain addresses, keys: `peerid`, `address`, `safe_address`, `module_address`
 - `hopr_rpc_call_count`: Number of Ethereum RPC calls over HTTP and their result, key: `call`, `result`
