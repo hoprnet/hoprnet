@@ -124,7 +124,7 @@ function cleanup {
 }
 trap cleanup SIGINT SIGTERM ERR
 
-# mine a block every 6 seconds
+# mine a block every 2 seconds
 declare flags="--host 0.0.0.0 --port ${port} --block-time 2 --config-out ${cfg_file}"
 if [ -n "${dump_state_file}" ]; then
   flags="${flags} --dump-state ${dump_state_file}"
