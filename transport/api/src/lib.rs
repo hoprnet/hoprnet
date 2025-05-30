@@ -79,8 +79,7 @@ use hopr_transport_protocol::{
 pub use hopr_transport_session::transfer_session;
 pub use hopr_transport_session::{
     Capability as SessionCapability, IncomingSession, SESSION_PAYLOAD_SIZE, ServiceId, Session, SessionClientConfig,
-    SessionId, SessionTarget, SurbBalancerConfig, USABLE_PAYLOAD_CAPACITY_FOR_SESSION, errors::TransportSessionError,
-    traits::SendMsg,
+    SessionId, SessionTarget, SurbBalancerConfig, errors::TransportSessionError, traits::SendMsg,
 };
 use hopr_transport_session::{DispatchResult, SessionManager, SessionManagerConfig};
 use hopr_transport_ticket_aggregation::{

@@ -301,8 +301,13 @@ pub const MIN_BALANCER_SAMPLING_INTERVAL: Duration = Duration::from_millis(100);
 impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
     pub fn new(mut cfg: SessionManagerConfig) -> Self {
-        // Accommodate the lower bound if too low.
         let min_session_tag_range_reservation = ReservedTag::range().end;
+        debug_assert!(
+            min_session_tag_range_reservation > StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG as u64,
+            "invalid tag reservation range"
+        );
+
+        // Accommodate the lower bound if too low.
         if cfg.session_tag_range.start < min_session_tag_range_reservation {
             let diff = min_session_tag_range_reservation - cfg.session_tag_range.start;
             cfg.session_tag_range = min_session_tag_range_reservation..cfg.session_tag_range.end + diff;
@@ -701,7 +706,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         pseudonym: HoprPseudonym,
         data: ApplicationData,
     ) -> crate::errors::Result<DispatchResult> {
-        if (0..self.cfg.session_tag_range.start).contains(&data.application_tag.as_u64()) {
+        if data.application_tag == StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG.into() {
             // This is a Start protocol message, so we handle it
             trace!(tag = %data.application_tag, "dispatching Start protocol message");
             return self
@@ -1350,7 +1355,7 @@ mod tests {
         bob_mgr
             .sessions
             .insert(
-                SessionId::new(16u64.into(), alice_pseudonym),
+                SessionId::new(16u64, alice_pseudonym),
                 CachedSession {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),

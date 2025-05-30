@@ -34,6 +34,9 @@ pub enum TransportSessionError {
     #[error("received data for an unregistered session")]
     UnknownData,
 
+    #[error("session establishment protocol error: {0}")]
+    StartProtocolError(String),
+
     #[error(transparent)]
     Manager(#[from] SessionManagerError),
 
