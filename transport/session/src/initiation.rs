@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use hopr_transport_packet::prelude::{ApplicationData, Tag};
+use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 
 use crate::{Capability, errors::TransportSessionError, types::SessionTarget};
 
@@ -76,7 +76,6 @@ pub struct StartEstablished<T> {
 ///     end
 /// ```
 // Do not implement Serialize,Deserialize -> enforce serialization via encode/decode
-// TODO(v3.0): use a single dedicated tag and use this object as a payload instead
 #[derive(Debug, Clone, PartialEq, Eq, strum::EnumDiscriminants)]
 #[strum_discriminants(vis(pub(crate)))]
 #[strum_discriminants(derive(strum::FromRepr, strum::EnumCount), repr(u8))]
@@ -94,14 +93,8 @@ pub enum StartProtocol<T> {
 }
 
 impl<T> StartProtocol<T> {
-    pub(crate) const START_PROTOCOL_MESSAGE_TAG: u16 = 0x0001;
+    pub(crate) const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(ReservedTag::SessionStart as u64);
     const START_PROTOCOL_VERSION: u8 = 0x01;
-}
-
-impl<T> From<&StartProtocol<T>> for Tag {
-    fn from(_: &StartProtocol<T>) -> Self {
-        StartProtocol::<T>::START_PROTOCOL_MESSAGE_TAG.into()
-    }
 }
 
 // TODO: implement this without Serde, see #7145
@@ -136,18 +129,18 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
             }
         }?;
 
-        Ok((Self::START_PROTOCOL_MESSAGE_TAG.into(), out.into_boxed_slice()))
+        Ok((Self::START_PROTOCOL_MESSAGE_TAG, out.into_boxed_slice()))
     }
 
     /// Deserialize the message from message tag and message data.
     /// Data is deserialized using `bincode`.
     pub fn decode(tag: Tag, data: &[u8]) -> crate::errors::Result<Self> {
-        if data.len() < 3 {
-            return Err(TransportSessionError::StartProtocolError("message too short".into()));
+        if tag != Self::START_PROTOCOL_MESSAGE_TAG {
+            return Err(TransportSessionError::StartProtocolError("unknown message tag".into()));
         }
 
-        if tag != Self::START_PROTOCOL_MESSAGE_TAG.into() {
-            return Err(TransportSessionError::StartProtocolError("unknown message tag".into()));
+        if data.len() < 3 {
+            return Err(TransportSessionError::StartProtocolError("message too short".into()));
         }
 
         if data[0] != Self::START_PROTOCOL_VERSION {
@@ -259,7 +252,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG.into();
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
@@ -295,7 +288,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG.into();
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
@@ -313,7 +306,7 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG.into();
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
@@ -328,7 +321,7 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::CloseSession(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG.into();
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
@@ -343,7 +336,7 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::KeepAlive(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG.into();
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
         assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;

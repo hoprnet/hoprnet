@@ -6,19 +6,11 @@ use strum::IntoEnumIterator;
 #[repr(u64)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, strum::EnumIter)]
 pub enum ReservedTag {
-    /// Request to initiate a new session.
-    SessionStart = 0,
-    /// Confirmation that a new session has been established by the counterparty.
-    SessionEstablished = 1,
-    /// Counterparty could not establish a new session due to an error.
-    SessionError = 2,
-    /// Counterparty has closed the session.
-    SessionClose = 3,
-    /// A ping message to keep the session alive.
-    SessionKeepAlive = 4,
-
     /// Ping traffic for 0-hop detection.
-    Ping = ReservedTag::Undefined as u64 - 1,
+    Ping = 0,
+
+    /// Commands associated with session start protocol regarding session initiation.
+    SessionStart = 1,
 
     /// Undefined catch all.
     Undefined = 15,
@@ -203,7 +195,7 @@ mod tests {
 
     #[test]
     fn tag_should_be_obtainable_as_reserved_when_created_from_a_reserved_range() {
-        let reserved_tag = ReservedTag::SessionStart as u64;
+        let reserved_tag = ReservedTag::Ping as u64;
 
         assert_eq!(Tag::from(reserved_tag), Tag::Reserved(reserved_tag));
     }

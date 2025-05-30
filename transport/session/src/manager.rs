@@ -303,7 +303,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     pub fn new(mut cfg: SessionManagerConfig) -> Self {
         let min_session_tag_range_reservation = ReservedTag::range().end;
         debug_assert!(
-            min_session_tag_range_reservation > StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG as u64,
+            min_session_tag_range_reservation > StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG.as_u64(),
             "invalid tag reservation range"
         );
 
@@ -706,7 +706,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         pseudonym: HoprPseudonym,
         data: ApplicationData,
     ) -> crate::errors::Result<DispatchResult> {
-        if data.application_tag == StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG.into() {
+        if data.application_tag == StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG {
             // This is a Start protocol message, so we handle it
             trace!(tag = %data.application_tag, "dispatching Start protocol message");
             return self
