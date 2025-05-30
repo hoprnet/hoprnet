@@ -11,7 +11,7 @@ env:
 on:
   merge_group:
     types: [checks_requested]
-  pull_request:
+  pull_request_target:
     types:
       - synchronize
       - ready_for_review
@@ -24,7 +24,6 @@ jobs:
   tests-unit:
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 60
-    if: github.event.pull_request.draft == false
     env:
       needs_nix_setup: false
       CI: "true"
