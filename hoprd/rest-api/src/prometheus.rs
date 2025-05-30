@@ -1,8 +1,10 @@
 use axum::{extract::Request, middleware::Next, response::Response};
-use hopr_lib::AsUnixTimestamp;
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::{MultiCounter, MultiHistogram, SimpleGauge};
-use hopr_platform::time::native::current_time;
+use {
+    hopr_lib::AsUnixTimestamp,
+    hopr_metrics::metrics::{MultiCounter, MultiHistogram, SimpleGauge},
+    hopr_platform::time::native::current_time,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
