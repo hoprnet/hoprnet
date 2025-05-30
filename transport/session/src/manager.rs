@@ -12,9 +12,10 @@ use futures::{
 };
 use hopr_crypto_packet::prelude::HoprPacket;
 use hopr_crypto_random::Randomizable;
-use hopr_internal_types::prelude::{ApplicationData, HoprPseudonym, Tag};
+use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
+use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
@@ -61,8 +62,9 @@ pub struct SessionManagerConfig {
     /// This is due to the reserved range by the Start sub-protocol.
     ///
     /// Default is 16..1024.
-    #[default(_code = "16..1024")]
-    pub session_tag_range: Range<Tag>,
+    #[doc(hidden)]
+    #[default(_code = "16u64..1024u64")]
+    pub session_tag_range: Range<u64>,
 
     /// The base timeout for initiation of Session initiation.
     ///
@@ -293,19 +295,22 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
     base * (hops as u32)
 }
 
-/// The Minimum Session tag due to Start-protocol messages.
-pub const MIN_SESSION_TAG_RANGE_RESERVATION: Tag = 16;
-
 /// Smallest possible interval for balancer sampling.
 pub const MIN_BALANCER_SAMPLING_INTERVAL: Duration = Duration::from_millis(100);
 
 impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
     pub fn new(mut cfg: SessionManagerConfig) -> Self {
+        let min_session_tag_range_reservation = ReservedTag::range().end;
+        debug_assert!(
+            min_session_tag_range_reservation > StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG.as_u64(),
+            "invalid tag reservation range"
+        );
+
         // Accommodate the lower bound if too low.
-        if cfg.session_tag_range.start < MIN_SESSION_TAG_RANGE_RESERVATION {
-            let diff = MIN_SESSION_TAG_RANGE_RESERVATION - cfg.session_tag_range.start;
-            cfg.session_tag_range = MIN_SESSION_TAG_RANGE_RESERVATION..cfg.session_tag_range.end + diff;
+        if cfg.session_tag_range.start < min_session_tag_range_reservation {
+            let diff = min_session_tag_range_reservation - cfg.session_tag_range.start;
+            cfg.session_tag_range = min_session_tag_range_reservation..cfg.session_tag_range.end + diff;
         }
 
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -315,7 +320,13 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         Self {
             msg_sender: msg_sender.clone(),
             session_initiations: moka::future::Cache::builder()
-                .max_capacity(cfg.session_tag_range.clone().count() as u64)
+                .max_capacity(
+                    std::ops::Range {
+                        start: cfg.session_tag_range.start,
+                        end: cfg.session_tag_range.end,
+                    }
+                    .count() as u64,
+                )
                 .time_to_live(
                     2 * initiation_timeout_max_one_way(
                         cfg.initiation_timeout_base,
@@ -695,13 +706,14 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         pseudonym: HoprPseudonym,
         data: ApplicationData,
     ) -> crate::errors::Result<DispatchResult> {
-        if (0..self.cfg.session_tag_range.start).contains(&data.application_tag) {
-            trace!(tag = data.application_tag, "dispatching Start protocol message");
+        if data.application_tag == StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG {
+            // This is a Start protocol message, so we handle it
+            trace!(tag = %data.application_tag, "dispatching Start protocol message");
             return self
                 .handle_start_protocol_message(pseudonym, data)
                 .await
                 .map(|_| DispatchResult::Processed);
-        } else if self.cfg.session_tag_range.contains(&data.application_tag) {
+        } else if self.cfg.session_tag_range.contains(&data.application_tag.as_u64()) {
             let session_id = SessionId::new(data.application_tag, pseudonym);
 
             return if let Some(session_data) = self.sessions.get(&session_id).await {
@@ -718,6 +730,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             };
         }
 
+        trace!(%data.application_tag, "received data not associated with session protocol or any existing session");
         Ok(DispatchResult::Unrelated(data))
     }
 
@@ -750,13 +763,15 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     |sid| {
                         // NOTE: It is allowed to insert sessions using the same tag
                         // but different pseudonyms because the SessionId is different.
-                        let next_tag = match sid {
-                            Some(session_id) => ((session_id.tag() + 1) % self.cfg.session_tag_range.end)
-                                .max(self.cfg.session_tag_range.start),
+                        let next_tag: Tag = match sid {
+                            Some(session_id) => ((session_id.tag().as_u64() + 1) % self.cfg.session_tag_range.end)
+                                .max(self.cfg.session_tag_range.start)
+                                .into(),
                             None => hopr_crypto_random::random_integer(
-                                self.cfg.session_tag_range.start as u64,
-                                Some(self.cfg.session_tag_range.end as u64),
-                            ) as u16,
+                                self.cfg.session_tag_range.start,
+                                Some(self.cfg.session_tag_range.end),
+                            )
+                            .into(),
                         };
                         SessionId::new(next_tag, pseudonym)
                     },
@@ -1054,7 +1069,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Bob sends the SessionEstablished message
         let alice_mgr_clone = alice_mgr.clone();
@@ -1080,7 +1095,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Alice sends the CloseSession message to initiate closure
         let bob_mgr_clone = bob_mgr.clone();
@@ -1208,7 +1223,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Bob sends the SessionEstablished message
         let alice_mgr_clone = alice_mgr.clone();
@@ -1234,7 +1249,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Alice sends the CloseSession message to initiate closure
         let bob_mgr_clone = bob_mgr.clone();
@@ -1328,7 +1343,7 @@ mod tests {
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
-            session_tag_range: 16..17, // Slot for exactly one session
+            session_tag_range: 16u64..17u64, // Slot for exactly one session
             ..Default::default()
         };
 
@@ -1340,7 +1355,7 @@ mod tests {
         bob_mgr
             .sessions
             .insert(
-                SessionId::new(16, alice_pseudonym),
+                SessionId::new(16u64, alice_pseudonym),
                 CachedSession {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
@@ -1453,7 +1468,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Alice sends the SessionEstablished message (as Bob)
         let alice_mgr_clone = alice_mgr.clone();
@@ -1479,7 +1494,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Start Alice
         let (new_session_tx_alice, _) = futures::channel::mpsc::unbounded();
@@ -1595,7 +1610,7 @@ mod tests {
             .expect_clone()
             .once()
             .in_sequence(&mut sequence)
-            .return_once(|| MockMsgSender::new());
+            .return_once(MockMsgSender::new);
 
         // Bob sends the SessionEstablished message
         let alice_mgr_clone = alice_mgr.clone();

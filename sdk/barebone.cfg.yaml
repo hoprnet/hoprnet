@@ -1,11 +1,10 @@
 ---
 hopr:
   # run heartbeats more frequently
-  heartbeat:
+  probe:
+    timeout: 1
     max_parallel_probes: 10
-    interval: 3
-    threshold: 2
-    variance: 0
+    recheck_threshold: 1
   network_options:
     # do not ignore in tests at all
     ignore_timeframe: 0
@@ -15,8 +14,6 @@ hopr:
     execution_interval: 1
     strategies: []
   protocol:
-    heartbeat:
-      timeout: 5
     outgoing_ticket_winning_prob: 1.0
 session_ip_forwarding:
   use_target_allow_list: false

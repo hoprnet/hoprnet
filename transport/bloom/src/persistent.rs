@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use async_lock::RwLock;
 use hopr_crypto_types::types::PacketTag;
-use hopr_internal_types::protocol::TagBloomFilter;
 use hopr_platform::file::native::{read_file, write};
 use tracing::{debug, error, info};
+
+use crate::raw::TagBloomFilter;
 
 #[derive(Debug, Clone)]
 pub struct WrappedTagBloomFilter {

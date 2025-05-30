@@ -74,18 +74,17 @@ pub use hopr_strategy::Strategy;
 use hopr_strategy::strategy::{MultiStrategy, SingularStrategy};
 #[cfg(feature = "runtime-tokio")]
 pub use hopr_transport::transfer_session;
+pub use hopr_transport::{
+    ApplicationData, HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
+    OffchainKeypair as HoprOffchainKeypair, PeerId, PingQueryReplier, ProbeError, SESSION_PAYLOAD_SIZE, SendMsg,
+    ServiceId, Session as HoprSession, SessionCapability, SessionClientConfig, SessionId as HoprSessionId,
+    SessionTarget, SurbBalancerConfig, Tag, TicketStatistics,
+    config::{HostConfig, HostType, looks_like_domain},
+    errors::{HoprTransportError, NetworkingError, ProtocolError},
+};
 use hopr_transport::{
     ChainKeypair, Hash, HoprTransport, HoprTransportConfig, HoprTransportProcess, IncomingSession, OffchainKeypair,
     PeerDiscovery, PeerStatus, execute_on_tick,
-};
-pub use hopr_transport::{
-    HalfKeyChallenge, Health, IncomingSession as HoprIncomingSession, Keypair, Multiaddr,
-    OffchainKeypair as HoprOffchainKeypair, PeerId, SESSION_PAYLOAD_SIZE, SendMsg, ServiceId, Session as HoprSession,
-    SessionCapability, SessionClientConfig, SessionId as HoprSessionId, SessionTarget, SurbBalancerConfig,
-    TicketStatistics, USABLE_PAYLOAD_CAPACITY_FOR_SESSION,
-    config::{HostConfig, HostType, looks_like_domain},
-    constants::RESERVED_TAG_UPPER_LIMIT,
-    errors::{HoprTransportError, NetworkingError, ProtocolError},
 };
 use tracing::{debug, error, info, trace, warn};
 #[cfg(all(feature = "prometheus", not(test)))]
@@ -103,7 +102,7 @@ use crate::{
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PROCESS_START_TIME: SimpleGauge = SimpleGauge::new(
-        "hopr_up",
+        "hopr_start_time",
         "The unix timestamp in seconds at which the process was started"
     ).unwrap();
     static ref METRIC_HOPR_LIB_VERSION: MultiGauge = MultiGauge::new(
@@ -442,7 +441,7 @@ impl Hopr {
                 transport: cfg.transport.clone(),
                 network: cfg.network_options.clone(),
                 protocol: cfg.protocol,
-                heartbeat: cfg.heartbeat,
+                probe: cfg.probe,
                 session: cfg.session,
             },
             db.clone(),
@@ -722,7 +721,10 @@ impl Hopr {
                 .await
                 .unwrap_or(false)
             {
-                info!("Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.", my_ethereum_address.to_hex());
+                info!(
+                    "Once you become eligible to join the HOPR network, you can continue your onboarding by using the following URL: https://hub.hoprnet.org/staking/onboarding?HOPRdNodeAddressForOnboarding={}, or by manually entering the node address of your node on https://hub.hoprnet.org/.",
+                    my_ethereum_address.to_hex()
+                );
 
                 sleep(ONBOARDING_INFORMATION_INTERVAL).await;
 
@@ -926,7 +928,6 @@ impl Hopr {
             .transport_api
             .run(
                 &self.me_chain,
-                String::from(constants::APP_VERSION),
                 join(&[&self.cfg.db.data, "tbf"])
                     .map_err(|e| HoprLibError::GeneralError(format!("Failed to construct the bloom filter: {e}")))?,
                 transport_output_tx,
