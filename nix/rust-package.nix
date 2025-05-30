@@ -133,7 +133,6 @@ let
       sharedArgsBase
       // {
         cargoTestExtraArgs = "--workspace -F runtime-tokio";
-        doCheck = true;
         LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.pkgsBuildHost.openssl ];
         RUST_BACKTRACE = "full";
       }
@@ -177,7 +176,7 @@ let
 
   builder =
     if runTests then
-      craneLib.cargoTest
+      craneLib.cargoLlvmCov
     else if runClippy then
       craneLib.cargoClippy
     else if buildDocs then

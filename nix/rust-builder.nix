@@ -62,11 +62,15 @@ let
 
   rustToolchainFun =
     if useRustNightly then
-      p: p.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)
+      p:
+      p.rust-bin.selectLatestNightlyWith (
+        toolchain: toolchain.default.override { extensions = [ "llvm-tools-preview" ]; }
+      )
     else
       p:
       (p.pkgsBuildHost.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml).override {
         targets = [ cargoTarget ];
+        extensions = [ "llvm-tools-preview" ];
       };
 
   craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchainFun;
