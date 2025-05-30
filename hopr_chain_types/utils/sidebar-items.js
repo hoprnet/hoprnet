@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["add_announcement_as_target","approve_channel_transfer_from_safe","create_anvil","create_native_transfer","deploy_one_safe_one_module_and_setup_for_testing","fund_channel","fund_channel_from_different_client","fund_node","get_safe_tx","include_node_to_module_by_safe","mint_tokens"],"mod":["SafeContract"]};
