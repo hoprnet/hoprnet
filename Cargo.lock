@@ -4546,7 +4546,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-api"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "alloy",
  "async-channel 2.3.1",
