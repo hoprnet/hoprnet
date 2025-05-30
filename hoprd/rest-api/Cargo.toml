@@ -63,6 +63,7 @@ hopr-db-api = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-network-types = { workspace = true, features = ["runtime-tokio"] }
 hopr-metrics = { workspace = true, optional = true }
+hopr-platform = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
