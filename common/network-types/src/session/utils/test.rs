@@ -50,7 +50,7 @@ where
             .take(num_frames)
             .collect::<Vec<_>>()
     } else {
-        std::iter::repeat(frame_size).take(num_frames).collect::<Vec<_>>()
+        std::iter::repeat_n(frame_size, num_frames).collect::<Vec<_>>()
     };
 
     let socket_worker = |mut socket: S, d: Direction| {
@@ -64,7 +64,7 @@ where
                 for frame_size in &frame_sizes {
                     let mut write = vec![0u8; *frame_size];
                     hopr_crypto_random::random_fill(&mut write);
-                    socket.write(&write).await?;
+                    socket.write_all(&write).await?;
                     sent.extend(write);
                 }
             }
@@ -103,9 +103,9 @@ where
         },
     ));
 
-    let send_recv = futures::future::try_join(alice_worker, bob_worker);
+    let alice_bob = futures::future::try_join(alice_worker, bob_worker);
 
-    match tokio::time::timeout(timeout, send_recv).await?? {
+    match tokio::time::timeout(timeout, alice_bob).await?? {
         (Ok((alice_sent, alice_recv)), Ok((bob_sent, bob_recv))) => {
             assert_eq!(
                 hex::encode(alice_sent),
@@ -343,6 +343,7 @@ pub fn linear_half_normal_shuffle<T, R: Rng>(rng: &mut R, mut vec: VecDeque<T>, 
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use futures::io::{AsyncReadExt, AsyncWriteExt};
 
     use super::*;
@@ -359,26 +360,29 @@ mod tests {
             let mut out = Vec::with_capacity(len);
             for _ in 0..len {
                 let mut bytes = [0u8; 1];
-                if recv.read(&mut bytes).await.unwrap() > 0 {
+                if recv.read(&mut bytes).await.context("read")? > 0 {
                     out.push(bytes[0]);
                 } else {
                     break;
                 }
             }
-            out
+            anyhow::Ok(out)
         });
 
         let written = tokio::task::spawn(async move {
             let mut out = Vec::with_capacity(len);
             for byte in data {
-                send.write(&[byte]).await.unwrap();
+                send.write_all(&[byte]).await.context("write")?;
                 out.push(byte);
             }
-            send.close().await.unwrap();
-            out
+            send.close().await.context("close")?;
+            anyhow::Ok(out)
         });
 
-        Ok(futures::future::try_join(read, written).await?)
+        let (read,written) = futures::future::try_join(read, written)
+            .await?;
+        
+        Ok((read?, written?))
     }
 
     #[tokio::test]
