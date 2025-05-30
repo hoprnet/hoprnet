@@ -9,7 +9,7 @@ use hopr_internal_types::protocol::HoprPseudonym;
 use hopr_network_types::types::{ResolvedTransportRouting, SurbMatcher, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
-use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
+use hopr_transport_packet::prelude::{ApplicationData, ReservedTag};
 use hopr_transport_protocol::processor::{PacketError, PacketSendFinalizer};
 use libp2p_identity::PeerId;
 
@@ -229,7 +229,7 @@ impl Probe {
 
                 async move {
                     // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occuring on random tags
-                    if data.application_tag == Tag::from(ReservedTag::Ping) {
+                    if data.application_tag == ReservedTag::Ping.into() {
                         let message: anyhow::Result<Message> = data.try_into().context("failed to convert data into message");
 
                         match message {
@@ -289,6 +289,7 @@ mod tests {
     use async_trait::async_trait;
     use futures::future::BoxFuture;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_transport_packet::prelude::Tag;
 
     use super::*;
 
@@ -665,7 +666,7 @@ mod tests {
             let mut from_probing_up_rx = iface.from_probing_up_rx;
 
             let expected_data = ApplicationData {
-                application_tag: Tag::MAX,
+                application_tag: Tag::MAX.into(),
                 plain_text: b"Hello, this is a test message!".to_vec().into_boxed_slice(),
             };
 

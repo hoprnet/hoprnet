@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use hopr_transport_packet::prelude::{ApplicationData, Tag};
+use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 
 use crate::{Capability, errors::TransportSessionError, types::SessionTarget};
 
@@ -92,6 +92,11 @@ pub enum StartProtocol<T> {
     KeepAlive(T),
 }
 
+impl<T> StartProtocol<T> {
+    pub(crate) const START_PROTOCOL_MESSAGE_TAG: Tag = Tag::Reserved(ReservedTag::SessionStart as u64);
+    const START_PROTOCOL_VERSION: u8 = 0x01;
+}
+
 // TODO: implement this without Serde, see #7145
 #[cfg(feature = "serde")]
 impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
@@ -102,48 +107,69 @@ impl<T: serde::Serialize + for<'de> serde::Deserialize<'de>> StartProtocol<T> {
     /// Serialize the message into a message tag and message data.
     /// Data is serialized using `bincode`.
     pub fn encode(self) -> crate::errors::Result<(Tag, Box<[u8]>)> {
-        let disc = StartProtocolDiscriminants::from(&self) as u8 + 1;
-        let inner = match self {
+        let mut out = Vec::with_capacity(ApplicationData::PAYLOAD_SIZE);
+        out.push(Self::START_PROTOCOL_VERSION);
+        out.push(StartProtocolDiscriminants::from(&self) as u8);
+
+        match self {
             StartProtocol::StartSession(init) => {
-                bincode::serde::encode_to_vec(&init, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::encode_into_std_write(&init, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
             }
             StartProtocol::SessionEstablished(est) => {
-                bincode::serde::encode_to_vec(&est, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::encode_into_std_write(&est, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
             }
-            StartProtocol::SessionError(err) => bincode::serde::encode_to_vec(err, Self::SESSION_BINCODE_CONFIGURATION),
-            StartProtocol::CloseSession(id) => bincode::serde::encode_to_vec(&id, Self::SESSION_BINCODE_CONFIGURATION),
-            StartProtocol::KeepAlive(id) => bincode::serde::encode_to_vec(&id, Self::SESSION_BINCODE_CONFIGURATION),
+            StartProtocol::SessionError(err) => {
+                bincode::serde::encode_into_std_write(err, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
+            }
+            StartProtocol::CloseSession(id) => {
+                bincode::serde::encode_into_std_write(&id, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
+            }
+            StartProtocol::KeepAlive(id) => {
+                bincode::serde::encode_into_std_write(&id, &mut out, Self::SESSION_BINCODE_CONFIGURATION)
+            }
         }?;
 
-        Ok((disc.into(), inner.into_boxed_slice()))
+        Ok((Self::START_PROTOCOL_MESSAGE_TAG, out.into_boxed_slice()))
     }
 
     /// Deserialize the message from message tag and message data.
     /// Data is deserialized using `bincode`.
     pub fn decode(tag: Tag, data: &[u8]) -> crate::errors::Result<Self> {
-        if tag == 0 {
-            return Err(TransportSessionError::Tag);
+        if tag != Self::START_PROTOCOL_MESSAGE_TAG {
+            return Err(TransportSessionError::StartProtocolError("unknown message tag".into()));
         }
 
-        match StartProtocolDiscriminants::from_repr(tag.0 as u8 - 1).ok_or(TransportSessionError::PayloadSize)? {
+        if data.len() < 3 {
+            return Err(TransportSessionError::StartProtocolError("message too short".into()));
+        }
+
+        if data[0] != Self::START_PROTOCOL_VERSION {
+            return Err(TransportSessionError::StartProtocolError(
+                "unknown message version".into(),
+            ));
+        }
+
+        match StartProtocolDiscriminants::from_repr(data[1])
+            .ok_or(TransportSessionError::StartProtocolError("unknown message".into()))?
+        {
             StartProtocolDiscriminants::StartSession => Ok(StartProtocol::StartSession(
-                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::SessionEstablished => Ok(StartProtocol::SessionEstablished(
-                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::SessionError => Ok(StartProtocol::SessionError(
-                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::CloseSession => Ok(StartProtocol::CloseSession(
-                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
             StartProtocolDiscriminants::KeepAlive => Ok(StartProtocol::KeepAlive(
-                bincode::serde::borrow_decode_from_slice(data, Self::SESSION_BINCODE_CONFIGURATION)
+                bincode::serde::borrow_decode_from_slice(&data[2..], Self::SESSION_BINCODE_CONFIGURATION)
                     .map(|(v, _bytes)| v)?,
             )),
         }
@@ -226,7 +252,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(Tag(StartProtocolDiscriminants::StartSession as u64 + 1), tag);
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -261,7 +288,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(Tag(StartProtocolDiscriminants::SessionEstablished as u64 + 1), tag);
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -278,7 +306,8 @@ mod tests {
         });
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(Tag(StartProtocolDiscriminants::SessionError as u64 + 1), tag);
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -292,7 +321,8 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::CloseSession(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(Tag(StartProtocolDiscriminants::CloseSession as u64 + 1), tag);
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
@@ -306,7 +336,8 @@ mod tests {
         let msg_1 = StartProtocol::<i32>::KeepAlive(10);
 
         let (tag, msg) = msg_1.clone().encode()?;
-        assert_eq!(Tag(StartProtocolDiscriminants::KeepAlive as u64 + 1), tag);
+        let expected: Tag = StartProtocol::<()>::START_PROTOCOL_MESSAGE_TAG;
+        assert_eq!(tag, expected);
 
         let msg_2 = StartProtocol::<i32>::decode(tag, &msg)?;
 
