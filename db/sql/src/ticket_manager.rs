@@ -5,10 +5,7 @@ use hopr_async_runtime::prelude::spawn;
 use hopr_db_api::tickets::TicketSelector;
 use hopr_db_entity::ticket;
 use hopr_internal_types::{prelude::AcknowledgedTicketStatus, tickets::AcknowledgedTicket};
-use hopr_primitive_types::{
-    prelude::ToHex,
-    primitives::{Balance, BalanceType},
-};
+use hopr_primitive_types::prelude::{HoprBalance, IntoEndian, ToHex};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, TransactionTrait};
 use tracing::{debug, error};
 
@@ -249,7 +246,7 @@ impl TicketManager {
     }
 
     /// Get unrealized value for a channel
-    pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<Balance> {
+    pub async fn unrealized_value(&self, selector: TicketSelector) -> Result<HoprBalance> {
         if !selector.is_single_channel() {
             return Err(crate::DbSqlError::LogicalError(
                 "selector must represent a single channel".into(),
@@ -282,8 +279,8 @@ impl TicketManager {
                                 .await
                                 .map_err(crate::errors::DbSqlError::from)?
                                 .map_err(crate::errors::DbSqlError::from)
-                                .try_fold(BalanceType::HOPR.zero(), |value, t| async move {
-                                    Ok(value + BalanceType::HOPR.balance_bytes(t.amount))
+                                .try_fold(HoprBalance::zero(), |value, t| async move {
+                                    Ok(value + HoprBalance::from_be_bytes(t.amount))
                                 })
                                 .await
                         })
@@ -394,7 +391,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(u32::MAX),
+            u32::MAX.into(),
             1.into(),
             ChannelStatus::Open,
             4_u32.into(),
@@ -403,7 +400,7 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         assert_eq!(
-            Balance::zero(BalanceType::HOPR),
+            HoprBalance::zero(),
             db.ticket_manager.unrealized_value((&channel).into()).await?
         );
 

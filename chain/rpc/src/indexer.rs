@@ -420,7 +420,7 @@ mod tests {
         // The last block must contain all 4 events
         let last_block_logs = retrieved_logs
             .into_iter()
-            .last()
+            .next_back()
             .context("a log should be present")?
             .clone()
             .logs;

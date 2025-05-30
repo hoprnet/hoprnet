@@ -32,7 +32,7 @@ fn setup_network<const MTU: usize>(
 async fn send_one_way(network_cfg: FaultyNetworkConfig, session_cfg: SessionConfig, data: &[u8]) -> anyhow::Result<()> {
     let (mut a_to_b, mut b_to_a) = setup_network::<MTU>(network_cfg, session_cfg);
 
-    a_to_b.write_all(&data).await?;
+    a_to_b.write_all(data).await?;
 
     let mut data_out = vec![0u8; data.len()];
     b_to_a.read_exact(&mut data_out[..]).await?;

@@ -424,14 +424,7 @@ pub(crate) mod tests {
     }
 
     pub fn dummy_channel(src: Address, dst: Address, status: ChannelStatus) -> ChannelEntry {
-        ChannelEntry::new(
-            src,
-            dst,
-            Balance::new_from_str("1", BalanceType::HOPR),
-            1u32.into(),
-            status,
-            1u32.into(),
-        )
+        ChannelEntry::new(src, dst, 1.into(), 1u32.into(), status, 1u32.into())
     }
 
     fn create_graph_and_resolver_entries(me: Address) -> (ChannelGraph, Vec<(OffchainPublicKey, Address)>) {

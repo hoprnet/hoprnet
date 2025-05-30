@@ -1,16 +1,9 @@
 use std::{sync::Arc, time::Duration};
 
 use alloy::{
-    network::Ethereum,
-    node_bindings::AnvilInstance,
-    primitives::U256,
-    rpc::client::RpcClient,
-    transports::http::{Http, ReqwestTransport},
+    node_bindings::AnvilInstance, primitives::U256, rpc::client::RpcClient, transports::http::ReqwestTransport,
 };
-use hopr_chain_rpc::{
-    client::{AnvilRpcClient, SnapshotRequestor},
-    transport::ReqwestClient,
-};
+use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
 use hopr_chain_types::{
     ContractAddresses, ContractInstances,
     utils::{
@@ -23,6 +16,7 @@ use tokio::time::sleep;
 use tracing::info;
 
 /// Used for testing. Creates RPC client to the local Anvil instance.
+#[allow(dead_code)]
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_rpc_client_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,
@@ -33,13 +27,12 @@ pub fn create_rpc_client_to_anvil_with_snapshot(
 
     let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
-    let rpc_client = ClientBuilder::default()
+    ClientBuilder::default()
         .layer(SnapshotRequestorLayer::from_requestor(snapshot_requestor))
-        .transport(transport_client.clone(), transport_client.guess_local());
-    rpc_client
+        .transport(transport_client.clone(), transport_client.guess_local())
 }
 
-/// Used for testing. Creates RPC client to the local Anvil instance.
+/// Used for testing. Creates an RPC client to the local Anvil instance.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn create_provider_to_anvil_with_snapshot(
     snapshot_requestor: SnapshotRequestor,
@@ -58,7 +51,7 @@ pub fn create_provider_to_anvil_with_snapshot(
         .layer(SnapshotRequestorLayer::from_requestor(snapshot_requestor))
         .transport(transport_client.clone(), transport_client.guess_local());
 
-    let provider = ProviderBuilder::new().wallet(wallet).on_client(rpc_client);
+    let provider = ProviderBuilder::new().wallet(wallet).connect_client(rpc_client);
 
     Arc::new(provider)
 }
@@ -130,7 +123,7 @@ pub async fn onboard_node(
 
     // Deploy Safe and Module for node
     let (module, safe) =
-        hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<(), Arc<AnvilRpcClient>, Ethereum>(
+        hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<Arc<AnvilRpcClient>>(
             &chain_env.contract_instances,
             provider.clone(),
             &chain_env.contract_deployer,

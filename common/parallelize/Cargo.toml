@@ -20,3 +20,6 @@ runtime-tokio = ["dep:tokio"]
 futures = { workspace = true }
 rayon = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+
+[package.metadata.cargo-machete]
+ignored = ["tokio"]

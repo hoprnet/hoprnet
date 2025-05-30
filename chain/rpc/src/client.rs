@@ -871,7 +871,7 @@ pub fn create_rpc_client_to_anvil(
 
     let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
 
-    let provider = ProviderBuilder::new().wallet(wallet).on_client(rpc_client);
+    let provider = ProviderBuilder::new().wallet(wallet).connect_client(rpc_client);
 
     Arc::new(provider)
 }
@@ -911,7 +911,7 @@ mod tests {
 
         let rpc_client = ClientBuilder::default().http(anvil.endpoint_url());
 
-        let provider = ProviderBuilder::new().wallet(signer).on_client(rpc_client);
+        let provider = ProviderBuilder::new().wallet(signer).connect_client(rpc_client);
 
         let contracts = ContractInstances::deploy_for_testing(provider.clone(), &signer_chain_key)
             .await
@@ -940,7 +940,7 @@ mod tests {
 
         let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
 
-        let provider = ProviderBuilder::new().wallet(signer).on_client(rpc_client);
+        let provider = ProviderBuilder::new().wallet(signer).connect_client(rpc_client);
 
         let mut last_number = 0;
 
@@ -973,7 +973,7 @@ mod tests {
             .layer(MetricsLayer)
             .transport(transport_client.clone(), transport_client.guess_local());
 
-        let provider = ProviderBuilder::new().wallet(signer).on_client(rpc_client);
+        let provider = ProviderBuilder::new().wallet(signer).connect_client(rpc_client);
 
         let mut last_number = 0;
 
@@ -1005,7 +1005,7 @@ mod tests {
 
         let rpc_client = ClientBuilder::default().transport(transport_client.clone(), transport_client.guess_local());
 
-        let provider = ProviderBuilder::new().wallet(signer).on_client(rpc_client);
+        let provider = ProviderBuilder::new().wallet(signer).connect_client(rpc_client);
 
         let err = provider
             .raw_request::<(), alloy::primitives::U64>("eth_blockNumber_bla".into(), ())
@@ -1035,7 +1035,7 @@ mod tests {
             .layer(RetryBackoffLayer::new(2, 100, 100))
             .transport(transport_client.clone(), transport_client.guess_local());
 
-        let provider = ProviderBuilder::new().on_client(rpc_client);
+        let provider = ProviderBuilder::new().connect_client(rpc_client);
 
         let err = provider
             .raw_request::<(), alloy::primitives::U64>("eth_blockNumber".into(), ())
@@ -1081,7 +1081,7 @@ mod tests {
         //     },
         // );
 
-        let provider = ProviderBuilder::new().on_client(rpc_client);
+        let provider = ProviderBuilder::new().connect_client(rpc_client);
 
         let err = provider
             .raw_request::<(), alloy::primitives::U64>("eth_blockNumber".into(), ())
@@ -1117,7 +1117,7 @@ mod tests {
             .layer(RetryBackoffLayer::new_with_policy(2, 100, 100, ZeroRetryPolicy))
             .transport(transport_client.clone(), transport_client.guess_local());
 
-        let provider = ProviderBuilder::new().on_client(rpc_client);
+        let provider = ProviderBuilder::new().connect_client(rpc_client);
 
         let err = provider
             .raw_request::<(), alloy::primitives::U64>("eth_blockNumber".into(), ())
@@ -1171,7 +1171,7 @@ mod tests {
             ))
             .transport(transport_client.clone(), transport_client.guess_local());
 
-        let provider = ProviderBuilder::new().on_client(rpc_client);
+        let provider = ProviderBuilder::new().connect_client(rpc_client);
 
         let err = provider
             .raw_request::<(), alloy::primitives::U64>("eth_blockNumber".into(), ())
@@ -1225,7 +1225,7 @@ mod tests {
             ))
             .transport(transport_client.clone(), transport_client.guess_local());
 
-        let provider = ProviderBuilder::new().on_client(rpc_client);
+        let provider = ProviderBuilder::new().connect_client(rpc_client);
 
         let err = provider
             .raw_request::<(), alloy::primitives::U64>("eth_blockNumber".into(), ())
@@ -1281,7 +1281,7 @@ mod tests {
             ))
             .transport(transport_client.clone(), transport_client.guess_local());
 
-        let provider = ProviderBuilder::new().on_client(rpc_client);
+        let provider = ProviderBuilder::new().connect_client(rpc_client);
 
         let err = provider
             .raw_request::<(), alloy::primitives::U64>("eth_blockNumber".into(), ())
@@ -1337,7 +1337,7 @@ mod tests {
             ))
             .transport(transport_client.clone(), transport_client.guess_local());
 
-        let provider = ProviderBuilder::new().on_client(rpc_client);
+        let provider = ProviderBuilder::new().connect_client(rpc_client);
 
         let err = provider
             .raw_request::<(), alloy::primitives::U64>("eth_blockNumber".into(), ())
@@ -1377,7 +1377,7 @@ mod tests {
                 .layer(SnapshotRequestorLayer::new(snapshot_file.path().to_str().unwrap()))
                 .transport(transport_client.clone(), transport_client.guess_local());
 
-            let provider = ProviderBuilder::new().on_client(rpc_client);
+            let provider = ProviderBuilder::new().connect_client(rpc_client);
 
             for _ in 0..3 {
                 sleep(block_time).await;
@@ -1406,7 +1406,7 @@ mod tests {
                 .layer(SnapshotRequestorLayer::from_requestor(snapshot_requestor))
                 .transport(transport_client.clone(), transport_client.guess_local());
 
-            let provider = ProviderBuilder::new().on_client(rpc_client);
+            let provider = ProviderBuilder::new().connect_client(rpc_client);
 
             let mut last_number = 0;
             for _ in 0..3 {
@@ -1454,7 +1454,7 @@ mod tests {
                 Some((server.url() + "/gasapi.ashx?apikey=key&method=gasoracle").parse()?),
             ))
             .filler(GasFiller)
-            .on_client(rpc_client);
+            .connect_client(rpc_client);
 
         let tx = TransactionRequest::default()
             .with_chain_id(provider.get_chain_id().await?)
@@ -1462,7 +1462,7 @@ mod tests {
             .value(U256::from(100))
             .transaction_type(2);
 
-        let receipt = provider.send_transaction(tx.into()).await?.get_receipt().await?;
+        let receipt = provider.send_transaction(tx).await?.get_receipt().await?;
 
         m.assert();
         assert_eq!(receipt.gas_used, 21000);
@@ -1502,7 +1502,7 @@ mod tests {
             ))
             .filler(GasFiller)
             .filler(BlobGasFiller)
-            .on_client(rpc_client);
+            .connect_client(rpc_client);
 
         // GasEstimationLayer requires chain_id to be set to handle EIP-1559 tx
         let tx = TransactionRequest::default()
@@ -1510,7 +1510,7 @@ mod tests {
             .with_value(U256::from(100))
             .with_gas_price(1000000000);
 
-        let receipt = provider.send_transaction(tx.into()).await?.get_receipt().await?;
+        let receipt = provider.send_transaction(tx).await?.get_receipt().await?;
 
         m.assert();
         assert_eq!(receipt.gas_used, 21000);

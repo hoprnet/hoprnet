@@ -204,7 +204,7 @@ fn get_safe_transaction_hash(
 /// so that the transaction can be executed.
 /// Note that the refund address is the caller (safe owner) wallet
 pub async fn send_multisend_safe_transaction_with_threshold_one<P: WalletProvider + Provider>(
-    safe: SafeSingletonInstance<(), Arc<P>>,
+    safe: SafeSingletonInstance<Arc<P>>,
     signer_key: ChainKeypair,
     multisend_contract: Address,
     multisend_txns: Vec<MultisendTransaction>,
@@ -303,18 +303,18 @@ pub async fn deploy_multicall3_for_testing<P: Provider>(provider: Arc<P>) -> Res
 
 /// Get chain id and safe nonce
 pub async fn get_chain_id_and_safe_nonce<P: Provider>(
-    safe: SafeSingletonInstance<(), P>,
+    safe: SafeSingletonInstance<P>,
 ) -> Result<(U256, U256), HelperErrors> {
     let provider = safe.provider();
     let multicall = provider.multicall().get_chain_id().add(safe.nonce());
     let (get_chain_id_return, nonce_return) = multicall.aggregate().await?;
 
-    Ok((get_chain_id_return.chainid, nonce_return._0))
+    Ok((get_chain_id_return, nonce_return))
 }
 
 /// Get native balance and hopr token balance for given addresses
 pub async fn get_native_and_token_balances<P: Provider>(
-    hopr_token: HoprTokenInstance<(), P>,
+    hopr_token: HoprTokenInstance<P>,
     addresses: Vec<Address>,
 ) -> Result<(Vec<U256>, Vec<U256>), MulticallError> {
     let provider = hopr_token.provider();
@@ -332,7 +332,7 @@ pub async fn get_native_and_token_balances<P: Provider>(
             .add(hopr_token.balanceOf(address));
 
         let (native_balance, token_balance) = multicall.aggregate().await?;
-        Ok((vec![native_balance.balance], vec![token_balance._0]))
+        Ok((vec![native_balance], vec![token_balance]))
     } else {
         let mut native_balances_multicall = MulticallBuilder::new_dynamic(provider);
         let mut token_balances_multicall = MulticallBuilder::new_dynamic(provider);
@@ -347,12 +347,7 @@ pub async fn get_native_and_token_balances<P: Provider>(
         let native_balances_return = native_balances_multicall.aggregate().await?;
         let token_balances_return = token_balances_multicall.aggregate().await?;
 
-        let native_balances = native_balances_return
-            .into_iter()
-            .map(|x| x.balance)
-            .collect::<Vec<U256>>();
-        let token_balances = token_balances_return.into_iter().map(|x| x._0).collect::<Vec<U256>>();
-        Ok((native_balances, token_balances))
+        Ok((native_balances_return, token_balances_return))
     }
 }
 
@@ -371,7 +366,7 @@ pub async fn get_native_and_token_balances<P: Provider>(
 /// TODO: To mitigate this risk, create a MulticallErc777Recipient contract to enable receiption of tokens
 /// on the multicall contract and purposely re-entrance with forwarded payload
 pub async fn transfer_or_mint_tokens<P: Provider + WalletProvider>(
-    hopr_token: HoprTokenInstance<(), Arc<P>>,
+    hopr_token: HoprTokenInstance<Arc<P>>,
     addresses: Vec<Address>,
     amounts: Vec<U256>,
 ) -> Result<U256, HelperErrors> {
@@ -415,9 +410,9 @@ pub async fn transfer_or_mint_tokens<P: Provider + WalletProvider>(
 
     // compare the total with caller's current balance. If caller doens't have enough balance, try to mint some.
     // Otherwise, revert
-    if total.gt(&token_balance_return._0) {
+    if total.gt(&token_balance_return) {
         info!("caller does not have enough balance to transfer tokens to recipients.");
-        if has_role_return._0 {
+        if has_role_return {
             info!("caller tries to mint tokens");
             hopr_token
                 .mint(caller, total, Bytes::default(), Bytes::default())
@@ -534,7 +529,7 @@ pub async fn transfer_native_tokens<P: Provider + WalletProvider>(
 
 /// Get registered safes for given nodes on the network registry
 pub async fn get_registered_safes_for_nodes_on_network_registry<P: Provider + WalletProvider>(
-    network_registry: HoprNetworkRegistryInstance<(), Arc<P>>,
+    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
     node_addresses: Vec<Address>,
 ) -> Result<Vec<Address>, MulticallError> {
     let provider = network_registry.provider();
@@ -545,7 +540,7 @@ pub async fn get_registered_safes_for_nodes_on_network_registry<P: Provider + Wa
         dynamic_multicall = dynamic_multicall.add_dynamic(network_registry.nodeRegisterdToAccount(node));
     }
 
-    let response = dynamic_multicall.aggregate().await?.into_iter().map(|e| e._0).collect();
+    let response = dynamic_multicall.aggregate().await?;
 
     Ok(response)
 }
@@ -560,7 +555,7 @@ pub async fn get_registered_safes_for_nodes_on_network_registry<P: Provider + Wa
 /// After all the nodes have been added to the network registry, force-sync the eligibility of all the added safes to
 /// true
 pub async fn register_safes_and_nodes_on_network_registry<P: Provider + WalletProvider + Clone>(
-    network_registry: HoprNetworkRegistryInstance<(), Arc<P>>,
+    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
     safe_addresses: Vec<Address>,
     node_addresses: Vec<Address>,
 ) -> Result<(usize, usize), HelperErrors> {
@@ -626,7 +621,7 @@ pub async fn register_safes_and_nodes_on_network_registry<P: Provider + WalletPr
 /// - If nodes have been registered to a safe, remove the node
 /// - If nodes have not been registered to any safe, no op
 pub async fn deregister_nodes_from_network_registry<P: Provider + WalletProvider + Clone>(
-    network_registry: HoprNetworkRegistryInstance<(), Arc<P>>,
+    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
     node_addresses: Vec<Address>,
 ) -> Result<usize, HelperErrors> {
     // check registered safes of given node addresses
@@ -656,7 +651,7 @@ pub async fn deregister_nodes_from_network_registry<P: Provider + WalletProvider
 
 /// Force-sync the eligibility to given values. This can only be called with a manager account
 pub async fn force_sync_safes_on_network_registry<P: Provider>(
-    network_registry: HoprNetworkRegistryInstance<(), Arc<P>>,
+    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
     safe_addresses: Vec<Address>,
     eligibilities: Vec<bool>,
 ) -> Result<(), HelperErrors> {
@@ -803,7 +798,7 @@ pub fn prepare_safe_tx_multicall_payload_from_owner_contract(
 /// Returns safe proxy address and module proxy address
 #[allow(clippy::too_many_arguments)]
 pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provider>(
-    hopr_node_stake_factory: HoprNodeStakeFactoryInstance<(), Arc<P>>,
+    hopr_node_stake_factory: HoprNodeStakeFactoryInstance<Arc<P>>,
     hopr_token_address: Address,
     hopr_channels_address: Address,
     hopr_module_implementation_address: Address,
@@ -812,13 +807,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
     node_addresses: Option<Vec<Address>>,
     admins: Vec<Address>,
     threshold: U256,
-) -> Result<
-    (
-        SafeSingletonInstance<(), Arc<P>>,
-        HoprNodeManagementModuleInstance<(), Arc<P>>,
-    ),
-    HelperErrors,
-> {
+) -> Result<(SafeSingletonInstance<Arc<P>>, HoprNodeManagementModuleInstance<Arc<P>>), HelperErrors> {
     let caller = hopr_node_stake_factory.provider().default_signer_address();
     let provider = hopr_node_stake_factory.provider();
 
@@ -1024,7 +1013,7 @@ pub async fn deploy_safe_module_with_targets_and_nodes<P: WalletProvider + Provi
 
 /// Get registered safes for given nodes on the node-safe registry
 pub async fn get_registered_safes_for_nodes_on_node_safe_registry<P: Provider>(
-    node_safe_registry: HoprNodeSafeRegistryInstance<(), P>,
+    node_safe_registry: HoprNodeSafeRegistryInstance<P>,
     node_addresses: Vec<Address>,
 ) -> Result<Vec<Address>, MulticallError> {
     let provider = node_safe_registry.provider();
@@ -1036,10 +1025,7 @@ pub async fn get_registered_safes_for_nodes_on_node_safe_registry<P: Provider>(
 
     let native_balances_return = dyn_multicall.aggregate().await?;
 
-    Ok(native_balances_return
-        .into_iter()
-        .map(|e| e._0)
-        .collect::<Vec<Address>>())
+    Ok(native_balances_return)
 }
 
 /// Deregister safes and nodes from the node-safe registry.
@@ -1049,7 +1035,7 @@ pub async fn get_registered_safes_for_nodes_on_node_safe_registry<P: Provider>(
 ///
 /// When deregsitering one node, also remove the node from the module
 pub async fn deregister_nodes_from_node_safe_registry_and_remove_from_module<P: WalletProvider + Provider>(
-    node_safe_registry: HoprNodeSafeRegistryInstance<(), Arc<P>>,
+    node_safe_registry: HoprNodeSafeRegistryInstance<Arc<P>>,
     node_addresses: Vec<Address>,
     module_addresses: Vec<Address>,
     owner_chain_key: ChainKeypair,
@@ -1116,7 +1102,7 @@ pub async fn deregister_nodes_from_node_safe_registry_and_remove_from_module<P: 
 
 /// Include nodes to the module
 pub async fn include_nodes_to_module<P: WalletProvider + Provider>(
-    safe: SafeSingletonInstance<(), Arc<P>>,
+    safe: SafeSingletonInstance<Arc<P>>,
     node_addresses: Vec<Address>,
     module_address: Address,
     owner_chain_key: ChainKeypair,
@@ -1159,7 +1145,7 @@ pub async fn include_nodes_to_module<P: WalletProvider + Provider>(
 // - scope the Announcement contract as target to the module
 // - approve HOPR tokens of the Safe proxy to be transferred by the new Channels contract
 pub async fn migrate_nodes<P: WalletProvider + Provider>(
-    safe: SafeSingletonInstance<(), Arc<P>>,
+    safe: SafeSingletonInstance<Arc<P>>,
     module_addresses: Address,
     channels_address: Address,
     token_address: Address,
@@ -1237,8 +1223,8 @@ pub async fn migrate_nodes<P: WalletProvider + Provider>(
 /// 2. If node has been included on Network Registry
 /// 3. If node and safe are associated on Node Safe Registry
 pub async fn debug_node_safe_module_setup_on_balance_and_registries<P: Provider>(
-    network_registry: HoprNetworkRegistryInstance<(), Arc<P>>,
-    node_safe_registry: HoprNodeSafeRegistryInstance<(), Arc<P>>,
+    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
+    node_safe_registry: HoprNodeSafeRegistryInstance<Arc<P>>,
     node_address: &Address,
 ) -> Result<Address, MulticallError> {
     let provider = network_registry.provider();
@@ -1256,9 +1242,7 @@ pub async fn debug_node_safe_module_setup_on_balance_and_registries<P: Provider>
         // 3. get the safe address from the Node Safe Registry
         .add(node_safe_registry.nodeToSafe(*node_address));
 
-    let result = multicall.aggregate().await?;
-    let (node_native_balance, safe_in_network_registry, safe_in_nodesafe_registry) =
-        (result.0.balance, result.1._0, result.2._0);
+    let (node_native_balance, safe_in_network_registry, safe_in_nodesafe_registry) = multicall.aggregate().await?;
 
     info!(
         "node does{:?} have xDAI balance {:?}",
@@ -1299,7 +1283,7 @@ pub async fn debug_node_safe_module_setup_on_balance_and_registries<P: Provider>
 /// 8. Get all the targets of the safe (then check if channel and announcement are there)
 /// 9. Get the owner of the module
 pub async fn debug_node_safe_module_setup_main<P: Provider>(
-    hopr_token: HoprTokenInstance<(), Arc<P>>,
+    hopr_token: HoprTokenInstance<Arc<P>>,
     module_address: &Address,
     node_address: &Address,
     safe_address: &Address,
@@ -1329,7 +1313,6 @@ pub async fn debug_node_safe_module_setup_main<P: Provider>(
         // 8. get owner of the module
         .add(module.owner());
 
-    let result = multicall.aggregate().await?;
     let (
         safe_owners,
         safe_wxhopr_balance,
@@ -1338,15 +1321,7 @@ pub async fn debug_node_safe_module_setup_main<P: Provider>(
         is_node_included,
         module_targets,
         module_owner,
-    ) = (
-        result.0._0,
-        result.1._0,
-        result.2._0,
-        result.3._0,
-        result.4._0,
-        result.5._0,
-        result.6._0,
-    );
+    ) = multicall.aggregate().await?;
 
     info!("safe has owners: {:?}", safe_owners);
     info!(
@@ -1413,7 +1388,7 @@ mod tests {
         // .map_err(|e| ContractError::MiddlewareError { e })?;
 
         // only deploy contracts when needed
-        if code.len() == 0 {
+        if code.is_empty() {
             debug!("deploying safe code");
             // Deploy Safe diamond deployment proxy singleton
             let safe_diamond_proxy_address = {
@@ -1491,8 +1466,7 @@ mod tests {
         deploy_multicall3_for_testing(client.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(instances.token, vec![kp_address.into()]).await?;
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, vec![kp_address]).await?;
         assert_eq!(native_balance.len(), 1, "invalid native balance lens");
         assert_eq!(token_balance.len(), 1, "invalid token balance lens");
         assert_eq!(native_balance[0].to::<u64>(), 0u64, "wrong native balance");
@@ -1526,10 +1500,7 @@ mod tests {
         let encoded_minter_role = keccak256(b"MINTER_ROLE");
         instances
             .token
-            .grantRole(
-                encoded_minter_role.clone(),
-                contract_deployer.public().to_address().into(),
-            )
+            .grantRole(encoded_minter_role, contract_deployer.public().to_address().into())
             .send()
             .await?
             .watch()
@@ -1538,21 +1509,17 @@ mod tests {
         // test the deployer has minter role now
         let check_minter_role = instances
             .token
-            .hasRole(
-                encoded_minter_role.clone(),
-                contract_deployer.public().to_address().into(),
-            )
+            .hasRole(encoded_minter_role, contract_deployer.public().to_address().into())
             .call()
             .await?;
-        assert!(check_minter_role._0, "deployer does not have minter role yet");
+        assert!(check_minter_role, "deployer does not have minter role yet");
 
         // transfer or mint tokens to addresses
         let total_transferred_amount =
             transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone()).await?;
 
         assert_eq!(native_balance.len(), 4, "invalid native balance lens");
         assert_eq!(token_balance.len(), 4, "invalid token balance lens");
@@ -1570,7 +1537,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_transfer_or_mint_tokens_in_anvil_with_one_recipient() -> anyhow::Result<()> {
-        let addresses: Vec<Address> = vec![get_random_address_for_testing().into()];
+        let addresses: Vec<Address> = vec![get_random_address_for_testing()];
         let desired_amount = vec![U256::from(42)];
 
         // launch local anvil instance
@@ -1588,10 +1555,7 @@ mod tests {
         let encoded_minter_role = keccak256(b"MINTER_ROLE");
         instances
             .token
-            .grantRole(
-                encoded_minter_role.clone(),
-                contract_deployer.public().to_address().into(),
-            )
+            .grantRole(encoded_minter_role, contract_deployer.public().to_address().into())
             .send()
             .await?
             .watch()
@@ -1600,21 +1564,17 @@ mod tests {
         // test the deployer has minter role now
         let check_minter_role = instances
             .token
-            .hasRole(
-                encoded_minter_role.clone(),
-                contract_deployer.public().to_address().into(),
-            )
+            .hasRole(encoded_minter_role, contract_deployer.public().to_address().into())
             .call()
             .await?;
-        assert!(check_minter_role._0, "deployer does not have minter role yet");
+        assert!(check_minter_role, "deployer does not have minter role yet");
 
         // transfer or mint tokens to addresses
         let total_transferred_amount =
             transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone()).await?;
         assert_eq!(native_balance.len(), 1, "invalid native balance lens");
         assert_eq!(token_balance.len(), 1, "invalid token balance lens");
         for (i, amount) in desired_amount.iter().enumerate() {
@@ -1650,8 +1610,7 @@ mod tests {
             transfer_or_mint_tokens(instances.token.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone()).await?;
         assert_eq!(native_balance.len(), 0, "invalid native balance lens");
         assert_eq!(token_balance.len(), 0, "invalid token balance lens");
         // for (i, amount) in desired_amount.iter().enumerate() {
@@ -1670,7 +1629,7 @@ mod tests {
     async fn test_transfer_native_tokens_in_anvil_with_multicall() -> anyhow::Result<()> {
         let mut addresses: Vec<Address> = Vec::new();
         for _ in 0..4 {
-            addresses.push(get_random_address_for_testing().into());
+            addresses.push(get_random_address_for_testing());
         }
         let desired_amount = vec![U256::from(1), U256::from(2), U256::from(3), U256::from(4)];
 
@@ -1690,8 +1649,7 @@ mod tests {
             transfer_native_tokens(client.clone(), addresses.clone(), desired_amount.clone()).await?;
 
         // get native and token balances
-        let (native_balance, token_balance) =
-            get_native_and_token_balances(instances.token, addresses.clone().into()).await?;
+        let (native_balance, token_balance) = get_native_and_token_balances(instances.token, addresses.clone()).await?;
         assert_eq!(native_balance.len(), 4, "invalid native balance lens");
         assert_eq!(token_balance.len(), 4, "invalid token balance lens");
         for (i, amount) in desired_amount.iter().enumerate() {
@@ -1711,8 +1669,8 @@ mod tests {
         let mut safe_addresses: Vec<Address> = Vec::new();
         let mut node_addresses: Vec<Address> = Vec::new();
         for _ in 0..4 {
-            safe_addresses.push(get_random_address_for_testing().into());
-            node_addresses.push(get_random_address_for_testing().into());
+            safe_addresses.push(get_random_address_for_testing());
+            node_addresses.push(get_random_address_for_testing());
         }
 
         // launch local anvil instance
@@ -1773,7 +1731,7 @@ mod tests {
     async fn test_deploy_proxy() -> anyhow::Result<()> {
         let prediction = deploy_proxy(
             address!("41675c099f32341bf84bfc5382af534df5c7461a"),
-            hex!("09e458584ce79e57b65cb303dc136c5d53e17b676599b9b7bc03815e0eef5172").into(),
+            hex!("09e458584ce79e57b65cb303dc136c5d53e17b676599b9b7bc03815e0eef5172"),
             Address::from_str(SAFE_SAFEPROXYFACTORY_ADDRESS)?,
         )?;
 
@@ -1925,29 +1883,28 @@ mod tests {
         let try_get_announcement_target = node_module
             .tryGetTarget(*instances.announcements.address())
             .call()
-            .await;
+            .await?;
 
-        assert!(try_get_announcement_target?._0, "announcement is not a target");
+        assert!(try_get_announcement_target._0, "announcement is not a target");
 
         // check allowance for channel contract has increased
         let allowance = instances
             .token
             .allowance(*safe.address(), *instances.channels.address())
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert_eq!(allowance, U256::MAX, "allowance is not set");
 
         // check nodes have been included in the module
         for node_address in node_addresses {
-            let is_node_included = node_module.isNode(node_address).call().await?._0;
+            let is_node_included = node_module.isNode(node_address).call().await?;
             assert!(is_node_included, "failed to include a node");
         }
 
         // check owners are provided admins
-        let owners = safe.getOwners().call().await?._0;
-        let thresold = safe.getThreshold().call().await?._0;
+        let owners = safe.getOwners().call().await?;
+        let thresold = safe.getThreshold().call().await?;
 
         assert_eq!(owners.len(), 2, "should have 2 owners");
         for (i, owner) in owners.iter().enumerate() {
@@ -1992,7 +1949,7 @@ mod tests {
         .await?;
 
         // check owner of safe
-        let is_owner = safe.getOwners().call().await?._0;
+        let is_owner = safe.getOwners().call().await?;
         assert_eq!(is_owner.len(), 1, "safe has too many owners");
         assert_eq!(
             is_owner[0].0.0,
@@ -2005,8 +1962,7 @@ mod tests {
             .token
             .allowance(*safe.address(), *instances.channels.address())
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert_eq!(allowance, U256::MAX, "allowance initiation is wrong");
 
@@ -2028,7 +1984,7 @@ mod tests {
 
         // get chain_id and safe_nonce
         let chain_id = client.get_chain_id().await?;
-        let safe_nonce = safe.nonce().call().await?._0;
+        let safe_nonce = safe.nonce().call().await?;
         debug!("safe address {:?}", safe.address());
         debug!("chain_id {:?}", chain_id);
         debug!("safe_nonce {:?}", safe_nonce);
@@ -2049,8 +2005,7 @@ mod tests {
             .token
             .allowance(*safe.address(), *instances.channels.address())
             .call()
-            .await?
-            ._0;
+            .await?;
 
         assert_eq!(new_allowance, U256::from(4), "final allowance is not desired");
         Ok(())
@@ -2127,8 +2082,7 @@ mod tests {
         let is_removed = node_module
             .isNode(contract_deployer.public().to_address().into())
             .call()
-            .await?
-            ._0;
+            .await?;
         assert!(!is_removed, "node is not removed");
         Ok(())
     }
@@ -2140,7 +2094,7 @@ mod tests {
 
         let mut node_addresses: Vec<Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(get_random_address_for_testing().into());
+            node_addresses.push(get_random_address_for_testing());
         }
 
         // launch local anvil instance
@@ -2174,7 +2128,7 @@ mod tests {
         // check ndoes are not included
         for node_addr in node_addresses.clone() {
             // node is removed
-            let node_is_not_included = node_module.isNode(node_addr).call().await?._0;
+            let node_is_not_included = node_module.isNode(node_addr).call().await?;
             assert!(!node_is_not_included, "node should not be included");
         }
 
@@ -2185,7 +2139,7 @@ mod tests {
         // check nodes are not included
         for node_addr in node_addresses {
             // node is removed
-            let node_is_included = node_module.isNode(node_addr).call().await?._0;
+            let node_is_included = node_module.isNode(node_addr).call().await?;
             assert!(node_is_included, "node should be included");
         }
         Ok(())
@@ -2198,7 +2152,7 @@ mod tests {
 
         let mut node_addresses: Vec<Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(get_random_address_for_testing().into());
+            node_addresses.push(get_random_address_for_testing());
         }
 
         // launch local anvil instance
@@ -2250,10 +2204,10 @@ mod tests {
         .await?;
 
         // check new network is not included
-        let old_channels_inclusion = node_module.tryGetTarget(*instances.channels.address()).call().await?._0;
-        assert!(old_channels_inclusion, "old channel should be included");
-        let new_channels_inclusion = node_module.tryGetTarget(*new_channels.address()).call().await?._0;
-        assert!(!new_channels_inclusion, "new channel should not be included");
+        let old_channels_inclusion = node_module.tryGetTarget(*instances.channels.address()).call().await?;
+        assert!(old_channels_inclusion._0, "old channel should be included");
+        let new_channels_inclusion = node_module.tryGetTarget(*new_channels.address()).call().await?;
+        assert!(!new_channels_inclusion._0, "new channel should not be included");
 
         // migrate nodes
         migrate_nodes(
@@ -2268,10 +2222,10 @@ mod tests {
         .await?;
 
         // check new network is included
-        let old_channels_inclusion = node_module.tryGetTarget(*instances.channels.address()).call().await?._0;
-        assert!(old_channels_inclusion, "old channel should still be included");
-        let new_channels_inclusion = node_module.tryGetTarget(*new_channels.address()).call().await?._0;
-        assert!(new_channels_inclusion, "new channel should now be included");
+        let old_channels_inclusion = node_module.tryGetTarget(*instances.channels.address()).call().await?;
+        assert!(old_channels_inclusion._0, "old channel should still be included");
+        let new_channels_inclusion = node_module.tryGetTarget(*new_channels.address()).call().await?;
+        assert!(new_channels_inclusion._0, "new channel should now be included");
         Ok(())
     }
 
@@ -2282,7 +2236,7 @@ mod tests {
 
         let mut node_addresses: Vec<Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(get_random_address_for_testing().into());
+            node_addresses.push(get_random_address_for_testing());
         }
 
         // launch local anvil instance
@@ -2355,7 +2309,7 @@ mod tests {
 
         let mut node_addresses: Vec<Address> = Vec::new();
         for _ in 0..2 {
-            node_addresses.push(get_random_address_for_testing().into());
+            node_addresses.push(get_random_address_for_testing());
         }
 
         // launch local anvil instance
@@ -2396,11 +2350,11 @@ mod tests {
 
         debug_node_safe_module_setup_main(
             instances.token.clone(),
-            &node_module.address(),
+            node_module.address(),
             &node_addresses[0],
-            &safe.address(),
-            &instances.channels.address(),
-            &instances.announcements.address(),
+            safe.address(),
+            instances.channels.address(),
+            instances.announcements.address(),
         )
         .await?;
         Ok(())

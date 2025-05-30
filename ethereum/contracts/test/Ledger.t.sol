@@ -14,9 +14,11 @@ uint256 constant INDEX_SNAPSHOT_INTERVAL = ONE_HOUR;
 contract HoprLedgerTest is Test, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprChannelsEvents {
     function setUp() public { }
 
-    function test_update_domain_separator(uint256 newChainId) public {
-        newChainId = bound(newChainId, 1, 1e18);
-        vm.assume(newChainId != block.chainid);
+    function test_update_domain_separator(uint64 newId) public {
+        // chain ID must be less than 2^64 - 1
+        uint256 newChainId = bound(uint256(newId), 1, 0xFFFFFFFFFFFFFFFE);
+        uint256 oldChainId = block.chainid;
+        vm.assume(newChainId != oldChainId);
         bytes32 domainSeparatorOnDeployment = ledgerDomainSeparator;
 
         // call updateDomainSeparator when chainid is the same
@@ -39,6 +41,7 @@ contract HoprLedgerTest is Test, HoprLedger(INDEX_SNAPSHOT_INTERVAL), HoprChanne
         );
         updateLedgerDomainSeparator();
         assertTrue(ledgerDomainSeparator != domainSeparatorOnDeployment);
+        vm.chainId(oldChainId);
     }
 
     function test_initialState() public {

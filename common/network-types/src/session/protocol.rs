@@ -495,7 +495,9 @@ mod tests {
         assert_eq!(10, SessionMessage::<0>::SEGMENT_OVERHEAD);
         assert_eq!(8, SessionMessage::<0>::MAX_SEGMENTS_PER_FRAME);
 
-        assert!(SessionMessage::<0>::MAX_MESSAGE_SIZE < 2048);
+        const _: () = {
+            assert!(SessionMessage::<0>::MAX_MESSAGE_SIZE < 2048);
+        };
     }
 
     #[test]
@@ -663,7 +665,7 @@ mod tests {
                 .iter()
                 .cloned()
                 .flat_map(|m| m.into_encoded().into_vec())
-                .chain(std::iter::repeat(0).take(10))
+                .chain(std::iter::repeat_n(0, 10))
                 .collect::<Vec<u8>>(),
         );
 
@@ -692,7 +694,7 @@ mod tests {
             .iter()
             .cloned()
             .flat_map(|m| m.into_encoded().into_vec())
-            .chain(std::iter::repeat(0u8).take(10))
+            .chain(std::iter::repeat_n(0u8, 10))
             .collect::<Vec<_>>();
 
         let mut iter = SessionMessageIter::<MTU>::from(data);

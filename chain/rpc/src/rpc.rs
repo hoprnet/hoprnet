@@ -131,8 +131,8 @@ pub struct RpcOperations<R: HttpRequestor + 'static + Clone> {
     pub(crate) provider: Arc<HoprProvider<R>>,
     pub(crate) cfg: RpcOperationsConfig,
     contract_instances: Arc<ContractInstances<HoprProvider<R>>>,
-    node_module: HoprNodeManagementModuleInstance<(), HoprProvider<R>>,
-    node_safe: SafeSingletonInstance<(), HoprProvider<R>>,
+    node_module: HoprNodeManagementModuleInstance<HoprProvider<R>>,
+    node_safe: SafeSingletonInstance<HoprProvider<R>>,
 }
 
 impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
@@ -153,7 +153,7 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
             .filler(GasFiller)
             .filler(GasOracleFiller::new(requestor.clone(), cfg.gas_oracle_url.clone()))
             .filler(BlobGasFiller)
-            .on_client(rpc_client);
+            .connect_client(rpc_client);
 
         debug!("{:?}", cfg.contract_addrs);
 
@@ -191,45 +191,49 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         Ok(self.get_block(block_number).await?.map(|b| b.header.timestamp))
     }
 
-    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance> {
-        match balance_type {
-            BalanceType::Native => {
-                let native = self
-                    .provider
-                    .get_balance(address.into())
-                    // .number(self.get_block_number().await?)
-                    .await?;
+    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>> {
+        let value = if C::is::<XDai>() {
+            U256::from_be_bytes(self.provider.get_balance(address.into()).await?.to_be_bytes::<32>())
+        } else if C::is::<WxHOPR>() {
+            U256::from_be_bytes(
+                self.contract_instances
+                    .token
+                    .balanceOf(address.into())
+                    .call()
+                    .await?
+                    .to_be_bytes::<32>(),
+            )
+        } else {
+            return Err(RpcError::Other("unknown currency".into()));
+        };
 
-                Ok(Balance::new(native.to_be_bytes(), BalanceType::Native))
-            }
-            BalanceType::HOPR => match self.contract_instances.token.balanceOf(address.into()).call().await {
-                Ok(token_balance) => Ok(Balance::new(token_balance._0.to_be_bytes(), BalanceType::HOPR)),
-                Err(e) => Err(e.into()),
-            },
-        }
+        Ok(Balance::<C>::from(value))
     }
 
     async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability> {
         match self.contract_instances.win_prob_oracle.currentWinProb().call().await {
             Ok(encoded_win_prob) => {
                 let mut encoded: EncodedWinProb = Default::default();
-                encoded.copy_from_slice(&encoded_win_prob._0.to_be_bytes_vec());
+                encoded.copy_from_slice(&encoded_win_prob.to_be_bytes_vec());
                 Ok(encoded.into())
             }
             Err(e) => Err(e.into()),
         }
     }
 
-    async fn get_minimum_network_ticket_price(&self) -> Result<Balance> {
-        match self.contract_instances.price_oracle.currentTicketPrice().call().await {
-            Ok(ticket_price) => Ok(BalanceType::HOPR.balance(ticket_price._0.to_be_bytes_vec().as_slice())),
-            Err(e) => Err(e.into()),
-        }
+    async fn get_minimum_network_ticket_price(&self) -> Result<HoprBalance> {
+        Ok(self
+            .contract_instances
+            .price_oracle
+            .currentTicketPrice()
+            .call()
+            .await
+            .map(|v| HoprBalance::from(U256::from_be_bytes(v.to_be_bytes::<32>())))?)
     }
 
     async fn get_eligibility_status(&self, address: Address) -> Result<bool> {
         // 2) check if the node is registered to an account. In case the selfRegister is disabled
-        // (i.e. when staking threshold is zero), this value is used to check if the node is eligible
+        // (i.e., when the staking threshold is zero) this value is used to check if the node is eligible
         let tx_2 = CallItemBuilder::new(
             self.contract_instances
                 .network_registry
@@ -259,11 +263,9 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                     multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
                 (
                     max_allowed_registration
-                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-                        ._0,
+                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?,
                     node_registered_to_account
-                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-                        ._0,
+                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?,
                     quick_check,
                 )
             }
@@ -278,19 +280,16 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
                 let (stake_threshold, node_registered_to_account, quick_check) =
                     multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
                 (
-                    stake_threshold
-                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-                        ._0,
+                    stake_threshold.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?,
                     node_registered_to_account
-                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-                        ._0,
+                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?,
                     quick_check,
                 )
             }
         };
 
         match &quick_check {
-            Ok(eligiblity_quick_check) => return Ok(eligiblity_quick_check._0),
+            Ok(eligibility_quick_check) => return Ok(*eligibility_quick_check),
             Err(e) => {
                 // check in details what is the failure message
                 // The "division by zero" error is caused by the self-registration,
@@ -314,7 +313,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         match self.node_module.tryGetTarget(target.into()).call().await {
             Ok(returned_result) => Ok(returned_result
                 ._0
-                .then_some(returned_result._1.to_be_bytes_vec().as_slice().into())),
+                .then_some(U256::from_big_endian(returned_result._1.to_be_bytes_vec().as_slice()))),
             Err(e) => Err(e.into()),
         }
     }
@@ -327,14 +326,14 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
             .call()
             .await
         {
-            Ok(returned_result) => Ok(returned_result._0.into()),
+            Ok(returned_result) => Ok(returned_result.into()),
             Err(e) => Err(e.into()),
         }
     }
 
     async fn get_module_target_address(&self) -> Result<Address> {
         match self.node_module.owner().call().await {
-            Ok(returned_result) => Ok(returned_result._0.into()),
+            Ok(returned_result) => Ok(returned_result.into()),
             Err(e) => Err(e.into()),
         }
     }
@@ -348,7 +347,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
             .call()
             .await
         {
-            Ok(returned_result) => Ok(Duration::from_secs(returned_result._0.into())),
+            Ok(returned_result) => Ok(Duration::from_secs(returned_result.into())),
             Err(e) => Err(e.into()),
         }
     }
@@ -366,15 +365,12 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
 
         let (node_in_module_inclusion, module_safe_enabling, safe_of_module_ownership) =
             multicall.aggregate3_value().await.map_err(RpcError::MulticallError)?;
-        let is_node_included_in_module = node_in_module_inclusion
-            .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-            ._0;
-        let is_module_enabled_in_safe = module_safe_enabling
-            .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-            ._0;
+        let is_node_included_in_module =
+            node_in_module_inclusion.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?;
+        let is_module_enabled_in_safe =
+            module_safe_enabling.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?;
         let is_safe_owner_of_module = self.cfg.safe_address.eq(&safe_of_module_ownership
             .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))?
-            ._0
             .0
             .0
             .into());
@@ -448,7 +444,7 @@ mod tests {
             .with_to(*MULTICALL3_DEPLOYER_ADDRESS)
             .with_value(U256::from(ETH_VALUE_FOR_MULTICALL3_DEPLOYER));
 
-        provider.send_transaction(tx.into()).await?.watch().await?;
+        provider.send_transaction(tx).await?.watch().await?;
 
         provider
             .send_raw_transaction(MULTICALL3_DEPLOY_CODE.as_ref())
@@ -542,7 +538,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        let balance_1: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         // Send 1 ETH to some random address
@@ -578,11 +574,11 @@ mod tests {
             .transport(transport_client.clone(), transport_client.guess_local());
 
         // Wait until contracts deployments are final
-        sleep((1 + cfg.finality.clone()) * expected_block_time).await;
+        sleep((1 + cfg.finality) * expected_block_time).await;
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg.clone())?;
 
-        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        let balance_1: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         let txs_count = 5_u64;
@@ -600,7 +596,7 @@ mod tests {
 
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let balance_2 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        let balance_2: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
 
         assert!(
             balance_2.amount() <= balance_1.amount() - txs_count * send_amount,
@@ -638,7 +634,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let balance_1 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        let balance_1: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         // Send 1 ETH to some random address
@@ -648,7 +644,7 @@ mod tests {
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
 
-        let balance_2 = rpc.get_balance((&chain_key_0).into(), BalanceType::Native).await?;
+        let balance_2: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
         assert!(balance_2.lt(&balance_1), "balance must be diminished");
 
         Ok(())
@@ -692,7 +688,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let balance = rpc.get_balance((&chain_key_0).into(), BalanceType::HOPR).await?;
+        let balance: HoprBalance = rpc.get_balance((&chain_key_0).into()).await?;
         assert_eq!(amount, balance.amount().as_u64(), "invalid balance");
 
         Ok(())
@@ -715,9 +711,7 @@ mod tests {
             deploy_multicall3_to_anvil(&client.clone()).await?;
 
             let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<
-                (),
                 Arc<AnvilRpcClient>,
-                Ethereum,
             >(&instances, client.clone(), &chain_key_0)
             .await?;
 
@@ -810,9 +804,7 @@ mod tests {
             deploy_multicall3_to_anvil(&client.clone()).await?;
 
             let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<
-                (),
                 Arc<AnvilRpcClient>,
-                Ethereum,
             >(&instances, client.clone(), &chain_key_0)
             .await?;
 

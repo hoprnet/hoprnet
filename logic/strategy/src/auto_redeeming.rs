@@ -4,7 +4,10 @@
 //! fewer on-chain transactions being issued).
 //!
 //! For details on default parameters, see [AutoRedeemingStrategyConfig].
-use std::fmt::{Debug, Display, Formatter};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    str::FromStr,
+};
 
 use async_trait::async_trait;
 use hopr_chain_actions::redeem::TicketRedeemActions;
@@ -33,8 +36,8 @@ fn just_true() -> bool {
     true
 }
 
-fn min_redeem_hopr() -> Balance {
-    Balance::new_from_str("90000000000000000", BalanceType::HOPR)
+fn min_redeem_hopr() -> HoprBalance {
+    HoprBalance::from_str("0.09 wxHOPR").unwrap()
 }
 
 /// Configuration object for the `AutoRedeemingStrategy`
@@ -61,11 +64,11 @@ pub struct AutoRedeemingStrategyConfig {
     /// If 0 is given, the strategy will redeem tickets regardless of their value.
     /// This is not used for cases where `on_close_redeem_single_tickets_value_min` applies.
     ///
-    /// Default is 0.09 HOPR.
+    /// Default is 0.09 wxHOPR.
     #[serde(default = "min_redeem_hopr")]
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("90000000000000000", BalanceType::HOPR))]
-    pub minimum_redeem_ticket_value: Balance,
+    #[default(min_redeem_hopr())]
+    pub minimum_redeem_ticket_value: HoprBalance,
 }
 
 /// The `AutoRedeemingStrategy` automatically sends an acknowledged ticket
@@ -265,7 +268,7 @@ mod tests {
                 ChannelEntry::new(
                     BOB.public().to_address(),
                     ALICE.public().to_address(),
-                    Balance::new_from_str("10", BalanceType::HOPR),
+                    10.into(),
                     U256::zero(),
                     ChannelStatus::Open,
                     U256::zero(),
@@ -296,7 +299,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
-            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
+            minimum_redeem_ticket_value: 0.into(),
             ..Default::default()
         };
 
@@ -327,7 +330,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
-            minimum_redeem_ticket_value: BalanceType::HOPR.zero(),
+            minimum_redeem_ticket_value: 0.into(),
             ..Default::default()
         };
 
@@ -361,7 +364,7 @@ mod tests {
 
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: false,
-            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
             ..Default::default()
         };
 
@@ -383,13 +386,13 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(10),
+            10.into(),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             4.into(),
         );
 
-        // Make ticket worth exactly the threshold
+        // Make the ticket worth exactly the threshold
         let ack_ticket = generate_random_ack_ticket(0, 1, 5)?;
 
         db.upsert_channel(None, channel).await?;
@@ -409,7 +412,7 @@ mod tests {
         let cfg = AutoRedeemingStrategyConfig {
             redeem_only_aggregated: true,
             redeem_all_on_close: true,
-            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
         };
 
         let ars = AutoRedeemingStrategy::new(cfg, db, actions);
@@ -436,7 +439,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(10),
+            10.into(),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             0.into(),
@@ -452,7 +455,7 @@ mod tests {
         actions.expect_redeem_ticket().never();
 
         let cfg = AutoRedeemingStrategyConfig {
-            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
             redeem_only_aggregated: false,
             redeem_all_on_close: true,
         };
@@ -480,7 +483,7 @@ mod tests {
         let channel = ChannelEntry::new(
             BOB.public().to_address(),
             ALICE.public().to_address(),
-            BalanceType::HOPR.balance(10),
+            10.into(),
             0.into(),
             ChannelStatus::PendingToClose(SystemTime::now().add(Duration::from_secs(100))),
             4.into(),
@@ -513,7 +516,7 @@ mod tests {
             .return_once(move |_| Ok(ok(mock_confirm).boxed()));
 
         let cfg = AutoRedeemingStrategyConfig {
-            minimum_redeem_ticket_value: BalanceType::HOPR.balance(*PRICE_PER_PACKET * 5),
+            minimum_redeem_ticket_value: HoprBalance::from(*PRICE_PER_PACKET * 5),
             redeem_only_aggregated: false,
             redeem_all_on_close: true,
         };

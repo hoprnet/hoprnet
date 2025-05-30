@@ -1,6 +1,6 @@
 [package]
 name = "hopr-db-sql"
-version = "0.14.0"
+version = "0.14.1"
 edition = "2021"
 description = "Contains SQL DB functionality implementing the DB API traits to be used by other crates in the code base"
 homepage = "https://hoprnet.org/"
@@ -72,3 +72,6 @@ sqlx = { workspace = true, features = ["runtime-tokio-rustls"] }
 lazy_static = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hex-literal = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["hopr-db-migration"]

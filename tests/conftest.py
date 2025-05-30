@@ -96,7 +96,7 @@ async def swarm7(request, base_port):
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
     try:
         cluster, anvil = await localcluster.bringup(
-            params_path, test_mode=True, fully_connected=False, use_nat=True, base_port=base_port
+            params_path, test_mode=True, fully_connected=False, use_nat=False, base_port=base_port
         )
 
         yield cluster.nodes
@@ -119,7 +119,7 @@ async def swarm7_reset(swarm7: dict[str, Node]):
 
 
 def to_ws_url(host, port, args: list[tuple[str, str]]):
-    return f"ws://{host}:{port}/api/v3/session/websocket?" + "&".join(f"{a[0]}={a[1]}" for a in args)
+    return f"ws://{host}:{port}/api/v4/session/websocket?" + "&".join(f"{a[0]}={a[1]}" for a in args)
 
 
 def run_hopli_cmd(cmd: list[str], custom_env):

@@ -24,7 +24,7 @@ pub fn por_creation_bench(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(format!("{hop} hop")), hop, |b, &hop| {
             let secrets = HoprSphinxSuite::new_shared_keys(
                 &(0..=hop)
-                    .map(|_| OffchainKeypair::random().public().clone())
+                    .map(|_| *OffchainKeypair::random().public())
                     .collect::<Vec<_>>(),
             )
             .unwrap()

@@ -1,3 +1,6 @@
+from decimal import Decimal, ROUND_UP
+
+
 class ApiRequestObject:
     def __init__(self, *args, **kwargs):
         if not hasattr(self, "keys"):
@@ -36,18 +39,21 @@ class OpenChannelBody(ApiRequestObject):
         "destination": "destination",
     }
 
-    def __init__(self, amount: str, destination: str):
+    def __init__(self, amount: Decimal, destination: str):
         super().__init__(vars())
+
+    def post_init(self):
+        self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
 
 
 class FundChannelBody(ApiRequestObject):
     keys = {"amount": "amount"}
 
-    def __init__(self, amount: float):
+    def __init__(self, amount: Decimal):
         super().__init__(vars())
 
     def post_init(self):
-        self.amount = f"{self.amount:.0f}"
+        self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
 
 
 class GetChannelsBody(ApiRequestObject):
@@ -143,25 +149,6 @@ class SessionTargetBody(ApiRequestObject):
         super().__init__(vars())
 
 
-class GetMessagesBody(ApiRequestObject):
-    keys = {
-        "tag": "tag",
-    }
-
-    def __init__(self, tag: int):
-        super().__init__(vars())
-
-
-class PeekAllMessagesBody(ApiRequestObject):
-    keys = {"tag": "tag", "timestamp": "timestamp"}
-
-    def __init__(self, tag: int, timestamp: int = None):
-        if timestamp is None:
-            del timestamp
-
-        super().__init__(vars())
-
-
 class SendMessageBody(ApiRequestObject):
     keys = {"body": "body", "hops": "hops", "path": "path", "destination": "destination", "tag": "tag"}
 
@@ -170,7 +157,7 @@ class SendMessageBody(ApiRequestObject):
 
 
 class WithdrawBody(ApiRequestObject):
-    keys = {"address": "address", "amount": "amount", "currency": "currency"}
+    keys = {"address": "address", "amount": "amount"}
 
-    def __init__(self, address: str, amount: str, currency: str):
+    def __init__(self, address: str, amount: str):
         super().__init__(vars())

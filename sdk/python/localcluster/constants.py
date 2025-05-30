@@ -1,10 +1,11 @@
 import logging
+from decimal import Decimal
 from pathlib import Path
 
 logging.basicConfig(format="%(asctime)s %(message)s")
 logging.getLogger().setLevel(logging.DEBUG)
 
-OPEN_CHANNEL_FUNDING_VALUE_HOPR = 1000
+OPEN_CHANNEL_FUNDING_VALUE_HOPR = Decimal(1000)
 TICKET_PRICE_PER_HOP = 100
 
 PWD = Path(__file__).parents[3]

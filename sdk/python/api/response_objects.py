@@ -1,3 +1,5 @@
+import logging
+from decimal import Decimal
 from typing import Any
 
 from .channelstatus import ChannelStatus
@@ -22,6 +24,14 @@ def _convert(value: Any):
             return int(value)
 
     return value
+
+
+def _parse_balance_string(balance_str):
+    """Parse a balance string with currency units and return the amount as a big decimal"""
+    try:
+        return Decimal(balance_str.split()[0])
+    except (ValueError, AttributeError, IndexError) as e:
+        raise ValueError(f"Failed to parse balance string: {balance_str}") from e
 
 
 class ApiResponseObject:
@@ -71,6 +81,13 @@ class Balances(ApiResponseObject):
         "safe_hopr_allowance": "safeHoprAllowance",
     }
 
+    def post_init(self):
+        self.hopr = _parse_balance_string(self.hopr)
+        self.native = _parse_balance_string(self.native)
+        self.safe_native = _parse_balance_string(self.safe_native)
+        self.safe_hopr = _parse_balance_string(self.safe_hopr)
+        self.safe_hopr_allowance = _parse_balance_string(self.safe_hopr_allowance)
+
 
 class Infos(ApiResponseObject):
     keys = {"hopr_node_safe": "hoprNodeSafe"}
@@ -93,6 +110,7 @@ class Channel(ApiResponseObject):
     }
 
     def post_init(self):
+        self.balance = _parse_balance_string(self.balance)
         self.status = ChannelStatus.fromString(self.status)
 
 
@@ -107,9 +125,15 @@ class Ticket(ApiResponseObject):
         "winn_prob": "winProb",
     }
 
+    def post_init(self):
+        self.amount = _parse_balance_string(self.amount)
+
 
 class TicketPrice(ApiResponseObject):
     keys = {"value": "price"}
+
+    def post_init(self):
+        self.value = _parse_balance_string(self.value)
 
 
 class TicketProbability(ApiResponseObject):
@@ -127,6 +151,12 @@ class TicketStatistics(ApiResponseObject):
         "unredeemed_value": "unredeemedValue",
         "winning_count": "winningCount",
     }
+
+    def post_init(self):
+        self.rejected_value = _parse_balance_string(self.rejected_value)
+        self.neglected_value = _parse_balance_string(self.neglected_value)
+        self.redeemed_value = _parse_balance_string(self.redeemed_value)
+        self.unredeemed_value = _parse_balance_string(self.unredeemed_value)
 
 
 class Configuration(ApiResponseObject):

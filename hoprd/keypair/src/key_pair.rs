@@ -226,11 +226,11 @@ impl HoprKeys {
                 let identity_file_exists = metadata(id_path).is_ok();
 
                 if identity_file_exists {
-                    info!("identity file exists at {}", id_path);
+                    info!(file_path = %id_path, "found existing identity file");
 
                     match HoprKeys::read_eth_keystore(id_path, password) {
                         Ok((keys, needs_migration)) => {
-                            info!("migration needed = {}", needs_migration);
+                            info!(needs_migration, "status");
                             if needs_migration {
                                 keys.write_eth_keystore(id_path, password)?
                             }
@@ -244,8 +244,7 @@ impl HoprKeys {
                 } else {
                     let keys = HoprKeys::random();
 
-                    info!("created a new set of keypairs at {}", id_path);
-                    info!("{}", keys);
+                    info!(file_path = %id_path, %keys, "created new keypairs");
 
                     keys.write_eth_keystore(id_path, password)?;
                     Ok(keys)
@@ -261,7 +260,7 @@ impl HoprKeys {
                 let identity_file_exists = metadata(id_path).is_ok();
 
                 if identity_file_exists {
-                    info!("identity file exists at {}", id_path);
+                    info!(file_path = %id_path, "found an existing identity file");
 
                     Err(KeyPairError::GeneralError(format!(
                         "Cannot create identity file at {} because the file already exists.",
@@ -543,8 +542,8 @@ mod tests {
 
         assert!(
             super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
-                password: "local".into(),
-                id_path: identity_path.into()
+                password: "local",
+                id_path: identity_path
             })
             .is_ok()
         );
@@ -571,8 +570,8 @@ mod tests {
         // Overwriting existing keys must not be possible
         assert!(
             super::HoprKeys::init(super::IdentityRetrievalModes::FromFile {
-                password: "local".into(),
-                id_path: identity_path.into()
+                password: "local",
+                id_path: identity_path
             })
             .is_err()
         );

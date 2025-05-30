@@ -223,7 +223,7 @@ mod tests {
     where
         <<S as SphinxSuite>::P as Keypair>::Public: Copy,
     {
-        let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
+        let pub_keys = keypairs.iter().map(|kp| *kp.public()).collect::<Vec<_>>();
         let shares = S::new_shared_keys(&pub_keys)?;
 
         Ok(create_surb::<S, HeaderSpec<S>>(

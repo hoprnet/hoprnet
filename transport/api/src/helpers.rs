@@ -12,7 +12,8 @@ use hopr_network_types::{
     types::DestinationRouting,
 };
 use hopr_path::{ChainPath, PathAddressResolver, ValidatedPath, selectors::PathSelector};
-use hopr_primitive_types::primitives::Address;
+use hopr_primitive_types::{prelude::HoprBalance, primitives::Address};
+use hopr_transport_packet::prelude::ApplicationData;
 use hopr_transport_protocol::processor::{MsgSender, SendMsgInput};
 use hopr_transport_session::{
     errors::{SessionManagerError, TransportSessionError},
@@ -50,10 +51,10 @@ impl From<NetworkRegistryStatus> for PeerEligibility {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TicketStatistics {
     pub winning_count: u128,
-    pub unredeemed_value: hopr_primitive_types::primitives::Balance,
-    pub redeemed_value: hopr_primitive_types::primitives::Balance,
-    pub neglected_value: hopr_primitive_types::primitives::Balance,
-    pub rejected_value: hopr_primitive_types::primitives::Balance,
+    pub unredeemed_value: HoprBalance,
+    pub redeemed_value: HoprBalance,
+    pub neglected_value: HoprBalance,
+    pub rejected_value: HoprBalance,
 }
 
 #[derive(Clone)]

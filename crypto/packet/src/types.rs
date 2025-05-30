@@ -197,12 +197,12 @@ mod tests {
         static ref MAPPER: bimap::BiMap<KeyIdent, OffchainPublicKey> = PEERS
             .iter()
             .enumerate()
-            .map(|(i, (_, k))| (KeyIdent::from(i as u32), k.public().clone()))
+            .map(|(i, (_, k))| (KeyIdent::from(i as u32), *k.public()))
             .collect::<BiHashMap<_, _>>();
     }
 
     fn generate_surbs(count: usize) -> anyhow::Result<Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>> {
-        let path = PEERS.iter().map(|(_, k)| k.public().clone()).collect::<Vec<_>>();
+        let path = PEERS.iter().map(|(_, k)| *k.public()).collect::<Vec<_>>();
         let path_ids =
             <BiHashMap<_, _> as KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>::map_keys_to_ids(&*MAPPER, &path)
                 .into_iter()
@@ -212,7 +212,6 @@ mod tests {
         let recv_data = HoprSenderId::new(&pseudonym);
 
         Ok((0..count)
-            .into_iter()
             .map(|_| {
                 let shared_keys = HoprSphinxSuite::new_shared_keys(&path)?;
                 let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)

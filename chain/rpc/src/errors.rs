@@ -30,12 +30,14 @@ pub enum RpcError {
     #[error(transparent)]
     PendingTransactionError(#[from] PendingTransactionError),
 
-    // InterfaceError(String),
     #[error("filter does not contain any criteria")]
     FilterIsEmpty,
 
     #[error("transaction submission to the RPC provider timed out")]
     Timeout,
+
+    #[error("unknown error: {0}")]
+    Other(String),
 }
 
 pub type Result<T> = std::result::Result<T, RpcError>;

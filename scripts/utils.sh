@@ -181,7 +181,7 @@ get_native_address() {
   local endpoint url cmd
 
   endpoint="${1:-localhost:3001}"
-  url="${endpoint}/api/v3/account/addresses"
+  url="${endpoint}/api/v4/account/addresses"
   cmd="$(get_authenticated_curl_cmd "${url}")"
 
   try_cmd "${cmd}" 30 5 | jq -r ".native"
@@ -192,7 +192,7 @@ get_hopr_address() {
   local endpoint url cmd
 
   endpoint="${1:-localhost:3001}"
-  url="${endpoint}/api/v3/account/addresses"
+  url="${endpoint}/api/v4/account/addresses"
   cmd="$(get_authenticated_curl_cmd "${url}")"
 
   try_cmd "${cmd}" 30 5 | jq -r ".hopr"

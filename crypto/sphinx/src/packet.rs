@@ -624,7 +624,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    fn generic_test_meta_packet<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<()>
+    fn generic_test_meta_packet<S>(keypairs: Vec<S::P>) -> anyhow::Result<()>
     where
         S: SphinxSuite,
         <S::P as Keypair>::Public: Eq + Hash,
@@ -682,7 +682,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    fn generic_meta_packet_reply_test<S: SphinxSuite>(keypairs: Vec<S::P>) -> anyhow::Result<()>
+    fn generic_meta_packet_reply_test<S>(keypairs: Vec<S::P>) -> anyhow::Result<()>
     where
         S: SphinxSuite,
         <S::P as Keypair>::Public: Eq + Hash,

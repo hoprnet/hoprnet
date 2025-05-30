@@ -77,7 +77,7 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
 /// This is done by querying the RPC provider for balance with backoff until `max_delay` argument.
 pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     address: Address,
-    min_balance: Balance,
+    min_balance: XDaiBalance,
     max_delay: Duration,
     rpc: &Rpc,
 ) -> Result<()> {
@@ -85,7 +85,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     let mut current_delay = Duration::from_secs(2).min(max_delay);
 
     while current_delay <= max_delay {
-        match rpc.get_balance(address, min_balance.balance_type()).await {
+        match rpc.get_balance(address).await {
             Ok(current_balance) => {
                 info!(balance = %current_balance, "balance status");
                 if current_balance.ge(&min_balance) {
@@ -306,11 +306,11 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.db.get_all_channels(None).await?)
     }
 
-    pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
-        Ok(self.db.get_indexer_data(None).await?.ticket_price.map(|b| b.amount()))
+    pub async fn ticket_price(&self) -> errors::Result<Option<HoprBalance>> {
+        Ok(self.db.get_indexer_data(None).await?.ticket_price)
     }
 
-    pub async fn safe_allowance(&self) -> errors::Result<Balance> {
+    pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {
         Ok(self.db.get_safe_hopr_allowance(None).await?)
     }
 
@@ -326,12 +326,12 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         &self.rpc_operations
     }
 
-    pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
-        Ok(self.rpc_operations.get_balance(self.me_onchain(), balance_type).await?)
+    pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
+        Ok(self.rpc_operations.get_balance(self.me_onchain()).await?)
     }
 
-    pub async fn get_safe_balance(&self, safe_address: Address, balance_type: BalanceType) -> errors::Result<Balance> {
-        Ok(self.rpc_operations.get_balance(safe_address, balance_type).await?)
+    pub async fn get_safe_balance<C: Currency + Send>(&self, safe_address: Address) -> errors::Result<Balance<C>> {
+        Ok(self.rpc_operations.get_balance(safe_address).await?)
     }
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
@@ -346,7 +346,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.rpc_operations.get_minimum_network_winning_probability().await?)
     }
 
-    pub async fn get_minimum_ticket_price(&self) -> errors::Result<Balance> {
+    pub async fn get_minimum_ticket_price(&self) -> errors::Result<HoprBalance> {
         Ok(self.rpc_operations.get_minimum_network_ticket_price().await?)
     }
 }

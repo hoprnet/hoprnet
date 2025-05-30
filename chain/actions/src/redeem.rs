@@ -326,7 +326,7 @@ mod tests {
                     let channel = ChannelEntry::new(
                         ckp.public().to_address(),
                         ALICE.public().to_address(),
-                        Balance::zero(BalanceType::HOPR),
+                        0.into(),
                         U256::zero(),
                         ChannelStatus::Open,
                         channel_epoch.into(),
@@ -473,12 +473,13 @@ mod tests {
 
         // Tickets with index 0 will be skipped, as that is already past
         channel_from_bob.ticket_index = 1_u32.into();
-        db.upsert_channel(None, channel_from_bob.clone()).await?;
+        db.upsert_channel(None, channel_from_bob).await?;
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
 
-        for tkt in bob_tickets.iter().cloned() {
+        // Skipping ticket with index 0
+        for tkt in bob_tickets.iter().skip(1).cloned() {
             indexer_action_tracker
                 .expect_register_expectation()
                 .once()
@@ -492,11 +493,14 @@ mod tests {
                 });
         }
 
-        // Expect only Bob's tickets to get redeemed
         let mut tx_exec = MockTransactionExecutor::new();
+        let mut seq = mockall::Sequence::new();
+
+        // Expect only Bob's tickets to get redeemed
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - 1)
+            .in_sequence(&mut seq)
             .withf(move |t| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
             .returning(move |_| Ok(random_hash));
 
@@ -699,7 +703,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_redeem_must_not_work_for_tickets_of_next_epoch_being_redeemed() -> anyhow::Result<()> {
-        let ticket_count = 4;
+        let ticket_count = 3;
         let ticket_from_next_epoch_count = 2;
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -759,12 +763,9 @@ mod tests {
         )
         .await;
 
-        for unredeemable_index in 0..ticket_from_next_epoch_count {
+        for ticket in tickets.iter().take(ticket_from_next_epoch_count) {
             assert!(
-                actions
-                    .redeem_ticket(tickets[unredeemable_index].clone())
-                    .await
-                    .is_err(),
+                actions.redeem_ticket(ticket.clone()).await.is_err(),
                 "cannot redeem a ticket that's from the next epoch"
             );
         }
@@ -834,7 +835,7 @@ mod tests {
         let (mut channel_from_bob, tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 1u32).await?;
 
         channel_from_bob.ticket_index = 2_u32.into();
-        db.upsert_channel(None, channel_from_bob.clone()).await?;
+        db.upsert_channel(None, channel_from_bob).await?;
 
         let ticket = tickets.into_iter().next().unwrap();
 

@@ -84,7 +84,7 @@ pub(super) async fn configuration(State(state): State<Arc<InternalState>>) -> im
 pub(crate) struct NodePeersQueryRequest {
     #[serde(default)]
     #[schema(required = false, example = 0.7)]
-    /// Minimum peer quality to be include in the response.
+    /// Minimum peer quality to be included in the response.
     quality: f64,
 }
 
@@ -311,7 +311,10 @@ pub(super) async fn peers(
 }
 
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::gather_all_metrics as collect_hopr_metrics;
+fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
+    hopr_metrics::metrics::gather_all_metrics()
+        .map_err(|_| ApiErrorStatus::UnknownFailure("Failed to gather metrics".into()))
+}
 
 #[cfg(any(not(feature = "prometheus"), test))]
 fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
@@ -337,7 +340,7 @@ fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
 pub(super) async fn metrics() -> impl IntoResponse {
     match collect_hopr_metrics() {
         Ok(metrics) => (StatusCode::OK, metrics).into_response(),
-        Err(error) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(error)).into_response(),
+        Err(error) => (StatusCode::UNPROCESSABLE_ENTITY, error).into_response(),
     }
 }
 

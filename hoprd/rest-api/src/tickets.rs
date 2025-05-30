@@ -7,7 +7,7 @@ use axum::{
 };
 use hopr_crypto_types::types::Hash;
 use hopr_lib::{
-    HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex,
+    HoprBalance, HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex,
     errors::{HoprLibError, HoprStatusError},
 };
 use serde::Deserialize;
@@ -32,8 +32,9 @@ pub(crate) struct ChannelTicket {
     #[serde_as(as = "DisplayFromStr")]
     #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
     channel_id: Hash,
-    #[schema(example = "100")]
-    amount: String,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "1.0 wxHOPR")]
+    amount: HoprBalance,
     #[schema(example = 0)]
     index: u64,
     #[schema(example = 1)]
@@ -52,7 +53,7 @@ impl From<Ticket> for ChannelTicket {
     fn from(value: Ticket) -> Self {
         Self {
             channel_id: value.channel_id,
-            amount: value.amount.amount().to_string(),
+            amount: value.amount,
             index: value.index,
             index_offset: value.index_offset,
             win_prob: value.win_prob().to_string(),
@@ -79,7 +80,7 @@ pub(crate) struct ChannelIdParams {
         responses(
             (status = 200, description = "Fetched all tickets for the given channel ID", body = [ChannelTicket], example = json!([
                 {
-                    "amount": "100",
+                    "amount": "10 wxHOPR",
                     "channelEpoch": 1,
                     "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
                     "index": 0,
@@ -126,7 +127,7 @@ pub(super) async fn show_channel_tickets(
     responses(
         (status = 200, description = "Fetched all tickets in all the channels", body = [ChannelTicket], example = json!([
         {
-            "amount": "100",
+            "amount": "10 wxHOPR",
             "channelEpoch": 1,
             "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
             "index": 0,
@@ -149,37 +150,42 @@ pub(super) async fn show_all_tickets() -> impl IntoResponse {
     (StatusCode::OK, Json(tickets)).into_response()
 }
 
+#[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
         "winningCount": 0,
-        "neglectedValue": "0",
-        "redeemedValue": "1000000000000000000",
-        "rejectedValue": "0",
-        "unredeemedValue": "2000000000000000",
+        "neglectedValue": "0 wxHOPR",
+        "redeemedValue": "1000 wxHOPR",
+        "rejectedValue": "0 wxHOPR",
+        "unredeemedValue": "2000 wxHOPR",
     }))]
 #[serde(rename_all = "camelCase")]
 /// Received tickets statistics.
 pub(crate) struct NodeTicketStatisticsResponse {
     #[schema(example = 0)]
     winning_count: u64,
-    #[schema(example = "2000000000000000")]
-    unredeemed_value: String,
-    #[schema(example = "1000000000000000000")]
-    redeemed_value: String,
-    #[schema(example = "0")]
-    neglected_value: String,
-    #[schema(example = "0")]
-    rejected_value: String,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "20 wxHOPR")]
+    unredeemed_value: HoprBalance,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String,example = "100 wxHOPR")]
+    redeemed_value: HoprBalance,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String,example = "0 wxHOPR")]
+    neglected_value: HoprBalance,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "0 wHOPR")]
+    rejected_value: HoprBalance,
 }
 
 impl From<TicketStatistics> for NodeTicketStatisticsResponse {
     fn from(value: TicketStatistics) -> Self {
         Self {
             winning_count: value.winning_count as u64,
-            unredeemed_value: value.unredeemed_value.amount().to_string(),
-            redeemed_value: value.redeemed_value.amount().to_string(),
-            neglected_value: value.neglected_value.amount().to_string(),
-            rejected_value: value.rejected_value.amount().to_string(),
+            unredeemed_value: value.unredeemed_value,
+            redeemed_value: value.redeemed_value,
+            neglected_value: value.neglected_value,
+            rejected_value: value.rejected_value,
         }
     }
 }

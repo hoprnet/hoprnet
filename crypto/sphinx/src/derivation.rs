@@ -118,10 +118,10 @@ mod tests {
         // vrf verification algorithm
         let pub_key = PublicKey::from_privkey(&priv_key)?;
 
-        let params = derive_vrf_parameters(&message, &keypair, dst)?;
+        let params = derive_vrf_parameters(message, &keypair, dst)?;
 
         let cap_b =
-            Secp256k1::hash_from_bytes::<ExpandMsgXmd<Keccak256>>(&[&pub_key.to_address().as_ref(), &message], &[dst])?;
+            Secp256k1::hash_from_bytes::<ExpandMsgXmd<Keccak256>>(&[pub_key.to_address().as_ref(), &message], &[dst])?;
 
         assert_eq!(
             params.get_s_b_witness(&keypair.public().to_address(), &message, dst)?,
@@ -135,7 +135,7 @@ mod tests {
 
         let h_check = Secp256k1::hash_to_scalar::<ExpandMsgXmd<Keccak256>>(
             &[
-                &pub_key.to_address().as_ref(),
+                pub_key.to_address().as_ref(),
                 &params.V.as_uncompressed().as_bytes()[1..],
                 &r_v.to_affine().to_encoded_point(false).as_bytes()[1..],
                 &message,

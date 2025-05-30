@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from decimal import Decimal
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
 
@@ -127,7 +128,7 @@ class Node:
                 "--contracts-root",
                 "./ethereum/contracts",
                 "--hopr-amount",
-                "20000.0",
+                "200000000000.0",
                 "--native-amount",
                 "10.0",
                 "--private-key",
@@ -282,9 +283,7 @@ class Node:
         for address in addresses:
             if address == self.address:
                 continue
-            tasks.append(
-                asyncio.create_task(self.api.open_channel(address, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"))
-            )
+            tasks.append(asyncio.create_task(self.api.open_channel(address, OPEN_CHANNEL_FUNDING_VALUE_HOPR)))
 
         await asyncio.gather(*tasks)
 
