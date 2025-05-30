@@ -33,8 +33,8 @@ pub struct RpcEthereumClientConfig {
     ///
     /// This must be strictly greater than any timeouts in the underlying `HoprRpcOperations`
     ///
-    /// Defaults to 30 seconds.
-    #[default(Duration::from_secs(30))]
+    /// Defaults to 5 seconds.
+    #[default(Duration::from_secs(5))]
     pub max_tx_submission_wait: Duration,
 }
 
