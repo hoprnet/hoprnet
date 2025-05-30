@@ -5462,6 +5462,7 @@ dependencies = [
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-platform",
  "hopr-transport-session",
  "lazy_static",
  "oas3",
