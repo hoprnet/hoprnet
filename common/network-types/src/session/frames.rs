@@ -6,8 +6,7 @@ use std::{
 };
 
 use bitvec::{
-    BitArr,
-    prelude::{BitVec, Lsb0},
+    prelude::BitVec
 };
 
 use crate::prelude::errors::SessionError;

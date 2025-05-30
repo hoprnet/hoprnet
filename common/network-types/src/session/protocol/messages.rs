@@ -52,7 +52,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use bitvec::{BitArr, field::BitField, order::Lsb0, prelude::BitVec};
+use bitvec::{BitArr, field::BitField, order::Lsb0};
 
 use crate::session::{
     errors::SessionError,
