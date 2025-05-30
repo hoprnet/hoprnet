@@ -1138,7 +1138,7 @@ mod tests {
                 .take(num_frames)
                 .collect::<Vec<_>>()
         } else {
-            std::iter::repeat(frame_size).take(num_frames).collect::<Vec<_>>()
+            std::iter::repeat_n(frame_size, num_frames).collect::<Vec<_>>()
         };
 
         let socket_worker = |mut socket: S, d: Direction| {
@@ -1152,7 +1152,7 @@ mod tests {
                     for frame_size in &frame_sizes {
                         let mut write = vec![0u8; *frame_size];
                         hopr_crypto_random::random_fill(&mut write);
-                        socket.write(&write).await?;
+                        let _ = socket.write(&write).await?;
                         sent.extend(write);
                     }
                 }
@@ -1474,7 +1474,7 @@ mod tests {
     }
 
     #[test(tokio::test)]
-    async fn receiving_on_disconnected_network_should_timeout() {
+    async fn receiving_on_disconnected_network_should_timeout() -> anyhow::Result<()> {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
             rto_base_receiver: Duration::from_millis(300),
@@ -1491,7 +1491,7 @@ mod tests {
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
         let data = b"will not be delivered!";
 
-        alice_to_bob.write(data.as_ref()).await.unwrap();
+        let _ = alice_to_bob.write(data.as_ref()).await?;
 
         let mut out = vec![0u8; data.len()];
         let f1 = bob_to_alice.read_exact(&mut out);
@@ -1503,10 +1503,12 @@ mod tests {
             Either::Left(_) => panic!("should timeout: {:?}", out),
             Either::Right(_) => {}
         }
+
+        Ok(())
     }
 
     #[test(tokio::test)]
-    async fn single_frame_resend_should_be_resent_on_unreliable_network() {
+    async fn single_frame_resend_should_be_resent_on_unreliable_network() -> anyhow::Result<()> {
         let cfg = SessionConfig {
             rto_base_sender: Duration::from_millis(250),
             rto_base_receiver: Duration::from_millis(300),
@@ -1523,7 +1525,7 @@ mod tests {
         let (mut alice_to_bob, mut bob_to_alice) = setup_alice_bob(cfg, net_cfg, None, None);
         let data = b"will be re-delivered!";
 
-        alice_to_bob.write(data.as_ref()).await.unwrap();
+        let _ = alice_to_bob.write(data.as_ref()).await?;
 
         let mut out = vec![0u8; data.len()];
         let f1 = bob_to_alice.read_exact(&mut out);
@@ -1535,5 +1537,7 @@ mod tests {
             Either::Left(_) => {}
             Either::Right(_) => panic!("timeout"),
         }
+
+        Ok(())
     }
 }

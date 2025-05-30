@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+from decimal import Decimal
 
 import pytest
 
@@ -98,8 +99,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                2 * (ticket_count + 1) * ticket_price / win_prob,
-                ticket_price / win_prob,
+                2 * (ticket_count + 1) * ticket_price / Decimal(win_prob),
+                ticket_price / Decimal(win_prob),
             ) as channels:
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -134,7 +135,9 @@ class TestWinProbWithSwarm:
                 assert await swarm7[relay].api.channel_redeem_tickets(channels.fwd_channels[0].id)
 
                 # The only unredeemed ticket is on the return channel
-                await asyncio.wait_for(check_unredeemed_tickets_value_max(swarm7[relay], ticket_price / win_prob), 30.0)
+                await asyncio.wait_for(
+                    check_unredeemed_tickets_value_max(swarm7[relay], ticket_price / Decimal(win_prob)), 30.0
+                )
 
                 # The redeemed ticket value must be the new value minus the ticket on the return channel
                 ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
@@ -174,8 +177,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                2 * (ticket_count + 1) * ticket_price / win_prob,
-                ticket_price / win_prob,
+                2 * (ticket_count + 1) * ticket_price / Decimal(win_prob),
+                ticket_price / Decimal(win_prob),
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -249,8 +252,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                2 * (ticket_count + 1) * ticket_price / win_prob,
-                ticket_price / win_prob,
+                2 * (ticket_count + 1) * ticket_price / Decimal(win_prob),
+                ticket_price / Decimal(win_prob),
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before_1 = await swarm7[relay_1].api.get_tickets_statistics()
@@ -313,8 +316,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                2 * (ticket_count + 1) * ticket_price / win_prob,
-                ticket_price / win_prob,
+                2 * (ticket_count + 1) * ticket_price / Decimal(win_prob),
+                ticket_price / Decimal(win_prob),
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -371,8 +374,8 @@ class TestWinProbWithSwarm:
 
         async with create_bidirectional_channels_for_route(
             [swarm7[hop] for hop in route],
-            3 * ticket_price / win_prob,
-            ticket_price / win_prob,
+            3 * ticket_price / Decimal(win_prob),
+            ticket_price / Decimal(win_prob),
         ):
             # ensure ticket stats are what we expect before starting
             statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -395,7 +398,9 @@ class TestWinProbWithSwarm:
 
                 # wait until the relay rejects the session establishment packet
                 await asyncio.wait_for(
-                    check_rejected_tickets_value(swarm7[relay], rejected_value_before + ticket_price / win_prob),
+                    check_rejected_tickets_value(
+                        swarm7[relay], rejected_value_before + ticket_price / Decimal(win_prob)
+                    ),
                     30.0,
                 )
 

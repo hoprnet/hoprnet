@@ -134,6 +134,14 @@ impl Validate for NetworkConfig {
             );
         }
 
+        // #[validate(range(min = 0.0))]
+        if self.backoff_min < 0.0 {
+            errors.add(
+                "backoff_min",
+                validator::ValidationError::new("backoff_min must be greater or equal 0"),
+            );
+        }
+
         if self.backoff_min >= self.backoff_max {
             errors.add(
                 "backoff_min and backoff_max",

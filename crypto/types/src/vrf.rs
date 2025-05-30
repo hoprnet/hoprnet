@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn vrf_values_serialize_deserialize() -> anyhow::Result<()> {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref())?;
+        let vrf_values = derive_vrf_parameters(*TEST_MSG, &ALICE, Hash::default().as_ref())?;
 
         let deserialized = VrfParameters::try_from(ALICE_VRF_OUTPUT.as_ref())?;
 
@@ -267,7 +267,7 @@ mod tests {
         assert_eq!(vrf_values.V, deserialized.V);
         assert!(
             deserialized
-                .verify(&*ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
+                .verify(&ALICE_ADDR, &TEST_MSG, Hash::default().as_ref())
                 .is_ok()
         );
 
@@ -290,11 +290,11 @@ mod tests {
 
     #[test]
     fn vrf_values_crypto() -> anyhow::Result<()> {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref())?;
+        let vrf_values = derive_vrf_parameters(*TEST_MSG, &ALICE, Hash::default().as_ref())?;
 
         assert!(
             vrf_values
-                .verify(&ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
+                .verify(&ALICE_ADDR, &TEST_MSG, Hash::default().as_ref())
                 .is_ok()
         );
 

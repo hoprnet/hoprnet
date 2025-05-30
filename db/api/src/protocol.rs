@@ -1,9 +1,9 @@
 use async_trait::async_trait;
-use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
+pub use hopr_crypto_packet::{HoprSurb, prelude::HoprSenderId};
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
-use hopr_primitive_types::prelude::Balance;
+use hopr_primitive_types::balance::HoprBalance;
 
 use crate::errors::Result;
 
@@ -22,7 +22,7 @@ pub trait HoprDbProtocolOperations {
     async fn get_network_winning_probability(&self) -> Result<WinningProbability>;
 
     /// Loads (presumably cached) value of the network's minimum ticket price from the DB.
-    async fn get_network_ticket_price(&self) -> Result<Balance>;
+    async fn get_network_ticket_price(&self) -> Result<HoprBalance>;
 
     /// Attempts to find SURB and its ID given the [`SurbMatcher`].
     async fn find_surb(&self, matcher: SurbMatcher) -> Result<(HoprSenderId, HoprSurb)>;
@@ -36,7 +36,7 @@ pub trait HoprDbProtocolOperations {
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: Balance,
+        outgoing_ticket_price: HoprBalance,
     ) -> Result<OutgoingPacket>;
 
     /// Process the incoming packet into data
@@ -47,7 +47,7 @@ pub trait HoprDbProtocolOperations {
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: Balance,
+        outgoing_ticket_price: HoprBalance,
     ) -> Result<Option<IncomingPacket>>;
 }
 

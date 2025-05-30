@@ -330,9 +330,8 @@ mod tests {
         let elapsed = start.elapsed()?;
 
         assert!(elapsed < MAXIMUM_SINGLE_DELAY_DURATION + PROCESSING_LEEWAY);
-        Ok(assert!(
-            elapsed > Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-        ))
+        assert!(elapsed > Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS));
+        Ok(())
     }
 
     #[tokio::test]
@@ -355,9 +354,8 @@ mod tests {
         let elapsed = start.elapsed()?;
 
         assert!(elapsed < MAXIMUM_SINGLE_DELAY_DURATION + PROCESSING_LEEWAY);
-        Ok(assert!(
-            elapsed > Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS)
-        ))
+        assert!(elapsed > Duration::from_millis(crate::config::HOPR_MIXER_MINIMUM_DEFAULT_DELAY_IN_MS));
+        Ok(())
     }
 
     #[tokio::test]
@@ -407,7 +405,8 @@ mod tests {
         .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
-        Ok(assert_ne!(input, mixed_output))
+        assert_ne!(input, mixed_output);
+        Ok(())
     }
 
     #[tokio::test]
@@ -431,7 +430,8 @@ mod tests {
         .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
-        Ok(assert_ne!(input, mixed_output))
+        assert_ne!(input, mixed_output);
+        Ok(())
     }
 
     #[tokio::test]
@@ -456,13 +456,14 @@ mod tests {
         .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
-        Ok(assert_ne!(input, mixed_output))
+        assert_ne!(input, mixed_output);
+        Ok(())
     }
 
     #[tokio::test]
     // #[tracing_test::traced_test]
     async fn mixer_channel_should_not_mix_the_order_if_the_min_delay_and_delay_range_is_0() -> anyhow::Result<()> {
-        const ITERATIONS: usize = 20; // highly unlikely that this produces the same order on the input given the size
+        const ITERATIONS: usize = 40; // highly unlikely that this produces the same order on the input given the size
 
         let (tx, rx) = channel(MixerConfig {
             min_delay: Duration::from_millis(0),
@@ -474,6 +475,7 @@ mod tests {
 
         for i in input.iter() {
             tx.send(*i)?;
+            tokio::time::sleep(std::time::Duration::from_micros(10)).await; // ensure we don't send too fast
         }
 
         let mixed_output = timeout(
@@ -483,6 +485,8 @@ mod tests {
         .await?;
 
         tracing::info!(?input, ?mixed_output, "asserted data");
-        Ok(assert_eq!(input, mixed_output))
+        assert_eq!(input, mixed_output);
+
+        Ok(())
     }
 }

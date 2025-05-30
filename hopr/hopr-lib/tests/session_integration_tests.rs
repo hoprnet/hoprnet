@@ -4,7 +4,7 @@ use futures::StreamExt;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
-use hopr_lib::SendMsg;
+use hopr_lib::{ApplicationData, SendMsg};
 use hopr_network_types::prelude::{protocol::SessionMessage, *};
 use hopr_primitive_types::prelude::Address;
 use hopr_transport::{Session, SessionId, TransportSessionError};
@@ -31,7 +31,7 @@ impl SendMsg for BufferingMsgSender {
 #[tokio::test]
 async fn udp_session_bridging() -> anyhow::Result<()> {
     let dst: Address = (&ChainKeypair::random()).into();
-    let id = SessionId::new(1, HoprPseudonym::random());
+    let id = SessionId::new(1u64, HoprPseudonym::random());
     let (_tx, rx) = futures::channel::mpsc::unbounded();
     let (buffer_tx, mut buffer_rx) = futures::channel::mpsc::unbounded();
 
@@ -89,7 +89,7 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
 #[tokio::test]
 async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
     let dst: Address = (&ChainKeypair::random()).into();
-    let id = SessionId::new(1, HoprPseudonym::random());
+    let id = SessionId::new(1u64, HoprPseudonym::random());
     let (_tx, rx) = futures::channel::mpsc::unbounded();
     let (buffer_tx, mut buffer_rx) = futures::channel::mpsc::unbounded();
 
@@ -133,10 +133,7 @@ async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
                 .await?
                 .expect("must have data");
             if let Some(msg) =
-                SessionMessage::<{ hopr_transport_session::USABLE_PAYLOAD_CAPACITY_FOR_SESSION }>::try_from(
-                    read.as_ref(),
-                )?
-                .try_as_segment()
+                SessionMessage::<{ ApplicationData::PAYLOAD_SIZE }>::try_from(read.as_ref())?.try_as_segment()
             {
                 recv_buf.extend_from_slice(&msg.data);
             }

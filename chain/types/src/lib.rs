@@ -57,8 +57,8 @@ pub struct ContractAddresses {
 
 #[derive(Debug, Clone)]
 pub enum NetworkRegistryProxy<P> {
-    Dummy(HoprDummyProxyForNetworkRegistryInstance<(), P>),
-    Safe(HoprSafeProxyForNetworkRegistryInstance<(), P>),
+    Dummy(HoprDummyProxyForNetworkRegistryInstance<P>),
+    Safe(HoprSafeProxyForNetworkRegistryInstance<P>),
 }
 
 impl<P> NetworkRegistryProxy<P>
@@ -76,16 +76,16 @@ where
 /// Holds instances to contracts.
 #[derive(Debug)]
 pub struct ContractInstances<P> {
-    pub token: HoprTokenInstance<(), P>,
-    pub channels: HoprChannelsInstance<(), P>,
-    pub announcements: HoprAnnouncementsInstance<(), P>,
-    pub network_registry: HoprNetworkRegistryInstance<(), P>,
+    pub token: HoprTokenInstance<P>,
+    pub channels: HoprChannelsInstance<P>,
+    pub announcements: HoprAnnouncementsInstance<P>,
+    pub network_registry: HoprNetworkRegistryInstance<P>,
     pub network_registry_proxy: NetworkRegistryProxy<P>,
-    pub safe_registry: HoprNodeSafeRegistryInstance<(), P>,
-    pub price_oracle: HoprTicketPriceOracleInstance<(), P>,
-    pub win_prob_oracle: HoprWinningProbabilityOracleInstance<(), P>,
-    pub stake_factory: HoprNodeStakeFactoryInstance<(), P>,
-    pub module_implementation: HoprNodeManagementModuleInstance<(), P>,
+    pub safe_registry: HoprNodeSafeRegistryInstance<P>,
+    pub price_oracle: HoprTicketPriceOracleInstance<P>,
+    pub win_prob_oracle: HoprWinningProbabilityOracleInstance<P>,
+    pub stake_factory: HoprNodeStakeFactoryInstance<P>,
+    pub module_implementation: HoprNodeManagementModuleInstance<P>,
 }
 
 impl<P> ContractInstances<P>
