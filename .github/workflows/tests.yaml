@@ -148,6 +148,7 @@ jobs:
           HOPR_NETWORK: anvil-localhost
 
   build-candidate-binaries:
+    name: Build Candidate Binaries
     runs-on: self-hosted-hoprnet-bigger
     timeout-minutes: 10
     strategy:
