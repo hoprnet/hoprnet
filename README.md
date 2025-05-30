@@ -350,8 +350,8 @@ nix run .#lint
 # make kill-anvil
 # make clean
 
-# build deps and HOPRd code
-make -j deps && make -j build
+# build HOPRd code
+cargo build
 
 # starting network
 make run-anvil args="-p"
@@ -385,8 +385,8 @@ make run-hopr-admin &
 Running one node in test mode, with safe and module attached (in dufour network)
 
 ```bash
-# build deps and HOPRd code
-make -j deps && make -j build
+# HOPRd code
+cargo build
 
 # Fill out the `ethereum/contract/.env` from the `ethereum/contracts/example.env`
 #
@@ -446,22 +446,6 @@ When using the `nix` environment, the test environment preparation and activatio
 Tests are using the `pytest` infrastructure.
 
 #### Running Tests Locally
-
-##### Testing environment
-
-If not using `nix`, setup the `pytest` environment:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -r tests/requirements.txt
-```
-
-To deactivate the activated testing environment if no longer needed:
-
-```bash
-deactivate
-```
 
 ##### Test execution
 
@@ -527,7 +511,7 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 
 ## Contact
 
-- [Twitter](https://twitter.com/hoprnet)
+- [X](https://x.com/hoprnet)
 - [Telegram](https://t.me/hoprnet)
 - [Medium](https://medium.com/hoprnet)
 - [Reddit](https://www.reddit.com/r/HOPR/)

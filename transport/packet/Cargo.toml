@@ -16,6 +16,7 @@ serde = ["dep:serde", "dep:serde_bytes"]
 hex = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_bytes = { workspace = true, optional = true }
+strum = { workspace = true }
 thiserror = { workspace = true }
 
 hopr-crypto-packet = { workspace = true }
