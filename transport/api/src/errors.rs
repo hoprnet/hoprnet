@@ -1,5 +1,8 @@
+use hopr_crypto_packet::errors::PacketError;
 pub use hopr_transport_network::errors::NetworkingError;
+pub use hopr_transport_probe::errors::ProbeError;
 pub use hopr_transport_protocol::errors::ProtocolError;
+use hopr_transport_session::errors::TransportSessionError;
 use thiserror::Error;
 
 /// Errors produced by the crate.
@@ -22,19 +25,22 @@ pub enum HoprTransportError {
     Path(#[from] hopr_path::errors::PathError),
 
     #[error("Protocol error: {0}")]
-    Protocol(#[from] hopr_transport_protocol::errors::ProtocolError),
+    Protocol(#[from] ProtocolError),
+
+    #[error("Probe error: {0}")]
+    Probe(#[from] ProbeError),
 
     #[error("Transport session error: {0}")]
-    Session(#[from] hopr_transport_session::errors::TransportSessionError),
+    Session(#[from] TransportSessionError),
 
     #[error("Packet error: {0}")]
-    Packet(#[from] hopr_crypto_packet::errors::PacketError),
+    Packet(#[from] PacketError),
 
     #[error("Type error: {0}")]
     Types(#[from] hopr_internal_types::errors::CoreTypesError),
 
     #[error("Network monitoring error: {0}")]
-    NetworkError(#[from] hopr_transport_network::errors::NetworkingError),
+    NetworkError(#[from] NetworkingError),
 
     #[error("Ticket aggregation error: {0}")]
     TicketAggregationError(#[from] hopr_transport_ticket_aggregation::TicketAggregationError),
