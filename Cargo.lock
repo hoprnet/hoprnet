@@ -4829,7 +4829,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.8.1"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5369,7 +5369,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.1.0"
+version = "4.0.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",
