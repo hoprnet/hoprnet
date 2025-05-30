@@ -31,7 +31,7 @@ pub trait EthereumClient<T: Into<TransactionRequest>> {
 pub struct RpcEthereumClientConfig {
     /// Maximum time to wait for the TX to get submitted.
     ///
-    /// This must be strictly greater than any timeouts in the underlying `HoprRpcOperations`
+    /// This should be strictly greater than any timeouts in the underlying `HoprRpcOperations`
     ///
     /// Defaults to 5 seconds.
     #[default(Duration::from_secs(5))]
