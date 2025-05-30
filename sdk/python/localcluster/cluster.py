@@ -3,6 +3,7 @@ import os
 import shutil
 from pathlib import Path
 from subprocess import run
+from typing import Optional
 
 from . import utils
 from .constants import (
@@ -21,7 +22,7 @@ GLOBAL_TIMEOUT = 100
 
 class Cluster:
     def __init__(
-        self, config: dict, anvil_config: Path, protocol_config: Path, use_nat: bool, exposed: bool, base_port: int
+        self, config: dict, anvil_config: Path, protocol_config: Path, use_nat: bool, exposed: bool, base_port: int, extra_env: Optional[dict] = None
     ):
         self.anvil_config = anvil_config
         self.protocol_config = protocol_config
@@ -33,7 +34,7 @@ class Cluster:
         for network_name, params in config["networks"].items():
             for node in params["nodes"]:
                 self.nodes[str(index)] = Node.fromConfig(
-                    index, node, config["defaults"], network_name, use_nat, exposed, base_port
+                    index, node, config["defaults"], network_name, use_nat, exposed, base_port, extra_env[index-1] if extra_env else {}
                 )
                 index += 1
 
