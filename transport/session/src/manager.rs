@@ -15,7 +15,7 @@ use hopr_crypto_random::Randomizable;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::*;
 use hopr_primitive_types::prelude::Address;
-use hopr_transport_packet::prelude::{ApplicationData, Tag};
+use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
@@ -63,8 +63,8 @@ pub struct SessionManagerConfig {
     ///
     /// Default is 16..1024.
     #[doc(hidden)]
-    #[default(_code = "16u64.into()..1024u64.into()")]
-    pub session_tag_range: Range<Tag>,
+    #[default(_code = "16u64..1024u64")]
+    pub session_tag_range: Range<u64>,
 
     /// The base timeout for initiation of Session initiation.
     ///
@@ -295,19 +295,22 @@ fn initiation_timeout_max_one_way(base: Duration, hops: usize) -> Duration {
     base * (hops as u32)
 }
 
-/// The Minimum Session tag due to Start-protocol messages.
-pub const MIN_SESSION_TAG_RANGE_RESERVATION: Tag = Tag::new(16u64);
-
 /// Smallest possible interval for balancer sampling.
 pub const MIN_BALANCER_SAMPLING_INTERVAL: Duration = Duration::from_millis(100);
 
 impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
     /// Creates a new instance given the `PeerId` and [config](SessionManagerConfig).
     pub fn new(mut cfg: SessionManagerConfig) -> Self {
+        let min_session_tag_range_reservation = ReservedTag::range().end;
+        debug_assert!(
+            min_session_tag_range_reservation > StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG.as_u64(),
+            "invalid tag reservation range"
+        );
+
         // Accommodate the lower bound if too low.
-        if cfg.session_tag_range.start < MIN_SESSION_TAG_RANGE_RESERVATION {
-            let diff = MIN_SESSION_TAG_RANGE_RESERVATION - cfg.session_tag_range.start;
-            cfg.session_tag_range = MIN_SESSION_TAG_RANGE_RESERVATION..cfg.session_tag_range.end + diff;
+        if cfg.session_tag_range.start < min_session_tag_range_reservation {
+            let diff = min_session_tag_range_reservation - cfg.session_tag_range.start;
+            cfg.session_tag_range = min_session_tag_range_reservation..cfg.session_tag_range.end + diff;
         }
 
         #[cfg(all(feature = "prometheus", not(test)))]
@@ -319,8 +322,8 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
             session_initiations: moka::future::Cache::builder()
                 .max_capacity(
                     std::ops::Range {
-                        start: cfg.session_tag_range.start.0,
-                        end: cfg.session_tag_range.end.0,
+                        start: cfg.session_tag_range.start,
+                        end: cfg.session_tag_range.end,
                     }
                     .count() as u64,
                 )
@@ -703,14 +706,14 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         pseudonym: HoprPseudonym,
         data: ApplicationData,
     ) -> crate::errors::Result<DispatchResult> {
-        if (0..self.cfg.session_tag_range.start.0).contains(&data.application_tag.0) {
+        if data.application_tag == StartProtocol::<SessionId>::START_PROTOCOL_MESSAGE_TAG {
             // This is a Start protocol message, so we handle it
-            trace!(tag = data.application_tag.0, "dispatching Start protocol message");
+            trace!(tag = %data.application_tag, "dispatching Start protocol message");
             return self
                 .handle_start_protocol_message(pseudonym, data)
                 .await
                 .map(|_| DispatchResult::Processed);
-        } else if self.cfg.session_tag_range.contains(&data.application_tag) {
+        } else if self.cfg.session_tag_range.contains(&data.application_tag.as_u64()) {
             let session_id = SessionId::new(data.application_tag, pseudonym);
 
             return if let Some(session_data) = self.sessions.get(&session_id).await {
@@ -761,12 +764,12 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                         // NOTE: It is allowed to insert sessions using the same tag
                         // but different pseudonyms because the SessionId is different.
                         let next_tag: Tag = match sid {
-                            Some(session_id) => ((session_id.tag().0 + 1) % self.cfg.session_tag_range.end.0)
-                                .max(self.cfg.session_tag_range.start.0)
+                            Some(session_id) => ((session_id.tag().as_u64() + 1) % self.cfg.session_tag_range.end)
+                                .max(self.cfg.session_tag_range.start)
                                 .into(),
                             None => hopr_crypto_random::random_integer(
-                                self.cfg.session_tag_range.start.0,
-                                Some(self.cfg.session_tag_range.end.0),
+                                self.cfg.session_tag_range.start,
+                                Some(self.cfg.session_tag_range.end),
                             )
                             .into(),
                         };
@@ -1340,7 +1343,7 @@ mod tests {
         let bob_peer: Address = (&ChainKeypair::random()).into();
 
         let cfg = SessionManagerConfig {
-            session_tag_range: 16u64.into()..17u64.into(), // Slot for exactly one session
+            session_tag_range: 16u64..17u64, // Slot for exactly one session
             ..Default::default()
         };
 
@@ -1352,7 +1355,7 @@ mod tests {
         bob_mgr
             .sessions
             .insert(
-                SessionId::new(16u64.into(), alice_pseudonym),
+                SessionId::new(16u64, alice_pseudonym),
                 CachedSession {
                     session_tx: Arc::new(dummy_tx),
                     routing_opts: DestinationRouting::Return(SurbMatcher::Pseudonym(alice_pseudonym)),
