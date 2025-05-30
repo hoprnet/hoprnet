@@ -102,7 +102,7 @@ use crate::{
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
     static ref METRIC_PROCESS_START_TIME: SimpleGauge = SimpleGauge::new(
-        "hopr_up",
+        "hopr_start_time",
         "The unix timestamp in seconds at which the process was started"
     ).unwrap();
     static ref METRIC_HOPR_LIB_VERSION: MultiGauge = MultiGauge::new(
