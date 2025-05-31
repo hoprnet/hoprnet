@@ -379,9 +379,8 @@ mod tests {
             anyhow::Ok(out)
         });
 
-        let (read,written) = futures::future::try_join(read, written)
-            .await?;
-        
+        let (read, written) = futures::future::try_join(read, written).await?;
+
         Ok((read?, written?))
     }
 

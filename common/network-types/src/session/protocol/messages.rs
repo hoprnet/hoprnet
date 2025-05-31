@@ -73,7 +73,7 @@ impl<const C: usize> SegmentRequest<C> {
     /// Maximum number of segment retransmission entries.
     pub const MAX_ENTRIES: usize = Self::SIZE / Self::ENTRY_SIZE;
     /// Maximum number of missing segments per frame.
-    pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = size_of::<SeqNum>() * 8;
+    pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = SeqNum::BITS as usize;
     pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
 
     /// Returns the number of segments to retransmit.
@@ -107,7 +107,7 @@ impl<const C: usize> IntoIterator for SegmentRequest<C> {
     type Item = SegmentId;
 
     fn into_iter(self) -> Self::IntoIter {
-        let seq_size = size_of::<SeqNum>() * 8;
+        let seq_size = SeqNum::BITS as usize;
         let mut ret = SegmentIdIter(Vec::with_capacity(seq_size * 8 * self.0.len()));
         for (frame_id, missing) in self.0 {
             for i in (0..seq_size).rev() {

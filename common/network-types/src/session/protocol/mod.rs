@@ -67,8 +67,9 @@ impl<const C: usize> SessionMessage<C> {
 impl<const C: usize> From<SessionMessage<C>> for Vec<u8> {
     fn from(message: SessionMessage<C>) -> Self {
         let mut result = BytesMut::new();
-        let mut codec = SessionCodec::<C>::default();
-        codec.encode(message, &mut result).expect("encoding never fails");
+        SessionCodec::<C>
+            .encode(message, &mut result)
+            .expect("encoding never fails");
 
         result.to_vec()
     }
@@ -78,7 +79,7 @@ impl<const C: usize> TryFrom<&[u8]> for SessionMessage<C> {
     type Error = SessionError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        SessionCodec::default()
+        SessionCodec
             .decode(&mut BytesMut::from(value))?
             .ok_or(SessionError::IncorrectMessageLength)
     }

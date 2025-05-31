@@ -63,7 +63,12 @@ impl<const C: usize> Segmenter<C> {
 
             ready!(self.tx.as_mut().poll_ready(cx))?;
 
-            tracing::trace!(frame_id = seg.frame_id, seq_idx = seg.seq_idx, seg_len = seg.len(), "segment out");
+            tracing::trace!(
+                frame_id = seg.frame_id,
+                seq_idx = seg.seq_idx,
+                seg_len = seg.len(),
+                "segment out"
+            );
             self.tx.as_mut().start_send(seg)?;
 
             if self.flush_each_segment {
@@ -123,7 +128,8 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
         }
 
         // Write only that much there is space in the segment or the frame
-        let new_len_in_buffer = buf.len()
+        let new_len_in_buffer = buf
+            .len()
             .min(Self::PAYLOAD_CAPACITY - self.seg_buffer.len())
             .min(self.frame_size - self.current_frame_len);
 
@@ -143,8 +149,7 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
             tracing::trace!("frame is complete");
             self.complete_segment();
             ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
-        }
-        else if self.seg_buffer.len() == Self::PAYLOAD_CAPACITY {
+        } else if self.seg_buffer.len() == Self::PAYLOAD_CAPACITY {
             tracing::trace!("segment is complete");
             self.complete_segment();
 

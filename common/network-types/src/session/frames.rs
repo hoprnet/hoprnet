@@ -5,9 +5,7 @@ use std::{
     time::Instant,
 };
 
-use bitvec::{
-    prelude::BitVec
-};
+use bitvec::prelude::BitVec;
 
 use crate::prelude::errors::SessionError;
 
@@ -285,6 +283,7 @@ impl FrameBuilder {
         self.segments.iter().map(Option::is_none).collect()
     }
 
+    #[allow(unused)]
     #[inline]
     pub fn frame_id(&self) -> &FrameId {
         &self.frame_id
@@ -308,6 +307,7 @@ impl FrameInspector {
 pub(crate) trait FrameMapOccupiedEntry {
     fn get_builder_mut(&mut self) -> &mut FrameBuilder;
 
+    #[allow(unused)]
     fn frame_id(&self) -> &FrameId;
 
     fn finalize(self) -> FrameBuilder;
