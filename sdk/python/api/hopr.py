@@ -197,7 +197,7 @@ class HoprdAPI:
         Closes multiple channels at once.
         """
         data = CloseChannelsBody(direction.value, status.value)
-        is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "channels", data=data)
+        is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "channels", data)
         return is_ok
 
     async def channel_redeem_tickets(self, channel_id: str) -> bool:
@@ -224,7 +224,7 @@ class HoprdAPI:
         Returns all incoming channels.
         :return: channels: list
         """
-        params = GetChannelsBody("true", "true" if include_closed else "false")
+        params = GetChannelsBody("false", "true" if include_closed else "false")
 
         is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
         return Channels(response, "incoming") if is_ok else None
@@ -234,7 +234,7 @@ class HoprdAPI:
         Returns all outgoing channels.
         :return: channels: list
         """
-        params = GetChannelsBody("true", "true" if include_closed else "false")
+        params = GetChannelsBody("false", "true" if include_closed else "false")
 
         is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
         return Channels(response, "outgoing") if is_ok else None
