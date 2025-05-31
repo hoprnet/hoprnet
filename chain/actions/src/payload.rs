@@ -45,6 +45,7 @@ use crate::errors::{
     ChainActionsError::{InvalidArguments, InvalidState},
     Result,
 };
+use tracing::debug;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -308,6 +309,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
                     .collect();
 
                 let tx_payload = MultisendCallOnlyTransaction::build_multisend_tx(multisend_txns);
+                debug!(?tx_payload, "Multisend payload for initiating outgoing channel closure");
 
                 let tx = TransactionRequest::default()
                     .with_input(tx_payload)
@@ -322,6 +324,7 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
         destinations: S,
     ) -> Result<TransactionRequest> {
         let destinations = destinations.into_iter().collect::<Vec<_>>();
+        debug!(?destinations, "Finalizing outgoing channel closure for destinations");
 
         match destinations.len() {
             0 => Err(InvalidArguments("No outgoing channel to finalize closure".into())),
@@ -365,7 +368,8 @@ impl PayloadGenerator<TransactionRequest> for BasicPayloadGenerator {
 
                 let tx = TransactionRequest::default()
                     .with_input(tx_payload)
-                    .with_to(MULTISEND_CALL_ONLY);
+                    .with_to(MULTISEND_CALL_ONLY)
+                    .with_gas_limit(DEFAULT_TX_GAS);
                 Ok(tx)
             }
         }
@@ -408,6 +412,7 @@ pub struct SafePayloadGenerator {
 }
 
 pub const DEFAULT_TX_GAS: u64 = 400_000;
+pub const DEFAULT_MULTISEND_TX_GAS: u64 = 10_000_000;
 
 impl SafePayloadGenerator {
     pub fn new(chain_keypair: &ChainKeypair, contract_addrs: ContractAddresses, module: Address) -> Self {
@@ -530,6 +535,7 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
                 Ok(tx)
             }
             _ => {
+                debug!(?sources, "Using multisend to close incoming channels");
                 // create multisend data payload
                 let multisend_txns = sources
                     .into_iter()
@@ -553,7 +559,8 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
 
                 let tx = TransactionRequest::default()
                     .with_input(multisend_payload(tx_payload))
-                    .with_to(self.module.into());
+                    .with_to(self.module.into())
+                    .with_gas_limit(DEFAULT_MULTISEND_TX_GAS);
                 Ok(tx)
             }
         }
@@ -610,7 +617,8 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
 
                 let tx = TransactionRequest::default()
                     .with_input(multisend_payload(tx_payload))
-                    .with_to(self.module.into());
+                    .with_to(self.module.into())
+                    .with_gas_limit(DEFAULT_MULTISEND_TX_GAS);
                 Ok(tx)
             }
         }
@@ -663,11 +671,16 @@ impl PayloadGenerator<TransactionRequest> for SafePayloadGenerator {
                     })
                     .collect();
 
+                debug!(
+                    ?multisend_txns,
+                    "Multisend transactions created for finalizing outgoing channel closure"
+                );
                 let tx_payload = MultisendCallOnlyTransaction::build_multisend_tx(multisend_txns);
 
                 let tx = TransactionRequest::default()
                     .with_input(multisend_payload(tx_payload))
-                    .with_to(self.module.into());
+                    .with_to(self.module.into())
+                    .with_gas_limit(DEFAULT_MULTISEND_TX_GAS);
                 Ok(tx)
             }
         }

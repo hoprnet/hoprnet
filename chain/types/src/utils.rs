@@ -42,6 +42,12 @@ sol!(
     }
 );
 
+sol!(
+    #![sol(abi)]
+    #![sol(rpc)]
+    function multiSend(bytes memory transactions) public payable;
+);
+
 lazy_static::lazy_static! {
     static ref MINTER_ROLE_VALUE: primitives::FixedBytes<32> = keccak256("MINTER_ROLE");
 }
@@ -79,7 +85,13 @@ impl MultisendCallOnlyTransaction {
         for transaction in transactions {
             payload = [payload, transaction.encode_packed()].concat();
         }
-        payload
+
+        // prepare the multisend call selector
+        let multisend_payload = multiSendCall {
+            transactions: payload.into(),
+        }
+        .abi_encode();
+        multisend_payload
     }
 }
 

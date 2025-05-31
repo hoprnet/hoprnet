@@ -260,7 +260,7 @@ where
                     if channel.source == self.self_address() {
                         let remaining = channel.remaining_closure_time(closure_time);
                         info!(%channel, ?remaining, "remaining closure time update for a channel");
-                        remaining == Some(Duration::ZERO)
+                        remaining.eq(&Some(Duration::ZERO))
                     } else {
                         true
                     }

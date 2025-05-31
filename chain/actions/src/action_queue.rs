@@ -221,36 +221,34 @@ where
 
                     IndexerExpectation::new(
                         tx_hash,
-                        move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channels[0].get_id()),
+                        move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if channels.iter().any(|c| c.get_id() == r_channel.get_id())),
                     )
                 }
                 ChannelDirection::Outgoing => {
                     let to_close = channels
                         .clone()
                         .iter()
-                        .filter(|channel| channel.status == status)
+                        .filter(|channel| channel.status.to_string() == status.to_string())
                         .map(|channel| channel.destination)
                         .collect::<Vec<_>>();
 
                     match status {
                         ChannelStatus::Open => {
-                            debug!(?channels, "initiating channels closure");
                             let tx_hash = self.tx_exec.initiate_outgoing_channel_closure(to_close.clone()).await?;
 
                             debug!(?tx_hash, "initiating channels closure at hash");
                             IndexerExpectation::new(
                                 tx_hash,
-                                move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channels[0].get_id()),
+                                move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if channels.iter().any(|c| c.get_id() == r_channel.get_id())),
                             )
                         }
                         ChannelStatus::PendingToClose(_) => {
-                            debug!(?channels, "finalizing channel closure");
                             let tx_hash = self.tx_exec.finalize_outgoing_channel_closure(to_close.clone()).await?;
 
                             debug!(?tx_hash, "finalizing channels closure at hash");
                             IndexerExpectation::new(
                                 tx_hash,
-                                move |event| matches!(event, ChainEventType::ChannelClosed(r_channel)  if r_channel.get_id() == channels[0].get_id()),
+                                move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if channels.iter().any(|c| c.get_id() == r_channel.get_id())),
                             )
                         }
                         ChannelStatus::Closed => {
