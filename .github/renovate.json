@@ -4,6 +4,8 @@
   "extends": [
     "schedule:earlyMondays",
     "config:recommended",
+    "group:allNonMajor",
+    "group:allDigest",
     ":disableDependencyDashboard"
   ],
   "vulnerabilityAlerts": { "enabled": true },

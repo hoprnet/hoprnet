@@ -58,9 +58,10 @@ jobs:
             automated
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Enable Auto Merge
+      - name: Configure PR and mark as ready
         run: |
+          gh pr edit ${{ steps.update.outputs.pull-request-number }} --add-assignee "@copilot"
+          gh pr edit ${{ steps.update.outputs.pull-request-number }} --add-reviewer "hoprnet/hopr-development"
           gh pr ready ${{ steps.update.outputs.pull-request-number }}
-          gh pr merge ${{ steps.update.outputs.pull-request-number }} --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

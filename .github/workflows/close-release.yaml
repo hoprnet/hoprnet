@@ -11,7 +11,7 @@ on:
       next_release_type:
         type: choice
         required: true
-        description: 'Next release type to create'
+        description: "Next release type to create"
         options:
           - ReleaseCandidate
           - Patch
@@ -20,7 +20,7 @@ on:
       release_name:
         type: choice
         required: true
-        description: 'Name of the release'
+        description: "Name of the release"
         options:
           - singapore
           - kaunas
@@ -53,7 +53,7 @@ jobs:
         if: ${{ !env.ACT }}
         with:
           name: hoprnet
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
         env:
           USER: runner
 
@@ -93,8 +93,8 @@ jobs:
         run: |
           git fetch
           git checkout bot/close-${{ steps.template.outputs.current_version }}
+          gh pr edit --add-reviewer "hoprnet/hopr-development"
           gh pr ready
-          gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 

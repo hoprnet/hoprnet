@@ -284,7 +284,7 @@ where
         let tx_hash = expectation.tx_hash;
         debug!(?action, %tx_hash, "action submitted via tx, registering expectation");
 
-        // Register new expectation and await it with timeout
+        // Register a new expectation and await it with timeout
         let confirmation = self.action_state.register_expectation(expectation).await?.fuse();
         let timeout = futures_timer::Delay::new(self.cfg.max_action_confirmation_wait).fuse();
 
