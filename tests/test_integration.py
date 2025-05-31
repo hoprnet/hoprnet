@@ -282,7 +282,9 @@ class TestIntegrationWithSwarm:
     @pytest.mark.parametrize(
         "src1,src2,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
-    async def test_close_multiple_incoming_channels_at_once(self, src1: str, src2: str, dest: str, swarm7: dict[str, Node]):
+    async def test_close_multiple_incoming_channels_at_once(
+        self, src1: str, src2: str, dest: str, swarm7: dict[str, Node]
+    ):
         dst = swarm7[dest]
 
         channel1 = await swarm7[src1].api.open_channel(dst.address, OPEN_CHANNEL_FUNDING_VALUE_HOPR)
@@ -300,12 +302,14 @@ class TestIntegrationWithSwarm:
 
         channels = (await dst.api.incoming_channels(include_closed=False)).incoming
         assert len(channels) == 0
-    
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "src,dest1,dest2", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
-    async def test_close_multiple_outgoing_channels_at_once(self, src: str, dest1: str, dest2: str, swarm7: dict[str, Node]):
+    async def test_close_multiple_outgoing_channels_at_once(
+        self, src: str, dest1: str, dest2: str, swarm7: dict[str, Node]
+    ):
         src = swarm7[src]
         dst1 = swarm7[dest1]
         dst2 = swarm7[dest2]

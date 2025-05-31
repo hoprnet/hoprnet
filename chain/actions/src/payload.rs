@@ -40,12 +40,12 @@ use hopr_chain_types::{ContractAddresses, constants::MULTISEND_CALL_ONLY, utils:
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use tracing::debug;
 
 use crate::errors::{
     ChainActionsError::{InvalidArguments, InvalidState},
     Result,
 };
-use tracing::debug;
 
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

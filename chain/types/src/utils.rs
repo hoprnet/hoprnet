@@ -87,11 +87,10 @@ impl MultisendCallOnlyTransaction {
         }
 
         // prepare the multisend call selector
-        let multisend_payload = multiSendCall {
+        multiSendCall {
             transactions: payload.into(),
         }
-        .abi_encode();
-        multisend_payload
+        .abi_encode()
     }
 }
 
