@@ -39,6 +39,9 @@ pub enum ChainActionsError {
     #[error("channel stake is too low or too high")]
     InvalidChannelStake,
 
+    #[error("no channel to be closed")]
+    NoChannelToClose,
+
     #[error("safe does not have enough allowance to fund channel")]
     NotEnoughAllowance,
 

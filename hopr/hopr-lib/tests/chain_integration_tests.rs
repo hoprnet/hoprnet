@@ -734,7 +734,7 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
     // Close channel
     let confirmation = alice_node
         .actions
-        .close_channel(bob_chain_key.public().to_address(), ChannelDirection::Outgoing, true)
+        .close_channel_by_counterparty(bob_chain_key.public().to_address(), ChannelDirection::Outgoing, true)
         .await
         .expect("should submit channel close tx")
         .await

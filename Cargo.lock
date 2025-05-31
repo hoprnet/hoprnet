@@ -4512,13 +4512,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-actions"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "alloy",
  "anyhow",
  "async-channel 2.3.1",
  "async-lock 3.4.0",
  "async-trait",
+ "env_logger",
  "futures",
  "futures-timer",
  "hex-literal",
@@ -4546,7 +4547,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-api"
-version = "0.5.1"
+version = "0.6.1"
 dependencies = [
  "alloy",
  "async-channel 2.3.1",
@@ -4651,7 +4652,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-types"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "alloy",
  "hex",
@@ -4855,7 +4856,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-internal-types"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5444,7 +5445,7 @@ dependencies = [
 
 [[package]]
 name = "hoprd-api"
-version = "4.0.0"
+version = "4.0.1"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",

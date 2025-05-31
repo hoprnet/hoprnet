@@ -46,6 +46,13 @@ class OpenChannelBody(ApiRequestObject):
         self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
 
 
+class CloseChannelsBody(ApiRequestObject):
+    keys = {"direction": "direction", "status": "status"}
+
+    def __init__(self, direction: str, status: str):
+        super().__init__(vars())
+
+
 class FundChannelBody(ApiRequestObject):
     keys = {"amount": "amount"}
 
