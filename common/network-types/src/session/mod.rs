@@ -27,3 +27,9 @@ pub use socket::{
     SessionSocket, SessionSocketConfig,
     state::{AcknowledgementState, AcknowledgementStateConfig, SocketState, Stateless},
 };
+
+/// Represents a stateless (and therefore unreliable) socket.
+pub type StatelessSocket<const C: usize> = SessionSocket<C, Stateless<C>>;
+
+/// Represents a socket with reliable delivery.
+pub type ReliableSocket<const C: usize> = SessionSocket<C, AcknowledgementState<C>>;

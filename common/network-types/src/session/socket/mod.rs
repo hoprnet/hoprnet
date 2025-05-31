@@ -23,7 +23,7 @@ use crate::session::{
 pub struct SessionSocketConfig {
     #[default(1500)]
     pub frame_size: usize,
-    #[default(Duration::from_secs(4))]
+    #[default(Duration::from_millis(800))]
     pub frame_timeout: Duration,
     #[default(0)]
     pub max_buffered_segments: usize,

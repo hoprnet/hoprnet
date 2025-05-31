@@ -1,13 +1,28 @@
+#[allow(unused)]
+#[path = "../src/session/utils/test.rs"]
+mod test;
+
+#[allow(unused)]
+#[path = "../src/session/frames.rs"]
+mod frames;
+
+#[allow(unused)]
+#[path = "../src/session/processing/mod.rs"]
+mod processing;
+
 use std::{collections::VecDeque, time::Duration};
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use futures::{StreamExt, TryStreamExt};
-use hopr_network_types::{
-    prelude::{Frame, Segment, frame_reconstructor},
-    session::{FrameId, utils::test::linear_half_normal_shuffle},
-};
+use hopr_crypto_packet::prelude::HoprPacket;
 use rand::{Rng, thread_rng};
 use rayon::prelude::{IndexedParallelIterator, ParallelIterator, ParallelSlice};
+
+use crate::{
+    frames::Segment,
+    processing::{frame_reconstructor, segment},
+    test::linear_half_normal_shuffle,
+};
 
 async fn send_one_way(segments: &Vec<Segment>) {
     let (r_sink, seq_stream) = frame_reconstructor("bench", Duration::from_secs(5), 8192);
@@ -22,7 +37,7 @@ async fn send_one_way(segments: &Vec<Segment>) {
 pub fn frame_reconstructor_randomized_benchmark(c: &mut Criterion) {
     static KB: usize = 1024;
     static FRAME_LEN: usize = 1492;
-    static MTU: usize = 462;
+    static MTU: usize = HoprPacket::PAYLOAD_SIZE;
 
     let mut group = c.benchmark_group("frame_reconstructor_randomized_benchmark");
 
@@ -35,14 +50,7 @@ pub fn frame_reconstructor_randomized_benchmark(c: &mut Criterion) {
         let segments = data
             .par_chunks(FRAME_LEN)
             .enumerate()
-            .flat_map(|(id, chunk)| {
-                Frame {
-                    frame_id: (id + 1) as FrameId,
-                    data: chunk.into(),
-                }
-                .segment(MTU)
-                .unwrap()
-            })
+            .flat_map(|(id, chunk)| segment(chunk, MTU, (id + 1) as u32).unwrap())
             .collect::<VecDeque<_>>();
         let segments = linear_half_normal_shuffle(&mut thread_rng(), segments, 4.0);
 
