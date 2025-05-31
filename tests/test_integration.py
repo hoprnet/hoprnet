@@ -3,6 +3,7 @@ import logging
 import random
 import re
 from decimal import Decimal
+from contextlib import AsyncExitStack
 
 import pytest
 
@@ -26,6 +27,7 @@ from .utils import (
     check_unredeemed_tickets_value,
     create_bidirectional_channels_for_route,
     create_channel,
+    check_channel_status,
     get_ticket_price,
     shuffled,
 )
@@ -278,50 +280,62 @@ class TestIntegrationWithSwarm:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "route",
-        [shuffled(barebone_nodes())[:3] for _ in range(PARAMETERIZED_SAMPLE_SIZE)],
+        "src1,src2,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
-    async def test_close_multiple_channels_at_once(self, route, swarm7: dict[str, Node]):
-        src = swarm7[route[0]]
+    async def test_close_multiple_incoming_channels_at_once(self, src1: str, src2: str, dest: str, swarm7: dict[str, Node]):
+        dst = swarm7[dest]
 
-        logging.info(f"Opening channels between {src.peer_id} -> {swarm7[route[1]].peer_id}")
-        logging.info(f"Opening channels between {src.peer_id} -> {swarm7[route[2]].peer_id}")
-        async with AsyncExitStack() as channels:
-            await asyncio.gather(
-                *[
-                    channels.enter_async_context(
-                        create_channel(
-                            src,
-                            swarm7[route[i + 1]],
-                            OPEN_CHANNEL_FUNDING_VALUE_HOPR,
-                            close_from_dest=False,
-                        )
-                    )
-                    for i in range(len(route) - 1)
-                ]
-            )
+        channel1 = await swarm7[src1].api.open_channel(dst.address, OPEN_CHANNEL_FUNDING_VALUE_HOPR)
+        assert channel1 is not None
+        await asyncio.wait_for(check_channel_status(swarm7[src1], dst, status=ChannelStatus.Open), 10.0)
+        channel2 = await swarm7[src2].api.open_channel(dst.address, OPEN_CHANNEL_FUNDING_VALUE_HOPR)
+        assert channel2 is not None
+        await asyncio.wait_for(check_channel_status(swarm7[src2], dst, status=ChannelStatus.Open), 10.0)
 
-            logging.info(f"Channels opened")
-            assert len((await src.api.outgoing_channels(include_closed=False)).all) == 2
+        # check that both channels are opened
+        assert len((await dst.api.incoming_channels(include_closed=False)).incoming) == 2
 
-            logging.info(f"Checked 2 channels are opened")
-            # turn all Open channels to PendingToClose
-            assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
-            logging.info(f"Closed open channels")
+        # turn all Open incoming channels to Close
+        assert await dst.api.close_channels(ChannelDirection.Incoming, ChannelStatus.Open)
 
-            channels = (await src.api.outgoing_channels(include_closed=False)).all
-            logging.info(f"Still 2 channels are opened")
+        channels = (await dst.api.incoming_channels(include_closed=False)).incoming
+        assert len(channels) == 0
+    
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "src,dest1,dest2", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
+    )
+    async def test_close_multiple_outgoing_channels_at_once(self, src: str, dest1: str, dest2: str, swarm7: dict[str, Node]):
+        src = swarm7[src]
+        dst1 = swarm7[dest1]
+        dst2 = swarm7[dest2]
 
-            assert all(c.status == ChannelStatus.PendingToClose for c in channels)
-            logging.info(f"Two channels are in PendingToClose state")
+        channel1 = await src.api.open_channel(dst1.address, OPEN_CHANNEL_FUNDING_VALUE_HOPR)
+        assert channel1 is not None
+        await asyncio.wait_for(check_channel_status(src, dst1, status=ChannelStatus.Open), 10.0)
+        channel2 = await src.api.open_channel(dst2.address, OPEN_CHANNEL_FUNDING_VALUE_HOPR)
+        assert channel2 is not None
+        await asyncio.wait_for(check_channel_status(src, dst2, status=ChannelStatus.Open), 10.0)
 
-            # turn all PendingToClose channels to Closed
-            assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
-            logging.info(f"Closed PendingToClose channels")
+        # check that both channels are opened
+        assert len((await src.api.outgoing_channels(include_closed=False)).outgoing) == 2
 
-            channels = (await src.api.outgoing_channels(include_closed=False)).all
-            logging.info(f"Now there are {len(channels)} channels opened")
-            assert len(channels) == 0
+        # turn all Open channels to PendingToClose
+        assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.Open)
+
+        # check that both channels are in PendingToClose state
+        channels = (await src.api.outgoing_channels(include_closed=False)).outgoing
+        assert len(channels) == 2
+        assert all(c.status == ChannelStatus.PendingToClose for c in channels)
+
+        # wait for at least 15 seconds for the channel closure notice period
+        await asyncio.sleep(40)
+
+        # turn all PendingToClose channels to Closed
+        assert await src.api.close_channels(ChannelDirection.Outgoing, ChannelStatus.PendingToClose)
+
+        channels = (await src.api.outgoing_channels(include_closed=False)).outgoing
+        assert len(channels) == 0
 
     # generate a 1-hop route with a node using strategies in the middle
     @pytest.mark.asyncio
