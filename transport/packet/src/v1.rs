@@ -1,173 +1,112 @@
-use std::{
-    fmt::Formatter,
-    ops::{Add, Range, Sub},
-};
+use std::{fmt::Formatter, ops::Range};
 
-/// Tags are represented by 8 bytes ([`u64`]`).
-///
-/// [`u64`] should offer enough space to even avoid collisions and tag attacks.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Tag(pub u64);
+use strum::IntoEnumIterator;
 
-/// The tag appended to the application data packet to identify the application target.
-impl Tag {
-    pub const MAX: Tag = Tag(u64::MAX);
-    pub const SIZE: usize = size_of::<u64>();
-    /// Tag range usable by external applications of the library.
-    pub const USABLE_RANGE: Range<Tag> = ReservedTag::UPPER_BOUND..CustomTag::UPPER_BOUND;
+/// List of all reserved application tags for the protocol.
+#[repr(u64)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, strum::EnumIter)]
+pub enum ReservedTag {
+    /// Ping traffic for 0-hop detection.
+    Ping = 0,
 
-    pub const fn new(tag: u64) -> Self {
-        Self(tag)
-    }
+    /// Commands associated with session start protocol regarding session initiation.
+    SessionStart = 1,
 
-    pub fn from_be_bytes(bytes: [u8; Self::SIZE]) -> Self {
-        Self(u64::from_be_bytes(bytes))
-    }
+    /// Undefined catch all.
+    Undefined = 15,
+}
 
-    pub fn to_be_bytes(&self) -> [u8; Self::SIZE] {
-        self.0.to_be_bytes()
+impl ReservedTag {
+    /// The range of reserved tags
+    pub fn range() -> Range<u64> {
+        0..(Self::iter().max().unwrap_or(Self::Undefined) as u64 + 1)
     }
 }
 
+impl From<ReservedTag> for Tag {
+    fn from(tag: ReservedTag) -> Self {
+        (tag as u64).into()
+    }
+}
+
+/// Tags are represented by 8 bytes ([`u64`]`).
+///
+/// [`u64`] should offer enough space to avoid collisions and tag attacks.
+// #[repr(u64)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Tag {
+    Reserved(u64),
+    Application(u64),
+}
+
+impl Tag {
+    /// Application tag range for external usage
+    pub const APPLICATION_TAG_RANGE: Range<Self> =
+        (Self::Application(ReservedTag::Undefined as u64 + 1))..Self::Application(Self::MAX);
+    pub const MAX: u64 = u64::MAX;
+    pub const SIZE: usize = size_of::<u64>();
+
+    pub fn from_be_bytes(bytes: [u8; Self::SIZE]) -> Self {
+        let tag = u64::from_be_bytes(bytes);
+        tag.into()
+    }
+
+    pub fn to_be_bytes(&self) -> [u8; Self::SIZE] {
+        match self {
+            Tag::Reserved(tag) | Tag::Application(tag) => tag.to_be_bytes(),
+        }
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        match self {
+            Tag::Reserved(tag) | Tag::Application(tag) => *tag,
+        }
+    }
+}
+
+impl<T: Into<u64>> From<T> for Tag {
+    fn from(tag: T) -> Self {
+        let tag: u64 = tag.into();
+
+        if ReservedTag::range().contains(&tag) {
+            Tag::Reserved(
+                ReservedTag::iter()
+                    .find(|&t| t as u64 == tag)
+                    .unwrap_or(ReservedTag::Undefined) as u64,
+            )
+        } else {
+            Tag::Application(tag)
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
 impl serde::Serialize for Tag {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        serializer.serialize_u64(self.0)
+        match self {
+            Tag::Reserved(tag) | Tag::Application(tag) => serializer.serialize_u64(*tag),
+        }
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'a> serde::Deserialize<'a> for Tag {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'a>,
     {
         let value = u64::deserialize(deserializer)?;
-        Ok(Self(value))
-    }
-}
 
-impl Add for Tag {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self::Output {
-        Self(self.0 + other.0)
-    }
-}
-
-impl Sub for Tag {
-    type Output = Self;
-
-    fn sub(self, other: Self) -> Self::Output {
-        Self(self.0 - other.0)
+        Ok(value.into())
     }
 }
 
 impl std::fmt::Display for Tag {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Tag({})", self.0)
-    }
-}
-
-impl From<u64> for Tag {
-    fn from(value: u64) -> Self {
-        Self(value)
-    }
-}
-
-impl From<u32> for Tag {
-    fn from(value: u32) -> Self {
-        Self(value as u64)
-    }
-}
-
-impl From<u8> for Tag {
-    fn from(value: u8) -> Self {
-        Self(value as u64)
-    }
-}
-
-impl PartialEq<u64> for Tag {
-    fn eq(&self, other: &u64) -> bool {
-        self.0 == *other
-    }
-}
-
-impl PartialOrd<u64> for Tag {
-    fn partial_cmp(&self, other: &u64) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(other)
-    }
-}
-
-/// Resolved tag type with translated tag annotation.
-///
-/// The resolved tag covers the entire range of tags and a tag is always representable by it.
-#[repr(u64)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ResolvedTag {
-    Reserved(ReservedTag),
-    Custom(CustomTag),
-}
-
-impl From<ResolvedTag> for Tag {
-    fn from(tag: ResolvedTag) -> Self {
-        match tag {
-            ResolvedTag::Reserved(reserved_tag) => reserved_tag.into(),
-            ResolvedTag::Custom(custom_tag) => custom_tag.0,
-        }
-    }
-}
-
-impl From<Tag> for ResolvedTag {
-    fn from(tag: Tag) -> Self {
-        if tag < ReservedTag::UPPER_BOUND {
-            match tag.0 {
-                x if x == ReservedTag::SessionInit as u64 => ResolvedTag::Reserved(ReservedTag::SessionInit),
-                x if x == ReservedTag::Ping as u64 => ResolvedTag::Reserved(ReservedTag::Ping),
-                _ => ResolvedTag::Reserved(ReservedTag::Undefined),
-            }
-        } else {
-            ResolvedTag::Custom(CustomTag(tag))
-        }
-    }
-}
-
-/// List of all reserved application tags for the protocol.
-#[repr(u64)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-
-pub enum ReservedTag {
-    /// Opening a new session.
-    SessionInit = 0,
-    /// Ping traffic for 0-hop detection.
-    Ping = 14,
-    /// Undefined catch all.
-    Undefined = Self::UPPER_BOUND.0 - 1,
-}
-
-impl ReservedTag {
-    /// The upper limit value for the session reserved tag range.
-    pub const UPPER_BOUND: Tag = Tag(1 << 4); // 16
-}
-
-impl From<ReservedTag> for Tag {
-    fn from(tag: ReservedTag) -> Self {
-        Self(tag as u64)
-    }
-}
-
-/// Tags used for application data labeling only.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct CustomTag(Tag);
-
-impl CustomTag {
-    pub const UPPER_BOUND: Tag = Tag(u64::MAX);
-}
-
-impl From<CustomTag> for Tag {
-    fn from(tag: CustomTag) -> Self {
-        tag.0
+        write!(f, "Tag({})", self.as_u64())
     }
 }
 
@@ -190,9 +129,9 @@ impl ApplicationData {
         }
     }
 
-    pub fn new_from_owned(application_tag: Tag, plain_text: Box<[u8]>) -> Self {
+    pub fn new_from_owned<T: Into<Tag>>(tag: T, plain_text: Box<[u8]>) -> Self {
         Self {
-            application_tag,
+            application_tag: tag.into(),
             plain_text,
         }
     }
@@ -218,9 +157,7 @@ impl std::fmt::Display for ApplicationData {
 }
 
 impl ApplicationData {
-    const TAG_SIZE: usize = size_of::<Tag>();
-
-    // minimum size
+    const TAG_SIZE: usize = Tag::SIZE;
 
     pub fn from_bytes(data: &[u8]) -> crate::errors::Result<Self> {
         if data.len() >= Self::TAG_SIZE {
@@ -248,6 +185,41 @@ impl ApplicationData {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reserved_tag_v1_range_is_stable() {
+        let range = ReservedTag::range();
+        assert_eq!(range.start, 0);
+        assert_eq!(range.count(), 16); // 0 to 15 inclusive
+    }
+
+    #[test]
+    fn tag_should_be_obtainable_as_reserved_when_created_from_a_reserved_range() {
+        let reserved_tag = ReservedTag::Ping as u64;
+
+        assert_eq!(Tag::from(reserved_tag), Tag::Reserved(reserved_tag));
+    }
+
+    #[test]
+    fn tag_should_be_obtainable_as_undefined_reserved_when_created_from_an_undefined_value_in_reserved_range() {
+        let reserved_tag_without_assignment = 7u64;
+
+        assert_eq!(
+            Tag::from(reserved_tag_without_assignment),
+            Tag::Reserved(ReservedTag::Undefined as u64)
+        );
+    }
+
+    #[test]
+    fn v1_format_is_binary_stable() -> anyhow::Result<()> {
+        let original = ApplicationData::new(10u64, &[0_u8, 1_u8]);
+        let reserialized = ApplicationData::from_bytes(&original.to_bytes())?;
+        let reserialized = ApplicationData::from_bytes(&reserialized.to_bytes())?;
+
+        assert_eq!(original, reserialized);
+
+        Ok(())
+    }
 
     #[test]
     fn test_application_data() -> anyhow::Result<()> {
