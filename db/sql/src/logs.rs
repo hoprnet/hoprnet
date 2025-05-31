@@ -12,13 +12,13 @@ use hopr_db_entity::{
 };
 use hopr_primitive_types::prelude::*;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect,
     entity::Set,
     query::QueryTrait,
     sea_query::{Expr, OnConflict, Value},
 };
-use tracing::{error, trace};
+use tracing::{error, trace, warn};
 
 use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb, errors::DbSqlError};
 
@@ -48,6 +48,7 @@ impl HoprDbLogOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     let results = stream::iter(logs).then(|log| async {
+                        let log_id = log.to_string();
                         let model = log::ActiveModel::from(log.clone());
                         let status_model = log_status::ActiveModel::from(log);
                         let log_status_query = LogStatus::insert(status_model).on_conflict(
@@ -72,13 +73,23 @@ impl HoprDbLogOperations for HoprDb {
                         match log_status_query.exec(tx.as_ref()).await {
                             Ok(_) => match log_query.exec(tx.as_ref()).await {
                                 Ok(_) => Ok(()),
+                                Err(DbErr::RecordNotInserted) => {
+                                    warn!(log_id, "log already in the DB");
+                                    Err(DbError::General(format!("log already exists in the DB: {log_id}")))
+                                }
                                 Err(e) => {
                                     error!("Failed to insert log into db: {:?}", e);
                                     Err(DbError::General(e.to_string()))
                                 }
                             },
+                            Err(DbErr::RecordNotInserted) => {
+                                warn!(log_id, "log already in the DB");
+                                Err(DbError::General(format!(
+                                    "log status already exists in the DB: {log_id}"
+                                )))
+                            }
                             Err(e) => {
-                                error!("Failed to insert log status into db: {:?}", e);
+                                error!(%log_id, "Failed to insert log status into db: {:?}", e);
                                 Err(DbError::General(e.to_string()))
                             }
                         }
