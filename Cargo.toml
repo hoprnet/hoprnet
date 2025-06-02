@@ -45,7 +45,7 @@ members = [
 ]
 
 [workspace.dependencies]
-alloy = { version = "=1.0.4", default-features = false, features = [
+alloy = { version = "=1.0.9", default-features = false, features = [
   "essentials",
   "json-rpc",
   "node-bindings",
@@ -124,9 +124,9 @@ moka = { version = "0.12.10", features = ["future"] }
 more-asserts = "0.3.1"
 multiaddr = "0.18.2"
 num_enum = "0.7.3"
-opentelemetry = { version = "0.29.1" }
-opentelemetry-otlp = { version = "0.29.0", default-features = false }
-opentelemetry_sdk = { version = "0.29.0" }
+opentelemetry = { version = "0.30.0" }
+opentelemetry-otlp = { version = "0.30.0", default-features = false }
+opentelemetry_sdk = { version = "0.30.0" }
 tracing-opentelemetry = { version = "0.30.0" }
 temp-env = "0.3.6"
 parameterized = "2.0.0"
@@ -153,7 +153,7 @@ sea-orm-migration = { version = "1.1.12", features = [
   "sqlx-sqlite",
   "with-chrono",
 ] }
-sea-query = { version = "0.32.5", default-features = false }
+sea-query = { version = "0.32.6", default-features = false }
 sea-query-binder = { version = "0.7.0", default-features = false, features = [
   "with-chrono",
   "sqlx-sqlite",
@@ -191,7 +191,7 @@ tokio-util = { version = "0.7.15", default-features = false, features = [
   "compat",
 ] }
 tokio-retry = "0.3.0"
-tower = { version = "0.5", default-features = false, features = ["util"] }
+tower = { version = "0.5.2", default-features = false, features = ["util"] }
 tracing = { version = "0.1.41" }
 tracing-futures = { version = "0.2.5" }
 tracing-subscriber = { version = "0.3.19", features = [
