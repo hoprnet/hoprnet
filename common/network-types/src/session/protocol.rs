@@ -584,7 +584,7 @@ mod tests {
     #[test]
     fn session_message_ack_should_serialize_and_deserialize() -> anyhow::Result<()> {
         let mut rng = thread_rng();
-        let frame_ids: Vec<u32> = (0..500).map(|_| rng.gen()).collect();
+        let frame_ids: Vec<u32> = (0..500).map(|_| rng.r#gen()).collect();
 
         let msg_1 = SessionMessage::<466>::Acknowledge(frame_ids.into());
         let data = Vec::from(msg_1.clone());
@@ -657,7 +657,7 @@ mod tests {
         ])));
 
         let mut rng = thread_rng();
-        let frame_ids: Vec<u32> = (0..100).map(|_| rng.gen()).collect();
+        let frame_ids: Vec<u32> = (0..100).map(|_| rng.r#gen()).collect();
         messages_1.push(SessionMessage::<MTU>::Acknowledge(frame_ids.into()));
 
         let iter = SessionMessageIter::<MTU>::from(
