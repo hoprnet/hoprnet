@@ -4,6 +4,8 @@
   "extends": [
     "schedule:earlyMondays",
     "config:recommended",
+    "group:allNonMajor",
+    "group:allDigest",
     ":disableDependencyDashboard"
   ],
   "vulnerabilityAlerts": { "enabled": true },
@@ -15,11 +17,9 @@
     {
       "matchPackageNames": [
         "serde_yaml",
-        "serde_cbor",
         "libp2p-stream",
         "generic-array",
         "hickory-resolver",
-        "primitive-types",
         "rand",
         "rand_distr"
       ],

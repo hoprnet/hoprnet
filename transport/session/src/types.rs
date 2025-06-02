@@ -11,15 +11,13 @@ use std::{
 
 use futures::{StreamExt, pin_mut};
 use hopr_crypto_packet::prelude::HoprPacket;
-use hopr_internal_types::{
-    prelude::{HoprPseudonym, Tag},
-    protocol::ApplicationData,
-};
+use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::{
     prelude::{DestinationRouting, SealedHost},
     session::state::{SessionConfig, SessionSocket},
 };
 use hopr_primitive_types::prelude::BytesRepresentable;
+use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, error};
 
 use crate::{Capability, errors::TransportSessionError, traits::SendMsg};
@@ -72,7 +70,8 @@ pub struct SessionId {
 }
 
 impl SessionId {
-    pub fn new(tag: Tag, pseudonym: HoprPseudonym) -> Self {
+    pub fn new<T: Into<Tag>>(tag: T, pseudonym: HoprPseudonym) -> Self {
+        let tag = tag.into();
         let mut cached = format!("{pseudonym}:{tag}");
         cached.truncate(MAX_SESSION_ID_STR_LEN);
 
@@ -83,7 +82,7 @@ impl SessionId {
         }
     }
 
-    pub fn tag(&self) -> u16 {
+    pub fn tag(&self) -> Tag {
         self.tag
     }
 
@@ -139,7 +138,8 @@ impl<'de> serde::Deserialize<'de> for SessionId {
                 A: de::SeqAccess<'de>,
             {
                 Ok(SessionId::new(
-                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?,
+                    seq.next_element::<Tag>()?
+                        .ok_or_else(|| de::Error::invalid_length(0, &self))?,
                     seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
                 ))
             }
@@ -148,13 +148,13 @@ impl<'de> serde::Deserialize<'de> for SessionId {
             where
                 V: de::MapAccess<'de>,
             {
-                let mut tag = None;
-                let mut pseudonym = None;
+                let mut tag: Option<Tag> = None;
+                let mut pseudonym: Option<HoprPseudonym> = None;
                 while let Some(key) = map.next_key()? {
                     match key {
                         Field::Tag => {
                             if tag.is_some() {
-                                return Err(de::Error::duplicate_field("tx_tag"));
+                                return Err(de::Error::duplicate_field("tag"));
                             }
                             tag = Some(map.next_value()?);
                         }
@@ -205,10 +205,6 @@ impl Hash for SessionId {
         self.pseudonym.hash(state);
     }
 }
-
-/// Payload capacity of a HOPR packet usable by the Session protocol.
-// TODO: Move this into ApplicationData
-pub const USABLE_PAYLOAD_CAPACITY_FOR_SESSION: usize = HoprPacket::PAYLOAD_SIZE - size_of::<Tag>();
 
 /// Helper trait to allow Box aliasing
 trait AsyncReadWrite: futures::AsyncWrite + futures::AsyncRead + Send {}
@@ -296,7 +292,7 @@ impl Session {
 
             Self {
                 id,
-                inner: Box::pin(SessionSocket::<USABLE_PAYLOAD_CAPACITY_FOR_SESSION>::new(
+                inner: Box::pin(SessionSocket::<{ ApplicationData::PAYLOAD_SIZE }>::new(
                     id,
                     inner_session,
                     cfg,
@@ -488,11 +484,11 @@ impl futures::AsyncWrite for InnerSession {
         self.tx_buffer.clear();
         self.tx_bytes = 0;
 
-        for i in 0..(buf.len() / USABLE_PAYLOAD_CAPACITY_FOR_SESSION
-            + ((buf.len() % USABLE_PAYLOAD_CAPACITY_FOR_SESSION != 0) as usize))
+        for i in
+            0..(buf.len() / ApplicationData::PAYLOAD_SIZE + ((buf.len() % ApplicationData::PAYLOAD_SIZE != 0) as usize))
         {
-            let start = i * USABLE_PAYLOAD_CAPACITY_FOR_SESSION;
-            let end = ((i + 1) * USABLE_PAYLOAD_CAPACITY_FOR_SESSION).min(buf.len());
+            let start = i * ApplicationData::PAYLOAD_SIZE;
+            let end = ((i + 1) * ApplicationData::PAYLOAD_SIZE).min(buf.len());
 
             let payload = ApplicationData::new(tag, &buf[start..end]);
             let sender = self.tx.clone();
@@ -607,7 +603,7 @@ where
     // 1) If Session protocol is used for segmentation, we need to buffer up data at MAX_WRITE_SIZE.
     // 2) Otherwise, the bare session implements chunking, therefore, data can be written with arbitrary sizes.
     let into_session_len = if session.capabilities().contains(&Capability::Segmentation) {
-        max_buffer.min(SessionSocket::<USABLE_PAYLOAD_CAPACITY_FOR_SESSION>::MAX_WRITE_SIZE)
+        max_buffer.min(SessionSocket::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_WRITE_SIZE)
     } else {
         max_buffer
     };
@@ -651,7 +647,7 @@ mod tests {
             .with_variable_int_encoding();
 
         let pseudonym = HoprPseudonym::random();
-        let tag = 1234;
+        let tag: Tag = 1234u64.into();
 
         let session_id_1 = SessionId::new(tag, pseudonym);
         let data = bincode::serde::encode_to_vec(session_id_1, SESSION_BINCODE_CONFIGURATION)?;
@@ -669,7 +665,7 @@ mod tests {
     #[test]
     fn session_should_identify_with_its_own_id() -> anyhow::Result<()> {
         let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64, HoprPseudonym::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
@@ -688,7 +684,7 @@ mod tests {
     #[tokio::test]
     async fn session_should_read_data_in_one_swoop_if_the_buffer_is_sufficiently_large() -> anyhow::Result<()> {
         let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64, HoprPseudonym::random());
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
@@ -720,7 +716,7 @@ mod tests {
     async fn session_should_read_data_in_multiple_rounds_if_the_buffer_is_not_sufficiently_large() -> anyhow::Result<()>
     {
         let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64, HoprPseudonym::random());
         let (tx, rx) = futures::channel::mpsc::unbounded();
         let mock = MockSendMsg::new();
 
@@ -757,7 +753,7 @@ mod tests {
     #[tokio::test]
     async fn session_should_write_data_on_forward_path() -> anyhow::Result<()> {
         let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64, HoprPseudonym::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
 
@@ -787,7 +783,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_should_write_data_on_return_path() -> anyhow::Result<()> {
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64, HoprPseudonym::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
 
@@ -818,10 +814,10 @@ mod tests {
     #[tokio::test]
     async fn session_should_chunk_the_data_if_without_segmentation_the_write_size_is_greater_than_the_usable_mtu_size()
     -> anyhow::Result<()> {
-        const TO_SEND: usize = USABLE_PAYLOAD_CAPACITY_FOR_SESSION * 2 + 10;
+        const TO_SEND: usize = ApplicationData::PAYLOAD_SIZE * 2 + 10;
 
         let addr: Address = (&ChainKeypair::random()).into();
-        let id = SessionId::new(1, HoprPseudonym::random());
+        let id = SessionId::new(1u64, HoprPseudonym::random());
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let mut mock = MockSendMsg::new();
 
