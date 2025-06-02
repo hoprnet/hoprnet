@@ -35,16 +35,25 @@ lazy_static::lazy_static! {
 
 /// Splits the range between `from_block` and `to_block` (inclusive)
 /// to chunks of maximum size `max_chunk_size` and creates [alloy::rpc::types::Filter] for each chunk
-/// using the given [LogFilter].
-fn split_range<'a>(filter: LogFilter, from_block: u64, to_block: u64, max_chunk_size: u64) -> BoxStream<'a, Filter> {
+/// using the given list of [Filter].
+fn split_range<'a>(
+    filters: Vec<Filter>,
+    from_block: u64,
+    to_block: u64,
+    max_chunk_size: u64,
+) -> BoxStream<'a, Vec<Filter>> {
     assert!(from_block <= to_block, "invalid block range");
     assert!(max_chunk_size > 0, "chunk size must be greater than 0");
 
     futures::stream::unfold((from_block, to_block), move |(start, to)| {
         if start <= to {
             let end = to_block.min(start + max_chunk_size - 1);
-            let filter = Filter::from(filter.clone()).from_block(start).to_block(end);
-            futures::future::ready(Some((filter, (end + 1, to))))
+            let ranged_filters = filters
+                .clone()
+                .into_iter()
+                .map(|f| f.from_block(start).to_block(end))
+                .collect::<Vec<_>>();
+            futures::future::ready(Some((ranged_filters, (end + 1, to))))
         } else {
             futures::future::ready(None)
         }
@@ -55,8 +64,13 @@ fn split_range<'a>(filter: LogFilter, from_block: u64, to_block: u64, max_chunk_
 // impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R> {
 impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
     /// Retrieves logs in the given range (`from_block` and `to_block` are inclusive).
-    fn stream_logs(&self, filter: LogFilter, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
-        let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
+    fn stream_logs(
+        &self,
+        filters: Vec<ethers::types::Filter>,
+        from_block: u64,
+        to_block: u64,
+    ) -> BoxStream<Result<Log>> {
+        let fetch_ranges = split_range(filters, from_block, to_block, self.cfg.max_block_range_fetch_size);
 
         debug!(
             "polling logs from blocks #{from_block} - #{to_block} (via {:?} chunks)",
@@ -64,35 +78,50 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
         );
 
         fetch_ranges
-            .then(|subrange| {
-                let prov_clone = self.provider.clone();
+            .then(move |subrange_filters| async move {
+                let mut results = futures::stream::iter(subrange_filters)
+                    .then_concurrent(|filter| async move {
+                        let prov_clone = self.provider.clone();
 
-                async move {
-                    trace!(
-                        from = ?subrange.get_from_block(),
-                        to = ?subrange.get_to_block(),
-                        "fetching logs in block subrange"
-                    );
-                    match prov_clone.get_logs(&subrange).await {
-                        Ok(logs) => Ok(logs),
-                        Err(e) => {
-                            error!(
-                                from = ?subrange.get_from_block(),
-                                to = ?subrange.get_to_block(),
-                                error = %e,
-                                "failed to fetch logs in block subrange"
-                            );
-                            Err(e)
+                        match prov_clone.get_logs(&filter).await {
+                            Ok(logs) => Ok(logs),
+                            Err(e) => {
+                                error!(
+                                    from = ?filter.get_from_block(),
+                                    to = ?filter.get_to_block(),
+                                    error = %e,
+                                    "failed to fetch logs in block subrange"
+                                );
+                                Err(e)
+                            }
                         }
+                    })
+                    .flat_map(|result| {
+                        futures::stream::iter(match result {
+                            Ok(logs) => logs.into_iter().map(|log| Ok(Log::from(log))).collect::<Vec<_>>(),
+                            Err(e) => vec![Err(RpcError::from(e))],
+                        })
+                    })
+                    .collect::<Vec<_>>()
+                    .await;
+
+                // at this point we need to ensure logs are ordered by block number since that is
+                // expected by the indexer
+                results.sort_by(|a, b| {
+                    if let Ok(a) = a {
+                        if let Ok(b) = b {
+                            a.block_number.cmp(&b.block_number)
+                        } else {
+                            std::cmp::Ordering::Greater
+                        }
+                    } else {
+                        std::cmp::Ordering::Less
                     }
-                }
+                });
+
+                futures::stream::iter(results)
             })
-            .flat_map(|result| {
-                futures::stream::iter(match result {
-                    Ok(logs) => logs.into_iter().map(|log| Ok(Log::try_from(log)?)).collect::<Vec<_>>(),
-                    Err(e) => vec![Err(RpcError::from(e))],
-                })
-            })
+            .flatten()
             .boxed()
     }
 }
@@ -103,14 +132,31 @@ impl<R: HttpRequestor + 'static + Clone> HoprIndexerRpcOperations for RpcOperati
         self.get_block_number().await
     }
 
+    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance> {
+        self.get_allowance(owner, spender).await
+    }
+
+    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance> {
+        self.get_balance(address, balance_type).await
+    }
+
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
-        filter: LogFilter,
+        filters: FilterSet,
+        is_synced: bool,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>> {
-        if filter.is_empty() {
+        if filters.all.is_empty() {
             return Err(FilterIsEmpty);
         }
+
+        let log_filters = if !is_synced {
+            // Because we are not synced yet, we will not get logs for the token contract.
+            // These are only relevant for the indexer if we are synced.
+            filters.no_token
+        } else {
+            filters.all
+        };
 
         Ok(Box::pin(stream! {
             // On first iteration use the given block number as start
@@ -146,7 +192,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprIndexerRpcOperations for RpcOperati
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
-                        let mut retrieved_logs = self.stream_logs(filter.clone(), from_block, latest_block);
+                        let mut retrieved_logs = self.stream_logs(log_filters.clone(), from_block, latest_block);
 
                         trace!(from_block, to_block = latest_block, "processing batch");
 
@@ -271,9 +317,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_split_range() -> anyhow::Result<()> {
-        let ranges = split_range(LogFilter::default(), 0, 10, 2).collect::<Vec<_>>().await;
+        let filters = vec![ethers::types::Filter::default()];
+        let ranges = split_range(filters, 0, 10, 2).collect::<Vec<_>>().await;
 
         assert_eq!(6, ranges.len());
+        &ranges[0].iter().for_each(|x| assert_eq!((0, 1), filter_bounds(&x)?));
         assert_eq!((0, 1), filter_bounds(&ranges[0])?);
         assert_eq!((2, 3), filter_bounds(&ranges[1])?);
         assert_eq!((4, 5), filter_bounds(&ranges[2])?);
@@ -398,7 +446,7 @@ mod tests {
         let count_filtered_topics = log_filter.topics.len();
         let retrieved_logs = spawn(async move {
             Ok::<_, RpcError>(
-                rpc.try_stream_logs(1, log_filter)?
+                rpc.try_stream_logs(1, log_filter, false)?
                     .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
                     .next()
                     .await,
@@ -540,7 +588,7 @@ mod tests {
         let count_filtered_topics = log_filter.topics.len();
         let retrieved_logs = spawn(async move {
             Ok::<_, RpcError>(
-                rpc.try_stream_logs(1, log_filter)?
+                rpc.try_stream_logs(1, log_filter, false)?
                     .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
                     // .next()
                     .take(1)

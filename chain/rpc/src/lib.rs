@@ -175,51 +175,15 @@ impl PartialOrd<Self> for Log {
     }
 }
 
-/// Represents a filter to extract logs containing specific contract events from a block.
+/// A type containing filters from the `eth_getLogs` RPC calls.
 #[derive(Debug, Clone, Default)]
-pub struct LogFilter {
-    /// Contract addresses
-    pub address: Vec<Address>,
-    /// Event topics
-    pub topics: Vec<Hash>,
-}
-
-impl LogFilter {
-    /// Indicates if this filter filters anything.
-    pub fn is_empty(&self) -> bool {
-        self.address.is_empty() && self.topics.is_empty()
-    }
-}
-
-impl Display for LogFilter {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "filter of {} contracts with {} topics",
-            self.address.len(),
-            self.topics.len()
-        )
-    }
-}
-
-impl From<LogFilter> for alloy::rpc::types::Filter {
-    fn from(value: LogFilter) -> Self {
-        alloy::rpc::types::Filter::new()
-            .address(
-                value
-                    .address
-                    .into_iter()
-                    .map(alloy::primitives::Address::from)
-                    .collect::<Vec<_>>(),
-            )
-            .event_signature(
-                value
-                    .topics
-                    .into_iter()
-                    .map(|h| alloy::primitives::B256::from_slice(h.as_ref()))
-                    .collect::<Vec<_>>(),
-            )
-    }
+pub struct FilterSet {
+    /// holds all filters for the indexer
+    pub all: Vec<alloy::rpc::types::Filter>,
+    /// holds only the token contract related filters
+    pub token: Vec<alloy::rpc::types::Filter>,
+    /// holds only filters not related to the token contract
+    pub no_token: Vec<alloy::rpc::types::Filter>,
 }
 
 /// Indicates what retry action should be taken, as result of a `RetryPolicy` implementation.
@@ -287,6 +251,9 @@ pub trait HoprRpcOperations {
     /// Retrieves the node's account balance of the given type.
     async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>>;
 
+    /// Retrieves the HOPR token allowance for the given owner and spender.
+    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance>;
+
     /// Retrieves the minimum incoming ticket winning probability by directly
     /// calling the network's winning probability oracle.
     async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability>;
@@ -351,6 +318,12 @@ pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
 
+    /// Retrieves token allowance for the given owner and spender.
+    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance>;
+
+    /// Retrieves on-chain token balance of the given address.
+    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
+
     /// Starts streaming logs from the given `start_block_number`.
     /// If no `start_block_number` is given, the stream starts from the latest block.
     /// The given `filter` are applied to retrieve the logs, the function fails if the filter is empty.
@@ -358,6 +331,7 @@ pub trait HoprIndexerRpcOperations {
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
-        filter: LogFilter,
+        filters: FilterSet,
+        is_synced: bool,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
 }

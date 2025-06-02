@@ -30,6 +30,7 @@ http = { workspace = true }
 lazy_static = { workspace = true }
 moka = { workspace = true }
 primitive-types = { workspace = true }
+rust-stream-ext-concurrent = { workspace = true }
 reqwest = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_with = { workspace = true }

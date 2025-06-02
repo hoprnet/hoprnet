@@ -63,9 +63,11 @@ pub struct ContractEventHandlers<Db: Clone> {
     chain_key: ChainKeypair, // TODO: store only address here once Ticket have TryFrom DB
     /// callbacks to inform other modules
     db: Db,
+    /// rpc operations to interact with the chain
+    rpc_operations: RpcOperations<JsonRpcClient>,
 }
 
-impl<Db: Clone> std::fmt::Debug for ContractEventHandlers<Db> {
+impl<Db: Clone> Debug for ContractEventHandlers<Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ContractEventHandler")
             .field("addresses", &self.addresses)
@@ -79,12 +81,19 @@ impl<Db> ContractEventHandlers<Db>
 where
     Db: HoprDbAllOperations + Clone,
 {
-    pub fn new(addresses: ContractAddresses, safe_address: Address, chain_key: ChainKeypair, db: Db) -> Self {
+    pub fn new(
+        addresses: ContractAddresses,
+        safe_address: Address,
+        chain_key: ChainKeypair,
+        db: Db,
+        rpc_operations: RpcOperations<JsonRpcClient>,
+    ) -> Self {
         Self {
             addresses: Arc::new(addresses),
             safe_address,
             chain_key,
             db,
+            rpc_operations,
         }
     }
 
@@ -192,6 +201,12 @@ where
                     .begin_channel_update(tx.into(), &balance_decreased.channelId.0.into())
                     .await?;
 
+                trace!(
+                    channel_id = %Hash::from(balance_decreased.channel_id),
+                    is_channel = maybe_channel.is_some(),
+                    "on_channel_balance_decreased_event",
+                );
+
                 if let Some(channel_edits) = maybe_channel {
                     let new_balance = HoprBalance::from_be_bytes(balance_decreased.newBalance.to_be_bytes::<12>());
                     let diff = channel_edits.entry().balance - new_balance;
@@ -212,6 +227,12 @@ where
                     .db
                     .begin_channel_update(tx.into(), &balance_increased.channelId.0.into())
                     .await?;
+
+                trace!(
+                    channel_id = %Hash::from(balance_increased.channel_id),
+                    is_channel = maybe_channel.is_some(),
+                    "on_channel_balance_increased_event",
+                );
 
                 if let Some(channel_edits) = maybe_channel {
                     let new_balance = HoprBalance::from_be_bytes(balance_increased.newBalance.to_be_bytes::<12>());
@@ -235,9 +256,9 @@ where
                     .await?;
 
                 trace!(
-                    "on_channel_closed_event - channel_id: {:?} - channel known: {:?}",
-                    channel_closed.channelId.0,
-                    maybe_channel.is_some()
+                    channel_id = channel_closed.channelId.0,
+                    is_channel = maybe_channel.is_some(),
+                    "on_channel_closed_event",
                 );
 
                 if let Some(channel_edits) = maybe_channel {
@@ -520,22 +541,25 @@ where
                     "on_token_transfer_event"
                 );
 
-                let mut current_balance = self.db.get_safe_hopr_balance(Some(tx)).await?;
-                let transferred_value = HoprBalance::from_be_bytes(transferred.value.to_be_bytes::<32>());
-
                 if to.ne(&self.safe_address) && from.ne(&self.safe_address) {
-                    return Ok(None);
+                    error!(
+                    safe_address = %&self.safe_address, %from, %to,
+                        "filter misconfiguration: transfer event not involving the safe");
                 } else if to.eq(&self.safe_address) {
-                    // This + is internally defined as saturating add
-                    info!(?current_balance, added_value = %transferred_value, "Safe balance increased ");
-                    current_balance += transferred_value;
-                } else if from.eq(&self.safe_address) {
-                    // This - is internally defined as saturating sub
-                    info!(?current_balance, removed_value = %transferred_value, "Safe balance decreased");
-                    current_balance -= transferred_value;
+                    info!("updating safe balance from chain after transfer event");
+                    match self
+                        .rpc_operations
+                        .get_balance(self.safe_address, BalanceType::HOPR)
+                        .await
+                    {
+                        Ok(balance) => {
+                            self.db.set_safe_hopr_balance(Some(tx), balance).await?;
+                        }
+                        Err(error) => {
+                            error!(%error, "error getting safe balance from chain after transfer event");
+                        }
+                    }
                 }
-
-                self.db.set_safe_hopr_balance(Some(tx), current_balance).await?;
             }
             HoprTokenEvents::Approval(approved) => {
                 let owner: Address = approved.owner.into();
@@ -549,14 +573,23 @@ where
 
                 // if approval is for tokens on Safe contract to be spent by HoprChannels
                 if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
-                    self.db
-                        .set_safe_hopr_allowance(
-                            Some(tx),
-                            HoprBalance::from_be_bytes(approved.value.to_be_bytes::<32>()),
-                        )
-                        .await?;
+                    info!("updating safe allowance from chain after approval event");
+                    match self
+                        .rpc_operations
+                        .get_allowance(self.addresses.channels, self.safe_address)
+                        .await
+                    {
+                        Ok(allowance) => {
+                            self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
+                        }
+                        Err(error) => {
+                            error!(%error, "error getting safe allowance from chain after approval event");
+                        }
+                    }
                 } else {
-                    return Ok(None);
+                    error!(
+                        address = %&self.safe_address, %owner, %spender, allowance = %approved.value,
+                        "filter misconfiguration: approval event not involving the safe and channels contract");
                 }
             }
             _ => error!("Implement all the other filters for HoprTokenEvents"),
@@ -842,7 +875,7 @@ where
 #[async_trait]
 impl<Db> crate::traits::ChainLogHandler for ContractEventHandlers<Db>
 where
-    Db: HoprDbAllOperations + Clone + Send + Sync + 'static,
+    Db: HoprDbAllOperations + Clone + Debug + Send + Sync + 'static,
 {
     fn contract_addresses(&self) -> Vec<Address> {
         vec![
@@ -855,6 +888,14 @@ where
             self.addresses.safe_registry,
             self.addresses.token,
         ]
+    }
+
+    fn contract_addresses_map(&self) -> Arc<ContractAddresses> {
+        self.addresses.clone()
+    }
+
+    fn safe_address(&self) -> Address {
+        self.safe_address
     }
 
     fn contract_address_topics(&self, contract: Address) -> Vec<B256> {
@@ -872,42 +913,38 @@ where
             crate::constants::topics::winning_prob_oracle()
         } else if contract.eq(&self.addresses.safe_registry) {
             crate::constants::topics::node_safe_registry()
-        } else if contract.eq(&self.addresses.token) {
-            crate::constants::topics::token()
         } else {
             vec![]
         }
     }
 
-    async fn collect_block_events(&self, block_with_logs: BlockWithLogs) -> Result<Vec<SignificantChainEvent>> {
+    async fn collect_log_event(&self, log: SerializableLog) -> Result<Option<SignificantChainEvent>> {
         let myself = self.clone();
         self.db
             .begin_transaction()
             .await?
             .perform(|tx| {
                 Box::pin(async move {
-                    // In the worst case, each log contains a single event
-                    let mut ret = Vec::with_capacity(block_with_logs.logs.len());
+                    let tx_hash = Hash::from(log.tx_hash);
+                    let log_id = log.log_index;
+                    let block_id = log.block_number;
 
-                    // Process all logs in the block
-                    for log in block_with_logs.logs {
-                        let tx_hash = Hash::from(log.tx_hash);
-                        let log_id = log.log_index;
-                        let block_id = log.block_number;
-
-                        match myself.process_log_event(tx, log).await {
-                            // If a significant chain event can be extracted from the log, push it
-                            Ok(Some(event_type)) => {
-                                let significant_event = SignificantChainEvent { tx_hash, event_type };
-                                debug!(block_id, %tx_hash, log_id, ?significant_event, "indexer got significant_event");
-                                ret.push(significant_event);
-                            }
-                            Ok(None) => debug!(block_id, %tx_hash, log_id, "no significant event in log"),
-                            Err(error) => error!(block_id, %tx_hash, log_id, %error, "error processing log in tx"),
+                    match myself.process_log_event(tx, log).await {
+                        // If a significant chain event can be extracted from the log
+                        Ok(Some(event_type)) => {
+                            let significant_event = SignificantChainEvent { tx_hash, event_type };
+                            debug!(block_id, %tx_hash, log_id, ?significant_event, "indexer got significant_event");
+                            Ok(Some(significant_event))
+                        }
+                        Ok(None) => {
+                            debug!(block_id, %tx_hash, log_id, "no significant event in log");
+                            Ok(None)
+                        }
+                        Err(error) => {
+                            error!(block_id, %tx_hash, log_id, %error, "error processing log in tx");
+                            Err(error)
                         }
                     }
-
-                    Ok(ret)
                 })
             })
             .await
@@ -969,6 +1006,8 @@ mod tests {
     }
 
     fn init_handlers<Db: HoprDbAllOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+
         ContractEventHandlers {
             addresses: Arc::new(ContractAddresses {
                 channels: *CHANNELS_ADDR,
@@ -985,6 +1024,7 @@ mod tests {
             chain_key: SELF_CHAIN_KEY.clone(),
             safe_address: SELF_CHAIN_KEY.public().to_address(),
             db,
+            rpc_operations,
         }
     }
 

@@ -4633,6 +4633,7 @@ dependencies = [
  "moka",
  "primitive-types 0.13.1",
  "reqwest",
+ "rust-stream-ext-concurrent",
  "serde",
  "serde_json",
  "serde_with",

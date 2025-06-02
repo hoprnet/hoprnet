@@ -257,6 +257,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
                     self.safe_address,
                     self.me_onchain.clone(),
                     self.db.clone(),
+                    self.rpc_operations.clone(),
                 ),
                 self.db.clone(),
                 self.indexer_cfg,
@@ -332,6 +333,13 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
     pub async fn get_safe_balance<C: Currency + Send>(&self, safe_address: Address) -> errors::Result<Balance<C>> {
         Ok(self.rpc_operations.get_balance(safe_address).await?)
+    }
+
+    pub async fn get_safe_hopr_allowance(&self) -> Result<Balance> {
+        Ok(self
+            .rpc_operations
+            .get_allowance(self.safe_address, self.contract_addresses.channels)
+            .await?)
     }
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {

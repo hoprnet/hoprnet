@@ -135,6 +135,7 @@ pub struct RpcOperations<R: HttpRequestor + 'static + Clone> {
     node_safe: SafeSingletonInstance<HoprProvider<R>>,
 }
 
+#[cfg_attr(test, mockall::automock)]
 impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
     pub fn new(
         rpc_client: RpcClient,
@@ -208,6 +209,23 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         };
 
         Ok(Balance::<C>::from(value))
+    }
+
+    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance> {
+        match self
+            .contract_instances
+            .token
+            .allowance(owner.into(), spender.into())
+            .call()
+            .await
+        {
+            Ok(token_allowance) => Ok(Balance::new(token_allowance, BalanceType::HOPR)),
+            Err(e) => Err(ContractError(
+                "HoprToken".to_string(),
+                "allowance".to_string(),
+                e.to_string(),
+            )),
+        }
     }
 
     async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability> {
