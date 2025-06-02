@@ -49,7 +49,7 @@ impl<T> Sender<T>
 where
     T: futures::Sink<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)> + Clone + Send + Sync + 'static,
 {
-    #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), err(level = tracing::Level::DEBUG, Display))]
+    #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), ret(level = tracing::Level::DEBUG), err(level = tracing::Level::DEBUG, Display))]
     async fn send_message(self, path: ResolvedTransportRouting, message: Message) -> crate::errors::Result<()> {
         let message: ApplicationData = message
             .try_into()
