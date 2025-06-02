@@ -1,15 +1,12 @@
 //! This crate contains various on-chain related modules and types.
-use ethers::abi::Token;
-use ethers::prelude::*;
-use hex_literal::hex;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use alloy::{
     contract::Result as ContractResult, network::TransactionBuilder, primitives, rpc::types::TransactionRequest,
 };
 use constants::{ERC_1820_DEPLOYER, ERC_1820_REGISTRY_DEPLOY_CODE, ETH_VALUE_FOR_ERC1820_DEPLOYER};
+use ethers::{abi::Token, prelude::*};
+use hex_literal::hex;
 use hopr_bindings::{
     hoprannouncements::HoprAnnouncements::{self, HoprAnnouncementsInstance},
     hoprchannels::HoprChannels::{self, HoprChannelsInstance},

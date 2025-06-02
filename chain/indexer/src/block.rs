@@ -505,9 +505,9 @@ where
                     let last_log = block.logs.into_iter().last().unwrap();
                     let log = db.get_log(block_id, last_log.tx_index, last_log.log_index).await.ok()?;
 
-                    //Self::print_indexer_state(block_id, log_count, log.checksum.unwrap()).await
+                    // Self::print_indexer_state(block_id, log_count, log.checksum.unwrap()).await
                 } else {
-                    //Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
+                    // Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
                 }
             }
             Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
