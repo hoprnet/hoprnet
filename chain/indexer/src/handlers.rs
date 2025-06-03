@@ -226,9 +226,7 @@ where
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?;
 
-                    if updated_channel.source == self.chain_key.public().to_address()
-                        || updated_channel.destination == self.chain_key.public().to_address()
-                    {
+                    if updated_channel.destination == self.chain_key.public().to_address() {
                         info!("updating safe balance from chain after channel balance decreased event");
                         match self.rpc_operations.get_hopr_balance(self.safe_address).await {
                             Ok(balance) => {
@@ -236,19 +234,6 @@ where
                             }
                             Err(error) => {
                                 error!(%error, "error getting safe balance from chain after channel balance decreased event");
-                            }
-                        }
-                        info!("updating safe allowance from chain after channel balance decreased event");
-                        match self
-                            .rpc_operations
-                            .get_hopr_allowance(self.safe_address, self.addresses.channels)
-                            .await
-                        {
-                            Ok(allowance) => {
-                                self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
-                            }
-                            Err(error) => {
-                                error!(%error, "error getting safe allowance from chain after channel balance decreased event");
                             }
                         }
                     }
@@ -280,9 +265,7 @@ where
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?;
 
-                    if updated_channel.source == self.chain_key.public().to_address()
-                        || updated_channel.destination == self.chain_key.public().to_address()
-                    {
+                    if updated_channel.source == self.chain_key.public().to_address() {
                         info!("updating safe balance from chain after channel balance increased event");
                         match self.rpc_operations.get_hopr_balance(self.safe_address).await {
                             Ok(balance) => {
