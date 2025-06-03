@@ -53,7 +53,7 @@ lazy_static::lazy_static! {
 /// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
 /// and passed on to this object that handles event-specific actions for each on-chain operation.
 #[derive(Clone)]
-pub struct ContractEventHandlers<T: Clone, Db: Clone> {
+pub struct ContractEventHandlers<T, Db> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
     addresses: Arc<ContractAddresses>,
@@ -67,7 +67,7 @@ pub struct ContractEventHandlers<T: Clone, Db: Clone> {
     rpc_operations: T,
 }
 
-impl<T: Clone, Db: Clone> Debug for ContractEventHandlers<T, Db> {
+impl<T, Db> Debug for ContractEventHandlers<T, Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ContractEventHandler")
             .field("addresses", &self.addresses)

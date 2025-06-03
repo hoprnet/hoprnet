@@ -335,7 +335,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.rpc_operations.get_balance(safe_address).await?)
     }
 
-    pub async fn get_safe_hopr_allowance(&self) -> Result<Balance> {
+    pub async fn get_safe_hopr_allowance(&self) -> Result<HoprBalance> {
         Ok(self
             .rpc_operations
             .get_allowance(self.safe_address, self.contract_addresses.channels)
