@@ -217,6 +217,33 @@ where
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?;
 
+                    if updated_channel.source == self.chain_key.public().to_address()
+                        || updated_channel.destination == self.chain_key.public().to_address()
+                    {
+                        info!("updating safe balance from chain after channel balance decreased event");
+                        match self.rpc_operations.get_hopr_balance(self.safe_address).await {
+                            Ok(balance) => {
+                                self.db.set_safe_hopr_balance(Some(tx), balance).await?;
+                            }
+                            Err(error) => {
+                                error!(%error, "error getting safe balance from chain after channel balance decreased event");
+                            }
+                        }
+                        info!("updating safe allowance from chain after channel balance decreased event");
+                        match self
+                            .rpc_operations
+                            .get_hopr_allowance(self.safe_address, self.addresses.channels)
+                            .await
+                        {
+                            Ok(allowance) => {
+                                self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
+                            }
+                            Err(error) => {
+                                error!(%error, "error getting safe allowance from chain after channel balance decreased event");
+                            }
+                        }
+                    }
+
                     Ok(Some(ChainEventType::ChannelBalanceDecreased(updated_channel, diff)))
                 } else {
                     error!(channel_id = %Hash::from(balance_decreased.channelId.0), "observed balance decreased event for a channel that does not exist");
@@ -243,6 +270,33 @@ where
                         .db
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?;
+
+                    if updated_channel.source == self.chain_key.public().to_address()
+                        || updated_channel.destination == self.chain_key.public().to_address()
+                    {
+                        info!("updating safe balance from chain after channel balance increased event");
+                        match self.rpc_operations.get_hopr_balance(self.safe_address).await {
+                            Ok(balance) => {
+                                self.db.set_safe_hopr_balance(Some(tx), balance).await?;
+                            }
+                            Err(error) => {
+                                error!(%error, "error getting safe balance from chain after channel balance increased event");
+                            }
+                        }
+                        info!("updating safe allowance from chain after channel balance increased event");
+                        match self
+                            .rpc_operations
+                            .get_hopr_allowance(self.safe_address, self.addresses.channels)
+                            .await
+                        {
+                            Ok(allowance) => {
+                                self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
+                            }
+                            Err(error) => {
+                                error!(%error, "error getting safe allowance from chain after channel balance increased event");
+                            }
+                        }
+                    }
 
                     Ok(Some(ChainEventType::ChannelBalanceIncreased(updated_channel, diff)))
                 } else {
@@ -553,7 +607,20 @@ where
                             self.db.set_safe_hopr_balance(Some(tx), balance).await?;
                         }
                         Err(error) => {
-                            error!(%error, "error getting safe balance from chain after tranpfer event");
+                            error!(%error, "error getting safe balance from chain after transfer event");
+                        }
+                    }
+                    info!("updating safe allowance from chain after transfer event");
+                    match self
+                        .rpc_operations
+                        .get_hopr_allowance(self.addresses.channels, self.safe_address)
+                        .await
+                    {
+                        Ok(allowance) => {
+                            self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
+                        }
+                        Err(error) => {
+                            error!(%error, "error getting safe allowance from chain after transfer event");
                         }
                     }
                 }
@@ -912,7 +979,7 @@ where
         } else if contract.eq(&self.addresses.safe_registry) {
             crate::constants::topics::node_safe_registry()
         } else {
-            vec![]
+            panic!("use of unsupported contract address: {contract}");
         }
     }
 

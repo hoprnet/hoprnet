@@ -23,6 +23,9 @@ mod m20250219_000020_logs_add_index;
 mod m20250219_000021_channels_add_index;
 mod m20250419_000022_account_add_published_block;
 mod m20250528_000023_peers_reset;
+mod m20250603_000024_index_reset;
+mod m20250603_000025_peers_reset;
+mod m20250603_000026_logs_reset;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -69,6 +72,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20250219_000021_channels_add_index::Migration),
             Box::new(m20250419_000022_account_add_published_block::Migration),
             Box::new(m20250528_000023_peers_reset::Migration),
+            Box::new(m20250603_000024_index_reset::Migration),
+            Box::new(m20250603_000025_peers_reset::Migration),
+            Box::new(m20250603_000026_logs_reset::Migration),
         ]
     }
 }
@@ -96,6 +102,7 @@ impl MigratorTrait for MigratorIndex {
             Box::new(m20240917_000015_add_minimum_incoming_ticket_win_prob_column::Migration),
             Box::new(m20250219_000021_channels_add_index::Migration),
             Box::new(m20250419_000022_account_add_published_block::Migration),
+            Box::new(m20250603_000024_index_reset::Migration),
         ]
     }
 }
@@ -111,6 +118,7 @@ impl MigratorTrait for MigratorPeers {
                 BackendType::SQLite,
             )),
             Box::new(m20250528_000023_peers_reset::Migration),
+            Box::new(m20250603_000025_peers_reset::Migration),
         ]
     }
 }
@@ -146,6 +154,7 @@ impl MigratorTrait for MigratorChainLogs {
             Box::new(m20241112_000018_logs_add_index::Migration),
             Box::new(m20250107_000019_logs_meta_table::Migration),
             Box::new(m20250219_000020_logs_add_index::Migration),
+            Box::new(m20250603_000026_logs_reset::Migration),
         ]
     }
 }

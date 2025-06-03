@@ -655,7 +655,7 @@ where
 
                 if let Some((channels_address, safe_address)) = channels_address.zip(safe_address) {
                     info!("updating safe allowance from chain after indexer sync completed");
-                    match rpc.get_hopr_allowance(channels_address, safe_address).await {
+                    match rpc.get_hopr_allowance(safe_address, channels_address).await {
                         Ok(allowance) => {
                             if let Err(error) = db.set_safe_hopr_allowance(None, allowance).await {
                                 error!(%error, "failed to update safe allowance from chain after indexer sync completed");
