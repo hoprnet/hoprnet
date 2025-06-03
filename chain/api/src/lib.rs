@@ -328,17 +328,17 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 
     pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        Ok(self.rpc_operations.get_balance(self.me_onchain()).await?)
+        Ok(self.rpc_operations.get_balance::<C>(self.me_onchain()).await?)
     }
 
     pub async fn get_safe_balance<C: Currency + Send>(&self, safe_address: Address) -> errors::Result<Balance<C>> {
-        Ok(self.rpc_operations.get_balance(safe_address).await?)
+        Ok(self.rpc_operations.get_balance::<C>(safe_address).await?)
     }
 
     pub async fn get_safe_hopr_allowance(&self) -> Result<HoprBalance> {
         Ok(self
             .rpc_operations
-            .get_allowance(self.safe_address, self.contract_addresses.channels)
+            .get_allowance::<WxHOPR>(self.safe_address, self.contract_addresses.channels)
             .await?)
     }
 
