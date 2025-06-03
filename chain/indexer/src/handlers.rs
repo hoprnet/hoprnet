@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    fmt::Formatter,
+    fmt::{Debug, Formatter},
     ops::Add,
     sync::Arc,
     time::{Duration, SystemTime},
@@ -16,7 +16,7 @@ use hopr_bindings::{
     hoprticketpriceoracle::HoprTicketPriceOracle::HoprTicketPriceOracleEvents, hoprtoken::HoprToken::HoprTokenEvents,
     hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::HoprWinningProbabilityOracleEvents,
 };
-use hopr_chain_rpc::Log;
+use hopr_chain_rpc::{HoprIndexerRpcOperations, Log};
 use hopr_chain_types::{
     ContractAddresses,
     chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent},
@@ -53,7 +53,7 @@ lazy_static::lazy_static! {
 /// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
 /// and passed on to this object that handles event-specific actions for each on-chain operation.
 #[derive(Clone)]
-pub struct ContractEventHandlers<Db: Clone> {
+pub struct ContractEventHandlers<T: Clone, Db: Clone> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
     addresses: Arc<ContractAddresses>,
@@ -64,7 +64,7 @@ pub struct ContractEventHandlers<Db: Clone> {
     /// callbacks to inform other modules
     db: Db,
     /// rpc operations to interact with the chain
-    rpc_operations: RpcOperations<JsonRpcClient>,
+    rpc_operations: T,
 }
 
 impl<Db: Clone> Debug for ContractEventHandlers<Db> {
@@ -79,6 +79,7 @@ impl<Db: Clone> Debug for ContractEventHandlers<Db> {
 
 impl<Db> ContractEventHandlers<Db>
 where
+    T: HoprIndexerRpcOperations + Send + 'static,
     Db: HoprDbAllOperations + Clone,
 {
     pub fn new(
@@ -86,7 +87,7 @@ where
         safe_address: Address,
         chain_key: ChainKeypair,
         db: Db,
-        rpc_operations: RpcOperations<JsonRpcClient>,
+        rpc_operations: T,
     ) -> Self {
         Self {
             addresses: Arc::new(addresses),
@@ -202,7 +203,7 @@ where
                     .await?;
 
                 trace!(
-                    channel_id = %Hash::from(balance_decreased.channel_id),
+                    channel_id = %Hash::from(balance_decreased.channelId.0),
                     is_channel = maybe_channel.is_some(),
                     "on_channel_balance_decreased_event",
                 );
@@ -229,7 +230,7 @@ where
                     .await?;
 
                 trace!(
-                    channel_id = %Hash::from(balance_increased.channel_id),
+                    channel_id = %Hash::from(balance_increased.channelId.0),
                     is_channel = maybe_channel.is_some(),
                     "on_channel_balance_increased_event",
                 );
@@ -547,16 +548,12 @@ where
                         "filter misconfiguration: transfer event not involving the safe");
                 } else if to.eq(&self.safe_address) {
                     info!("updating safe balance from chain after transfer event");
-                    match self
-                        .rpc_operations
-                        .get_balance<WxHOPR>(self.safe_address)
-                        .await
-                    {
+                    match self.rpc_operations.get_balance::<WxHOPR>(self.safe_address).await {
                         Ok(balance) => {
                             self.db.set_safe_hopr_balance(Some(tx), balance).await?;
                         }
                         Err(error) => {
-                            error!(%error, "error getting safe balance from chain after transfer event");
+                            error!(%error, "error getting safe balance from chain after tranpfer event");
                         }
                     }
                 }
@@ -576,7 +573,7 @@ where
                     info!("updating safe allowance from chain after approval event");
                     match self
                         .rpc_operations
-                        .get_allowance<WxHOPR>(self.addresses.channels, self.safe_address)
+                        .get_allowance::<WxHOPR>(self.addresses.channels, self.safe_address)
                         .await
                     {
                         Ok(allowance) => {

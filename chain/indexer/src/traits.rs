@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use alloy::primitives::B256;
 use async_trait::async_trait;
-use chain_types::{ContractAddresses, chain_events::SignificantChainEvent};
+use hopr_chain_types::{ContractAddresses, chain_events::SignificantChainEvent};
 use hopr_primitive_types::prelude::*;
 
 use crate::errors::Result;

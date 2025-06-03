@@ -5,14 +5,13 @@ use std::sync::{
 
 use futures::{FutureExt, StreamExt, stream};
 use hopr_async_runtime::prelude::{JoinHandle, spawn};
-use hopr_bindings::hoprtoken::HoprToken::HoprTokenEvents::Transfer;
-use hopr_chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
+use hopr_chain_rpc::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations};
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{HoprDbGeneralModelOperations, info::HoprDbInfoOperations};
 #[cfg(all(feature = "prometheus", not(test)))]
-use hopr_primitive_types::prelude::ToHex;
+use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, trace};
 
 use crate::{
@@ -126,7 +125,11 @@ where
         let tx_significant_events = self.egress.clone();
         let panic_on_completion = self.panic_on_completion;
 
-        let log_filters = Self::generate_log_filters(&logs_handler);
+        let (log_filters, address_topics) = Self::generate_log_filters(&logs_handler);
+
+        // Check that the contract addresses and topics are consistent with what is in the logs DB,
+        // or if the DB is empty, prime it with the given addresses and topics.
+        db.ensure_logs_origin(address_topics).await?;
 
         let is_synced = Arc::new(AtomicBool::new(false));
         let chain_head = Arc::new(AtomicU64::new(0));
@@ -341,7 +344,7 @@ where
     // (3) for the token contract which filters transfer events to our safe.
     // (4) for the token contract which filters approval events involving our safe and the channels
     // contract.
-    fn generate_log_filters(logs_handler: &U) -> FilterSet {
+    fn generate_log_filters(logs_handler: &U) -> (FilterSet, Vec<(Address, FixedBytes<32>)>) {
         let safe_address = logs_handler.safe_address();
         let addresses_no_token = logs_handler
             .contract_addresses()
@@ -363,34 +366,32 @@ where
             }
         });
 
-        let filter_base = Filter::new().address(filter_base_addresses).topic0(filter_base_topics);
-        let filter_token = Filter::new().address(alloy::primitives::Address::from(
+        let filter_base = alloy::rpc::types::Filter::new()
+            .address(filter_base_addresses)
+            .event_signature(filter_base_topics);
+        let filter_token = alloy::rpc::types::Filter::new().address(alloy::primitives::Address::from(
             logs_handler.contract_addresses_map().token,
         ));
 
         let filter_transfer_to = filter_token
             .clone()
-            .topic0(TransferFilter::signature())
+            .event_signature(TransferFilter::signature())
             .topic2(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()));
 
-        let filter_transfer_from = Filter::new()
+        let filter_transfer_from = alloy::rpc::types::Filter::new()
             .clone()
-            .topic0(TransferFilter::signature())
+            .event_signature(TransferFilter::signature())
             .topic1(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()));
 
-        let filter_approval = Filter::new()
+        let filter_approval = alloy::rpc::types::Filter::new()
             .clone()
-            .topic0(ApprovalFilter::signature())
+            .event_signature(ApprovalFilter::signature())
             .topic1(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()))
             .topic2(alloy::primitives::B256::from_slice(
                 logs_handler.contract_addresses_map().channels.to_bytes32().as_ref(),
             ));
 
-        // Check that the contract addresses and topics are consistent with what is in the logs DB,
-        // or if the DB is empty, prime it with the given addresses and topics.
-        db.ensure_logs_origin(address_topics).await?;
-
-        FilterSet {
+        let set = FilterSet {
             all: vec![
                 filter_base.clone(),
                 filter_transfer_from.clone(),
@@ -399,7 +400,9 @@ where
             ],
             token: vec![filter_transfer_from, filter_transfer_to, filter_approval],
             no_token: vec![filter_base],
-        }
+        };
+
+        (set, address_topics)
     }
 
     /// Processes a block by its ID.
