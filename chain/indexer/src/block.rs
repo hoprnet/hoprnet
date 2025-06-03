@@ -486,14 +486,13 @@ where
         let events = stream::iter(block.logs.clone())
             .filter_map(|log| async move {
                 match logs_handler.collect_log_event(log.clone()).await {
-                    Ok(Some(event)) => match db.set_log_processed(log).await {
-                        Ok(_) => Some(event),
+                    Ok(data) => match db.set_log_processed(log).await {
+                        Ok(_) => data,
                         Err(error) => {
                             error!(block_id, %error, "failed to mark log as processed, panicking to prevent data loss");
                             panic!("failed to mark log as processed, panicking to prevent data loss")
                         }
                     },
-                    Ok(None) => None,
                     Err(error) => {
                         error!(block_id, %error, "failed to process log into event, panicking to prevent data loss");
                         panic!("failed to process log into event, panicking to prevent data loss")
@@ -506,13 +505,39 @@ where
         // if we made it this far, no errors occurred and we can update checksums and indexer state
         match db.update_logs_checksums().await {
             Ok(last_log_checksum) => {
-                if fetch_checksum_from_db {
+                let checksum = if fetch_checksum_from_db {
                     let last_log = block.logs.into_iter().last().unwrap();
                     let log = db.get_log(block_id, last_log.tx_index, last_log.log_index).await.ok()?;
 
-                    // Self::print_indexer_state(block_id, log_count, log.checksum.unwrap()).await
+                    log.checksum.unwrap()
                 } else {
-                    // Self::print_indexer_state(block_id, log_count, last_log_checksum.to_string()).await
+                    last_log_checksum.to_string()
+                };
+
+                if log_count != 0 {
+                    info!(
+                        block_number = block_id,
+                        log_count, last_log_checksum = ?checksum, "Indexer state update",
+                    );
+
+                    #[cfg(all(feature = "prometheus", not(test)))]
+                    {
+                        if let Ok(checksum_hash) = Hash::from_hex(checksum.as_str()) {
+                            let low_4_bytes =
+                                hopr_primitive_types::prelude::U256::from_big_endian(checksum_hash.as_ref()).low_u32();
+                            METRIC_INDEXER_CHECKSUM.set(low_4_bytes.into());
+                        } else {
+                            error!("Invalid checksum generated from logs");
+                        }
+                    }
+                }
+
+                // finally update the block number in the database to the last processed block
+                match db.set_indexer_state_info(None, block_id as u32).await {
+                    Ok(_) => {
+                        trace!(block_id, "updated indexer state info");
+                    }
+                    Err(error) => error!(block_id, %error, "failed to update indexer state info"),
                 }
             }
             Err(error) => error!(block_id, %error, "failed to update checksums for logs from block"),
