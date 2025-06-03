@@ -154,13 +154,13 @@ fn close_session_after_eviction<S: SendMsg + Send + Sync + 'static>(
 /// calls the generator (with the previous value) to generate a new seeding key and retry.
 /// The function either finds a suitable free slot, inserting the `value` and returns the found key,
 /// or terminates with `None` when `gen` returns the initial seed again.
-async fn insert_into_next_slot<K, V, F>(cache: &moka::future::Cache<K, V>, gen: F, value: V) -> Option<K>
+async fn insert_into_next_slot<K, V, F>(cache: &moka::future::Cache<K, V>, generator: F, value: V) -> Option<K>
 where
     K: Copy + std::hash::Hash + Eq + Send + Sync + 'static,
     V: Clone + Send + Sync + 'static,
     F: Fn(Option<K>) -> K,
 {
-    let initial = gen(None);
+    let initial = generator(None);
     let mut next = initial;
     loop {
         let insertion_result = cache
@@ -180,7 +180,7 @@ where
         }
 
         // Otherwise, generate the next key
-        next = gen(Some(next));
+        next = generator(Some(next));
 
         // If generated keys made it to full loop, return failure
         if next == initial {

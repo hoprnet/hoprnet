@@ -233,6 +233,10 @@ async fn build_api(
         )
         .merge(
             Router::new()
+                .route("/startedz", get(checks::startedz))
+                .route("/readyz", get(checks::readyz))
+                .route("/healthyz", get(checks::healthyz))
+                .route("/eligiblez", get(checks::eligiblez))
                 .layer(
                     ServiceBuilder::new().layer(
                         CorsLayer::new()
@@ -242,10 +246,6 @@ async fn build_api(
                             .max_age(std::time::Duration::from_secs(86400)),
                     ),
                 )
-                .route("/startedz", get(checks::startedz))
-                .route("/readyz", get(checks::readyz))
-                .route("/healthyz", get(checks::healthyz))
-                .route("/eligiblez", get(checks::eligiblez))
                 .with_state(state.into()),
         )
         .merge(
