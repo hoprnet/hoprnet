@@ -60,4 +60,5 @@ test-log = { workspace = true }
 tokio = { workspace = true }
 
 hopr-crypto-random = { workspace = true }
+hopr-chain-rpc = { workspace = true, features = ["runtime-tokio"] }
 hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }
