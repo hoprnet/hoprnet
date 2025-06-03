@@ -284,10 +284,7 @@ mod tests {
         hoprtoken::HoprToken::{Approval, Transfer},
     };
     use hopr_chain_types::{ContractAddresses, ContractInstances};
-    use hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair},
-        types::Hash,
-    };
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use tokio::time::timeout;
     use tracing::debug;
 
