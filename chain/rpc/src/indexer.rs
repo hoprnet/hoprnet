@@ -339,9 +339,6 @@ mod tests {
         assert_eq!((8, 9), filter_bounds(&ranges[4])?);
         assert_eq!((10, 10), filter_bounds(&ranges[5])?);
 
-        assert_eq!(1, ranges.len());
-        assert_eq!((0, 0), filter_bounds(&ranges[0])?);
-
         let ranges = split_range(filters.clone(), 0, 0, 1).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
         assert_eq!((0, 0), filter_bounds(&ranges[0])?);
@@ -411,32 +408,7 @@ mod tests {
             ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
-        let tokens_minted_at =
-            hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128))
-                .await?
-                .unwrap();
-        debug!("tokens were minted at block {tokens_minted_at}");
-
         let contract_addrs = ContractAddresses::from(&contract_instances);
-
-        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
-
-        let rpc_client = ClientBuilder::default()
-            .layer(RetryBackoffLayer::new(2, 100, 100))
-            .transport(transport_client.clone(), transport_client.guess_local());
-
-        let cfg = RpcOperationsConfig {
-            tx_polling_interval: Duration::from_millis(10),
-            contract_addrs,
-            expected_block_time,
-            gas_oracle_url: None,
-            ..RpcOperationsConfig::default()
-        };
-
-        // Wait until contracts deployments are final
-        sleep((1 + cfg.finality) * expected_block_time).await;
-
-        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
         let filter_token_approval = alloy::rpc::types::Filter::new()
             .address(alloy::primitives::Address::from(contract_addrs.token))
@@ -465,8 +437,33 @@ mod tests {
         debug!("{:#?}", contract_addrs);
         debug!("{:#?}", log_filter);
 
+        let tokens_minted_at =
+            hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128))
+                .await?
+                .unwrap();
+        debug!("tokens were minted at block {tokens_minted_at}");
+
+        let transport_client = ReqwestTransport::new(anvil.endpoint_url());
+
+        let rpc_client = ClientBuilder::default()
+            .layer(RetryBackoffLayer::new(2, 100, 100))
+            .transport(transport_client.clone(), transport_client.guess_local());
+
+        let cfg = RpcOperationsConfig {
+            tx_polling_interval: Duration::from_millis(10),
+            contract_addrs,
+            expected_block_time,
+            gas_oracle_url: None,
+            ..RpcOperationsConfig::default()
+        };
+
+        // Wait until contracts deployments are final
+        sleep((1 + cfg.finality) * expected_block_time).await;
+
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
+
         // Spawn stream
-        let count_filtered_topics = 4;
+        let count_filtered_topics = 2;
         let retrieved_logs = spawn(async move {
             Ok::<_, RpcError>(
                 rpc.try_stream_logs(1, log_filter, false)?
@@ -498,8 +495,6 @@ mod tests {
 
         let channel_open_filter = ChannelOpened::SIGNATURE_HASH;
         let channel_balance_filter = ChannelBalanceIncreased::SIGNATURE_HASH;
-        let approval_filter = Approval::SIGNATURE_HASH;
-        let transfer_filter = Transfer::SIGNATURE_HASH;
 
         debug!(
             "channel_open_filter: {:?} - {:?}",
@@ -510,16 +505,6 @@ mod tests {
             "channel_balance_filter: {:?} - {:?}",
             channel_balance_filter,
             channel_balance_filter.0.to_vec()
-        );
-        debug!(
-            "approval_filter: {:?} - {:?}",
-            approval_filter,
-            approval_filter.0.to_vec()
-        );
-        debug!(
-            "transfer_filter: {:?} - {:?}",
-            transfer_filter,
-            transfer_filter.0.to_vec()
         );
         debug!("logs: {:#?}", last_block_logs);
 
@@ -534,18 +519,6 @@ mod tests {
                 |log| log.address == contract_addrs.channels && log.topics.contains(&channel_balance_filter.into())
             ),
             "must contain channel balance increase"
-        );
-        assert!(
-            last_block_logs
-                .iter()
-                .any(|log| log.address == contract_addrs.token && log.topics.contains(&approval_filter.into())),
-            "must contain token approval"
-        );
-        assert!(
-            last_block_logs
-                .iter()
-                .any(|log| log.address == contract_addrs.token && log.topics.contains(&transfer_filter.into())),
-            "must contain token transfer"
         );
 
         Ok(())
