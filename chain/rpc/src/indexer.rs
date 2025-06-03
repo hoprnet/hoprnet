@@ -299,21 +299,34 @@ mod tests {
         rpc::{RpcOperations, RpcOperationsConfig},
     };
 
-    fn filter_bounds(filter: &Filter) -> anyhow::Result<(u64, u64)> {
-        Ok((
-            filter
+    fn filter_bounds(filters: &Vec<Filter>) -> anyhow::Result<(u64, u64)> {
+        let bounds = filters.iter().try_fold((0, 0), |acc, filter| {
+            let to = filter
                 .block_option
                 .get_from_block()
                 .context("a value should be present")?
                 .as_number()
-                .context("a value should be convertible")?,
-            filter
+                .context("a value should be convertible")?;
+            let from = filter
                 .block_option
                 .get_to_block()
                 .context("a value should be present")?
                 .as_number()
-                .context("a value should be convertible")?,
-        ))
+                .context("a value should be convertible")?;
+            let next = (to, from);
+
+            match acc {
+                (0, 0) => Ok(next), // First pair becomes the reference
+                acc => {
+                    if acc != next {
+                        anyhow::bail!("range bounds are not equal across all filters");
+                    }
+                    Ok(acc)
+                }
+            }
+        })?;
+
+        Ok(bounds)
     }
 
     #[tokio::test]
@@ -322,7 +335,6 @@ mod tests {
         let ranges = split_range(filters, 0, 10, 2).collect::<Vec<_>>().await;
 
         assert_eq!(6, ranges.len());
-        &ranges[0].iter().for_each(|x| assert_eq!((0, 1), filter_bounds(&x)?));
         assert_eq!((0, 1), filter_bounds(&ranges[0])?);
         assert_eq!((2, 3), filter_bounds(&ranges[1])?);
         assert_eq!((4, 5), filter_bounds(&ranges[2])?);

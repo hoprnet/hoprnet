@@ -964,6 +964,7 @@ mod tests {
     };
     use anyhow::{Context, anyhow};
     use hex_literal::hex;
+    use hopr_chain_rpc::MockHoprIndexerRpcOperations;
     use hopr_chain_types::{
         ContractAddresses,
         chain_events::{ChainEventType, NetworkRegistryStatus},
@@ -1004,9 +1005,10 @@ mod tests {
         static ref WIN_PROB_ORACLE_ADDR: Address = "00db4391bf45ef31a10ea4a1b5cb90f46cc64c7e".parse().expect("lazy static address should be constructible"); // just a dummy
     }
 
-    fn init_handlers<Db: HoprDbAllOperations + Clone>(db: Db) -> ContractEventHandlers<Db> {
-        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
-
+    fn init_handlers<T: Clone, Db: HoprDbAllOperations + Clone>(
+        rpc_operations: T,
+        db: Db,
+    ) -> ContractEventHandlers<T, Db> {
         ContractEventHandlers {
             addresses: Arc::new(ContractAddresses {
                 channels: *CHANNELS_ADDR,
@@ -1034,8 +1036,8 @@ mod tests {
     #[tokio::test]
     async fn announce_keybinding() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockHoprIndexerRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let keybinding = KeyBinding::new(*SELF_CHAIN_ADDRESS, &SELF_PRIV_KEY);
 
@@ -1083,8 +1085,8 @@ mod tests {
     #[tokio::test]
     async fn announce_address_announcement() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         // Assume that there is a keybinding
         let account_entry = AccountEntry {
@@ -1262,7 +1264,8 @@ mod tests {
     #[tokio::test]
     async fn announce_revoke() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let test_multiaddr: Multiaddr = "/ip4/1.2.3.4/tcp/56".parse()?;
 
@@ -1321,8 +1324,8 @@ mod tests {
     #[tokio::test]
     async fn on_token_transfer_to() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let value = U256::MAX;
 
@@ -1360,8 +1363,8 @@ mod tests {
     #[tokio::test]
     async fn on_token_transfer_from() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let value = U256::MAX;
 
@@ -1402,8 +1405,8 @@ mod tests {
     #[tokio::test]
     async fn on_token_approval_correct() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let encoded_data = (U256::from(1000u64)).abi_encode();
 
@@ -1463,8 +1466,8 @@ mod tests {
     #[tokio::test]
     async fn on_network_registry_event_registered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let encoded_data = ().abi_encode();
 
@@ -1507,8 +1510,8 @@ mod tests {
     #[tokio::test]
     async fn on_network_registry_event_registered_by_manager() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let registered_log = SerializableLog {
             address: handlers.addresses.network_registry,
@@ -1550,8 +1553,8 @@ mod tests {
     #[tokio::test]
     async fn on_network_registry_event_deregistered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
             .await?;
@@ -1596,8 +1599,8 @@ mod tests {
     #[tokio::test]
     async fn on_network_registry_event_deregistered_by_manager() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         db.set_access_in_network_registry(None, *SELF_CHAIN_ADDRESS, true)
             .await?;
@@ -1643,8 +1646,8 @@ mod tests {
     #[tokio::test]
     async fn on_network_registry_event_enabled() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let encoded_data = ().abi_encode();
 
@@ -1675,8 +1678,8 @@ mod tests {
     #[tokio::test]
     async fn on_network_registry_event_disabled() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         db.set_network_registry_enabled(None, true).await?;
 
@@ -1709,8 +1712,8 @@ mod tests {
     #[tokio::test]
     async fn on_network_registry_set_eligible() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let encoded_data = ().abi_encode();
 
@@ -1745,8 +1748,8 @@ mod tests {
     #[tokio::test]
     async fn on_network_registry_set_not_eligible() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         db.set_safe_eligibility(None, *STAKE_ADDRESS, false).await?;
 
@@ -1783,8 +1786,8 @@ mod tests {
     #[tokio::test]
     async fn on_channel_event_balance_increased() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -1836,8 +1839,8 @@ mod tests {
     #[tokio::test]
     async fn on_channel_event_domain_separator_updated() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let separator = Hash::from(hopr_crypto_random::random_bytes());
 
@@ -1881,8 +1884,8 @@ mod tests {
     #[tokio::test]
     async fn on_channel_event_balance_decreased() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -1939,8 +1942,8 @@ mod tests {
     #[tokio::test]
     async fn on_channel_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let starting_balance = HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1));
 
@@ -2000,8 +2003,8 @@ mod tests {
     #[tokio::test]
     async fn on_foreign_channel_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let starting_balance = HoprBalance::from(primitive_types::U256::from((1u128 << 96) - 1));
 
@@ -2050,8 +2053,8 @@ mod tests {
     #[tokio::test]
     async fn on_channel_opened() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel_id = generate_channel_id(&SELF_CHAIN_ADDRESS, &COUNTERPARTY_CHAIN_ADDRESS);
 
@@ -2100,8 +2103,8 @@ mod tests {
     #[tokio::test]
     async fn on_channel_reopened() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -2160,8 +2163,8 @@ mod tests {
     #[tokio::test]
     async fn on_channel_should_not_reopen_when_not_closed() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -2230,8 +2233,8 @@ mod tests {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
@@ -2339,8 +2342,8 @@ mod tests {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
@@ -2446,8 +2449,8 @@ mod tests {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -2518,8 +2521,8 @@ mod tests {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         db.set_domain_separator(None, DomainSeparator::Channel, Hash::default())
             .await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel = ChannelEntry::new(
             *COUNTERPARTY_CHAIN_ADDRESS,
@@ -2571,8 +2574,8 @@ mod tests {
     #[tokio::test]
     async fn on_channel_ticket_redeemed_on_foreign_channel_should_pass() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel = ChannelEntry::new(
             Address::from(hopr_crypto_random::random_bytes()),
@@ -2624,8 +2627,8 @@ mod tests {
     #[tokio::test]
     async fn on_channel_closure_initiated() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let channel = ChannelEntry::new(
             *SELF_CHAIN_ADDRESS,
@@ -2681,8 +2684,8 @@ mod tests {
     #[tokio::test]
     async fn on_node_safe_registry_registered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let encoded_data = ().abi_encode();
 
@@ -2713,8 +2716,8 @@ mod tests {
     #[tokio::test]
     async fn on_node_safe_registry_deregistered() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         // Nothing to write to the DB here, since we do not track this
 
@@ -2750,8 +2753,8 @@ mod tests {
     #[tokio::test]
     async fn ticket_price_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let encoded_data = (U256::from(1u64), U256::from(123u64)).abi_encode();
 
@@ -2789,8 +2792,8 @@ mod tests {
     #[tokio::test]
     async fn minimum_win_prob_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let encoded_data = (
             U256::from_be_slice(WinningProbability::ALWAYS.as_ref()),
@@ -2883,7 +2886,8 @@ mod tests {
         let stats = db.get_ticket_statistics(None).await?;
         assert_eq!(HoprBalance::zero(), stats.rejected_value);
 
-        let handlers = init_handlers(db.clone());
+        let rpc_operations = MockRpcOperations::new(None, SELF_CHAIN_KEY.clone(), None);
+        let handlers = init_handlers(rpc_operations, db.clone());
 
         let encoded_data = (
             U256::from_be_slice(WinningProbability::try_from(0.1)?.as_ref()),

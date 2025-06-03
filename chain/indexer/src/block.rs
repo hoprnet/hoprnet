@@ -12,7 +12,6 @@ use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{HoprDbGeneralModelOperations, info::HoprDbInfoOperations};
-#[cfg(all(feature = "prometheus", not(test)))]
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, trace};
 
@@ -757,8 +756,9 @@ mod tests {
         #[async_trait]
         impl HoprIndexerRpcOperations for HoprIndexerOps {
             async fn block_number(&self) -> hopr_chain_rpc::errors::Result<u64>;
-            async fn get_allowanc<C: Currency>e(&self, owner: Address, spender: Address) -> hopr_chain_rpc::errors::Result<Balance<C>>;
-            async fn get_balance<C: Currency>(&self, address: Address) -> hopr_chain_rpc::errors::Result<Balance<C>>;
+            async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> hopr_chain_rpc::errors::Result<HoprBalance>;
+            async fn get_xdai_balance(&self, address: Address) -> hopr_chain_rpc::errors::Result<XDaiBalance>;
+            async fn get_hopr_balance(&self, address: Address) -> hopr_chain_rpc::errors::Result<HoprBalance>;
 
             fn try_stream_logs<'a>(
                 &'a self,
