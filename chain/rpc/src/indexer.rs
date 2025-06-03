@@ -292,7 +292,7 @@ mod tests {
     use tracing::debug;
 
     use crate::{
-        BlockWithLogs, HoprIndexerRpcOperations,
+        BlockWithLogs, FilterSet, HoprIndexerRpcOperations,
         client::create_rpc_client_to_anvil,
         errors::RpcError,
         indexer::split_range,
@@ -332,7 +332,7 @@ mod tests {
     #[tokio::test]
     async fn test_split_range() -> anyhow::Result<()> {
         let filters = vec![Filter::default()];
-        let ranges = split_range(filters, 0, 10, 2).collect::<Vec<_>>().await;
+        let ranges = split_range(filters.clone(), 0, 10, 2).collect::<Vec<_>>().await;
 
         assert_eq!(6, ranges.len());
         assert_eq!((0, 1), filter_bounds(&ranges[0])?);
@@ -342,22 +342,21 @@ mod tests {
         assert_eq!((8, 9), filter_bounds(&ranges[4])?);
         assert_eq!((10, 10), filter_bounds(&ranges[5])?);
 
-        let ranges = split_range(LogFilter::default(), 0, 0, 2).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
         assert_eq!((0, 0), filter_bounds(&ranges[0])?);
 
-        let ranges = split_range(LogFilter::default(), 0, 0, 1).collect::<Vec<_>>().await;
+        let ranges = split_range(filters.clone(), 0, 0, 1).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
         assert_eq!((0, 0), filter_bounds(&ranges[0])?);
 
-        let ranges = split_range(LogFilter::default(), 0, 3, 1).collect::<Vec<_>>().await;
+        let ranges = split_range(filters.clone(), 0, 3, 1).collect::<Vec<_>>().await;
         assert_eq!(4, ranges.len());
         assert_eq!((0, 0), filter_bounds(&ranges[0])?);
         assert_eq!((1, 1), filter_bounds(&ranges[1])?);
         assert_eq!((2, 2), filter_bounds(&ranges[2])?);
         assert_eq!((3, 3), filter_bounds(&ranges[3])?);
 
-        let ranges = split_range(LogFilter::default(), 0, 3, 10).collect::<Vec<_>>().await;
+        let ranges = split_range(filters.clone(), 0, 3, 10).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
         assert_eq!((0, 3), filter_bounds(&ranges[0])?);
 
@@ -442,21 +441,35 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let log_filter = LogFilter {
-            address: vec![contract_addrs.token, contract_addrs.channels],
-            topics: vec![
-                Hash::from(Approval::SIGNATURE_HASH.0),
-                Hash::from(Transfer::SIGNATURE_HASH.0),
-                Hash::from(ChannelOpened::SIGNATURE_HASH.0),
-                Hash::from(ChannelBalanceIncreased::SIGNATURE_HASH.0),
+        let filter_token_approval = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.token))
+            .event_signature(Approval::SIGNATURE_HASH);
+        let filter_token_transfer = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.token))
+            .event_signature(Transfer::SIGNATURE_HASH);
+        let filter_channels_opened = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.channels))
+            .event_signature(ChannelOpened::SIGNATURE_HASH);
+        let filter_channels_balance_increased = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.channels))
+            .event_signature(ChannelBalanceIncreased::SIGNATURE_HASH);
+
+        let log_filter = FilterSet {
+            all: vec![
+                filter_token_approval.clone(),
+                filter_token_transfer.clone(),
+                filter_channels_opened.clone(),
+                filter_channels_balance_increased.clone(),
             ],
+            token: vec![filter_token_approval, filter_token_transfer],
+            no_token: vec![filter_channels_opened, filter_channels_balance_increased],
         };
 
         debug!("{:#?}", contract_addrs);
         debug!("{:#?}", log_filter);
 
         // Spawn stream
-        let count_filtered_topics = log_filter.topics.len();
+        let count_filtered_topics = 4;
         let retrieved_logs = spawn(async move {
             Ok::<_, RpcError>(
                 rpc.try_stream_logs(1, log_filter, false)?
@@ -586,19 +599,27 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let log_filter = LogFilter {
-            address: vec![contract_addrs.channels],
-            topics: vec![
-                Hash::from(ChannelOpened::SIGNATURE_HASH.0),
-                Hash::from(ChannelBalanceIncreased::SIGNATURE_HASH.0),
+        let filter_channels_opened = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.channels))
+            .event_signature(ChannelOpened::SIGNATURE_HASH);
+        let filter_channels_balance_increased = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.channels))
+            .event_signature(ChannelBalanceIncreased::SIGNATURE_HASH);
+
+        let log_filter = FilterSet {
+            all: vec![
+                filter_channels_opened.clone(),
+                filter_channels_balance_increased.clone(),
             ],
+            token: vec![],
+            no_token: vec![filter_channels_opened, filter_channels_balance_increased],
         };
 
         debug!("{:#?}", contract_addrs);
         debug!("{:#?}", log_filter);
 
         // Spawn stream
-        let count_filtered_topics = log_filter.topics.len();
+        let count_filtered_topics = 2;
         let retrieved_logs = spawn(async move {
             Ok::<_, RpcError>(
                 rpc.try_stream_logs(1, log_filter, false)?
