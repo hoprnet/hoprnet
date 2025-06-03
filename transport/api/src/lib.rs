@@ -59,7 +59,7 @@ use hopr_primitive_types::prelude::*;
 use hopr_transport_identity::multiaddrs::strip_p2p_protocol;
 pub use hopr_transport_identity::{Multiaddr, PeerId};
 use hopr_transport_mixer::MixerConfig;
-pub use hopr_transport_network::network::{Health, Network, NetworkTriggeredEvent, PeerOrigin, PeerStatus};
+pub use hopr_transport_network::network::{Health, Network, PeerOrigin, PeerStatus};
 use hopr_transport_p2p::{
     HoprSwarm,
     swarm::{TicketAggregationRequestType, TicketAggregationResponseType},
