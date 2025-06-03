@@ -133,7 +133,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprIndexerRpcOperations for RpcOperati
         self.get_allowance::<C>(owner, spender).await
     }
 
-    async fn get_balance<C: Currency>(&self, address: Address) -> Result<Balance<C>> {
+    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>> {
         self.get_balance::<C>(address).await
     }
 

@@ -322,7 +322,7 @@ pub trait HoprIndexerRpcOperations {
     async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>>;
 
     /// Retrieves on-chain token balance of the given address.
-    async fn get_balance<C: Currency>(&self, address: Address) -> Result<Balance<C>>;
+    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>>;
 
     /// Starts streaming logs from the given `start_block_number`.
     /// If no `start_block_number` is given, the stream starts from the latest block.

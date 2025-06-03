@@ -184,15 +184,8 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
         let result = self.provider.get_block_by_number(sanitized_block_number.into()).await?;
         Ok(result)
     }
-}
 
-#[async_trait]
-impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> {
-    async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
-        Ok(self.get_block(block_number).await?.map(|b| b.header.timestamp))
-    }
-
-    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>> {
+    pub(crate) async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>> {
         let value = if C::is::<XDai>() {
             U256::from_be_bytes(self.provider.get_balance(address.into()).await?.to_be_bytes::<32>())
         } else if C::is::<WxHOPR>() {
@@ -211,7 +204,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         Ok(Balance::<C>::from(value))
     }
 
-    async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>> {
+    pub(crate) async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>> {
         if C::is::<WxHOPR>() {
             return Ok(Balance::<C>::from(U256::from_be_bytes(
                 self.contract_instances
@@ -224,6 +217,21 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         } else {
             return Err(RpcError::Other("unsupported currency".into()));
         };
+    }
+}
+
+#[async_trait]
+impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> {
+    async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>> {
+        Ok(self.get_block(block_number).await?.map(|b| b.header.timestamp))
+    }
+
+    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>> {
+        self.get_balance::<C>(address).await
+    }
+
+    async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>> {
+        self.get_allowance::<C>(owner, spender).await
     }
 
     async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability> {
