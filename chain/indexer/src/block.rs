@@ -688,7 +688,7 @@ mod tests {
     use futures::{Stream, join};
     use hex_literal::hex;
     use hopr_chain_rpc::BlockWithLogs;
-    use hopr_chain_types::chain_events::ChainEventType;
+    use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
     use hopr_crypto_types::{
         keypairs::{Keypair, OffchainKeypair},
         prelude::ChainKeypair,
@@ -786,6 +786,16 @@ mod tests {
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
             .return_const(vec![B256::from_slice(topic.as_ref())]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
+        handlers
+            .expect_safe_address()
+            .return_const(Address::new(b"my safe address 1234"));
+        handlers
+            .expect_contract_addresses_map()
+            .return_const(ContractAddresses::default());
 
         let head_block = 1000;
         rpc.expect_block_number().times(2).returning(move || Ok(head_block));
@@ -830,6 +840,17 @@ mod tests {
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
             .return_const(vec![B256::from_slice(topic.as_ref())]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
+        handlers
+            .expect_safe_address()
+            .return_const(Address::new(b"my safe address 1234"));
+        handlers
+            .expect_contract_addresses_map()
+            .return_const(ContractAddresses::default());
+
         db.ensure_logs_origin(vec![(addr, topic)]).await?;
 
         rpc.expect_block_number().times(2).returning(move || Ok(head_block));
@@ -893,6 +914,12 @@ mod tests {
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
             .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
+        handlers
+            .expect_safe_address()
+            .return_const(Address::new(b"my safe address 1234"));
+        handlers
+            .expect_contract_addresses_map()
+            .return_const(ContractAddresses::default());
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         rpc.expect_try_stream_logs()
@@ -980,6 +1007,16 @@ mod tests {
                 .times(2)
                 .withf(move |l| [1, 2].contains(&l.block_number))
                 .returning(|_| Ok(None));
+            handlers
+                .expect_contract_address_topics()
+                .withf(move |x| x == &addr)
+                .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
+            handlers
+                .expect_safe_address()
+                .return_const(Address::new(b"my safe address 1234"));
+            handlers
+                .expect_contract_addresses_map()
+                .return_const(ContractAddresses::default());
 
             let indexer_cfg = IndexerConfig {
                 start_block_number: 0,
@@ -1061,6 +1098,16 @@ mod tests {
                 .times(2)
                 .withf(move |l| [3, 4].contains(&l.block_number))
                 .returning(|_| Ok(None));
+            handlers
+                .expect_contract_address_topics()
+                .withf(move |x| x == &addr)
+                .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
+            handlers
+                .expect_safe_address()
+                .return_const(Address::new(b"my safe address 1234"));
+            handlers
+                .expect_contract_addresses_map()
+                .return_const(ContractAddresses::default());
 
             let indexer_cfg = IndexerConfig {
                 start_block_number: 0,
@@ -1095,6 +1142,16 @@ mod tests {
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
             .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
+        handlers
+            .expect_safe_address()
+            .return_const(Address::new(b"my safe address 1234"));
+        handlers
+            .expect_contract_addresses_map()
+            .return_const(ContractAddresses::default());
 
         let (mut tx, rx) = futures::channel::mpsc::unbounded::<BlockWithLogs>();
         // Expected to be called once starting at 0 and yield the respective blocks
@@ -1102,6 +1159,12 @@ mod tests {
             .times(1)
             .withf(move |x: &u64, _y: &FilterSet, _: &bool| *x == 0)
             .return_once(move |_, _, _| Ok(Box::pin(rx)));
+        rpc.expect_get_hopr_balance()
+            .once()
+            .return_once(move |_| Ok(HoprBalance::zero()));
+        rpc.expect_get_hopr_allowance()
+            .once()
+            .return_once(move |_, _| Ok(HoprBalance::zero()));
 
         let head_block = 1000;
         let block_numbers = [head_block - 1, head_block, head_block + 1];
@@ -1190,6 +1253,14 @@ mod tests {
             .times(3)
             .returning(move || Ok(last_processed_block + 1));
 
+        rpc.expect_get_hopr_balance()
+            .once()
+            .return_once(move |_| Ok(HoprBalance::zero()));
+
+        rpc.expect_get_hopr_allowance()
+            .once()
+            .return_once(move |_, _| Ok(HoprBalance::zero()));
+
         let block = BlockWithLogs {
             block_id: last_processed_block + 1,
             logs: BTreeSet::from_iter(build_announcement_logs(*ALICE, 1, last_processed_block + 1, 23)?),
@@ -1203,6 +1274,16 @@ mod tests {
             .expect_contract_address_topics()
             .withf(move |x| x == &addr)
             .return_const(vec![B256::from_slice(topic.as_ref())]);
+        handlers
+            .expect_contract_address_topics()
+            .withf(move |x| x == &addr)
+            .return_const(vec![B256::from_slice(Hash::create(&[b"my topic"]).as_ref())]);
+        handlers
+            .expect_safe_address()
+            .return_const(Address::new(b"my safe address 1234"));
+        handlers
+            .expect_contract_addresses_map()
+            .return_const(ContractAddresses::default());
 
         let indexer_cfg = IndexerConfig {
             start_block_number: 0,
