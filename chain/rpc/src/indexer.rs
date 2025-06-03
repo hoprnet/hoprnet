@@ -15,10 +15,12 @@ use async_trait::async_trait;
 use futures::{Stream, StreamExt, stream::BoxStream};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
+use hopr_primitive_types::prelude::*;
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{debug, error, trace, warn};
 
 use crate::{
-    BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter,
+    BlockWithLogs, FilterSet, HoprIndexerRpcOperations, Log,
     errors::{Result, RpcError, RpcError::FilterIsEmpty},
     rpc::RpcOperations,
     transport::HttpRequestor,
@@ -64,12 +66,7 @@ fn split_range<'a>(
 // impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R> {
 impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
     /// Retrieves logs in the given range (`from_block` and `to_block` are inclusive).
-    fn stream_logs(
-        &self,
-        filters: Vec<ethers::types::Filter>,
-        from_block: u64,
-        to_block: u64,
-    ) -> BoxStream<Result<Log>> {
+    fn stream_logs(&self, filters: Vec<Filter>, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
         let fetch_ranges = split_range(filters, from_block, to_block, self.cfg.max_block_range_fetch_size);
 
         debug!(
@@ -98,7 +95,7 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
                     })
                     .flat_map(|result| {
                         futures::stream::iter(match result {
-                            Ok(logs) => logs.into_iter().map(|log| Ok(Log::from(log))).collect::<Vec<_>>(),
+                            Ok(logs) => logs.into_iter().map(|log| Ok(Log::try_from(log)?)).collect::<Vec<_>>(),
                             Err(e) => vec![Err(RpcError::from(e))],
                         })
                     })
@@ -132,12 +129,12 @@ impl<R: HttpRequestor + 'static + Clone> HoprIndexerRpcOperations for RpcOperati
         self.get_block_number().await
     }
 
-    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance> {
-        self.get_allowance(owner, spender).await
+    async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>> {
+        self.get_allowance::<C>(owner, spender).await
     }
 
-    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance> {
-        self.get_balance(address, balance_type).await
+    async fn get_balance<C: Currency>(&self, address: Address) -> Result<Balance<C>> {
+        self.get_balance::<C>(address).await
     }
 
     fn try_stream_logs<'a>(
@@ -291,7 +288,7 @@ mod tests {
     use tracing::debug;
 
     use crate::{
-        BlockWithLogs, HoprIndexerRpcOperations, LogFilter,
+        BlockWithLogs, HoprIndexerRpcOperations,
         client::create_rpc_client_to_anvil,
         errors::RpcError,
         indexer::split_range,
@@ -317,7 +314,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_split_range() -> anyhow::Result<()> {
-        let filters = vec![ethers::types::Filter::default()];
+        let filters = vec![Filter::default()];
         let ranges = split_range(filters, 0, 10, 2).collect::<Vec<_>>().await;
 
         assert_eq!(6, ranges.len());

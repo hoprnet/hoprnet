@@ -364,7 +364,7 @@ where
         });
 
         let filter_base = Filter::new().address(filter_base_addresses).topic0(filter_base_topics);
-        let filter_token = Filter::new().address(ethers::types::Address::from(
+        let filter_token = Filter::new().address(alloy::rpc::types::Address::from(
             logs_handler.contract_addresses_map().token,
         ));
 

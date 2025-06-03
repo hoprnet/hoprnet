@@ -211,21 +211,19 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         Ok(Balance::<C>::from(value))
     }
 
-    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance> {
-        match self
-            .contract_instances
-            .token
-            .allowance(owner.into(), spender.into())
-            .call()
-            .await
-        {
-            Ok(token_allowance) => Ok(Balance::new(token_allowance, BalanceType::HOPR)),
-            Err(e) => Err(ContractError(
-                "HoprToken".to_string(),
-                "allowance".to_string(),
-                e.to_string(),
-            )),
-        }
+    async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>> {
+        if C::is::<WxHOPR>() {
+            return Ok(Balance::<C>::from(U256::from_be_bytes(
+                self.contract_instances
+                    .token
+                    .allowance(owner.into(), spender.into())
+                    .call()
+                    .await?
+                    .to_be_bytes::<32>(),
+            )));
+        } else {
+            return Err(RpcError::Other("unsupported currency".into()));
+        };
     }
 
     async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability> {

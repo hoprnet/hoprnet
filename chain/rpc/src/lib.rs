@@ -252,7 +252,7 @@ pub trait HoprRpcOperations {
     async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>>;
 
     /// Retrieves the HOPR token allowance for the given owner and spender.
-    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance>;
+    async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>>;
 
     /// Retrieves the minimum incoming ticket winning probability by directly
     /// calling the network's winning probability oracle.
@@ -319,10 +319,10 @@ pub trait HoprIndexerRpcOperations {
     async fn block_number(&self) -> Result<u64>;
 
     /// Retrieves token allowance for the given owner and spender.
-    async fn get_allowance(&self, owner: Address, spender: Address) -> Result<Balance>;
+    async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>>;
 
     /// Retrieves on-chain token balance of the given address.
-    async fn get_balance(&self, address: Address, balance_type: BalanceType) -> Result<Balance>;
+    async fn get_balance<C: Currency>(&self, address: Address) -> Result<Balance<C>>;
 
     /// Starts streaming logs from the given `start_block_number`.
     /// If no `start_block_number` is given, the stream starts from the latest block.
