@@ -5,8 +5,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use futures::stream::{BoxStream, Stream, StreamExt};
-use futures_concurrency::stream::Merge;
-use hopr_transport_network::network::NetworkTriggeredEvent;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     Multiaddr, PeerId,
@@ -20,7 +18,6 @@ use tracing::debug;
 
 #[derive(Debug)]
 pub enum DiscoveryInput {
-    NetworkUpdate(NetworkTriggeredEvent),
     Indexer(PeerDiscovery),
 }
 
@@ -42,21 +39,13 @@ pub struct Behaviour {
 }
 
 impl Behaviour {
-    pub fn new<T, U>(me: PeerId, network_events: T, onchain_events: U) -> Self
+    pub fn new<T>(me: PeerId, onchain_events: T) -> Self
     where
-        T: Stream<Item = NetworkTriggeredEvent> + Send + 'static,
-        U: Stream<Item = PeerDiscovery> + Send + 'static,
+        T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         Self {
             me,
-            events: Box::pin(
-                (
-                    network_events.map(DiscoveryInput::NetworkUpdate),
-                    onchain_events.map(DiscoveryInput::Indexer),
-                )
-                    .merge()
-                    .fuse(),
-            ),
+            events: Box::pin(onchain_events.map(DiscoveryInput::Indexer)),
             all_peers: HashMap::new(),
             pending_events: VecDeque::new(),
             allowed_peers: HashSet::new(),
@@ -112,18 +101,13 @@ impl NetworkBehaviour for Behaviour {
     fn handle_established_outbound_connection(
         &mut self,
         _connection_id: libp2p::swarm::ConnectionId,
-        peer: libp2p::PeerId,
+        _peer: libp2p::PeerId,
         _addr: &libp2p::Multiaddr,
         _role_override: libp2p::core::Endpoint,
         _port_use: libp2p::core::transport::PortUse,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
-        if self.allowed_peers.contains(&peer) {
-            Ok(Self::ConnectionHandler {})
-        } else {
-            Err(libp2p::swarm::ConnectionDenied::new(crate::errors::P2PError::Logic(
-                format!("Connection to '{peer}' is not allowed"),
-            )))
-        }
+        // cannot connect without the handle_ending_outbound_connection being called first
+        Ok(Self::ConnectionHandler {})
     }
 
     fn on_swarm_event(&mut self, event: libp2p::swarm::FromSwarm) {
@@ -136,19 +120,6 @@ impl NetworkBehaviour for Behaviour {
                 if *v > 0 {
                     *v -= 1;
                 };
-            }
-            libp2p::swarm::FromSwarm::DialFailure(failure) => {
-                // NOTE: libp2p swarm in the current version removes the (PeerId, Multiaddr) from the cache on a dial
-                // failure, therefore it needs to be readded back to the swarm on every dial failure,
-                // for now we want to mirror the entire announcement back to the swarm
-                if let Some(peer_id) = failure.peer_id {
-                    if let Some(multiaddress) = self.all_peers.get(&peer_id) {
-                        self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
-                            peer_id,
-                            address: multiaddress.clone(),
-                        });
-                    }
-                }
             }
             _ => {}
         }
@@ -172,18 +143,6 @@ impl NetworkBehaviour for Behaviour {
         };
 
         let poll_result = self.events.poll_next_unpin(cx).map(|e| match e {
-            Some(DiscoveryInput::NetworkUpdate(event)) => match event {
-                NetworkTriggeredEvent::CloseConnection(peer) => {
-                    if self.is_peer_connected(&peer) {
-                        self.pending_events.push_back(ToSwarm::CloseConnection {
-                            peer_id: peer,
-                            connection: CloseConnection::default(),
-                        });
-                        debug!(peer = %peer, "p2p - discovery - Closing connection (reason: low ping connection quality");
-                    }
-                }
-                NetworkTriggeredEvent::UpdateQuality(_, _) => {}
-            },
             Some(DiscoveryInput::Indexer(event)) => match event {
                 PeerDiscovery::Allow(peer) => {
                     debug!(peer = %peer, "p2p - discovery - Network registry allow");

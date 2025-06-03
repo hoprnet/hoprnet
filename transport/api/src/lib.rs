@@ -436,16 +436,8 @@ where
             (tx, rx)
         };
 
-        let (network_events_tx, network_events_rx) =
-            mpsc::channel::<NetworkTriggeredEvent>(constants::MAXIMUM_NETWORK_UPDATE_EVENT_QUEUE_SIZE);
-
-        let mut transport_layer = HoprSwarm::new(
-            (&self.me).into(),
-            network_events_rx,
-            discovery_updates,
-            self.my_multiaddresses.clone(),
-        )
-        .await;
+        let mut transport_layer =
+            HoprSwarm::new((&self.me).into(), discovery_updates, self.my_multiaddresses.clone()).await;
 
         if let Some(port) = self.cfg.protocol.autonat_port {
             transport_layer.run_nat_server(port);
@@ -511,7 +503,6 @@ where
                     self.network.clone(),
                     self.db.clone(),
                     self.path_planner.channel_graph(),
-                    network_events_tx,
                 ),
                 DbProxy::new(self.db.clone()),
                 tx_from_probing,

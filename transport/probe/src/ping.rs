@@ -51,8 +51,8 @@ impl PingQueryReplier {
     /// The resulting timing information about the RTT is halved to provide a unidirectional latency.
     pub fn notify(self, result: PingQueryResult) {
         let result = result.map(|rtt| {
-            let unidirectional_latency = rtt.div(2u32);
-            unidirectional_latency
+            
+            rtt.div(2u32)
         });
 
         if self.notifier.unbounded_send(result).is_err() {
@@ -112,8 +112,9 @@ impl Pinger {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::anyhow;
     use std::time::Duration;
+
+    use anyhow::anyhow;
 
     use super::*;
     use crate::ping::Pinger;

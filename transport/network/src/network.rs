@@ -55,7 +55,6 @@ pub enum Health {
 #[derive(Debug, Clone, PartialEq, strum::Display)]
 pub enum NetworkTriggeredEvent {
     CloseConnection(PeerId),
-    UpdateQuality(PeerId, f64),
 }
 
 /// Calculate the health factor for network from the available stats
@@ -220,7 +219,7 @@ where
         peer: &PeerId,
         ping_result: std::result::Result<Duration, ()>,
         version: Option<String>,
-    ) -> crate::errors::Result<Option<NetworkTriggeredEvent>> {
+    ) -> crate::errors::Result<()> {
         if peer == &self.me {
             return Err(crate::errors::NetworkingError::DisallowedOperationOnOwnPeerIdError);
         }
@@ -253,7 +252,6 @@ where
                 }
             }
 
-            let (peer_id, quality) = (entry.id.1, entry.get_quality());
             self.db.update_network_peer(entry).await?;
 
             #[cfg(all(feature = "prometheus", not(test)))]
@@ -262,14 +260,10 @@ where
                 self.refresh_metrics(&stats)
             }
 
-            if quality <= self.cfg.quality_offline_threshold {
-                Ok(Some(NetworkTriggeredEvent::CloseConnection(peer_id)))
-            } else {
-                Ok(Some(NetworkTriggeredEvent::UpdateQuality(peer_id, quality)))
-            }
+            Ok(())
         } else {
             debug!(%peer, "Ignoring update request for unknown peer");
-            Ok(None)
+            Ok(())
         }
     }
 
@@ -384,7 +378,7 @@ mod tests {
     use libp2p_identity::PeerId;
     use more_asserts::*;
 
-    use crate::network::{Health, Network, NetworkConfig, NetworkTriggeredEvent, PeerOrigin};
+    use crate::network::{Health, Network, NetworkConfig, PeerOrigin};
 
     #[test]
     fn test_network_health_should_serialize_to_a_proper_string() {
@@ -781,8 +775,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_network_should_close_connection_to_peer_once_it_reaches_the_lowest_possible_quality()
-    -> anyhow::Result<()> {
+    async fn test_network_should_allow_the_quality_to_go_to_0() -> anyhow::Result<()> {
         let peer: PeerId = OffchainKeypair::random().public().into();
         let public = peer;
         let me: PeerId = OffchainKeypair::random().public().into();
@@ -801,10 +794,7 @@ mod tests {
 
         peers.add(&peer, PeerOrigin::IncomingConnection, vec![]).await?;
 
-        assert_eq!(
-            peers.update(&peer, Err(()), None).await?,
-            Some(NetworkTriggeredEvent::CloseConnection(peer))
-        );
+        assert!(peers.update(&peer, Err(()), None).await.is_ok());
 
         assert!(peers.is_ignored(&public).await);
 
