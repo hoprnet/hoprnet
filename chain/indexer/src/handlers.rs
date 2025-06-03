@@ -546,7 +546,7 @@ where
                     error!(
                     safe_address = %&self.safe_address, %from, %to,
                         "filter misconfiguration: transfer event not involving the safe");
-                } else if to.eq(&self.safe_address) || from.eq(&self.safe_address) {
+                } else {
                     info!("updating safe balance from chain after transfer event");
                     match self.rpc_operations.get_hopr_balance(self.safe_address).await {
                         Ok(balance) => {
@@ -1498,12 +1498,17 @@ mod tests {
     #[tokio::test]
     async fn on_token_approval_correct() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
+
+        let target_allowance = HoprBalance::from(primitive_types::U256::from(1000u64));
+        let mut rpc_operations = MockIndexerRpcOperations::new();
+        rpc_operations
+            .expect_get_hopr_allowance()
+            .times(2)
+            .returning(move |_, _| Ok(target_allowance.clone()));
         let clonable_rpc_operations = ClonableMockOperations {
-            //
             inner: Arc::new(rpc_operations),
         };
+
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
 
         let encoded_data = (U256::from(1000u64)).abi_encode();
@@ -1519,6 +1524,7 @@ mod tests {
             ..test_log()
         };
 
+        // before any operation the allowance should be 0
         assert_eq!(db.get_safe_hopr_allowance(None).await?, HoprBalance::zero());
 
         let approval_log_clone = approval_log.clone();
@@ -1531,10 +1537,8 @@ mod tests {
 
         assert!(event_type.is_none(), "token approval does not have chain event type");
 
-        assert_eq!(
-            db.get_safe_hopr_allowance(None).await?,
-            HoprBalance::from(primitive_types::U256::from(1000u64))
-        );
+        // after processing the allowance should be 0
+        assert_eq!(db.get_safe_hopr_allowance(None).await?, target_allowance.clone());
 
         // reduce allowance manually to verify a second time
         let _ = db
@@ -1554,10 +1558,7 @@ mod tests {
 
         assert!(event_type.is_none(), "token approval does not have chain event type");
 
-        assert_eq!(
-            db.get_safe_hopr_allowance(None).await?,
-            HoprBalance::from(primitive_types::U256::from(1000u64))
-        );
+        assert_eq!(db.get_safe_hopr_allowance(None).await?, target_allowance);
         Ok(())
     }
 
