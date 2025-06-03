@@ -5,15 +5,10 @@ use futures::{
     channel::mpsc::{UnboundedSender, unbounded},
 };
 use hopr_async_runtime::prelude::timeout_fut;
-use hopr_platform::time::native::current_time;
-use hopr_primitive_types::prelude::AsUnixTimestamp;
 use libp2p_identity::PeerId;
 use tracing::{debug, warn};
 
-use crate::{
-    content::NeighborProbe,
-    errors::{ProbeError, Result},
-};
+use crate::errors::{ProbeError, Result};
 
 /// Heartbeat send ping TX type
 ///
@@ -43,41 +38,24 @@ pub type PingQueryResult = Result<std::time::Duration>;
 pub struct PingQueryReplier {
     /// Back channel for notifications, is [`Clone`] to allow caching
     notifier: UnboundedSender<PingQueryResult>,
-    challenge: (u64, NeighborProbe),
 }
 
 impl PingQueryReplier {
     pub fn new(notifier: UnboundedSender<PingQueryResult>) -> Self {
-        Self {
-            notifier,
-            challenge: (
-                current_time().as_unix_timestamp().as_millis() as u64,
-                NeighborProbe::random_nonce(),
-            ),
-        }
-    }
-
-    /// Return a copy of the challenge for which the reply is expected
-    pub fn challenge(&self) -> NeighborProbe {
-        self.challenge.1
+        Self { notifier }
     }
 
     /// Mechanism to finalize the ping operation by providing a [`ControlMessage`] received by the
     /// transport layer.
     ///
     /// The resulting timing information about the RTT is halved to provide a unidirectional latency.
-    pub fn notify(self, pong: NeighborProbe) {
-        let timed_result = if self.challenge.1.is_complement_to(pong) {
-            let unidirectional_latency = current_time()
-                .as_unix_timestamp()
-                .saturating_sub(std::time::Duration::from_millis(self.challenge.0))
-                .div(2u32); // RTT -> unidirectional latency
-            Ok(unidirectional_latency)
-        } else {
-            Err(ProbeError::DecodingError)
-        };
+    pub fn notify(self, result: PingQueryResult) {
+        let result = result.map(|rtt| {
+            let unidirectional_latency = rtt.div(2u32);
+            unidirectional_latency
+        });
 
-        if self.notifier.unbounded_send(timed_result).is_err() {
+        if self.notifier.unbounded_send(result).is_err() {
             warn!("Failed to notify the ping query result due to upper layer ping timeout");
         }
     }
@@ -134,36 +112,19 @@ impl Pinger {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::anyhow;
+    use std::time::Duration;
+
     use super::*;
-    use crate::{content::NeighborProbe, ping::Pinger};
+    use crate::ping::Pinger;
 
     #[tokio::test]
-    async fn ping_query_replier_should_return_ok_result_when_the_pong_is_correct_for_the_challenge()
-    -> anyhow::Result<()> {
+    async fn ping_query_replier_should_yield_a_failed_probe() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
-        let challenge = replier.challenge.1;
 
-        replier.notify(NeighborProbe::Pong(challenge.into()));
-
-        assert!(rx.next().await.is_some_and(|r| r.is_ok()));
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn ping_query_replier_should_return_err_result_when_the_reply_is_incorrect_for_the_challenge()
-    -> anyhow::Result<()> {
-        let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
-
-        let replier = PingQueryReplier::new(tx);
-        let challenge = replier.challenge.1;
-
-        let mut wrong: [u8; NeighborProbe::SIZE] = challenge.into();
-        wrong[0] = wrong[0].wrapping_add(1); // Modify the first byte to ensure it's different
-
-        replier.notify(NeighborProbe::Pong(wrong));
+        replier.notify(Err(ProbeError::Timeout(4u64)));
 
         assert!(rx.next().await.is_some_and(|r| r.is_err()));
 
@@ -171,63 +132,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ping_query_replier_should_return_the_latency_on_notification() -> anyhow::Result<()> {
+    async fn ping_query_replier_should_yield_a_successful_probe_as_unidirectional_latency() -> anyhow::Result<()> {
+        const RTT: Duration = Duration::from_millis(100);
+
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<PingQueryResult>();
 
         let replier = PingQueryReplier::new(tx);
-        let challenge = replier.challenge.1;
 
-        let delay = std::time::Duration::from_millis(10);
-        tokio::time::sleep(delay).await;
+        replier.notify(Ok(RTT));
 
-        replier.notify(NeighborProbe::Pong(challenge.into()));
+        let result = rx.next().await.ok_or(anyhow!("should contain a value"))?;
 
-        let actual_latency = rx
-            .next()
-            .await
-            .ok_or_else(|| anyhow::anyhow!("should contain a result value"))?
-            .map_err(|_e| anyhow::anyhow!("should contain a result value"))?;
-
-        assert!(actual_latency > delay / 2);
-        assert!(actual_latency < delay);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn pinger_should_return_the_measeured_latency_when_no_issues_occur() -> anyhow::Result<()> {
-        let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
-
-        let ideal_channel = tokio::task::spawn(async move {
-            while let Some((_peer, replier)) = rx.next().await {
-                let challenge = replier.challenge.1;
-
-                replier.notify(NeighborProbe::Pong(challenge.into()));
-            }
-        });
-
-        let pinger = Pinger::new(Default::default(), tx);
-        pinger.ping(PeerId::random()).await?;
-
-        ideal_channel.abort();
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn pinger_should_return_an_error_if_an_incorrect_nonce_is_replied() -> anyhow::Result<()> {
-        let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
-
-        let failing_channel = tokio::task::spawn(async move {
-            while let Some((_peer, replier)) = rx.next().await {
-                replier.notify(NeighborProbe::Pong(NeighborProbe::random_nonce().into()));
-            }
-        });
-
-        let pinger = Pinger::new(Default::default(), tx);
-        assert!(pinger.ping(PeerId::random()).await.is_err());
-
-        failing_channel.abort();
+        assert!(result.is_ok());
+        let result = result?;
+        assert_eq!(result, RTT.div(2));
 
         Ok(())
     }
@@ -236,20 +154,18 @@ mod tests {
     async fn pinger_should_return_an_error_if_the_latency_is_longer_than_the_configure_timeout() -> anyhow::Result<()> {
         let (tx, mut rx) = futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
-        let delay = std::time::Duration::from_millis(10);
+        let delay = Duration::from_millis(10);
         let delaying_channel = tokio::task::spawn(async move {
             while let Some((_peer, replier)) = rx.next().await {
-                let challenge = replier.challenge.1;
-
                 tokio::time::sleep(delay).await;
 
-                replier.notify(NeighborProbe::Pong(challenge.into()));
+                replier.notify(Ok(delay));
             }
         });
 
         let pinger = Pinger::new(
             PingConfig {
-                timeout: std::time::Duration::from_millis(0),
+                timeout: Duration::from_millis(0),
             },
             tx,
         );
