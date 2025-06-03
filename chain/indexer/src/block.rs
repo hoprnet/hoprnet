@@ -641,7 +641,7 @@ where
 
                 if let Some(safe_address) = safe_address {
                     info!("updating safe balance from chain after indexer sync completed");
-                    match rpc.get_balance::<WxHOPR>(safe_address).await {
+                    match rpc.get_hopr_balance(safe_address).await {
                         Ok(balance) => {
                             if let Err(error) = db.set_safe_hopr_balance(None, balance).await {
                                 error!(%error, "failed to update safe balance from chain after indexer sync completed");
@@ -655,7 +655,7 @@ where
 
                 if let Some((channels_address, safe_address)) = channels_address.zip(safe_address) {
                     info!("updating safe allowance from chain after indexer sync completed");
-                    match rpc.get_allowance(channels_address, safe_address).await {
+                    match rpc.get_hopr_allowance(channels_address, safe_address).await {
                         Ok(allowance) => {
                             if let Err(error) = db.set_safe_hopr_allowance(None, allowance).await {
                                 error!(%error, "failed to update safe allowance from chain after indexer sync completed");

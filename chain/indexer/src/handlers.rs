@@ -548,7 +548,7 @@ where
                         "filter misconfiguration: transfer event not involving the safe");
                 } else if to.eq(&self.safe_address) {
                     info!("updating safe balance from chain after transfer event");
-                    match self.rpc_operations.get_balance::<WxHOPR>(self.safe_address).await {
+                    match self.rpc_operations.get_hopr_balance(self.safe_address).await {
                         Ok(balance) => {
                             self.db.set_safe_hopr_balance(Some(tx), balance).await?;
                         }
@@ -573,7 +573,7 @@ where
                     info!("updating safe allowance from chain after approval event");
                     match self
                         .rpc_operations
-                        .get_allowance::<WxHOPR>(self.addresses.channels, self.safe_address)
+                        .get_hopr_allowance(self.addresses.channels, self.safe_address)
                         .await
                     {
                         Ok(allowance) => {

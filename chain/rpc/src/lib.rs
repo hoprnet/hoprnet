@@ -248,11 +248,14 @@ pub trait HoprRpcOperations {
     /// Retrieves the timestamp from the given block number.
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>>;
 
-    /// Retrieves the node's account balance of the given type.
-    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>>;
+    /// Retrieves on-chain xdai balance of the given address.
+    async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance>;
 
-    /// Retrieves the HOPR token allowance for the given owner and spender.
-    async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>>;
+    /// Retrieves on-chain wxHOPR token balance of the given address.
+    async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance>;
+
+    /// Retrieves the wxHOPR token allowance for the given owner and spender.
+    async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance>;
 
     /// Retrieves the minimum incoming ticket winning probability by directly
     /// calling the network's winning probability oracle.
@@ -318,11 +321,14 @@ pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
 
-    /// Retrieves token allowance for the given owner and spender.
-    async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>>;
+    /// Retrieves wxHOPR token allowance for the given owner and spender.
+    async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance>;
 
-    /// Retrieves on-chain token balance of the given address.
-    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>>;
+    /// Retrieves on-chain xdai balance of the given address.
+    async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance>;
+
+    /// Retrieves on-chain wxHOPR token balance of the given address.
+    async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance>;
 
     /// Starts streaming logs from the given `start_block_number`.
     /// If no `start_block_number` is given, the stream starts from the latest block.

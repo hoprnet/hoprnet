@@ -129,12 +129,16 @@ impl<R: HttpRequestor + 'static + Clone> HoprIndexerRpcOperations for RpcOperati
         self.get_block_number().await
     }
 
-    async fn get_allowance<C: Currency>(&self, owner: Address, spender: Address) -> Result<Balance<C>> {
-        self.get_allowance::<C>(owner, spender).await
+    async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance> {
+        self.get_hopr_allowance(owner, spender).await
     }
 
-    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>> {
-        self.get_balance::<C>(address).await
+    async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance> {
+        self.get_xdai_balance(address).await
+    }
+
+    async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance> {
+        self.get_hopr_balance(address).await
     }
 
     fn try_stream_logs<'a>(

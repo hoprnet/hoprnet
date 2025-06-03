@@ -85,7 +85,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     let mut current_delay = Duration::from_secs(2).min(max_delay);
 
     while current_delay <= max_delay {
-        match rpc.get_balance(address).await {
+        match rpc.get_xdai_balance(address).await {
             Ok(current_balance) => {
                 info!(balance = %current_balance, "balance status");
                 if current_balance.ge(&min_balance) {
@@ -328,17 +328,39 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     }
 
     pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        Ok(self.rpc_operations.get_balance::<C>(self.me_onchain()).await?)
+        let bal = if C::is::<XDai>() {
+            self.rpc_operations
+                .get_xdai_balance(self.me_onchain())
+                .await?
+                .to_be_bytes()
+        } else if C::is::<WxHOPR>() {
+            self.rpc_operations
+                .get_hopr_balance(self.me_onchain())
+                .await?
+                .to_be_bytes()
+        } else {
+            return Err(HoprChainError::Api("unsupported currency".into()));
+        };
+
+        Ok(Balance::<C>::from(U256::from_be_bytes(bal)))
     }
 
     pub async fn get_safe_balance<C: Currency + Send>(&self, safe_address: Address) -> errors::Result<Balance<C>> {
-        Ok(self.rpc_operations.get_balance::<C>(safe_address).await?)
+        let bal = if C::is::<XDai>() {
+            self.rpc_operations.get_xdai_balance(safe_address).await?.to_be_bytes()
+        } else if C::is::<WxHOPR>() {
+            self.rpc_operations.get_hopr_balance(safe_address).await?.to_be_bytes()
+        } else {
+            return Err(HoprChainError::Api("unsupported currency".into()));
+        };
+
+        Ok(Balance::<C>::from(U256::from_be_bytes(bal)))
     }
 
     pub async fn get_safe_hopr_allowance(&self) -> Result<HoprBalance> {
         Ok(self
             .rpc_operations
-            .get_allowance::<WxHOPR>(self.safe_address, self.contract_addresses.channels)
+            .get_hopr_allowance(self.safe_address, self.contract_addresses.channels)
             .await?)
     }
 
