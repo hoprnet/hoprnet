@@ -296,7 +296,7 @@ mod tests {
         rpc::{RpcOperations, RpcOperationsConfig},
     };
 
-    fn filter_bounds(filters: &Vec<Filter>) -> anyhow::Result<(u64, u64)> {
+    fn filter_bounds(filters: &[Filter]) -> anyhow::Result<(u64, u64)> {
         let bounds = filters.iter().try_fold((0, 0), |acc, filter| {
             let to = filter
                 .block_option

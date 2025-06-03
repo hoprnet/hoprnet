@@ -960,7 +960,6 @@ mod tests {
     use alloy::{
         dyn_abi::DynSolValue,
         primitives::{Address as AlloyAddress, U256},
-        signers::k256::elliptic_curve::rand_core::le,
         sol_types::{SolEvent, SolValue},
     };
     use anyhow::{Context, anyhow};
@@ -2967,10 +2966,11 @@ mod tests {
     async fn ticket_price_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
-           // ==> set mock expectations here
-           let clonable_rpc_operations = ClonableMockOperations {//
-               inner: Arc::new(rpc_operations),
-           };;
+        // ==> set mock expectations here
+        let clonable_rpc_operations = ClonableMockOperations {
+            //
+            inner: Arc::new(rpc_operations),
+        };
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
 
         let encoded_data = (U256::from(1u64), U256::from(123u64)).abi_encode();
@@ -3010,10 +3010,11 @@ mod tests {
     async fn minimum_win_prob_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
         let rpc_operations = MockIndexerRpcOperations::new();
-           // ==> set mock expectations here
-           let clonable_rpc_operations = ClonableMockOperations {//
-               inner: Arc::new(rpc_operations),
-           };;
+        // ==> set mock expectations here
+        let clonable_rpc_operations = ClonableMockOperations {
+            //
+            inner: Arc::new(rpc_operations),
+        };
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
 
         let encoded_data = (
@@ -3108,10 +3109,11 @@ mod tests {
         assert_eq!(HoprBalance::zero(), stats.rejected_value);
 
         let rpc_operations = MockIndexerRpcOperations::new();
-           // ==> set mock expectations here
-           let clonable_rpc_operations = ClonableMockOperations {//
-               inner: Arc::new(rpc_operations),
-           };;
+        // ==> set mock expectations here
+        let clonable_rpc_operations = ClonableMockOperations {
+            //
+            inner: Arc::new(rpc_operations),
+        };
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
 
         let encoded_data = (
