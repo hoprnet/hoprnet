@@ -113,10 +113,10 @@ where
                 g.update_node_score(&chain_key, result.into());
                 debug!(%chain_key, ?result, "update node score for peer");
             } else {
-                error!(%peer, "could not resolve chain key");
+                error!("could not resolve chain key");
             }
         } else {
-            error!(%peer, "encountered invalid peer id");
+            error!("encountered invalid peer id");
         }
 
         if let Err(error) = self.network.update(peer, result, None).await {

@@ -50,10 +50,7 @@ impl PingQueryReplier {
     ///
     /// The resulting timing information about the RTT is halved to provide a unidirectional latency.
     pub fn notify(self, result: PingQueryResult) {
-        let result = result.map(|rtt| {
-            
-            rtt.div(2u32)
-        });
+        let result = result.map(|rtt| rtt.div(2u32));
 
         if self.notifier.unbounded_send(result).is_err() {
             warn!("Failed to notify the ping query result due to upper layer ping timeout");
