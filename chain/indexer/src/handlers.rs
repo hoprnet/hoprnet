@@ -546,7 +546,7 @@ where
                     error!(
                     safe_address = %&self.safe_address, %from, %to,
                         "filter misconfiguration: transfer event not involving the safe");
-                } else if to.eq(&self.safe_address) {
+                } else if to.eq(&self.safe_address) || from.eq(&self.safe_address) {
                     info!("updating safe balance from chain after transfer event");
                     match self.rpc_operations.get_hopr_balance(self.safe_address).await {
                         Ok(balance) => {
@@ -1401,15 +1401,22 @@ mod tests {
     #[tokio::test]
     async fn on_token_transfer_to() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
-        let clonable_rpc_operations = ClonableMockOperations {
-            //
-            inner: Arc::new(rpc_operations),
-        };
-        let handlers = init_handlers(clonable_rpc_operations, db.clone());
 
         let value = U256::MAX;
+        let target_hopr_balance = HoprBalance::from(primitive_types::U256::from_big_endian(
+            value.to_be_bytes_vec().as_slice(),
+        ));
+
+        let mut rpc_operations = MockIndexerRpcOperations::new();
+        rpc_operations
+            .expect_get_hopr_balance()
+            .times(1)
+            .return_once(move |_| Ok(target_hopr_balance.clone()));
+        let clonable_rpc_operations = ClonableMockOperations {
+            inner: Arc::new(rpc_operations),
+        };
+
+        let handlers = init_handlers(clonable_rpc_operations, db.clone());
 
         let encoded_data = (value).abi_encode();
 
@@ -1432,12 +1439,7 @@ mod tests {
 
         assert!(event_type.is_none(), "token transfer does not have chain event type");
 
-        assert_eq!(
-            db.get_safe_hopr_balance(None).await?,
-            HoprBalance::from(primitive_types::U256::from_big_endian(
-                value.to_be_bytes_vec().as_slice()
-            ))
-        );
+        assert_eq!(db.get_safe_hopr_balance(None).await?, target_hopr_balance);
 
         Ok(())
     }
@@ -1445,12 +1447,16 @@ mod tests {
     #[tokio::test]
     async fn on_token_transfer_from() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
+
+        let mut rpc_operations = MockIndexerRpcOperations::new();
+        rpc_operations
+            .expect_get_hopr_balance()
+            .times(1)
+            .return_once(|_| Ok(HoprBalance::zero()));
         let clonable_rpc_operations = ClonableMockOperations {
-            //
             inner: Arc::new(rpc_operations),
         };
+
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
 
         let value = U256::MAX;
