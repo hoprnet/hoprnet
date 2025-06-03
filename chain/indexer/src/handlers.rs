@@ -150,7 +150,8 @@ where
                     OffchainSignature::try_from((key_binding.ed25519_sig_0.0, key_binding.ed25519_sig_1.0))?,
                 ) {
                     Ok(binding) => {
-                        self.db
+                        match self
+                            .db
                             .insert_account(
                                 Some(tx),
                                 AccountEntry {
@@ -160,7 +161,15 @@ where
                                     published_at: block_number,
                                 },
                             )
-                            .await?;
+                            .await
+                        {
+                            Ok(_) => (),
+                            Err(err) => {
+                                // We handle these errors gracefully and don't want the indexer to crash,
+                                // because anybody could write faulty entries into the announcement contract.
+                                error!(%err, "failed to store announcement key binding")
+                            }
+                        }
                     }
                     Err(e) => {
                         warn!(
