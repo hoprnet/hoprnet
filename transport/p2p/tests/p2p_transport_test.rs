@@ -10,7 +10,6 @@ use futures::{
 };
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_platform::time::native::current_time;
-use hopr_transport_network::network::NetworkTriggeredEvent;
 use hopr_transport_p2p::HoprSwarm;
 use hopr_transport_probe::ping::PingQueryReplier;
 use hopr_transport_protocol::PeerDiscovery;
@@ -27,8 +26,6 @@ pub fn random_free_local_ipv4_port() -> Option<u16> {
 pub(crate) struct Interface {
     pub me: PeerId,
     pub address: Multiaddr,
-    #[allow(dead_code)]
-    pub update_from_network: futures::channel::mpsc::Sender<NetworkTriggeredEvent>,
     pub update_from_announcements: futures::channel::mpsc::UnboundedSender<PeerDiscovery>,
     #[allow(dead_code)]
     pub send_heartbeat: futures::channel::mpsc::UnboundedSender<(PeerId, PingQueryReplier)>,
@@ -49,7 +46,6 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     let identity: libp2p::identity::Keypair = (&random_keypair).into();
     let peer_id: PeerId = identity.public().into();
 
-    let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(100);
     let (transport_updates_tx, transport_updates_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
     let (heartbeat_requests_tx, _heartbeat_requests_rx) =
         futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
@@ -59,13 +55,7 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     };
     let multiaddress = Multiaddr::from_str(&multiaddress).context("failed to create a valid multiaddress")?;
 
-    let swarm = HoprSwarm::new(
-        identity,
-        network_events_rx,
-        transport_updates_rx,
-        vec![multiaddress.clone()],
-    )
-    .await;
+    let swarm = HoprSwarm::new(identity, transport_updates_rx, vec![multiaddress.clone()]).await;
 
     let msg_proto_control = swarm.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
     let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
@@ -75,7 +65,6 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     let api = Interface {
         me: peer_id,
         address: multiaddress,
-        update_from_network: network_events_tx,
         update_from_announcements: transport_updates_tx,
         send_heartbeat: heartbeat_requests_tx,
         send_msg: wire_msg_tx,

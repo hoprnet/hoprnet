@@ -8,7 +8,6 @@ use hopr_transport_identity::{
     Multiaddr, PeerId,
     multiaddrs::{replace_transport_with_unspecified, resolve_dns_if_any},
 };
-use hopr_transport_network::network::NetworkTriggeredEvent;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{
     autonat,
@@ -33,7 +32,6 @@ lazy_static::lazy_static! {
 /// Returns a built [libp2p::Swarm] object implementing the HoprNetworkBehavior functionality.
 async fn build_p2p_network<T>(
     me: libp2p::identity::Keypair,
-    network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
     indexer_update_input: T,
 ) -> Result<libp2p::Swarm<HoprNetworkBehavior>>
 where
@@ -59,7 +57,7 @@ where
 
     Ok(swarm
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
-        .with_behaviour(|_key| HoprNetworkBehavior::new(me_peerid, network_update_input, indexer_update_input))
+        .with_behaviour(|_key| HoprNetworkBehavior::new(me_peerid, indexer_update_input))
         .map_err(|e| crate::errors::P2PError::Libp2p(e.to_string()))?
         .with_swarm_config(|cfg| {
             cfg.with_dial_concurrency_factor(
@@ -104,14 +102,13 @@ impl From<HoprSwarm> for libp2p::Swarm<HoprNetworkBehavior> {
 impl HoprSwarm {
     pub async fn new<T>(
         identity: libp2p::identity::Keypair,
-        network_update_input: futures::channel::mpsc::Receiver<NetworkTriggeredEvent>,
         indexer_update_input: T,
         my_multiaddresses: Vec<Multiaddr>,
     ) -> Self
     where
         T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
-        let mut swarm = build_p2p_network(identity, network_update_input, indexer_update_input)
+        let mut swarm = build_p2p_network(identity, indexer_update_input)
             .await
             .expect("swarm must be constructible");
 
