@@ -315,7 +315,6 @@ impl BlockWithLogs {
 }
 
 /// Trait with RPC provider functionality required by the Indexer.
-#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.

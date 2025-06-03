@@ -72,7 +72,7 @@ struct ChainNode {
     offchain_key: OffchainKeypair,
     db: HoprDb,
     actions: ChainActions<HoprDb>,
-    _indexer: Indexer<TestRpc, ContractEventHandlers<HoprDb>, HoprDb>,
+    _indexer: Indexer<TestRpc, ContractEventHandlers<TestRpc, HoprDb>, HoprDb>,
     node_tasks: Vec<JoinHandle<()>>,
 }
 

@@ -953,18 +953,22 @@ where
 #[cfg(test)]
 mod tests {
     use std::{
-        sync::{Arc, atomic::Ordering},
+        sync::{
+            Arc,
+            atomic::{AtomicI64, AtomicU64, Ordering},
+        },
         time::SystemTime,
     };
 
     use alloy::{
         dyn_abi::DynSolValue,
         primitives::{Address as AlloyAddress, U256},
+        signers::k256::elliptic_curve::rand_core::le,
         sol_types::{SolEvent, SolValue},
     };
     use anyhow::{Context, anyhow};
     use hex_literal::hex;
-    use hopr_chain_rpc::MockHoprIndexerRpcOperations;
+    use hopr_chain_rpc::HoprIndexerRpcOperations;
     use hopr_chain_types::{
         ContractAddresses,
         chain_events::{ChainEventType, NetworkRegistryStatus},
@@ -1003,6 +1007,67 @@ mod tests {
         static ref SAFE_INSTANCE_ADDR: Address = "b93d7fdd605fb64fdcc87f21590f950170719d47".parse().expect("lazy static address should be constructible"); // just a dummy
         static ref TICKET_PRICE_ORACLE_ADDR: Address = "11db4391bf45ef31a10ea4a1b5cb90f46cc72c7e".parse().expect("lazy static address should be constructible"); // just a dummy
         static ref WIN_PROB_ORACLE_ADDR: Address = "00db4391bf45ef31a10ea4a1b5cb90f46cc64c7e".parse().expect("lazy static address should be constructible"); // just a dummy
+    }
+
+    mockall::mock! {
+        IndexerRpcOperations {}
+
+        #[async_trait::async_trait]
+        impl HoprIndexerRpcOperations for IndexerRpcOperations {
+            async fn block_number(&self) -> hopr_chain_rpc::errors::Result<u64>;
+
+        async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> hopr_chain_rpc::errors::Result<HoprBalance>;
+
+        async fn get_xdai_balance(&self, address: Address) -> hopr_chain_rpc::errors::Result<XDaiBalance>;
+
+        async fn get_hopr_balance(&self, address: Address) -> hopr_chain_rpc::errors::Result<HoprBalance>;
+
+        fn try_stream_logs<'a>(
+            &'a self,
+            start_block_number: u64,
+            filters: hopr_chain_rpc::FilterSet,
+            is_synced: bool,
+        ) -> hopr_chain_rpc::errors::Result<std::pin::Pin<Box<dyn futures::Stream<Item=hopr_chain_rpc::BlockWithLogs> + Send + 'a> > >;
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct ClonableMockOperations {
+        pub inner: Arc<MockIndexerRpcOperations>,
+    }
+
+    #[async_trait::async_trait]
+    impl HoprIndexerRpcOperations for ClonableMockOperations {
+        async fn block_number(&self) -> hopr_chain_rpc::errors::Result<u64> {
+            self.inner.block_number().await
+        }
+
+        async fn get_hopr_allowance(
+            &self,
+            owner: Address,
+            spender: Address,
+        ) -> hopr_chain_rpc::errors::Result<HoprBalance> {
+            self.inner.get_hopr_allowance(owner, spender).await
+        }
+
+        async fn get_xdai_balance(&self, address: Address) -> hopr_chain_rpc::errors::Result<XDaiBalance> {
+            self.inner.get_xdai_balance(address).await
+        }
+
+        async fn get_hopr_balance(&self, address: Address) -> hopr_chain_rpc::errors::Result<HoprBalance> {
+            self.inner.get_hopr_balance(address).await
+        }
+
+        fn try_stream_logs<'a>(
+            &'a self,
+            start_block_number: u64,
+            filters: hopr_chain_rpc::FilterSet,
+            is_synced: bool,
+        ) -> hopr_chain_rpc::errors::Result<
+            std::pin::Pin<Box<dyn futures::Stream<Item = hopr_chain_rpc::BlockWithLogs> + Send + 'a>>,
+        > {
+            self.inner.try_stream_logs(start_block_number, filters, is_synced)
+        }
     }
 
     fn init_handlers<T: Clone, Db: HoprDbAllOperations + Clone>(
