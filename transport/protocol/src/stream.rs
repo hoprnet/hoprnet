@@ -1,7 +1,12 @@
 //! Infrastructure supporting converting a collection of [`libp2p::PeerId`] split [`libp2p_stream`] managed
 //! individual peer-to-peer [`libp2p::swarm::Stream`]s.
 
-use futures::{AsyncRead, AsyncReadExt, AsyncWrite, SinkExt as _, Stream, StreamExt};
+use std::sync::Arc;
+
+use futures::{
+    AsyncRead, AsyncReadExt, AsyncWrite, SinkExt as _, Stream, StreamExt,
+    channel::mpsc::{Receiver, Sender, channel},
+};
 use libp2p::PeerId;
 use tokio_util::{
     codec::{Decoder, Encoder, FramedRead, FramedWrite},
@@ -21,9 +26,8 @@ pub async fn process_stream_protocol<C, V>(
     codec: C,
     control: V,
 ) -> crate::errors::Result<(
-    futures::channel::mpsc::Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
-    futures::channel::mpsc::Receiver<(PeerId, <C as Decoder>::Item)>, /* impl Stream<Item = (PeerId, <C as
-                                                                     * Decoder>::Item)>, */
+    Sender<(PeerId, <C as Decoder>::Item)>, // impl Sink<(PeerId, <C as Decoder>::Item)>,
+    Receiver<(PeerId, <C as Decoder>::Item)>, // impl Stream<Item = (PeerId, <C as Decoder>::Item)>,
 )>
 where
     C: Encoder<<C as Decoder>::Item> + Decoder + Send + Sync + Clone + 'static,
@@ -32,8 +36,8 @@ where
     <C as Decoder>::Item: Clone + Send + 'static,
     V: BidirectionalStreamControl + Clone + Send + Sync + 'static,
 {
-    let (tx_out, rx_out) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(10_000);
-    let (tx_in, rx_in) = futures::channel::mpsc::channel::<(PeerId, <C as Decoder>::Item)>(10_000);
+    let (tx_out, rx_out) = channel::<(PeerId, <C as Decoder>::Item)>(10_000);
+    let (tx_in, rx_in) = channel::<(PeerId, <C as Decoder>::Item)>(10_000);
 
     let cache_out = moka::future::Cache::new(2000);
 
@@ -56,7 +60,7 @@ where
 
         async move {
             let (stream_rx, stream_tx) = stream.split();
-            let (send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
+            let (send, recv) = channel::<<C as Decoder>::Item>(1000);
             let cache_internal = cache.clone();
 
             hopr_async_runtime::prelude::spawn(
@@ -105,52 +109,47 @@ where
                 }
             }
 
-            let cached = cache
-                .optionally_get_with(peer_id, async move {
-                    let r = control.open(peer_id).await;
-                    match r {
-                        Ok(stream) => {
-                            tracing::debug!(peer = %peer_id, "Opening outgoing peer-to-peer stream");
+            let cached: std::result::Result<Sender<<C as Decoder>::Item>, Arc<anyhow::Error>> = cache
+                .try_get_with(peer_id, async move {
+                    let stream = control.open(peer_id).await.map_err(|e| anyhow::anyhow!("{e}"))?;
+                    tracing::debug!(peer = %peer_id, "Opening outgoing peer-to-peer stream");
 
-                            let (stream_rx, stream_tx) = stream.split();
-                            let (send, recv) = futures::channel::mpsc::channel::<<C as Decoder>::Item>(1000);
+                    let (stream_rx, stream_tx) = stream.split();
+                    let (send, recv) = channel::<<C as Decoder>::Item>(1000);
 
-                            hopr_async_runtime::prelude::spawn(
-                                recv.map(Ok)
-                                    .forward(FramedWrite::new(stream_tx.compat_write(), codec.clone())),
-                            );
-                            hopr_async_runtime::prelude::spawn(
-                                FramedRead::new(stream_rx.compat(), codec)
-                                    .filter_map(move |v| async move {
-                                        match v {
-                                            Ok(v) => Some((peer_id, v)),
-                                            Err(e) => {
-                                                tracing::error!(error = %e, "Error decoding object from the underlying stream");
-                                                None
-                                            }
-                                        }
-                                    })
-                                    .map(Ok)
-                                    .forward(tx_in),
-                            );
+                    hopr_async_runtime::prelude::spawn(
+                        recv.map(Ok)
+                            .forward(FramedWrite::new(stream_tx.compat_write(), codec.clone())),
+                    );
+                    hopr_async_runtime::prelude::spawn(
+                        FramedRead::new(stream_rx.compat(), codec)
+                            .filter_map(move |v| async move {
+                                match v {
+                                    Ok(v) => Some((peer_id, v)),
+                                    Err(e) => {
+                                        tracing::error!(error = %e, "Error decoding object from the underlying stream");
+                                        None
+                                    }
+                                }
+                            })
+                            .map(Ok)
+                            .forward(tx_in),
+                    );
 
-                            Some(send)
-                        }
-                        Err(error) => {
-                            tracing::error!(peer = %peer_id, %error, "Error opening stream to peer");
-                            None
-                        }
-                    }
+                    Ok(send)
                 })
                 .await;
 
-            if let Some(mut cached) = cached {
-                if let Err(error) = cached.send(msg).await {
-                    tracing::error!(peer = %peer_id, %error, "Error sending message to peer");
-                    cache.invalidate(&peer_id).await;
-                }
-            } else {
-                tracing::error!(peer = %peer_id, "Error sending message to peer: the stream failed to be created and cached");
+            match cached {
+                Ok(mut cached) => {
+                    if let Err(error) = cached.send(msg).await {
+                        tracing::error!(peer = %peer_id, %error, "Error sending message to peer");
+                        cache.invalidate(&peer_id).await;
+                    }
+                },
+                Err(error) => {
+                    tracing::error!(peer = %peer_id, %error, "Failed to open a stream to peer");
+                },
             }
         }
     }));
