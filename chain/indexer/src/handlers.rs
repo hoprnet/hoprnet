@@ -53,7 +53,7 @@ lazy_static::lazy_static! {
 /// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
 /// and passed on to this object that handles event-specific actions for each on-chain operation.
 #[derive(Clone)]
-pub struct ContractEventHandlers<T: Clone, Db: Clone> {
+pub struct ContractEventHandlers<T, Db: Clone> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
     addresses: Arc<ContractAddresses>,
@@ -67,7 +67,7 @@ pub struct ContractEventHandlers<T: Clone, Db: Clone> {
     rpc_operations: T,
 }
 
-impl<Db: Clone> Debug for ContractEventHandlers<Db> {
+impl<T, Db: Clone> Debug for ContractEventHandlers<T, Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ContractEventHandler")
             .field("addresses", &self.addresses)
@@ -77,7 +77,7 @@ impl<Db: Clone> Debug for ContractEventHandlers<Db> {
     }
 }
 
-impl<Db> ContractEventHandlers<Db>
+impl<T, Db> ContractEventHandlers<T, Db>
 where
     T: HoprIndexerRpcOperations + Send + 'static,
     Db: HoprDbAllOperations + Clone,
@@ -257,7 +257,7 @@ where
                     .await?;
 
                 trace!(
-                    channel_id = channel_closed.channelId.0,
+                    channel_id = ?channel_closed.channelId.0,
                     is_channel = maybe_channel.is_some(),
                     "on_channel_closed_event",
                 );
@@ -870,8 +870,9 @@ where
 }
 
 #[async_trait]
-impl<Db> crate::traits::ChainLogHandler for ContractEventHandlers<Db>
+impl<T, Db> crate::traits::ChainLogHandler for ContractEventHandlers<T, Db>
 where
+    T: HoprIndexerRpcOperations + Send + Sync + 'static,
     Db: HoprDbAllOperations + Clone + Debug + Send + Sync + 'static,
 {
     fn contract_addresses(&self) -> Vec<Address> {

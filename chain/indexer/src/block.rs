@@ -3,8 +3,10 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
+use alloy::sol_types::SolEvent;
 use futures::{FutureExt, StreamExt, stream};
 use hopr_async_runtime::prelude::{JoinHandle, spawn};
+use hopr_bindings::hoprtoken::HoprToken::{Approval, Transfer};
 use hopr_chain_rpc::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations};
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
@@ -344,7 +346,7 @@ where
     // (3) for the token contract which filters transfer events to our safe.
     // (4) for the token contract which filters approval events involving our safe and the channels
     // contract.
-    fn generate_log_filters(logs_handler: &U) -> (FilterSet, Vec<(Address, FixedBytes<32>)>) {
+    fn generate_log_filters(logs_handler: &U) -> (FilterSet, Vec<(Address, Hash)>) {
         let safe_address = logs_handler.safe_address();
         let addresses_no_token = logs_handler
             .contract_addresses()
@@ -359,9 +361,9 @@ where
             let topics = logs_handler.contract_address_topics(*address);
             if !topics.is_empty() {
                 filter_base_addresses.push(alloy::primitives::Address::from(*address));
-                filter_base_topics.extend(topics);
-                for topic in topics {
-                    address_topics.push((*address, alloy::primitives::B256::from_slice(topic.as_ref())))
+                filter_base_topics.extend(topics.clone());
+                for topic in topics.iter() {
+                    address_topics.push((*address, Hash::from(topic.0)))
                 }
             }
         });
@@ -375,17 +377,17 @@ where
 
         let filter_transfer_to = filter_token
             .clone()
-            .event_signature(TransferFilter::signature())
+            .event_signature(Transfer::SIGNATURE_HASH)
             .topic2(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()));
 
         let filter_transfer_from = alloy::rpc::types::Filter::new()
             .clone()
-            .event_signature(TransferFilter::signature())
+            .event_signature(Transfer::SIGNATURE_HASH)
             .topic1(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()));
 
         let filter_approval = alloy::rpc::types::Filter::new()
             .clone()
-            .event_signature(ApprovalFilter::signature())
+            .event_signature(Approval::SIGNATURE_HASH)
             .topic1(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()))
             .topic2(alloy::primitives::B256::from_slice(
                 logs_handler.contract_addresses_map().channels.to_bytes32().as_ref(),
