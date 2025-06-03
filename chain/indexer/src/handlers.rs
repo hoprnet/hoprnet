@@ -53,7 +53,7 @@ lazy_static::lazy_static! {
 /// Once an on-chain operation is recorded by the [crate::block::Indexer], it is pre-processed
 /// and passed on to this object that handles event-specific actions for each on-chain operation.
 #[derive(Clone)]
-pub struct ContractEventHandlers<T, Db: Clone> {
+pub struct ContractEventHandlers<T: Clone, Db: Clone> {
     /// channels, announcements, network_registry, token: contract addresses
     /// whose event we process
     addresses: Arc<ContractAddresses>,
@@ -67,7 +67,7 @@ pub struct ContractEventHandlers<T, Db: Clone> {
     rpc_operations: T,
 }
 
-impl<T, Db: Clone> Debug for ContractEventHandlers<T, Db> {
+impl<T: Clone, Db: Clone> Debug for ContractEventHandlers<T, Db> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ContractEventHandler")
             .field("addresses", &self.addresses)
@@ -79,7 +79,7 @@ impl<T, Db: Clone> Debug for ContractEventHandlers<T, Db> {
 
 impl<T, Db> ContractEventHandlers<T, Db>
 where
-    T: HoprIndexerRpcOperations + Send + 'static,
+    T: HoprIndexerRpcOperations + Clone + Send + 'static,
     Db: HoprDbAllOperations + Clone,
 {
     pub fn new(
@@ -872,7 +872,7 @@ where
 #[async_trait]
 impl<T, Db> crate::traits::ChainLogHandler for ContractEventHandlers<T, Db>
 where
-    T: HoprIndexerRpcOperations + Send + Sync + 'static,
+    T: HoprIndexerRpcOperations + Clone + Send + Sync + 'static,
     Db: HoprDbAllOperations + Clone + Debug + Send + Sync + 'static,
 {
     fn contract_addresses(&self) -> Vec<Address> {
@@ -916,17 +916,18 @@ where
         }
     }
 
-    async fn collect_log_event(&self, log: SerializableLog) -> Result<Option<SignificantChainEvent>> {
+    async fn collect_log_event(&self, log0: SerializableLog) -> Result<Option<SignificantChainEvent>> {
         let myself = self.clone();
         self.db
             .begin_transaction()
             .await?
-            .perform(|tx| {
-                Box::pin(async move {
-                    let tx_hash = Hash::from(log.tx_hash);
-                    let log_id = log.log_index;
-                    let block_id = log.block_number;
+            .perform(move |tx| {
+                let log = log0.clone();
+                let tx_hash = Hash::from(log.tx_hash);
+                let log_id = log.log_index;
+                let block_id = log.block_number;
 
+                Box::pin(async move {
                     match myself.process_log_event(tx, log).await {
                         // If a significant chain event can be extracted from the log
                         Ok(Some(event_type)) => {
