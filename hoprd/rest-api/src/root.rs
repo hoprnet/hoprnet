@@ -27,7 +27,7 @@ fn collect_hopr_metrics() -> Result<String, ApiErrorStatus> {
             ("api_token" = []),
             ("bearer_token" = [])
         ),
-        tag = "Node"
+        tag = "Metrics"
     )]
 pub(super) async fn metrics() -> impl IntoResponse {
     match collect_hopr_metrics() {

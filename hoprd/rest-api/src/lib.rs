@@ -142,6 +142,7 @@ pub(crate) struct InternalState {
         (name = "Peers", description = "HOPR node peer manipulation endpoints"),
         (name = "Session", description = "HOPR node session management endpoints"),
         (name = "Tickets", description = "HOPR node ticket management endpoints"),
+        (name = "Metrics", description = "HOPR node metrics endpoints"),
     )
 )]
 pub struct ApiDoc;
