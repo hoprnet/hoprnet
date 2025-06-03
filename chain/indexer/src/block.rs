@@ -5,6 +5,7 @@ use std::sync::{
 
 use futures::{FutureExt, StreamExt, stream};
 use hopr_async_runtime::prelude::{JoinHandle, spawn};
+use hopr_bindings::hoprtoken::HoprToken::HoprTokenEvents::Transfer;
 use hopr_chain_rpc::{BlockWithLogs, HoprIndexerRpcOperations, LogFilter};
 use hopr_chain_types::chain_events::SignificantChainEvent;
 use hopr_crypto_types::types::Hash;
@@ -280,7 +281,6 @@ where
                         // in the database.
                         let logs_vec = logs
                             .into_iter()
-                            .map(SerializableLog::from)
                             .filter(|log| log.address != logs_handler.contract_addresses_map().token)
                             .collect();
 
@@ -355,34 +355,34 @@ where
         addresses_no_token.iter().for_each(|address| {
             let topics = logs_handler.contract_address_topics(*address);
             if !topics.is_empty() {
-                filter_base_addresses.push(alloy::rpc::types::Address::from(*address));
+                filter_base_addresses.push(alloy::primitives::Address::from(*address));
                 filter_base_topics.extend(topics);
                 for topic in topics {
-                    address_topics.push((*address, Hash::from(topic.0)));
+                    address_topics.push((*address, alloy::primitives::B256::from_slice(topic.as_ref())))
                 }
             }
         });
 
         let filter_base = Filter::new().address(filter_base_addresses).topic0(filter_base_topics);
-        let filter_token = Filter::new().address(alloy::rpc::types::Address::from(
+        let filter_token = Filter::new().address(alloy::primitives::Address::from(
             logs_handler.contract_addresses_map().token,
         ));
 
         let filter_transfer_to = filter_token
             .clone()
             .topic0(TransferFilter::signature())
-            .topic2(H256::from_slice(safe_address.to_bytes32().as_ref()));
+            .topic2(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()));
 
         let filter_transfer_from = Filter::new()
             .clone()
             .topic0(TransferFilter::signature())
-            .topic1(H256::from_slice(safe_address.to_bytes32().as_ref()));
+            .topic1(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()));
 
         let filter_approval = Filter::new()
             .clone()
             .topic0(ApprovalFilter::signature())
-            .topic1(H256::from_slice(safe_address.to_bytes32().as_ref()))
-            .topic2(H256::from_slice(
+            .topic1(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()))
+            .topic2(alloy::primitives::B256::from_slice(
                 logs_handler.contract_addresses_map().channels.to_bytes32().as_ref(),
             ));
 
@@ -611,7 +611,7 @@ where
 
                 if let Some(safe_address) = safe_address {
                     info!("updating safe balance from chain after indexer sync completed");
-                    match rpc.get_balance(safe_address, BalanceType::HOPR).await {
+                    match rpc.get_balance::<WxHOPR>(safe_address).await {
                         Ok(balance) => {
                             if let Err(error) = db.set_safe_hopr_balance(None, balance).await {
                                 error!(%error, "failed to update safe balance from chain after indexer sync completed");
@@ -727,8 +727,8 @@ mod tests {
         #[async_trait]
         impl HoprIndexerRpcOperations for HoprIndexerOps {
             async fn block_number(&self) -> hopr_chain_rpc::errors::Result<u64>;
-            async fn get_allowance(&self, owner: Address, spender: Address) -> hopr_chain_rpc::errors::Result<Balance>;
-            async fn get_balance(&self, address: Address, balance_type: BalanceType) -> hopr_chain_rpc::errors::Result<Balance>;
+            async fn get_allowanc<C: Currency>e(&self, owner: Address, spender: Address) -> hopr_chain_rpc::errors::Result<Balance<C>>;
+            async fn get_balance<C: Currency>(&self, address: Address) -> hopr_chain_rpc::errors::Result<Balance<C>>;
 
             fn try_stream_logs<'a>(
                 &'a self,

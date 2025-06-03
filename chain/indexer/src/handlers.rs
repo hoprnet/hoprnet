@@ -16,7 +16,7 @@ use hopr_bindings::{
     hoprticketpriceoracle::HoprTicketPriceOracle::HoprTicketPriceOracleEvents, hoprtoken::HoprToken::HoprTokenEvents,
     hoprwinningprobabilityoracle::HoprWinningProbabilityOracle::HoprWinningProbabilityOracleEvents,
 };
-use hopr_chain_rpc::{BlockWithLogs, Log};
+use hopr_chain_rpc::Log;
 use hopr_chain_types::{
     ContractAddresses,
     chain_events::{ChainEventType, NetworkRegistryStatus, SignificantChainEvent},
@@ -549,7 +549,7 @@ where
                     info!("updating safe balance from chain after transfer event");
                     match self
                         .rpc_operations
-                        .get_balance(self.safe_address, BalanceType::HOPR)
+                        .get_balance<WxHOPR>(self.safe_address)
                         .await
                     {
                         Ok(balance) => {
@@ -576,7 +576,7 @@ where
                     info!("updating safe allowance from chain after approval event");
                     match self
                         .rpc_operations
-                        .get_allowance(self.addresses.channels, self.safe_address)
+                        .get_allowance<WxHOPR>(self.addresses.channels, self.safe_address)
                         .await
                     {
                         Ok(allowance) => {
