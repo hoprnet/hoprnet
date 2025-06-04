@@ -339,11 +339,6 @@ pub trait HoprIndexerRpcOperations {
     ///
     /// # Returns
     /// * `Result<HoprBalance>` - The current allowance amount
-    ///
-    /// # Examples
-    /// ```rust
-    /// let allowance = rpc.get_hopr_allowance(safe_address, channels_address).await?;
-    /// ```
     async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance>;
 
     /// Queries the xDAI (native token) balance for a specific address.
