@@ -618,7 +618,7 @@ where
                     info!("updating safe allowance from chain after transfer event");
                     match self
                         .rpc_operations
-                        .get_hopr_allowance(self.addresses.channels, self.safe_address)
+                        .get_hopr_allowance(self.safe_address, self.addresses.channels)
                         .await
                     {
                         Ok(allowance) => {
@@ -652,7 +652,7 @@ where
                     info!("updating safe allowance from chain after approval event");
                     match self
                         .rpc_operations
-                        .get_hopr_allowance(self.addresses.channels, self.safe_address)
+                        .get_hopr_allowance(self.safe_address, self.addresses.channels)
                         .await
                     {
                         Ok(allowance) => {
