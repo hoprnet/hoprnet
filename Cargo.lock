@@ -4546,7 +4546,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-api"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "alloy",
  "async-channel 2.3.1",
@@ -5245,6 +5245,7 @@ dependencies = [
  "hopr-crypto-packet",
  "serde",
  "serde_bytes",
+ "strum 0.27.1",
  "thiserror 2.0.12",
 ]
 
@@ -5335,7 +5336,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "aquamarine",
@@ -5461,6 +5462,7 @@ dependencies = [
  "hopr-lib",
  "hopr-metrics",
  "hopr-network-types",
+ "hopr-platform",
  "hopr-transport-session",
  "lazy_static",
  "oas3",

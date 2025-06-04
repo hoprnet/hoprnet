@@ -28,7 +28,6 @@ permissions:
   contents: read
 
 jobs:
-
   open-release:
     name: Open Release
     runs-on: self-hosted-hoprnet-small
@@ -70,8 +69,8 @@ jobs:
         run: |
           git fetch
           git checkout bot/open-${{ inputs.release_type }}-${{ steps.bump.outputs.next_version }}
+          gh pr edit --add-reviewer "hoprnet/hopr-development"
           gh pr ready
-          gh pr merge --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GH_RUNNER_TOKEN }}
 
