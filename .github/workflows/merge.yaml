@@ -102,12 +102,11 @@ jobs:
       cluster_nodes: core-rotsee
       topology: receiver
       workload: constant
-      duration: ${{ vars.K6_TEST_DURATION }}
-      echo_service_replicas: ${{ vars.K6_ECHO_SERVERS_REPLICAS }}
-      payload_size: ${{ vars.K6_PAYLOAD_SIZE }}
-      download_throughput: ${{ vars.K6_DOWNLOAD_THROUGHPUT }}
-      upload_throughput: ${{ vars.K6_UPLOAD_THROUGHPUT }}
-
+      duration: ${{ fromJson(vars.K6_TEST_DURATION) }}
+      echo_service_replicas: ${{ fromJson(vars.K6_ECHO_SERVERS_REPLICAS) }}
+      payload_size: ${{ fromJson(vars.K6_PAYLOAD_SIZE) }}
+      download_throughput: ${{ fromJson(vars.K6_DOWNLOAD_THROUGHPUT) }}
+      upload_throughput: ${{ fromJson(vars.K6_UPLOAD_THROUGHPUT) }}
     secrets: inherit
 
   create_release:
