@@ -602,29 +602,30 @@ where
                     error!(
                     safe_address = %&self.safe_address, %from, %to,
                         "filter misconfiguration: transfer event not involving the safe");
-                } else {
-                    if is_synced {
-                        info!("updating safe balance from chain after transfer event");
-                        match self.rpc_operations.get_hopr_balance(self.safe_address).await {
-                            Ok(balance) => {
-                                self.db.set_safe_hopr_balance(Some(tx), balance).await?;
-                            }
-                            Err(error) => {
-                                error!(%error, "error getting safe balance from chain after transfer event");
-                            }
+                    return Ok(None);
+                }
+
+                if is_synced {
+                    info!("updating safe balance from chain after transfer event");
+                    match self.rpc_operations.get_hopr_balance(self.safe_address).await {
+                        Ok(balance) => {
+                            self.db.set_safe_hopr_balance(Some(tx), balance).await?;
                         }
-                        info!("updating safe allowance from chain after transfer event");
-                        match self
-                            .rpc_operations
-                            .get_hopr_allowance(self.addresses.channels, self.safe_address)
-                            .await
-                        {
-                            Ok(allowance) => {
-                                self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
-                            }
-                            Err(error) => {
-                                error!(%error, "error getting safe allowance from chain after transfer event");
-                            }
+                        Err(error) => {
+                            error!(%error, "error getting safe balance from chain after transfer event");
+                        }
+                    }
+                    info!("updating safe allowance from chain after transfer event");
+                    match self
+                        .rpc_operations
+                        .get_hopr_allowance(self.addresses.channels, self.safe_address)
+                        .await
+                    {
+                        Ok(allowance) => {
+                            self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
+                        }
+                        Err(error) => {
+                            error!(%error, "error getting safe allowance from chain after transfer event");
                         }
                     }
                 }
@@ -639,8 +640,15 @@ where
 
                 );
 
+                if owner.ne(&self.safe_address) || spender.ne(&self.addresses.channels) {
+                    error!(
+                        address = %&self.safe_address, %owner, %spender, allowance = %approved.value,
+                        "filter misconfiguration: approval event not involving the safe and channels contract");
+                    return Ok(None);
+                }
+
                 // if approval is for tokens on Safe contract to be spent by HoprChannels
-                if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) && is_synced {
+                if is_synced {
                     info!("updating safe allowance from chain after approval event");
                     match self
                         .rpc_operations
@@ -654,10 +662,6 @@ where
                             error!(%error, "error getting safe allowance from chain after approval event");
                         }
                     }
-                } else {
-                    error!(
-                        address = %&self.safe_address, %owner, %spender, allowance = %approved.value,
-                        "filter misconfiguration: approval event not involving the safe and channels contract");
                 }
             }
             _ => error!("Implement all the other filters for HoprTokenEvents"),
@@ -998,13 +1002,13 @@ where
         }
     }
 
-    async fn collect_log_event(&self, log0: SerializableLog, is_synced: bool) -> Result<Option<SignificantChainEvent>> {
+    async fn collect_log_event(&self, slog: SerializableLog, is_synced: bool) -> Result<Option<SignificantChainEvent>> {
         let myself = self.clone();
         self.db
             .begin_transaction()
             .await?
             .perform(move |tx| {
-                let log = log0.clone();
+                let log = slog.clone();
                 let tx_hash = Hash::from(log.tx_hash);
                 let log_id = log.log_index;
                 let block_id = log.block_number;
