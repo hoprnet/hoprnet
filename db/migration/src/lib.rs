@@ -26,6 +26,7 @@ mod m20250528_000023_peers_reset;
 mod m20250603_000024_index_reset;
 mod m20250603_000025_peers_reset;
 mod m20250603_000026_logs_reset;
+mod m20250604_000027_index_initial_seed;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -75,6 +76,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20250603_000024_index_reset::Migration),
             Box::new(m20250603_000025_peers_reset::Migration),
             Box::new(m20250603_000026_logs_reset::Migration),
+            Box::new(m20250604_000027_index_initial_seed::Migration),
         ]
     }
 }
@@ -103,6 +105,7 @@ impl MigratorTrait for MigratorIndex {
             Box::new(m20250219_000021_channels_add_index::Migration),
             Box::new(m20250419_000022_account_add_published_block::Migration),
             Box::new(m20250603_000024_index_reset::Migration),
+            Box::new(m20250604_000027_index_initial_seed::Migration),
         ]
     }
 }

@@ -103,6 +103,7 @@ where
         tx: &OpenTransaction,
         event: HoprAnnouncementsEvents,
         block_number: u32,
+        _is_synced: bool,
     ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["announcements"]);
@@ -200,6 +201,7 @@ where
         &self,
         tx: &OpenTransaction,
         event: HoprChannelsEvents,
+        is_synced: bool,
     ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["channels"]);
@@ -226,7 +228,10 @@ where
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?;
 
-                    if updated_channel.destination == self.chain_key.public().to_address() {
+                    if is_synced
+                        && (updated_channel.source == self.chain_key.public().to_address()
+                            || updated_channel.destination == self.chain_key.public().to_address())
+                    {
                         info!("updating safe balance from chain after channel balance decreased event");
                         match self.rpc_operations.get_hopr_balance(self.safe_address).await {
                             Ok(balance) => {
@@ -265,7 +270,7 @@ where
                         .finish_channel_update(tx.into(), channel_edits.change_balance(new_balance))
                         .await?;
 
-                    if updated_channel.source == self.chain_key.public().to_address() {
+                    if updated_channel.source == self.chain_key.public().to_address() && is_synced {
                         info!("updating safe balance from chain after channel balance increased event");
                         match self.rpc_operations.get_hopr_balance(self.safe_address).await {
                             Ok(balance) => {
@@ -574,7 +579,12 @@ where
         }
     }
 
-    async fn on_token_event(&self, tx: &OpenTransaction, event: HoprTokenEvents) -> Result<Option<ChainEventType>> {
+    async fn on_token_event(
+        &self,
+        tx: &OpenTransaction,
+        event: HoprTokenEvents,
+        is_synced: bool,
+    ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["token"]);
 
@@ -593,26 +603,28 @@ where
                     safe_address = %&self.safe_address, %from, %to,
                         "filter misconfiguration: transfer event not involving the safe");
                 } else {
-                    info!("updating safe balance from chain after transfer event");
-                    match self.rpc_operations.get_hopr_balance(self.safe_address).await {
-                        Ok(balance) => {
-                            self.db.set_safe_hopr_balance(Some(tx), balance).await?;
+                    if is_synced {
+                        info!("updating safe balance from chain after transfer event");
+                        match self.rpc_operations.get_hopr_balance(self.safe_address).await {
+                            Ok(balance) => {
+                                self.db.set_safe_hopr_balance(Some(tx), balance).await?;
+                            }
+                            Err(error) => {
+                                error!(%error, "error getting safe balance from chain after transfer event");
+                            }
                         }
-                        Err(error) => {
-                            error!(%error, "error getting safe balance from chain after transfer event");
-                        }
-                    }
-                    info!("updating safe allowance from chain after transfer event");
-                    match self
-                        .rpc_operations
-                        .get_hopr_allowance(self.addresses.channels, self.safe_address)
-                        .await
-                    {
-                        Ok(allowance) => {
-                            self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
-                        }
-                        Err(error) => {
-                            error!(%error, "error getting safe allowance from chain after transfer event");
+                        info!("updating safe allowance from chain after transfer event");
+                        match self
+                            .rpc_operations
+                            .get_hopr_allowance(self.addresses.channels, self.safe_address)
+                            .await
+                        {
+                            Ok(allowance) => {
+                                self.db.set_safe_hopr_allowance(Some(tx), allowance).await?;
+                            }
+                            Err(error) => {
+                                error!(%error, "error getting safe allowance from chain after transfer event");
+                            }
                         }
                     }
                 }
@@ -628,7 +640,7 @@ where
                 );
 
                 // if approval is for tokens on Safe contract to be spent by HoprChannels
-                if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) {
+                if owner.eq(&self.safe_address) && spender.eq(&self.addresses.channels) && is_synced {
                     info!("updating safe allowance from chain after approval event");
                     match self
                         .rpc_operations
@@ -658,6 +670,7 @@ where
         &self,
         tx: &OpenTransaction,
         event: HoprNetworkRegistryEvents,
+        _is_synced: bool,
     ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["network_registry"]);
@@ -740,6 +753,7 @@ where
         &self,
         tx: &OpenTransaction,
         event: HoprNodeSafeRegistryEvents,
+        _is_synced: bool,
     ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["safe_registry"]);
@@ -776,6 +790,7 @@ where
         &self,
         _db: &OpenTransaction,
         _event: HoprNodeManagementModuleEvents,
+        _is_synced: bool,
     ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["node_management_module"]);
@@ -788,6 +803,7 @@ where
         &self,
         tx: &OpenTransaction,
         event: HoprWinningProbabilityOracleEvents,
+        _is_synced: bool,
     ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["win_prob_oracle"]);
@@ -850,6 +866,7 @@ where
         &self,
         tx: &OpenTransaction,
         event: HoprTicketPriceOracleEvents,
+        _is_synced: bool,
     ) -> Result<Option<ChainEventType>> {
         #[cfg(all(feature = "prometheus", not(test)))]
         METRIC_INDEXER_LOG_COUNTERS.increment(&["price_oracle"]);
@@ -876,7 +893,12 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self, slog), fields(log=%slog))]
-    async fn process_log_event(&self, tx: &OpenTransaction, slog: SerializableLog) -> Result<Option<ChainEventType>> {
+    async fn process_log_event(
+        &self,
+        tx: &OpenTransaction,
+        slog: SerializableLog,
+        is_synced: bool,
+    ) -> Result<Option<ChainEventType>> {
         trace!(log = %slog, "log content");
 
         let log = Log::from(slog.clone());
@@ -893,28 +915,29 @@ where
         if log.address.eq(&self.addresses.announcements) {
             let bn = log.block_number as u32;
             let event = HoprAnnouncementsEvents::decode_log(&primitive_log)?;
-            self.on_announcement_event(tx, event.data, bn).await
+            self.on_announcement_event(tx, event.data, bn, is_synced).await
         } else if log.address.eq(&self.addresses.channels) {
             let event = HoprChannelsEvents::decode_log(&primitive_log)?;
-            self.on_channel_event(tx, event.data).await
+            self.on_channel_event(tx, event.data, is_synced).await
         } else if log.address.eq(&self.addresses.network_registry) {
             let event = HoprNetworkRegistryEvents::decode_log(&primitive_log)?;
-            self.on_network_registry_event(tx, event.data).await
+            self.on_network_registry_event(tx, event.data, is_synced).await
         } else if log.address.eq(&self.addresses.token) {
             let event = HoprTokenEvents::decode_log(&primitive_log)?;
-            self.on_token_event(tx, event.data).await
+            self.on_token_event(tx, event.data, is_synced).await
         } else if log.address.eq(&self.addresses.safe_registry) {
             let event = HoprNodeSafeRegistryEvents::decode_log(&primitive_log)?;
-            self.on_node_safe_registry_event(tx, event.data).await
+            self.on_node_safe_registry_event(tx, event.data, is_synced).await
         } else if log.address.eq(&self.addresses.module_implementation) {
             let event = HoprNodeManagementModuleEvents::decode_log(&primitive_log)?;
-            self.on_node_management_module_event(tx, event.data).await
+            self.on_node_management_module_event(tx, event.data, is_synced).await
         } else if log.address.eq(&self.addresses.price_oracle) {
             let event = HoprTicketPriceOracleEvents::decode_log(&primitive_log)?;
-            self.on_ticket_price_oracle_event(tx, event.data).await
+            self.on_ticket_price_oracle_event(tx, event.data, is_synced).await
         } else if log.address.eq(&self.addresses.win_prob_oracle) {
             let event = HoprWinningProbabilityOracleEvents::decode_log(&primitive_log)?;
-            self.on_ticket_winning_probability_oracle_event(tx, event.data).await
+            self.on_ticket_winning_probability_oracle_event(tx, event.data, is_synced)
+                .await
         } else {
             #[cfg(all(feature = "prometheus", not(test)))]
             METRIC_INDEXER_LOG_COUNTERS.increment(&["unknown"]);
@@ -975,7 +998,7 @@ where
         }
     }
 
-    async fn collect_log_event(&self, log0: SerializableLog) -> Result<Option<SignificantChainEvent>> {
+    async fn collect_log_event(&self, log0: SerializableLog, is_synced: bool) -> Result<Option<SignificantChainEvent>> {
         let myself = self.clone();
         self.db
             .begin_transaction()
@@ -987,7 +1010,7 @@ where
                 let block_id = log.block_number;
 
                 Box::pin(async move {
-                    match myself.process_log_event(tx, log).await {
+                    match myself.process_log_event(tx, log, is_synced).await {
                         // If a significant chain event can be extracted from the log
                         Ok(Some(event_type)) => {
                             let significant_event = SignificantChainEvent { tx_hash, event_type };
@@ -1143,7 +1166,7 @@ mod tests {
                 stake_factory: Default::default(),
             }),
             chain_key: SELF_CHAIN_KEY.clone(),
-            safe_address: SELF_CHAIN_KEY.public().to_address(),
+            safe_address: STAKE_ADDRESS.clone(),
             db,
             rpc_operations,
         }
@@ -1175,10 +1198,7 @@ mod tests {
             data: DynSolValue::Tuple(vec![
                 DynSolValue::Bytes(keybinding.signature.as_ref().to_vec()),
                 DynSolValue::Bytes(keybinding.packet_key.as_ref().to_vec()),
-                DynSolValue::FixedBytes(
-                    AlloyAddress::from_slice(SELF_CHAIN_KEY.public().to_address().as_ref()).into_word(),
-                    32,
-                ),
+                DynSolValue::FixedBytes(AlloyAddress::from_slice(SELF_CHAIN_ADDRESS.as_ref()).into_word(), 32),
             ])
             .abi_encode_packed(),
             ..test_log()
@@ -1194,7 +1214,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, keybinding_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, keybinding_log, true).await }))
             .await?;
 
         assert!(event_type.is_none(), "keybinding does not have a chain event type");
@@ -1253,7 +1273,7 @@ mod tests {
             .perform(|tx| {
                 Box::pin(async move {
                     handlers_clone
-                        .process_log_event(tx, address_announcement_empty_log)
+                        .process_log_event(tx, address_announcement_empty_log, true)
                         .await
                 })
             })
@@ -1304,7 +1324,13 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers_clone.process_log_event(tx, address_announcement_log).await }))
+            .perform(|tx| {
+                Box::pin(async move {
+                    handlers_clone
+                        .process_log_event(tx, address_announcement_log, true)
+                        .await
+                })
+            })
             .await?;
 
         assert!(
@@ -1363,7 +1389,9 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, address_announcement_dns_log).await }))
+            .perform(|tx| {
+                Box::pin(async move { handlers.process_log_event(tx, address_announcement_dns_log, true).await })
+            })
             .await?;
 
         assert!(
@@ -1440,7 +1468,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, revoke_announcement_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, revoke_announcement_log, true).await }))
             .await?;
 
         assert!(
@@ -1471,6 +1499,10 @@ mod tests {
             .expect_get_hopr_balance()
             .times(1)
             .return_once(move |_| Ok(target_hopr_balance.clone()));
+        rpc_operations
+            .expect_get_hopr_allowance()
+            .times(1)
+            .returning(move |_, _| Ok(HoprBalance::from(primitive_types::U256::from(1000u64))));
         let clonable_rpc_operations = ClonableMockOperations {
             inner: Arc::new(rpc_operations),
         };
@@ -1484,7 +1516,7 @@ mod tests {
             topics: vec![
                 hopr_bindings::hoprtoken::HoprToken::Transfer::SIGNATURE_HASH.into(),
                 H256::from_slice(&Address::default().to_bytes32()).into(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
             ],
             data: encoded_data,
             ..test_log()
@@ -1493,7 +1525,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, transferred_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, transferred_log, true).await }))
             .await?;
 
         assert!(event_type.is_none(), "token transfer does not have chain event type");
@@ -1503,7 +1535,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn on_token_transfer_from() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
 
@@ -1512,6 +1544,10 @@ mod tests {
             .expect_get_hopr_balance()
             .times(1)
             .return_once(|_| Ok(HoprBalance::zero()));
+        rpc_operations
+            .expect_get_hopr_allowance()
+            .times(1)
+            .returning(move |_, _| Ok(HoprBalance::from(primitive_types::U256::from(1000u64))));
         let clonable_rpc_operations = ClonableMockOperations {
             inner: Arc::new(rpc_operations),
         };
@@ -1534,7 +1570,7 @@ mod tests {
             address: handlers.addresses.token,
             topics: vec![
                 hopr_bindings::hoprtoken::HoprToken::Transfer::SIGNATURE_HASH.into(),
-                H256::from_slice(&SELF_CHAIN_ADDRESS.to_bytes32()).into(),
+                H256::from_slice(&STAKE_ADDRESS.to_bytes32()).into(),
                 H256::from_slice(&Address::default().to_bytes32()).into(),
             ],
             data: encoded_data,
@@ -1544,7 +1580,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, transferred_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, transferred_log, true).await }))
             .await?;
 
         assert!(event_type.is_none(), "token transfer does not have chain event type");
@@ -1591,7 +1627,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers_clone.process_log_event(tx, approval_log_clone).await }))
+            .perform(|tx| Box::pin(async move { handlers_clone.process_log_event(tx, approval_log_clone, true).await }))
             .await?;
 
         assert!(event_type.is_none(), "token approval does not have chain event type");
@@ -1612,7 +1648,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers_clone.process_log_event(tx, approval_log).await }))
+            .perform(|tx| Box::pin(async move { handlers_clone.process_log_event(tx, approval_log, true).await }))
             .await?;
 
         assert!(event_type.is_none(), "token approval does not have chain event type");
@@ -1654,7 +1690,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log, false).await }))
             .await?;
 
         assert!(
@@ -1702,7 +1738,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log, false).await }))
             .await?;
 
         assert!(
@@ -1753,7 +1789,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log, false).await }))
             .await?;
 
         assert!(
@@ -1805,7 +1841,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, registered_log, false).await }))
             .await?;
 
         assert!(
@@ -1849,7 +1885,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, nr_enabled).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, nr_enabled, false).await }))
             .await?;
 
         assert!(event_type.is_none(), "there's no chain event type for nr disable");
@@ -1888,7 +1924,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, nr_disabled).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, nr_disabled, false).await }))
             .await?;
 
         assert!(event_type.is_none(), "there's no chain event type for nr enable");
@@ -1925,7 +1961,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, set_eligible).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, set_eligible, false).await }))
             .await?;
 
         assert!(
@@ -1968,7 +2004,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, set_eligible).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, set_eligible, true).await }))
             .await?;
 
         assert!(
@@ -1984,10 +2020,22 @@ mod tests {
     #[tokio::test]
     async fn on_channel_event_balance_increased() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
+
+        let value = U256::MAX;
+        let target_hopr_balance = HoprBalance::from(primitive_types::U256::from_big_endian(
+            value.to_be_bytes_vec().as_slice(),
+        ));
+
+        let mut rpc_operations = MockIndexerRpcOperations::new();
+        rpc_operations
+            .expect_get_hopr_balance()
+            .times(1)
+            .return_once(move |_| Ok(target_hopr_balance.clone()));
+        rpc_operations
+            .expect_get_hopr_allowance()
+            .times(1)
+            .returning(move |_, _| Ok(HoprBalance::from(primitive_types::U256::from(1000u64))));
         let clonable_rpc_operations = ClonableMockOperations {
-            //
             inner: Arc::new(rpc_operations),
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
@@ -2022,7 +2070,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_increased_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_increased_log, true).await }))
             .await?;
 
         let channel = db
@@ -2070,7 +2118,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channels_dst_updated).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channels_dst_updated, true).await }))
             .await?;
 
         assert!(
@@ -2092,10 +2140,18 @@ mod tests {
     #[tokio::test]
     async fn on_channel_event_balance_decreased() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(SELF_CHAIN_KEY.clone()).await?;
-        let rpc_operations = MockIndexerRpcOperations::new();
-        // ==> set mock expectations here
+
+        let value = U256::MAX;
+        let target_hopr_balance = HoprBalance::from(primitive_types::U256::from_big_endian(
+            value.to_be_bytes_vec().as_slice(),
+        ));
+
+        let mut rpc_operations = MockIndexerRpcOperations::new();
+        rpc_operations
+            .expect_get_hopr_balance()
+            .times(1)
+            .return_once(move |_| Ok(target_hopr_balance.clone()));
         let clonable_rpc_operations = ClonableMockOperations {
-            //
             inner: Arc::new(rpc_operations),
         };
         let handlers = init_handlers(clonable_rpc_operations, db.clone());
@@ -2135,7 +2191,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_decreased_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, balance_decreased_log, true).await }))
             .await?;
 
         let channel = db
@@ -2192,7 +2248,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_closed_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_closed_log, true).await }))
             .await?;
 
         let closed_channel = db
@@ -2258,7 +2314,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_closed_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_closed_log, true).await }))
             .await?;
 
         let closed_channel = db.get_channel_by_id(None, &channel.get_id()).await?;
@@ -2303,7 +2359,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log, true).await }))
             .await?;
 
         let channel = db
@@ -2367,7 +2423,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log, true).await }))
             .await?;
 
         let channel = db
@@ -2431,7 +2487,7 @@ mod tests {
 
         db.begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, channel_opened_log, true).await }))
             .await
             .expect_err("should not re-open channel that is not Closed");
         Ok(())
@@ -2535,7 +2591,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log, true).await }))
             .await?;
 
         let channel = db
@@ -2649,7 +2705,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log, true).await }))
             .await?;
 
         let channel = db
@@ -2733,7 +2789,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log, true).await }))
             .await?;
 
         let channel = db
@@ -2809,7 +2865,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log, true).await }))
             .await?;
 
         let channel = db
@@ -2867,7 +2923,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, ticket_redeemed_log, true).await }))
             .await?;
 
         let channel = db
@@ -2928,7 +2984,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, closure_initiated_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, closure_initiated_log, true).await }))
             .await?;
 
         let channel = db
@@ -2977,7 +3033,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, safe_registered_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, safe_registered_log, true).await }))
             .await?;
 
         assert!(matches!(event_type, Some(ChainEventType::NodeSafeRegistered(addr)) if addr == *SAFE_INSTANCE_ADDR));
@@ -3016,7 +3072,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, safe_registered_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, safe_registered_log, true).await }))
             .await?;
 
         assert!(
@@ -3057,7 +3113,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, price_change_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, price_change_log, true).await }))
             .await?;
 
         assert!(
@@ -3105,7 +3161,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, win_prob_change_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, win_prob_change_log, true).await }))
             .await?;
 
         assert!(
@@ -3200,7 +3256,7 @@ mod tests {
         let event_type = db
             .begin_transaction()
             .await?
-            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, win_prob_change_log).await }))
+            .perform(|tx| Box::pin(async move { handlers.process_log_event(tx, win_prob_change_log, true).await }))
             .await?;
 
         assert!(

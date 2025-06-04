@@ -17,7 +17,7 @@ pub trait ChainLogHandler {
 
     fn safe_address(&self) -> Address;
 
-    async fn collect_log_event(&self, log: SerializableLog) -> Result<Option<SignificantChainEvent>>;
+    async fn collect_log_event(&self, log: SerializableLog, is_synced: bool) -> Result<Option<SignificantChainEvent>>;
 }
 
 #[cfg(test)]
@@ -32,7 +32,7 @@ mock! {
     /// use mockall::predicate::*;
     /// let mut mock = MockChainLogHandler::new();
     /// mock.expect_collect_log_event()
-    ///     .returning(|_| Ok(None));
+    ///     .returning(|_, _| Ok(None));
     /// ```
     pub ChainLogHandler {}
 
@@ -46,6 +46,6 @@ mock! {
         fn contract_addresses_map(&self) -> Arc<ContractAddresses>;
         fn contract_address_topics(&self, contract: Address) -> Vec<B256>;
         fn safe_address(&self) -> Address;
-        async fn collect_log_event(&self, log: SerializableLog) -> Result<Option<SignificantChainEvent>>;
+        async fn collect_log_event(&self, log: SerializableLog, is_synced: bool) -> Result<Option<SignificantChainEvent>>;
     }
 }

@@ -211,7 +211,7 @@ where
                     "computing processed logs"
                 );
                 // Do not pollute the logs with the fast-sync progress
-                Self::process_block_by_id(&db, &logs_handler, block_number).await?;
+                Self::process_block_by_id(&db, &logs_handler, block_number, is_synced.load(Ordering::Relaxed)).await?;
 
                 #[cfg(all(feature = "prometheus", not(test)))]
                 {
@@ -309,7 +309,9 @@ where
                         }
                     }
                 })
-                .filter_map(|block| Self::process_block(&db, &logs_handler, block, false))
+                .filter_map(|block| {
+                    Self::process_block(&db, &logs_handler, block, false, is_synced.load(Ordering::Relaxed))
+                })
                 .flat_map(stream::iter);
 
             futures::pin_mut!(event_stream);
@@ -379,13 +381,12 @@ where
             .event_signature(Transfer::SIGNATURE_HASH)
             .topic2(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()));
 
-        let filter_transfer_from = alloy::rpc::types::Filter::new()
+        let filter_transfer_from = filter_token
             .clone()
             .event_signature(Transfer::SIGNATURE_HASH)
             .topic1(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()));
 
-        let filter_approval = alloy::rpc::types::Filter::new()
-            .clone()
+        let filter_approval = filter_token
             .event_signature(Approval::SIGNATURE_HASH)
             .topic1(alloy::primitives::B256::from_slice(safe_address.to_bytes32().as_ref()))
             .topic2(alloy::primitives::B256::from_slice(
@@ -425,6 +426,7 @@ where
         db: &Db,
         logs_handler: &U,
         block_id: u64,
+        is_synced: bool,
     ) -> crate::errors::Result<Option<Vec<SignificantChainEvent>>>
     where
         U: ChainLogHandler + 'static,
@@ -449,7 +451,7 @@ where
             }
         }
 
-        Ok(Self::process_block(db, logs_handler, block, true).await)
+        Ok(Self::process_block(db, logs_handler, block, true, is_synced).await)
     }
 
     /// Processes a block and its logs.
@@ -471,6 +473,7 @@ where
         logs_handler: &U,
         block: BlockWithLogs,
         fetch_checksum_from_db: bool,
+        is_synced: bool,
     ) -> Option<Vec<SignificantChainEvent>>
     where
         U: ChainLogHandler + 'static,
@@ -484,7 +487,7 @@ where
         // transaction. This is difficult since currently this would be across databases.
         let events = stream::iter(block.logs.clone())
             .filter_map(|log| async move {
-                match logs_handler.collect_log_event(log.clone()).await {
+                match logs_handler.collect_log_event(log.clone(), is_synced).await {
                     Ok(data) => match db.set_log_processed(log).await {
                         Ok(_) => data,
                         Err(error) => {
@@ -944,7 +947,7 @@ mod tests {
             .expect_collect_log_event()
             // .times(2)
             .times(finalized_block.logs.len())
-            .returning(|_| Ok(None));
+            .returning(|_, _| Ok(None));
 
         assert!(tx.start_send(finalized_block.clone()).is_ok());
         assert!(tx.start_send(head_allowing_finalization.clone()).is_ok());
@@ -1005,8 +1008,8 @@ mod tests {
             handlers
                 .expect_collect_log_event()
                 .times(2)
-                .withf(move |l| [1, 2].contains(&l.block_number))
-                .returning(|_| Ok(None));
+                .withf(move |l, _| [1, 2].contains(&l.block_number))
+                .returning(|_, _| Ok(None));
             handlers
                 .expect_contract_address_topics()
                 .withf(move |x| x == &addr)
@@ -1096,8 +1099,8 @@ mod tests {
             handlers
                 .expect_collect_log_event()
                 .times(2)
-                .withf(move |l| [3, 4].contains(&l.block_number))
-                .returning(|_| Ok(None));
+                .withf(move |l, _| [3, 4].contains(&l.block_number))
+                .returning(|_, _| Ok(None));
             handlers
                 .expect_contract_address_topics()
                 .withf(move |x| x == &addr)
@@ -1189,8 +1192,8 @@ mod tests {
         handlers
             .expect_collect_log_event()
             .times(1)
-            .withf(move |l| block_numbers.contains(&l.block_number))
-            .returning(|l| {
+            .withf(move |l, _| block_numbers.contains(&l.block_number))
+            .returning(|l, _| {
                 let block_number = l.block_number;
                 Ok(Some(SignificantChainEvent {
                     tx_hash: Hash::create(&[format!("my tx hash {block_number}").as_bytes()]),
