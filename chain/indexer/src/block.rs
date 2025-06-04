@@ -341,12 +341,24 @@ where
         }
     }
 
-    // We are setting up the logs filters.
-    // (1) for all contract addresses, except the token contract, which have topics.
-    // (2) for the token contract which filters transfer events from our safe.
-    // (3) for the token contract which filters transfer events to our safe.
-    // (4) for the token contract which filters approval events involving our safe and the channels
-    // contract.
+    /// Generates specialized log filters for efficient blockchain event processing.
+    ///
+    /// This function creates a comprehensive set of log filters that optimize
+    /// indexer performance by categorizing filters based on contract types and
+    /// event relevance to the specific node.
+    ///
+    /// # Arguments
+    /// * `logs_handler` - Handler containing contract addresses and safe address
+    ///
+    /// # Returns
+    /// * `(FilterSet, Vec<(Address, Hash)>)` - A tuple containing:
+    ///   - `FilterSet`: Categorized filters for blockchain event processing.
+    ///   - `Vec<(Address, Hash)>`: A vector of address-topic pairs for logs origin validation.
+    ///
+    /// # Filter Categories
+    /// * `all` - Complete set of filters for normal operation
+    /// * `token` - Token-specific filters (Transfer, Approval events for safe)
+    /// * `no_token` - Non-token contract filters for initial sync optimization
     fn generate_log_filters(logs_handler: &U) -> (FilterSet, Vec<(Address, Hash)>) {
         let safe_address = logs_handler.safe_address();
         let addresses_no_token = logs_handler

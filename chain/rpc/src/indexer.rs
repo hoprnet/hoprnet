@@ -35,9 +35,20 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Splits the range between `from_block` and `to_block` (inclusive)
-/// to chunks of maximum size `max_chunk_size` and creates [alloy::rpc::types::Filter] for each chunk
-/// using the given list of [Filter].
+/// Splits a block range into smaller chunks and applies filters to each chunk.
+///
+/// This function takes a range of blocks and divides it into smaller sub-ranges
+/// for concurrent processing. Each sub-range gets a copy of all the provided filters
+/// with the appropriate block range applied.
+///
+/// # Arguments
+/// * `filters` - Vector of log filters to apply to each chunk
+/// * `from_block` - Starting block number
+/// * `to_block` - Ending block number
+/// * `max_chunk_size` - Maximum number of blocks per chunk
+///
+/// # Returns
+/// * `impl Stream<Item = Vec<Filter>>` - Stream of filter vectors, one per chunk
 fn split_range<'a>(
     filters: Vec<Filter>,
     from_block: u64,

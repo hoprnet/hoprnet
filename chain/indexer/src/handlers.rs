@@ -82,6 +82,23 @@ where
     T: HoprIndexerRpcOperations + Clone + Send + 'static,
     Db: HoprDbAllOperations + Clone,
 {
+    /// Creates a new instance of contract event handlers with RPC operations support.
+    ///
+    /// This constructor initializes the event handlers with all necessary dependencies
+    /// for processing blockchain events and making direct RPC calls for fresh state data.
+    ///
+    /// # Type Parameters
+    /// * `T` - Type implementing `HoprIndexerRpcOperations` for blockchain queries
+    ///
+    /// # Arguments
+    /// * `addresses` - Contract addresses configuration
+    /// * `safe_address` - The node's safe address for filtering relevant events
+    /// * `chain_key` - Cryptographic key for chain operations
+    /// * `db` - Database connection for persistent storage
+    /// * `rpc_operations` - RPC interface for direct blockchain queries
+    ///
+    /// # Returns
+    /// * `Self` - New instance of `ContractEventHandlers`
     pub fn new(
         addresses: ContractAddresses,
         safe_address: Address,

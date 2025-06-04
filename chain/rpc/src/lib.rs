@@ -175,7 +175,15 @@ impl PartialOrd<Self> for Log {
     }
 }
 
-/// A type containing filters from the `eth_getLogs` RPC calls.
+/// Represents a set of categorized blockchain log filters for optimized indexer performance.
+///
+/// This structure organizes filters into different categories to enable selective log
+/// processing based on the indexer's operational state. During initial synchronization,
+/// the indexer uses `no_token` filters to exclude irrelevant token events, significantly
+/// reducing processing time and storage requirements. During normal operation, it uses
+/// `all` filters for complete event coverage.
+///
+/// The `token` filters specifically target token-related events for the node's safe address.
 #[derive(Debug, Clone, Default)]
 pub struct FilterSet {
     /// holds all filters for the indexer
@@ -320,19 +328,66 @@ pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
 
-    /// Retrieves wxHOPR token allowance for the given owner and spender.
+    /// Queries the HOPR token allowance between owner and spender addresses.
+    ///
+    /// This method queries the HOPR token contract to determine how many tokens
+    /// the owner has approved the spender to transfer on their behalf.
+    ///
+    /// # Arguments
+    /// * `owner` - The address that owns the tokens and grants the allowance
+    /// * `spender` - The address that is approved to spend the tokens
+    ///
+    /// # Returns
+    /// * `Result<HoprBalance>` - The current allowance amount
+    ///
+    /// # Examples
+    /// ```rust
+    /// let allowance = rpc.get_hopr_allowance(safe_address, channels_address).await?;
+    /// ```
     async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance>;
 
-    /// Retrieves on-chain xdai balance of the given address.
+    /// Queries the xDAI (native token) balance for a specific address.
+    ///
+    /// This method queries the current xDAI balance of the specified address
+    /// from the blockchain.
+    ///
+    /// # Arguments
+    /// * `address` - The Ethereum address to query the balance for
+    ///
+    /// # Returns
+    /// * `Result<XDaiBalance>` - The current xDAI balance
     async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance>;
 
-    /// Retrieves on-chain wxHOPR token balance of the given address.
+    /// Queries the HOPR token balance for a specific address.
+    ///
+    /// This method directly queries the HOPR token contract to get the current
+    /// token balance of the specified address.
+    ///
+    /// # Arguments
+    /// * `address` - The Ethereum address to query the balance for
+    ///
+    /// # Returns
+    /// * `Result<HoprBalance>` - The current HOPR token balance
     async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance>;
 
-    /// Starts streaming logs from the given `start_block_number`.
-    /// If no `start_block_number` is given, the stream starts from the latest block.
-    /// The given `filter` are applied to retrieve the logs, the function fails if the filter is empty.
-    /// The streaming stops only when the corresponding channel is closed by the returned receiver.
+    /// Streams blockchain logs using selective filtering based on synchronization state.
+    ///
+    /// This method intelligently selects which log filters to use based on whether
+    /// the indexer is currently syncing historical data or processing live events.
+    /// During initial sync, it uses `no_token` filters to exclude irrelevant token
+    /// events. When synced, it uses all filters to capture complete event data.
+    ///
+    /// # Arguments
+    /// * `start_block_number` - Starting block number for log retrieval
+    /// * `filters` - Set of categorized filters (all, token, no_token)
+    /// * `is_synced` - Whether the indexer has completed initial synchronization
+    ///
+    /// # Returns
+    /// * `impl Stream<Item = Result<Log>>` - Stream of blockchain logs
+    ///
+    /// # Behavior
+    /// * When `is_synced` is `false`: Uses `filter_set.no_token` to reduce log volume
+    /// * When `is_synced` is `true`: Uses `filter_set.all` for complete coverage
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
