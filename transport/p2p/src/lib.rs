@@ -38,7 +38,6 @@ use std::fmt::Debug;
 use futures::{AsyncRead, AsyncWrite, Stream};
 use hopr_internal_types::prelude::*;
 use hopr_transport_identity::PeerId;
-use hopr_transport_network::network::NetworkTriggeredEvent;
 use hopr_transport_protocol::PeerDiscovery;
 use libp2p::{StreamProtocol, autonat, swarm::NetworkBehaviour};
 use rand::rngs::OsRng;
@@ -104,15 +103,13 @@ impl Debug for HoprNetworkBehavior {
 }
 
 impl HoprNetworkBehavior {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new<T, U>(me: PeerId, network_events: T, onchain_events: U) -> Self
+    pub fn new<T>(me: PeerId, onchain_events: T) -> Self
     where
-        T: Stream<Item = NetworkTriggeredEvent> + Send + 'static,
-        U: Stream<Item = PeerDiscovery> + Send + 'static,
+        T: Stream<Item = PeerDiscovery> + Send + 'static,
     {
         Self {
             streams: libp2p_stream::Behaviour::new(),
-            discovery: behavior::discovery::Behaviour::new(me, network_events, onchain_events),
+            discovery: behavior::discovery::Behaviour::new(me, onchain_events),
             autonat_client: autonat::v2::client::Behaviour::new(
                 OsRng,
                 autonat::v2::client::Config::default().with_probe_interval(NAT_SERVER_PROBE_INTERVAL), /* TODO (jean): make this configurable */

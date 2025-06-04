@@ -7,12 +7,9 @@ use hopr_db_sql::api::resolver::HoprDbResolverOperations;
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleHistogram};
 use hopr_path::channel_graph::ChannelGraph;
-use hopr_transport_network::{
-    HoprDbPeersOperations,
-    network::{Network, NetworkTriggeredEvent},
-};
+use hopr_transport_network::{HoprDbPeersOperations, network::Network};
 use hopr_transport_probe::traits::{PeerDiscoveryFetch, ProbeStatusUpdate};
-use tracing::{debug, error, trace};
+use tracing::{debug, error};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -44,26 +41,17 @@ where
     network: Arc<Network<T>>,
     resolver: T,
     channel_graph: Arc<RwLock<ChannelGraph>>,
-    /// Implementation of the network interface allowing emitting events
-    /// based on the [hopr_transport_network::network::Network] events into the p2p swarm.
-    emitter: futures::channel::mpsc::Sender<NetworkTriggeredEvent>,
 }
 
 impl<T> ProbeNetworkInteractions<T>
 where
     T: HoprDbPeersOperations + HoprDbResolverOperations + Sync + Send + Clone + std::fmt::Debug,
 {
-    pub fn new(
-        network: Arc<Network<T>>,
-        resolver: T,
-        channel_graph: Arc<RwLock<ChannelGraph>>,
-        emitter: futures::channel::mpsc::Sender<NetworkTriggeredEvent>,
-    ) -> Self {
+    pub fn new(network: Arc<Network<T>>, resolver: T, channel_graph: Arc<RwLock<ChannelGraph>>) -> Self {
         Self {
             network,
             resolver,
             channel_graph,
-            emitter,
         }
     }
 }
@@ -125,29 +113,14 @@ where
                 g.update_node_score(&chain_key, result.into());
                 debug!(%chain_key, ?result, "update node score for peer");
             } else {
-                error!(%peer, "could not resolve chain key");
+                error!("could not resolve chain key");
             }
         } else {
-            error!(%peer, "encountered invalid peer id");
+            error!("encountered invalid peer id");
         }
 
-        match self.network.update(peer, result, None).await {
-            Ok(Some(updated)) => match updated {
-                NetworkTriggeredEvent::CloseConnection(peer) => {
-                    if let Err(e) = self
-                        .emitter
-                        .clone()
-                        .try_send(NetworkTriggeredEvent::CloseConnection(peer))
-                    {
-                        error!(error = %e, "Failed to emit a network event 'close connection'")
-                    }
-                }
-                NetworkTriggeredEvent::UpdateQuality(peer, quality) => {
-                    tracing::trace!(%peer, %quality, "peer changed quality");
-                }
-            },
-            Ok(None) => trace!("No update necessary"),
-            Err(e) => error!(error = %e, "Encountered error on on updating the collected ping data"),
+        if let Err(error) = self.network.update(peer, result, None).await {
+            error!(%error, "Encountered error on on updating the collected ping data")
         }
     }
 }
