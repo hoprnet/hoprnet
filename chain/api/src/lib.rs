@@ -334,7 +334,8 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     /// an error is returned.
     ///
     /// # Returns
-    /// * `Result<Balance<C>>` - The balance of the node's account for the specified currency, or an error if the query fails.
+    /// * `Result<Balance<C>>` - The balance of the node's account for the specified currency, or an error if the query
+    ///   fails.
     pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
         let bal = if C::is::<XDai>() {
             self.rpc_operations
@@ -363,7 +364,8 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     /// * `address` - The address whose balance is to be retrieved.
     ///
     /// # Returns
-    /// * `Result<Balance<C>>` - The balance of the specified address for the given currency, or an error if the query fails.
+    /// * `Result<Balance<C>>` - The balance of the specified address for the given currency, or an error if the query
+    ///   fails.
     pub async fn get_safe_balance<C: Currency + Send>(&self, safe_address: Address) -> errors::Result<Balance<C>> {
         let bal = if C::is::<XDai>() {
             self.rpc_operations.get_xdai_balance(safe_address).await?.to_be_bytes()
