@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ModuleSingletonCalls"],"fn":["new"],"mod":["abi"],"struct":["ModuleSingletonInstance","getTargetsCall","getTargetsReturn","isNodeCall","isNodeReturn","ownerCall","ownerReturn"]};

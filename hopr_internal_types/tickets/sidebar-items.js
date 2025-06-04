@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["REDEEM_CALL_SELECTOR"],"enum":["AcknowledgedTicketStatus"],"struct":["AcknowledgedTicket","RedeemableTicket","Ticket","TicketBuilder","TransferableWinningTicket","UnacknowledgedTicket","VerifiedTicket","WinningProbability"],"type":["EncodedWinProb"]};
