@@ -242,7 +242,7 @@ where
                     let maybe_direction = channel.direction(&me_onchain);
 
                     let change = channel_graph
-                        .write()
+                        .write_arc()
                         .await
                         .update_channel(channel);
 
@@ -826,7 +826,7 @@ impl Hopr {
 
             // Sync the Channel graph
             let channel_graph = self.channel_graph.clone();
-            let mut cg = channel_graph.write().await;
+            let mut cg = channel_graph.write_arc().await;
 
             info!("Syncing channels from the previous runs");
             let mut channel_stream = self
@@ -1481,11 +1481,11 @@ impl Hopr {
     }
 
     pub async fn export_channel_graph(&self, cfg: GraphExportConfig) -> String {
-        self.channel_graph.read().await.as_dot(cfg)
+        self.channel_graph.read_arc().await.as_dot(cfg)
     }
 
     pub async fn export_raw_channel_graph(&self) -> errors::Result<String> {
-        let cg = self.channel_graph.read().await;
+        let cg = self.channel_graph.read_arc().await;
         serde_json::to_string(cg.deref()).map_err(|e| HoprLibError::GeneralError(e.to_string()))
     }
 }

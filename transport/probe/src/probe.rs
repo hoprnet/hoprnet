@@ -314,7 +314,7 @@ mod tests {
     #[async_trait]
     impl ProbeStatusUpdate for PeerStore {
         async fn on_finished(&self, peer: &PeerId, result: &crate::errors::Result<Duration>) {
-            let mut on_finished = self.on_finished.write().unwrap();
+            let mut on_finished = self.on_finished.write_arc().unwrap();
             on_finished.push((
                 *peer,
                 match result {
@@ -328,7 +328,7 @@ mod tests {
     #[async_trait]
     impl PeerDiscoveryFetch for PeerStore {
         async fn get_peers(&self, _from_timestamp: std::time::SystemTime) -> Vec<PeerId> {
-            let mut get_peers = self.get_peers.write().unwrap();
+            let mut get_peers = self.get_peers.write_arc().unwrap();
             get_peers.pop_front().unwrap_or_default()
         }
     }
@@ -579,7 +579,7 @@ mod tests {
         assert_eq!(
             store
                 .on_finished
-                .read()
+                .read_arc()
                 .expect("should be lockable")
                 .iter()
                 .filter(|(_peer, result)| result.is_ok())
@@ -633,7 +633,7 @@ mod tests {
         assert_eq!(
             store
                 .on_finished
-                .read()
+                .read_arc()
                 .expect("should be lockable")
                 .iter()
                 .filter(|(_peer, result)| result.is_err())
