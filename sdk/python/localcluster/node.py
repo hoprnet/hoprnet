@@ -4,6 +4,7 @@ import os
 from decimal import Decimal
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
+from typing import Optional
 
 from ..api import HoprdAPI
 from . import utils
@@ -44,6 +45,7 @@ class Node:
         base_port: int,
         api_addr: str = None,
         use_nat: bool = False,
+        extra_env: Optional[dict] = None,
     ):
         # initialized
         self.id = id
@@ -52,6 +54,7 @@ class Node:
         self.network: str = network
         self.identity_path: str = identity_path
         self.use_nat: bool = use_nat
+        self.env: dict = extra_env
         self.base_port: int = base_port
 
         # optional
@@ -95,6 +98,13 @@ class Node:
             + f"tokio console {self.tokio_console_port}, "
             + f"anvil {self.anvil_port}"
         )
+
+    def add_additional_settings(self, custom_env: dict):
+        if self.env:
+            logging.info(f"Node: {self.id} Applying additional environment variables: {self.env}")
+            for key, value in self.env.items():
+                env_value = str(value)
+                custom_env[key] = env_value
 
     def load_addresses(self):
         loaded_env = load_env_file(self.dir.joinpath(".env"))
@@ -190,6 +200,10 @@ class Node:
             "TOKIO_CONSOLE_BIND": f"localhost:{self.tokio_console_port}",
             "HOPRD_NAT": "true" if self.use_nat else "false",
         }
+
+        # Add additional settings to custom_env
+        self.add_additional_settings(custom_env)
+
         loaded_env = load_env_file(self.dir.joinpath(".env"))
 
         cmd = [
@@ -262,6 +276,7 @@ class Node:
         use_nat: bool,
         exposed: bool,
         base_port: int,
+        extra_env: Optional[dict] = None
     ):
         token = config.get("api_token", defaults.get("api_token"))
 
@@ -274,6 +289,7 @@ class Node:
             config["config_file"],
             api_addr="0.0.0.0" if exposed else None,
             use_nat=use_nat,
+            extra_env=extra_env,
             base_port=base_port,
         )
 
