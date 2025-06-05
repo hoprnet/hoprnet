@@ -155,6 +155,10 @@ pub struct CloseChannelResult {
     pub status: ChannelStatus,
 }
 
+pub struct CloseAllChannelResult {
+    pub tx_hash: Hash,
+}
+
 /// Enum differentiator for loop component futures.
 ///
 /// Used to differentiate the type of the future that exits the loop premateruly
@@ -1359,7 +1363,7 @@ impl Hopr {
         let confirmation = self
             .hopr_chain_api
             .actions_ref()
-            .close_channel(*counterparty, direction, redeem_before_close)
+            .close_channel_by_counterparty(*counterparty, direction, redeem_before_close)
             .await?
             .await?;
 
@@ -1397,6 +1401,26 @@ impl Hopr {
             },
             None => Err(HoprLibError::ChainError(ChainActionsError::ChannelDoesNotExist)),
         }
+    }
+
+    pub async fn close_multiple_channels(
+        &self,
+        direction: ChannelDirection,
+        status: ChannelStatus,
+        redeem_before_close: bool,
+    ) -> errors::Result<CloseAllChannelResult> {
+        self.error_if_not_in_state(HoprState::Running, "Node is not ready for on-chain operations".into())?;
+
+        let confirmation = self
+            .hopr_chain_api
+            .actions_ref()
+            .close_channel_by_status(direction, status, redeem_before_close)
+            .await?
+            .await?;
+
+        Ok(CloseAllChannelResult {
+            tx_hash: confirmation.tx_hash,
+        })
     }
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {

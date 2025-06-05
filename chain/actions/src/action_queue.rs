@@ -53,14 +53,20 @@ pub trait TransactionExecutor {
     /// Channel funding and channel opening are both same transactions.
     async fn fund_channel(&self, destination: Address, balance: HoprBalance) -> Result<Hash>;
 
-    /// Initiates closure of an outgoing channel.
-    async fn initiate_outgoing_channel_closure(&self, dst: Address) -> Result<Hash>;
+    /// Initiates closure of one or multiple outgoing channel(s)
+    async fn initiate_outgoing_channel_closure<T: IntoIterator<Item = Address> + Send + 'static>(
+        &self,
+        dst: T,
+    ) -> Result<Hash>;
 
-    /// Finalizes closure of an outgoing channel.
-    async fn finalize_outgoing_channel_closure(&self, dst: Address) -> Result<Hash>;
+    /// Finalizes closure of one or multiple outgoing channel(s)
+    async fn finalize_outgoing_channel_closure<T: IntoIterator<Item = Address> + Send + 'static>(
+        &self,
+        dst: T,
+    ) -> Result<Hash>;
 
-    /// Closes incoming channel.
-    async fn close_incoming_channel(&self, src: Address) -> Result<Hash>;
+    /// Closes one or multiple incoming channel(s)
+    async fn close_incoming_channel<T: IntoIterator<Item = Address> + Send + 'static>(&self, src: T) -> Result<Hash>;
 
     /// Performs withdrawal of a certain amount from an address.
     /// Note that this transaction is typically awaited via polling and is not tracked
@@ -199,49 +205,58 @@ where
                 }
             }
 
-            Action::CloseChannel(channel, direction) => match direction {
-                ChannelDirection::Incoming => match channel.status {
-                    ChannelStatus::Open | ChannelStatus::PendingToClose(_) => {
-                        debug!(%channel, "closing incoming channel");
-                        let tx_hash = self.tx_exec.close_incoming_channel(channel.source).await?;
-                        IndexerExpectation::new(
-                            tx_hash,
-                            move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
-                        )
+            Action::CloseChannel(channels, direction, status) => match direction {
+                ChannelDirection::Incoming => {
+                    debug!(?channels, "closing incoming channels");
+                    // ignore closed channels
+                    let to_close = channels
+                        .iter()
+                        .filter(|channel| channel.status != ChannelStatus::Closed)
+                        .map(|channel| channel.source)
+                        .collect::<Vec<_>>();
+
+                    let tx_hash = self.tx_exec.close_incoming_channel(to_close.clone()).await?;
+
+                    debug!(?tx_hash, "closing incoming channels at hash");
+
+                    IndexerExpectation::new(
+                        tx_hash,
+                        move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if channels.iter().any(|c| c.get_id() == r_channel.get_id())),
+                    )
+                }
+                ChannelDirection::Outgoing => {
+                    let to_close = channels
+                        .clone()
+                        .iter()
+                        .filter(|channel| channel.status.to_string() == status.to_string())
+                        .map(|channel| channel.destination)
+                        .collect::<Vec<_>>();
+
+                    match status {
+                        ChannelStatus::Open => {
+                            let tx_hash = self.tx_exec.initiate_outgoing_channel_closure(to_close.clone()).await?;
+
+                            debug!(?tx_hash, "initiating channels closure at hash");
+                            IndexerExpectation::new(
+                                tx_hash,
+                                move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if channels.iter().any(|c| c.get_id() == r_channel.get_id())),
+                            )
+                        }
+                        ChannelStatus::PendingToClose(_) => {
+                            let tx_hash = self.tx_exec.finalize_outgoing_channel_closure(to_close.clone()).await?;
+
+                            debug!(?tx_hash, "finalizing channels closure at hash");
+                            IndexerExpectation::new(
+                                tx_hash,
+                                move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if channels.iter().any(|c| c.get_id() == r_channel.get_id())),
+                            )
+                        }
+                        ChannelStatus::Closed => {
+                            warn!("cannot close already closed channels");
+                            return Err(ChannelAlreadyClosed);
+                        }
                     }
-                    ChannelStatus::Closed => {
-                        warn!(%channel, "channel already closed");
-                        return Err(ChannelAlreadyClosed);
-                    }
-                },
-                ChannelDirection::Outgoing => match channel.status {
-                    ChannelStatus::Open => {
-                        debug!(%channel, "initiating channel closure");
-                        let tx_hash = self
-                            .tx_exec
-                            .initiate_outgoing_channel_closure(channel.destination)
-                            .await?;
-                        IndexerExpectation::new(
-                            tx_hash,
-                            move |event| matches!(event, ChainEventType::ChannelClosureInitiated(r_channel) if r_channel.get_id() == channel.get_id()),
-                        )
-                    }
-                    ChannelStatus::PendingToClose(_) => {
-                        debug!(%channel, "finalizing channel closure");
-                        let tx_hash = self
-                            .tx_exec
-                            .finalize_outgoing_channel_closure(channel.destination)
-                            .await?;
-                        IndexerExpectation::new(
-                            tx_hash,
-                            move |event| matches!(event, ChainEventType::ChannelClosed(r_channel) if r_channel.get_id() == channel.get_id()),
-                        )
-                    }
-                    ChannelStatus::Closed => {
-                        warn!(%channel, "channel already closed");
-                        return Err(ChannelAlreadyClosed);
-                    }
-                },
+                }
             },
 
             // Withdrawals are not awaited via the Indexer, but polled for completion,
