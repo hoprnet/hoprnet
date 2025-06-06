@@ -14,7 +14,7 @@
 //! a log that matches [NodeSafeRegistered(`0x0123..ef`)](ChainEventType) event type.
 //! If such event is never encountered by the Indexer, the safe registration action naturally times out.
 use std::{
-    collections::{HashMap, hash_map::Entry},
+    collections::HashMap,
     fmt::{Debug, Formatter},
     future::Future,
     pin::Pin,
@@ -144,19 +144,17 @@ impl ActionState for IndexerActionTracker {
 
     #[tracing::instrument(level = "debug", skip(self))]
     async fn register_expectation(&self, exp: IndexerExpectation) -> Result<ExpectationResolver> {
-        match self.expectations.write_arc().await.entry(exp.tx_hash) {
-            Entry::Occupied(_) => {
-                // TODO: currently cannot register multiple expectations for the same TX hash
-                return Err(ChainActionsError::InvalidState(format!(
-                    "expectation for tx {} already present",
-                    exp.tx_hash
-                )));
-            }
-            Entry::Vacant(e) => {
-                let (tx, rx) = channel::oneshot::channel();
-                e.insert((exp, tx));
-                Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
-            }
+        let mut db = self.expectations.write_arc().await;
+        if db.contains_key(&exp.tx_hash) {
+            // TODO: currently cannot register multiple expectations for the same TX hash
+            Err(ChainActionsError::InvalidState(format!(
+                "expectation for tx {} already present",
+                exp.tx_hash
+            )))
+        } else {
+            let (tx, rx) = channel::oneshot::channel();
+            db.insert(exp.tx_hash, (exp, tx));
+            Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
         }
     }
 

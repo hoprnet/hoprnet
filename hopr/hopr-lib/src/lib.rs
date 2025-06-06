@@ -226,7 +226,7 @@ where
             if resolved.is_empty() {
                 trace!(%event, "No indexer expectations resolved for the event");
             } else {
-                debug!(count = resolved.len(), %event, "resolved indexer expectations", );
+                debug!(count = resolved.len(), %event, "resolved indexer expectations");
             }
 
             match event.event_type {
