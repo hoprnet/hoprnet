@@ -163,7 +163,7 @@ class Node:
         logging.error(f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
         return False
 
-    def setup(self, password: str, config_file: Path, dir: Path):
+    def setup(self, password: str, config_file: Path, dir: Path, log_tag: str):
         trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
         log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
 
@@ -172,14 +172,14 @@ class Node:
             "RUST_LOG": ",".join(
                 [
                     log_level,
-                    "libp2p_swarm=info",
+                    # "libp2p_swarm=info",
                     "multistream_select=info",
                     "isahc=error",
                     "sea_orm=warn",
                     "sqlx=warn",
                     "hyper_util=warn",
-                    "libp2p_tcp=info",
-                    "libp2p_dns=info",
+                    # "libp2p_tcp=info",
+                    # "libp2p_dns=info",
                     "hickory_resolver=warn",
                 ]
             ),
@@ -212,8 +212,9 @@ class Node:
         ]
         if self.cfg_file_path is not None:
             cmd += [f"--configurationFilePath={self.cfg_file_path}"]
+        log_file_name = f"hoprd.{log_tag}.log" if log_tag else "hoprd.log"
 
-        with open(self.dir.joinpath("hoprd.log"), "w") as log_file:
+        with open(self.dir.joinpath(log_file_name), "w") as log_file:
             self.proc = Popen(
                 cmd,
                 stdout=log_file,
