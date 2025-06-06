@@ -105,9 +105,10 @@ impl Default for IndexerActionTracker {
 impl ActionState for IndexerActionTracker {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn match_and_resolve(&self, event: &SignificantChainEvent) -> Vec<IndexerExpectation> {
-        let db_read_locked = self.expectations.read_arc().await;
-
-        let matched_keys = db_read_locked
+        let matched_keys = self
+            .expectations
+            .read_arc()
+            .await
             .iter()
             .filter_map(|(k, (e, _))| e.test(event).then_some(*k))
             .collect::<Vec<_>>();
