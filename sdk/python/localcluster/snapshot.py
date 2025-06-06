@@ -4,6 +4,7 @@ from pathlib import Path
 from .cluster import Cluster
 from .constants import ANVIL_FOLDER, ANVIL_FOLDER_NAME, NODE_NAME_PREFIX, logging
 
+
 class Snapshot:
     def __init__(self, anvil_port: int, parent_dir: Path, cluster: Cluster):
         self.anvil_port = anvil_port

@@ -4512,7 +4512,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-actions"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4546,7 +4546,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-api"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "alloy",
  "async-channel 2.3.1",
@@ -4576,7 +4576,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-indexer"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4609,7 +4609,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-rpc"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4812,7 +4812,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.14.1"
+version = "0.14.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",

@@ -62,8 +62,8 @@ fn split_range<'a>(
         if start <= to {
             let end = to_block.min(start + max_chunk_size - 1);
             let ranged_filters = filters
-                .clone()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(|f| f.from_block(start).to_block(end))
                 .collect::<Vec<_>>();
             futures::future::ready(Some((ranged_filters, (end + 1, to))))

@@ -21,7 +21,7 @@ use std::{
     sync::Arc,
 };
 
-use async_lock::{RwLock, RwLockUpgradableReadGuardArc};
+use async_lock::RwLock;
 use async_trait::async_trait;
 use futures::{FutureExt, TryFutureExt, channel};
 use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
@@ -105,9 +105,9 @@ impl Default for IndexerActionTracker {
 impl ActionState for IndexerActionTracker {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn match_and_resolve(&self, event: &SignificantChainEvent) -> Vec<IndexerExpectation> {
-        let db_read_lock = self.expectations.upgradable_read_arc().await;
+        let db_read_locked = self.expectations.read_arc().await;
 
-        let matched_keys = db_read_lock
+        let matched_keys = db_read_locked
             .iter()
             .filter_map(|(k, (e, _))| e.test(event).then_some(*k))
             .collect::<Vec<_>>();
@@ -119,12 +119,12 @@ impl ActionState for IndexerActionTracker {
 
         debug!(count = matched_keys.len(), %event, "found expectations to match event",);
 
-        let mut db_write_lock = RwLockUpgradableReadGuardArc::upgrade(db_read_lock).await;
+        let mut db_write_locked = self.expectations.write_arc().await;
 
         matched_keys
             .into_iter()
             .filter_map(|key| {
-                db_write_lock
+                db_write_locked
                     .remove(&key)
                     .and_then(|(exp, sender)| match sender.send(event.clone()) {
                         Ok(_) => {
