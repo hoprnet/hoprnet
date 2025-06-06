@@ -146,16 +146,16 @@ impl ActionState for IndexerActionTracker {
     #[tracing::instrument(level = "debug", skip(self))]
     async fn register_expectation(&self, exp: IndexerExpectation) -> Result<ExpectationResolver> {
         let mut db = self.expectations.write_arc().await;
-        if db.contains_key(&exp.tx_hash) {
+        if let std::collections::hash_map::Entry::Vacant(e) = db.entry(exp.tx_hash) {
+            let (tx, rx) = channel::oneshot::channel();
+            e.insert((exp, tx));
+            Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
+        } else {
             // TODO: currently cannot register multiple expectations for the same TX hash
             Err(ChainActionsError::InvalidState(format!(
                 "expectation for tx {} already present",
                 exp.tx_hash
             )))
-        } else {
-            let (tx, rx) = channel::oneshot::channel();
-            db.insert(exp.tx_hash, (exp, tx));
-            Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
         }
     }
 
