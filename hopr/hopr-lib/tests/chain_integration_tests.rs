@@ -72,7 +72,7 @@ struct ChainNode {
     offchain_key: OffchainKeypair,
     db: HoprDb,
     actions: ChainActions<HoprDb>,
-    _indexer: Indexer<TestRpc, ContractEventHandlers<HoprDb>, HoprDb>,
+    _indexer: Indexer<TestRpc, ContractEventHandlers<TestRpc, HoprDb>, HoprDb>,
     node_tasks: Vec<JoinHandle<()>>,
 }
 
@@ -150,6 +150,7 @@ async fn start_node_chain_logic(
         safe_cfg.safe_address,
         chain_key.clone(),
         db.clone(),
+        rpc_ops_in.clone(),
     );
 
     let indexer = Indexer::new(rpc_ops_in, chain_log_handler, db.clone(), indexer_cfg, sce_tx);

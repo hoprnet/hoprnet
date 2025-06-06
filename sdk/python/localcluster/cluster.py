@@ -46,11 +46,11 @@ class Cluster:
         for node in self.nodes.values():
             assert node.create_local_safe(self.anvil_config)
 
-    async def shared_bringup(self, skip_funding: bool = False):
+    async def shared_bringup(self, log_tag: str = ""):
         logging.info("Setting up nodes with protocol config files")
         for node in self.nodes.values():
             logging.debug(f"Setting up {node}")
-            node.setup(PASSWORD, self.protocol_config, PWD)
+            node.setup(PASSWORD, self.protocol_config, PWD, log_tag)
 
         # WAIT FOR NODES TO BE UP
         logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to start up")
@@ -64,10 +64,6 @@ class Cluster:
         if not all(nodes_readyness):
             logging.critical("Not all nodes are started, interrupting setup")
             raise RuntimeError
-
-        if not skip_funding:
-            self.fund_nodes()
-            return
 
         # WAIT FOR NODES TO BE UP
         logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to be ready")
@@ -149,11 +145,6 @@ class Cluster:
         for f in MAIN_DIR.glob(f"{NODE_NAME_PREFIX}/*.id"):
             os.remove(f)
         logging.info(f"Removed '*.id' files in {MAIN_DIR} subfolders")
-
-        # Remove old logs
-        for f in MAIN_DIR.glob(f"{NODE_NAME_PREFIX}/*.log"):
-            os.remove(f)
-        logging.info(f"Removed '*.log' files in {MAIN_DIR} subfolders")
 
         # Copy new identity files
         for idx, node in enumerate(self.nodes.values(), start=1):

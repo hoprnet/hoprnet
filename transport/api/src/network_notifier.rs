@@ -121,7 +121,7 @@ where
         if let Ok(pk) = OffchainPublicKey::try_from(peer) {
             let maybe_chain_key = self.resolver.resolve_chain_key(&pk).await;
             if let Ok(Some(chain_key)) = maybe_chain_key {
-                let mut g = self.channel_graph.write().await;
+                let mut g = self.channel_graph.write_arc().await;
                 g.update_node_score(&chain_key, result.into());
                 debug!(%chain_key, ?result, "update node score for peer");
             } else {

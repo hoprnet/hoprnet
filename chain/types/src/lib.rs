@@ -1,5 +1,4 @@
 //! This crate contains various on-chain related modules and types.
-
 use alloy::{
     contract::Result as ContractResult, network::TransactionBuilder, primitives, rpc::types::TransactionRequest,
 };

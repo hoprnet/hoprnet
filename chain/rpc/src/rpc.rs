@@ -135,6 +135,7 @@ pub struct RpcOperations<R: HttpRequestor + 'static + Clone> {
     node_safe: SafeSingletonInstance<HoprProvider<R>>,
 }
 
+#[cfg_attr(test, mockall::automock)]
 impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
     pub fn new(
         rpc_client: RpcClient,
@@ -183,6 +184,34 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
         let result = self.provider.get_block_by_number(sanitized_block_number.into()).await?;
         Ok(result)
     }
+
+    pub(crate) async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance> {
+        Ok(XDaiBalance::from(U256::from_be_bytes(
+            self.provider.get_balance(address.into()).await?.to_be_bytes::<32>(),
+        )))
+    }
+
+    pub(crate) async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance> {
+        Ok(HoprBalance::from(U256::from_be_bytes(
+            self.contract_instances
+                .token
+                .balanceOf(address.into())
+                .call()
+                .await?
+                .to_be_bytes::<32>(),
+        )))
+    }
+
+    pub(crate) async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance> {
+        Ok(HoprBalance::from(U256::from_be_bytes(
+            self.contract_instances
+                .token
+                .allowance(owner.into(), spender.into())
+                .call()
+                .await?
+                .to_be_bytes::<32>(),
+        )))
+    }
 }
 
 #[async_trait]
@@ -191,23 +220,16 @@ impl<R: HttpRequestor + 'static + Clone> HoprRpcOperations for RpcOperations<R> 
         Ok(self.get_block(block_number).await?.map(|b| b.header.timestamp))
     }
 
-    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>> {
-        let value = if C::is::<XDai>() {
-            U256::from_be_bytes(self.provider.get_balance(address.into()).await?.to_be_bytes::<32>())
-        } else if C::is::<WxHOPR>() {
-            U256::from_be_bytes(
-                self.contract_instances
-                    .token
-                    .balanceOf(address.into())
-                    .call()
-                    .await?
-                    .to_be_bytes::<32>(),
-            )
-        } else {
-            return Err(RpcError::Other("unknown currency".into()));
-        };
+    async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance> {
+        self.get_xdai_balance(address).await
+    }
 
-        Ok(Balance::<C>::from(value))
+    async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance> {
+        self.get_hopr_balance(address).await
+    }
+
+    async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance> {
+        self.get_hopr_allowance(owner, spender).await
     }
 
     async fn get_minimum_network_winning_probability(&self) -> Result<WinningProbability> {
@@ -538,7 +560,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let balance_1: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
+        let balance_1: XDaiBalance = rpc.get_xdai_balance((&chain_key_0).into()).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         // Send 1 ETH to some random address
@@ -578,7 +600,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg.clone())?;
 
-        let balance_1: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
+        let balance_1: XDaiBalance = rpc.get_xdai_balance((&chain_key_0).into()).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         let txs_count = 5_u64;
@@ -596,7 +618,7 @@ mod tests {
 
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let balance_2: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
+        let balance_2: XDaiBalance = rpc.get_xdai_balance((&chain_key_0).into()).await?;
 
         assert!(
             balance_2.amount() <= balance_1.amount() - txs_count * send_amount,
@@ -634,7 +656,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let balance_1: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
+        let balance_1: XDaiBalance = rpc.get_xdai_balance((&chain_key_0).into()).await?;
         assert!(balance_1.amount().gt(&0.into()), "balance must be greater than 0");
 
         // Send 1 ETH to some random address
@@ -644,7 +666,7 @@ mod tests {
 
         wait_until_tx(tx_hash, Duration::from_secs(8)).await;
 
-        let balance_2: XDaiBalance = rpc.get_balance((&chain_key_0).into()).await?;
+        let balance_2: XDaiBalance = rpc.get_xdai_balance((&chain_key_0).into()).await?;
         assert!(balance_2.lt(&balance_1), "balance must be diminished");
 
         Ok(())
@@ -688,7 +710,7 @@ mod tests {
 
         let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
 
-        let balance: HoprBalance = rpc.get_balance((&chain_key_0).into()).await?;
+        let balance: HoprBalance = rpc.get_hopr_balance((&chain_key_0).into()).await?;
         assert_eq!(amount, balance.amount().as_u64(), "invalid balance");
 
         Ok(())
