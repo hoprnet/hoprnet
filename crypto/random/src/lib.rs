@@ -45,7 +45,7 @@ pub const fn is_rng_fixed() -> bool {
 /// Generates a random float uniformly distributed between 0 (inclusive) and 1 (exclusive).
 #[inline]
 pub fn random_float() -> f64 {
-    rng().gen()
+    rng().r#gen()
 }
 
 /// Generates a random float uniformly distributed in the given range.

@@ -4,11 +4,11 @@ pub mod config;
 mod account;
 mod channels;
 mod checks;
+mod middleware;
 mod network;
 mod node;
 mod peers;
-mod preconditions;
-mod prometheus;
+mod root;
 mod session;
 mod tickets;
 
@@ -30,7 +30,6 @@ use axum::{
     Router,
     extract::Json,
     http::{Method, header::AUTHORIZATION, status::StatusCode},
-    middleware,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
@@ -105,6 +104,7 @@ pub(crate) struct InternalState {
         node::version,
         peers::ping_peer,
         peers::show_peer_info,
+        root::metrics,
         session::create_client,
         session::list_clients,
         session::close_client,
@@ -142,6 +142,7 @@ pub(crate) struct InternalState {
         (name = "Peers", description = "HOPR node peer manipulation endpoints"),
         (name = "Session", description = "HOPR node session management endpoints"),
         (name = "Tickets", description = "HOPR node ticket management endpoints"),
+        (name = "Metrics", description = "HOPR node metrics endpoints"),
     )
 )]
 pub struct ApiDoc;
@@ -233,6 +234,10 @@ async fn build_api(
         )
         .merge(
             Router::new()
+                .route("/startedz", get(checks::startedz))
+                .route("/readyz", get(checks::readyz))
+                .route("/healthyz", get(checks::healthyz))
+                .route("/eligiblez", get(checks::eligiblez))
                 .layer(
                     ServiceBuilder::new().layer(
                         CorsLayer::new()
@@ -242,22 +247,18 @@ async fn build_api(
                             .max_age(std::time::Duration::from_secs(86400)),
                     ),
                 )
-                .route("/startedz", get(checks::startedz))
-                .route("/readyz", get(checks::readyz))
-                .route("/healthyz", get(checks::healthyz))
-                .route("/eligiblez", get(checks::eligiblez))
                 .with_state(state.into()),
         )
         .merge(
             Router::new()
-                .route("/metrics", get(node::metrics))
-                .layer(middleware::from_fn_with_state(
+                .route("/metrics", get(root::metrics))
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::authenticate,
+                    middleware::preconditions::authenticate,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::cap_websockets,
+                    middleware::preconditions::cap_websockets,
                 ))
                 .layer(
                     ServiceBuilder::new()
@@ -269,7 +270,7 @@ async fn build_api(
                                 .allow_headers(Any)
                                 .max_age(std::time::Duration::from_secs(86400)),
                         )
-                        .layer(middleware::from_fn(prometheus::record))
+                        .layer(axum::middleware::from_fn(middleware::prometheus::record))
                         .layer(CompressionLayer::new())
                         .layer(ValidateRequestHeaderLayer::accept("text/plain"))
                         .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
@@ -314,13 +315,13 @@ async fn build_api(
                 .route("/session/{protocol}", get(session::list_clients))
                 .route("/session/{protocol}/{ip}/{port}", delete(session::close_client))
                 .with_state(inner_state.clone().into())
-                .layer(middleware::from_fn_with_state(
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::authenticate,
+                    middleware::preconditions::authenticate,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::cap_websockets,
+                    middleware::preconditions::cap_websockets,
                 ))
                 .layer(
                     ServiceBuilder::new()
@@ -332,7 +333,7 @@ async fn build_api(
                                 .allow_headers(Any)
                                 .max_age(std::time::Duration::from_secs(86400)),
                         )
-                        .layer(middleware::from_fn(prometheus::record))
+                        .layer(axum::middleware::from_fn(middleware::prometheus::record))
                         .layer(CompressionLayer::new())
                         .layer(ValidateRequestHeaderLayer::accept("application/json"))
                         .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
