@@ -14,7 +14,6 @@ use libp2p::{
         dummy::ConnectionHandler,
     },
 };
-use tracing::debug;
 
 #[derive(Debug)]
 pub enum DiscoveryInput {
@@ -33,7 +32,7 @@ pub struct Behaviour {
             <<Self as NetworkBehaviour>::ConnectionHandler as libp2p::swarm::ConnectionHandler>::FromBehaviour,
         >,
     >,
-    all_peers: HashMap<PeerId, Multiaddr>,
+    all_peers: HashMap<PeerId, Vec<Multiaddr>>,
     allowed_peers: HashSet<PeerId>,
     connected_peers: HashMap<PeerId, usize>,
 }
@@ -62,12 +61,13 @@ impl NetworkBehaviour for Behaviour {
     type ConnectionHandler = ConnectionHandler;
     type ToSwarm = Event;
 
+    #[tracing::instrument(level = "debug", skip(self), fields(transport = "p2p discovery"), err(Display))]
     fn handle_established_inbound_connection(
         &mut self,
-        _connection_id: libp2p::swarm::ConnectionId,
+        connection_id: libp2p::swarm::ConnectionId,
         peer: libp2p::PeerId,
-        _local_addr: &libp2p::Multiaddr,
-        _remote_addr: &libp2p::Multiaddr,
+        local_addr: &libp2p::Multiaddr,
+        remote_addr: &libp2p::Multiaddr,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         if self.allowed_peers.contains(&peer) {
             Ok(Self::ConnectionHandler {})
@@ -78,33 +78,48 @@ impl NetworkBehaviour for Behaviour {
         }
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        skip(self),
+        fields(transport = "p2p discovery"),
+        ret(Debug),
+        err(Display)
+    )]
     fn handle_pending_outbound_connection(
         &mut self,
-        _connection_id: ConnectionId,
-        _maybe_peer: Option<PeerId>,
-        _addresses: &[Multiaddr],
-        _effective_role: Endpoint,
+        connection_id: ConnectionId,
+        maybe_peer: Option<PeerId>,
+        addresses: &[Multiaddr],
+        effective_role: Endpoint,
     ) -> Result<Vec<Multiaddr>, ConnectionDenied> {
-        if let Some(peer) = _maybe_peer {
+        if let Some(peer) = maybe_peer {
             if self.allowed_peers.contains(&peer) {
                 // inject the multiaddress of the peer for possible dial usage by stream protocols
-                return Ok(self.all_peers.get(&peer).map_or(vec![], |addr| vec![addr.clone()]));
+                return Ok(self.all_peers.get(&peer).map_or_else(
+                    || {
+                        tracing::debug!(%peer, "No multiaddress found for peer");
+                        vec![]
+                    },
+                    |addresses| addresses.clone(),
+                ));
             } else {
                 return Err(libp2p::swarm::ConnectionDenied::new(crate::errors::P2PError::Logic(
                     format!("Connection to '{peer}' is not allowed"),
                 )));
             }
         }
+
         Ok(vec![])
     }
 
+    #[tracing::instrument(level = "debug", skip(self), fields(transport = "p2p discovery"), err(Display))]
     fn handle_established_outbound_connection(
         &mut self,
-        _connection_id: libp2p::swarm::ConnectionId,
-        _peer: libp2p::PeerId,
-        _addr: &libp2p::Multiaddr,
-        _role_override: libp2p::core::Endpoint,
-        _port_use: libp2p::core::transport::PortUse,
+        connection_id: libp2p::swarm::ConnectionId,
+        peer: libp2p::PeerId,
+        addr: &libp2p::Multiaddr,
+        role_override: libp2p::core::Endpoint,
+        port_use: libp2p::core::transport::PortUse,
     ) -> Result<libp2p::swarm::THandler<Self>, libp2p::swarm::ConnectionDenied> {
         // cannot connect without the handle_ending_outbound_connection being called first
         Ok(Self::ConnectionHandler {})
@@ -134,6 +149,12 @@ impl NetworkBehaviour for Behaviour {
         // Nothing is necessary here, because no ConnectionHandler events should be generated
     }
 
+    #[tracing::instrument(
+        level = "debug",
+        name = "poll_on_event",
+        skip(self, cx),
+        fields(transport = "p2p discovery")
+    )]
     fn poll(
         &mut self,
         cx: &mut std::task::Context<'_>,
@@ -145,44 +166,49 @@ impl NetworkBehaviour for Behaviour {
         let poll_result = self.events.poll_next_unpin(cx).map(|e| match e {
             Some(DiscoveryInput::Indexer(event)) => match event {
                 PeerDiscovery::Allow(peer) => {
-                    debug!(peer = %peer, "p2p - discovery - Network registry allow");
-                    let _ = self.allowed_peers.insert(peer);
+                    let inserted_into_allow_list = self.allowed_peers.insert(peer);
 
-                    if let Some(multiaddress) = self.all_peers.get(&peer) {
-                        self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
-                            peer_id: peer,
-                            address: multiaddress.clone(),
-                        });
+                    let multiaddresses = self.all_peers.get(&peer);
+                    if let Some(multiaddresses) = self.all_peers.get(&peer) {
+                        for address in multiaddresses {
+                            self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
+                                peer_id: peer,
+                                address: address.clone(),
+                            });
+                        }
                     }
+
+                    tracing::debug!(%peer, inserted_into_allow_list, emitted_libp2p_address_announce = multiaddresses.is_some_and(|v| !v.is_empty()), "Network registry allow");
                 }
                 PeerDiscovery::Ban(peer) => {
-                    debug!(peer = %peer, "p2p - discovery - Network registry ban");
-                    self.allowed_peers.remove(&peer);
+                    let was_allowed = self.allowed_peers.remove(&peer);
+                    tracing::debug!(%peer, was_allowed, "Network registry ban");
 
                     if self.is_peer_connected(&peer) {
                         self.pending_events.push_back(ToSwarm::CloseConnection {
                             peer_id: peer,
                             connection: CloseConnection::default(),
                         });
-                        debug!(peer = %peer, "p2p - discovery - Requesting disconnect due to ban");
+                        tracing::debug!(%peer, "Requesting disconnect due to ban");
                     }
                 }
                 PeerDiscovery::Announce(peer, multiaddresses) => {
                     if peer != self.me {
-                        debug!(peer = %peer, addresses = tracing::field::debug(&multiaddresses), "p2p - discovery - Announcement");
-                        if let Some(multiaddress) = multiaddresses.last() {
-                            self.all_peers.insert(peer, multiaddress.clone());
+                        tracing::debug!(%peer, addresses = ?&multiaddresses, "Announcement");
 
+                        for multiaddress in &multiaddresses {
                             self.pending_events.push_back(ToSwarm::NewExternalAddrOfPeer {
                                 peer_id: peer,
                                 address: multiaddress.clone(),
                             });
-
-                            // the dial is important to create a first connection some time before the heartbeat mechanism
-                            // kicks in, otherwise the heartbeat is likely to fail on the first try due to dial and protocol
-                            // negotiation taking longer than the request response timeout
-                            self.pending_events.push_back(ToSwarm::Dial { opts: DialOpts::peer_id(peer).addresses(multiaddresses).build()});
                         }
+
+                        self.all_peers.insert(peer, multiaddresses.clone());
+
+                        // the dial is performed to create a first connection some time before the heartbeat mechanism
+                        // kicks in, otherwise the heartbeat is likely to fail on the first try due to dial and protocol
+                        // negotiation taking longer than the request response timeout
+                        self.pending_events.push_back(ToSwarm::Dial { opts: DialOpts::peer_id(peer).addresses(multiaddresses).build()});
                     }
                 }
             },
