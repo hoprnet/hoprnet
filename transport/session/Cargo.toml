@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-session"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Session functionality providing session abstraction over the HOPR transport"
@@ -15,8 +15,10 @@ crate-type = ["rlib"]
 default = ["serde"]
 serde = [
   "dep:serde",
+  "dep:serde_repr",
   "dep:serde_with",
   "dep:bincode",
+  "flagset/serde",
   "hopr-network-types/serde",
 ]
 runtime-tokio = ["hopr-network-types/runtime-tokio", "dep:tokio"]
@@ -27,6 +29,7 @@ aquamarine = { workspace = true }
 arrayvec = { workspace = true }
 async-trait = { workspace = true }
 bincode = { workspace = true, optional = true }
+flagset = { workspace = true }
 futures = { workspace = true }
 futures-time = { workspace = true }
 lazy_static = { workspace = true, optional = true }
@@ -34,6 +37,7 @@ moka = { workspace = true }
 pid = "4.0.0"
 pin-project = "1.1.10"
 serde = { workspace = true, optional = true }
+serde_repr = { workspace = true, optional = true }
 serde_with = { workspace = true, optional = true }
 smart-default = { workspace = true }
 strum = { workspace = true }

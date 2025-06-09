@@ -496,7 +496,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
         let start_session_msg = StartProtocol::<SessionId>::StartSession(StartInitiation {
             challenge,
             target,
-            capabilities: cfg.capabilities.iter().copied().collect(),
+            capabilities: cfg.capabilities,
         });
 
         let pseudonym = cfg.pseudonym.unwrap_or(HoprPseudonym::random());
@@ -620,7 +620,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     Session::new(
                         session_id,
                         forward_routing.clone(),
-                        cfg.capabilities.into_iter().collect(),
+                        cfg.capabilities,
                         sender,
                         Box::pin(rx.inspect(move |_| {
                             // Received packets = SURB consumption estimate
@@ -633,7 +633,7 @@ impl<S: SendMsg + Clone + Send + Sync + 'static> SessionManager<S> {
                     Session::new(
                         session_id,
                         forward_routing.clone(),
-                        cfg.capabilities.into_iter().collect(),
+                        cfg.capabilities,
                         Arc::new(msg_sender.clone()),
                         Box::pin(rx),
                         Some(notifier),
@@ -981,7 +981,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        Capability, balancer::SurbBalancerConfig, initiation::StartProtocolDiscriminants, types::SessionTarget,
+        Capabilities, Capability, balancer::SurbBalancerConfig, initiation::StartProtocolDiscriminants,
+        types::SessionTarget,
     };
 
     mockall::mock! {
@@ -1166,8 +1167,9 @@ mod tests {
         let mut alice_session = alice_session?;
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
-        assert!(
-            alice_session.capabilities().len() == 1 && alice_session.capabilities().contains(&Capability::Segmentation)
+        assert_eq!(
+            alice_session.capabilities(),
+            &Capabilities::from(Capability::Segmentation)
         );
         assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
@@ -1321,8 +1323,9 @@ mod tests {
         let alice_session = alice_session?;
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
-        assert!(
-            alice_session.capabilities().len() == 1 && alice_session.capabilities().contains(&Capability::Segmentation)
+        assert_eq!(
+            alice_session.capabilities(),
+            &Capabilities::from(Capability::Segmentation)
         );
         assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
@@ -1419,7 +1422,7 @@ mod tests {
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 SessionClientConfig {
-                    capabilities: vec![],
+                    capabilities: Capabilities::empty(),
                     pseudonym: alice_pseudonym.into(),
                     surb_management: None,
                     ..Default::default()
@@ -1505,7 +1508,7 @@ mod tests {
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 SessionClientConfig {
-                    capabilities: vec![],
+                    capabilities: Capabilities::empty(),
                     pseudonym: alice_pseudonym.into(),
                     surb_management: None,
                     ..Default::default()
@@ -1562,7 +1565,7 @@ mod tests {
                 bob_peer,
                 SessionTarget::TcpStream(SealedHost::Plain("127.0.0.1:80".parse()?)),
                 SessionClientConfig {
-                    capabilities: vec![],
+                    capabilities: Capabilities::empty(),
                     pseudonym: None,
                     surb_management: None,
                     ..Default::default()

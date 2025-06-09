@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     fmt::{Debug, Display, Formatter},
     hash::{Hash, Hasher},
     io::{Error, ErrorKind},
@@ -20,7 +19,7 @@ use hopr_primitive_types::prelude::BytesRepresentable;
 use hopr_transport_packet::prelude::{ApplicationData, Tag};
 use tracing::{debug, error};
 
-use crate::{Capability, errors::TransportSessionError, traits::SendMsg};
+use crate::{Capabilities, Capability, capabilities_to_features, errors::TransportSessionError, traits::SendMsg};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -245,7 +244,7 @@ pub struct Session {
     id: SessionId,
     inner: Pin<Box<dyn AsyncReadWrite>>,
     routing: DestinationRouting,
-    capabilities: HashSet<Capability>,
+    capabilities: Capabilities,
     on_close: Option<Box<dyn FnOnce(SessionId) + Send + Sync>>,
 }
 
@@ -253,7 +252,7 @@ impl Session {
     pub fn new(
         id: SessionId,
         routing: DestinationRouting,
-        capabilities: HashSet<Capability>,
+        capabilities: Capabilities,
         tx: Arc<dyn SendMsg + Send + Sync>,
         rx: Pin<Box<dyn futures::Stream<Item = Box<[u8]>> + Send + Sync>>,
         on_close: Option<Box<dyn FnOnce(SessionId) + Send + Sync>>,
@@ -267,17 +266,16 @@ impl Session {
             // it is not known for SURB-based routing.
             let rto_base = Duration::from_secs(3);
 
-            let expiration_coefficient = if capabilities.contains(&Capability::Retransmission)
-                || capabilities.contains(&Capability::RetransmissionAckOnly)
-            {
-                4
-            } else {
-                1
-            };
+            let expiration_coefficient =
+                if !capabilities.is_disjoint(Capability::RetransmissionAck | Capability::RetransmissionNack) {
+                    4
+                } else {
+                    1
+                };
 
             // TODO: tweak the default Session protocol config
             let cfg = SessionConfig {
-                enabled_features: capabilities.iter().cloned().flatten().collect(),
+                enabled_features: capabilities_to_features(&capabilities),
                 acknowledged_frames_buffer: 100_000, // Can hold frames for > 40 sec at 2000 frames/sec
                 frame_expiration_age: rto_base * expiration_coefficient,
                 rto_base_receiver: rto_base, // Ask for segment resend, if not yet complete after this period
@@ -324,7 +322,7 @@ impl Session {
     }
 
     /// Capabilities of this Session.
-    pub fn capabilities(&self) -> &HashSet<Capability> {
+    pub fn capabilities(&self) -> &Capabilities {
         &self.capabilities
     }
 }
@@ -602,7 +600,7 @@ where
     // There are two possibilities for the opposite direction:
     // 1) If Session protocol is used for segmentation, we need to buffer up data at MAX_WRITE_SIZE.
     // 2) Otherwise, the bare session implements chunking, therefore, data can be written with arbitrary sizes.
-    let into_session_len = if session.capabilities().contains(&Capability::Segmentation) {
+    let into_session_len = if session.capabilities().contains(Capability::Segmentation) {
         max_buffer.min(SessionSocket::<{ ApplicationData::PAYLOAD_SIZE }>::MAX_WRITE_SIZE)
     } else {
         max_buffer
