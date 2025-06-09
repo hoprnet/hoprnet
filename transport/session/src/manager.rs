@@ -1167,8 +1167,9 @@ mod tests {
         let mut alice_session = alice_session?;
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
-        assert!(
-            alice_session.capabilities() == &Capabilities::from(Capability::Segmentation)
+        assert_eq!(
+            alice_session.capabilities(),
+            &Capabilities::from(Capability::Segmentation)
         );
         assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));
@@ -1322,8 +1323,9 @@ mod tests {
         let alice_session = alice_session?;
         let bob_session = bob_session.ok_or(anyhow!("bob must get an incoming session"))?;
 
-        assert!(
-            alice_session.capabilities() == &Capabilities::from(Capability::Segmentation)
+        assert_eq!(
+            alice_session.capabilities(),
+            &Capabilities::from(Capability::Segmentation)
         );
         assert_eq!(alice_session.capabilities(), bob_session.session.capabilities());
         assert!(matches!(bob_session.target, SessionTarget::TcpStream(host) if host == target));

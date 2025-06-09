@@ -8,7 +8,7 @@ use hopr_lib::{ApplicationData, SendMsg};
 use hopr_network_types::prelude::{protocol::SessionMessage, *};
 use hopr_primitive_types::prelude::Address;
 use hopr_transport::{Session, SessionId, TransportSessionError};
-use hopr_transport_session::{Capability, transfer_session, Capabilities};
+use hopr_transport_session::{Capabilities, Capability, transfer_session};
 use tokio::net::UdpSocket;
 
 struct BufferingMsgSender {

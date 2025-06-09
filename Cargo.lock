@@ -4680,7 +4680,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.10.2"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -5345,7 +5345,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "aquamarine",
