@@ -13,6 +13,8 @@ mod manager;
 pub mod traits;
 mod types;
 
+use std::collections::HashSet;
+
 pub use balancer::SurbBalancerConfig;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_network_types::prelude::state::{SessionFeature, SessionSocket};
@@ -30,40 +32,54 @@ compile_error!("The `serde` feature currently must be enabled, see #7145");
 /// Number of bytes that can be sent in a single Session protocol payload.
 pub const SESSION_PAYLOAD_SIZE: usize = SessionSocket::<{ ApplicationData::PAYLOAD_SIZE }>::PAYLOAD_CAPACITY;
 
-/// Capabilities of a session.
-#[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::EnumIter, strum::Display, strum::EnumString)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum Capability {
-    /// Frame segmentation
-    Segmentation,
-    /// Frame retransmission (ACK and NACK-based)
-    Retransmission,
-    /// Frame retransmission (only ACK-based)
-    RetransmissionAckOnly,
-    /// Disable packet buffering
-    NoDelay,
+flagset::flags! {
+    /// Individual capabilities of a Session.
+    #[repr(u8)]
+    #[derive(strum::EnumString, strum::Display)]
+    #[cfg_attr(feature = "serde", derive(serde_repr::Serialize_repr, serde_repr::Deserialize_repr))]
+    pub enum Capability : u8 {
+        /// No capabilities.
+        None = 0,
+        /// Frame segmentation.
+        Segmentation = 0b1000,
+        /// Frame retransmission (ACK-based)
+        ///
+        /// Implies [`Segmentation`].
+        RetransmissionAck = 0b1100,
+        /// Frame retransmission (NACK-based)
+        ///
+        /// Implies [`Segmentation`].
+        RetransmissionNack = 0b1010,
+        /// Disable packet buffering
+        ///
+        /// Implies [`Segmentation`].
+        NoDelay = 0b1001,
+    }
 }
 
-impl IntoIterator for Capability {
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-    type Item = SessionFeature;
+/// Set of Session [capabilities](Capability).
+pub type Capabilities = flagset::FlagSet<Capability>;
 
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Capability::Segmentation => vec![],
-            Capability::Retransmission => vec![
-                SessionFeature::AcknowledgeFrames,
-                SessionFeature::RequestIncompleteFrames,
-                SessionFeature::RetransmitFrames,
-            ],
-            Capability::RetransmissionAckOnly => {
-                vec![SessionFeature::AcknowledgeFrames, SessionFeature::RetransmitFrames]
-            }
-            Capability::NoDelay => vec![SessionFeature::NoDelay],
-        }
-        .into_iter()
+// Converts a set of capabilities to a set of Session features.
+// TODO: remove this in 3.1
+pub(crate) fn capabilities_to_features(value: &Capabilities) -> HashSet<SessionFeature> {
+    let mut ret = HashSet::new();
+    if value.contains(Capability::NoDelay) {
+        ret.insert(SessionFeature::NoDelay);
     }
+
+    if value.contains(Capability::RetransmissionAck) {
+        ret.extend(&[SessionFeature::AcknowledgeFrames, SessionFeature::RetransmitFrames]);
+    }
+
+    if value.contains(Capability::RetransmissionNack) {
+        ret.extend(&[
+            SessionFeature::AcknowledgeFrames,
+            SessionFeature::RequestIncompleteFrames,
+        ]);
+    }
+
+    ret
 }
 
 /// Configuration for the session.
@@ -79,8 +95,8 @@ pub struct SessionClientConfig {
     #[default(RoutingOptions::Hops(hopr_primitive_types::bounded::BoundedSize::MIN))]
     pub return_path_options: RoutingOptions,
     /// Capabilities offered by the session.
-    #[default(_code = "vec![Capability::Segmentation]")]
-    pub capabilities: Vec<Capability>,
+    #[default(_code = "Capability::Segmentation.into()")]
+    pub capabilities: Capabilities,
     /// Optional pseudonym used for the session. Mostly useful for testing only.
     #[default(None)]
     pub pseudonym: Option<HoprPseudonym>,

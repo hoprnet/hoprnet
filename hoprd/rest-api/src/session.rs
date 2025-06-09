@@ -14,8 +14,8 @@ use base64::Engine;
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
-    Address, HoprSession, SESSION_PAYLOAD_SIZE, ServiceId, SessionClientConfig, SessionTarget, SurbBalancerConfig,
-    errors::HoprLibError, transfer_session,
+    Address, HoprSession, SESSION_PAYLOAD_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionTarget,
+    SurbBalancerConfig, errors::HoprLibError, transfer_session,
 };
 use hopr_network_types::{
     prelude::{ConnectedUdpStream, IpOrHost, SealedHost, UdpStreamParallelism},
@@ -157,13 +157,15 @@ pub enum SessionCapability {
     NoDelay,
 }
 
-impl From<SessionCapability> for hopr_lib::SessionCapability {
-    fn from(cap: SessionCapability) -> hopr_lib::SessionCapability {
+impl From<SessionCapability> for hopr_lib::SessionCapabilities {
+    fn from(cap: SessionCapability) -> hopr_lib::SessionCapabilities {
         match cap {
-            SessionCapability::Segmentation => hopr_lib::SessionCapability::Segmentation,
-            SessionCapability::Retransmission => hopr_lib::SessionCapability::Retransmission,
-            SessionCapability::RetransmissionAckOnly => hopr_lib::SessionCapability::RetransmissionAckOnly,
-            SessionCapability::NoDelay => hopr_lib::SessionCapability::NoDelay,
+            SessionCapability::Segmentation => hopr_lib::SessionCapability::Segmentation.into(),
+            SessionCapability::Retransmission => {
+                hopr_lib::SessionCapability::RetransmissionNack | hopr_lib::SessionCapability::RetransmissionAck
+            }
+            SessionCapability::RetransmissionAckOnly => hopr_lib::SessionCapability::RetransmissionAck.into(),
+            SessionCapability::NoDelay => hopr_lib::SessionCapability::NoDelay.into(),
         }
     }
 }
@@ -211,13 +213,16 @@ impl SessionWebsocketClientQueryRequest {
             hopr_lib::RoutingOptions::Hops((self.hops as u32).try_into()?)
         };
 
+        let mut capabilities = SessionCapabilities::empty();
+        capabilities.extend(self.capabilities.into_iter().flat_map(SessionCapabilities::from));
+
         Ok((
             self.destination,
             self.target.into_target(self.protocol)?,
             SessionClientConfig {
                 forward_path_options: path_options.clone(),
                 return_path_options: path_options.clone(), // TODO: allow using separate return options
-                capabilities: self.capabilities.into_iter().map(SessionCapability::into).collect(),
+                capabilities,
                 ..Default::default()
             },
         ))
@@ -441,21 +446,18 @@ impl SessionClientRequest {
                 capabilities: self
                     .capabilities
                     .map(|vs| {
-                        vs.into_iter()
-                            .map(|v| {
-                                let cap: hopr_lib::SessionCapability = v.into();
-                                cap
-                            })
-                            .collect::<Vec<_>>()
+                        let mut caps = SessionCapabilities::empty();
+                        caps.extend(vs.into_iter().map(SessionCapabilities::from));
+                        caps
                     })
                     .unwrap_or_else(|| match target_protocol {
                         IpProtocol::TCP => {
-                            vec![
-                                hopr_lib::SessionCapability::Retransmission,
-                                hopr_lib::SessionCapability::Segmentation,
-                            ]
+                            hopr_lib::SessionCapability::RetransmissionAck
+                                | hopr_lib::SessionCapability::RetransmissionNack
+                                | hopr_lib::SessionCapability::Segmentation
                         }
-                        _ => vec![], // no default capabilities for UDP, etc.
+                        // Only Segmentation capability for UDP per default
+                        _ => SessionCapability::Segmentation.into(),
                     }),
                 surb_management: match self.response_buffer {
                     // Buffer worth at least 2 reply packets
@@ -1018,8 +1020,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use anyhow::Context;
     use futures::channel::mpsc::UnboundedSender;
     use hopr_crypto_types::crypto_traits::Randomizable;
@@ -1070,7 +1070,7 @@ mod tests {
                 peer,
                 hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             ),
-            HashSet::default(),
+            SessionCapabilities::empty(),
             Arc::new(SendMsgResender::new(tx)),
             Box::pin(rx),
             None,
@@ -1116,7 +1116,7 @@ mod tests {
                 peer,
                 hopr_lib::RoutingOptions::IntermediatePath(Default::default()),
             ),
-            HashSet::default(),
+            SessionCapabilities::empty(),
             Arc::new(SendMsgResender::new(tx)),
             Box::pin(rx),
             None,

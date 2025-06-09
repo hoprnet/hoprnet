@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use futures::StreamExt;
 use hopr_crypto_random::Randomizable;
@@ -8,7 +8,7 @@ use hopr_lib::{ApplicationData, SendMsg};
 use hopr_network_types::prelude::{protocol::SessionMessage, *};
 use hopr_primitive_types::prelude::Address;
 use hopr_transport::{Session, SessionId, TransportSessionError};
-use hopr_transport_session::{Capability, transfer_session};
+use hopr_transport_session::{Capability, transfer_session, Capabilities};
 use tokio::net::UdpSocket;
 
 struct BufferingMsgSender {
@@ -38,7 +38,7 @@ async fn udp_session_bridging() -> anyhow::Result<()> {
     let mut session = Session::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
-        HashSet::new(),
+        Capabilities::empty(),
         Arc::new(BufferingMsgSender { buffer: buffer_tx }),
         Box::pin(rx),
         None,
@@ -96,7 +96,7 @@ async fn udp_session_bridging_with_segmentation() -> anyhow::Result<()> {
     let mut session = Session::new(
         id,
         DestinationRouting::forward_only(dst, RoutingOptions::Hops(0_u32.try_into()?)),
-        HashSet::from_iter([Capability::Segmentation]),
+        Capability::Segmentation.into(),
         Arc::new(BufferingMsgSender { buffer: buffer_tx }),
         Box::pin(rx),
         None,

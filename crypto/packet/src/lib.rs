@@ -77,8 +77,11 @@ pub type HoprReplyOpener = (types::HoprSurbId, ReplyOpener);
 /// The calculation here is based on the fact that libp2p Stream over QUIC
 /// leaves space for 1460 bytes in the packet payload.
 ///
+/// The value of 1013 has been chosen so that the Session protocol payload
+/// has the entire 1000 bytes (the Session protocol has a current overhead of 13 bytes).
+///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
-pub(crate) const PAYLOAD_SIZE_INT: usize = 1000;
+pub(crate) const PAYLOAD_SIZE_INT: usize = 1013;
 
 #[cfg(test)]
 mod tests {
