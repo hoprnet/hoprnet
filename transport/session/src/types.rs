@@ -267,7 +267,7 @@ impl Session {
             let rto_base = Duration::from_secs(3);
 
             let expiration_coefficient =
-                if !capabilities.is_disjoint(Capability::RetransmissionAck & Capability::RetransmissionNack) {
+                if !capabilities.is_disjoint(Capability::RetransmissionAck | Capability::RetransmissionNack) {
                     4
                 } else {
                     1
