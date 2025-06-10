@@ -59,7 +59,6 @@ arrayvec = { version = "0.7.6", features = ["serde"] }
 async-channel = "2.3.1"
 async-lock = "3.4.0"
 async-signal = "0.2.11"
-async-std = { version = "1.13.1", features = ["attributes", "unstable"] }
 async-stream = "0.3.6"
 async-trait = "0.1.88"
 asynchronous-codec = { version = "0.7.0", features = ["cbor"] }
