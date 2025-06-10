@@ -77,11 +77,6 @@ pub type HoprReplyOpener = (types::HoprSurbId, ReplyOpener);
 /// The calculation here is based on the fact that libp2p Stream over QUIC
 /// leaves space for 1460 bytes in the packet payload.
 ///
-/// The value of 1021 bytes has been chosen so that the Session protocol
-/// has exactly 1000 bytes for effective payload:
-/// - the Session protocol has a current overhead of 13 bytes
-/// - Tag requires 8 bytes
-///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
 pub(crate) const PAYLOAD_SIZE_INT: usize = 1021;
 
@@ -101,8 +96,8 @@ mod tests {
         );
 
         assert!(
-            hopr_packet_len < 1492 - 32, // 32 bytes was measured as the libp2p QUIC overhead
-            "HOPR packet {hopr_packet_len} must fit within a layer 4 packet with libp2p overhead"
+            hopr_packet_len <= 1492 - 32, // 32 bytes was measured as the libp2p QUIC overhead
+            "HOPR packet of {hopr_packet_len} bytes must fit within a layer 4 packet with libp2p overhead"
         );
     }
 
