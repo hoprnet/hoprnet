@@ -4,6 +4,7 @@ from pathlib import Path
 from .cluster import Cluster
 from .constants import ANVIL_FOLDER, ANVIL_FOLDER_NAME, NODE_NAME_PREFIX, logging
 
+
 class Snapshot:
     def __init__(self, anvil_port: int, parent_dir: Path, cluster: Cluster):
         self.anvil_port = anvil_port
@@ -31,7 +32,6 @@ class Snapshot:
         for i in range(self.cluster.size):
             source_dir: Path = self.parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
             target_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
-            db_target_dir = target_dir.joinpath("db/")
 
             shutil.copy(source_dir.joinpath("./hoprd.id"), target_dir)
             shutil.copy(source_dir.joinpath("./.env"), target_dir)
@@ -41,7 +41,6 @@ class Snapshot:
 
         # remove all files and folder in self.dir which are not snapshot and not
         # logs
-
         for entry in self.parent_dir.glob("*"):
             if entry.is_dir():
                 continue
