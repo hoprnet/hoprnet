@@ -94,7 +94,8 @@ class TestWinProbWithSwarm:
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
         set_minimum_winning_probability_in_network(private_key, win_prob, base_port)
-        await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay], win_prob), 10.0)
+        for node in route:
+            await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[node], win_prob), 10.0)
 
         try:
             async with create_bidirectional_channels_for_route(

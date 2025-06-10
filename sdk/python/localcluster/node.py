@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import tempfile
 from decimal import Decimal
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
@@ -44,6 +45,7 @@ class Node:
         base_port: int,
         api_addr: str = None,
         use_nat: bool = False,
+        remove_temp_data: bool = True,
     ):
         # initialized
         self.id = id
@@ -52,7 +54,9 @@ class Node:
         self.network: str = network
         self.identity_path: str = identity_path
         self.use_nat: bool = use_nat
+        self.remove_temp_data: bool = remove_temp_data
         self.base_port: int = base_port
+        self.temp_data_dir = tempfile.TemporaryDirectory(prefix=f"{NODE_NAME_PREFIX}_{self.id}_")
 
         # optional
         self.cfg_file: str = cfg_file
@@ -201,7 +205,7 @@ class Node:
             "--testPreferLocalAddresses",
             f"--apiHost={self.api_addr}",
             f"--apiPort={self.api_port}",
-            f"--data={self.dir}",
+            f"--data={self.temp_data_dir.name}",
             f"--host={self.host_addr}:{self.p2p_port}",
             f"--identity={self.dir.joinpath('hoprd.id')}",
             f"--network={self.network}",
@@ -251,6 +255,11 @@ class Node:
 
     def clean_up(self):
         self.proc.kill()
+        if self.remove_temp_data:
+            try:
+                self.temp_data_dir.cleanup()
+            except OSError as e:
+                logging.warning(f"Failed to cleanup temporary directory for node {self.id}: {e}")
 
     @classmethod
     def fromConfig(
