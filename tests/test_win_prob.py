@@ -132,14 +132,12 @@ class TestWinProbWithSwarm:
                 assert abs((winning_count - 1) - (ticket_count + 1) * win_prob) <= win_ticket_tolerance * (
                     ticket_count + 1
                 )
-                
+
                 # Redeem only on the channel incoming from the Entry
                 assert await swarm7[relay].api.channel_redeem_tickets(channels.fwd_channels[0].id)
 
                 # The only unredeemed ticket is on the return channel
-                await asyncio.wait_for(
-                    check_unredeemed_tickets_value_max(swarm7[relay], ticket_price / Decimal(win_prob)), 30.0
-                )
+                await asyncio.wait_for(check_unredeemed_tickets_value_max(swarm7[relay], ticket_price), 30.0)
 
                 # The redeemed ticket value must be the new value minus the ticket on the return channel
                 ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
