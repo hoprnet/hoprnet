@@ -48,8 +48,7 @@ const fn max_decimal_digits_for_n_bytes(n: usize) -> usize {
 }
 
 // Enough to fit HoprPseudonym in hex (with 0x prefix), delimiter and tag number
-const MAX_SESSION_ID_STR_LEN: usize =
-    2 + 2 * HoprPseudonym::SIZE + 1 + max_decimal_digits_for_n_bytes(size_of::<Tag>());
+const MAX_SESSION_ID_STR_LEN: usize = 2 + 2 * HoprPseudonym::SIZE + 1 + max_decimal_digits_for_n_bytes(Tag::SIZE);
 
 /// Unique ID of a specific Session in a certain direction.
 ///
