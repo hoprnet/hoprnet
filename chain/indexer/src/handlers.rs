@@ -127,10 +127,10 @@ where
 
         match event {
             HoprAnnouncementsEvents::AddressAnnouncement(address_announcement) => {
-                trace!(
+                debug!(
                     multiaddress = &address_announcement.baseMultiaddr,
                     address = &address_announcement.node.to_string(),
-                    "on_announcement_event",
+                    "on_announcement_event: AddressAnnouncement",
                 );
                 // safeguard against empty multiaddrs, skip
                 if address_announcement.baseMultiaddr.is_empty() {
@@ -162,6 +162,11 @@ where
                 };
             }
             HoprAnnouncementsEvents::KeyBinding(key_binding) => {
+                debug!(
+                    address = ?key_binding.chain_key,
+                    public_key = ?key_binding.ed25519_pub_key.0,
+                    "on_announcement_event: KeyBinding",
+                );
                 match KeyBinding::from_parts(
                     key_binding.chain_key.into(),
                     key_binding.ed25519_pub_key.0.try_into()?,
@@ -698,6 +703,10 @@ where
 
         match event {
             HoprNetworkRegistryEvents::DeregisteredByManager(deregistered) => {
+                debug!(
+                    node_address = %deregistered.nodeAddress,
+                    "on_network_registry_deregistered_by_manager_event",
+                );
                 let node_address: Address = deregistered.nodeAddress.into();
                 self.db
                     .set_access_in_network_registry(Some(tx), node_address, false)
@@ -709,6 +718,10 @@ where
                 )));
             }
             HoprNetworkRegistryEvents::Deregistered(deregistered) => {
+                debug!(
+                    node_address = %deregistered.nodeAddress,
+                    "on_network_registry_deregistered_event",
+                );
                 let node_address: Address = deregistered.nodeAddress.into();
                 self.db
                     .set_access_in_network_registry(Some(tx), node_address, false)
@@ -763,7 +776,8 @@ where
             }
             HoprNetworkRegistryEvents::EligibilityUpdated(eligibility_updated) => {
                 debug!(
-                    %eligibility_updated.stakingAccount,
+                    staking_account = %eligibility_updated.stakingAccount,
+                    eligibility = %eligibility_updated.eligibility,
                     "Node eligibility updated, updating the safe eligibility",
                 );
                 let account: Address = eligibility_updated.stakingAccount.into();
@@ -772,12 +786,14 @@ where
                     .await?;
             }
             HoprNetworkRegistryEvents::NetworkRegistryStatusUpdated(enabled) => {
-                debug!("Network registry enabled: {}", enabled.isEnabled);
+                debug!(enabled = enabled.isEnabled, "on_network_registry_status_updated_event",);
                 self.db
                     .set_network_registry_enabled(Some(tx), enabled.isEnabled)
                     .await?;
             }
-            _ => {} // Not important to at the moment
+            _ => {
+                debug!("on_network_registry_event - not implemented for event: {:?}", event);
+            } // Not important to at the moment
         };
 
         Ok(None)

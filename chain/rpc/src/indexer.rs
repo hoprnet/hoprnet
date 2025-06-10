@@ -390,7 +390,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg, None)?;
 
         let b1 = rpc.block_number().await?;
 
@@ -471,7 +471,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg, None)?;
 
         // Spawn stream
         let count_filtered_topics = 2;
@@ -578,7 +578,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg, None)?;
 
         let filter_channels_opened = alloy::rpc::types::Filter::new()
             .address(alloy::primitives::Address::from(contract_addrs.channels))

@@ -207,13 +207,15 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
      * In development, dummy is used
      */
     function _deployNRProxy(address deployerAddress) internal {
-        if (currentEnvironmentType == EnvironmentType.LOCAL) {
-            // deploy DummyProxy in LOCAL environment
-            currentNetworkDetail.addresses.networkRegistryProxyContractAddress = deployCode(
-                "DummyProxyForNetworkRegistry.sol:HoprDummyProxyForNetworkRegistry", abi.encode(deployerAddress)
-            );
-            isHoprNetworkRegistryDeployed = true;
-        } else if (!isValidAddress(currentNetworkDetail.addresses.networkRegistryProxyContractAddress)) {
+        bool shouldDeployStakingProxy = false;
+
+        if (currentEnvironmentType == EnvironmentType.LOCAL && vm.envBool("USE_STAKING_PROXY")) {
+           shouldDeployStakingProxy = true;
+        } else if (currentEnvironmentType != EnvironmentType.LOCAL && !isValidAddress(currentNetworkDetail.addresses.networkRegistryProxyContractAddress)) {
+            shouldDeployStakingProxy = true;
+        }
+        
+        if (shouldDeployStakingProxy) {
             // deploy StakingProxy in other environment types, if no proxy contract is given.
             // temporarily grant default admin role to the deployer wallet
             currentNetworkDetail.addresses.networkRegistryProxyContractAddress = deployCode(
@@ -233,6 +235,12 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
                 currentNetworkDetail.addresses.networkRegistryContractAddress, deployerAddress, owner
             );
             // flag isHoprNetworkRegistryDeployed
+            isHoprNetworkRegistryDeployed = true;
+        } else {
+            // deploy DummyProxy in LOCAL environment
+            currentNetworkDetail.addresses.networkRegistryProxyContractAddress = deployCode(
+                "DummyProxyForNetworkRegistry.sol:HoprDummyProxyForNetworkRegistry", abi.encode(deployerAddress)
+            );
             isHoprNetworkRegistryDeployed = true;
         }
     }

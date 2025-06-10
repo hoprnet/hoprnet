@@ -44,7 +44,7 @@ async def bringup(
         config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port
     )
     anvil = Anvil(
-        ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"), base_port
+        ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"), base_port, not test_mode
     )
 
     snapshot = Snapshot(base_port, MAIN_DIR, cluster)

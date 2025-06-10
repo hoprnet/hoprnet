@@ -201,7 +201,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
         // Build RPC operations
         let rpc_operations =
-            RpcOperations::new(rpc_client, requestor, &me_onchain, rpc_cfg).expect("failed to initialize RPC");
+            RpcOperations::new(rpc_client, requestor, &me_onchain, rpc_cfg, None).expect("failed to initialize RPC");
 
         // Build the Ethereum Transaction Executor that uses RpcOperations as backend
         let ethereum_tx_executor = EthereumTransactionExecutor::new(

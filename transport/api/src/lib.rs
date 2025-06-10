@@ -318,6 +318,7 @@ where
                                 }
                             }
                             PeerDiscovery::Announce(peer, multiaddresses) => {
+                                debug!(peer = %peer, ?multiaddresses, "Processing peer discovery event: Announce");
                                 if peer != me {
                                     // decapsulate the `p2p/<peer_id>` to remove duplicities
                                     let mas = multiaddresses
