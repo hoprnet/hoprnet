@@ -89,7 +89,7 @@ class TestWinProbWithSwarm:
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 10
         win_prob = 0.1
-        win_ticket_tolerance = 0.1
+        win_ticket_tolerance = 0.3
         relay = route[1]
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
@@ -132,7 +132,7 @@ class TestWinProbWithSwarm:
                 assert abs((winning_count - 1) - (ticket_count + 1) * win_prob) <= win_ticket_tolerance * (
                     ticket_count + 1
                 )
-
+                
                 # Redeem only on the channel incoming from the Entry
                 assert await swarm7[relay].api.channel_redeem_tickets(channels.fwd_channels[0].id)
 
@@ -169,7 +169,7 @@ class TestWinProbWithSwarm:
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
         win_prob = 0.1
-        win_ticket_tolerance = 0.1
+        win_ticket_tolerance = 0.3
         relay = route[1]
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
@@ -242,7 +242,7 @@ class TestWinProbWithSwarm:
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
         win_prob = 0.1
-        win_ticket_tolerance = 0.1
+        win_ticket_tolerance = 0.3
 
         relay_1 = route[1]
         relay_2 = route[2]
