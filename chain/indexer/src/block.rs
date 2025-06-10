@@ -945,6 +945,14 @@ mod tests {
         let head_block = 1000;
         rpc.expect_block_number().returning(move || Ok(head_block));
 
+        rpc.expect_get_hopr_balance()
+            .withf(move |x| x == &Address::new(b"my safe address 1234"))
+            .returning(move |_| Ok(HoprBalance::default()));
+
+        rpc.expect_get_hopr_allowance()
+            .withf(move |x, y| x == &Address::new(b"my safe address 1234") && y == &Address::from([0; 20]))
+            .returning(move |_, _| Ok(HoprBalance::default()));
+
         let finalized_block = BlockWithLogs {
             block_id: head_block - 1,
             logs: BTreeSet::from_iter(build_announcement_logs(*BOB, 4, head_block - 1, 23)?),
