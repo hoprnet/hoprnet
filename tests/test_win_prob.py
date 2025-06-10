@@ -115,7 +115,7 @@ class TestWinProbWithSwarm:
                 # Wait for at least some tickets to become acknowledged
                 await asyncio.wait_for(
                     check_unredeemed_tickets_value(
-                        swarm7[relay], statistics_before.unredeemed_value + ticket_count * ticket_price
+                        swarm7[relay], statistics_before.unredeemed_value + (ticket_count * ticket_price / Decimal(win_prob))
                     ),
                     30.0,
                 )
