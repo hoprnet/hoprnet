@@ -176,15 +176,15 @@ class Node:
             "RUST_LOG": ",".join(
                 [
                     log_level,
-                    # "libp2p_swarm=info",
-                    "multistream_select=info",
+                    "hyper_util=warn",
+                    "hickory_resolver=warn",
                     "isahc=error",
+                    "libp2p_swarm=info",
+                    "libp2p_tcp=info",
+                    "libp2p_dns=info",
+                    "multistream_select=info",
                     "sea_orm=warn",
                     "sqlx=warn",
-                    "hyper_util=warn",
-                    # "libp2p_tcp=info",
-                    # "libp2p_dns=info",
-                    "hickory_resolver=warn",
                 ]
             ),
             "RUST_BACKTRACE": "full",
