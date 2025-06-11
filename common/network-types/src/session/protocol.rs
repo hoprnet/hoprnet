@@ -62,7 +62,7 @@ use crate::{
     errors::NetworkTypeError,
     session::{
         errors::SessionError,
-        frame::{FrameId, FrameInfo, Segment, SegmentId, SeqNum},
+        frame::{FrameId, FrameInfo, MissingSegmentsBitmap, Segment, SegmentId, SeqNum},
     },
 };
 
@@ -101,17 +101,15 @@ impl<const C: usize> IntoIterator for SegmentRequest<C> {
     type Item = SegmentId;
 
     fn into_iter(self) -> Self::IntoIter {
-        let seq_size = mem::size_of::<SeqNum>() * 8;
-        let mut ret = Vec::with_capacity(seq_size * 8 * self.0.len());
+        let seq_size = SeqNum::BITS as usize;
+        let mut ret = Vec::with_capacity(seq_size * self.0.len());
         for (frame_id, missing) in self.0 {
-            for i in 0..seq_size {
-                let mask = (1 << (seq_size - i - 1)) as SeqNum;
-                if (mask & missing) != 0 {
-                    ret.push(SegmentId(frame_id, i as SeqNum));
-                }
-            }
+            ret.extend(
+                MissingSegmentsBitmap::from([missing])
+                    .iter_ones()
+                    .map(|i| SegmentId(frame_id, i as SeqNum)),
+            );
         }
-        ret.shrink_to_fit();
         ret.into_iter()
     }
 }
@@ -550,8 +548,8 @@ mod tests {
     fn session_message_segment_request_should_serialize_and_deserialize() -> anyhow::Result<()> {
         let frame_info = FrameInfo {
             frame_id: 10,
-            total_segments: 255,
-            missing_segments: ALL_MISSING_SEGMENTS,
+            total_segments: 8,
+            missing_segments: [0b10100001].into(),
             last_update: SystemTime::now(),
         };
 
@@ -564,7 +562,7 @@ mod tests {
         match msg_1 {
             SessionMessage::Request(r) => {
                 let missing_segments = r.into_iter().collect::<Vec<_>>();
-                let expected = (0..=7).map(|s| SegmentId(10, s)).collect::<Vec<_>>();
+                let expected = vec![SegmentId(10, 0), SegmentId(10, 2), SegmentId(10, 7)];
                 assert_eq!(expected, missing_segments);
             }
             _ => panic!("invalid type"),
