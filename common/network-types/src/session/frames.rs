@@ -5,8 +5,7 @@ use std::{
     time::Instant,
 };
 
-use crate::prelude::errors::SessionError;
-use crate::session::protocol::MissingSegmentsBitmap;
+use crate::{prelude::errors::SessionError, session::protocol::MissingSegmentsBitmap};
 
 /// ID of a [Frame].
 pub type FrameId = u32;
@@ -489,8 +488,6 @@ impl FrameMap for FrameHashMap {
 
 #[cfg(test)]
 mod tests {
-    use bitvec::prelude::*;
-
     use super::*;
 
     #[test]
@@ -517,7 +514,7 @@ mod tests {
         })?;
 
         assert!(fb.is_complete());
-        assert_eq!(bits![0, 0, 0], &fb.as_missing());
+        assert_eq!(MissingSegmentsBitmap::ZERO, fb.as_missing());
 
         let reassembled: Frame = fb.try_into()?;
         assert_eq!(1, reassembled.frame_id);

@@ -204,7 +204,11 @@ mod tests {
     fn session_message_segment_request_should_serialize_and_deserialize() -> anyhow::Result<()> {
         // The first 8 segments are missing in Frame 10
         let msg_1 =
-            SessionMessage::<466>::Request(SegmentRequest::from_iter([(10 as FrameId, !MissingSegmentsBitmap::ZERO)]));
+            SessionMessage::<466>::Request(SegmentRequest::from_iter([
+                (2 as FrameId,  [0b11000001].into()),
+                (10 as FrameId, [0b01000100].into())
+                ]
+            ));
         let data = Vec::from(msg_1.clone());
         let msg_2 = SessionMessage::try_from(&data[..])?;
 
@@ -213,7 +217,10 @@ mod tests {
         match msg_1 {
             SessionMessage::Request(r) => {
                 let missing_segments = r.into_iter().collect::<Vec<_>>();
-                let expected = (0..=7).map(|s| SegmentId(10, s)).collect::<Vec<_>>();
+                let expected = vec![
+                    SegmentId(2, 0), SegmentId(2, 1), SegmentId(2, 7),
+                    SegmentId(10, 1), SegmentId(10, 5),
+                ];
                 assert_eq!(expected, missing_segments);
             }
             _ => panic!("invalid type"),
@@ -225,7 +232,7 @@ mod tests {
     #[test]
     fn session_message_ack_should_serialize_and_deserialize() -> anyhow::Result<()> {
         let mut rng = thread_rng();
-        let frame_ids: Vec<u32> = (0..500).map(|_| rng.gen()).collect();
+        let frame_ids: Vec<u32> = (0..FrameAcknowledgements::<466>::MAX_ACK_FRAMES).map(|_| rng.gen()).collect();
 
         let msg_1 = SessionMessage::<466>::Acknowledge(frame_ids.try_into()?);
         let data = Vec::from(msg_1.clone());

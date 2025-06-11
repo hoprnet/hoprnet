@@ -52,8 +52,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use bitvec::{BitArr, field::BitField};
-use bitvec::prelude::Msb0;
+use bitvec::{BitArr, field::BitField, prelude::Msb0};
+
 use crate::session::{
     errors::SessionError,
     frames::{FrameId, SegmentId, SeqNum},
@@ -105,9 +105,11 @@ impl<const C: usize> IntoIterator for SegmentRequest<C> {
         let seq_size = SeqNum::BITS as usize;
         let mut ret = Vec::with_capacity(seq_size * self.0.len());
         for (frame_id, missing) in self.0 {
-            ret.extend(MissingSegmentsBitmap::from([missing])
-                .iter_ones()
-                .map(|i| SegmentId(frame_id, i as SeqNum)));
+            ret.extend(
+                MissingSegmentsBitmap::from([missing])
+                    .iter_ones()
+                    .map(|i| SegmentId(frame_id, i as SeqNum)),
+            );
         }
         ret.into_iter()
     }
@@ -314,7 +316,7 @@ mod tests {
     }
 
     #[test]
-    fn test_missing_segments_in_segment_request()  {
+    fn test_missing_segments_in_segment_request() {
         let frame_1_missing: MissingSegmentsBitmap = [0b00000000_u8].into();
         let frame_2_missing: MissingSegmentsBitmap = [0b00100000_u8].into();
         let frame_3_missing: MissingSegmentsBitmap = [0b00111001_u8].into();
@@ -330,8 +332,18 @@ mod tests {
         let missing = req.into_iter().collect::<Vec<SegmentId>>();
         let missing_seg_ids = [
             SegmentId(2, 2),
-            SegmentId(3, 2), SegmentId(3, 3), SegmentId(3, 4), SegmentId(3, 7),
-            SegmentId(4, 0), SegmentId(4, 1), SegmentId(4, 2), SegmentId(4, 3), SegmentId(4, 4), SegmentId(4, 5), SegmentId(4, 6), SegmentId(4, 7),
+            SegmentId(3, 2),
+            SegmentId(3, 3),
+            SegmentId(3, 4),
+            SegmentId(3, 7),
+            SegmentId(4, 0),
+            SegmentId(4, 1),
+            SegmentId(4, 2),
+            SegmentId(4, 3),
+            SegmentId(4, 4),
+            SegmentId(4, 5),
+            SegmentId(4, 6),
+            SegmentId(4, 7),
         ];
 
         assert_eq!(missing, missing_seg_ids);

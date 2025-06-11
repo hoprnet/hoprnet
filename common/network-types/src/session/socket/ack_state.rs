@@ -625,7 +625,7 @@ mod tests {
             ctl_tx,
         })?;
 
-        let expected_segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
+        let expected_segments = segment(hopr_crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(), MTU, 1)?;
         for segment in &expected_segments {
             state.segment_sent(segment)?;
         }
@@ -661,18 +661,17 @@ mod tests {
             ctl_tx,
         })?;
 
-        let expected_segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
+        let expected_segments = segment(hopr_crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(), MTU, 1)?;
         for segment in expected_segments.iter().skip(1) {
             state.segment_sent(segment)?;
         }
 
-        // Partially acknowledge the frame
-        //state.incoming_retransmission_request()
-        state.incoming_acknowledged_frames(vec![1].try_into()?)?;
+        // Partially acknowledge the frame (report the first segment as missing)
+        state.incoming_retransmission_request(SegmentRequest::from_iter([(1, [0b10000000].into())]))?;
 
         state.stop()?;
 
-        // No retransmission should be sent because the frame was already acknowledged.
+        // No retransmission should be sent because the frame was partially acknowledged.
         assert!(ctl_rx.collect::<Vec<_>>().await.is_empty());
 
         Ok(())
@@ -688,5 +687,4 @@ mod tests {
     {
         Ok(())
     }
-
 }
