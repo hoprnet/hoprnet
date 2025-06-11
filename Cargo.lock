@@ -4820,7 +4820,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-network-types"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aquamarine",

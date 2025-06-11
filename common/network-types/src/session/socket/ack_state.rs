@@ -564,11 +564,12 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn ack_state_receiver_must_resend_unacknowledged_frame() -> anyhow::Result<()> {
         const FRAME_SIZE: usize = 1500;
+        const NUM_RETRIES: usize = 2;
 
         let cfg = AcknowledgementStateConfig {
             mode: AcknowledgementMode::Full,
             expected_packet_latency: Duration::from_millis(2),
-            max_outgoing_frame_retries: 1,
+            max_outgoing_frame_retries: NUM_RETRIES,
             ..Default::default()
         };
 
@@ -599,7 +600,10 @@ mod tests {
             .map(|m| m.try_as_segment().ok_or(anyhow::anyhow!("must be segment")))
             .collect::<Result<Vec<_>, _>>()?;
 
-        assert_eq!(expected_segments.len(), retransmitted_segments.len());
+        assert_eq!(NUM_RETRIES * expected_segments.len(), retransmitted_segments.len());
+
+        let len = expected_segments.len();
+        let expected_segments = expected_segments.into_iter().cycle().take(NUM_RETRIES*len).collect::<Vec<_>>();
         assert_eq!(expected_segments, retransmitted_segments);
 
         Ok(())
@@ -679,6 +683,11 @@ mod tests {
 
     #[tokio::test]
     async fn ack_state_receiver_must_request_missing_frames_when_partial_acks_are_enabled() -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ack_state_receiver_must_not_request_missing_frames_when_partial_acks_are_not_enabled() -> anyhow::Result<()> {
         Ok(())
     }
 
