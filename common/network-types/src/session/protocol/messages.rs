@@ -52,7 +52,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use bitvec::{BitArr, field::BitField, order::Lsb0};
+use bitvec::{BitArr, field::BitField};
 use bitvec::prelude::Msb0;
 use crate::session::{
     errors::SessionError,
@@ -71,7 +71,7 @@ pub struct SegmentRequest<const C: usize>(pub(super) BTreeMap<FrameId, SeqNum>);
 ///
 /// Represented by `u8`, it can cover up to 8 segments per frame.
 /// If a bit is set, the segment is *missing* from the frame.
-pub type MissingSegmentsBitmap = BitArr!(for 1, in u8, Lsb0);
+pub type MissingSegmentsBitmap = BitArr!(for 1, in SeqNum, Msb0);
 
 impl<const C: usize> SegmentRequest<C> {
     /// Size of a single segment retransmission request entry.
@@ -97,34 +97,19 @@ impl<const C: usize> SegmentRequest<C> {
     }
 }
 
-/// Iterator over [`SegmentId`] in [`SegmentRequest`].
-pub struct SegmentIdIter(Vec<SegmentId>);
-
-impl Iterator for SegmentIdIter {
-    type Item = SegmentId;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.pop()
-    }
-}
-
 impl<const C: usize> IntoIterator for SegmentRequest<C> {
-    type IntoIter = SegmentIdIter;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
     type Item = SegmentId;
 
     fn into_iter(self) -> Self::IntoIter {
         let seq_size = SeqNum::BITS as usize;
-        let mut ret = SegmentIdIter(Vec::with_capacity(seq_size * 8 * self.0.len()));
-        for (frame_id, missing) in self.0.into_iter().rev() {
-            for i in (0..seq_size).rev() {
-                let mask = (1 << i) as SeqNum;
-                if (mask & missing) != 0 {
-                    ret.0.push(SegmentId(frame_id, i as SeqNum));
-                }
-            }
+        let mut ret = Vec::with_capacity(seq_size * self.0.len());
+        for (frame_id, missing) in self.0 {
+            ret.extend(MissingSegmentsBitmap::from([missing])
+                .iter_ones()
+                .map(|i| SegmentId(frame_id, i as SeqNum)));
         }
-        ret.0.shrink_to_fit();
-        ret
+        ret.into_iter()
     }
 }
 
@@ -345,7 +330,7 @@ mod tests {
         let missing = req.into_iter().collect::<Vec<SegmentId>>();
         let missing_seg_ids = [
             SegmentId(2, 2),
-            SegmentId(3, 2), SegmentId(2, 3), SegmentId(2, 4), SegmentId(2, 7),
+            SegmentId(3, 2), SegmentId(3, 3), SegmentId(3, 4), SegmentId(3, 7),
             SegmentId(4, 0), SegmentId(4, 1), SegmentId(4, 2), SegmentId(4, 3), SegmentId(4, 4), SegmentId(4, 5), SegmentId(4, 6), SegmentId(4, 7),
         ];
 

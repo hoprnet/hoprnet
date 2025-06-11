@@ -19,7 +19,6 @@ use crate::{
         socket::state::SocketComponents,
     },
 };
-use crate::session::protocol::MissingSegmentsBitmap;
 
 /// Indicates the acknowledgement mode of a [stateful](AcknowledgementState) Session socket.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -264,12 +263,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                             tracing::debug!(frame_id, "last request of incoming frame segments");
                         }
 
-                        if let Ok(missing_segments) = MissingSegmentsBitmap::try_from(missing_segments.as_bitslice()) {
-                            futures::future::ready(Some((frame_id, missing_segments)))
-                        } else {
-                            tracing::error!(frame_id, "frame has more missing segments than allowed");
-                            futures::future::ready(None)
-                        }
+                        futures::future::ready(Some((frame_id, missing_segments)))
                     } else {
                         tracing::debug!(frame_id, "no more missing segments in frame");
                         futures::future::ready(None)

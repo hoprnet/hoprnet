@@ -5,9 +5,8 @@ use std::{
     time::Instant,
 };
 
-use bitvec::prelude::{BitVec, Msb0};
-
 use crate::prelude::errors::SessionError;
+use crate::session::protocol::MissingSegmentsBitmap;
 
 /// ID of a [Frame].
 pub type FrameId = u32;
@@ -279,8 +278,14 @@ impl FrameBuilder {
         Ok(())
     }
 
-    pub fn as_missing(&self) -> BitVec<u8> {
-        self.segments.iter().map(Option::is_none).collect()
+    pub fn as_missing(&self) -> MissingSegmentsBitmap {
+        let mut ret = MissingSegmentsBitmap::ZERO;
+        self.segments
+            .iter()
+            .take(SeqNum::BITS as usize)
+            .enumerate()
+            .for_each(|(i, v)| ret.set(i, v.is_none()));
+        ret
     }
 
     #[inline]
@@ -294,7 +299,8 @@ impl FrameBuilder {
 pub struct FrameInspector(pub(crate) FrameDashMap);
 
 impl FrameInspector {
-    pub fn missing_segments(&self, frame_id: &FrameId) -> Option<BitVec<u8>> {
+    /// Returns a [`MissingSegmentsBitmap`] of missing segments in a frame.
+    pub fn missing_segments(&self, frame_id: &FrameId) -> Option<MissingSegmentsBitmap> {
         self.0.0.get(frame_id).map(|f| f.as_missing())
     }
 }
@@ -511,7 +517,7 @@ mod tests {
         })?;
 
         assert!(fb.is_complete());
-        assert_eq!(bits![0, 0, 0], fb.as_missing());
+        assert_eq!(bits![0, 0, 0], &fb.as_missing());
 
         let reassembled: Frame = fb.try_into()?;
         assert_eq!(1, reassembled.frame_id);

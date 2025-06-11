@@ -161,8 +161,6 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 
 #[cfg(test)]
 mod tests {
-    use bitvec::{bitarr, prelude::Lsb0};
-    use bitvec::prelude::Msb0;
     use hex_literal::hex;
     use rand::{Rng, thread_rng};
 
@@ -206,7 +204,7 @@ mod tests {
     fn session_message_segment_request_should_serialize_and_deserialize() -> anyhow::Result<()> {
         // The first 8 segments are missing in Frame 10
         let msg_1 =
-            SessionMessage::<466>::Request(SegmentRequest::from_iter([(10 as FrameId, bitarr![u8, Lsb0; 1; 8])]));
+            SessionMessage::<466>::Request(SegmentRequest::from_iter([(10 as FrameId, !MissingSegmentsBitmap::ZERO)]));
         let data = Vec::from(msg_1.clone());
         let msg_2 = SessionMessage::try_from(&data[..])?;
 
@@ -240,7 +238,7 @@ mod tests {
 
     #[test]
     fn session_message_segment_request_should_yield_correct_bitset_values() {
-        let seg_req = SegmentRequest::<466>::from_iter([(10, bitarr![u8, Lsb0; 0,0,1,0,1,0,0,0])]);
+        let seg_req = SegmentRequest::<466>::from_iter([(10, MissingSegmentsBitmap::from([0b00101000]))]);
 
         let mut iter = seg_req.into_iter();
         assert_eq!(iter.next(), Some(SegmentId(10, 2)));
