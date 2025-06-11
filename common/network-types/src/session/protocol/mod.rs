@@ -2,7 +2,8 @@ mod messages;
 
 use asynchronous_codec::{Decoder, Encoder};
 use bytes::{Buf, BufMut, BytesMut};
-pub use messages::{FrameAcknowledgements, SegmentRequest};
+
+pub use messages::{FrameAcknowledgements, SegmentRequest, MissingSegmentsBitmap};
 
 use crate::session::{errors::SessionError, frames::Segment};
 
@@ -161,6 +162,7 @@ impl<const C: usize> Decoder for SessionCodec<C> {
 #[cfg(test)]
 mod tests {
     use bitvec::{bitarr, prelude::Lsb0};
+    use bitvec::prelude::Msb0;
     use hex_literal::hex;
     use rand::{Rng, thread_rng};
 
@@ -227,7 +229,7 @@ mod tests {
         let mut rng = thread_rng();
         let frame_ids: Vec<u32> = (0..500).map(|_| rng.gen()).collect();
 
-        let msg_1 = SessionMessage::<466>::Acknowledge(frame_ids.into());
+        let msg_1 = SessionMessage::<466>::Acknowledge(frame_ids.try_into()?);
         let data = Vec::from(msg_1.clone());
         let msg_2 = SessionMessage::try_from(&data[..])?;
 
@@ -238,11 +240,11 @@ mod tests {
 
     #[test]
     fn session_message_segment_request_should_yield_correct_bitset_values() {
-        let seg_req = SegmentRequest::<466>::from_iter([(10, bitarr![u8, Lsb0; 0,0,1,0,0,1,0,0])]);
+        let seg_req = SegmentRequest::<466>::from_iter([(10, bitarr![u8, Lsb0; 0,0,1,0,1,0,0,0])]);
 
         let mut iter = seg_req.into_iter();
         assert_eq!(iter.next(), Some(SegmentId(10, 2)));
-        assert_eq!(iter.next(), Some(SegmentId(10, 5)));
+        assert_eq!(iter.next(), Some(SegmentId(10, 4)));
         assert_eq!(iter.next(), None);
     }
 }

@@ -1,6 +1,5 @@
 use std::time::{Duration, Instant};
 
-use bitvec::{BitArr, prelude::Lsb0};
 use futures::{FutureExt, StreamExt, channel::mpsc::UnboundedSender};
 use futures_time::stream::StreamExt as TimeStreamExt;
 use tracing::Instrument;
@@ -20,6 +19,7 @@ use crate::{
         socket::state::SocketComponents,
     },
 };
+use crate::session::protocol::MissingSegmentsBitmap;
 
 /// Indicates the acknowledgement mode of a [stateful](AcknowledgementState) Session socket.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -209,8 +209,6 @@ impl<const C: usize> AcknowledgementState<C> {
     }
 }
 
-type MissingSegments = BitArr!(for 1, in u8, Lsb0);
-
 impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     fn session_id(&self) -> &str {
         &self.id
@@ -266,7 +264,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                             tracing::debug!(frame_id, "last request of incoming frame segments");
                         }
 
-                        if let Ok(missing_segments) = MissingSegments::try_from(missing_segments.as_bitslice()) {
+                        if let Ok(missing_segments) = MissingSegmentsBitmap::try_from(missing_segments.as_bitslice()) {
                             futures::future::ready(Some((frame_id, missing_segments)))
                         } else {
                             tracing::error!(frame_id, "frame has more missing segments than allowed");
@@ -563,7 +561,7 @@ mod tests {
 
         assert_eq!(
             ctl_msg,
-            SessionMessage::Acknowledge(FrameAcknowledgements::new_multiple(acked_frame_ids)[0].clone())
+            SessionMessage::Acknowledge(acked_frame_ids.to_vec().try_into()?)
         );
 
         Ok(())
@@ -594,7 +592,8 @@ mod tests {
             state.segment_sent(segment)?;
         }
 
-        tokio::time::sleep(cfg.expected_packet_latency * (expected_segments.len() + 2) as u32).await;
+        let expected_frame_delivery = cfg.expected_packet_latency * (expected_segments.len() + 1) as u32;
+        tokio::time::sleep(2 * expected_frame_delivery).await;
         state.stop()?;
 
         let ctl_msg = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
@@ -613,6 +612,79 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn ack_state_sender_must_not_resend_acknowledged_frame() -> anyhow::Result<()> {
+        const FRAME_SIZE: usize = 1500;
+
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Full,
+            expected_packet_latency: Duration::from_millis(2),
+            max_outgoing_frame_retries: 1,
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
+        for segment in &expected_segments {
+            state.segment_sent(segment)?;
+        }
+
+        // Acknowledge the frame
+        state.incoming_acknowledged_frames(vec![1].try_into()?)?;
+
+        state.stop()?;
+
+        // No retransmission should be sent because the frame was already acknowledged.
+        assert!(ctl_rx.collect::<Vec<_>>().await.is_empty());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ack_state_sender_must_not_resend_entire_frame_when_already_partially_acknowledged() -> anyhow::Result<()> {
+        const FRAME_SIZE: usize = 1500;
+
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Full,
+            expected_packet_latency: Duration::from_millis(2),
+            max_outgoing_frame_retries: 1,
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
+        for segment in expected_segments.iter().skip(1) {
+            state.segment_sent(segment)?;
+        }
+
+        // Partially acknowledge the frame
+        //state.incoming_retransmission_request()
+        state.incoming_acknowledged_frames(vec![1].try_into()?)?;
+
+        state.stop()?;
+
+        // No retransmission should be sent because the frame was already acknowledged.
+        assert!(ctl_rx.collect::<Vec<_>>().await.is_empty());
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn ack_state_receiver_must_request_missing_frames_when_partial_acks_are_enabled() -> anyhow::Result<()> {
         Ok(())
     }
@@ -623,13 +695,4 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn ack_state_sender_must_not_resend_acknowledged_frame() -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn ack_state_sender_must_not_resend_entire_frame_when_already_partially_acknowledged() -> anyhow::Result<()> {
-        Ok(())
-    }
 }

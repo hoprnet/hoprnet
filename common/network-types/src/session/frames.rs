@@ -5,7 +5,7 @@ use std::{
     time::Instant,
 };
 
-use bitvec::prelude::BitVec;
+use bitvec::prelude::{BitVec, Msb0};
 
 use crate::prelude::errors::SessionError;
 

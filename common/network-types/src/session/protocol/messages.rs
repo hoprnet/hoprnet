@@ -53,7 +53,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bitvec::{BitArr, field::BitField, order::Lsb0};
-
+use bitvec::prelude::Msb0;
 use crate::session::{
     errors::SessionError,
     frames::{FrameId, SegmentId, SeqNum},
@@ -67,6 +67,12 @@ use crate::session::{
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SegmentRequest<const C: usize>(pub(super) BTreeMap<FrameId, SeqNum>);
 
+/// Bitmap of segments missing in a frame.
+///
+/// Represented by `u8`, it can cover up to 8 segments per frame.
+/// If a bit is set, the segment is *missing* from the frame.
+pub type MissingSegmentsBitmap = BitArr!(for 1, in u8, Lsb0);
+
 impl<const C: usize> SegmentRequest<C> {
     /// Size of a single segment retransmission request entry.
     pub const ENTRY_SIZE: usize = size_of::<FrameId>() + size_of::<SeqNum>();
@@ -76,7 +82,7 @@ impl<const C: usize> SegmentRequest<C> {
     pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = SeqNum::BITS as usize;
     pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
 
-    /// Returns the number of segments to retransmit.
+    /// Returns the total number of segments to retransmit for all frames in this request.
     pub fn len(&self) -> usize {
         self.0
             .values()
@@ -87,7 +93,7 @@ impl<const C: usize> SegmentRequest<C> {
 
     /// Returns true if there are no segments to retransmit in this request.
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.0.iter().all(|(_, e)| e.count_ones() == 0)
     }
 }
 
@@ -109,7 +115,7 @@ impl<const C: usize> IntoIterator for SegmentRequest<C> {
     fn into_iter(self) -> Self::IntoIter {
         let seq_size = SeqNum::BITS as usize;
         let mut ret = SegmentIdIter(Vec::with_capacity(seq_size * 8 * self.0.len()));
-        for (frame_id, missing) in self.0 {
+        for (frame_id, missing) in self.0.into_iter().rev() {
             for i in (0..seq_size).rev() {
                 let mask = (1 << i) as SeqNum;
                 if (mask & missing) != 0 {
@@ -123,8 +129,8 @@ impl<const C: usize> IntoIterator for SegmentRequest<C> {
 }
 
 // From FrameIds and bitmap of missing segments per frame
-impl<const C: usize> FromIterator<(FrameId, BitArr!(for 1, in u8, Lsb0))> for SegmentRequest<C> {
-    fn from_iter<T: IntoIterator<Item = (FrameId, BitArr!(for 1, in u8, Lsb0))>>(iter: T) -> Self {
+impl<const C: usize> FromIterator<(FrameId, MissingSegmentsBitmap)> for SegmentRequest<C> {
+    fn from_iter<T: IntoIterator<Item = (FrameId, MissingSegmentsBitmap)>>(iter: T) -> Self {
         Self(
             iter.into_iter()
                 .map(|(fid, missing_segments)| (fid, missing_segments.load()))
@@ -231,15 +237,25 @@ impl<const C: usize> FrameAcknowledgements<C> {
     }
 }
 
-impl<const C: usize> From<Vec<FrameId>> for FrameAcknowledgements<C> {
-    fn from(value: Vec<FrameId>) -> Self {
-        Self(
+impl<const C: usize> TryFrom<Vec<FrameId>> for FrameAcknowledgements<C> {
+    type Error = SessionError;
+
+    fn try_from(value: Vec<FrameId>) -> Result<Self, Self::Error> {
+        if value.len() <= Self::MAX_ACK_FRAMES {
             value
                 .into_iter()
-                .take(Self::MAX_ACK_FRAMES)
-                .filter(|v| *v > 0)
-                .collect(),
-        )
+                .map(|v| {
+                    if v > 0 {
+                        Ok(v)
+                    } else {
+                        Err(SessionError::InvalidFrameId)
+                    }
+                })
+                .collect::<Result<BTreeSet<_>, _>>()
+                .map(Self)
+        } else {
+            Err(SessionError::DataTooLong)
+        }
     }
 }
 
@@ -310,5 +326,29 @@ mod tests {
 
         let actual = acks.into_iter().flat_map(|a| a.into_iter()).collect::<Vec<_>>();
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_missing_segments_in_segment_request()  {
+        let frame_1_missing: MissingSegmentsBitmap = [0b00000000_u8].into();
+        let frame_2_missing: MissingSegmentsBitmap = [0b00100000_u8].into();
+        let frame_3_missing: MissingSegmentsBitmap = [0b00111001_u8].into();
+        let frame_4_missing: MissingSegmentsBitmap = [0b11111111_u8].into();
+
+        let req = SegmentRequest::<1000>::from_iter([
+            (1, frame_1_missing),
+            (2, frame_2_missing),
+            (3, frame_3_missing),
+            (4, frame_4_missing),
+        ]);
+
+        let missing = req.into_iter().collect::<Vec<SegmentId>>();
+        let missing_seg_ids = [
+            SegmentId(2, 2),
+            SegmentId(3, 2), SegmentId(2, 3), SegmentId(2, 4), SegmentId(2, 7),
+            SegmentId(4, 0), SegmentId(4, 1), SegmentId(4, 2), SegmentId(4, 3), SegmentId(4, 4), SegmentId(4, 5), SegmentId(4, 6), SegmentId(4, 7),
+        ];
+
+        assert_eq!(missing, missing_seg_ids);
     }
 }
