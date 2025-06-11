@@ -79,7 +79,7 @@ where
 
 impl<T, U, Db> Indexer<T, U, Db>
 where
-    T: HoprIndexerRpcOperations + Sync + Send + 'static + Clone,
+    T: HoprIndexerRpcOperations + Sync + Send + 'static,
     U: ChainLogHandler + Send + Sync + 'static,
     Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
@@ -254,12 +254,13 @@ where
                 METRIC_INDEXER_SYNC_SOURCE.set(&["rpc"], 1.0);
             }
 
+            let rpc_ref = &rpc;
+
             let event_stream = rpc
                 .try_stream_logs(next_block_to_process, log_filters, is_synced.load(Ordering::Relaxed))
                 .expect("block stream should be constructible")
                 .then(|block| {
                     let db = db.clone();
-                    let rpc = rpc.clone();
                     let chain_head = chain_head.clone();
                     let is_synced = is_synced.clone();
                     let tx = tx.clone();
@@ -268,7 +269,7 @@ where
                     async move {
                         Self::calculate_sync_process(
                             block.block_id,
-                            &rpc,
+                            rpc_ref,
                             db,
                             chain_head.clone(),
                             is_synced.clone(),
