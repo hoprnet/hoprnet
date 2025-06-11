@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use alloy::sol_types::SolEvent;
-use futures::{FutureExt, StreamExt, stream};
+use futures::{StreamExt, stream};
 use hopr_async_runtime::prelude::{JoinHandle, spawn};
 use hopr_bindings::hoprtoken::HoprToken::{Approval, Transfer};
 use hopr_chain_rpc::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations};
@@ -79,7 +79,7 @@ where
 
 impl<T, U, Db> Indexer<T, U, Db>
 where
-    T: HoprIndexerRpcOperations + Sync + Send + 'static,
+    T: HoprIndexerRpcOperations + Sync + Send + 'static + Clone,
     U: ChainLogHandler + Send + Sync + 'static,
     Db: HoprDbGeneralModelOperations + HoprDbInfoOperations + HoprDbLogOperations + Clone + Send + Sync + 'static,
 {
@@ -259,19 +259,28 @@ where
                 .expect("block stream should be constructible")
                 .then(|block| {
                     let db = db.clone();
+                    let rpc = rpc.clone();
+                    let chain_head = chain_head.clone();
+                    let is_synced = is_synced.clone();
+                    let tx = tx.clone();
+                    let logs_handler = logs_handler.clone();
 
-                    Self::calculate_sync_process(
-                        block.block_id,
-                        &rpc,
-                        db,
-                        chain_head.clone(),
-                        is_synced.clone(),
-                        next_block_to_process,
-                        tx.clone(),
-                        logs_handler.safe_address().into(),
-                        logs_handler.contract_addresses_map().channels.into(),
-                    )
-                    .map(|_| block)
+                    async move {
+                        Self::calculate_sync_process(
+                            block.block_id,
+                            &rpc,
+                            db,
+                            chain_head.clone(),
+                            is_synced.clone(),
+                            next_block_to_process,
+                            tx.clone(),
+                            logs_handler.safe_address().into(),
+                            logs_handler.contract_addresses_map().channels.into(),
+                        )
+                        .await;
+
+                        block
+                    }
                 })
                 .filter_map(|block| {
                     let db = db.clone();
@@ -310,7 +319,12 @@ where
                     }
                 })
                 .filter_map(|block| {
-                    Self::process_block(&db, &logs_handler, block, false, is_synced.load(Ordering::Relaxed))
+                    let db = db.clone();
+                    let logs_handler = logs_handler.clone();
+                    let is_synced = is_synced.clone();
+                    async move {
+                        Self::process_block(&db, &logs_handler, block, false, is_synced.load(Ordering::Relaxed)).await
+                    }
                 })
                 .flat_map(stream::iter);
 
