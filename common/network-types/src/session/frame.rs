@@ -52,7 +52,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use bitvec::{BitArr, array::BitArray, bitarr};
+use bitvec::{BitArr, bitarr, prelude::Msb0};
 use dashmap::{DashMap, mapref::entry::Entry};
 use futures::{Sink, Stream};
 use hopr_platform::time::native::current_time;
@@ -288,10 +288,11 @@ impl FrameBuilder {
 
     /// Returns information about the frame that is being built by this builder.
     pub fn info(&self) -> FrameInfo {
-        let mut missing_segments = bitarr![0; 256];
+        let mut missing_segments = NO_MISSING_SEGMENTS;
         self.segments
             .iter()
             .enumerate()
+            .take(SeqNum::BITS as usize) // take only as much to fit into MissingSegmentsBitmap
             .filter_map(|(i, s)| s.get().is_none().then_some(i))
             .for_each(|i| missing_segments.set(i, true));
 
@@ -323,6 +324,14 @@ impl FrameBuilder {
     }
 }
 
+/// Contains a bitmap of missing segments in a frame.
+/// An `i`-th set bit represents `i`-th missing segment.
+///
+/// The bitmap is most-significant-bit-first ordered and can represent at most 8 missing segments
+/// per frame.
+pub type MissingSegmentsBitmap = BitArr!(for 1, in SeqNum, Msb0);
+pub const NO_MISSING_SEGMENTS: MissingSegmentsBitmap = bitarr![SeqNum, Msb0; 0; SeqNum::BITS as usize];
+
 /// Contains information about a frame that being built.
 /// The instances are totally ordered as most recently used first.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -330,7 +339,7 @@ pub struct FrameInfo {
     /// ID of the frame.
     pub frame_id: FrameId,
     /// Indices of segments that are missing. Empty if the frame is complete.
-    pub missing_segments: BitArr!(for 256),
+    pub missing_segments: MissingSegmentsBitmap,
     /// The total number of segments in this frame.
     pub total_segments: SeqNum,
     /// Time of the last received segment in this frame.
@@ -569,7 +578,7 @@ impl FrameReassembler {
             .filter_map(|frame_id| match self.sequences.get(&frame_id) {
                 Some(e) => (!e.is_complete()).then(|| e.info()),
                 None => Some({
-                    let mut missing_segments = BitArray::ZERO;
+                    let mut missing_segments = NO_MISSING_SEGMENTS;
                     missing_segments.set(0, true);
                     FrameInfo {
                         frame_id,
@@ -700,7 +709,7 @@ pub(crate) mod tests {
 
     const MTU: usize = 448;
     const FRAME_COUNT: u32 = 65_535;
-    const FRAME_SIZE: usize = 4096;
+    const FRAME_SIZE: usize = 3072;
     const MIXING_FACTOR: f64 = 4.0;
 
     lazy_static! {

@@ -56,6 +56,8 @@ use std::{
     mem,
 };
 
+use bitvec::field::BitField;
+
 use crate::{
     errors::NetworkTypeError,
     session::{
@@ -76,7 +78,7 @@ impl<const C: usize> SegmentRequest<C> {
     /// Maximum number of segment retransmission entries.
     pub const MAX_ENTRIES: usize = Self::SIZE / Self::ENTRY_SIZE;
     /// Maximum number of missing segments per frame.
-    pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = mem::size_of::<SeqNum>() * 8;
+    pub const MAX_MISSING_SEGMENTS_PER_FRAME: usize = SeqNum::BITS as usize;
     pub const SIZE: usize = C - SessionMessage::<C>::HEADER_SIZE;
 
     /// Returns the number of segments to retransmit.
@@ -94,34 +96,23 @@ impl<const C: usize> SegmentRequest<C> {
     }
 }
 
-/// Iterator over [`SegmentId`] in [`SegmentRequest`].
-pub struct SegmentIdIter(Vec<SegmentId>);
-
-impl Iterator for SegmentIdIter {
-    type Item = SegmentId;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.pop()
-    }
-}
-
 impl<const C: usize> IntoIterator for SegmentRequest<C> {
-    type IntoIter = SegmentIdIter;
+    type IntoIter = std::vec::IntoIter<SegmentId>;
     type Item = SegmentId;
 
     fn into_iter(self) -> Self::IntoIter {
         let seq_size = mem::size_of::<SeqNum>() * 8;
-        let mut ret = SegmentIdIter(Vec::with_capacity(seq_size * 8 * self.0.len()));
-        for (frame_id, missing) in self.0 {
-            for i in (0..seq_size).rev() {
-                let mask = (1 << i) as SeqNum;
+        let mut ret = Vec::with_capacity(seq_size * 8 * self.0.len());
+        for (frame_id, missing) in self.0.into_iter().rev() {
+            for i in 0..seq_size {
+                let mask = (1 << (seq_size - i - 1)) as SeqNum;
                 if (mask & missing) != 0 {
-                    ret.0.push(SegmentId(frame_id, i as SeqNum));
+                    ret.push(SegmentId(frame_id, i as SeqNum));
                 }
             }
         }
-        ret.0.shrink_to_fit();
-        ret
+        ret.shrink_to_fit();
+        ret.into_iter()
     }
 }
 
@@ -130,12 +121,7 @@ impl<const C: usize> FromIterator<FrameInfo> for SegmentRequest<C> {
         let mut ret = Self::default();
         for frame in iter.into_iter().take(Self::MAX_ENTRIES) {
             let frame_id = frame.frame_id;
-            let missing = frame
-                .iter_missing_sequence_indices()
-                .filter(|s| *s < Self::MAX_MISSING_SEGMENTS_PER_FRAME as SeqNum)
-                .map(|idx| 1 << idx)
-                .fold(SeqNum::default(), |acc, n| acc | n);
-            ret.0.insert(frame_id, missing);
+            ret.0.insert(frame_id, frame.missing_segments.load());
         }
         ret
     }
@@ -479,13 +465,18 @@ impl<const C: usize> std::iter::FusedIterator for SessionMessageIter<'_, C> {}
 mod tests {
     use std::time::SystemTime;
 
-    use bitvec::{array::BitArray, bitarr};
+    use bitvec::bitarr;
     use hex_literal::hex;
     use hopr_platform::time::native::current_time;
     use rand::{Rng, prelude::IteratorRandom, thread_rng};
 
     use super::*;
-    use crate::session::Frame;
+    use crate::session::{
+        Frame,
+        frame::{MissingSegmentsBitmap, NO_MISSING_SEGMENTS},
+    };
+
+    pub const ALL_MISSING_SEGMENTS: MissingSegmentsBitmap = bitarr![SeqNum, bitvec::prelude::Msb0; 1; SeqNum::BITS as usize];
 
     #[test]
     fn ensure_session_protocol_version_1_values() {
@@ -504,7 +495,7 @@ mod tests {
     fn segment_request_should_be_constructible_from_frame_info() {
         let frames = (1..20)
             .map(|i| {
-                let mut missing_segments = BitArray::ZERO;
+                let mut missing_segments = NO_MISSING_SEGMENTS;
                 (0..7_usize)
                     .choose_multiple(&mut thread_rng(), 4)
                     .into_iter()
@@ -559,7 +550,7 @@ mod tests {
         let frame_info = FrameInfo {
             frame_id: 10,
             total_segments: 255,
-            missing_segments: bitarr![1; 256],
+            missing_segments: ALL_MISSING_SEGMENTS,
             last_update: SystemTime::now(),
         };
 
@@ -597,25 +588,31 @@ mod tests {
 
     #[test]
     fn session_message_segment_request_should_yield_correct_bitset_values() {
-        let seg_req = SegmentRequest::<466>([(10, 0b00100100)].into());
+        let seg_req = SegmentRequest::<466>([(10, 0b00101000)].into());
 
         let mut iter = seg_req.into_iter();
         assert_eq!(iter.next(), Some(SegmentId(10, 2)));
-        assert_eq!(iter.next(), Some(SegmentId(10, 5)));
+        assert_eq!(iter.next(), Some(SegmentId(10, 4)));
         assert_eq!(iter.next(), None);
 
         let mut frame_info = FrameInfo {
             frame_id: 10,
-            missing_segments: bitarr![0; 256],
+            missing_segments: NO_MISSING_SEGMENTS,
             total_segments: 10,
             last_update: current_time(),
         };
         frame_info.missing_segments.set(2, true);
-        frame_info.missing_segments.set(5, true);
+        frame_info.missing_segments.set(4, true);
+
+        let mut iter = frame_info.clone().into_missing_segments();
+
+        assert_eq!(iter.next(), Some(SegmentId(10, 2)));
+        assert_eq!(iter.next(), Some(SegmentId(10, 4)));
+        assert_eq!(iter.next(), None);
 
         let mut iter = SegmentRequest::<466>::from_iter(vec![frame_info]).into_iter();
         assert_eq!(iter.next(), Some(SegmentId(10, 2)));
-        assert_eq!(iter.next(), Some(SegmentId(10, 5)));
+        assert_eq!(iter.next(), Some(SegmentId(10, 4)));
         assert_eq!(iter.next(), None);
     }
 
@@ -648,7 +645,7 @@ mod tests {
         let frame_info = FrameInfo {
             frame_id: 10,
             total_segments: 255,
-            missing_segments: bitarr![1; 256],
+            missing_segments: ALL_MISSING_SEGMENTS,
             last_update: SystemTime::now(),
         };
 
