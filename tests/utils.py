@@ -111,12 +111,13 @@ async def check_unredeemed_tickets_value_max(src: Node, value: Decimal):
         current = (await src.api.get_tickets_statistics()).unredeemed_value
 
 
-async def check_unredeemed_tickets_value(src: Node, value: Decimal):
-    current = (await src.api.get_tickets_statistics()).unredeemed_value
+async def check_unredeemed_tickets_value(src: Node, value: Decimal, quantize: Decimal = Decimal("1e-10")):
+    current = Decimal((await src.api.get_tickets_statistics()).unredeemed_value).quantize(quantize)
+    value = value.quantize(quantize)
     while current < value:
         logging.debug(f"Unredeemed tickets value: {current}, wanted min: {value}")
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
-        current = (await src.api.get_tickets_statistics()).unredeemed_value
+        current = Decimal((await src.api.get_tickets_statistics()).unredeemed_value).quantize(quantize)
 
 
 async def check_winning_tickets_count(src: Node, value: int):
