@@ -75,7 +75,7 @@ jobs:
     secrets: inherit
 
   validate-pr-title:
-    name: Validate PR title
+    name: PR / Validate title
     runs-on: self-hosted-hoprnet-small
     permissions:
       pull-requests: read
@@ -90,7 +90,6 @@ jobs:
             feat
             build
             chore
-            ci
             docs
             style
             refactor
@@ -99,6 +98,7 @@ jobs:
           # These are regex patterns auto-wrapped in `^ $`.
           scopes: |
             ci
+            deps
             hoprd
             hopr-lib
             tests
@@ -109,7 +109,7 @@ jobs:
             ignore-semantic-pull-request
 
   label:
-    name: Add PR labels
+    name: PR / Add labels
     runs-on: self-hosted-hoprnet-small
     permissions:
       contents: read
