@@ -2962,6 +2962,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
 
 [[package]]
+name = "flagset"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7ac824320a75a52197e8f2d787f6a38b6718bb6897a35142d749af3c0e8f4fe"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "flate2"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4672,7 +4681,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-crypto-packet"
-version = "0.10.2"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "bimap",
@@ -5215,7 +5224,6 @@ dependencies = [
  "anyhow",
  "async-trait",
  "futures",
- "futures-concurrency",
  "hopr-crypto-packet",
  "hopr-crypto-random",
  "hopr-crypto-types",
@@ -5223,7 +5231,6 @@ dependencies = [
  "hopr-metrics",
  "hopr-platform",
  "hopr-transport-identity",
- "hopr-transport-network",
  "hopr-transport-probe",
  "hopr-transport-protocol",
  "lazy_static",
@@ -5239,7 +5246,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-packet"
-version = "3.0.0"
+version = "3.0.1"
 dependencies = [
  "anyhow",
  "hex",
@@ -5337,13 +5344,14 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "aquamarine",
  "arrayvec",
  "async-trait",
  "bincode",
+ "flagset",
  "futures",
  "futures-time",
  "hopr-async-runtime",
@@ -5361,6 +5369,7 @@ dependencies = [
  "pid",
  "pin-project",
  "serde",
+ "serde_repr",
  "serde_with",
  "smart-default",
  "strum 0.27.1",
@@ -9106,6 +9115,17 @@ checksum = "59fab13f937fa393d08645bf3a84bdfe86e296747b506ada67bb15f10f218b2a"
 dependencies = [
  "itoa",
  "serde",
+]
+
+[[package]]
+name = "serde_repr"
+version = "0.1.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "175ee3e80ae9982737ca543e96133087cbd9a485eecc3bc4de9c1a37b47ea59c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
 ]
 
 [[package]]

@@ -49,7 +49,7 @@ impl<T> Sender<T>
 where
     T: futures::Sink<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)> + Clone + Send + Sync + 'static,
 {
-    #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), err(level = tracing::Level::DEBUG, Display))]
+    #[tracing::instrument(level = "debug", skip(self, path, message), fields(message=%message, nonce=%to_nonce(&message), pseudonym=%to_pseudonym(&path)), ret(level = tracing::Level::TRACE), err(Display))]
     async fn send_message(self, path: ResolvedTransportRouting, message: Message) -> crate::errors::Result<()> {
         let message: ApplicationData = message
             .try_into()
@@ -137,9 +137,12 @@ impl Probe {
                     if matches!(cause, moka::notification::RemovalCause::Expired) {
                         // If the eviction cause is expiration => record as a failed probe
                         let store = store_eviction.clone();
-                        let (peer, _start, _notifier) = v;
+                        let (peer, _start, notifier) = v;
 
                         tracing::debug!(%peer, pseudonym = %k.0, probe = %k.1, reason = "timeout", "probe failed");
+                        if let Some(replier) = notifier {
+                            replier.notify(Err(ProbeError::Timeout(timeout.as_millis() as u64)));
+                        };
                         async move {
                             store
                                 .on_finished(&peer, &Err(ProbeError::Timeout(timeout.as_millis() as u64)))
@@ -195,11 +198,7 @@ impl Probe {
 
                         match result {
                             Ok(ResolvedTransportRouting::Forward { pseudonym, forward_path, return_paths }) => {
-                                let nonce = if let Some(notifier) = &notifier {
-                                    notifier.challenge()
-                                } else {
-                                    NeighborProbe::random_nonce()
-                                };
+                                let nonce = NeighborProbe::random_nonce();
 
                                 let message = Message::Probe(nonce);
                                 let path = ResolvedTransportRouting::Forward { pseudonym, forward_path, return_paths };
@@ -257,7 +256,7 @@ impl Probe {
                                             store.on_finished(&peer, &Ok(latency)).await;
 
                                             if let Some(replier) = replier {
-                                                replier.notify(NeighborProbe::Pong(pong))
+                                                replier.notify(Ok(latency))
                                             };
                                         } else {
                                             tracing::warn!(%pseudonym, nonce = hex::encode(pong), possible_reasons = "[timeout, adversary]", "received pong for unknown probe");
