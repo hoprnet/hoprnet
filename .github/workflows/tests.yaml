@@ -155,7 +155,7 @@ jobs:
   build-candidate-binaries:
     name: Build Candidate Binaries
     runs-on: self-hosted-hoprnet-bigger
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

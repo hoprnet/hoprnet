@@ -120,7 +120,7 @@ pub struct ApplicationData {
 }
 
 impl ApplicationData {
-    pub const PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE - size_of::<Tag>();
+    pub const PAYLOAD_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::PAYLOAD_SIZE - Tag::SIZE;
 
     pub fn new<T: Into<Tag>>(application_tag: T, plain_text: &[u8]) -> Self {
         Self {

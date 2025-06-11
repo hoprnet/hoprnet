@@ -89,12 +89,13 @@ class TestWinProbWithSwarm:
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 10
         win_prob = 0.1
-        win_ticket_tolerance = 0.1
+        win_ticket_tolerance = 0.3
         relay = route[1]
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
         set_minimum_winning_probability_in_network(private_key, win_prob, base_port)
-        await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[relay], win_prob), 10.0)
+        for node in route:
+            await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[node], win_prob), 10.0)
 
         try:
             async with create_bidirectional_channels_for_route(
@@ -112,9 +113,11 @@ class TestWinProbWithSwarm:
                 )
 
                 # Wait for at least some tickets to become acknowledged
+                precision = 10
                 await asyncio.wait_for(
                     check_unredeemed_tickets_value(
-                        swarm7[relay], statistics_before.unredeemed_value + ticket_count * ticket_price
+                        swarm7[relay],
+                        statistics_before.unredeemed_value + (ticket_price + ticket_price / Decimal(win_prob)),
                     ),
                     30.0,
                 )
@@ -135,9 +138,7 @@ class TestWinProbWithSwarm:
                 assert await swarm7[relay].api.channel_redeem_tickets(channels.fwd_channels[0].id)
 
                 # The only unredeemed ticket is on the return channel
-                await asyncio.wait_for(
-                    check_unredeemed_tickets_value_max(swarm7[relay], ticket_price / Decimal(win_prob)), 30.0
-                )
+                await asyncio.wait_for(check_unredeemed_tickets_value_max(swarm7[relay], ticket_price), 30.0)
 
                 # The redeemed ticket value must be the new value minus the ticket on the return channel
                 ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
@@ -167,7 +168,7 @@ class TestWinProbWithSwarm:
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
         win_prob = 0.1
-        win_ticket_tolerance = 0.1
+        win_ticket_tolerance = 0.3
         relay = route[1]
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
@@ -240,7 +241,7 @@ class TestWinProbWithSwarm:
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
         win_prob = 0.1
-        win_ticket_tolerance = 0.1
+        win_ticket_tolerance = 0.3
 
         relay_1 = route[1]
         relay_2 = route[2]

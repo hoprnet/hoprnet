@@ -185,7 +185,7 @@ impl<const C: usize> From<SegmentRequest<C>> for Vec<u8> {
 }
 
 /// Holds the Frame Acknowledgement message.
-/// This carries an ordered set of up to [`FrameAcknowledgements::MAX_ACK_FRAMES`] [frame IDs](FrameId) that have
+/// This carries an ordered set of up to [`FrameAcknowledgements::MAX_ACK_FRAMES`] [frame IDs](FrameId) that has
 /// been acknowledged by the counterparty.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct FrameAcknowledgements<const C: usize>(BTreeSet<FrameId>);

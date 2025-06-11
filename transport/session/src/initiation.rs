@@ -1,10 +1,8 @@
 //! This module defines the Start sub-protocol used for HOPR Session initiation and management.
 
-use std::collections::HashSet;
-
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag, Tag};
 
-use crate::{Capability, errors::TransportSessionError, types::SessionTarget};
+use crate::{Capabilities, errors::TransportSessionError, types::SessionTarget};
 
 /// Challenge that identifies a Start initiation protocol message.
 pub type StartChallenge = u64;
@@ -39,7 +37,7 @@ pub struct StartInitiation {
     /// [Target](SessionTarget) of the session, i.e., what should the other party do with the traffic.
     pub target: SessionTarget,
     /// Capabilities of the session.
-    pub capabilities: HashSet<Capability>,
+    pub capabilities: Capabilities,
 }
 
 /// Message of the Start protocol that confirms the establishment of a session.
@@ -240,7 +238,7 @@ mod tests {
     use hopr_transport_packet::prelude::Tag;
 
     use super::*;
-    use crate::SessionId;
+    use crate::{Capability, SessionId};
 
     #[cfg(feature = "serde")]
     #[test]
@@ -353,7 +351,7 @@ mod tests {
             target: SessionTarget::TcpStream(SealedHost::Plain(
                 "example-of-a-very-very-long-second-level-name.on-a-very-very-long-domain-name.info:65530".parse()?,
             )),
-            capabilities: HashSet::from_iter([Capability::Retransmission, Capability::Segmentation]),
+            capabilities: Capability::RetransmissionAck | Capability::RetransmissionNack | Capability::Segmentation,
         });
 
         assert!(

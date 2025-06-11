@@ -78,7 +78,7 @@ pub type HoprReplyOpener = (types::HoprSurbId, ReplyOpener);
 /// leaves space for 1460 bytes in the packet payload.
 ///
 /// **DO NOT USE this value for calculations outside of this crate: use `HoprPacket::PAYLOAD_SIZE` instead!**
-pub(crate) const PAYLOAD_SIZE_INT: usize = 1000;
+pub(crate) const PAYLOAD_SIZE_INT: usize = 1021;
 
 #[cfg(test)]
 mod tests {
@@ -96,8 +96,8 @@ mod tests {
         );
 
         assert!(
-            hopr_packet_len < 1492 - 32, // 32 bytes was measured as the libp2p QUIC overhead
-            "HOPR packet {hopr_packet_len} must fit within a layer 4 packet with libp2p overhead"
+            hopr_packet_len <= 1492 - 32, // 32 bytes was measured as the libp2p QUIC overhead
+            "HOPR packet of {hopr_packet_len} bytes must fit within a layer 4 packet with libp2p overhead"
         );
     }
 
