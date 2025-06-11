@@ -103,7 +103,7 @@ impl<const C: usize> IntoIterator for SegmentRequest<C> {
     fn into_iter(self) -> Self::IntoIter {
         let seq_size = mem::size_of::<SeqNum>() * 8;
         let mut ret = Vec::with_capacity(seq_size * 8 * self.0.len());
-        for (frame_id, missing) in self.0.into_iter().rev() {
+        for (frame_id, missing) in self.0 {
             for i in 0..seq_size {
                 let mask = (1 << (seq_size - i - 1)) as SeqNum;
                 if (mask & missing) != 0 {
@@ -476,7 +476,8 @@ mod tests {
         frame::{MissingSegmentsBitmap, NO_MISSING_SEGMENTS},
     };
 
-    pub const ALL_MISSING_SEGMENTS: MissingSegmentsBitmap = bitarr![SeqNum, bitvec::prelude::Msb0; 1; SeqNum::BITS as usize];
+    pub const ALL_MISSING_SEGMENTS: MissingSegmentsBitmap =
+        bitarr![SeqNum, bitvec::prelude::Msb0; 1; SeqNum::BITS as usize];
 
     #[test]
     fn ensure_session_protocol_version_1_values() {
@@ -588,9 +589,11 @@ mod tests {
 
     #[test]
     fn session_message_segment_request_should_yield_correct_bitset_values() {
-        let seg_req = SegmentRequest::<466>([(10, 0b00101000)].into());
+        let seg_req = SegmentRequest::<466>([(3, 0b01000001), (10, 0b00101000)].into());
 
         let mut iter = seg_req.into_iter();
+        assert_eq!(iter.next(), Some(SegmentId(3, 1)));
+        assert_eq!(iter.next(), Some(SegmentId(3, 7)));
         assert_eq!(iter.next(), Some(SegmentId(10, 2)));
         assert_eq!(iter.next(), Some(SegmentId(10, 4)));
         assert_eq!(iter.next(), None);
