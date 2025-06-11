@@ -680,6 +680,17 @@ impl Hopr {
             ))));
         }
 
+        // set safe and module addresses in the DB
+        self.db
+            .set_safe_info(
+                None,
+                SafeInfo {
+                    safe_address: self.cfg.safe_module.safe_address,
+                    module_address: self.cfg.safe_module.module_address,
+                },
+            )
+            .await?;
+
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
         let (indexer_peer_update_tx, indexer_peer_update_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
@@ -786,16 +797,6 @@ impl Hopr {
                 error!(error = %e, "Failed to register node with safe")
             }
         }
-
-        self.db
-            .set_safe_info(
-                None,
-                SafeInfo {
-                    safe_address: self.cfg.safe_module.safe_address,
-                    module_address: self.cfg.safe_module.module_address,
-                },
-            )
-            .await?;
 
         if self.is_public() {
             // At this point the node is already registered with Safe, so
