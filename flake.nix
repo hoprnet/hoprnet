@@ -597,8 +597,16 @@
           pre-commit-check = pre-commit.lib.${system}.run {
             src = ./.;
             hooks = {
+              # https://github.com/cachix/git-hooks.nix
               treefmt.enable = false;
               treefmt.package = config.treefmt.build.wrapper;
+              check-executables-have-shebangs.enable = true;
+              check-shebang-scripts-are-executable.enable = true;
+              check-case-conflicts.enable = true;
+              check-symlinks.enable = true;
+              check-merge-conflicts.enable = true;
+              check-added-large-files.enable = true;
+              commitizen.enable = true;
               immutable-files = {
                 enable = false;
                 name = "Immutable files - the files should not change";
