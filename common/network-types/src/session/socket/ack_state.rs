@@ -583,7 +583,7 @@ mod tests {
 
     #[parameterized::parameterized(num_frames = { 1, 2, 3 })]
     #[parameterized_macro(test_log::test(tokio::test))]
-    async fn ack_state_receiver_must_resend_unacknowledged_frame(num_frames: usize) -> anyhow::Result<()> {
+    async fn ack_state_sender_must_resend_unacknowledged_frames(num_frames: usize) -> anyhow::Result<()> {
         const FRAME_SIZE: usize = 1500;
         const NUM_RETRIES: usize = 2;
 
@@ -644,7 +644,7 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
-    async fn ack_state_receiver_must_not_resend_unacknowledged_frame_when_full_resend_disabled() -> anyhow::Result<()> {
+    async fn ack_state_sender_must_not_resend_unacknowledged_frame_when_full_resend_disabled() -> anyhow::Result<()> {
         const FRAME_SIZE: usize = 1500;
         const NUM_RETRIES: usize = 2;
 
@@ -800,7 +800,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ack_state_receiver_must_not_request_missing_frames_when_partial_acks_are_not_enabled() -> anyhow::Result<()>
+    async fn ack_state_receiver_must_not_request_missing_frames_when_partial_acks_are_disabled() -> anyhow::Result<()>
     {
         const FRAME_SIZE: usize = 1500;
 
