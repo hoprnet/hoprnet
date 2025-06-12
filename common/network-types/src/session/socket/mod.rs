@@ -277,10 +277,12 @@ mod tests {
     use std::collections::HashSet;
 
     use futures::{AsyncReadExt, AsyncWriteExt};
-    use crate::prelude::AcknowledgementState;
-    use crate::session::AcknowledgementStateConfig;
+
     use super::*;
-    use crate::session::utils::test::*;
+    use crate::{
+        prelude::AcknowledgementState,
+        session::{AcknowledgementStateConfig, utils::test::*},
+    };
 
     const MTU: usize = 466;
 
@@ -318,8 +320,10 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
+        let mut alice_socket =
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+        let mut bob_socket =
+            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
@@ -372,8 +376,10 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
+        let mut alice_socket =
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+        let mut bob_socket =
+            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&alice_sent_data).await?;
@@ -435,8 +441,10 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
+        let mut alice_socket =
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+        let mut bob_socket =
+            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&data).await?;
@@ -501,8 +509,10 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
+        let mut alice_socket =
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+        let mut bob_socket =
+            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&alice_sent_data).await?;
@@ -586,7 +596,8 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+        let mut alice_socket =
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
@@ -684,7 +695,8 @@ mod tests {
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), alice_cfg)?;
+        let mut alice_socket =
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), alice_cfg)?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
