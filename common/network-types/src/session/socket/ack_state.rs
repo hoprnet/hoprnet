@@ -62,8 +62,8 @@ pub struct AcknowledgementStateConfig {
 
     /// The expected (average) latency of a packet (= single frame segment).
     ///
-    /// Default is 200 ms
-    #[default(Duration::from_millis(200))]
+    /// Default is 20 ms
+    #[default(Duration::from_millis(20))]
     pub expected_packet_latency: Duration,
 
     /// Backoff base applied for segment or frame retransmissions.
@@ -424,7 +424,12 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 false
             }
         });
-        tracing::trace!(count = segments.len(), "found matching segments to be retransmitted");
+
+        tracing::trace!(
+            found = segments.len(),
+            requested = missing_frame_ids.len(),
+            "found matching segments to be retransmitted"
+        );
 
         // Partially acknowledged frames will not need to be fully resent in the future.
         // Cancel all partially acknowledged frame resends.

@@ -277,7 +277,8 @@ mod tests {
     use std::collections::HashSet;
 
     use futures::{AsyncReadExt, AsyncWriteExt};
-
+    use crate::prelude::AcknowledgementState;
+    use crate::session::AcknowledgementStateConfig;
     use super::*;
     use crate::session::utils::test::*;
 
@@ -308,11 +309,71 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    async fn stateful_socket_unidirectional_should_work() -> anyhow::Result<()> {
+        let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+
+        let ack_cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(2),
+            acknowledgement_delay: Duration::from_millis(5),
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
+
+        let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+
+        alice_socket.write_all(&data).await?;
+        alice_socket.flush().await?;
+
+        let mut bob_data = [0u8; DATA_SIZE];
+        bob_socket.read_exact(&mut bob_data).await?;
+        assert_eq!(data, bob_data);
+
+        alice_socket.close().await?;
+        bob_socket.close().await?;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
     async fn stateless_socket_bidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
 
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, Default::default())?;
+
+        let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket.flush().await?;
+
+        let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        bob_socket.write_all(&bob_sent_data).await?;
+        bob_socket.flush().await?;
+
+        let mut bob_recv_data = [0u8; DATA_SIZE];
+        bob_socket.read_exact(&mut bob_recv_data).await?;
+        assert_eq!(alice_sent_data, bob_recv_data);
+
+        let mut alice_recv_data = [0u8; DATA_SIZE];
+        alice_socket.read_exact(&mut alice_recv_data).await?;
+        assert_eq!(bob_sent_data, alice_recv_data);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stateful_socket_bidirectional_should_work() -> anyhow::Result<()> {
+        let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
+
+        let ack_cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(2),
+            acknowledgement_delay: Duration::from_millis(5),
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&alice_sent_data).await?;
@@ -360,6 +421,38 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    async fn stateful_socket_unidirectional_should_work_with_mixing() -> anyhow::Result<()> {
+        let network_cfg = FaultyNetworkConfig {
+            mixing_factor: 10,
+            ..Default::default()
+        };
+
+        let (alice, bob) = setup_alice_bob::<MTU>(network_cfg, None, None);
+
+        let ack_cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(2),
+            acknowledgement_delay: Duration::from_millis(5),
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
+
+        let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        alice_socket.write_all(&data).await?;
+        alice_socket.flush().await?;
+
+        let mut bob_recv_data = [0u8; DATA_SIZE];
+        bob_socket.read_exact(&mut bob_recv_data).await?;
+        assert_eq!(data, bob_recv_data);
+
+        alice_socket.close().await?;
+        bob_socket.close().await?;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
     async fn stateless_socket_bidirectional_should_work_with_mixing() -> anyhow::Result<()> {
         let network_cfg = FaultyNetworkConfig {
             mixing_factor: 10,
@@ -370,6 +463,46 @@ mod tests {
 
         let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, Default::default())?;
+
+        let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket.flush().await?;
+
+        let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        bob_socket.write_all(&bob_sent_data).await?;
+        bob_socket.flush().await?;
+
+        let mut bob_recv_data = [0u8; DATA_SIZE];
+        bob_socket.read_exact(&mut bob_recv_data).await?;
+        assert_eq!(alice_sent_data, bob_recv_data);
+
+        let mut alice_recv_data = [0u8; DATA_SIZE];
+        alice_socket.read_exact(&mut alice_recv_data).await?;
+        assert_eq!(bob_sent_data, alice_recv_data);
+
+        alice_socket.close().await?;
+        bob_socket.close().await?;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stateful_socket_bidirectional_should_work_with_mixing() -> anyhow::Result<()> {
+        let network_cfg = FaultyNetworkConfig {
+            mixing_factor: 10,
+            ..Default::default()
+        };
+
+        let (alice, bob) = setup_alice_bob::<MTU>(network_cfg, None, None);
+
+        let ack_cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(2),
+            acknowledgement_delay: Duration::from_millis(5),
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&alice_sent_data).await?;
@@ -431,6 +564,48 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
+    async fn stateful_socket_unidirectional_should_should_not_skip_missing_frames() -> anyhow::Result<()> {
+        let (alice, bob) = setup_alice_bob::<MTU>(
+            FaultyNetworkConfig {
+                avg_delay: Duration::from_millis(10),
+                ids_to_drop: HashSet::from_iter([0_usize]),
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+
+        let bob_cfg = SessionSocketConfig {
+            frame_timeout: Duration::from_millis(1000),
+            ..Default::default()
+        };
+
+        let ack_cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(10),
+            acknowledgement_delay: Duration::from_millis(40),
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
+
+        let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        alice_socket.write_all(&data).await?;
+        alice_socket.flush().await?;
+
+        tracing::warn!("---------- sending done ----------");
+
+        let mut bob_data = [0u8; DATA_SIZE];
+        bob_socket.read_exact(&mut bob_data).await?;
+        assert_eq!(data, bob_data);
+
+        bob_socket.close().await?;
+        alice_socket.close().await?;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
     async fn stateless_socket_bidirectional_should_should_skip_missing_frames() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(
             FaultyNetworkConfig {
@@ -477,6 +652,59 @@ mod tests {
 
         assert_eq!(alice_sent_data.len() - 1500, bob_recv_data.len());
         assert_eq!(&alice_sent_data[1500..], &bob_recv_data);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn stateful_socket_bidirectional_should_should_not_skip_missing_frames() -> anyhow::Result<()> {
+        let (alice, bob) = setup_alice_bob::<MTU>(
+            FaultyNetworkConfig {
+                avg_delay: Duration::from_millis(10),
+                ids_to_drop: HashSet::from_iter([0_usize]),
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+
+        let alice_cfg = SessionSocketConfig {
+            frame_timeout: Duration::from_millis(1000),
+            ..Default::default()
+        };
+
+        let bob_cfg = SessionSocketConfig {
+            frame_timeout: Duration::from_millis(1000),
+            ..Default::default()
+        };
+
+        let ack_cfg = AcknowledgementStateConfig {
+            expected_packet_latency: Duration::from_millis(10),
+            acknowledgement_delay: Duration::from_millis(40),
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), alice_cfg)?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
+
+        let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket.flush().await?;
+
+        let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        bob_socket.write_all(&bob_sent_data).await?;
+        bob_socket.flush().await?;
+
+        let mut bob_recv_data = [0u8; DATA_SIZE];
+        bob_socket.read_exact(&mut bob_recv_data).await?;
+        assert_eq!(alice_sent_data, bob_recv_data);
+
+        let mut alice_recv_data = [0u8; DATA_SIZE];
+        alice_socket.read_exact(&mut alice_recv_data).await?;
+        assert_eq!(bob_sent_data, alice_recv_data);
+
+        alice_socket.close().await?;
+        bob_socket.close().await?;
 
         Ok(())
     }
