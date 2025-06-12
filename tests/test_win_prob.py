@@ -97,6 +97,18 @@ class TestWinProbWithSwarm:
         for node in route:
             await asyncio.wait_for(check_min_incoming_win_prob_eq(swarm7[node], win_prob), 10.0)
 
+        # Situation:
+        #
+        # Session: A -> B -> C
+        # A sends 10 messages to C
+        # A has win prob 0.1 on tickets, everyone else has 1.0
+        #
+        # So B (relay) should get:
+        #  - 12 tickets (1 session establish + 10 messages + 1 session closure) from A with win prob 0.1.
+        #  - 1 ticket (session establishment confirmation) from C with win prob 1
+        #
+        # Average B should have 0.1 * 12 + 1 = 2.2 winning tickets
+
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
@@ -113,11 +125,11 @@ class TestWinProbWithSwarm:
                 )
 
                 # Wait for at least some tickets to become acknowledged
-                precision = 10
+                # The only certain ticket here is the one from C
                 await asyncio.wait_for(
                     check_unredeemed_tickets_value(
                         swarm7[relay],
-                        statistics_before.unredeemed_value + (ticket_price + ticket_price / Decimal(win_prob)),
+                        statistics_before.unredeemed_value + ticket_price,
                     ),
                     30.0,
                 )
@@ -128,10 +140,9 @@ class TestWinProbWithSwarm:
                 winning_count = ticket_statistics.winning_count - statistics_before.winning_count
                 assert new_tickets_value > 0
 
-                # ticket_count + 1 tickets are sent with win_prob < 1, and one is sent with win_prob = 1
-                # due to the session establishment from the Exit.
-                assert abs((winning_count - 1) - (ticket_count + 1) * win_prob) <= win_ticket_tolerance * (
-                    ticket_count + 1
+                # ticket_count + 2 tickets are sent with win_prob < 1 (A), and one is sent with win_prob = 1 (C)
+                assert abs((winning_count - 1) - (ticket_count + 2) * win_prob) <= win_ticket_tolerance * (
+                    ticket_count + 2
                 )
 
                 # Redeem only on the channel incoming from the Entry
