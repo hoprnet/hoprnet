@@ -317,6 +317,7 @@ pub(crate) trait FrameMapVacantEntry {
     fn insert_builder(self, value: FrameBuilder);
 }
 
+#[derive(strum::EnumTryAs)]
 pub(crate) enum FrameMapEntry<O: FrameMapOccupiedEntry, V: FrameMapVacantEntry> {
     Occupied(O),
     Vacant(V),

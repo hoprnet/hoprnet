@@ -285,9 +285,9 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         let ack_delay = self.cfg.acknowledgement_delay;
         hopr_async_runtime::prelude::spawn(
             ack_rx
-                //.ready_chunks(FrameAcknowledgements::<C>::MAX_ACK_FRAMES)
                 .buffer(futures_time::time::Duration::from(ack_delay))
                 .flat_map(|acks| futures::stream::iter(FrameAcknowledgements::<C>::new_multiple(acks)))
+                .filter(|acks| futures::future::ready(!acks.is_empty()))
                 .map(|acks| Ok(SessionMessage::<C>::Acknowledge(acks)))
                 .forward(ctl_tx_clone)
                 .map(move |res| match res {
@@ -516,6 +516,7 @@ mod tests {
         frames::{FrameDashMap, FrameMap},
         processing::segment,
     };
+    use crate::session::frames::FrameBuilder;
 
     const MTU: usize = 1000;
 
@@ -546,15 +547,14 @@ mod tests {
 
         state.stop()?;
 
-        let ctl_msg = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
+        let ctl_msgs = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
             .await
-            .context("timeout receiving Control message")?
-            .first()
-            .cloned()
-            .ok_or(anyhow::anyhow!("must have received a Control message"))?;
+            .context("timeout receiving Control messages")?;
+
+        assert_eq!(1, ctl_msgs.len());
 
         assert_eq!(
-            ctl_msg,
+            ctl_msgs[0],
             SessionMessage::Acknowledge(acked_frame_ids.to_vec().try_into()?)
         );
 
@@ -683,17 +683,240 @@ mod tests {
 
     #[tokio::test]
     async fn ack_state_receiver_must_request_missing_frames_when_partial_acks_are_enabled() -> anyhow::Result<()> {
+        const FRAME_SIZE: usize = 1500;
+
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Partial,
+            expected_packet_latency: Duration::from_millis(2),
+            max_incoming_frame_retries: 1,
+            ..Default::default()
+        };
+
+        let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+
+        let segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
+
+        inspector.0
+            .entry(1)
+            .try_as_vacant()
+            .ok_or(anyhow::anyhow!("frame 1 must be vacant"))?
+            .insert(FrameBuilder::from(segments[0].clone()));
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        state.incoming_segment(&segments[0].id(), segments.len() as SeqNum)?;
+
+        tokio::time::sleep(cfg.expected_packet_latency * 2).await;
+
+        state.stop()?;
+
+        let ctl_msgs = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
+            .await
+            .context("timeout receiving Control messages")?;
+
+        assert_eq!(1, ctl_msgs.len());
+        assert_eq!(
+            ctl_msgs[0],
+            SessionMessage::Request(SegmentRequest::from_iter([(1, [0b01000000].into())]))
+        );
+
         Ok(())
     }
 
     #[tokio::test]
     async fn ack_state_receiver_must_not_request_missing_frames_when_partial_acks_are_not_enabled() -> anyhow::Result<()> {
+        const FRAME_SIZE: usize = 1500;
+
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Full,
+            expected_packet_latency: Duration::from_millis(2),
+            max_incoming_frame_retries: 1,
+            ..Default::default()
+        };
+
+        let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+
+        let segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
+
+        inspector.0
+            .entry(1)
+            .try_as_vacant()
+            .ok_or(anyhow::anyhow!("frame 1 must be vacant"))?
+            .insert(FrameBuilder::from(segments[0].clone()));
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        state.incoming_segment(&segments[0].id(), segments.len() as SeqNum)?;
+
+        tokio::time::sleep(cfg.expected_packet_latency * 2).await;
+
+        state.stop()?;
+
+        let ctl_msgs = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
+            .await
+            .context("timeout receiving Control messages")?;
+
+        assert!(ctl_msgs.iter().all(|m| !matches!(m, SessionMessage::Request(_))));
+
         Ok(())
     }
 
     #[tokio::test]
     async fn ack_state_receiver_must_continue_requesting_missing_frames_when_frame_not_completed() -> anyhow::Result<()>
     {
+        const FRAME_SIZE: usize = 1500;
+
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Partial,
+            expected_packet_latency: Duration::from_millis(2),
+            max_incoming_frame_retries: 3,
+            ..Default::default()
+        };
+
+        let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+
+        let segments = segment(hopr_crypto_random::random_bytes::<{2 * FRAME_SIZE}>(), MTU, 1)?;
+
+        inspector.0
+            .entry(1)
+            .try_as_vacant()
+            .ok_or(anyhow::anyhow!("frame 1 must be vacant"))?
+            .insert(FrameBuilder::from(segments[0].clone()));
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.clone().into(),
+            ctl_tx,
+        })?;
+
+        state.incoming_segment(&segments[0].id(), segments.len() as SeqNum)?;
+
+        tokio::time::sleep(cfg.expected_packet_latency * 2).await;
+
+        inspector.0
+            .entry(1)
+            .try_as_occupied()
+            .ok_or(anyhow::anyhow!("frame 1 must be occupied"))?
+            .get_mut()
+            .add_segment(segments[1].clone())?;
+
+        state.incoming_segment(&segments[1].id(), segments.len() as SeqNum)?;
+
+        tokio::time::sleep(cfg.expected_packet_latency * 2).await;
+
+        state.stop()?;
+
+        let ctl_msgs = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
+            .await
+            .context("timeout receiving Control messages")?;
+
+        assert_eq!(2, ctl_msgs.len());
+        assert_eq!(
+            ctl_msgs[0],
+            SessionMessage::Request(SegmentRequest::from_iter([(1, [0b01100000].into())]))
+        );
+
+        assert_eq!(
+            ctl_msgs[1],
+            SessionMessage::Request(SegmentRequest::from_iter([(1, [0b00100000].into())]))
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn ack_state_receiver_must_continue_requesting_missing_frames_and_acknowledge_once_complete() -> anyhow::Result<()>
+    {
+        const FRAME_SIZE: usize = 1500;
+
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Partial,
+            expected_packet_latency: Duration::from_millis(2),
+            max_incoming_frame_retries: 3,
+            acknowledgement_delay: Duration::from_millis(5),
+            ..Default::default()
+        };
+
+        let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+
+        let segments = segment(hopr_crypto_random::random_bytes::<{2 * FRAME_SIZE}>(), MTU, 1)?;
+
+        // Segment 1
+        inspector.0
+            .entry(1)
+            .try_as_vacant()
+            .ok_or(anyhow::anyhow!("frame 1 must be vacant"))?
+            .insert(FrameBuilder::from(segments[0].clone()));
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.clone().into(),
+            ctl_tx,
+        })?;
+
+        // Segment 2
+        state.incoming_segment(&segments[0].id(), segments.len() as SeqNum)?;
+
+        tokio::time::sleep(cfg.expected_packet_latency * 2).await;
+
+        inspector.0
+            .entry(1)
+            .try_as_occupied()
+            .ok_or(anyhow::anyhow!("frame 1 must be occupied"))?
+            .get_mut()
+            .add_segment(segments[1].clone())?;
+
+        state.incoming_segment(&segments[1].id(), segments.len() as SeqNum)?;
+
+        tokio::time::sleep(cfg.expected_packet_latency * 2).await;
+
+        // Segment 3
+        inspector.0
+            .entry(1)
+            .try_as_occupied()
+            .ok_or(anyhow::anyhow!("frame 1 must be occupied"))?
+            .get_mut()
+            .add_segment(segments[2].clone())?;
+
+        state.incoming_segment(&segments[2].id(), segments.len() as SeqNum)?;
+        state.frame_received(1)?;
+
+        tokio::time::sleep(cfg.acknowledgement_delay * 2).await;
+
+        state.stop()?;
+
+        let ctl_msgs = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
+            .await
+            .context("timeout receiving Control messages")?;
+
+        assert_eq!(3, ctl_msgs.len());
+        assert_eq!(
+            ctl_msgs[0],
+            SessionMessage::Request(SegmentRequest::from_iter([(1, [0b01100000].into())]))
+        );
+
+        assert_eq!(
+            ctl_msgs[1],
+            SessionMessage::Request(SegmentRequest::from_iter([(1, [0b00100000].into())]))
+        );
+
+        assert_eq!(
+            ctl_msgs[2],
+            SessionMessage::Acknowledge(vec![1].try_into()?)
+        );
+
         Ok(())
     }
 }
