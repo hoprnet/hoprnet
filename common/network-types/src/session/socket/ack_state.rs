@@ -89,6 +89,27 @@ pub struct AcknowledgementStateConfig {
     /// Default is 50 ms
     #[default(Duration::from_millis(50))]
     pub acknowledgement_delay: Duration,
+
+    /// Number of segments to hold back for retransmission upon other party's request.
+    /// Minimum is 1024.
+    ///
+    /// Default is 16 384.
+    #[default(16384)]
+    pub lookbehind_segments: usize,
+}
+
+impl AcknowledgementStateConfig {
+    fn normalize(self) -> AcknowledgementStateConfig {
+        Self {
+            mode: self.mode,
+            expected_packet_latency: self.expected_packet_latency.max(Duration::from_millis(1)),
+            backoff_base: self.backoff_base.max(1.0),
+            max_incoming_frame_retries: self.max_incoming_frame_retries,
+            max_outgoing_frame_retries: self.max_outgoing_frame_retries,
+            acknowledgement_delay: self.acknowledgement_delay.max(Duration::from_millis(1)),
+            lookbehind_segments: self.lookbehind_segments.max(1024),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -202,7 +223,7 @@ impl<const C: usize> AcknowledgementState<C> {
     pub fn new<I: std::fmt::Display>(session_id: I, cfg: AcknowledgementStateConfig) -> Self {
         Self {
             id: session_id.to_string(),
-            cfg,
+            cfg: cfg.normalize(),
             context: Default::default(),
         }
     }
@@ -221,7 +242,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
 
         let (incoming_frame_retries_tx, incoming_frame_retries_rx) = skip_delay_channel();
         let (outgoing_frame_retries_tx, outgoing_frame_retries_rx) = skip_delay_channel();
-        let (rb_tx, rb_rx) = searchable_ringbuffer(1024);
+        let (rb_tx, rb_rx) = searchable_ringbuffer(self.cfg.lookbehind_segments);
 
         // Full frame acknowledgements get a special channel with fixed capacity
         let (ack_tx, ack_rx) = futures::channel::mpsc::channel(200_000);
@@ -513,10 +534,9 @@ mod tests {
 
     use super::*;
     use crate::session::{
-        frames::{FrameDashMap, FrameMap},
+        frames::{FrameBuilder, FrameDashMap, FrameMap},
         processing::segment,
     };
-    use crate::session::frames::FrameBuilder;
 
     const MTU: usize = 1000;
 
@@ -561,13 +581,75 @@ mod tests {
         Ok(())
     }
 
-    #[test_log::test(tokio::test)]
-    async fn ack_state_receiver_must_resend_unacknowledged_frame() -> anyhow::Result<()> {
+    #[parameterized::parameterized(num_frames = { 1, 2, 3 })]
+    #[parameterized_macro(test_log::test(tokio::test))]
+    async fn ack_state_receiver_must_resend_unacknowledged_frame(num_frames: usize) -> anyhow::Result<()> {
         const FRAME_SIZE: usize = 1500;
         const NUM_RETRIES: usize = 2;
 
         let cfg = AcknowledgementStateConfig {
             mode: AcknowledgementMode::Full,
+            expected_packet_latency: Duration::from_millis(2),
+            max_outgoing_frame_retries: NUM_RETRIES,
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let mut expected_frame_segments = Vec::new();
+        let num_segments_in_frame = FRAME_SIZE / MTU + 1;
+        for i in 1..=num_frames {
+            let expected_segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, i as FrameId)?;
+            for segment in &expected_segments {
+                state.segment_sent(segment)?;
+            }
+            expected_frame_segments.push(expected_segments);
+        }
+
+        let expected_frame_delivery = cfg.expected_packet_latency * (num_segments_in_frame + 1) as u32;
+        tokio::time::sleep(2 * expected_frame_delivery).await;
+        state.stop()?;
+
+        let ctl_msg = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
+            .await
+            .context("timeout receiving Control message")?;
+
+        let retransmitted_segments = ctl_msg
+            .into_iter()
+            .map(|m| m.try_as_segment().ok_or(anyhow::anyhow!("must be segment")))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        assert_eq!(
+            NUM_RETRIES * num_segments_in_frame * num_frames,
+            retransmitted_segments.len()
+        );
+
+        let total_segments = expected_frame_segments.iter().map(|m| m.len()).sum::<usize>();
+        let expected_segments = expected_frame_segments
+            .into_iter()
+            .flatten()
+            .cycle()
+            .take(total_segments * NUM_RETRIES)
+            .collect::<Vec<_>>();
+        assert_eq!(expected_segments, retransmitted_segments);
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_receiver_must_not_resend_unacknowledged_frame_when_full_resend_disabled() -> anyhow::Result<()> {
+        const FRAME_SIZE: usize = 1500;
+        const NUM_RETRIES: usize = 2;
+
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Partial,
             expected_packet_latency: Duration::from_millis(2),
             max_outgoing_frame_retries: NUM_RETRIES,
             ..Default::default()
@@ -591,20 +673,8 @@ mod tests {
         tokio::time::sleep(2 * expected_frame_delivery).await;
         state.stop()?;
 
-        let ctl_msg = tokio::time::timeout(Duration::from_millis(100), ctl_rx.collect::<Vec<_>>())
-            .await
-            .context("timeout receiving Control message")?;
-
-        let retransmitted_segments = ctl_msg
-            .into_iter()
-            .map(|m| m.try_as_segment().ok_or(anyhow::anyhow!("must be segment")))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        assert_eq!(NUM_RETRIES * expected_segments.len(), retransmitted_segments.len());
-
-        let len = expected_segments.len();
-        let expected_segments = expected_segments.into_iter().cycle().take(NUM_RETRIES*len).collect::<Vec<_>>();
-        assert_eq!(expected_segments, retransmitted_segments);
+        // No retransmission should be sent because it is disabled
+        assert!(ctl_rx.collect::<Vec<_>>().await.is_empty());
 
         Ok(())
     }
@@ -697,7 +767,8 @@ mod tests {
 
         let segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
 
-        inspector.0
+        inspector
+            .0
             .entry(1)
             .try_as_vacant()
             .ok_or(anyhow::anyhow!("frame 1 must be vacant"))?
@@ -729,7 +800,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ack_state_receiver_must_not_request_missing_frames_when_partial_acks_are_not_enabled() -> anyhow::Result<()> {
+    async fn ack_state_receiver_must_not_request_missing_frames_when_partial_acks_are_not_enabled() -> anyhow::Result<()>
+    {
         const FRAME_SIZE: usize = 1500;
 
         let cfg = AcknowledgementStateConfig {
@@ -744,7 +816,8 @@ mod tests {
 
         let segments = segment(hopr_crypto_random::random_bytes::<FRAME_SIZE>(), MTU, 1)?;
 
-        inspector.0
+        inspector
+            .0
             .entry(1)
             .try_as_vacant()
             .ok_or(anyhow::anyhow!("frame 1 must be vacant"))?
@@ -786,9 +859,10 @@ mod tests {
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
 
-        let segments = segment(hopr_crypto_random::random_bytes::<{2 * FRAME_SIZE}>(), MTU, 1)?;
+        let segments = segment(hopr_crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(), MTU, 1)?;
 
-        inspector.0
+        inspector
+            .0
             .entry(1)
             .try_as_vacant()
             .ok_or(anyhow::anyhow!("frame 1 must be vacant"))?
@@ -804,7 +878,8 @@ mod tests {
 
         tokio::time::sleep(cfg.expected_packet_latency * 2).await;
 
-        inspector.0
+        inspector
+            .0
             .entry(1)
             .try_as_occupied()
             .ok_or(anyhow::anyhow!("frame 1 must be occupied"))?
@@ -836,8 +911,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ack_state_receiver_must_continue_requesting_missing_frames_and_acknowledge_once_complete() -> anyhow::Result<()>
-    {
+    async fn ack_state_receiver_must_continue_requesting_missing_frames_and_acknowledge_once_complete()
+    -> anyhow::Result<()> {
         const FRAME_SIZE: usize = 1500;
 
         let cfg = AcknowledgementStateConfig {
@@ -851,10 +926,11 @@ mod tests {
         let mut inspector = FrameInspector(FrameDashMap::with_capacity(10));
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
 
-        let segments = segment(hopr_crypto_random::random_bytes::<{2 * FRAME_SIZE}>(), MTU, 1)?;
+        let segments = segment(hopr_crypto_random::random_bytes::<{ 2 * FRAME_SIZE }>(), MTU, 1)?;
 
         // Segment 1
-        inspector.0
+        inspector
+            .0
             .entry(1)
             .try_as_vacant()
             .ok_or(anyhow::anyhow!("frame 1 must be vacant"))?
@@ -871,7 +947,8 @@ mod tests {
 
         tokio::time::sleep(cfg.expected_packet_latency * 2).await;
 
-        inspector.0
+        inspector
+            .0
             .entry(1)
             .try_as_occupied()
             .ok_or(anyhow::anyhow!("frame 1 must be occupied"))?
@@ -883,7 +960,8 @@ mod tests {
         tokio::time::sleep(cfg.expected_packet_latency * 2).await;
 
         // Segment 3
-        inspector.0
+        inspector
+            .0
             .entry(1)
             .try_as_occupied()
             .ok_or(anyhow::anyhow!("frame 1 must be occupied"))?
@@ -912,10 +990,7 @@ mod tests {
             SessionMessage::Request(SegmentRequest::from_iter([(1, [0b00100000].into())]))
         );
 
-        assert_eq!(
-            ctl_msgs[2],
-            SessionMessage::Acknowledge(vec![1].try_into()?)
-        );
+        assert_eq!(ctl_msgs[2], SessionMessage::Acknowledge(vec![1].try_into()?));
 
         Ok(())
     }
