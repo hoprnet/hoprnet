@@ -39,7 +39,7 @@ impl<T> Clone for RingBufferView<T> {
 }
 
 impl<T: Clone> RingBufferView<T> {
-    pub fn find<F: Fn(&T) -> bool>(&self, predicate: F) -> Vec<T> {
+    pub fn find<F: FnMut(&T) -> bool>(&self, mut predicate: F) -> Vec<T> {
         self.0.lock().iter().filter(|item| predicate(item)).cloned().collect()
     }
 }

@@ -363,6 +363,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                 )),
         );
 
+        tracing::debug!("acknowledgement state has been started");
         Ok(())
     }
 
@@ -410,18 +411,31 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
 
         let ctx = self.context.as_mut().ok_or(SessionError::StateNotRunning)?;
 
-        let missing = request.into_iter().collect::<Vec<_>>();
+        let (mut missing_seg_ids, mut missing_frame_ids): (Vec<_>, Vec<_>) =
+            request.into_iter().map(|s| (s, s.0)).unzip();
 
         // Perform a single find to lock the RB only once
-        let segments = ctx.rb_rx.find(|s| missing.contains(&s.id()));
+        let segments = ctx.rb_rx.find(|s| {
+            // SegmentIds are guaranteed to be sorted, so we can use binary search
+            if let Ok(i) = missing_seg_ids.binary_search(&s.id()) {
+                missing_seg_ids.remove(i);
+                true
+            } else {
+                false
+            }
+        });
+        tracing::trace!(count = segments.len(), "found matching segments to be retransmitted");
 
         // Partially acknowledged frames will not need to be fully resent in the future.
         // Cancel all partially acknowledged frame resends.
         if self.cfg.mode.is_full_ack_enabled() {
+            // Since the FrameIds are guaranteed to be sorted, we can simply dedup them.
+            missing_frame_ids.dedup();
+
             if let Err(error) = ctx.outgoing_frame_retries_tx.send_many(
-                missing
+                missing_frame_ids
                     .into_iter()
-                    .map(|seg_id| (RetriedFrameId::new(seg_id.0), Skip).into()),
+                    .map(|frame_id| (RetriedFrameId::new(frame_id), Skip).into()),
             ) {
                 tracing::error!(%error, "failed to cancel frame resend of partially acknowledged frames");
             }
@@ -430,7 +444,10 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         // Resend the segments via the Control Stream
         segments
             .into_iter()
-            .try_for_each(|s| ctx.ctl_tx.unbounded_send(SessionMessage::Segment(s)))
+            .try_for_each(|s| {
+                tracing::trace!(seg_id = %s.id(), "retransmit segment on request");
+                ctx.ctl_tx.unbounded_send(SessionMessage::Segment(s))
+            })
             .map_err(|e| SessionError::ProcessingError(e.to_string()))
     }
 
@@ -503,9 +520,11 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
 
         let ctx = self.context.as_mut().ok_or(SessionError::StateNotRunning)?;
 
-        // Since segments are re-sent via Control stream, they are not fed again
+        // Since segments are re-sent via Control stream, they are not later fed again
         // into the ring buffer.
-        ctx.rb_tx.push(segment.clone());
+        if !ctx.rb_tx.push(segment.clone()) {
+            tracing::error!("failed to push segment into ring buffer");
+        }
 
         // When the last segment of a frame has been sent,
         // add it to outgoing retries (if the full ack mode is enabled).
@@ -707,6 +726,8 @@ mod tests {
         // Acknowledge the frame
         state.incoming_acknowledged_frames(vec![1].try_into()?)?;
 
+        tokio::time::sleep(10 * cfg.expected_packet_latency).await;
+
         state.stop()?;
 
         // No retransmission should be sent because the frame was already acknowledged.
@@ -715,7 +736,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test_log::test(tokio::test)]
     async fn ack_state_sender_must_not_resend_entire_frame_when_already_partially_acknowledged() -> anyhow::Result<()> {
         const FRAME_SIZE: usize = 1500;
 
@@ -736,17 +757,94 @@ mod tests {
         })?;
 
         let expected_segments = segment(hopr_crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(), MTU, 1)?;
-        for segment in expected_segments.iter().skip(1) {
+
+        // Load segments into the ring buffer
+        for segment in &expected_segments {
             state.segment_sent(segment)?;
         }
+
+        tokio::time::sleep(cfg.expected_packet_latency).await;
 
         // Partially acknowledge the frame (report the first segment as missing)
         state.incoming_retransmission_request(SegmentRequest::from_iter([(1, [0b10000000].into())]))?;
 
         state.stop()?;
 
-        // No retransmission should be sent because the frame was partially acknowledged.
-        assert!(ctl_rx.collect::<Vec<_>>().await.is_empty());
+        // Only segment 1 must be retransmitted
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+        assert_eq!(1, ctl_msgs.len());
+        assert_eq!(ctl_msgs[0], SessionMessage::Segment(expected_segments[0].clone()));
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn ack_state_sender_must_retransmit_segments_when_requested() -> anyhow::Result<()> {
+        const FRAME_SIZE: usize = 1500;
+
+        let cfg = AcknowledgementStateConfig {
+            mode: AcknowledgementMode::Full,
+            expected_packet_latency: Duration::from_millis(2),
+            max_outgoing_frame_retries: 1,
+            ..Default::default()
+        };
+
+        let inspector = FrameInspector(FrameDashMap::with_capacity(10));
+        let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
+
+        let mut state = AcknowledgementState::<MTU>::new("test", cfg);
+        state.run(SocketComponents {
+            inspector: inspector.into(),
+            ctl_tx,
+        })?;
+
+        let expected_segments_1 = segment(hopr_crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(), MTU, 1)?;
+        // Load frame 1 segments into the ring buffer
+        for segment in &expected_segments_1 {
+            state.segment_sent(segment)?;
+        }
+
+        let expected_segments_2 = segment(hopr_crypto_random::random_bytes::<{ FRAME_SIZE * 2 }>(), MTU, 2)?;
+        // Load frame 2 segments into the ring buffer
+        for segment in &expected_segments_2 {
+            state.segment_sent(segment)?;
+        }
+
+        tokio::time::sleep(cfg.expected_packet_latency).await;
+
+        // Request different segments to be retransmitted
+        state.incoming_retransmission_request(SegmentRequest::from_iter([
+            (1, [0b11100000].into()),
+            (2, [0b11100000].into()),
+        ]))?;
+        tokio::time::sleep(cfg.expected_packet_latency).await;
+
+        state.incoming_retransmission_request(SegmentRequest::from_iter([(2, [0b11000000].into())]))?;
+        tokio::time::sleep(cfg.expected_packet_latency).await;
+
+        state.incoming_retransmission_request(SegmentRequest::from_iter([(2, [0b01000000].into())]))?;
+        tokio::time::sleep(cfg.expected_packet_latency).await;
+
+        state.stop()?;
+
+        let ctl_msgs = ctl_rx.collect::<Vec<_>>().await;
+
+        assert_eq!(9, ctl_msgs.len());
+        // Request 1 - frame 1
+        assert_eq!(ctl_msgs[0], SessionMessage::Segment(expected_segments_1[0].clone()));
+        assert_eq!(ctl_msgs[1], SessionMessage::Segment(expected_segments_1[1].clone()));
+        assert_eq!(ctl_msgs[2], SessionMessage::Segment(expected_segments_1[2].clone()));
+        // Request 1 - frame 2
+        assert_eq!(ctl_msgs[3], SessionMessage::Segment(expected_segments_2[0].clone()));
+        assert_eq!(ctl_msgs[4], SessionMessage::Segment(expected_segments_2[1].clone()));
+        assert_eq!(ctl_msgs[5], SessionMessage::Segment(expected_segments_2[2].clone()));
+
+        // Request 2 - frame 2
+        assert_eq!(ctl_msgs[6], SessionMessage::Segment(expected_segments_2[0].clone()));
+        assert_eq!(ctl_msgs[7], SessionMessage::Segment(expected_segments_2[1].clone()));
+
+        // Request 3 - frame 2
+        assert_eq!(ctl_msgs[8], SessionMessage::Segment(expected_segments_2[1].clone()));
 
         Ok(())
     }
@@ -800,8 +898,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn ack_state_receiver_must_not_request_missing_frames_when_partial_acks_are_disabled() -> anyhow::Result<()>
-    {
+    async fn ack_state_receiver_must_not_request_missing_frames_when_partial_acks_are_disabled() -> anyhow::Result<()> {
         const FRAME_SIZE: usize = 1500;
 
         let cfg = AcknowledgementStateConfig {

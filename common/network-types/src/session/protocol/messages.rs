@@ -101,6 +101,7 @@ impl<const C: usize> IntoIterator for SegmentRequest<C> {
     type IntoIter = std::vec::IntoIter<Self::Item>;
     type Item = SegmentId;
 
+    // An ordered iterator of missing segments in the form of SegmentId tuples.
     fn into_iter(self) -> Self::IntoIter {
         let seq_size = SeqNum::BITS as usize;
         let mut ret = Vec::with_capacity(seq_size * self.0.len());
@@ -323,12 +324,13 @@ mod tests {
         let frame_4_missing: MissingSegmentsBitmap = [0b11111111_u8].into();
 
         let req = SegmentRequest::<1000>::from_iter([
-            (1, frame_1_missing),
-            (2, frame_2_missing),
-            (3, frame_3_missing),
             (4, frame_4_missing),
+            (1, frame_1_missing),
+            (3, frame_3_missing),
+            (2, frame_2_missing),
         ]);
 
+        // Iterator of SegmentIds is guaranteed to be sorted
         let missing = req.into_iter().collect::<Vec<SegmentId>>();
         let missing_seg_ids = [
             SegmentId(2, 2),
