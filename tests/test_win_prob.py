@@ -133,7 +133,7 @@ class TestWinProbWithSwarm:
                     ),
                     30.0,
                 )
-                await asyncio.sleep(5) # Wait some more for the rest to become acknowledged if any
+                await asyncio.sleep(5)  # Wait some more for the rest to become acknowledged if any
 
                 # the value of redeemable tickets on the relay should not go above the given threshold
                 ticket_statistics = await swarm7[relay].api.get_tickets_statistics()
