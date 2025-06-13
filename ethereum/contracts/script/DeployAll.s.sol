@@ -211,11 +211,13 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
         if (currentEnvironmentType == EnvironmentType.LOCAL && vm.envBool("USE_STAKING_PROXY")) {
             shouldDeployStakingProxy = true;
-        } else if (currentEnvironmentType != EnvironmentType.LOCAL && !isValidAddress(currentNetworkDetail.addresses.networkRegistryProxyContractAddress)) {
+        } else if (
+            currentEnvironmentType != EnvironmentType.LOCAL
+                && !isValidAddress(currentNetworkDetail.addresses.networkRegistryProxyContractAddress)
+        ) {
             shouldDeployStakingProxy = true;
         }
-        emit log_named_uint("shouldDeployStakingProxy", (shouldDeployStakingProxy ? 1 : 0));
-    
+
         if (shouldDeployStakingProxy) {
             // deploy StakingProxy in other environment types, if no proxy contract is given.
             // temporarily grant default admin role to the deployer wallet

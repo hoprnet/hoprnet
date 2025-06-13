@@ -124,7 +124,6 @@ class Node:
             cwd=PWD,
         )
 
-
         for el in res.stdout.split("\n"):
             if el.startswith("Identity addresses:"):
                 logging.debug(f"Node {self.id} identity read line: {el}")

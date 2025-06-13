@@ -310,7 +310,6 @@ where
                                 }
                             }
                             PeerDiscovery::Ban(peer_id) => {
-                                debug!(peer = %peer_id, "Processing peer discovery event: Ban");
                                 if let Err(e) = network.remove(&peer_id).await {
                                     error!(peer = %peer_id, error = %e, "Failed to ban locally (already banned on-chain)")
                                 } else {
