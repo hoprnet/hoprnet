@@ -2,6 +2,8 @@ mod reassembly;
 mod segmenter;
 mod sequencer;
 
+use std::rc::Rc;
+use futures::SinkExt;
 pub(crate) use reassembly::Reassembler;
 pub(crate) use segmenter::Segmenter;
 pub(crate) use sequencer::Sequencer;
@@ -11,15 +13,22 @@ use crate::session::{
     errors::SessionError,
     frames::{Frame, FrameDashMap, FrameHashMap, FrameInspector, FrameMap, OrderedFrame, Segment},
 };
+use crate::session::frames::FrameId;
+use crate::utils::Woc;
 
-fn build_reconstructor<M: FrameMap + Send + 'static>(
+fn build_reconstructor<M, R>(
     id: &str,
     reassembler: Reassembler<M>,
     sequencer: Sequencer<OrderedFrame>,
+    reassembled_frame_ids: R,
 ) -> (
     impl futures::Sink<Segment, Error = SessionError>,
     impl futures::Stream<Item = Result<Frame, SessionError>>,
-) {
+)
+where 
+    M: FrameMap + Send + 'static, 
+    R: futures::Sink<FrameId, Error = SessionError> + Send + Unpin + 'static 
+{
     use futures::StreamExt;
 
     let (sink, rs_stream) = reassembler.split();
@@ -36,9 +45,14 @@ fn build_reconstructor<M: FrameMap + Send + 'static>(
                     maybe_frame
                         .inspect_err(|error| tracing::error!(%error, "failed to reassemble frame"))
                         .ok()
-                        .map(|f| Ok(OrderedFrame(f)))
+                        .map(|f| Ok(Woc::new(OrderedFrame(f))))
                 })
-                .forward(seq_sink)
+                .forward(
+                    // The first sink in Fanout gets a cloned value, the second one gets the non-cloned value (original)
+                    reassembled_frame_ids
+                        .with(|clone: Woc<OrderedFrame>| futures::future::ready(clone.inspect(|f| f.0.frame_id).ok_or(SessionError::InvalidState("value cannot be dropped".into()))))
+                        .fanout(seq_sink.with(|original: Woc<OrderedFrame>| futures::future::ready(original.into_inner().ok_or(SessionError::InvalidState("value is guaranteed to be original".into())))))
+                )
                 .await
             {
                 Ok(_) => tracing::debug!("frame reconstructor finished"),
@@ -70,6 +84,7 @@ pub fn frame_reconstructor(
             capacity,
             ..Default::default()
         }),
+        futures::sink::drain().sink_map_err(|_| SessionError::DataTooLong), // TODO
     )
 }
 
@@ -98,6 +113,7 @@ pub fn frame_reconstructor_with_inspector(
             capacity,
             ..Default::default()
         }),
+        futures::sink::drain().sink_map_err(|_| SessionError::DataTooLong), // TODO
     );
 
     (sink, stream, inspector)

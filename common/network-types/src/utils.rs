@@ -5,8 +5,65 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-
+use std::sync::{Arc, Weak};
 use futures::io::{AsyncRead, AsyncWrite};
+
+/// A weak-on-Clone smart pointer.
+///
+/// Enforces shallow-clone on a type, such that clones maintain only weak
+/// references to the original.
+/// 
+/// This is useful whenever value has to be cheaply cloned, but only
+/// the original must be [retrievable](Woc::into_inner), while still maintaining the ability to
+/// [compute](Woc::inspect) the clones (if the original exists).
+#[derive(Debug, strum::EnumTryAs, strum::EnumIs)]
+pub enum Woc<T> {
+    /// Contains the original value.
+    Strong(Arc<T>),
+    /// Contains the cloned value (weak reference to the original).
+    Weak(Weak<T>)
+}
+
+impl<T> Woc<T> {
+    /// Creates an original [`Woc::Strong`] value.
+    pub fn new(value: T) -> Self {
+        Woc::Strong(Arc::new(value))
+    }
+
+    /// Applies the function `f` on the inner value and returns the result.
+    ///
+    /// If the instance is [`Woc::Strong`], the function `f` is guaranteed to be called and is always `Some` returned.
+    /// If the instance is [`Woc::Weak`], `None` may be returned if the original has been dropped, otherwise `f` is called and `Some` is returned.
+    pub fn inspect<F, R>(&self, f: F) -> Option<R>
+    where F: FnOnce(&T) -> R {
+        match self {
+            Woc::Strong(x) => Some(f(&x)),
+            Woc::Weak(x) => x.upgrade().map(|x| f(&x)),
+        }
+    }
+
+    /// Returns `Some(T)` if [`Woc::Strong`] or `None` otherwise.
+    pub fn into_inner(self) -> Option<T> {
+        match self {
+            Woc::Strong(x) => {
+                // Guaranteed to be `Some` here, because there is always only 1 strong reference
+                let out = Arc::into_inner(x);
+                debug_assert!(out.is_some());
+                out
+            },
+            Woc::Weak(_) => None,
+        }
+    }
+}
+
+impl<T> Clone for Woc<T> {
+    fn clone(&self) -> Self {
+        match self {
+            Woc::Strong(x) => Woc::Weak(Arc::downgrade(x)),
+            Woc::Weak(x) => Woc::Weak(x.clone())
+        }
+    }
+}
 
 /// Joins [`futures::AsyncRead`] and [`futures::AsyncWrite`] into a single object.
 #[pin_project::pin_project]

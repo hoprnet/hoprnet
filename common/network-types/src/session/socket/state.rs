@@ -44,7 +44,11 @@ pub trait SocketState<const C: usize>: Send {
     fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<C>) -> Result<(), SessionError>;
 
     /// Called when a complete Frame has been finalized from segments received from Downstream.
-    fn frame_received(&mut self, id: FrameId) -> Result<(), SessionError>;
+    fn frame_complete(&mut self, id: FrameId) -> Result<(), SessionError>;
+
+    /// Called when a complete Frame has been finalized from segments received from Downstream and
+    /// emitted to Upstream.
+    fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError>;
 
     /// Called when a frame could not be completed from the segments received from Downstream.
     fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError>;
@@ -90,19 +94,25 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
 
     #[tracing::instrument(skip(self), fields(session_id = self.0))]
     fn incoming_retransmission_request(&mut self, _request: SegmentRequest<C>) -> Result<(), SessionError> {
-        tracing::debug!("incoming retransmission request");
+        tracing::trace!("incoming retransmission request");
         Ok(())
     }
 
     #[tracing::instrument(skip(self), fields(session_id = self.0))]
     fn incoming_acknowledged_frames(&mut self, _: FrameAcknowledgements<C>) -> Result<(), SessionError> {
-        tracing::debug!("incoming frame acknowledgements");
+        tracing::trace!("incoming frame acknowledgements");
         Ok(())
     }
 
     #[tracing::instrument(skip(self), fields(session_id = self.0))]
-    fn frame_received(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
-        tracing::trace!("frame completed");
+    fn frame_complete(&mut self, id: FrameId) -> Result<(), SessionError> {
+        tracing::trace!("frame complete");
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self), fields(session_id = self.0))]
+    fn frame_emitted(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
+        tracing::trace!("frame emitted");
         Ok(())
     }
 
@@ -145,7 +155,8 @@ mod tests {
             fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqNum) -> Result<(), SessionError>;
             fn incoming_retransmission_request(&mut self, request: SegmentRequest<MTU>) -> Result<(), SessionError>;
             fn incoming_acknowledged_frames(&mut self, ack: FrameAcknowledgements<MTU>) -> Result<(), SessionError>;
-            fn frame_received(&mut self, id: FrameId) -> Result<(), SessionError>;
+            fn frame_complete(&mut self, id: FrameId) -> Result<(), SessionError>;
+            fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError>;
             fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError>;
             fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError>;
         }
@@ -191,9 +202,14 @@ mod tests {
             self.0.lock().unwrap().incoming_acknowledged_frames(ack)
         }
 
-        fn frame_received(&mut self, id: FrameId) -> Result<(), SessionError> {
+        fn frame_complete(&mut self, id: FrameId) -> Result<(), SessionError> {
+            tracing::debug!(id = self.1, "frame_complete called");
+            self.0.lock().unwrap().frame_complete(id)
+        }
+
+        fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError> {
             tracing::debug!(id = self.1, "frame_received called");
-            self.0.lock().unwrap().frame_received(id)
+            self.0.lock().unwrap().frame_emitted(id)
         }
 
         fn frame_discarded(&mut self, id: FrameId) -> Result<(), SessionError> {
@@ -255,7 +271,7 @@ mod tests {
             .with(mockall::predicate::eq(1))
             .returning(|_| Ok::<_, SessionError>(()));
         bob_state
-            .expect_frame_received()
+            .expect_frame_emitted()
             .once()
             .in_sequence(&mut bob_seq)
             .with(mockall::predicate::eq(2))

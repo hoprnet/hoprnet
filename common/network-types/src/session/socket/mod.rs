@@ -166,10 +166,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         tracing::error!(%error, "error while processing outgoing packets")
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_out",
-                    session_id = state.session_id()
-                )),
+                .instrument(tracing::debug_span!("SessionSocket::packets_out")),
         );
 
         // Packets incoming from Downstream:
@@ -197,10 +194,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         tracing::error!(%error, "error while processing incoming packets")
                     }
                 })
-                .instrument(tracing::debug_span!(
-                    "SessionSocket::packets_in",
-                    session_id = state.session_id()
-                )),
+                .instrument(tracing::debug_span!("SessionSocket::packets_in")),
         );
 
         Ok(Self {
@@ -212,7 +206,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         // Filter out discarded Frames and dispatch events to the State if needed
                         future::ready(match maybe_frame {
                             Ok(frame) => {
-                                if let Err(error) = state.frame_received(frame.frame_id) {
+                                if let Err(error) = state.frame_emitted(frame.frame_id) {
                                     tracing::error!(%error, "frame received state update failed");
                                 }
                                 Some(Ok(frame))
@@ -226,10 +220,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                             }
                             Err(err) => Some(Err(std::io::Error::other(err))),
                         })
-                        .instrument(tracing::debug_span!(
-                            "SessionSocket::frame_writer",
-                            session_id = state.session_id()
-                        ))
+                        .instrument(tracing::debug_span!("SessionSocket::frame_writer"))
                     })
                     .into_async_read(),
             ),
@@ -603,9 +594,7 @@ mod tests {
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&data).await?;
         alice_socket.flush().await?;
-
-        tracing::warn!("---------- sending done ----------");
-
+        
         let mut bob_data = [0u8; DATA_SIZE];
         bob_socket.read_exact(&mut bob_data).await?;
         assert_eq!(data, bob_data);

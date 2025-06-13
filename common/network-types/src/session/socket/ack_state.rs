@@ -234,7 +234,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         &self.id
     }
 
-    #[tracing::instrument(skip(self, socket_components), fields(session_id = self.id))]
+    #[tracing::instrument(name = "AcknowledgementState", skip(self, socket_components), fields(session_id = self.id))]
     fn run(&mut self, socket_components: SocketComponents<C>) -> Result<(), SessionError> {
         if self.context.is_some() {
             return Err(SessionError::InvalidState("state is already running".into()));
@@ -297,7 +297,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     Ok(_) => tracing::debug!("incoming frame resends processing done"),
                     Err(error) => tracing::error!(%error, "error while processing incoming frame resends")
                 })
-                .instrument(tracing::debug_span!("incoming_frame_retries_sender", session_id = self.id))
+                .instrument(tracing::debug_span!("incoming_frame_retries_sender"))
             );
         }
 
@@ -315,7 +315,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     Ok(_) => tracing::debug!("acknowledgement forwarding done"),
                     Err(error) => tracing::error!(%error, "acknowledgement forwarding failed"),
                 })
-                .instrument(tracing::debug_span!("acknowledgement_sender", session_id = self.id)),
+                .instrument(tracing::debug_span!("acknowledgement_sender")),
         );
 
         // Resend outgoing frame Segments if they were not (partially or fully) acknowledged
@@ -357,10 +357,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
                     Ok(_) => tracing::debug!("outgoing frame retries processing done"),
                     Err(error) => tracing::error!(%error, "error while processing outgoing frame retries"),
                 })
-                .instrument(tracing::debug_span!(
-                    "outgoing_frame_retries_sender",
-                    session_id = self.id
-                )),
+                .instrument(tracing::debug_span!("outgoing_frame_retries_sender")),
         );
 
         tracing::debug!("acknowledgement state has been started");
@@ -477,8 +474,14 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     }
 
     #[tracing::instrument(skip(self), fields(session_id = self.id))]
-    fn frame_received(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
-        tracing::trace!("frame completed");
+    fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError> {
+        tracing::trace!("frame emitted");
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self), fields(session_id = self.id))]
+    fn frame_complete(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
+        tracing::trace!("frame complete");
 
         let ctx = self.context.as_mut().ok_or(SessionError::StateNotRunning)?;
 
@@ -584,7 +587,7 @@ mod tests {
         let acked_frame_ids = [1, 2, 3];
 
         for &frame_id in &acked_frame_ids {
-            state.frame_received(frame_id)?;
+            state.frame_emitted(frame_id)?;
         }
 
         tokio::time::sleep(cfg.acknowledgement_delay * 2).await;
@@ -1071,7 +1074,7 @@ mod tests {
             .add_segment(segments[2].clone())?;
 
         state.incoming_segment(&segments[2].id(), segments.len() as SeqNum)?;
-        state.frame_received(1)?;
+        state.frame_emitted(1)?;
 
         tokio::time::sleep(cfg.acknowledgement_delay * 2).await;
 
