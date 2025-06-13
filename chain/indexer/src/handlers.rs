@@ -721,6 +721,10 @@ where
             }
             HoprNetworkRegistryEvents::RegisteredByManager(registered) => {
                 let node_address: Address = registered.nodeAddress.into();
+                debug!(
+                    %node_address,
+                    "Node registered by manager, adding to the network registry",
+                );
                 self.db
                     .set_access_in_network_registry(Some(tx), node_address, true)
                     .await?;
@@ -738,6 +742,10 @@ where
             }
             HoprNetworkRegistryEvents::Registered(registered) => {
                 let node_address: Address = registered.nodeAddress.into();
+                debug!(
+                    %node_address,
+                    "Node registered, adding to the network registry",
+                );
                 self.db
                     .set_access_in_network_registry(Some(tx), node_address, true)
                     .await?;
@@ -754,12 +762,17 @@ where
                 )));
             }
             HoprNetworkRegistryEvents::EligibilityUpdated(eligibility_updated) => {
+                debug!(
+                    %eligibility_updated.stakingAccount,
+                    "Node eligibility updated, updating the safe eligibility",
+                );
                 let account: Address = eligibility_updated.stakingAccount.into();
                 self.db
                     .set_safe_eligibility(Some(tx), account, eligibility_updated.eligibility)
                     .await?;
             }
             HoprNetworkRegistryEvents::NetworkRegistryStatusUpdated(enabled) => {
+                debug!("Network registry enabled: {}", enabled.isEnabled);
                 self.db
                     .set_network_registry_enabled(Some(tx), enabled.isEnabled)
                     .await?;

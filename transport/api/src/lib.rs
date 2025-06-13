@@ -285,6 +285,7 @@ where
                     async move {
                         match event {
                             PeerDiscovery::Allow(peer_id) => {
+                                debug!(peer = %peer_id, "Processing peer discovery event: Allow");
                                 if let Ok(pk) = OffchainPublicKey::try_from(peer_id) {
                                     if !network.has(&peer_id).await {
                                         let mas = db
