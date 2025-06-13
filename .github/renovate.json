@@ -11,9 +11,14 @@
   "vulnerabilityAlerts": { "enabled": true },
   "semanticCommits": "enabled",
   "rangeStrategy": "bump",
+  
   "packageRules": [
     { "matchCategories": ["rust"], "enabled": true },
     { "matchCategories": ["docker"], "enabled": true, "pinDigests": true },
+    {
+      "matchPackageNames": ["python"],
+      "enabled": false
+    },
     {
       "matchPackageNames": [
         "serde_yaml",
