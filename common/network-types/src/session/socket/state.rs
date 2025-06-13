@@ -301,6 +301,12 @@ mod tests {
             .in_sequence(&mut bob_seq)
             .returning(|_, _| Ok::<_, SessionError>(()));
         bob_state
+            .expect_frame_complete()
+            .once()
+            .in_sequence(&mut bob_seq)
+            .with(mockall::predicate::eq(2))
+            .returning(|_| Ok::<_, SessionError>(()));
+        bob_state
             .expect_frame_discarded()
             .once()
             .in_sequence(&mut bob_seq)

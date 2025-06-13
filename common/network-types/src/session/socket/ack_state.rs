@@ -592,7 +592,7 @@ mod tests {
         let acked_frame_ids = [1, 2, 3];
 
         for &frame_id in &acked_frame_ids {
-            state.frame_emitted(frame_id)?;
+            state.frame_complete(frame_id)?;
         }
 
         tokio::time::sleep(cfg.acknowledgement_delay * 2).await;
@@ -1079,7 +1079,7 @@ mod tests {
             .add_segment(segments[2].clone())?;
 
         state.incoming_segment(&segments[2].id(), segments.len() as SeqNum)?;
-        state.frame_emitted(1)?;
+        state.frame_complete(1)?;
 
         tokio::time::sleep(cfg.acknowledgement_delay * 2).await;
 
