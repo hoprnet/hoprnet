@@ -15,10 +15,12 @@ use async_trait::async_trait;
 use futures::{Stream, StreamExt, stream::BoxStream};
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::SimpleGauge;
+use hopr_primitive_types::prelude::*;
+use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 use tracing::{debug, error, trace, warn};
 
 use crate::{
-    BlockWithLogs, HoprIndexerRpcOperations, Log, LogFilter,
+    BlockWithLogs, FilterSet, HoprIndexerRpcOperations, Log,
     errors::{Result, RpcError, RpcError::FilterIsEmpty},
     rpc::RpcOperations,
     transport::HttpRequestor,
@@ -33,18 +35,38 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
-/// Splits the range between `from_block` and `to_block` (inclusive)
-/// to chunks of maximum size `max_chunk_size` and creates [alloy::rpc::types::Filter] for each chunk
-/// using the given [LogFilter].
-fn split_range<'a>(filter: LogFilter, from_block: u64, to_block: u64, max_chunk_size: u64) -> BoxStream<'a, Filter> {
+/// Splits a block range into smaller chunks and applies filters to each chunk.
+///
+/// This function takes a range of blocks and divides it into smaller sub-ranges
+/// for concurrent processing. Each sub-range gets a copy of all the provided filters
+/// with the appropriate block range applied.
+///
+/// # Arguments
+/// * `filters` - Vector of log filters to apply to each chunk
+/// * `from_block` - Starting block number
+/// * `to_block` - Ending block number
+/// * `max_chunk_size` - Maximum number of blocks per chunk
+///
+/// # Returns
+/// * `impl Stream<Item = Vec<Filter>>` - Stream of filter vectors, one per chunk
+fn split_range<'a>(
+    filters: Vec<Filter>,
+    from_block: u64,
+    to_block: u64,
+    max_chunk_size: u64,
+) -> BoxStream<'a, Vec<Filter>> {
     assert!(from_block <= to_block, "invalid block range");
     assert!(max_chunk_size > 0, "chunk size must be greater than 0");
 
     futures::stream::unfold((from_block, to_block), move |(start, to)| {
         if start <= to {
             let end = to_block.min(start + max_chunk_size - 1);
-            let filter = Filter::from(filter.clone()).from_block(start).to_block(end);
-            futures::future::ready(Some((filter, (end + 1, to))))
+            let ranged_filters = filters
+                .iter()
+                .cloned()
+                .map(|f| f.from_block(start).to_block(end))
+                .collect::<Vec<_>>();
+            futures::future::ready(Some((ranged_filters, (end + 1, to))))
         } else {
             futures::future::ready(None)
         }
@@ -55,8 +77,8 @@ fn split_range<'a>(filter: LogFilter, from_block: u64, to_block: u64, max_chunk_
 // impl<P: JsonRpcClient + 'static, R: HttpRequestor + 'static> RpcOperations<P, R> {
 impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
     /// Retrieves logs in the given range (`from_block` and `to_block` are inclusive).
-    fn stream_logs(&self, filter: LogFilter, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
-        let fetch_ranges = split_range(filter, from_block, to_block, self.cfg.max_block_range_fetch_size);
+    fn stream_logs(&self, filters: Vec<Filter>, from_block: u64, to_block: u64) -> BoxStream<Result<Log>> {
+        let fetch_ranges = split_range(filters, from_block, to_block, self.cfg.max_block_range_fetch_size);
 
         debug!(
             "polling logs from blocks #{from_block} - #{to_block} (via {:?} chunks)",
@@ -64,35 +86,50 @@ impl<R: HttpRequestor + 'static + Clone> RpcOperations<R> {
         );
 
         fetch_ranges
-            .then(|subrange| {
-                let prov_clone = self.provider.clone();
+            .then(move |subrange_filters| async move {
+                let mut results = futures::stream::iter(subrange_filters)
+                    .then_concurrent(|filter| async move {
+                        let prov_clone = self.provider.clone();
 
-                async move {
-                    trace!(
-                        from = ?subrange.get_from_block(),
-                        to = ?subrange.get_to_block(),
-                        "fetching logs in block subrange"
-                    );
-                    match prov_clone.get_logs(&subrange).await {
-                        Ok(logs) => Ok(logs),
-                        Err(e) => {
-                            error!(
-                                from = ?subrange.get_from_block(),
-                                to = ?subrange.get_to_block(),
-                                error = %e,
-                                "failed to fetch logs in block subrange"
-                            );
-                            Err(e)
+                        match prov_clone.get_logs(&filter).await {
+                            Ok(logs) => Ok(logs),
+                            Err(e) => {
+                                error!(
+                                    from = ?filter.get_from_block(),
+                                    to = ?filter.get_to_block(),
+                                    error = %e,
+                                    "failed to fetch logs in block subrange"
+                                );
+                                Err(e)
+                            }
                         }
+                    })
+                    .flat_map(|result| {
+                        futures::stream::iter(match result {
+                            Ok(logs) => logs.into_iter().map(|log| Ok(Log::try_from(log)?)).collect::<Vec<_>>(),
+                            Err(e) => vec![Err(RpcError::from(e))],
+                        })
+                    })
+                    .collect::<Vec<_>>()
+                    .await;
+
+                // at this point we need to ensure logs are ordered by block number since that is
+                // expected by the indexer
+                results.sort_by(|a, b| {
+                    if let Ok(a) = a {
+                        if let Ok(b) = b {
+                            a.block_number.cmp(&b.block_number)
+                        } else {
+                            std::cmp::Ordering::Greater
+                        }
+                    } else {
+                        std::cmp::Ordering::Less
                     }
-                }
+                });
+
+                futures::stream::iter(results)
             })
-            .flat_map(|result| {
-                futures::stream::iter(match result {
-                    Ok(logs) => logs.into_iter().map(|log| Ok(Log::try_from(log)?)).collect::<Vec<_>>(),
-                    Err(e) => vec![Err(RpcError::from(e))],
-                })
-            })
+            .flatten()
             .boxed()
     }
 }
@@ -103,14 +140,35 @@ impl<R: HttpRequestor + 'static + Clone> HoprIndexerRpcOperations for RpcOperati
         self.get_block_number().await
     }
 
+    async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance> {
+        self.get_hopr_allowance(owner, spender).await
+    }
+
+    async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance> {
+        self.get_xdai_balance(address).await
+    }
+
+    async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance> {
+        self.get_hopr_balance(address).await
+    }
+
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
-        filter: LogFilter,
+        filters: FilterSet,
+        is_synced: bool,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>> {
-        if filter.is_empty() {
+        if filters.all.is_empty() {
             return Err(FilterIsEmpty);
         }
+
+        let log_filters = if !is_synced {
+            // Because we are not synced yet, we will not get logs for the token contract.
+            // These are only relevant for the indexer if we are synced.
+            filters.no_token
+        } else {
+            filters.all
+        };
 
         Ok(Box::pin(stream! {
             // On first iteration use the given block number as start
@@ -146,7 +204,7 @@ impl<R: HttpRequestor + 'static + Clone> HoprIndexerRpcOperations for RpcOperati
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_RPC_CHAIN_HEAD.set(latest_block as f64);
 
-                        let mut retrieved_logs = self.stream_logs(filter.clone(), from_block, latest_block);
+                        let mut retrieved_logs = self.stream_logs(log_filters.clone(), from_block, latest_block);
 
                         trace!(from_block, to_block = latest_block, "processing batch");
 
@@ -237,41 +295,52 @@ mod tests {
         hoprtoken::HoprToken::{Approval, Transfer},
     };
     use hopr_chain_types::{ContractAddresses, ContractInstances};
-    use hopr_crypto_types::{
-        keypairs::{ChainKeypair, Keypair},
-        types::Hash,
-    };
+    use hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
     use tokio::time::timeout;
     use tracing::debug;
 
     use crate::{
-        BlockWithLogs, HoprIndexerRpcOperations, LogFilter,
+        BlockWithLogs, FilterSet, HoprIndexerRpcOperations,
         client::create_rpc_client_to_anvil,
         errors::RpcError,
         indexer::split_range,
         rpc::{RpcOperations, RpcOperationsConfig},
     };
 
-    fn filter_bounds(filter: &Filter) -> anyhow::Result<(u64, u64)> {
-        Ok((
-            filter
+    fn filter_bounds(filters: &[Filter]) -> anyhow::Result<(u64, u64)> {
+        let bounds = filters.iter().try_fold((0, 0), |acc, filter| {
+            let to = filter
                 .block_option
                 .get_from_block()
                 .context("a value should be present")?
                 .as_number()
-                .context("a value should be convertible")?,
-            filter
+                .context("a value should be convertible")?;
+            let from = filter
                 .block_option
                 .get_to_block()
                 .context("a value should be present")?
                 .as_number()
-                .context("a value should be convertible")?,
-        ))
+                .context("a value should be convertible")?;
+            let next = (to, from);
+
+            match acc {
+                (0, 0) => Ok(next), // First pair becomes the reference
+                acc => {
+                    if acc != next {
+                        anyhow::bail!("range bounds are not equal across all filters");
+                    }
+                    Ok(acc)
+                }
+            }
+        })?;
+
+        Ok(bounds)
     }
 
     #[tokio::test]
     async fn test_split_range() -> anyhow::Result<()> {
-        let ranges = split_range(LogFilter::default(), 0, 10, 2).collect::<Vec<_>>().await;
+        let filters = vec![Filter::default()];
+        let ranges = split_range(filters.clone(), 0, 10, 2).collect::<Vec<_>>().await;
 
         assert_eq!(6, ranges.len());
         assert_eq!((0, 1), filter_bounds(&ranges[0])?);
@@ -281,22 +350,18 @@ mod tests {
         assert_eq!((8, 9), filter_bounds(&ranges[4])?);
         assert_eq!((10, 10), filter_bounds(&ranges[5])?);
 
-        let ranges = split_range(LogFilter::default(), 0, 0, 2).collect::<Vec<_>>().await;
+        let ranges = split_range(filters.clone(), 0, 0, 1).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
         assert_eq!((0, 0), filter_bounds(&ranges[0])?);
 
-        let ranges = split_range(LogFilter::default(), 0, 0, 1).collect::<Vec<_>>().await;
-        assert_eq!(1, ranges.len());
-        assert_eq!((0, 0), filter_bounds(&ranges[0])?);
-
-        let ranges = split_range(LogFilter::default(), 0, 3, 1).collect::<Vec<_>>().await;
+        let ranges = split_range(filters.clone(), 0, 3, 1).collect::<Vec<_>>().await;
         assert_eq!(4, ranges.len());
         assert_eq!((0, 0), filter_bounds(&ranges[0])?);
         assert_eq!((1, 1), filter_bounds(&ranges[1])?);
         assert_eq!((2, 2), filter_bounds(&ranges[2])?);
         assert_eq!((3, 3), filter_bounds(&ranges[3])?);
 
-        let ranges = split_range(LogFilter::default(), 0, 3, 10).collect::<Vec<_>>().await;
+        let ranges = split_range(filters.clone(), 0, 3, 10).collect::<Vec<_>>().await;
         assert_eq!(1, ranges.len());
         assert_eq!((0, 3), filter_bounds(&ranges[0])?);
 
@@ -325,7 +390,7 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg, None)?;
 
         let b1 = rpc.block_number().await?;
 
@@ -354,13 +419,40 @@ mod tests {
             ContractInstances::deploy_for_testing(client, &chain_key_0).await?
         };
 
+        let contract_addrs = ContractAddresses::from(&contract_instances);
+
+        let filter_token_approval = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.token))
+            .event_signature(Approval::SIGNATURE_HASH);
+        let filter_token_transfer = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.token))
+            .event_signature(Transfer::SIGNATURE_HASH);
+        let filter_channels_opened = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.channels))
+            .event_signature(ChannelOpened::SIGNATURE_HASH);
+        let filter_channels_balance_increased = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.channels))
+            .event_signature(ChannelBalanceIncreased::SIGNATURE_HASH);
+
+        let log_filter = FilterSet {
+            all: vec![
+                filter_token_approval.clone(),
+                filter_token_transfer.clone(),
+                filter_channels_opened.clone(),
+                filter_channels_balance_increased.clone(),
+            ],
+            token: vec![filter_token_approval, filter_token_transfer],
+            no_token: vec![filter_channels_opened, filter_channels_balance_increased],
+        };
+
+        debug!("{:#?}", contract_addrs);
+        debug!("{:#?}", log_filter);
+
         let tokens_minted_at =
             hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1000_u128))
                 .await?
                 .unwrap();
         debug!("tokens were minted at block {tokens_minted_at}");
-
-        let contract_addrs = ContractAddresses::from(&contract_instances);
 
         let transport_client = ReqwestTransport::new(anvil.endpoint_url());
 
@@ -379,26 +471,13 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
-
-        let log_filter = LogFilter {
-            address: vec![contract_addrs.token, contract_addrs.channels],
-            topics: vec![
-                Hash::from(Approval::SIGNATURE_HASH.0),
-                Hash::from(Transfer::SIGNATURE_HASH.0),
-                Hash::from(ChannelOpened::SIGNATURE_HASH.0),
-                Hash::from(ChannelBalanceIncreased::SIGNATURE_HASH.0),
-            ],
-        };
-
-        debug!("{:#?}", contract_addrs);
-        debug!("{:#?}", log_filter);
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg, None)?;
 
         // Spawn stream
-        let count_filtered_topics = log_filter.topics.len();
+        let count_filtered_topics = 2;
         let retrieved_logs = spawn(async move {
             Ok::<_, RpcError>(
-                rpc.try_stream_logs(1, log_filter)?
+                rpc.try_stream_logs(1, log_filter, false)?
                     .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
                     .next()
                     .await,
@@ -427,8 +506,6 @@ mod tests {
 
         let channel_open_filter = ChannelOpened::SIGNATURE_HASH;
         let channel_balance_filter = ChannelBalanceIncreased::SIGNATURE_HASH;
-        let approval_filter = Approval::SIGNATURE_HASH;
-        let transfer_filter = Transfer::SIGNATURE_HASH;
 
         debug!(
             "channel_open_filter: {:?} - {:?}",
@@ -439,16 +516,6 @@ mod tests {
             "channel_balance_filter: {:?} - {:?}",
             channel_balance_filter,
             channel_balance_filter.0.to_vec()
-        );
-        debug!(
-            "approval_filter: {:?} - {:?}",
-            approval_filter,
-            approval_filter.0.to_vec()
-        );
-        debug!(
-            "transfer_filter: {:?} - {:?}",
-            transfer_filter,
-            transfer_filter.0.to_vec()
         );
         debug!("logs: {:#?}", last_block_logs);
 
@@ -463,18 +530,6 @@ mod tests {
                 |log| log.address == contract_addrs.channels && log.topics.contains(&channel_balance_filter.into())
             ),
             "must contain channel balance increase"
-        );
-        assert!(
-            last_block_logs
-                .iter()
-                .any(|log| log.address == contract_addrs.token && log.topics.contains(&approval_filter.into())),
-            "must contain token approval"
-        );
-        assert!(
-            last_block_logs
-                .iter()
-                .any(|log| log.address == contract_addrs.token && log.topics.contains(&transfer_filter.into())),
-            "must contain token transfer"
         );
 
         Ok(())
@@ -523,24 +578,32 @@ mod tests {
         // Wait until contracts deployments are final
         sleep((1 + cfg.finality) * expected_block_time).await;
 
-        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg)?;
+        let rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), &chain_key_0, cfg, None)?;
 
-        let log_filter = LogFilter {
-            address: vec![contract_addrs.channels],
-            topics: vec![
-                Hash::from(ChannelOpened::SIGNATURE_HASH.0),
-                Hash::from(ChannelBalanceIncreased::SIGNATURE_HASH.0),
+        let filter_channels_opened = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.channels))
+            .event_signature(ChannelOpened::SIGNATURE_HASH);
+        let filter_channels_balance_increased = alloy::rpc::types::Filter::new()
+            .address(alloy::primitives::Address::from(contract_addrs.channels))
+            .event_signature(ChannelBalanceIncreased::SIGNATURE_HASH);
+
+        let log_filter = FilterSet {
+            all: vec![
+                filter_channels_opened.clone(),
+                filter_channels_balance_increased.clone(),
             ],
+            token: vec![],
+            no_token: vec![filter_channels_opened, filter_channels_balance_increased],
         };
 
         debug!("{:#?}", contract_addrs);
         debug!("{:#?}", log_filter);
 
         // Spawn stream
-        let count_filtered_topics = log_filter.topics.len();
+        let count_filtered_topics = 2;
         let retrieved_logs = spawn(async move {
             Ok::<_, RpcError>(
-                rpc.try_stream_logs(1, log_filter)?
+                rpc.try_stream_logs(1, log_filter, false)?
                     .skip_while(|b| futures::future::ready(b.len() != count_filtered_topics))
                     // .next()
                     .take(1)

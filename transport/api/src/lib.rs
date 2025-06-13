@@ -285,6 +285,7 @@ where
                     async move {
                         match event {
                             PeerDiscovery::Allow(peer_id) => {
+                                debug!(peer = %peer_id, "Processing peer discovery event: Allow");
                                 if let Ok(pk) = OffchainPublicKey::try_from(peer_id) {
                                     if !network.has(&peer_id).await {
                                         let mas = db
@@ -316,6 +317,7 @@ where
                                 }
                             }
                             PeerDiscovery::Announce(peer, multiaddresses) => {
+                                debug!(peer = %peer, ?multiaddresses, "Processing peer discovery event: Announce");
                                 if peer != me {
                                     // decapsulate the `p2p/<peer_id>` to remove duplicities
                                     let mas = multiaddresses

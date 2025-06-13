@@ -175,51 +175,23 @@ impl PartialOrd<Self> for Log {
     }
 }
 
-/// Represents a filter to extract logs containing specific contract events from a block.
+/// Represents a set of categorized blockchain log filters for optimized indexer performance.
+///
+/// This structure organizes filters into different categories to enable selective log
+/// processing based on the indexer's operational state. During initial synchronization,
+/// the indexer uses `no_token` filters to exclude irrelevant token events, significantly
+/// reducing processing time and storage requirements. During normal operation, it uses
+/// `all` filters for complete event coverage.
+///
+/// The `token` filters specifically target token-related events for the node's safe address.
 #[derive(Debug, Clone, Default)]
-pub struct LogFilter {
-    /// Contract addresses
-    pub address: Vec<Address>,
-    /// Event topics
-    pub topics: Vec<Hash>,
-}
-
-impl LogFilter {
-    /// Indicates if this filter filters anything.
-    pub fn is_empty(&self) -> bool {
-        self.address.is_empty() && self.topics.is_empty()
-    }
-}
-
-impl Display for LogFilter {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "filter of {} contracts with {} topics",
-            self.address.len(),
-            self.topics.len()
-        )
-    }
-}
-
-impl From<LogFilter> for alloy::rpc::types::Filter {
-    fn from(value: LogFilter) -> Self {
-        alloy::rpc::types::Filter::new()
-            .address(
-                value
-                    .address
-                    .into_iter()
-                    .map(alloy::primitives::Address::from)
-                    .collect::<Vec<_>>(),
-            )
-            .event_signature(
-                value
-                    .topics
-                    .into_iter()
-                    .map(|h| alloy::primitives::B256::from_slice(h.as_ref()))
-                    .collect::<Vec<_>>(),
-            )
-    }
+pub struct FilterSet {
+    /// holds all filters for the indexer
+    pub all: Vec<alloy::rpc::types::Filter>,
+    /// holds only the token contract related filters
+    pub token: Vec<alloy::rpc::types::Filter>,
+    /// holds only filters not related to the token contract
+    pub no_token: Vec<alloy::rpc::types::Filter>,
 }
 
 /// Indicates what retry action should be taken, as result of a `RetryPolicy` implementation.
@@ -284,8 +256,14 @@ pub trait HoprRpcOperations {
     /// Retrieves the timestamp from the given block number.
     async fn get_timestamp(&self, block_number: u64) -> Result<Option<u64>>;
 
-    /// Retrieves the node's account balance of the given type.
-    async fn get_balance<C: Currency + Send>(&self, address: Address) -> Result<Balance<C>>;
+    /// Retrieves on-chain xdai balance of the given address.
+    async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance>;
+
+    /// Retrieves on-chain wxHOPR token balance of the given address.
+    async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance>;
+
+    /// Retrieves the wxHOPR token allowance for the given owner and spender.
+    async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance>;
 
     /// Retrieves the minimum incoming ticket winning probability by directly
     /// calling the network's winning probability oracle.
@@ -345,19 +323,70 @@ impl BlockWithLogs {
 }
 
 /// Trait with RPC provider functionality required by the Indexer.
-#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub trait HoprIndexerRpcOperations {
     /// Retrieves the latest block number.
     async fn block_number(&self) -> Result<u64>;
 
-    /// Starts streaming logs from the given `start_block_number`.
-    /// If no `start_block_number` is given, the stream starts from the latest block.
-    /// The given `filter` are applied to retrieve the logs, the function fails if the filter is empty.
-    /// The streaming stops only when the corresponding channel is closed by the returned receiver.
+    /// Queries the HOPR token allowance between owner and spender addresses.
+    ///
+    /// This method queries the HOPR token contract to determine how many tokens
+    /// the owner has approved the spender to transfer on their behalf.
+    ///
+    /// # Arguments
+    /// * `owner` - The address that owns the tokens and grants the allowance
+    /// * `spender` - The address that is approved to spend the tokens
+    ///
+    /// # Returns
+    /// * `Result<HoprBalance>` - The current allowance amount
+    async fn get_hopr_allowance(&self, owner: Address, spender: Address) -> Result<HoprBalance>;
+
+    /// Queries the xDAI (native token) balance for a specific address.
+    ///
+    /// This method queries the current xDAI balance of the specified address
+    /// from the blockchain.
+    ///
+    /// # Arguments
+    /// * `address` - The Ethereum address to query the balance for
+    ///
+    /// # Returns
+    /// * `Result<XDaiBalance>` - The current xDAI balance
+    async fn get_xdai_balance(&self, address: Address) -> Result<XDaiBalance>;
+
+    /// Queries the HOPR token balance for a specific address.
+    ///
+    /// This method directly queries the HOPR token contract to get the current
+    /// token balance of the specified address.
+    ///
+    /// # Arguments
+    /// * `address` - The Ethereum address to query the balance for
+    ///
+    /// # Returns
+    /// * `Result<HoprBalance>` - The current HOPR token balance
+    async fn get_hopr_balance(&self, address: Address) -> Result<HoprBalance>;
+
+    /// Streams blockchain logs using selective filtering based on synchronization state.
+    ///
+    /// This method intelligently selects which log filters to use based on whether
+    /// the indexer is currently syncing historical data or processing live events.
+    /// During initial sync, it uses `no_token` filters to exclude irrelevant token
+    /// events. When synced, it uses all filters to capture complete event data.
+    ///
+    /// # Arguments
+    /// * `start_block_number` - Starting block number for log retrieval
+    /// * `filters` - Set of categorized filters (all, token, no_token)
+    /// * `is_synced` - Whether the indexer has completed initial synchronization
+    ///
+    /// # Returns
+    /// * `impl Stream<Item = Result<Log>>` - Stream of blockchain logs
+    ///
+    /// # Behavior
+    /// * When `is_synced` is `false`: Uses `filter_set.no_token` to reduce log volume
+    /// * When `is_synced` is `true`: Uses `filter_set.all` for complete coverage
     fn try_stream_logs<'a>(
         &'a self,
         start_block_number: u64,
-        filter: LogFilter,
+        filters: FilterSet,
+        is_synced: bool,
     ) -> Result<Pin<Box<dyn Stream<Item = BlockWithLogs> + Send + 'a>>>;
 }

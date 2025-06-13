@@ -10,6 +10,7 @@
 //! A manager account can register nodes and safes with `manager-regsiter`
 //! A manager account can deregister nodes with `manager-deregsiter`
 //! A manager account can set eligibility of staking accounts with `manager-force-sync`
+//! A manager account can enable or disable the network registry globally with `toggle`
 //!
 //! Some sample commands:
 //! - Manager registers nodes:
@@ -43,6 +44,15 @@
 //!     --eligibility true \
 //!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
 //!     --provider-url "http://localhost:8545"
+//!
+//! - Manager syncs the eligibility of safes
+//! ```text
+//! hopli network-registry toggle \
+//!     --network anvil-localhost \
+//!     --contracts-root "../ethereum/contracts" \
+//!     --ena true \
+//!     --private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+//!     --provider-url "http://localhost:8545"
 //! ```
 use std::str::FromStr;
 
@@ -56,7 +66,7 @@ use crate::{
     key_pair::{ArgEnvReader, IdentityFileArgs, PrivateKeyArgs},
     methods::{
         deregister_nodes_from_network_registry, force_sync_safes_on_network_registry,
-        register_safes_and_nodes_on_network_registry,
+        register_safes_and_nodes_on_network_registry, toggle_network_registry_status,
     },
     utils::{Cmd, HelperErrors},
 };
@@ -151,6 +161,22 @@ pub enum NetworkRegistrySubcommands {
             default_value = None
         )]
         eligibility: Option<bool>,
+    },
+
+    // Globally enable / disable manager account
+    #[command(visible_alias = "t")]
+    Toggle {
+        /// Network name, contracts config file root, and customized provider, if available
+        #[command(flatten)]
+        network_provider: NetworkProviderArgs,
+
+        /// Access to the private key of a manager of Network Registry contract
+        #[command(flatten)]
+        private_key: PrivateKeyArgs,
+
+        /// Enable or disable network registry
+        #[clap(help = "Desired state of the network registry", long, short)]
+        enable: bool,
     },
 }
 
@@ -343,6 +369,27 @@ impl NetworkRegistrySubcommands {
             None => Err(HelperErrors::MissingParameter("eligibility".to_string())),
         }
     }
+
+    /// Execute command to enable or disable the network registry with manager privilege
+    pub async fn execute_toggle(
+        network_provider: NetworkProviderArgs,
+        private_key: PrivateKeyArgs,
+        enable: bool,
+    ) -> Result<(), HelperErrors> {
+        // read private key
+        let signer_private_key = private_key.read("MANAGER_PRIVATE_KEY")?;
+
+        // get RPC provider for the given network and environment
+        let rpc_provider = network_provider.get_provider_with_signer(&signer_private_key).await?;
+        let contract_addresses = network_provider.get_network_details_from_name()?;
+
+        let hopr_network_registry = HoprNetworkRegistry::new(
+            contract_addresses.addresses.network_registry.into(),
+            rpc_provider.clone(),
+        );
+
+        toggle_network_registry_status(hopr_network_registry, enable).await
+    }
 }
 
 impl Cmd for NetworkRegistrySubcommands {
@@ -397,6 +444,13 @@ impl Cmd for NetworkRegistrySubcommands {
                     eligibility,
                 )
                 .await?;
+            }
+            NetworkRegistrySubcommands::Toggle {
+                network_provider,
+                private_key,
+                enable,
+            } => {
+                NetworkRegistrySubcommands::execute_toggle(network_provider, private_key, enable).await?;
             }
         }
         Ok(())

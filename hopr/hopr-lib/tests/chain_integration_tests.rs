@@ -72,7 +72,7 @@ struct ChainNode {
     offchain_key: OffchainKeypair,
     db: HoprDb,
     actions: ChainActions<HoprDb>,
-    _indexer: Indexer<TestRpc, ContractEventHandlers<HoprDb>, HoprDb>,
+    _indexer: Indexer<TestRpc, ContractEventHandlers<TestRpc, HoprDb>, HoprDb>,
     node_tasks: Vec<JoinHandle<()>>,
 }
 
@@ -108,11 +108,23 @@ async fn start_node_chain_logic(
 
     let http_requestor_in = DefaultHttpRequestor::new();
     let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_in.clone(), &chain_env.anvil);
-    let rpc_ops_in = RpcOperations::new(json_rpc_client, http_requestor_in.clone(), chain_key, rpc_cfg.clone())?;
+    let rpc_ops_in = RpcOperations::new(
+        json_rpc_client,
+        http_requestor_in.clone(),
+        chain_key,
+        rpc_cfg.clone(),
+        None,
+    )?;
 
     let http_requestor_out = DefaultHttpRequestor::new();
     let json_rpc_client = create_rpc_client_to_anvil_with_snapshot(requestor_out.clone(), &chain_env.anvil);
-    let rpc_ops_out = RpcOperations::new(json_rpc_client, http_requestor_out.clone(), chain_key, rpc_cfg.clone())?;
+    let rpc_ops_out = RpcOperations::new(
+        json_rpc_client,
+        http_requestor_out.clone(),
+        chain_key,
+        rpc_cfg.clone(),
+        None,
+    )?;
 
     // Transaction executor
     let eth_client = RpcEthereumClient::new(rpc_ops_out, RpcEthereumClientConfig::default());
@@ -150,6 +162,7 @@ async fn start_node_chain_logic(
         safe_cfg.safe_address,
         chain_key.clone(),
         db.clone(),
+        rpc_ops_in.clone(),
     );
 
     let indexer = Indexer::new(rpc_ops_in, chain_log_handler, db.clone(), indexer_cfg, sce_tx);
