@@ -2,19 +2,20 @@ mod reassembly;
 mod segmenter;
 mod sequencer;
 
-use std::rc::Rc;
+use std::sync::Arc;
 use futures::SinkExt;
+use tracing::Instrument;
+
 pub(crate) use reassembly::Reassembler;
 pub(crate) use segmenter::Segmenter;
 pub(crate) use sequencer::Sequencer;
-use tracing::Instrument;
+
 
 use crate::session::{
     errors::SessionError,
     frames::{Frame, FrameDashMap, FrameHashMap, FrameInspector, FrameMap, OrderedFrame, Segment},
 };
 use crate::session::frames::FrameId;
-use crate::utils::Woc;
 
 fn build_reconstructor<M, R>(
     id: &str,
@@ -25,9 +26,9 @@ fn build_reconstructor<M, R>(
     impl futures::Sink<Segment, Error = SessionError>,
     impl futures::Stream<Item = Result<Frame, SessionError>>,
 )
-where 
-    M: FrameMap + Send + 'static, 
-    R: futures::Sink<FrameId, Error = SessionError> + Send + Unpin + 'static 
+where
+    M: FrameMap + Send + 'static,
+    R: futures::Sink<FrameId, Error = SessionError> + Send + 'static
 {
     use futures::StreamExt;
 
@@ -45,13 +46,15 @@ where
                     maybe_frame
                         .inspect_err(|error| tracing::error!(%error, "failed to reassemble frame"))
                         .ok()
-                        .map(|f| Ok(Woc::new(OrderedFrame(f))))
+                        .map(|f| Ok(Arc::new(OrderedFrame(f))))
                 })
                 .forward(
-                    // The first sink in Fanout gets a cloned value, the second one gets the non-cloned value (original)
+                    // In Fanout, the first Sink clones the item, processes it and drops the clone.
+                    // After that, the second Sink gets to process the original uncloned value.
+                    // Therefore, when the second Sink calls `into_inner`, it is guaranteed to get the original.
                     reassembled_frame_ids
-                        .with(|clone: Woc<OrderedFrame>| futures::future::ready(clone.inspect(|f| f.0.frame_id).ok_or(SessionError::InvalidState("value cannot be dropped".into()))))
-                        .fanout(seq_sink.with(|original: Woc<OrderedFrame>| futures::future::ready(original.into_inner().ok_or(SessionError::InvalidState("value is guaranteed to be original".into())))))
+                        .with(|clone: Arc<OrderedFrame>| futures::future::ok::<_, SessionError>(clone.0.frame_id))
+                        .fanout(seq_sink.with(|original: Arc<OrderedFrame>| futures::future::ready(Arc::into_inner(original).ok_or(SessionError::InvalidState("value is guaranteed to be original".into())))))
                 )
                 .await
             {
@@ -72,6 +75,7 @@ pub fn frame_reconstructor(
     id: &str,
     frame_timeout: std::time::Duration,
     capacity: usize,
+    reassembled_frame_ids: impl futures::Sink<FrameId, Error = SessionError> + Send + 'static,
 ) -> (
     impl futures::Sink<Segment, Error = SessionError>,
     impl futures::Stream<Item = Result<Frame, SessionError>>,
@@ -84,7 +88,7 @@ pub fn frame_reconstructor(
             capacity,
             ..Default::default()
         }),
-        futures::sink::drain().sink_map_err(|_| SessionError::DataTooLong), // TODO
+        reassembled_frame_ids,
     )
 }
 
@@ -97,6 +101,7 @@ pub fn frame_reconstructor_with_inspector(
     id: &str,
     frame_timeout: std::time::Duration,
     capacity: usize,
+    reassembled_frame_ids: impl futures::Sink<FrameId, Error = SessionError> + Send + 'static,
 ) -> (
     impl futures::Sink<Segment, Error = SessionError>,
     impl futures::Stream<Item = Result<Frame, SessionError>>,
@@ -113,7 +118,7 @@ pub fn frame_reconstructor_with_inspector(
             capacity,
             ..Default::default()
         }),
-        futures::sink::drain().sink_map_err(|_| SessionError::DataTooLong), // TODO
+        reassembled_frame_ids,
     );
 
     (sink, stream, inspector)
@@ -180,7 +185,9 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_secs(5), 1024);
+        let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
+
+        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_secs(5), 1024, reassm_tx.sink_map_err(|_| SessionError::DataTooLong));
 
         let mut segments = expected
             .iter()
@@ -200,7 +207,13 @@ mod tests {
 
         assert_eq!(actual, expected);
 
+        let mut shuffled_frames = reassm_rx.collect::<Vec<_>>().await;
+        shuffled_frames.sort();
+        
+        assert_eq!(shuffled_frames, (1..=10u32).collect::<Vec<_>>());
+
         let _ = jh.await?;
+
         Ok(())
     }
 
@@ -213,7 +226,9 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_millis(50), 1024);
+        let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
+
+        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_millis(50), 1024, reassm_tx.sink_map_err(|_| SessionError::DataTooLong));
 
         let mut segments = expected
             .iter()
@@ -240,6 +255,10 @@ mod tests {
                 assert!(matches!(actual[i], Err(SessionError::FrameDiscarded(4))))
             }
         }
+        let mut shuffled_frame_ids = reassm_rx.collect::<Vec<_>>().await;
+        shuffled_frame_ids.sort();
+        
+        assert_eq!(shuffled_frame_ids, (1..=10u32).filter(|&i| i != 4).collect::<Vec<_>>());
 
         let _ = jh.await?;
         Ok(())
@@ -247,12 +266,16 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn test_segmenter_reconstructor_should_work_together() -> anyhow::Result<()> {
-        let (mut data_in, segments_out) = Segmenter::<462>::new(1500, 1024);
-        let (segments_in, data_out) = frame_reconstructor("test", Duration::from_secs(10), 1024);
+        const DATA_SIZE: usize = 9001;
+        const FRAME_SIZE: usize = 1500;
+        
+        let (mut data_in, segments_out) = Segmenter::<462>::new(FRAME_SIZE, 1024);
+        let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
+        let (segments_in, data_out) = frame_reconstructor("test", Duration::from_secs(10), 1024, reassm_tx.sink_map_err(|_| SessionError::DataTooLong));
 
         let jh = tokio::task::spawn(segments_out.map(Ok).forward(segments_in));
 
-        let data_written = hopr_crypto_random::random_bytes::<9001>();
+        let data_written = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
         let data_read = tokio::task::spawn(async move {
             let mut out = Vec::new();
@@ -270,9 +293,11 @@ mod tests {
         data_in.close().await?;
 
         let data_read = data_read.await???;
+        let count = reassm_rx.collect::<Vec<_>>().await.len();
         jh.await??;
 
         assert_eq!(&data_written, data_read.as_slice());
+        assert_eq!(DATA_SIZE / FRAME_SIZE + 1, count);
 
         Ok(())
     }

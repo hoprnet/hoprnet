@@ -19,6 +19,7 @@ use crate::{
         socket::state::SocketComponents,
     },
 };
+use crate::session::socket::state::SocketStateEvents;
 
 /// Indicates the acknowledgement mode of a [stateful](AcknowledgementState) Session socket.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -230,6 +231,11 @@ impl<const C: usize> AcknowledgementState<C> {
 }
 
 impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
+    #[inline]
+    fn subscribed_events() -> SocketStateEvents {
+        SocketStateEvents::full()
+    }
+
     fn session_id(&self) -> &str {
         &self.id
     }
@@ -474,12 +480,6 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     }
 
     #[tracing::instrument(skip(self), fields(session_id = self.id))]
-    fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError> {
-        tracing::trace!("frame emitted");
-        Ok(())
-    }
-
-    #[tracing::instrument(skip(self), fields(session_id = self.id))]
     fn frame_complete(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
         tracing::trace!("frame complete");
 
@@ -500,6 +500,12 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
             }
         }
 
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(self), fields(session_id = self.id))]
+    fn frame_emitted(&mut self, id: FrameId) -> Result<(), SessionError> {
+        tracing::trace!("frame emitted");
         Ok(())
     }
 

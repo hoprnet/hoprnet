@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use futures::{FutureExt, StreamExt, TryStreamExt, future, pin_mut};
+use futures::{FutureExt, StreamExt, TryStreamExt, future, pin_mut, SinkExt};
 use futures_concurrency::stream::Merge;
 use state::SocketState;
 use tracing::{Instrument, instrument};
@@ -19,6 +19,8 @@ use crate::session::{
     protocol::{SessionCodec, SessionMessage},
     socket::state::{SocketComponents, Stateless},
 };
+use crate::session::frames::FrameId;
+use crate::session::socket::state::SocketStateEvent;
 
 /// Configuration object for [`SessionSocket`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq, smart_default::SmartDefault)]
@@ -77,7 +79,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // but because we're stateless, we do not have to use frame inspector, which
         // could slow the Session down.
         let (downstream_segment_in, downstream_frames_out) =
-            frame_reconstructor(state.session_id(), cfg.frame_timeout, cfg.capacity);
+            frame_reconstructor(state.session_id(), cfg.frame_timeout, cfg.capacity, futures::sink::drain().sink_map_err(|_| SessionError::InvalidState("n/a".into())));
 
         Self::create(
             transport,
@@ -85,6 +87,7 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
             downstream_segment_in,
             downstream_frames_out,
             None,
+            futures::stream::empty(),
             cfg,
         )
     }
@@ -101,32 +104,54 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
     {
         // Downstream Segments get reconstructed into Frames
-        let (downstream_segment_in, downstream_frames_out, inspector) =
-            frame_reconstructor_with_inspector(state.session_id(), cfg.frame_timeout, cfg.capacity);
+        // Check if we need to also catch the completed (but not yet emitted) frames.
+        if S::subscribed_events().contains(SocketStateEvent::FrameComplete) {
+            let (frame_notifier_tx, frame_notifier_rx) = futures::channel::mpsc::channel(cfg.capacity);
+            let (downstream_segment_in, downstream_frames_out, inspector) =
+                frame_reconstructor_with_inspector(state.session_id(), cfg.frame_timeout, cfg.capacity, frame_notifier_tx.sink_map_err(|_| SessionError::InvalidSegment));
 
-        Self::create(
-            transport,
-            state,
-            downstream_segment_in,
-            downstream_frames_out,
-            Some(inspector),
-            cfg,
-        )
+            Self::create(
+                transport,
+                state,
+                downstream_segment_in,
+                downstream_frames_out,
+                Some(inspector),
+                frame_notifier_rx,
+                cfg,
+            )
+        } else {
+            let (downstream_segment_in, downstream_frames_out, inspector) =
+                frame_reconstructor_with_inspector(state.session_id(), cfg.frame_timeout, cfg.capacity, futures::sink::drain().sink_map_err(|_| SessionError::InvalidSegment));
+
+            Self::create(
+                transport,
+                state,
+                downstream_segment_in,
+                downstream_frames_out,
+                Some(inspector),
+                futures::stream::empty(),
+                cfg,
+            )
+        }
     }
 
-    fn create<T, SIn, FOut>(
+    fn create<T, SIn, FOut, FR>(
         transport: T,
         mut state: S,
         downstream_segment_in: SIn,
         downstream_frames_out: FOut,
         inspector: Option<FrameInspector>,
+        reassembled_ids: FR,
         cfg: SessionSocketConfig,
     ) -> Result<Self, SessionError>
     where
         T: futures::io::AsyncRead + futures::io::AsyncWrite + Send + Unpin + 'static,
         SIn: futures::Sink<Segment, Error = SessionError> + Send + 'static,
         FOut: futures::Stream<Item = Result<Frame, SessionError>> + Send + 'static,
+        FR: futures::Stream<Item = FrameId> + Send + 'static,
     {
+        let sub_events = S::subscribed_events();
+
         // Upstream frames get segmented and are yielded by the data_rx stream
         let (upstream_frames_in, segmented_data_rx) = Segmenter::<C>::new(cfg.frame_size, cfg.capacity);
 
@@ -142,6 +167,18 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
         state.run(SocketComponents { inspector, ctl_tx })?;
 
+        // Completed frames in the Reassembler (but not yet sequenced and emitted) are notified to the state
+        // if requested
+        let mut st_1 = state.clone();
+        if sub_events.contains(SocketStateEvent::FrameComplete) {
+            hopr_async_runtime::prelude::spawn(reassembled_ids.for_each(move |frame_id| {
+                if let Err(error) = st_1.frame_complete(frame_id) {
+                    tracing::error!(%error, "frame complete state update failed");
+                }
+                futures::future::ready(())
+            }));
+        }
+
         // Messages incoming from Upstream and from the State go downstream as Packets
         // Segmented data coming from Upstream go out right away.
         let mut st_1 = state.clone();
@@ -151,8 +188,10 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 segmented_data_rx.map(move |s| {
                     // The segment_sent event is raised only for segments coming from Upstream,
                     // not for the segments from the Control stream (= segment resends).
-                    if let Err(error) = st_1.segment_sent(&s) {
-                        tracing::debug!(%error, "outgoing segment state update failed");
+                    if sub_events.contains(SocketStateEvent::SegmentSent) {
+                        if let Err(error) = st_1.segment_sent(&s) {
+                            tracing::debug!(%error, "outgoing segment state update failed");
+                        }
                     }
                     SessionMessage::<C>::Segment(s)
                 }),
@@ -170,7 +209,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         );
 
         // Packets incoming from Downstream:
-        // - if the State requires it, packets passed (cloned) into the State
+        // - if the State requires it, packets passed by-ref into the State
         // - Packets that represent Segments (filtered out) are passed to the Reconstructor
         let mut st_1 = state.clone();
         let mut st_2 = state.clone();
@@ -178,9 +217,16 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             packets_in
                 .try_filter_map(move |packet| {
                     if let Err(error) = match &packet {
-                        SessionMessage::Segment(s) => st_1.incoming_segment(&s.id(), s.seq_len),
-                        SessionMessage::Request(r) => st_1.incoming_retransmission_request(r.clone()),
-                        SessionMessage::Acknowledge(a) => st_1.incoming_acknowledged_frames(a.clone()),
+                        SessionMessage::Segment(s) if sub_events.contains(SocketStateEvent::IncomingSegment) => {
+                            st_1.incoming_segment(&s.id(), s.seq_len)
+                        },
+                        SessionMessage::Request(r) if sub_events.contains(SocketStateEvent::IncomingRetransmissionRequest) => {
+                            st_1.incoming_retransmission_request(r.clone())
+                        },
+                        SessionMessage::Acknowledge(a) if sub_events.contains(SocketStateEvent::IncomingAcknowledgedFrames) => {
+                            st_1.incoming_acknowledged_frames(a.clone())
+                        }
+                        _ => Ok(())
                     } {
                         tracing::debug!(%error, "incoming message state update failed");
                     }
@@ -206,15 +252,19 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         // Filter out discarded Frames and dispatch events to the State if needed
                         future::ready(match maybe_frame {
                             Ok(frame) => {
-                                if let Err(error) = state.frame_emitted(frame.frame_id) {
-                                    tracing::error!(%error, "frame received state update failed");
+                                if sub_events.contains(SocketStateEvent::FrameEmitted) {
+                                    if let Err(error) = state.frame_emitted(frame.frame_id) {
+                                        tracing::error!(%error, "frame received state update failed");
+                                    }
                                 }
                                 Some(Ok(frame))
                             }
                             Err(SessionError::FrameDiscarded(frame_id))
                             | Err(SessionError::IncompleteFrame(frame_id)) => {
-                                if let Err(error) = state.frame_discarded(frame_id) {
-                                    tracing::error!(%error, "frame discarded state update failed");
+                                if sub_events.contains(SocketStateEvent::FrameDiscarded) {
+                                    if let Err(error) = state.frame_discarded(frame_id) {
+                                        tracing::error!(%error, "frame discarded state update failed");
+                                    }
                                 }
                                 None // Downstream skips discarded frames
                             }
@@ -594,7 +644,7 @@ mod tests {
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&data).await?;
         alice_socket.flush().await?;
-        
+
         let mut bob_data = [0u8; DATA_SIZE];
         bob_socket.read_exact(&mut bob_data).await?;
         assert_eq!(data, bob_data);

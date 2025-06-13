@@ -21,8 +21,34 @@ pub struct SocketComponents<const C: usize> {
     pub ctl_tx: UnboundedSender<SessionMessage<C>>,
 }
 
+flagset::flags! {
+    /// Lists all events that a [`SocketState`] would like to subscribe at [`SessionSocket`](crate::session::SessionSocket).
+    pub enum SocketStateEvent: u8 {
+        /// Subscribe to [`SocketState::incoming_segment`].
+        IncomingSegment,
+        /// Subscribe to [`SocketState::segment_sent`].
+        SegmentSent,
+        /// Subscribe to [`SocketState::incoming_retransmission_request`].
+        IncomingRetransmissionRequest,
+        /// Subscribe to [`SocketState::incoming_acknowledged_frames`].
+        IncomingAcknowledgedFrames,
+        /// Subscribe to [`SocketState::frame_emitted`].
+        FrameEmitted,
+        /// Subscribe to [`SocketState::frame_complete`].
+        FrameComplete,
+        /// Subscribe to [`SocketState::frame_discarded`].
+        FrameDiscarded
+    }
+}
+
+/// Type-alias for a set of [`SocketStateEvent`].
+pub type SocketStateEvents = flagset::FlagSet<SocketStateEvent>;
+
 /// Abstraction of the [`SessionSocket`] state.
 pub trait SocketState<const C: usize>: Send {
+    /// Gets the event types this state wants to subscribe to.
+    fn subscribed_events() -> SocketStateEvents;
+
     /// Gets ID of this Session.
     fn session_id(&self) -> &str;
 
@@ -70,6 +96,11 @@ impl<const C: usize> Stateless<C> {
 }
 
 impl<const C: usize> SocketState<C> for Stateless<C> {
+    #[inline]
+    fn subscribed_events() -> SocketStateEvents {
+        None.into()
+    }
+
     fn session_id(&self) -> &str {
         &self.0
     }
@@ -149,6 +180,7 @@ mod tests {
     mockall::mock! {
         SockState {}
         impl SocketState<MTU> for SockState {
+            fn subscribed_events() -> SocketStateEvents;
             fn session_id(&self) -> &str;
             fn run(&mut self, components: SocketComponents<MTU>) -> Result<(), SessionError>;
             fn stop(&mut self) -> Result<(), SessionError>;
@@ -172,6 +204,10 @@ mod tests {
     }
 
     impl<'a> SocketState<MTU> for CloneableMockState<'_> {
+        fn subscribed_events() -> SocketStateEvents {
+            SocketStateEvents::full()
+        }
+
         fn session_id(&self) -> &str {
             let _ = self.0.lock().unwrap().session_id();
             self.1

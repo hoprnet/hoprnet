@@ -36,6 +36,7 @@ bytes = { workspace = true }
 cfg-if = { workspace = true }
 dashmap = { workspace = true }
 flume = { workspace = true }
+flagset = { workspace = true }
 futures = { workspace = true }
 futures-concurrency = { workspace = true }
 futures-time = { workspace = true }
