@@ -7,11 +7,15 @@ name: Build Docker
 env:
   RUST_BACKTRACE: "1"
   needs_nix_setup: false
-
+permissions:
+  contents: read
 on:
   workflow_call:
     inputs:
-      branch:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
         required: true
         type: string
       package:
@@ -41,7 +45,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-          ref: ${{ inputs.branch }}
+          repository: ${{ inputs.source_repo }}
+          ref: ${{ inputs.source_branch }}
 
       # - name: Replace the crates.io registry with a private proxy registry
       #   env:

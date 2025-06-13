@@ -7,7 +7,10 @@ name: Create DappNode Release
 on:
   workflow_call:
     inputs:
-      base_branch:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
         required: true
         type: string
 
@@ -31,7 +34,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-          ref: ${{ inputs.base_branch }}
+          repository: ${{ inputs.source_repo }}
+          ref: ${{ inputs.source_branch }}
 
       - name: Setup GCP
         id: gcp

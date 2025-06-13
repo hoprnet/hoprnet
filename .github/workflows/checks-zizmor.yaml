@@ -1,5 +1,5 @@
 ---
-name: security | zizmor
+name: Zizmor
 
 env:
   needs_nix_setup: false
@@ -7,10 +7,14 @@ env:
 on:
   merge_group:
     types: [checks_requested]
-  pull_request:
-    types:
-      - synchronize
-      - ready_for_review
+  workflow_call:
+    inputs:
+      source_repo:
+        required: true
+        type: string
+      source_branch:
+        required: true
+        type: string
 
 concurrency:
   group: ${{ github.ref }}-zizmor
@@ -20,6 +24,7 @@ permissions: {}
 
 jobs:
   zizmor:
+    name: Zizmor
     runs-on: self-hosted-hoprnet-bigger
     permissions:
       contents: read
@@ -35,6 +40,8 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           persist-credentials: false
+          repository: ${{ inputs.source_repo }}
+          ref: ${{ inputs.source_branch }}
 
       - name: Install Nix
         if: env.needs_nix_setup == true
