@@ -76,6 +76,10 @@ async def bringup(
         # wait before contract deployments are finalized
         await asyncio.sleep(2.5)
 
+        # enable network registry
+        cluster.enable_network_registry()
+        await asyncio.sleep(1)
+
         # fund nodes
         cluster.fund_nodes()
 
@@ -92,6 +96,11 @@ async def bringup(
     # SETUP NODES USING STORED IDENTITIES
     cluster.copy_identities()
     cluster.load_addresses()
+    cluster.load_native_addresses()
+
+    # add nodes to network registry
+    cluster.add_nodes_to_network_registry()
+    await asyncio.sleep(2.5)
 
     # wait before contract deployments are finalized
     await asyncio.sleep(2.5)

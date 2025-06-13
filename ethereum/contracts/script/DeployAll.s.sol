@@ -210,11 +210,12 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
         bool shouldDeployStakingProxy = false;
 
         if (currentEnvironmentType == EnvironmentType.LOCAL && vm.envBool("USE_STAKING_PROXY")) {
-           shouldDeployStakingProxy = true;
+            shouldDeployStakingProxy = true;
         } else if (currentEnvironmentType != EnvironmentType.LOCAL && !isValidAddress(currentNetworkDetail.addresses.networkRegistryProxyContractAddress)) {
             shouldDeployStakingProxy = true;
         }
-        
+        emit log_named_uint("shouldDeployStakingProxy", (shouldDeployStakingProxy ? 1 : 0));
+    
         if (shouldDeployStakingProxy) {
             // deploy StakingProxy in other environment types, if no proxy contract is given.
             // temporarily grant default admin role to the deployer wallet
@@ -232,7 +233,7 @@ contract DeployAllContractsScript is Script, NetworkConfig, ERC1820RegistryFixtu
 
             // swap owner and grant manager role to more wallets
             _helperSwapOwnerGrantManager(
-                currentNetworkDetail.addresses.networkRegistryContractAddress, deployerAddress, owner
+                currentNetworkDetail.addresses.networkRegistryProxyContractAddress, deployerAddress, owner
             );
             // flag isHoprNetworkRegistryDeployed
             isHoprNetworkRegistryDeployed = true;

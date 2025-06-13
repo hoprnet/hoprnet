@@ -33,7 +33,7 @@ usage() {
   msg "-p <port>: Use particular port; default is 8545"
   msg "-ds <state_file>: Use particular state file to dump state on exit"
   msg "-ls <state_file>: Use particular state file to load state on startup"
-  msg "-sp <use_staking_proxy>: Use staking proxy. If not supplied, the script will use the dummy proxy."
+  msg "-sp: Use staking proxy. If not supplied, the script will use the dummy proxy."
   msg
 }
 
@@ -94,14 +94,14 @@ while (("$#")); do
     shift
     shift
     ;;
-  -* | --*=)
-    usage
-    exit 1
-    ;;
   -sp)
     # use staking proxy
     use_staking_proxy="true"
     shift
+    ;;
+  -* | --*=)
+    usage
+    exit 1
     ;;
   *)
     shift
