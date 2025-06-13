@@ -2,33 +2,30 @@ mod reassembly;
 mod segmenter;
 mod sequencer;
 
-use std::sync::Arc;
-use futures::SinkExt;
-use tracing::Instrument;
-
+use futures::{SinkExt, pin_mut};
 pub(crate) use reassembly::Reassembler;
 pub(crate) use segmenter::Segmenter;
 pub(crate) use sequencer::Sequencer;
-
+use tracing::Instrument;
 
 use crate::session::{
     errors::SessionError,
-    frames::{Frame, FrameDashMap, FrameHashMap, FrameInspector, FrameMap, OrderedFrame, Segment},
+    frames::{Frame, FrameDashMap, FrameHashMap, FrameId, FrameInspector, FrameMap, OrderedFrame, Segment},
 };
-use crate::session::frames::FrameId;
 
 fn build_reconstructor<M, R>(
     id: &str,
     reassembler: Reassembler<M>,
     sequencer: Sequencer<OrderedFrame>,
-    reassembled_frame_ids: R,
+    reassembled_ids: R,
 ) -> (
     impl futures::Sink<Segment, Error = SessionError>,
     impl futures::Stream<Item = Result<Frame, SessionError>>,
 )
 where
     M: FrameMap + Send + 'static,
-    R: futures::Sink<FrameId, Error = SessionError> + Send + 'static
+    R: futures::Sink<FrameId> + Clone + Send + Sync + 'static,
+    R::Error: std::error::Error,
 {
     use futures::StreamExt;
 
@@ -37,7 +34,7 @@ where
 
     let id = id.to_string();
     hopr_async_runtime::prelude::spawn(
-        async {
+        async move {
             match rs_stream
                 .filter_map(|maybe_frame| async {
                     // Frames that fail to reassemble will eventually be
@@ -46,16 +43,20 @@ where
                     maybe_frame
                         .inspect_err(|error| tracing::error!(%error, "failed to reassemble frame"))
                         .ok()
-                        .map(|f| Ok(Arc::new(OrderedFrame(f))))
+                        .map(|f| Ok::<_, SessionError>(OrderedFrame(f)))
                 })
-                .forward(
-                    // In Fanout, the first Sink clones the item, processes it and drops the clone.
-                    // After that, the second Sink gets to process the original uncloned value.
-                    // Therefore, when the second Sink calls `into_inner`, it is guaranteed to get the original.
-                    reassembled_frame_ids
-                        .with(|clone: Arc<OrderedFrame>| futures::future::ok::<_, SessionError>(clone.0.frame_id))
-                        .fanout(seq_sink.with(|original: Arc<OrderedFrame>| futures::future::ready(Arc::into_inner(original).ok_or(SessionError::InvalidState("value is guaranteed to be original".into())))))
-                )
+                .forward(seq_sink.with(|frame: OrderedFrame| {
+                    // We cannot use Fanout here, because it would imply either cloning each
+                    // packet or allocating it inside a new Arc (= heap alloc per packet)
+                    let reassembled_ids = reassembled_ids.clone();
+                    async move {
+                        pin_mut!(reassembled_ids);
+                        if let Err(error) = reassembled_ids.send(frame.0.frame_id).await {
+                            tracing::error!(%error, frame_id = frame.0.frame_id, "failed to notify reassembled frame");
+                        }
+                        Ok(frame)
+                    }
+                }))
                 .await
             {
                 Ok(_) => tracing::debug!("frame reconstructor finished"),
@@ -71,15 +72,19 @@ where
 ///
 /// The incoming segments are first reassembled into complete frames by the [`Reassembler`],
 /// and then passed into the [`Sequencer`] which returns them in the right order by the Frame ID.
-pub fn frame_reconstructor(
+pub fn frame_reconstructor<R>(
     id: &str,
     frame_timeout: std::time::Duration,
     capacity: usize,
-    reassembled_frame_ids: impl futures::Sink<FrameId, Error = SessionError> + Send + 'static,
+    reassembled_ids: R,
 ) -> (
     impl futures::Sink<Segment, Error = SessionError>,
     impl futures::Stream<Item = Result<Frame, SessionError>>,
-) {
+)
+where
+    R: futures::Sink<FrameId> + Clone + Send + Sync + 'static,
+    R::Error: std::error::Error,
+{
     build_reconstructor(
         id,
         Reassembler::<FrameHashMap>::new(frame_timeout, capacity),
@@ -88,7 +93,7 @@ pub fn frame_reconstructor(
             capacity,
             ..Default::default()
         }),
-        reassembled_frame_ids,
+        reassembled_ids,
     )
 }
 
@@ -97,16 +102,20 @@ pub fn frame_reconstructor(
 ///
 /// This reconstructor is slower than the one created via [`frame_reconstructor`], but is required
 /// in stateful sockets.
-pub fn frame_reconstructor_with_inspector(
+pub fn frame_reconstructor_with_inspector<R>(
     id: &str,
     frame_timeout: std::time::Duration,
     capacity: usize,
-    reassembled_frame_ids: impl futures::Sink<FrameId, Error = SessionError> + Send + 'static,
+    reassembled_ids: R,
 ) -> (
     impl futures::Sink<Segment, Error = SessionError>,
     impl futures::Stream<Item = Result<Frame, SessionError>>,
     FrameInspector,
-) {
+)
+where
+    R: futures::Sink<FrameId> + Clone + Send + Sync + 'static,
+    R::Error: std::error::Error,
+{
     let reassembler = Reassembler::<FrameDashMap>::new(frame_timeout, capacity);
     let inspector = reassembler.new_inspector();
 
@@ -118,7 +127,7 @@ pub fn frame_reconstructor_with_inspector(
             capacity,
             ..Default::default()
         }),
-        reassembled_frame_ids,
+        reassembled_ids,
     );
 
     (sink, stream, inspector)
@@ -187,7 +196,7 @@ mod tests {
 
         let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
 
-        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_secs(5), 1024, reassm_tx.sink_map_err(|_| SessionError::DataTooLong));
+        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_secs(5), 1024, reassm_tx);
 
         let mut segments = expected
             .iter()
@@ -209,7 +218,7 @@ mod tests {
 
         let mut shuffled_frames = reassm_rx.collect::<Vec<_>>().await;
         shuffled_frames.sort();
-        
+
         assert_eq!(shuffled_frames, (1..=10u32).collect::<Vec<_>>());
 
         let _ = jh.await?;
@@ -228,7 +237,7 @@ mod tests {
 
         let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
 
-        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_millis(50), 1024, reassm_tx.sink_map_err(|_| SessionError::DataTooLong));
+        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_millis(50), 1024, reassm_tx);
 
         let mut segments = expected
             .iter()
@@ -257,7 +266,7 @@ mod tests {
         }
         let mut shuffled_frame_ids = reassm_rx.collect::<Vec<_>>().await;
         shuffled_frame_ids.sort();
-        
+
         assert_eq!(shuffled_frame_ids, (1..=10u32).filter(|&i| i != 4).collect::<Vec<_>>());
 
         let _ = jh.await?;
@@ -268,10 +277,10 @@ mod tests {
     async fn test_segmenter_reconstructor_should_work_together() -> anyhow::Result<()> {
         const DATA_SIZE: usize = 9001;
         const FRAME_SIZE: usize = 1500;
-        
+
         let (mut data_in, segments_out) = Segmenter::<462>::new(FRAME_SIZE, 1024);
         let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
-        let (segments_in, data_out) = frame_reconstructor("test", Duration::from_secs(10), 1024, reassm_tx.sink_map_err(|_| SessionError::DataTooLong));
+        let (segments_in, data_out) = frame_reconstructor("test", Duration::from_secs(10), 1024, reassm_tx);
 
         let jh = tokio::task::spawn(segments_out.map(Ok).forward(segments_in));
 

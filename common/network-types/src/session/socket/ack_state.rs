@@ -16,10 +16,9 @@ use crate::{
     session::{
         frames::{FrameId, FrameInspector, Segment, SegmentId, SeqNum},
         protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
-        socket::state::SocketComponents,
+        socket::state::{SocketComponents, SocketStateEvents},
     },
 };
-use crate::session::socket::state::SocketStateEvents;
 
 /// Indicates the acknowledgement mode of a [stateful](AcknowledgementState) Session socket.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

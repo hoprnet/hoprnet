@@ -7,20 +7,18 @@ use std::{
     time::Duration,
 };
 
-use futures::{FutureExt, StreamExt, TryStreamExt, future, pin_mut, SinkExt};
+use futures::{FutureExt, StreamExt, TryStreamExt, future, pin_mut};
 use futures_concurrency::stream::Merge;
 use state::SocketState;
 use tracing::{Instrument, instrument};
 
 use crate::session::{
     errors::SessionError,
-    frames::{Frame, FrameInspector, Segment},
+    frames::{Frame, FrameId, FrameInspector, Segment},
     processing::{Segmenter, frame_reconstructor, frame_reconstructor_with_inspector},
     protocol::{SessionCodec, SessionMessage},
-    socket::state::{SocketComponents, Stateless},
+    socket::state::{SocketComponents, SocketStateEvent, Stateless},
 };
-use crate::session::frames::FrameId;
-use crate::session::socket::state::SocketStateEvent;
 
 /// Configuration object for [`SessionSocket`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq, smart_default::SmartDefault)]
@@ -78,8 +76,12 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
         // Downstream Segments get reconstructed into Frames,
         // but because we're stateless, we do not have to use frame inspector, which
         // could slow the Session down.
-        let (downstream_segment_in, downstream_frames_out) =
-            frame_reconstructor(state.session_id(), cfg.frame_timeout, cfg.capacity, futures::sink::drain().sink_map_err(|_| SessionError::InvalidState("n/a".into())));
+        let (downstream_segment_in, downstream_frames_out) = frame_reconstructor(
+            state.session_id(),
+            cfg.frame_timeout,
+            cfg.capacity,
+            futures::sink::drain(),
+        );
 
         Self::create(
             transport,
@@ -107,8 +109,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         // Check if we need to also catch the completed (but not yet emitted) frames.
         if S::subscribed_events().contains(SocketStateEvent::FrameComplete) {
             let (frame_notifier_tx, frame_notifier_rx) = futures::channel::mpsc::channel(cfg.capacity);
-            let (downstream_segment_in, downstream_frames_out, inspector) =
-                frame_reconstructor_with_inspector(state.session_id(), cfg.frame_timeout, cfg.capacity, frame_notifier_tx.sink_map_err(|_| SessionError::InvalidSegment));
+            let (downstream_segment_in, downstream_frames_out, inspector) = frame_reconstructor_with_inspector(
+                state.session_id(),
+                cfg.frame_timeout,
+                cfg.capacity,
+                frame_notifier_tx,
+            );
 
             Self::create(
                 transport,
@@ -120,8 +126,12 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 cfg,
             )
         } else {
-            let (downstream_segment_in, downstream_frames_out, inspector) =
-                frame_reconstructor_with_inspector(state.session_id(), cfg.frame_timeout, cfg.capacity, futures::sink::drain().sink_map_err(|_| SessionError::InvalidSegment));
+            let (downstream_segment_in, downstream_frames_out, inspector) = frame_reconstructor_with_inspector(
+                state.session_id(),
+                cfg.frame_timeout,
+                cfg.capacity,
+                futures::sink::drain(),
+            );
 
             Self::create(
                 transport,
@@ -168,15 +178,20 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         state.run(SocketComponents { inspector, ctl_tx })?;
 
         // Completed frames in the Reassembler (but not yet sequenced and emitted) are notified to the state
-        // if requested
+        // if requested. The task terminates instantly when the stream is already empty.
         let mut st_1 = state.clone();
         if sub_events.contains(SocketStateEvent::FrameComplete) {
-            hopr_async_runtime::prelude::spawn(reassembled_ids.for_each(move |frame_id| {
-                if let Err(error) = st_1.frame_complete(frame_id) {
-                    tracing::error!(%error, "frame complete state update failed");
-                }
-                futures::future::ready(())
-            }));
+            hopr_async_runtime::prelude::spawn(
+                reassembled_ids
+                    .for_each(move |frame_id| {
+                        if let Err(error) = st_1.frame_complete(frame_id) {
+                            tracing::error!(%error, "frame complete state update failed");
+                        }
+                        futures::future::ready(())
+                    })
+                    .map(|_| tracing::debug!("frame completion notifications done"))
+                    .instrument(tracing::debug_span!("SessionSocket::frame_complete_notify")),
+            );
         }
 
         // Messages incoming from Upstream and from the State go downstream as Packets
@@ -219,14 +234,18 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                     if let Err(error) = match &packet {
                         SessionMessage::Segment(s) if sub_events.contains(SocketStateEvent::IncomingSegment) => {
                             st_1.incoming_segment(&s.id(), s.seq_len)
-                        },
-                        SessionMessage::Request(r) if sub_events.contains(SocketStateEvent::IncomingRetransmissionRequest) => {
+                        }
+                        SessionMessage::Request(r)
+                            if sub_events.contains(SocketStateEvent::IncomingRetransmissionRequest) =>
+                        {
                             st_1.incoming_retransmission_request(r.clone())
-                        },
-                        SessionMessage::Acknowledge(a) if sub_events.contains(SocketStateEvent::IncomingAcknowledgedFrames) => {
+                        }
+                        SessionMessage::Acknowledge(a)
+                            if sub_events.contains(SocketStateEvent::IncomingAcknowledgedFrames) =>
+                        {
                             st_1.incoming_acknowledged_frames(a.clone())
                         }
-                        _ => Ok(())
+                        _ => Ok(()),
                     } {
                         tracing::debug!(%error, "incoming message state update failed");
                     }
