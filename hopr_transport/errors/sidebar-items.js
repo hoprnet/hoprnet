@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HoprTransportError","NetworkingError","ProbeError","ProtocolError"],"type":["Result"]};

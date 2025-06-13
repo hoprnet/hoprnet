@@ -1,0 +1,873 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `chain/rpc/src/rpc.rs`."><title>rpc.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-84e720fa.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="hopr_chain_rpc" data-themes="" data-resource-suffix="" data-rustdoc-version="1.89.0-nightly (44f415c1d 2025-06-06)" data-channel="nightly" data-search-js="search-f7877310.js" data-settings-js="settings-5514c975.js" ><script src="../../static.files/storage-4e99c027.js"></script><script defer src="../../static.files/src-script-63605ae7.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-fd3af306.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-32bb7600.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">hopr_chain_rpc/</div>rpc.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="doccomment">//! General purpose high-level RPC operations implementation (`HoprRpcOperations`).
+<a href=#2 id=2 data-nosnippet>2</a>//!
+<a href=#3 id=3 data-nosnippet>3</a>//! The purpose of this module is to give implementation of the [HoprRpcOperations] trait:
+<a href=#4 id=4 data-nosnippet>4</a>//! [RpcOperations] type, which is the main API exposed by this crate.
+<a href=#5 id=5 data-nosnippet>5</a></span><span class="kw">use </span>std::{sync::Arc, time::Duration};
+<a href=#6 id=6 data-nosnippet>6</a>
+<a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span>SafeSingleton::SafeSingletonInstance;
+<a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span>alloy::{
+<a href=#9 id=9 data-nosnippet>9</a>    network::EthereumWallet,
+<a href=#10 id=10 data-nosnippet>10</a>    providers::{
+<a href=#11 id=11 data-nosnippet>11</a>        CallItemBuilder, Identity, PendingTransaction, Provider, ProviderBuilder, RootProvider,
+<a href=#12 id=12 data-nosnippet>12</a>        fillers::{
+<a href=#13 id=13 data-nosnippet>13</a>            BlobGasFiller, CachedNonceManager, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
+<a href=#14 id=14 data-nosnippet>14</a>            WalletFiller,
+<a href=#15 id=15 data-nosnippet>15</a>        },
+<a href=#16 id=16 data-nosnippet>16</a>    },
+<a href=#17 id=17 data-nosnippet>17</a>    rpc::{
+<a href=#18 id=18 data-nosnippet>18</a>        client::RpcClient,
+<a href=#19 id=19 data-nosnippet>19</a>        types::{Block, TransactionRequest},
+<a href=#20 id=20 data-nosnippet>20</a>    },
+<a href=#21 id=21 data-nosnippet>21</a>    signers::local::PrivateKeySigner,
+<a href=#22 id=22 data-nosnippet>22</a>    sol,
+<a href=#23 id=23 data-nosnippet>23</a>};
+<a href=#24 id=24 data-nosnippet>24</a><span class="kw">use </span>async_trait::async_trait;
+<a href=#25 id=25 data-nosnippet>25</a><span class="kw">use </span>hopr_bindings::hoprnodemanagementmodule::HoprNodeManagementModule::{<span class="self">self</span>, HoprNodeManagementModuleInstance};
+<a href=#26 id=26 data-nosnippet>26</a><span class="kw">use </span>hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy};
+<a href=#27 id=27 data-nosnippet>27</a><span class="kw">use </span>hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+<a href=#28 id=28 data-nosnippet>28</a><span class="kw">use </span>hopr_internal_types::prelude::{EncodedWinProb, WinningProbability};
+<a href=#29 id=29 data-nosnippet>29</a><span class="kw">use </span>hopr_primitive_types::prelude::<span class="kw-2">*</span>;
+<a href=#30 id=30 data-nosnippet>30</a><span class="kw">use </span>primitive_types::U256;
+<a href=#31 id=31 data-nosnippet>31</a><span class="kw">use </span>serde::{Deserialize, Serialize};
+<a href=#32 id=32 data-nosnippet>32</a><span class="kw">use </span>tracing::debug;
+<a href=#33 id=33 data-nosnippet>33</a><span class="kw">use </span>url::Url;
+<a href=#34 id=34 data-nosnippet>34</a><span class="kw">use </span>validator::Validate;
+<a href=#35 id=35 data-nosnippet>35</a>
+<a href=#36 id=36 data-nosnippet>36</a><span class="comment">// use crate::middleware::GnosisScan;
+<a href=#37 id=37 data-nosnippet>37</a></span><span class="kw">use crate</span>::{
+<a href=#38 id=38 data-nosnippet>38</a>    HoprRpcOperations, NodeSafeModuleStatus,
+<a href=#39 id=39 data-nosnippet>39</a>    client::GasOracleFiller,
+<a href=#40 id=40 data-nosnippet>40</a>    errors::{<span class="prelude-ty">Result</span>, RpcError},
+<a href=#41 id=41 data-nosnippet>41</a>    transport::HttpRequestor,
+<a href=#42 id=42 data-nosnippet>42</a>};
+<a href=#43 id=43 data-nosnippet>43</a>
+<a href=#44 id=44 data-nosnippet>44</a><span class="comment">// define basic safe abi
+<a href=#45 id=45 data-nosnippet>45</a></span><span class="macro">sol!</span>(
+<a href=#46 id=46 data-nosnippet>46</a>    <span class="attr">#![sol(abi)]
+<a href=#47 id=47 data-nosnippet>47</a>    #![sol(rpc)]
+<a href=#48 id=48 data-nosnippet>48</a>    </span>contract SafeSingleton {
+<a href=#49 id=49 data-nosnippet>49</a>        function isModuleEnabled(address module) public view returns (bool);
+<a href=#50 id=50 data-nosnippet>50</a>    }
+<a href=#51 id=51 data-nosnippet>51</a>);
+<a href=#52 id=52 data-nosnippet>52</a>
+<a href=#53 id=53 data-nosnippet>53</a><span class="doccomment">/// Default gas oracle URL for Gnosis chain.
+<a href=#54 id=54 data-nosnippet>54</a></span><span class="kw">pub const </span>DEFAULT_GAS_ORACLE_URL: <span class="kw-2">&amp;</span>str = <span class="string">"https://ggnosis.blockscan.com/gasapi.ashx?apikey=key&amp;method=gasoracle"</span>;
+<a href=#55 id=55 data-nosnippet>55</a>
+<a href=#56 id=56 data-nosnippet>56</a><span class="doccomment">/// Configuration of the RPC related parameters.
+<a href=#57 id=57 data-nosnippet>57</a></span><span class="attr">#[derive(Clone, Debug, PartialEq, Eq, smart_default::SmartDefault, Serialize, Deserialize, Validate)]
+<a href=#58 id=58 data-nosnippet>58</a></span><span class="kw">pub struct </span>RpcOperationsConfig {
+<a href=#59 id=59 data-nosnippet>59</a>    <span class="doccomment">/// Blockchain id
+<a href=#60 id=60 data-nosnippet>60</a>    ///
+<a href=#61 id=61 data-nosnippet>61</a>    /// Default is 100.
+<a href=#62 id=62 data-nosnippet>62</a>    </span><span class="attr">#[default = <span class="number">100</span>]
+<a href=#63 id=63 data-nosnippet>63</a>    </span><span class="kw">pub </span>chain_id: u64,
+<a href=#64 id=64 data-nosnippet>64</a>    <span class="doccomment">/// Addresses of all deployed contracts
+<a href=#65 id=65 data-nosnippet>65</a>    ///
+<a href=#66 id=66 data-nosnippet>66</a>    /// Default contains empty (null) addresses.
+<a href=#67 id=67 data-nosnippet>67</a>    </span><span class="kw">pub </span>contract_addrs: ContractAddresses,
+<a href=#68 id=68 data-nosnippet>68</a>    <span class="doccomment">/// Address of the node's module.
+<a href=#69 id=69 data-nosnippet>69</a>    ///
+<a href=#70 id=70 data-nosnippet>70</a>    /// Defaults to null address.
+<a href=#71 id=71 data-nosnippet>71</a>    </span><span class="kw">pub </span>module_address: Address,
+<a href=#72 id=72 data-nosnippet>72</a>    <span class="doccomment">/// Address of the node's safe contract.
+<a href=#73 id=73 data-nosnippet>73</a>    ///
+<a href=#74 id=74 data-nosnippet>74</a>    /// Defaults to null address.
+<a href=#75 id=75 data-nosnippet>75</a>    </span><span class="kw">pub </span>safe_address: Address,
+<a href=#76 id=76 data-nosnippet>76</a>    <span class="doccomment">/// Expected block time of the blockchain
+<a href=#77 id=77 data-nosnippet>77</a>    ///
+<a href=#78 id=78 data-nosnippet>78</a>    /// Defaults to 5 seconds
+<a href=#79 id=79 data-nosnippet>79</a>    </span><span class="attr">#[default(Duration::from_secs(<span class="number">5</span>))]
+<a href=#80 id=80 data-nosnippet>80</a>    </span><span class="kw">pub </span>expected_block_time: Duration,
+<a href=#81 id=81 data-nosnippet>81</a>    <span class="doccomment">/// The largest amount of blocks to fetch at once when fetching a range of blocks.
+<a href=#82 id=82 data-nosnippet>82</a>    ///
+<a href=#83 id=83 data-nosnippet>83</a>    /// If the requested block range size is N, then the client will always fetch `min(N, max_block_range_fetch_size)`
+<a href=#84 id=84 data-nosnippet>84</a>    ///
+<a href=#85 id=85 data-nosnippet>85</a>    /// Defaults to 2000 blocks
+<a href=#86 id=86 data-nosnippet>86</a>    </span><span class="attr">#[validate(range(min = <span class="number">1</span>))]
+<a href=#87 id=87 data-nosnippet>87</a>    #[default = <span class="number">2000</span>]
+<a href=#88 id=88 data-nosnippet>88</a>    </span><span class="kw">pub </span>max_block_range_fetch_size: u64,
+<a href=#89 id=89 data-nosnippet>89</a>    <span class="doccomment">/// Interval for polling on TX submission
+<a href=#90 id=90 data-nosnippet>90</a>    ///
+<a href=#91 id=91 data-nosnippet>91</a>    /// Defaults to 7 seconds.
+<a href=#92 id=92 data-nosnippet>92</a>    </span><span class="attr">#[default(Duration::from_secs(<span class="number">7</span>))]
+<a href=#93 id=93 data-nosnippet>93</a>    </span><span class="kw">pub </span>tx_polling_interval: Duration,
+<a href=#94 id=94 data-nosnippet>94</a>    <span class="doccomment">/// Finalization chain length
+<a href=#95 id=95 data-nosnippet>95</a>    ///
+<a href=#96 id=96 data-nosnippet>96</a>    /// The number of blocks including and decreasing from the chain HEAD
+<a href=#97 id=97 data-nosnippet>97</a>    /// that the logs will be buffered for before being considered
+<a href=#98 id=98 data-nosnippet>98</a>    /// successfully joined to the chain.
+<a href=#99 id=99 data-nosnippet>99</a>    ///
+<a href=#100 id=100 data-nosnippet>100</a>    /// Defaults to 8
+<a href=#101 id=101 data-nosnippet>101</a>    </span><span class="attr">#[validate(range(min = <span class="number">1</span>, max = <span class="number">100</span>))]
+<a href=#102 id=102 data-nosnippet>102</a>    #[default = <span class="number">8</span>]
+<a href=#103 id=103 data-nosnippet>103</a>    </span><span class="kw">pub </span>finality: u32,
+<a href=#104 id=104 data-nosnippet>104</a>    <span class="doccomment">/// URL to the gas price oracle.
+<a href=#105 id=105 data-nosnippet>105</a>    ///
+<a href=#106 id=106 data-nosnippet>106</a>    /// Defaults to [`DEFAULT_GAS_ORACLE_URL`].
+<a href=#107 id=107 data-nosnippet>107</a>    </span><span class="attr">#[default(<span class="prelude-val">Some</span>(DEFAULT_GAS_ORACLE_URL.parse().unwrap()))]
+<a href=#108 id=108 data-nosnippet>108</a>    </span><span class="kw">pub </span>gas_oracle_url: <span class="prelude-ty">Option</span>&lt;Url&gt;,
+<a href=#109 id=109 data-nosnippet>109</a>}
+<a href=#110 id=110 data-nosnippet>110</a>
+<a href=#111 id=111 data-nosnippet>111</a><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">type </span>HoprProvider&lt;R&gt; = FillProvider&lt;
+<a href=#112 id=112 data-nosnippet>112</a>    JoinFill&lt;
+<a href=#113 id=113 data-nosnippet>113</a>        JoinFill&lt;
+<a href=#114 id=114 data-nosnippet>114</a>            JoinFill&lt;
+<a href=#115 id=115 data-nosnippet>115</a>                JoinFill&lt;
+<a href=#116 id=116 data-nosnippet>116</a>                    JoinFill&lt;JoinFill&lt;Identity, WalletFiller&lt;EthereumWallet&gt;&gt;, ChainIdFiller&gt;,
+<a href=#117 id=117 data-nosnippet>117</a>                    NonceFiller&lt;CachedNonceManager&gt;,
+<a href=#118 id=118 data-nosnippet>118</a>                &gt;,
+<a href=#119 id=119 data-nosnippet>119</a>                GasFiller,
+<a href=#120 id=120 data-nosnippet>120</a>            &gt;,
+<a href=#121 id=121 data-nosnippet>121</a>            GasOracleFiller&lt;R&gt;,
+<a href=#122 id=122 data-nosnippet>122</a>        &gt;,
+<a href=#123 id=123 data-nosnippet>123</a>        BlobGasFiller,
+<a href=#124 id=124 data-nosnippet>124</a>    &gt;,
+<a href=#125 id=125 data-nosnippet>125</a>    RootProvider,
+<a href=#126 id=126 data-nosnippet>126</a>&gt;;
+<a href=#127 id=127 data-nosnippet>127</a>
+<a href=#128 id=128 data-nosnippet>128</a><span class="doccomment">/// Implementation of `HoprRpcOperations` and `HoprIndexerRpcOperations` trait via `alloy`
+<a href=#129 id=129 data-nosnippet>129</a></span><span class="attr">#[derive(Debug, Clone)]
+<a href=#130 id=130 data-nosnippet>130</a></span><span class="kw">pub struct </span>RpcOperations&lt;R: HttpRequestor + <span class="lifetime">'static </span>+ Clone&gt; {
+<a href=#131 id=131 data-nosnippet>131</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) provider: Arc&lt;HoprProvider&lt;R&gt;&gt;,
+<a href=#132 id=132 data-nosnippet>132</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) cfg: RpcOperationsConfig,
+<a href=#133 id=133 data-nosnippet>133</a>    contract_instances: Arc&lt;ContractInstances&lt;HoprProvider&lt;R&gt;&gt;&gt;,
+<a href=#134 id=134 data-nosnippet>134</a>    node_module: HoprNodeManagementModuleInstance&lt;HoprProvider&lt;R&gt;&gt;,
+<a href=#135 id=135 data-nosnippet>135</a>    node_safe: SafeSingletonInstance&lt;HoprProvider&lt;R&gt;&gt;,
+<a href=#136 id=136 data-nosnippet>136</a>}
+<a href=#137 id=137 data-nosnippet>137</a>
+<a href=#138 id=138 data-nosnippet>138</a><span class="kw">impl</span>&lt;R: HttpRequestor + <span class="lifetime">'static </span>+ Clone&gt; RpcOperations&lt;R&gt; {
+<a href=#139 id=139 data-nosnippet>139</a>    <span class="kw">pub fn </span>new(
+<a href=#140 id=140 data-nosnippet>140</a>        rpc_client: RpcClient,
+<a href=#141 id=141 data-nosnippet>141</a>        requestor: R,
+<a href=#142 id=142 data-nosnippet>142</a>        chain_key: <span class="kw-2">&amp;</span>ChainKeypair,
+<a href=#143 id=143 data-nosnippet>143</a>        cfg: RpcOperationsConfig,
+<a href=#144 id=144 data-nosnippet>144</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>&gt; {
+<a href=#145 id=145 data-nosnippet>145</a>        <span class="kw">let </span>wallet =
+<a href=#146 id=146 data-nosnippet>146</a>            PrivateKeySigner::from_slice(chain_key.secret().as_ref()).map_err(|e| RpcError::SignerError(e.into()))<span class="question-mark">?</span>;
+<a href=#147 id=147 data-nosnippet>147</a>
+<a href=#148 id=148 data-nosnippet>148</a>        <span class="kw">let </span>provider = ProviderBuilder::new()
+<a href=#149 id=149 data-nosnippet>149</a>            .disable_recommended_fillers()
+<a href=#150 id=150 data-nosnippet>150</a>            .wallet(wallet)
+<a href=#151 id=151 data-nosnippet>151</a>            .filler(ChainIdFiller::default())
+<a href=#152 id=152 data-nosnippet>152</a>            .filler(NonceFiller::new(CachedNonceManager::default()))
+<a href=#153 id=153 data-nosnippet>153</a>            .filler(GasFiller)
+<a href=#154 id=154 data-nosnippet>154</a>            .filler(GasOracleFiller::new(requestor.clone(), cfg.gas_oracle_url.clone()))
+<a href=#155 id=155 data-nosnippet>155</a>            .filler(BlobGasFiller)
+<a href=#156 id=156 data-nosnippet>156</a>            .connect_client(rpc_client);
+<a href=#157 id=157 data-nosnippet>157</a>
+<a href=#158 id=158 data-nosnippet>158</a>        <span class="macro">debug!</span>(<span class="string">"{:?}"</span>, cfg.contract_addrs);
+<a href=#159 id=159 data-nosnippet>159</a>
+<a href=#160 id=160 data-nosnippet>160</a>        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+<a href=#161 id=161 data-nosnippet>161</a>            contract_instances: Arc::new(ContractInstances::new(
+<a href=#162 id=162 data-nosnippet>162</a>                <span class="kw-2">&amp;</span>cfg.contract_addrs,
+<a href=#163 id=163 data-nosnippet>163</a>                provider.clone(),
+<a href=#164 id=164 data-nosnippet>164</a>                <span class="macro">cfg!</span>(test),
+<a href=#165 id=165 data-nosnippet>165</a>            )),
+<a href=#166 id=166 data-nosnippet>166</a>            node_module: HoprNodeManagementModule::new(cfg.module_address.into(), provider.clone()),
+<a href=#167 id=167 data-nosnippet>167</a>            node_safe: SafeSingleton::new(cfg.safe_address.into(), provider.clone()),
+<a href=#168 id=168 data-nosnippet>168</a>            cfg,
+<a href=#169 id=169 data-nosnippet>169</a>            provider: Arc::new(provider),
+<a href=#170 id=170 data-nosnippet>170</a>        })
+<a href=#171 id=171 data-nosnippet>171</a>    }
+<a href=#172 id=172 data-nosnippet>172</a>
+<a href=#173 id=173 data-nosnippet>173</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">async fn </span>get_block_number(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;u64&gt; {
+<a href=#174 id=174 data-nosnippet>174</a>        <span class="prelude-val">Ok</span>(<span class="self">self
+<a href=#175 id=175 data-nosnippet>175</a>            </span>.provider
+<a href=#176 id=176 data-nosnippet>176</a>            .get_block_number()
+<a href=#177 id=177 data-nosnippet>177</a>            .<span class="kw">await</span><span class="question-mark">?
+<a href=#178 id=178 data-nosnippet>178</a>            </span>.saturating_sub(<span class="self">self</span>.cfg.finality <span class="kw">as </span>u64))
+<a href=#179 id=179 data-nosnippet>179</a>    }
+<a href=#180 id=180 data-nosnippet>180</a>
+<a href=#181 id=181 data-nosnippet>181</a>    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">async fn </span>get_block(<span class="kw-2">&amp;</span><span class="self">self</span>, block_number: u64) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;Block&gt;&gt; {
+<a href=#182 id=182 data-nosnippet>182</a>        <span class="kw">let </span>sanitized_block_number = block_number.saturating_sub(<span class="self">self</span>.cfg.finality <span class="kw">as </span>u64);
+<a href=#183 id=183 data-nosnippet>183</a>        <span class="kw">let </span>result = <span class="self">self</span>.provider.get_block_by_number(sanitized_block_number.into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#184 id=184 data-nosnippet>184</a>        <span class="prelude-val">Ok</span>(result)
+<a href=#185 id=185 data-nosnippet>185</a>    }
+<a href=#186 id=186 data-nosnippet>186</a>}
+<a href=#187 id=187 data-nosnippet>187</a>
+<a href=#188 id=188 data-nosnippet>188</a><span class="attr">#[async_trait]
+<a href=#189 id=189 data-nosnippet>189</a></span><span class="kw">impl</span>&lt;R: HttpRequestor + <span class="lifetime">'static </span>+ Clone&gt; HoprRpcOperations <span class="kw">for </span>RpcOperations&lt;R&gt; {
+<a href=#190 id=190 data-nosnippet>190</a>    <span class="kw">async fn </span>get_timestamp(<span class="kw-2">&amp;</span><span class="self">self</span>, block_number: u64) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;u64&gt;&gt; {
+<a href=#191 id=191 data-nosnippet>191</a>        <span class="prelude-val">Ok</span>(<span class="self">self</span>.get_block(block_number).<span class="kw">await</span><span class="question-mark">?</span>.map(|b| b.header.timestamp))
+<a href=#192 id=192 data-nosnippet>192</a>    }
+<a href=#193 id=193 data-nosnippet>193</a>
+<a href=#194 id=194 data-nosnippet>194</a>    <span class="kw">async fn </span>get_balance&lt;C: Currency + Send&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="prelude-ty">Result</span>&lt;Balance&lt;C&gt;&gt; {
+<a href=#195 id=195 data-nosnippet>195</a>        <span class="kw">let </span>value = <span class="kw">if </span>C::is::&lt;XDai&gt;() {
+<a href=#196 id=196 data-nosnippet>196</a>            U256::from_be_bytes(<span class="self">self</span>.provider.get_balance(address.into()).<span class="kw">await</span><span class="question-mark">?</span>.to_be_bytes::&lt;<span class="number">32</span>&gt;())
+<a href=#197 id=197 data-nosnippet>197</a>        } <span class="kw">else if </span>C::is::&lt;WxHOPR&gt;() {
+<a href=#198 id=198 data-nosnippet>198</a>            U256::from_be_bytes(
+<a href=#199 id=199 data-nosnippet>199</a>                <span class="self">self</span>.contract_instances
+<a href=#200 id=200 data-nosnippet>200</a>                    .token
+<a href=#201 id=201 data-nosnippet>201</a>                    .balanceOf(address.into())
+<a href=#202 id=202 data-nosnippet>202</a>                    .call()
+<a href=#203 id=203 data-nosnippet>203</a>                    .<span class="kw">await</span><span class="question-mark">?
+<a href=#204 id=204 data-nosnippet>204</a>                    </span>.to_be_bytes::&lt;<span class="number">32</span>&gt;(),
+<a href=#205 id=205 data-nosnippet>205</a>            )
+<a href=#206 id=206 data-nosnippet>206</a>        } <span class="kw">else </span>{
+<a href=#207 id=207 data-nosnippet>207</a>            <span class="kw">return </span><span class="prelude-val">Err</span>(RpcError::Other(<span class="string">"unknown currency"</span>.into()));
+<a href=#208 id=208 data-nosnippet>208</a>        };
+<a href=#209 id=209 data-nosnippet>209</a>
+<a href=#210 id=210 data-nosnippet>210</a>        <span class="prelude-val">Ok</span>(Balance::&lt;C&gt;::from(value))
+<a href=#211 id=211 data-nosnippet>211</a>    }
+<a href=#212 id=212 data-nosnippet>212</a>
+<a href=#213 id=213 data-nosnippet>213</a>    <span class="kw">async fn </span>get_minimum_network_winning_probability(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;WinningProbability&gt; {
+<a href=#214 id=214 data-nosnippet>214</a>        <span class="kw">match </span><span class="self">self</span>.contract_instances.win_prob_oracle.currentWinProb().call().<span class="kw">await </span>{
+<a href=#215 id=215 data-nosnippet>215</a>            <span class="prelude-val">Ok</span>(encoded_win_prob) =&gt; {
+<a href=#216 id=216 data-nosnippet>216</a>                <span class="kw">let </span><span class="kw-2">mut </span>encoded: EncodedWinProb = Default::default();
+<a href=#217 id=217 data-nosnippet>217</a>                encoded.copy_from_slice(<span class="kw-2">&amp;</span>encoded_win_prob.to_be_bytes_vec());
+<a href=#218 id=218 data-nosnippet>218</a>                <span class="prelude-val">Ok</span>(encoded.into())
+<a href=#219 id=219 data-nosnippet>219</a>            }
+<a href=#220 id=220 data-nosnippet>220</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="prelude-val">Err</span>(e.into()),
+<a href=#221 id=221 data-nosnippet>221</a>        }
+<a href=#222 id=222 data-nosnippet>222</a>    }
+<a href=#223 id=223 data-nosnippet>223</a>
+<a href=#224 id=224 data-nosnippet>224</a>    <span class="kw">async fn </span>get_minimum_network_ticket_price(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;HoprBalance&gt; {
+<a href=#225 id=225 data-nosnippet>225</a>        <span class="prelude-val">Ok</span>(<span class="self">self
+<a href=#226 id=226 data-nosnippet>226</a>            </span>.contract_instances
+<a href=#227 id=227 data-nosnippet>227</a>            .price_oracle
+<a href=#228 id=228 data-nosnippet>228</a>            .currentTicketPrice()
+<a href=#229 id=229 data-nosnippet>229</a>            .call()
+<a href=#230 id=230 data-nosnippet>230</a>            .<span class="kw">await
+<a href=#231 id=231 data-nosnippet>231</a>            </span>.map(|v| HoprBalance::from(U256::from_be_bytes(v.to_be_bytes::&lt;<span class="number">32</span>&gt;())))<span class="question-mark">?</span>)
+<a href=#232 id=232 data-nosnippet>232</a>    }
+<a href=#233 id=233 data-nosnippet>233</a>
+<a href=#234 id=234 data-nosnippet>234</a>    <span class="kw">async fn </span>get_eligibility_status(<span class="kw-2">&amp;</span><span class="self">self</span>, address: Address) -&gt; <span class="prelude-ty">Result</span>&lt;bool&gt; {
+<a href=#235 id=235 data-nosnippet>235</a>        <span class="comment">// 2) check if the node is registered to an account. In case the selfRegister is disabled
+<a href=#236 id=236 data-nosnippet>236</a>        // (i.e., when the staking threshold is zero) this value is used to check if the node is eligible
+<a href=#237 id=237 data-nosnippet>237</a>        </span><span class="kw">let </span>tx_2 = CallItemBuilder::new(
+<a href=#238 id=238 data-nosnippet>238</a>            <span class="self">self</span>.contract_instances
+<a href=#239 id=239 data-nosnippet>239</a>                .network_registry
+<a href=#240 id=240 data-nosnippet>240</a>                .nodeRegisterdToAccount(address.into()),
+<a href=#241 id=241 data-nosnippet>241</a>        )
+<a href=#242 id=242 data-nosnippet>242</a>        .allow_failure(<span class="bool-val">false</span>);
+<a href=#243 id=243 data-nosnippet>243</a>
+<a href=#244 id=244 data-nosnippet>244</a>        <span class="comment">// 3) check if the node is registered and eligible
+<a href=#245 id=245 data-nosnippet>245</a>        </span><span class="kw">let </span>tx_3 = CallItemBuilder::new(
+<a href=#246 id=246 data-nosnippet>246</a>            <span class="self">self</span>.contract_instances
+<a href=#247 id=247 data-nosnippet>247</a>                .network_registry
+<a href=#248 id=248 data-nosnippet>248</a>                .isNodeRegisteredAndEligible(address.into()),
+<a href=#249 id=249 data-nosnippet>249</a>        )
+<a href=#250 id=250 data-nosnippet>250</a>        .allow_failure(<span class="bool-val">true</span>);
+<a href=#251 id=251 data-nosnippet>251</a>
+<a href=#252 id=252 data-nosnippet>252</a>        <span class="comment">// 1) check if the staking threshold set in the implementation is above zero
+<a href=#253 id=253 data-nosnippet>253</a>        </span><span class="kw">let </span>(stake_threshold, node_registration, quick_check) = <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.contract_instances.network_registry_proxy {
+<a href=#254 id=254 data-nosnippet>254</a>            NetworkRegistryProxy::Dummy(c) =&gt; {
+<a href=#255 id=255 data-nosnippet>255</a>                <span class="kw">let </span>tx_1_dummy = CallItemBuilder::new(c.maxAllowedRegistrations(address.into())).allow_failure(<span class="bool-val">false</span>);
+<a href=#256 id=256 data-nosnippet>256</a>                <span class="kw">let </span>multicall = <span class="self">self
+<a href=#257 id=257 data-nosnippet>257</a>                    </span>.provider
+<a href=#258 id=258 data-nosnippet>258</a>                    .multicall()
+<a href=#259 id=259 data-nosnippet>259</a>                    .add_call(tx_1_dummy)
+<a href=#260 id=260 data-nosnippet>260</a>                    .add_call(tx_2)
+<a href=#261 id=261 data-nosnippet>261</a>                    .add_call(tx_3);
+<a href=#262 id=262 data-nosnippet>262</a>                <span class="kw">let </span>(max_allowed_registration, node_registered_to_account, quick_check) =
+<a href=#263 id=263 data-nosnippet>263</a>                    multicall.aggregate3_value().<span class="kw">await</span>.map_err(RpcError::MulticallError)<span class="question-mark">?</span>;
+<a href=#264 id=264 data-nosnippet>264</a>                (
+<a href=#265 id=265 data-nosnippet>265</a>                    max_allowed_registration
+<a href=#266 id=266 data-nosnippet>266</a>                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))<span class="question-mark">?</span>,
+<a href=#267 id=267 data-nosnippet>267</a>                    node_registered_to_account
+<a href=#268 id=268 data-nosnippet>268</a>                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))<span class="question-mark">?</span>,
+<a href=#269 id=269 data-nosnippet>269</a>                    quick_check,
+<a href=#270 id=270 data-nosnippet>270</a>                )
+<a href=#271 id=271 data-nosnippet>271</a>            }
+<a href=#272 id=272 data-nosnippet>272</a>            NetworkRegistryProxy::Safe(c) =&gt; {
+<a href=#273 id=273 data-nosnippet>273</a>                <span class="kw">let </span>tx_1_proxy = CallItemBuilder::new(c.stakeThreshold()).allow_failure(<span class="bool-val">false</span>);
+<a href=#274 id=274 data-nosnippet>274</a>                <span class="kw">let </span>multicall = <span class="self">self
+<a href=#275 id=275 data-nosnippet>275</a>                    </span>.provider
+<a href=#276 id=276 data-nosnippet>276</a>                    .multicall()
+<a href=#277 id=277 data-nosnippet>277</a>                    .add_call(tx_1_proxy)
+<a href=#278 id=278 data-nosnippet>278</a>                    .add_call(tx_2)
+<a href=#279 id=279 data-nosnippet>279</a>                    .add_call(tx_3);
+<a href=#280 id=280 data-nosnippet>280</a>                <span class="kw">let </span>(stake_threshold, node_registered_to_account, quick_check) =
+<a href=#281 id=281 data-nosnippet>281</a>                    multicall.aggregate3_value().<span class="kw">await</span>.map_err(RpcError::MulticallError)<span class="question-mark">?</span>;
+<a href=#282 id=282 data-nosnippet>282</a>                (
+<a href=#283 id=283 data-nosnippet>283</a>                    stake_threshold.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))<span class="question-mark">?</span>,
+<a href=#284 id=284 data-nosnippet>284</a>                    node_registered_to_account
+<a href=#285 id=285 data-nosnippet>285</a>                        .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))<span class="question-mark">?</span>,
+<a href=#286 id=286 data-nosnippet>286</a>                    quick_check,
+<a href=#287 id=287 data-nosnippet>287</a>                )
+<a href=#288 id=288 data-nosnippet>288</a>            }
+<a href=#289 id=289 data-nosnippet>289</a>        };
+<a href=#290 id=290 data-nosnippet>290</a>
+<a href=#291 id=291 data-nosnippet>291</a>        <span class="kw">match </span><span class="kw-2">&amp;</span>quick_check {
+<a href=#292 id=292 data-nosnippet>292</a>            <span class="prelude-val">Ok</span>(eligibility_quick_check) =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="kw-2">*</span>eligibility_quick_check),
+<a href=#293 id=293 data-nosnippet>293</a>            <span class="prelude-val">Err</span>(e) =&gt; {
+<a href=#294 id=294 data-nosnippet>294</a>                <span class="comment">// check in details what is the failure message
+<a href=#295 id=295 data-nosnippet>295</a>                // The "division by zero" error is caused by the self-registration,
+<a href=#296 id=296 data-nosnippet>296</a>                // which is forbidden to the public and thus returns false
+<a href=#297 id=297 data-nosnippet>297</a>                // therefore the eligibility check should be ignored
+<a href=#298 id=298 data-nosnippet>298</a>                // In EVM it returns `Panic(0x12)` error, where `0x4e487b71` is the function selector
+<a href=#299 id=299 data-nosnippet>299</a>                // https://docs.soliditylang.org/en/v0.8.12/control-structures.html#panic-via-assert-and-error-via-require
+<a href=#300 id=300 data-nosnippet>300</a>                </span><span class="kw">if </span>e.return_data.starts_with(<span class="kw-2">&amp;</span>[<span class="number">0x4e</span>, <span class="number">0x48</span>, <span class="number">0x7b</span>, <span class="number">0x71</span>])
+<a href=#301 id=301 data-nosnippet>301</a>                    &amp;&amp; e.return_data[e.return_data.len() - <span class="number">1</span>] == <span class="number">0x12
+<a href=#302 id=302 data-nosnippet>302</a>                </span>{
+<a href=#303 id=303 data-nosnippet>303</a>                    <span class="comment">// when receiving division by zero error, if the staking threshold is zero
+<a href=#304 id=304 data-nosnippet>304</a>                    // and registered account is not zero, return true
+<a href=#305 id=305 data-nosnippet>305</a>                    </span><span class="kw">return </span><span class="prelude-val">Ok</span>(stake_threshold.is_zero() &amp;&amp; !node_registration.is_zero());
+<a href=#306 id=306 data-nosnippet>306</a>                }
+<a href=#307 id=307 data-nosnippet>307</a>                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">false</span>);
+<a href=#308 id=308 data-nosnippet>308</a>            }
+<a href=#309 id=309 data-nosnippet>309</a>        }
+<a href=#310 id=310 data-nosnippet>310</a>    }
+<a href=#311 id=311 data-nosnippet>311</a>
+<a href=#312 id=312 data-nosnippet>312</a>    <span class="kw">async fn </span>get_node_management_module_target_info(<span class="kw-2">&amp;</span><span class="self">self</span>, target: Address) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;U256&gt;&gt; {
+<a href=#313 id=313 data-nosnippet>313</a>        <span class="kw">match </span><span class="self">self</span>.node_module.tryGetTarget(target.into()).call().<span class="kw">await </span>{
+<a href=#314 id=314 data-nosnippet>314</a>            <span class="prelude-val">Ok</span>(returned_result) =&gt; <span class="prelude-val">Ok</span>(returned_result
+<a href=#315 id=315 data-nosnippet>315</a>                ._0
+<a href=#316 id=316 data-nosnippet>316</a>                .then_some(U256::from_big_endian(returned_result._1.to_be_bytes_vec().as_slice()))),
+<a href=#317 id=317 data-nosnippet>317</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="prelude-val">Err</span>(e.into()),
+<a href=#318 id=318 data-nosnippet>318</a>        }
+<a href=#319 id=319 data-nosnippet>319</a>    }
+<a href=#320 id=320 data-nosnippet>320</a>
+<a href=#321 id=321 data-nosnippet>321</a>    <span class="kw">async fn </span>get_safe_from_node_safe_registry(<span class="kw-2">&amp;</span><span class="self">self</span>, node_address: Address) -&gt; <span class="prelude-ty">Result</span>&lt;Address&gt; {
+<a href=#322 id=322 data-nosnippet>322</a>        <span class="kw">match </span><span class="self">self
+<a href=#323 id=323 data-nosnippet>323</a>            </span>.contract_instances
+<a href=#324 id=324 data-nosnippet>324</a>            .safe_registry
+<a href=#325 id=325 data-nosnippet>325</a>            .nodeToSafe(node_address.into())
+<a href=#326 id=326 data-nosnippet>326</a>            .call()
+<a href=#327 id=327 data-nosnippet>327</a>            .<span class="kw">await
+<a href=#328 id=328 data-nosnippet>328</a>        </span>{
+<a href=#329 id=329 data-nosnippet>329</a>            <span class="prelude-val">Ok</span>(returned_result) =&gt; <span class="prelude-val">Ok</span>(returned_result.into()),
+<a href=#330 id=330 data-nosnippet>330</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="prelude-val">Err</span>(e.into()),
+<a href=#331 id=331 data-nosnippet>331</a>        }
+<a href=#332 id=332 data-nosnippet>332</a>    }
+<a href=#333 id=333 data-nosnippet>333</a>
+<a href=#334 id=334 data-nosnippet>334</a>    <span class="kw">async fn </span>get_module_target_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Address&gt; {
+<a href=#335 id=335 data-nosnippet>335</a>        <span class="kw">match </span><span class="self">self</span>.node_module.owner().call().<span class="kw">await </span>{
+<a href=#336 id=336 data-nosnippet>336</a>            <span class="prelude-val">Ok</span>(returned_result) =&gt; <span class="prelude-val">Ok</span>(returned_result.into()),
+<a href=#337 id=337 data-nosnippet>337</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="prelude-val">Err</span>(e.into()),
+<a href=#338 id=338 data-nosnippet>338</a>        }
+<a href=#339 id=339 data-nosnippet>339</a>    }
+<a href=#340 id=340 data-nosnippet>340</a>
+<a href=#341 id=341 data-nosnippet>341</a>    <span class="kw">async fn </span>get_channel_closure_notice_period(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Duration&gt; {
+<a href=#342 id=342 data-nosnippet>342</a>        <span class="comment">// TODO: should we cache this value internally ?
+<a href=#343 id=343 data-nosnippet>343</a>        </span><span class="kw">match </span><span class="self">self
+<a href=#344 id=344 data-nosnippet>344</a>            </span>.contract_instances
+<a href=#345 id=345 data-nosnippet>345</a>            .channels
+<a href=#346 id=346 data-nosnippet>346</a>            .noticePeriodChannelClosure()
+<a href=#347 id=347 data-nosnippet>347</a>            .call()
+<a href=#348 id=348 data-nosnippet>348</a>            .<span class="kw">await
+<a href=#349 id=349 data-nosnippet>349</a>        </span>{
+<a href=#350 id=350 data-nosnippet>350</a>            <span class="prelude-val">Ok</span>(returned_result) =&gt; <span class="prelude-val">Ok</span>(Duration::from_secs(returned_result.into())),
+<a href=#351 id=351 data-nosnippet>351</a>            <span class="prelude-val">Err</span>(e) =&gt; <span class="prelude-val">Err</span>(e.into()),
+<a href=#352 id=352 data-nosnippet>352</a>        }
+<a href=#353 id=353 data-nosnippet>353</a>    }
+<a href=#354 id=354 data-nosnippet>354</a>
+<a href=#355 id=355 data-nosnippet>355</a>    <span class="comment">// Check on-chain status of, node, safe, and module
+<a href=#356 id=356 data-nosnippet>356</a>    </span><span class="kw">async fn </span>check_node_safe_module_status(<span class="kw-2">&amp;</span><span class="self">self</span>, node_address: Address) -&gt; <span class="prelude-ty">Result</span>&lt;NodeSafeModuleStatus&gt; {
+<a href=#357 id=357 data-nosnippet>357</a>        <span class="comment">// 1) check if the node is already included into the module
+<a href=#358 id=358 data-nosnippet>358</a>        </span><span class="kw">let </span>tx_1 = CallItemBuilder::new(<span class="self">self</span>.node_module.isNode(node_address.into())).allow_failure(<span class="bool-val">false</span>);
+<a href=#359 id=359 data-nosnippet>359</a>        <span class="comment">// 2) if the module is enabled in the safe
+<a href=#360 id=360 data-nosnippet>360</a>        </span><span class="kw">let </span>tx_2 =
+<a href=#361 id=361 data-nosnippet>361</a>            CallItemBuilder::new(<span class="self">self</span>.node_safe.isModuleEnabled(<span class="self">self</span>.cfg.module_address.into())).allow_failure(<span class="bool-val">false</span>);
+<a href=#362 id=362 data-nosnippet>362</a>        <span class="comment">// 3) if the safe is the owner of the module
+<a href=#363 id=363 data-nosnippet>363</a>        </span><span class="kw">let </span>tx_3 = CallItemBuilder::new(<span class="self">self</span>.node_module.owner()).allow_failure(<span class="bool-val">false</span>);
+<a href=#364 id=364 data-nosnippet>364</a>        <span class="kw">let </span>multicall = <span class="self">self</span>.provider.multicall().add_call(tx_1).add_call(tx_2).add_call(tx_3);
+<a href=#365 id=365 data-nosnippet>365</a>
+<a href=#366 id=366 data-nosnippet>366</a>        <span class="kw">let </span>(node_in_module_inclusion, module_safe_enabling, safe_of_module_ownership) =
+<a href=#367 id=367 data-nosnippet>367</a>            multicall.aggregate3_value().<span class="kw">await</span>.map_err(RpcError::MulticallError)<span class="question-mark">?</span>;
+<a href=#368 id=368 data-nosnippet>368</a>        <span class="kw">let </span>is_node_included_in_module =
+<a href=#369 id=369 data-nosnippet>369</a>            node_in_module_inclusion.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))<span class="question-mark">?</span>;
+<a href=#370 id=370 data-nosnippet>370</a>        <span class="kw">let </span>is_module_enabled_in_safe =
+<a href=#371 id=371 data-nosnippet>371</a>            module_safe_enabling.map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))<span class="question-mark">?</span>;
+<a href=#372 id=372 data-nosnippet>372</a>        <span class="kw">let </span>is_safe_owner_of_module = <span class="self">self</span>.cfg.safe_address.eq(<span class="kw-2">&amp;</span>safe_of_module_ownership
+<a href=#373 id=373 data-nosnippet>373</a>            .map_err(|e| RpcError::MulticallFailure(e.idx, e.return_data.to_string()))<span class="question-mark">?
+<a href=#374 id=374 data-nosnippet>374</a>            </span>.<span class="number">0
+<a href=#375 id=375 data-nosnippet>375</a>            </span>.<span class="number">0
+<a href=#376 id=376 data-nosnippet>376</a>            </span>.into());
+<a href=#377 id=377 data-nosnippet>377</a>
+<a href=#378 id=378 data-nosnippet>378</a>        <span class="prelude-val">Ok</span>(NodeSafeModuleStatus {
+<a href=#379 id=379 data-nosnippet>379</a>            is_node_included_in_module,
+<a href=#380 id=380 data-nosnippet>380</a>            is_module_enabled_in_safe,
+<a href=#381 id=381 data-nosnippet>381</a>            is_safe_owner_of_module,
+<a href=#382 id=382 data-nosnippet>382</a>        })
+<a href=#383 id=383 data-nosnippet>383</a>    }
+<a href=#384 id=384 data-nosnippet>384</a>
+<a href=#385 id=385 data-nosnippet>385</a>    <span class="kw">async fn </span>send_transaction(<span class="kw-2">&amp;</span><span class="self">self</span>, tx: TransactionRequest) -&gt; <span class="prelude-ty">Result</span>&lt;PendingTransaction&gt; {
+<a href=#386 id=386 data-nosnippet>386</a>        <span class="kw">let </span>sent_tx = <span class="self">self</span>.provider.send_transaction(tx).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#387 id=387 data-nosnippet>387</a>
+<a href=#388 id=388 data-nosnippet>388</a>        <span class="kw">let </span>receipt = sent_tx
+<a href=#389 id=389 data-nosnippet>389</a>            .with_required_confirmations(<span class="self">self</span>.cfg.finality <span class="kw">as </span>u64)
+<a href=#390 id=390 data-nosnippet>390</a>            .register()
+<a href=#391 id=391 data-nosnippet>391</a>            .<span class="kw">await
+<a href=#392 id=392 data-nosnippet>392</a>            </span>.map_err(RpcError::PendingTransactionError)<span class="question-mark">?</span>;
+<a href=#393 id=393 data-nosnippet>393</a>
+<a href=#394 id=394 data-nosnippet>394</a>        <span class="prelude-val">Ok</span>(receipt)
+<a href=#395 id=395 data-nosnippet>395</a>    }
+<a href=#396 id=396 data-nosnippet>396</a>}
+<a href=#397 id=397 data-nosnippet>397</a>
+<a href=#398 id=398 data-nosnippet>398</a><span class="attr">#[cfg(test)]
+<a href=#399 id=399 data-nosnippet>399</a></span><span class="kw">mod </span>tests {
+<a href=#400 id=400 data-nosnippet>400</a>    <span class="kw">use </span>std::{sync::Arc, time::Duration};
+<a href=#401 id=401 data-nosnippet>401</a>
+<a href=#402 id=402 data-nosnippet>402</a>    <span class="kw">use </span>alloy::{
+<a href=#403 id=403 data-nosnippet>403</a>        network::{Ethereum, TransactionBuilder},
+<a href=#404 id=404 data-nosnippet>404</a>        primitives::{U256, address},
+<a href=#405 id=405 data-nosnippet>405</a>        providers::Provider,
+<a href=#406 id=406 data-nosnippet>406</a>        rpc::{client::ClientBuilder, types::TransactionRequest},
+<a href=#407 id=407 data-nosnippet>407</a>        transports::{http::ReqwestTransport, layers::RetryBackoffLayer},
+<a href=#408 id=408 data-nosnippet>408</a>    };
+<a href=#409 id=409 data-nosnippet>409</a>    <span class="kw">use </span>hex_literal::hex;
+<a href=#410 id=410 data-nosnippet>410</a>    <span class="kw">use </span>hopr_async_runtime::prelude::sleep;
+<a href=#411 id=411 data-nosnippet>411</a>    <span class="kw">use </span>hopr_chain_types::{ContractAddresses, ContractInstances, NetworkRegistryProxy, utils::create_native_transfer};
+<a href=#412 id=412 data-nosnippet>412</a>    <span class="kw">use </span>hopr_crypto_types::keypairs::{ChainKeypair, Keypair};
+<a href=#413 id=413 data-nosnippet>413</a>    <span class="kw">use </span>hopr_primitive_types::prelude::<span class="kw-2">*</span>;
+<a href=#414 id=414 data-nosnippet>414</a>    <span class="kw">use </span>primitive_types::H160;
+<a href=#415 id=415 data-nosnippet>415</a>
+<a href=#416 id=416 data-nosnippet>416</a>    <span class="kw">use crate</span>::{
+<a href=#417 id=417 data-nosnippet>417</a>        HoprRpcOperations, PendingTransaction,
+<a href=#418 id=418 data-nosnippet>418</a>        client::{AnvilRpcClient, create_rpc_client_to_anvil},
+<a href=#419 id=419 data-nosnippet>419</a>        errors::Result,
+<a href=#420 id=420 data-nosnippet>420</a>        rpc::{RpcOperations, RpcOperationsConfig},
+<a href=#421 id=421 data-nosnippet>421</a>    };
+<a href=#422 id=422 data-nosnippet>422</a>
+<a href=#423 id=423 data-nosnippet>423</a>    <span class="macro">lazy_static::lazy_static!</span> {
+<a href=#424 id=424 data-nosnippet>424</a>        <span class="kw">static </span><span class="kw-2">ref </span>RANDY: Address = <span class="macro">hex!</span>(<span class="string">"762614a5ed652457a2f1cdb8006380530c26ae6a"</span>).into();
+<a href=#425 id=425 data-nosnippet>425</a>        <span class="kw">static </span><span class="kw-2">ref </span>MULTICALL3_DEPLOY_CODE: [u8; <span class="number">3926</span>] = <span class="macro">hex!</span>(<span class="string">"f90f538085174876e800830f42408080b90f00608060405234801561001057600080fd5b50610ee0806100206000396000f3fe6080604052600436106100f35760003560e01c80634d2301cc1161008a578063a8b0574e11610059578063a8b0574e1461025a578063bce38bd714610275578063c3077fa914610288578063ee82ac5e1461029b57600080fd5b80634d2301cc146101ec57806372425d9d1461022157806382ad56cb1461023457806386d516e81461024757600080fd5b80633408e470116100c65780633408e47014610191578063399542e9146101a45780633e64a696146101c657806342cbb15c146101d957600080fd5b80630f28c97d146100f8578063174dea711461011a578063252dba421461013a57806327e86d6e1461015b575b600080fd5b34801561010457600080fd5b50425b6040519081526020015b60405180910390f35b61012d610128366004610a85565b6102ba565b6040516101119190610bbe565b61014d610148366004610a85565b6104ef565b604051610111929190610bd8565b34801561016757600080fd5b50437fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0140610107565b34801561019d57600080fd5b5046610107565b6101b76101b2366004610c60565b610690565b60405161011193929190610cba565b3480156101d257600080fd5b5048610107565b3480156101e557600080fd5b5043610107565b3480156101f857600080fd5b50610107610207366004610ce2565b73ffffffffffffffffffffffffffffffffffffffff163190565b34801561022d57600080fd5b5044610107565b61012d610242366004610a85565b6106ab565b34801561025357600080fd5b5045610107565b34801561026657600080fd5b50604051418152602001610111565b61012d610283366004610c60565b61085a565b6101b7610296366004610a85565b610a1a565b3480156102a757600080fd5b506101076102b6366004610d18565b4090565b60606000828067ffffffffffffffff8111156102d8576102d8610d31565b60405190808252806020026020018201604052801561031e57816020015b6040805180820190915260008152606060208201528152602001906001900390816102f65790505b5092503660005b8281101561047757600085828151811061034157610341610d60565b6020026020010151905087878381811061035d5761035d610d60565b905060200281019061036f9190610d8f565b6040810135958601959093506103886020850185610ce2565b73ffffffffffffffffffffffffffffffffffffffff16816103ac6060870187610dcd565b6040516103ba929190610e32565b60006040518083038185875af1925050503d80600081146103f7576040519150601f19603f3d011682016040523d82523d6000602084013e6103fc565b606091505b50602080850191909152901515808452908501351761046d577f08c379a000000000000000000000000000000000000000000000000000000000600052602060045260176024527f4d756c746963616c6c333a2063616c6c206661696c656400000000000000000060445260846000fd5b5050600101610325565b508234146104e6576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601a60248201527f4d756c746963616c6c333a2076616c7565206d69736d6174636800000000000060448201526064015b60405180910390fd5b50505092915050565b436060828067ffffffffffffffff81111561050c5761050c610d31565b60405190808252806020026020018201604052801561053f57816020015b606081526020019060019003908161052a5790505b5091503660005b8281101561068657600087878381811061056257610562610d60565b90506020028101906105749190610e42565b92506105836020840184610ce2565b73ffffffffffffffffffffffffffffffffffffffff166105a66020850185610dcd565b6040516105b4929190610e32565b6000604051808303816000865af19150503d80600081146105f1576040519150601f19603f3d011682016040523d82523d6000602084013e6105f6565b606091505b5086848151811061060957610609610d60565b602090810291909101015290508061067d576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f4d756c746963616c6c333a2063616c6c206661696c656400000000000000000060448201526064016104dd565b50600101610546565b5050509250929050565b43804060606106a086868661085a565b905093509350939050565b6060818067ffffffffffffffff8111156106c7576106c7610d31565b60405190808252806020026020018201604052801561070d57816020015b6040805180820190915260008152606060208201528152602001906001900390816106e55790505b5091503660005b828110156104e657600084828151811061073057610730610d60565b6020026020010151905086868381811061074c5761074c610d60565b905060200281019061075e9190610e76565b925061076d6020840184610ce2565b73ffffffffffffffffffffffffffffffffffffffff166107906040850185610dcd565b60405161079e929190610e32565b6000604051808303816000865af19150503d80600081146107db576040519150601f19603f3d011682016040523d82523d6000602084013e6107e0565b606091505b506020808401919091529015158083529084013517610851577f08c379a000000000000000000000000000000000000000000000000000000000600052602060045260176024527f4d756c746963616c6c333a2063616c6c206661696c656400000000000000000060445260646000fd5b50600101610714565b6060818067ffffffffffffffff81111561087657610876610d31565b6040519080825280602002602001820160405280156108bc57816020015b6040805180820190915260008152606060208201528152602001906001900390816108945790505b5091503660005b82811015610a105760008482815181106108df576108df610d60565b602002602001015190508686838181106108fb576108fb610d60565b905060200281019061090d9190610e42565b925061091c6020840184610ce2565b73ffffffffffffffffffffffffffffffffffffffff1661093f6020850185610dcd565b60405161094d929190610e32565b6000604051808303816000865af19150503d806000811461098a576040519150601f19603f3d011682016040523d82523d6000602084013e61098f565b606091505b506020830152151581528715610a07578051610a07576040517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601760248201527f4d756c746963616c6c333a2063616c6c206661696c656400000000000000000060448201526064016104dd565b506001016108c3565b5050509392505050565b6000806060610a2b60018686610690565b919790965090945092505050565b60008083601f840112610a4b57600080fd5b50813567ffffffffffffffff811115610a6357600080fd5b6020830191508360208260051b8501011115610a7e57600080fd5b9250929050565b60008060208385031215610a9857600080fd5b823567ffffffffffffffff811115610aaf57600080fd5b610abb85828601610a39565b90969095509350505050565b6000815180845260005b81811015610aed57602081850181015186830182015201610ad1565b81811115610aff576000602083870101525b50601f017fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0169290920160200192915050565b600082825180855260208086019550808260051b84010181860160005b84811015610bb1578583037fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe001895281518051151584528401516040858501819052610b9d81860183610ac7565b9a86019a9450505090830190600101610b4f565b5090979650505050505050565b602081526000610bd16020830184610b32565b9392505050565b600060408201848352602060408185015281855180845260608601915060608160051b870101935082870160005b82811015610c52577fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa0888703018452610c40868351610ac7565b95509284019290840190600101610c06565b509398975050505050505050565b600080600060408486031215610c7557600080fd5b83358015158114610c8557600080fd5b9250602084013567ffffffffffffffff811115610ca157600080fd5b610cad86828701610a39565b9497909650939450505050565b838152826020820152606060408201526000610cd96060830184610b32565b95945050505050565b600060208284031215610cf457600080fd5b813573ffffffffffffffffffffffffffffffffffffffff81168114610bd157600080fd5b600060208284031215610d2a57600080fd5b5035919050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052604160045260246000fd5b7f4e487b7100000000000000000000000000000000000000000000000000000000600052603260045260246000fd5b600082357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff81833603018112610dc357600080fd5b9190910192915050565b60008083357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe1843603018112610e0257600080fd5b83018035915067ffffffffffffffff821115610e1d57600080fd5b602001915036819003821315610a7e57600080fd5b8183823760009101908152919050565b600082357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffc1833603018112610dc357600080fd5b600082357fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffa1833603018112610dc357600080fdfea2646970667358221220bb2b5c71a328032f97c676ae39a1ec2148d3e5d6f73d95e9b17910152d61f16264736f6c634300080c00331ca0edce47092c0f398cebf3ffc267f05c8e7076e3b89445e0fe50f6332273d4569ba01b0b9d000e19b24c5869b0fc3b22b0d6fa47cd63316875cbbd577d76e6fde086"</span>);
+<a href=#426 id=426 data-nosnippet>426</a>        <span class="kw">static </span><span class="kw-2">ref </span>MULTICALL3_DEPLOYER_ADDRESS: alloy::primitives::Address = <span class="macro">address!</span>(<span class="string">"05f32b3cc3888453ff71b01135b34ff8e41263f2"</span>);
+<a href=#427 id=427 data-nosnippet>427</a>    }
+<a href=#428 id=428 data-nosnippet>428</a>
+<a href=#429 id=429 data-nosnippet>429</a>    <span class="kw">pub const </span>ETH_VALUE_FOR_MULTICALL3_DEPLOYER: u128 = <span class="number">100_000_000_000_000_000</span>;
+<a href=#430 id=430 data-nosnippet>430</a>    <span class="comment">// 0.1 (anvil) ETH
+<a href=#431 id=431 data-nosnippet>431</a>
+<a href=#432 id=432 data-nosnippet>432</a>    </span><span class="kw">pub async fn </span>wait_until_tx(pending: PendingTransaction, timeout: Duration) {
+<a href=#433 id=433 data-nosnippet>433</a>        <span class="kw">let </span>tx_hash = <span class="kw-2">*</span>pending.tx_hash();
+<a href=#434 id=434 data-nosnippet>434</a>        sleep(timeout).<span class="kw">await</span>;
+<a href=#435 id=435 data-nosnippet>435</a>        pending
+<a href=#436 id=436 data-nosnippet>436</a>            .<span class="kw">await
+<a href=#437 id=437 data-nosnippet>437</a>            </span>.unwrap_or_else(|<span class="kw">_</span>| <span class="macro">panic!</span>(<span class="string">"timeout awaiting tx hash {tx_hash} after {} seconds"</span>, timeout.as_secs()));
+<a href=#438 id=438 data-nosnippet>438</a>    }
+<a href=#439 id=439 data-nosnippet>439</a>
+<a href=#440 id=440 data-nosnippet>440</a>    <span class="doccomment">/// Deploy a MULTICALL contract into Anvil local chain for testing
+<a href=#441 id=441 data-nosnippet>441</a>    </span><span class="kw">pub async fn </span>deploy_multicall3_to_anvil&lt;P: Provider&gt;(provider: <span class="kw-2">&amp;</span>P) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#442 id=442 data-nosnippet>442</a>        <span class="comment">// Fund Multicall3 deployer and deploy ERC1820Registry
+<a href=#443 id=443 data-nosnippet>443</a>        </span><span class="kw">let </span>tx = TransactionRequest::default()
+<a href=#444 id=444 data-nosnippet>444</a>            .with_to(<span class="kw-2">*</span>MULTICALL3_DEPLOYER_ADDRESS)
+<a href=#445 id=445 data-nosnippet>445</a>            .with_value(U256::from(ETH_VALUE_FOR_MULTICALL3_DEPLOYER));
+<a href=#446 id=446 data-nosnippet>446</a>
+<a href=#447 id=447 data-nosnippet>447</a>        provider.send_transaction(tx).<span class="kw">await</span><span class="question-mark">?</span>.watch().<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#448 id=448 data-nosnippet>448</a>
+<a href=#449 id=449 data-nosnippet>449</a>        provider
+<a href=#450 id=450 data-nosnippet>450</a>            .send_raw_transaction(MULTICALL3_DEPLOY_CODE.as_ref())
+<a href=#451 id=451 data-nosnippet>451</a>            .<span class="kw">await</span><span class="question-mark">?
+<a href=#452 id=452 data-nosnippet>452</a>            </span>.watch()
+<a href=#453 id=453 data-nosnippet>453</a>            .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#454 id=454 data-nosnippet>454</a>        <span class="prelude-val">Ok</span>(())
+<a href=#455 id=455 data-nosnippet>455</a>    }
+<a href=#456 id=456 data-nosnippet>456</a>
+<a href=#457 id=457 data-nosnippet>457</a>    <span class="attr">#[tokio::test]
+<a href=#458 id=458 data-nosnippet>458</a>    </span><span class="kw">async fn </span>test_should_estimate_tx() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#459 id=459 data-nosnippet>459</a>        <span class="kw">let _ </span>= env_logger::builder().is_test(<span class="bool-val">true</span>).try_init();
+<a href=#460 id=460 data-nosnippet>460</a>
+<a href=#461 id=461 data-nosnippet>461</a>        <span class="kw">let </span>expected_block_time = Duration::from_secs(<span class="number">1</span>);
+<a href=#462 id=462 data-nosnippet>462</a>        <span class="kw">let </span>anvil = hopr_chain_types::utils::create_anvil(<span class="prelude-val">Some</span>(expected_block_time));
+<a href=#463 id=463 data-nosnippet>463</a>        <span class="kw">let </span>chain_key_0 = ChainKeypair::from_secret(anvil.keys()[<span class="number">0</span>].to_bytes().as_ref())<span class="question-mark">?</span>;
+<a href=#464 id=464 data-nosnippet>464</a>
+<a href=#465 id=465 data-nosnippet>465</a>        <span class="kw">let </span><span class="kw-2">mut </span>server = mockito::Server::new_async().<span class="kw">await</span>;
+<a href=#466 id=466 data-nosnippet>466</a>        <span class="kw">let </span>gas_oracle_mock = server.mock(<span class="string">"GET"</span>, <span class="string">"/gas_oracle"</span>)
+<a href=#467 id=467 data-nosnippet>467</a>            .with_status(<span class="number">200</span>)
+<a href=#468 id=468 data-nosnippet>468</a>            .with_body(<span class="string">r#"{"status":"1","message":"OK","result":{"LastBlock":"38791478","SafeGasPrice":"1.1","ProposeGasPrice":"1.1","FastGasPrice":"1.6","UsdPrice":"0.999985432689946"}}"#</span>)
+<a href=#469 id=469 data-nosnippet>469</a>            .expect(<span class="number">0</span>)
+<a href=#470 id=470 data-nosnippet>470</a>            .create_async()
+<a href=#471 id=471 data-nosnippet>471</a>            .<span class="kw">await</span>;
+<a href=#472 id=472 data-nosnippet>472</a>
+<a href=#473 id=473 data-nosnippet>473</a>        <span class="kw">let </span>cfg = RpcOperationsConfig {
+<a href=#474 id=474 data-nosnippet>474</a>            chain_id: anvil.chain_id(),
+<a href=#475 id=475 data-nosnippet>475</a>            tx_polling_interval: Duration::from_millis(<span class="number">10</span>),
+<a href=#476 id=476 data-nosnippet>476</a>            expected_block_time,
+<a href=#477 id=477 data-nosnippet>477</a>            finality: <span class="number">2</span>,
+<a href=#478 id=478 data-nosnippet>478</a>            gas_oracle_url: <span class="prelude-val">Some</span>((server.url() + <span class="string">"/gas_oracle"</span>).parse()<span class="question-mark">?</span>),
+<a href=#479 id=479 data-nosnippet>479</a>            ..RpcOperationsConfig::default()
+<a href=#480 id=480 data-nosnippet>480</a>        };
+<a href=#481 id=481 data-nosnippet>481</a>
+<a href=#482 id=482 data-nosnippet>482</a>        <span class="kw">let </span>transport_client = ReqwestTransport::new(anvil.endpoint_url());
+<a href=#483 id=483 data-nosnippet>483</a>
+<a href=#484 id=484 data-nosnippet>484</a>        <span class="kw">let </span>rpc_client = ClientBuilder::default()
+<a href=#485 id=485 data-nosnippet>485</a>            .layer(RetryBackoffLayer::new(<span class="number">2</span>, <span class="number">100</span>, <span class="number">100</span>))
+<a href=#486 id=486 data-nosnippet>486</a>            .transport(transport_client.clone(), transport_client.guess_local());
+<a href=#487 id=487 data-nosnippet>487</a>
+<a href=#488 id=488 data-nosnippet>488</a>        <span class="comment">// Wait until contracts deployments are final
+<a href=#489 id=489 data-nosnippet>489</a>        </span>sleep((<span class="number">1 </span>+ cfg.finality) * expected_block_time).<span class="kw">await</span>;
+<a href=#490 id=490 data-nosnippet>490</a>
+<a href=#491 id=491 data-nosnippet>491</a>        <span class="kw">let </span>rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), <span class="kw-2">&amp;</span>chain_key_0, cfg)<span class="question-mark">?</span>;
+<a href=#492 id=492 data-nosnippet>492</a>
+<a href=#493 id=493 data-nosnippet>493</a>        <span class="comment">// call eth_gas_estimate
+<a href=#494 id=494 data-nosnippet>494</a>        </span><span class="kw">let </span>fees = rpc.provider.estimate_eip1559_fees().<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#495 id=495 data-nosnippet>495</a>
+<a href=#496 id=496 data-nosnippet>496</a>        <span class="macro">assert!</span>(
+<a href=#497 id=497 data-nosnippet>497</a>            fees.max_priority_fee_per_gas.ge(<span class="kw-2">&amp;</span><span class="number">0_u128</span>),
+<a href=#498 id=498 data-nosnippet>498</a>            <span class="comment">// fees.max_priority_fee_per_gas.ge(&amp;100_000_000_u128),
+<a href=#499 id=499 data-nosnippet>499</a>            </span><span class="string">"estimated_max_priority_fee must be equal or greater than 0, 0.1 gwei"
+<a href=#500 id=500 data-nosnippet>500</a>        </span>);
+<a href=#501 id=501 data-nosnippet>501</a>
+<a href=#502 id=502 data-nosnippet>502</a>        <span class="kw">let </span>estimated_gas_price = rpc.provider.get_gas_price().<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#503 id=503 data-nosnippet>503</a>        <span class="macro">assert!</span>(
+<a href=#504 id=504 data-nosnippet>504</a>            estimated_gas_price.ge(<span class="kw-2">&amp;</span><span class="number">100_000_000_u128</span>),
+<a href=#505 id=505 data-nosnippet>505</a>            <span class="string">"estimated_max_fee must be greater than 0.1 gwei"
+<a href=#506 id=506 data-nosnippet>506</a>        </span>);
+<a href=#507 id=507 data-nosnippet>507</a>
+<a href=#508 id=508 data-nosnippet>508</a>        gas_oracle_mock.assert();
+<a href=#509 id=509 data-nosnippet>509</a>
+<a href=#510 id=510 data-nosnippet>510</a>        <span class="prelude-val">Ok</span>(())
+<a href=#511 id=511 data-nosnippet>511</a>    }
+<a href=#512 id=512 data-nosnippet>512</a>
+<a href=#513 id=513 data-nosnippet>513</a>    <span class="attr">#[tokio::test]
+<a href=#514 id=514 data-nosnippet>514</a>    </span><span class="kw">async fn </span>test_should_send_tx() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#515 id=515 data-nosnippet>515</a>        <span class="kw">let _ </span>= env_logger::builder().is_test(<span class="bool-val">true</span>).try_init();
+<a href=#516 id=516 data-nosnippet>516</a>
+<a href=#517 id=517 data-nosnippet>517</a>        <span class="kw">let </span>expected_block_time = Duration::from_secs(<span class="number">1</span>);
+<a href=#518 id=518 data-nosnippet>518</a>        <span class="kw">let </span>anvil = hopr_chain_types::utils::create_anvil(<span class="prelude-val">Some</span>(expected_block_time));
+<a href=#519 id=519 data-nosnippet>519</a>        <span class="kw">let </span>chain_key_0 = ChainKeypair::from_secret(anvil.keys()[<span class="number">0</span>].to_bytes().as_ref())<span class="question-mark">?</span>;
+<a href=#520 id=520 data-nosnippet>520</a>
+<a href=#521 id=521 data-nosnippet>521</a>        <span class="kw">let </span>cfg = RpcOperationsConfig {
+<a href=#522 id=522 data-nosnippet>522</a>            chain_id: anvil.chain_id(),
+<a href=#523 id=523 data-nosnippet>523</a>            tx_polling_interval: Duration::from_millis(<span class="number">10</span>),
+<a href=#524 id=524 data-nosnippet>524</a>            expected_block_time,
+<a href=#525 id=525 data-nosnippet>525</a>            finality: <span class="number">2</span>,
+<a href=#526 id=526 data-nosnippet>526</a>            gas_oracle_url: <span class="prelude-val">None</span>,
+<a href=#527 id=527 data-nosnippet>527</a>            ..RpcOperationsConfig::default()
+<a href=#528 id=528 data-nosnippet>528</a>        };
+<a href=#529 id=529 data-nosnippet>529</a>
+<a href=#530 id=530 data-nosnippet>530</a>        <span class="kw">let </span>transport_client = ReqwestTransport::new(anvil.endpoint_url());
+<a href=#531 id=531 data-nosnippet>531</a>
+<a href=#532 id=532 data-nosnippet>532</a>        <span class="kw">let </span>rpc_client = ClientBuilder::default()
+<a href=#533 id=533 data-nosnippet>533</a>            .layer(RetryBackoffLayer::new(<span class="number">2</span>, <span class="number">100</span>, <span class="number">100</span>))
+<a href=#534 id=534 data-nosnippet>534</a>            .transport(transport_client.clone(), transport_client.guess_local());
+<a href=#535 id=535 data-nosnippet>535</a>
+<a href=#536 id=536 data-nosnippet>536</a>        <span class="comment">// Wait until contracts deployments are final
+<a href=#537 id=537 data-nosnippet>537</a>        </span>sleep((<span class="number">1 </span>+ cfg.finality) * expected_block_time).<span class="kw">await</span>;
+<a href=#538 id=538 data-nosnippet>538</a>
+<a href=#539 id=539 data-nosnippet>539</a>        <span class="kw">let </span>rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), <span class="kw-2">&amp;</span>chain_key_0, cfg)<span class="question-mark">?</span>;
+<a href=#540 id=540 data-nosnippet>540</a>
+<a href=#541 id=541 data-nosnippet>541</a>        <span class="kw">let </span>balance_1: XDaiBalance = rpc.get_balance((<span class="kw-2">&amp;</span>chain_key_0).into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#542 id=542 data-nosnippet>542</a>        <span class="macro">assert!</span>(balance_1.amount().gt(<span class="kw-2">&amp;</span><span class="number">0</span>.into()), <span class="string">"balance must be greater than 0"</span>);
+<a href=#543 id=543 data-nosnippet>543</a>
+<a href=#544 id=544 data-nosnippet>544</a>        <span class="comment">// Send 1 ETH to some random address
+<a href=#545 id=545 data-nosnippet>545</a>        </span><span class="kw">let </span>tx = create_native_transfer::&lt;Ethereum&gt;(<span class="kw-2">*</span>RANDY, U256::from(<span class="number">1000000_u32</span>));
+<a href=#546 id=546 data-nosnippet>546</a>        <span class="kw">let </span>tx_hash = rpc.send_transaction(tx).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#547 id=547 data-nosnippet>547</a>
+<a href=#548 id=548 data-nosnippet>548</a>        wait_until_tx(tx_hash, Duration::from_secs(<span class="number">8</span>)).<span class="kw">await</span>;
+<a href=#549 id=549 data-nosnippet>549</a>
+<a href=#550 id=550 data-nosnippet>550</a>        <span class="prelude-val">Ok</span>(())
+<a href=#551 id=551 data-nosnippet>551</a>    }
+<a href=#552 id=552 data-nosnippet>552</a>
+<a href=#553 id=553 data-nosnippet>553</a>    <span class="attr">#[tokio::test]
+<a href=#554 id=554 data-nosnippet>554</a>    </span><span class="kw">async fn </span>test_should_send_consecutive_txs() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#555 id=555 data-nosnippet>555</a>        <span class="kw">let _ </span>= env_logger::builder().is_test(<span class="bool-val">true</span>).try_init();
+<a href=#556 id=556 data-nosnippet>556</a>
+<a href=#557 id=557 data-nosnippet>557</a>        <span class="kw">let </span>expected_block_time = Duration::from_secs(<span class="number">1</span>);
+<a href=#558 id=558 data-nosnippet>558</a>        <span class="kw">let </span>anvil = hopr_chain_types::utils::create_anvil(<span class="prelude-val">Some</span>(expected_block_time));
+<a href=#559 id=559 data-nosnippet>559</a>        <span class="kw">let </span>chain_key_0 = ChainKeypair::from_secret(anvil.keys()[<span class="number">0</span>].to_bytes().as_ref())<span class="question-mark">?</span>;
+<a href=#560 id=560 data-nosnippet>560</a>
+<a href=#561 id=561 data-nosnippet>561</a>        <span class="kw">let </span>cfg = RpcOperationsConfig {
+<a href=#562 id=562 data-nosnippet>562</a>            chain_id: anvil.chain_id(),
+<a href=#563 id=563 data-nosnippet>563</a>            tx_polling_interval: Duration::from_millis(<span class="number">10</span>),
+<a href=#564 id=564 data-nosnippet>564</a>            expected_block_time,
+<a href=#565 id=565 data-nosnippet>565</a>            finality: <span class="number">2</span>,
+<a href=#566 id=566 data-nosnippet>566</a>            gas_oracle_url: <span class="prelude-val">None</span>,
+<a href=#567 id=567 data-nosnippet>567</a>            ..RpcOperationsConfig::default()
+<a href=#568 id=568 data-nosnippet>568</a>        };
+<a href=#569 id=569 data-nosnippet>569</a>
+<a href=#570 id=570 data-nosnippet>570</a>        <span class="kw">let </span>transport_client = ReqwestTransport::new(anvil.endpoint_url());
+<a href=#571 id=571 data-nosnippet>571</a>
+<a href=#572 id=572 data-nosnippet>572</a>        <span class="kw">let </span>rpc_client = ClientBuilder::default()
+<a href=#573 id=573 data-nosnippet>573</a>            .layer(RetryBackoffLayer::new(<span class="number">2</span>, <span class="number">100</span>, <span class="number">100</span>))
+<a href=#574 id=574 data-nosnippet>574</a>            .transport(transport_client.clone(), transport_client.guess_local());
+<a href=#575 id=575 data-nosnippet>575</a>
+<a href=#576 id=576 data-nosnippet>576</a>        <span class="comment">// Wait until contracts deployments are final
+<a href=#577 id=577 data-nosnippet>577</a>        </span>sleep((<span class="number">1 </span>+ cfg.finality) * expected_block_time).<span class="kw">await</span>;
+<a href=#578 id=578 data-nosnippet>578</a>
+<a href=#579 id=579 data-nosnippet>579</a>        <span class="kw">let </span>rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), <span class="kw-2">&amp;</span>chain_key_0, cfg.clone())<span class="question-mark">?</span>;
+<a href=#580 id=580 data-nosnippet>580</a>
+<a href=#581 id=581 data-nosnippet>581</a>        <span class="kw">let </span>balance_1: XDaiBalance = rpc.get_balance((<span class="kw-2">&amp;</span>chain_key_0).into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#582 id=582 data-nosnippet>582</a>        <span class="macro">assert!</span>(balance_1.amount().gt(<span class="kw-2">&amp;</span><span class="number">0</span>.into()), <span class="string">"balance must be greater than 0"</span>);
+<a href=#583 id=583 data-nosnippet>583</a>
+<a href=#584 id=584 data-nosnippet>584</a>        <span class="kw">let </span>txs_count = <span class="number">5_u64</span>;
+<a href=#585 id=585 data-nosnippet>585</a>        <span class="kw">let </span>send_amount = <span class="number">1000000_u64</span>;
+<a href=#586 id=586 data-nosnippet>586</a>
+<a href=#587 id=587 data-nosnippet>587</a>        <span class="comment">// Send 1 ETH to some random address
+<a href=#588 id=588 data-nosnippet>588</a>        </span>futures::future::join_all((<span class="number">0</span>..txs_count).map(|<span class="kw">_</span>| <span class="kw">async </span>{
+<a href=#589 id=589 data-nosnippet>589</a>            rpc.send_transaction(create_native_transfer::&lt;Ethereum&gt;(<span class="kw-2">*</span>RANDY, U256::from(send_amount)))
+<a href=#590 id=590 data-nosnippet>590</a>                .<span class="kw">await
+<a href=#591 id=591 data-nosnippet>591</a>                </span>.expect(<span class="string">"tx should be sent"</span>)
+<a href=#592 id=592 data-nosnippet>592</a>                .<span class="kw">await
+<a href=#593 id=593 data-nosnippet>593</a>                </span>.expect(<span class="string">"tx should resolve"</span>)
+<a href=#594 id=594 data-nosnippet>594</a>        }))
+<a href=#595 id=595 data-nosnippet>595</a>        .<span class="kw">await</span>;
+<a href=#596 id=596 data-nosnippet>596</a>
+<a href=#597 id=597 data-nosnippet>597</a>        sleep((<span class="number">1 </span>+ cfg.finality) * expected_block_time).<span class="kw">await</span>;
+<a href=#598 id=598 data-nosnippet>598</a>
+<a href=#599 id=599 data-nosnippet>599</a>        <span class="kw">let </span>balance_2: XDaiBalance = rpc.get_balance((<span class="kw-2">&amp;</span>chain_key_0).into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#600 id=600 data-nosnippet>600</a>
+<a href=#601 id=601 data-nosnippet>601</a>        <span class="macro">assert!</span>(
+<a href=#602 id=602 data-nosnippet>602</a>            balance_2.amount() &lt;= balance_1.amount() - txs_count * send_amount,
+<a href=#603 id=603 data-nosnippet>603</a>            <span class="string">"balance must be less"
+<a href=#604 id=604 data-nosnippet>604</a>        </span>);
+<a href=#605 id=605 data-nosnippet>605</a>
+<a href=#606 id=606 data-nosnippet>606</a>        <span class="prelude-val">Ok</span>(())
+<a href=#607 id=607 data-nosnippet>607</a>    }
+<a href=#608 id=608 data-nosnippet>608</a>
+<a href=#609 id=609 data-nosnippet>609</a>    <span class="attr">#[tokio::test]
+<a href=#610 id=610 data-nosnippet>610</a>    </span><span class="kw">async fn </span>test_get_balance_native() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#611 id=611 data-nosnippet>611</a>        <span class="kw">let _ </span>= env_logger::builder().is_test(<span class="bool-val">true</span>).try_init();
+<a href=#612 id=612 data-nosnippet>612</a>
+<a href=#613 id=613 data-nosnippet>613</a>        <span class="kw">let </span>expected_block_time = Duration::from_secs(<span class="number">1</span>);
+<a href=#614 id=614 data-nosnippet>614</a>        <span class="kw">let </span>anvil = hopr_chain_types::utils::create_anvil(<span class="prelude-val">Some</span>(expected_block_time));
+<a href=#615 id=615 data-nosnippet>615</a>        <span class="kw">let </span>chain_key_0 = ChainKeypair::from_secret(anvil.keys()[<span class="number">0</span>].to_bytes().as_ref())<span class="question-mark">?</span>;
+<a href=#616 id=616 data-nosnippet>616</a>
+<a href=#617 id=617 data-nosnippet>617</a>        <span class="kw">let </span>cfg = RpcOperationsConfig {
+<a href=#618 id=618 data-nosnippet>618</a>            chain_id: anvil.chain_id(),
+<a href=#619 id=619 data-nosnippet>619</a>            tx_polling_interval: Duration::from_millis(<span class="number">10</span>),
+<a href=#620 id=620 data-nosnippet>620</a>            expected_block_time,
+<a href=#621 id=621 data-nosnippet>621</a>            finality: <span class="number">2</span>,
+<a href=#622 id=622 data-nosnippet>622</a>            gas_oracle_url: <span class="prelude-val">None</span>,
+<a href=#623 id=623 data-nosnippet>623</a>            ..RpcOperationsConfig::default()
+<a href=#624 id=624 data-nosnippet>624</a>        };
+<a href=#625 id=625 data-nosnippet>625</a>
+<a href=#626 id=626 data-nosnippet>626</a>        <span class="kw">let </span>transport_client = ReqwestTransport::new(anvil.endpoint_url());
+<a href=#627 id=627 data-nosnippet>627</a>
+<a href=#628 id=628 data-nosnippet>628</a>        <span class="kw">let </span>rpc_client = ClientBuilder::default()
+<a href=#629 id=629 data-nosnippet>629</a>            .layer(RetryBackoffLayer::new(<span class="number">2</span>, <span class="number">100</span>, <span class="number">100</span>))
+<a href=#630 id=630 data-nosnippet>630</a>            .transport(transport_client.clone(), transport_client.guess_local());
+<a href=#631 id=631 data-nosnippet>631</a>
+<a href=#632 id=632 data-nosnippet>632</a>        <span class="comment">// Wait until contracts deployments are final
+<a href=#633 id=633 data-nosnippet>633</a>        </span>sleep((<span class="number">1 </span>+ cfg.finality) * expected_block_time).<span class="kw">await</span>;
+<a href=#634 id=634 data-nosnippet>634</a>
+<a href=#635 id=635 data-nosnippet>635</a>        <span class="kw">let </span>rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), <span class="kw-2">&amp;</span>chain_key_0, cfg)<span class="question-mark">?</span>;
+<a href=#636 id=636 data-nosnippet>636</a>
+<a href=#637 id=637 data-nosnippet>637</a>        <span class="kw">let </span>balance_1: XDaiBalance = rpc.get_balance((<span class="kw-2">&amp;</span>chain_key_0).into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#638 id=638 data-nosnippet>638</a>        <span class="macro">assert!</span>(balance_1.amount().gt(<span class="kw-2">&amp;</span><span class="number">0</span>.into()), <span class="string">"balance must be greater than 0"</span>);
+<a href=#639 id=639 data-nosnippet>639</a>
+<a href=#640 id=640 data-nosnippet>640</a>        <span class="comment">// Send 1 ETH to some random address
+<a href=#641 id=641 data-nosnippet>641</a>        </span><span class="kw">let </span>tx_hash = rpc
+<a href=#642 id=642 data-nosnippet>642</a>            .send_transaction(create_native_transfer::&lt;Ethereum&gt;(<span class="kw-2">*</span>RANDY, U256::from(<span class="number">1_u32</span>)))
+<a href=#643 id=643 data-nosnippet>643</a>            .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#644 id=644 data-nosnippet>644</a>
+<a href=#645 id=645 data-nosnippet>645</a>        wait_until_tx(tx_hash, Duration::from_secs(<span class="number">8</span>)).<span class="kw">await</span>;
+<a href=#646 id=646 data-nosnippet>646</a>
+<a href=#647 id=647 data-nosnippet>647</a>        <span class="kw">let </span>balance_2: XDaiBalance = rpc.get_balance((<span class="kw-2">&amp;</span>chain_key_0).into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#648 id=648 data-nosnippet>648</a>        <span class="macro">assert!</span>(balance_2.lt(<span class="kw-2">&amp;</span>balance_1), <span class="string">"balance must be diminished"</span>);
+<a href=#649 id=649 data-nosnippet>649</a>
+<a href=#650 id=650 data-nosnippet>650</a>        <span class="prelude-val">Ok</span>(())
+<a href=#651 id=651 data-nosnippet>651</a>    }
+<a href=#652 id=652 data-nosnippet>652</a>
+<a href=#653 id=653 data-nosnippet>653</a>    <span class="attr">#[tokio::test]
+<a href=#654 id=654 data-nosnippet>654</a>    </span><span class="kw">async fn </span>test_get_balance_token() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#655 id=655 data-nosnippet>655</a>        <span class="kw">let _ </span>= env_logger::builder().is_test(<span class="bool-val">true</span>).try_init();
+<a href=#656 id=656 data-nosnippet>656</a>
+<a href=#657 id=657 data-nosnippet>657</a>        <span class="kw">let </span>expected_block_time = Duration::from_secs(<span class="number">1</span>);
+<a href=#658 id=658 data-nosnippet>658</a>        <span class="kw">let </span>anvil = hopr_chain_types::utils::create_anvil(<span class="prelude-val">Some</span>(expected_block_time));
+<a href=#659 id=659 data-nosnippet>659</a>        <span class="kw">let </span>chain_key_0 = ChainKeypair::from_secret(anvil.keys()[<span class="number">0</span>].to_bytes().as_ref())<span class="question-mark">?</span>;
+<a href=#660 id=660 data-nosnippet>660</a>
+<a href=#661 id=661 data-nosnippet>661</a>        <span class="comment">// Deploy contracts
+<a href=#662 id=662 data-nosnippet>662</a>        </span><span class="kw">let </span>contract_instances = {
+<a href=#663 id=663 data-nosnippet>663</a>            <span class="kw">let </span>client = create_rpc_client_to_anvil(<span class="kw-2">&amp;</span>anvil, <span class="kw-2">&amp;</span>chain_key_0);
+<a href=#664 id=664 data-nosnippet>664</a>            ContractInstances::deploy_for_testing(client, <span class="kw-2">&amp;</span>chain_key_0).<span class="kw">await</span><span class="question-mark">?
+<a href=#665 id=665 data-nosnippet>665</a>        </span>};
+<a href=#666 id=666 data-nosnippet>666</a>
+<a href=#667 id=667 data-nosnippet>667</a>        <span class="kw">let </span>cfg = RpcOperationsConfig {
+<a href=#668 id=668 data-nosnippet>668</a>            chain_id: anvil.chain_id(),
+<a href=#669 id=669 data-nosnippet>669</a>            tx_polling_interval: Duration::from_millis(<span class="number">10</span>),
+<a href=#670 id=670 data-nosnippet>670</a>            expected_block_time,
+<a href=#671 id=671 data-nosnippet>671</a>            finality: <span class="number">2</span>,
+<a href=#672 id=672 data-nosnippet>672</a>            contract_addrs: ContractAddresses::from(<span class="kw-2">&amp;</span>contract_instances),
+<a href=#673 id=673 data-nosnippet>673</a>            gas_oracle_url: <span class="prelude-val">None</span>,
+<a href=#674 id=674 data-nosnippet>674</a>            ..RpcOperationsConfig::default()
+<a href=#675 id=675 data-nosnippet>675</a>        };
+<a href=#676 id=676 data-nosnippet>676</a>
+<a href=#677 id=677 data-nosnippet>677</a>        <span class="kw">let </span>amount = <span class="number">1024_u64</span>;
+<a href=#678 id=678 data-nosnippet>678</a>        <span class="kw">let _ </span>= hopr_chain_types::utils::mint_tokens(contract_instances.token, U256::from(amount)).<span class="kw">await</span>;
+<a href=#679 id=679 data-nosnippet>679</a>
+<a href=#680 id=680 data-nosnippet>680</a>        <span class="kw">let </span>transport_client = ReqwestTransport::new(anvil.endpoint_url());
+<a href=#681 id=681 data-nosnippet>681</a>
+<a href=#682 id=682 data-nosnippet>682</a>        <span class="kw">let </span>rpc_client = ClientBuilder::default()
+<a href=#683 id=683 data-nosnippet>683</a>            .layer(RetryBackoffLayer::new(<span class="number">2</span>, <span class="number">100</span>, <span class="number">100</span>))
+<a href=#684 id=684 data-nosnippet>684</a>            .transport(transport_client.clone(), transport_client.guess_local());
+<a href=#685 id=685 data-nosnippet>685</a>
+<a href=#686 id=686 data-nosnippet>686</a>        <span class="comment">// Wait until contracts deployments are final
+<a href=#687 id=687 data-nosnippet>687</a>        </span>sleep((<span class="number">1 </span>+ cfg.finality) * expected_block_time).<span class="kw">await</span>;
+<a href=#688 id=688 data-nosnippet>688</a>
+<a href=#689 id=689 data-nosnippet>689</a>        <span class="kw">let </span>rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), <span class="kw-2">&amp;</span>chain_key_0, cfg)<span class="question-mark">?</span>;
+<a href=#690 id=690 data-nosnippet>690</a>
+<a href=#691 id=691 data-nosnippet>691</a>        <span class="kw">let </span>balance: HoprBalance = rpc.get_balance((<span class="kw-2">&amp;</span>chain_key_0).into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#692 id=692 data-nosnippet>692</a>        <span class="macro">assert_eq!</span>(amount, balance.amount().as_u64(), <span class="string">"invalid balance"</span>);
+<a href=#693 id=693 data-nosnippet>693</a>
+<a href=#694 id=694 data-nosnippet>694</a>        <span class="prelude-val">Ok</span>(())
+<a href=#695 id=695 data-nosnippet>695</a>    }
+<a href=#696 id=696 data-nosnippet>696</a>
+<a href=#697 id=697 data-nosnippet>697</a>    <span class="attr">#[tokio::test]
+<a href=#698 id=698 data-nosnippet>698</a>    </span><span class="kw">async fn </span>test_check_node_safe_module_status() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#699 id=699 data-nosnippet>699</a>        <span class="kw">let _ </span>= env_logger::builder().is_test(<span class="bool-val">true</span>).try_init();
+<a href=#700 id=700 data-nosnippet>700</a>
+<a href=#701 id=701 data-nosnippet>701</a>        <span class="kw">let </span>expected_block_time = Duration::from_secs(<span class="number">1</span>);
+<a href=#702 id=702 data-nosnippet>702</a>        <span class="kw">let </span>anvil = hopr_chain_types::utils::create_anvil(<span class="prelude-val">Some</span>(expected_block_time));
+<a href=#703 id=703 data-nosnippet>703</a>        <span class="kw">let </span>chain_key_0 = ChainKeypair::from_secret(anvil.keys()[<span class="number">0</span>].to_bytes().as_ref())<span class="question-mark">?</span>;
+<a href=#704 id=704 data-nosnippet>704</a>
+<a href=#705 id=705 data-nosnippet>705</a>        <span class="comment">// Deploy contracts
+<a href=#706 id=706 data-nosnippet>706</a>        </span><span class="kw">let </span>(contract_instances, module, safe) = {
+<a href=#707 id=707 data-nosnippet>707</a>            <span class="kw">let </span>client = create_rpc_client_to_anvil(<span class="kw-2">&amp;</span>anvil, <span class="kw-2">&amp;</span>chain_key_0);
+<a href=#708 id=708 data-nosnippet>708</a>            <span class="kw">let </span>instances = ContractInstances::deploy_for_testing(client.clone(), <span class="kw-2">&amp;</span>chain_key_0).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#709 id=709 data-nosnippet>709</a>
+<a href=#710 id=710 data-nosnippet>710</a>            <span class="comment">// deploy MULTICALL contract to anvil
+<a href=#711 id=711 data-nosnippet>711</a>            </span>deploy_multicall3_to_anvil(<span class="kw-2">&amp;</span>client.clone()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#712 id=712 data-nosnippet>712</a>
+<a href=#713 id=713 data-nosnippet>713</a>            <span class="kw">let </span>(module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::&lt;
+<a href=#714 id=714 data-nosnippet>714</a>                Arc&lt;AnvilRpcClient&gt;,
+<a href=#715 id=715 data-nosnippet>715</a>            &gt;(<span class="kw-2">&amp;</span>instances, client.clone(), <span class="kw-2">&amp;</span>chain_key_0)
+<a href=#716 id=716 data-nosnippet>716</a>            .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#717 id=717 data-nosnippet>717</a>
+<a href=#718 id=718 data-nosnippet>718</a>            <span class="comment">// deploy a module and safe instance and add node into the module. The module is enabled by default in the
+<a href=#719 id=719 data-nosnippet>719</a>            // safe
+<a href=#720 id=720 data-nosnippet>720</a>            </span>(instances, module, safe)
+<a href=#721 id=721 data-nosnippet>721</a>        };
+<a href=#722 id=722 data-nosnippet>722</a>
+<a href=#723 id=723 data-nosnippet>723</a>        <span class="kw">let </span>cfg = RpcOperationsConfig {
+<a href=#724 id=724 data-nosnippet>724</a>            chain_id: anvil.chain_id(),
+<a href=#725 id=725 data-nosnippet>725</a>            tx_polling_interval: Duration::from_millis(<span class="number">10</span>),
+<a href=#726 id=726 data-nosnippet>726</a>            expected_block_time,
+<a href=#727 id=727 data-nosnippet>727</a>            finality: <span class="number">2</span>,
+<a href=#728 id=728 data-nosnippet>728</a>            contract_addrs: ContractAddresses::from(<span class="kw-2">&amp;</span>contract_instances),
+<a href=#729 id=729 data-nosnippet>729</a>            module_address: module,
+<a href=#730 id=730 data-nosnippet>730</a>            safe_address: safe,
+<a href=#731 id=731 data-nosnippet>731</a>            gas_oracle_url: <span class="prelude-val">None</span>,
+<a href=#732 id=732 data-nosnippet>732</a>            ..RpcOperationsConfig::default()
+<a href=#733 id=733 data-nosnippet>733</a>        };
+<a href=#734 id=734 data-nosnippet>734</a>
+<a href=#735 id=735 data-nosnippet>735</a>        <span class="kw">let </span>transport_client = ReqwestTransport::new(anvil.endpoint_url());
+<a href=#736 id=736 data-nosnippet>736</a>
+<a href=#737 id=737 data-nosnippet>737</a>        <span class="kw">let </span>rpc_client = ClientBuilder::default()
+<a href=#738 id=738 data-nosnippet>738</a>            .layer(RetryBackoffLayer::new(<span class="number">2</span>, <span class="number">100</span>, <span class="number">100</span>))
+<a href=#739 id=739 data-nosnippet>739</a>            .transport(transport_client.clone(), transport_client.guess_local());
+<a href=#740 id=740 data-nosnippet>740</a>
+<a href=#741 id=741 data-nosnippet>741</a>        <span class="comment">// Wait until contracts deployments are final
+<a href=#742 id=742 data-nosnippet>742</a>        </span>sleep((<span class="number">1 </span>+ cfg.finality) * expected_block_time).<span class="kw">await</span>;
+<a href=#743 id=743 data-nosnippet>743</a>
+<a href=#744 id=744 data-nosnippet>744</a>        <span class="kw">let </span>rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), <span class="kw-2">&amp;</span>chain_key_0, cfg)<span class="question-mark">?</span>;
+<a href=#745 id=745 data-nosnippet>745</a>
+<a href=#746 id=746 data-nosnippet>746</a>        <span class="kw">let </span>result_before_including_node = rpc.check_node_safe_module_status((<span class="kw-2">&amp;</span>chain_key_0).into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#747 id=747 data-nosnippet>747</a>        <span class="comment">// before including node to the safe and module, only the first chck is false, the others are true
+<a href=#748 id=748 data-nosnippet>748</a>        </span><span class="macro">assert!</span>(
+<a href=#749 id=749 data-nosnippet>749</a>            !result_before_including_node.is_node_included_in_module,
+<a href=#750 id=750 data-nosnippet>750</a>            <span class="string">"node should not be included in a default module"
+<a href=#751 id=751 data-nosnippet>751</a>        </span>);
+<a href=#752 id=752 data-nosnippet>752</a>        <span class="macro">assert!</span>(
+<a href=#753 id=753 data-nosnippet>753</a>            result_before_including_node.is_module_enabled_in_safe,
+<a href=#754 id=754 data-nosnippet>754</a>            <span class="string">"module should be enabled in a default safe"
+<a href=#755 id=755 data-nosnippet>755</a>        </span>);
+<a href=#756 id=756 data-nosnippet>756</a>        <span class="macro">assert!</span>(
+<a href=#757 id=757 data-nosnippet>757</a>            result_before_including_node.is_safe_owner_of_module,
+<a href=#758 id=758 data-nosnippet>758</a>            <span class="string">"safe should not be the owner of a default module"
+<a href=#759 id=759 data-nosnippet>759</a>        </span>);
+<a href=#760 id=760 data-nosnippet>760</a>
+<a href=#761 id=761 data-nosnippet>761</a>        <span class="comment">// including node to the module
+<a href=#762 id=762 data-nosnippet>762</a>        </span>hopr_chain_types::utils::include_node_to_module_by_safe(
+<a href=#763 id=763 data-nosnippet>763</a>            contract_instances.channels.provider().clone(),
+<a href=#764 id=764 data-nosnippet>764</a>            safe,
+<a href=#765 id=765 data-nosnippet>765</a>            module,
+<a href=#766 id=766 data-nosnippet>766</a>            (<span class="kw-2">&amp;</span>chain_key_0).into(),
+<a href=#767 id=767 data-nosnippet>767</a>            <span class="kw-2">&amp;</span>chain_key_0,
+<a href=#768 id=768 data-nosnippet>768</a>        )
+<a href=#769 id=769 data-nosnippet>769</a>        .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#770 id=770 data-nosnippet>770</a>
+<a href=#771 id=771 data-nosnippet>771</a>        <span class="kw">let </span>result_with_node_included = rpc.check_node_safe_module_status((<span class="kw-2">&amp;</span>chain_key_0).into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#772 id=772 data-nosnippet>772</a>        <span class="comment">// after the node gets included into the module, all checks should be true
+<a href=#773 id=773 data-nosnippet>773</a>        </span><span class="macro">assert!</span>(
+<a href=#774 id=774 data-nosnippet>774</a>            result_with_node_included.is_node_included_in_module,
+<a href=#775 id=775 data-nosnippet>775</a>            <span class="string">"node should be included in a default module"
+<a href=#776 id=776 data-nosnippet>776</a>        </span>);
+<a href=#777 id=777 data-nosnippet>777</a>        <span class="macro">assert!</span>(
+<a href=#778 id=778 data-nosnippet>778</a>            result_with_node_included.is_module_enabled_in_safe,
+<a href=#779 id=779 data-nosnippet>779</a>            <span class="string">"module should be enabled in a default safe"
+<a href=#780 id=780 data-nosnippet>780</a>        </span>);
+<a href=#781 id=781 data-nosnippet>781</a>        <span class="macro">assert!</span>(
+<a href=#782 id=782 data-nosnippet>782</a>            result_with_node_included.is_safe_owner_of_module,
+<a href=#783 id=783 data-nosnippet>783</a>            <span class="string">"safe should be the owner of a default module"
+<a href=#784 id=784 data-nosnippet>784</a>        </span>);
+<a href=#785 id=785 data-nosnippet>785</a>
+<a href=#786 id=786 data-nosnippet>786</a>        <span class="prelude-val">Ok</span>(())
+<a href=#787 id=787 data-nosnippet>787</a>    }
+<a href=#788 id=788 data-nosnippet>788</a>
+<a href=#789 id=789 data-nosnippet>789</a>    <span class="attr">#[tokio::test]
+<a href=#790 id=790 data-nosnippet>790</a>    </span><span class="kw">async fn </span>test_get_eligibility_status() -&gt; anyhow::Result&lt;()&gt; {
+<a href=#791 id=791 data-nosnippet>791</a>        <span class="kw">let _ </span>= env_logger::builder().is_test(<span class="bool-val">true</span>).try_init();
+<a href=#792 id=792 data-nosnippet>792</a>
+<a href=#793 id=793 data-nosnippet>793</a>        <span class="kw">let </span>expected_block_time = Duration::from_secs(<span class="number">1</span>);
+<a href=#794 id=794 data-nosnippet>794</a>        <span class="kw">let </span>anvil = hopr_chain_types::utils::create_anvil(<span class="prelude-val">Some</span>(expected_block_time));
+<a href=#795 id=795 data-nosnippet>795</a>        <span class="kw">let </span>chain_key_0 = ChainKeypair::from_secret(anvil.keys()[<span class="number">0</span>].to_bytes().as_ref())<span class="question-mark">?</span>;
+<a href=#796 id=796 data-nosnippet>796</a>        <span class="kw">let </span>node_address: H160 = chain_key_0.public().to_address().into();
+<a href=#797 id=797 data-nosnippet>797</a>
+<a href=#798 id=798 data-nosnippet>798</a>        <span class="comment">// Deploy contracts
+<a href=#799 id=799 data-nosnippet>799</a>        </span><span class="kw">let </span>(contract_instances, module, safe) = {
+<a href=#800 id=800 data-nosnippet>800</a>            <span class="kw">let </span>client = create_rpc_client_to_anvil(<span class="kw-2">&amp;</span>anvil, <span class="kw-2">&amp;</span>chain_key_0);
+<a href=#801 id=801 data-nosnippet>801</a>            <span class="kw">let </span>instances = ContractInstances::deploy_for_testing(client.clone(), <span class="kw-2">&amp;</span>chain_key_0).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#802 id=802 data-nosnippet>802</a>
+<a href=#803 id=803 data-nosnippet>803</a>            <span class="comment">// deploy MULTICALL contract to anvil
+<a href=#804 id=804 data-nosnippet>804</a>            </span>deploy_multicall3_to_anvil(<span class="kw-2">&amp;</span>client.clone()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#805 id=805 data-nosnippet>805</a>
+<a href=#806 id=806 data-nosnippet>806</a>            <span class="kw">let </span>(module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::&lt;
+<a href=#807 id=807 data-nosnippet>807</a>                Arc&lt;AnvilRpcClient&gt;,
+<a href=#808 id=808 data-nosnippet>808</a>            &gt;(<span class="kw-2">&amp;</span>instances, client.clone(), <span class="kw-2">&amp;</span>chain_key_0)
+<a href=#809 id=809 data-nosnippet>809</a>            .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#810 id=810 data-nosnippet>810</a>
+<a href=#811 id=811 data-nosnippet>811</a>            <span class="comment">// deploy a module and safe instance and add node into the module. The module is enabled by default in the
+<a href=#812 id=812 data-nosnippet>812</a>            // safe
+<a href=#813 id=813 data-nosnippet>813</a>            </span>(instances, module, safe)
+<a href=#814 id=814 data-nosnippet>814</a>        };
+<a href=#815 id=815 data-nosnippet>815</a>
+<a href=#816 id=816 data-nosnippet>816</a>        <span class="kw">let </span>cfg = RpcOperationsConfig {
+<a href=#817 id=817 data-nosnippet>817</a>            chain_id: anvil.chain_id(),
+<a href=#818 id=818 data-nosnippet>818</a>            tx_polling_interval: Duration::from_millis(<span class="number">10</span>),
+<a href=#819 id=819 data-nosnippet>819</a>            expected_block_time,
+<a href=#820 id=820 data-nosnippet>820</a>            finality: <span class="number">2</span>,
+<a href=#821 id=821 data-nosnippet>821</a>            contract_addrs: ContractAddresses::from(<span class="kw-2">&amp;</span>contract_instances),
+<a href=#822 id=822 data-nosnippet>822</a>            module_address: module,
+<a href=#823 id=823 data-nosnippet>823</a>            safe_address: safe,
+<a href=#824 id=824 data-nosnippet>824</a>            gas_oracle_url: <span class="prelude-val">None</span>,
+<a href=#825 id=825 data-nosnippet>825</a>            ..RpcOperationsConfig::default()
+<a href=#826 id=826 data-nosnippet>826</a>        };
+<a href=#827 id=827 data-nosnippet>827</a>
+<a href=#828 id=828 data-nosnippet>828</a>        <span class="kw">let </span>transport_client = ReqwestTransport::new(anvil.endpoint_url());
+<a href=#829 id=829 data-nosnippet>829</a>
+<a href=#830 id=830 data-nosnippet>830</a>        <span class="kw">let </span>rpc_client = ClientBuilder::default()
+<a href=#831 id=831 data-nosnippet>831</a>            .layer(RetryBackoffLayer::new(<span class="number">2</span>, <span class="number">100</span>, <span class="number">100</span>))
+<a href=#832 id=832 data-nosnippet>832</a>            .transport(transport_client.clone(), transport_client.guess_local());
+<a href=#833 id=833 data-nosnippet>833</a>
+<a href=#834 id=834 data-nosnippet>834</a>        <span class="comment">// Wait until contracts deployments are final
+<a href=#835 id=835 data-nosnippet>835</a>        </span>sleep((<span class="number">1 </span>+ cfg.finality) * expected_block_time).<span class="kw">await</span>;
+<a href=#836 id=836 data-nosnippet>836</a>
+<a href=#837 id=837 data-nosnippet>837</a>        <span class="kw">let </span>rpc = RpcOperations::new(rpc_client, transport_client.client().clone(), <span class="kw-2">&amp;</span>chain_key_0, cfg.clone())<span class="question-mark">?</span>;
+<a href=#838 id=838 data-nosnippet>838</a>
+<a href=#839 id=839 data-nosnippet>839</a>        <span class="comment">// check the eligibility status (before registering in the NetworkRegistry contract)
+<a href=#840 id=840 data-nosnippet>840</a>        </span><span class="kw">let </span>result_before_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#841 id=841 data-nosnippet>841</a>
+<a href=#842 id=842 data-nosnippet>842</a>        <span class="macro">assert!</span>(
+<a href=#843 id=843 data-nosnippet>843</a>            !result_before_register_in_the_network_registry,
+<a href=#844 id=844 data-nosnippet>844</a>            <span class="string">"node should not be eligible"
+<a href=#845 id=845 data-nosnippet>845</a>        </span>);
+<a href=#846 id=846 data-nosnippet>846</a>
+<a href=#847 id=847 data-nosnippet>847</a>        <span class="comment">// register the node
+<a href=#848 id=848 data-nosnippet>848</a>        </span><span class="kw">match </span><span class="kw-2">&amp;</span>rpc.contract_instances.network_registry_proxy {
+<a href=#849 id=849 data-nosnippet>849</a>            NetworkRegistryProxy::Dummy(e) =&gt; {
+<a href=#850 id=850 data-nosnippet>850</a>                <span class="kw">let _ </span>= e.ownerAddAccount(cfg.safe_address.into()).send().<span class="kw">await</span><span class="question-mark">?</span>.watch().<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#851 id=851 data-nosnippet>851</a>            }
+<a href=#852 id=852 data-nosnippet>852</a>            NetworkRegistryProxy::Safe(<span class="kw">_</span>) =&gt; {}
+<a href=#853 id=853 data-nosnippet>853</a>        };
+<a href=#854 id=854 data-nosnippet>854</a>
+<a href=#855 id=855 data-nosnippet>855</a>        <span class="kw">let _ </span>= rpc
+<a href=#856 id=856 data-nosnippet>856</a>            .contract_instances
+<a href=#857 id=857 data-nosnippet>857</a>            .network_registry
+<a href=#858 id=858 data-nosnippet>858</a>            .managerRegister(
+<a href=#859 id=859 data-nosnippet>859</a>                <span class="macro">vec!</span>[cfg.safe_address.into()],
+<a href=#860 id=860 data-nosnippet>860</a>                <span class="macro">vec!</span>[alloy::primitives::Address::from_slice(node_address.as_ref())],
+<a href=#861 id=861 data-nosnippet>861</a>            )
+<a href=#862 id=862 data-nosnippet>862</a>            .send()
+<a href=#863 id=863 data-nosnippet>863</a>            .<span class="kw">await</span><span class="question-mark">?
+<a href=#864 id=864 data-nosnippet>864</a>            </span>.watch()
+<a href=#865 id=865 data-nosnippet>865</a>            .<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#866 id=866 data-nosnippet>866</a>
+<a href=#867 id=867 data-nosnippet>867</a>        <span class="comment">// check the eligibility status (after registering in the NetworkRegistry contract)
+<a href=#868 id=868 data-nosnippet>868</a>        </span><span class="kw">let </span>result_after_register_in_the_network_registry = rpc.get_eligibility_status(node_address.into()).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#869 id=869 data-nosnippet>869</a>
+<a href=#870 id=870 data-nosnippet>870</a>        <span class="macro">assert!</span>(result_after_register_in_the_network_registry, <span class="string">"node should be eligible"</span>);
+<a href=#871 id=871 data-nosnippet>871</a>        <span class="prelude-val">Ok</span>(())
+<a href=#872 id=872 data-nosnippet>872</a>    }
+<a href=#873 id=873 data-nosnippet>873</a>}</code></pre></div></section></main></body></html>
