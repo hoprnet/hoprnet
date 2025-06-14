@@ -29,6 +29,8 @@ where
 {
     use futures::StreamExt;
 
+    // TODO: replace with Sequencer adapter, and remove this task
+
     let (sink, rs_stream) = reassembler.split();
     let (seq_sink, stream) = sequencer.split();
 

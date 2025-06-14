@@ -344,7 +344,9 @@ mod tests {
         session::{AcknowledgementStateConfig, utils::test::*},
     };
 
-    const MTU: usize = 466;
+    const MTU: usize = 1000;
+
+    const FRAME_SIZE: usize = 1500;
 
     const DATA_SIZE: usize = 17 * MTU + 271; // Use some size not directly divisible by the MTU
 
@@ -352,8 +354,13 @@ mod tests {
     async fn stateless_socket_unidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, Default::default())?;
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, sock_cfg)?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
@@ -374,6 +381,11 @@ mod tests {
     async fn stateful_socket_unidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
 
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
         let ack_cfg = AcknowledgementStateConfig {
             expected_packet_latency: Duration::from_millis(2),
             acknowledgement_delay: Duration::from_millis(5),
@@ -381,9 +393,8 @@ mod tests {
         };
 
         let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
-        let mut bob_socket =
-            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), sock_cfg)?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
@@ -404,8 +415,13 @@ mod tests {
     async fn stateless_socket_bidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, Default::default())?;
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, sock_cfg)?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&alice_sent_data).await?;
@@ -430,6 +446,11 @@ mod tests {
     async fn stateful_socket_bidirectional_should_work() -> anyhow::Result<()> {
         let (alice, bob) = setup_alice_bob::<MTU>(FaultyNetworkConfig::default(), None, None);
 
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
         let ack_cfg = AcknowledgementStateConfig {
             expected_packet_latency: Duration::from_millis(2),
             acknowledgement_delay: Duration::from_millis(5),
@@ -437,9 +458,8 @@ mod tests {
         };
 
         let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
-        let mut bob_socket =
-            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), sock_cfg)?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&alice_sent_data).await?;
@@ -469,8 +489,13 @@ mod tests {
 
         let (alice, bob) = setup_alice_bob::<MTU>(network_cfg, None, None);
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, Default::default())?;
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, sock_cfg)?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&data).await?;
@@ -495,6 +520,11 @@ mod tests {
 
         let (alice, bob) = setup_alice_bob::<MTU>(network_cfg, None, None);
 
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
         let ack_cfg = AcknowledgementStateConfig {
             expected_packet_latency: Duration::from_millis(2),
             acknowledgement_delay: Duration::from_millis(5),
@@ -502,9 +532,8 @@ mod tests {
         };
 
         let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
-        let mut bob_socket =
-            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), sock_cfg)?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&data).await?;
@@ -529,8 +558,13 @@ mod tests {
 
         let (alice, bob) = setup_alice_bob::<MTU>(network_cfg, None, None);
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
-        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, Default::default())?;
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, sock_cfg)?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&alice_sent_data).await?;
@@ -563,6 +597,11 @@ mod tests {
 
         let (alice, bob) = setup_alice_bob::<MTU>(network_cfg, None, None);
 
+        let sock_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
         let ack_cfg = AcknowledgementStateConfig {
             expected_packet_latency: Duration::from_millis(2),
             acknowledgement_delay: Duration::from_millis(5),
@@ -570,9 +609,8 @@ mod tests {
         };
 
         let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
-        let mut bob_socket =
-            SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), Default::default())?;
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), sock_cfg)?;
+        let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
         alice_socket.write_all(&alice_sent_data).await?;
@@ -608,12 +646,18 @@ mod tests {
             None,
         );
 
+        let alice_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
         let bob_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
             frame_timeout: Duration::from_millis(55),
             ..Default::default()
         };
 
-        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, Default::default())?;
+        let mut alice_socket = SessionSocket::<MTU, _>::new_stateless("alice", alice, alice_cfg)?;
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, bob_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
@@ -645,7 +689,13 @@ mod tests {
             None,
         );
 
+        let alice_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            ..Default::default()
+        };
+
         let bob_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
             frame_timeout: Duration::from_millis(1000),
             ..Default::default()
         };
@@ -657,7 +707,7 @@ mod tests {
         };
 
         let mut alice_socket =
-            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), Default::default())?;
+            SessionSocket::<MTU, _>::new(alice, AcknowledgementState::new("alice", ack_cfg), alice_cfg)?;
         let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
@@ -687,11 +737,13 @@ mod tests {
         );
 
         let alice_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
             frame_timeout: Duration::from_millis(55),
             ..Default::default()
         };
 
         let bob_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
             frame_timeout: Duration::from_millis(55),
             ..Default::default()
         };
@@ -738,11 +790,13 @@ mod tests {
         );
 
         let alice_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
             frame_timeout: Duration::from_millis(1000),
             ..Default::default()
         };
 
         let bob_cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
             frame_timeout: Duration::from_millis(1000),
             ..Default::default()
         };

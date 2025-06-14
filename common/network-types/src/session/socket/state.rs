@@ -117,52 +117,38 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self, seg_id), fields(frame_id = seg_id.0, seq_idx = seg_id.1))]
-    fn incoming_segment(&mut self, seg_id: &SegmentId, seq_len: SeqNum) -> Result<(), SessionError> {
-        tracing::trace!("incoming segment");
+    fn incoming_segment(&mut self, _: &SegmentId, _: SeqNum) -> Result<(), SessionError> {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self), fields(session_id = self.0))]
-    fn incoming_retransmission_request(&mut self, _request: SegmentRequest<C>) -> Result<(), SessionError> {
-        tracing::trace!("incoming retransmission request");
+    fn incoming_retransmission_request(&mut self, _: SegmentRequest<C>) -> Result<(), SessionError> {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self), fields(session_id = self.0))]
     fn incoming_acknowledged_frames(&mut self, _: FrameAcknowledgements<C>) -> Result<(), SessionError> {
-        tracing::trace!("incoming frame acknowledgements");
         Ok(())
     }
 
-    #[tracing::instrument(skip(self), fields(session_id = self.0))]
-    fn frame_complete(&mut self, id: FrameId) -> Result<(), SessionError> {
-        tracing::trace!("frame complete");
+    fn frame_complete(&mut self, _: FrameId) -> Result<(), SessionError> {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self), fields(session_id = self.0))]
-    fn frame_emitted(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
-        tracing::trace!("frame emitted");
+    fn frame_emitted(&mut self, _: FrameId) -> Result<(), SessionError> {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self), fields(session_id = self.0))]
-    fn frame_discarded(&mut self, frame_id: FrameId) -> Result<(), SessionError> {
-        tracing::warn!("frame discarded");
+    fn frame_discarded(&mut self, _: FrameId) -> Result<(), SessionError> {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self, segment), fields(session_id = self.0, frame_id = segment.frame_id, seq_idx = segment.seq_idx))]
-    fn segment_sent(&mut self, segment: &Segment) -> Result<(), SessionError> {
-        tracing::trace!("segment sent");
+    fn segment_sent(&mut self, _: &Segment) -> Result<(), SessionError> {
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, time::Duration};
+    use std::{collections::HashSet, sync::Mutex, time::Duration};
 
     use futures::{AsyncReadExt, AsyncWriteExt};
 
@@ -175,7 +161,12 @@ mod tests {
         session::SessionSocket,
     };
 
+    const FRAME_SIZE: usize = 1500;
+
     const MTU: usize = 1000;
+
+    // Mutex is needed to synchronize tests due to mocking of a static method (subscribed_events)
+    static MTX: Mutex<()> = Mutex::new(());
 
     mockall::mock! {
         SockState {}
@@ -203,9 +194,9 @@ mod tests {
         }
     }
 
-    impl<'a> SocketState<MTU> for CloneableMockState<'_> {
+    impl SocketState<MTU> for CloneableMockState<'_> {
         fn subscribed_events() -> SocketStateEvents {
-            SocketStateEvents::full()
+            MockSockState::subscribed_events()
         }
 
         fn session_id(&self) -> &str {
@@ -262,9 +253,13 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn session_socket_must_correctly_dispatch_segment_and_frame_state_events() -> anyhow::Result<()> {
         const NUM_FRAMES: usize = 2;
-        const FRAME_SIZE: usize = 1500;
-        const DATA_SIZE: usize = NUM_FRAMES * FRAME_SIZE;
-        const NUM_SEGMENTS: usize = DATA_SIZE / MTU + 1;
+
+        const NUM_SEGMENTS: usize = NUM_FRAMES * FRAME_SIZE / MTU + 1;
+
+        let _m = MTX.lock();
+
+        let ctx = MockSockState::subscribed_events_context();
+        ctx.expect().returning(SocketStateEvents::full);
 
         let mut alice_seq = mockall::Sequence::new();
         let mut alice_state = MockSockState::new();
@@ -343,13 +338,97 @@ mod tests {
         let mut alice_socket = SessionSocket::new(alice, CloneableMockState::new(alice_state, "alice"), cfg)?;
         let mut bob_socket = SessionSocket::new(bob, CloneableMockState::new(bob_state, "bob"), cfg)?;
 
-        let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
+        let alice_sent_data = hopr_crypto_random::random_bytes::<{ NUM_FRAMES * FRAME_SIZE }>();
         alice_socket.write_all(&alice_sent_data).await?;
         alice_socket.flush().await?;
 
         // One entire frame is discarded
         let mut bob_recv_data = [0u8; (NUM_FRAMES - 1) * FRAME_SIZE];
         bob_socket.read_exact(&mut bob_recv_data).await?;
+
+        tracing::debug!("stopping");
+        alice_socket.close().await?;
+        bob_socket.close().await?;
+
+        Ok(())
+    }
+
+    #[test_log::test(tokio::test)]
+    async fn session_socket_must_not_dispatch_segment_and_frame_state_events_when_not_subscribed() -> anyhow::Result<()>
+    {
+        const NUM_FRAMES: usize = 2;
+
+        let _m = MTX.lock();
+
+        let ctx = MockSockState::subscribed_events_context();
+        ctx.expect().returning(SocketStateEvents::empty);
+
+        let mut alice_seq = mockall::Sequence::new();
+        let mut alice_state = MockSockState::new();
+        alice_state.expect_session_id().return_const("alice".into());
+
+        alice_state
+            .expect_run()
+            .once()
+            .in_sequence(&mut alice_seq)
+            .return_once(|_| Ok::<_, SessionError>(()));
+        alice_state.expect_segment_sent().never();
+        alice_state
+            .expect_stop()
+            .once()
+            .in_sequence(&mut alice_seq)
+            .return_once(|| Ok::<_, SessionError>(()));
+
+        let mut bob_seq = mockall::Sequence::new();
+        let mut bob_state = MockSockState::new();
+        bob_state.expect_session_id().return_const("bob".into());
+
+        bob_state
+            .expect_run()
+            .once()
+            .in_sequence(&mut bob_seq)
+            .return_once(|_| Ok::<_, SessionError>(()));
+        bob_state.expect_incoming_segment().never();
+        bob_state.expect_frame_complete().never();
+        bob_state.expect_frame_discarded().never();
+        bob_state.expect_frame_emitted().never();
+        bob_state
+            .expect_stop()
+            .once()
+            .in_sequence(&mut bob_seq)
+            .return_once(|| Ok::<_, SessionError>(()));
+
+        let (alice, bob) = setup_alice_bob::<MTU>(
+            FaultyNetworkConfig {
+                avg_delay: Duration::from_millis(10),
+                ids_to_drop: HashSet::from_iter([0_usize]),
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+
+        let cfg = SessionSocketConfig {
+            frame_size: FRAME_SIZE,
+            frame_timeout: Duration::from_millis(55),
+            ..Default::default()
+        };
+
+        let mut alice_socket = SessionSocket::new(alice, CloneableMockState::new(alice_state, "alice"), cfg)?;
+        let mut bob_socket = SessionSocket::new(bob, CloneableMockState::new(bob_state, "bob"), cfg)?;
+
+        let alice_sent_data = hopr_crypto_random::random_bytes::<{ NUM_FRAMES * FRAME_SIZE }>();
+        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket.flush().await?;
+
+        // One entire frame is discarded
+        let mut bob_recv_data = [0u8; (NUM_FRAMES - 1) * FRAME_SIZE];
+        tokio::time::timeout(Duration::from_secs(3), bob_socket.read_exact(&mut bob_recv_data)).await??;
+
+        // Data must be still well received
+        assert_eq!(&alice_sent_data[1500..], &bob_recv_data);
+
+        tracing::debug!("stopping");
 
         alice_socket.close().await?;
         bob_socket.close().await?;

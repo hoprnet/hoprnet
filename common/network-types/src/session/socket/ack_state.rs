@@ -570,6 +570,8 @@ mod tests {
         processing::segment,
     };
 
+    const FRAME_SIZE: usize = 1500;
+
     const MTU: usize = 1000;
 
     #[test_log::test(tokio::test)]
@@ -616,7 +618,6 @@ mod tests {
     #[parameterized::parameterized(num_frames = { 1, 2, 3 })]
     #[parameterized_macro(test_log::test(tokio::test))]
     async fn ack_state_sender_must_resend_unacknowledged_frames(num_frames: usize) -> anyhow::Result<()> {
-        const FRAME_SIZE: usize = 1500;
         const NUM_RETRIES: usize = 2;
 
         let cfg = AcknowledgementStateConfig {
@@ -677,7 +678,6 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn ack_state_sender_must_not_resend_unacknowledged_frame_when_full_resend_disabled() -> anyhow::Result<()> {
-        const FRAME_SIZE: usize = 1500;
         const NUM_RETRIES: usize = 2;
 
         let cfg = AcknowledgementStateConfig {
@@ -713,8 +713,6 @@ mod tests {
 
     #[tokio::test]
     async fn ack_state_sender_must_not_resend_acknowledged_frame() -> anyhow::Result<()> {
-        const FRAME_SIZE: usize = 1500;
-
         let cfg = AcknowledgementStateConfig {
             mode: AcknowledgementMode::Full,
             expected_packet_latency: Duration::from_millis(2),
@@ -751,8 +749,6 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn ack_state_sender_must_not_resend_entire_frame_when_already_partially_acknowledged() -> anyhow::Result<()> {
-        const FRAME_SIZE: usize = 1500;
-
         let cfg = AcknowledgementStateConfig {
             mode: AcknowledgementMode::Full,
             expected_packet_latency: Duration::from_millis(2),
@@ -793,8 +789,6 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn ack_state_sender_must_retransmit_segments_when_requested() -> anyhow::Result<()> {
-        const FRAME_SIZE: usize = 1500;
-
         let cfg = AcknowledgementStateConfig {
             mode: AcknowledgementMode::Full,
             expected_packet_latency: Duration::from_millis(2),
@@ -864,8 +858,6 @@ mod tests {
 
     #[tokio::test]
     async fn ack_state_receiver_must_request_missing_frames_when_partial_acks_are_enabled() -> anyhow::Result<()> {
-        const FRAME_SIZE: usize = 1500;
-
         let cfg = AcknowledgementStateConfig {
             mode: AcknowledgementMode::Partial,
             expected_packet_latency: Duration::from_millis(2),
@@ -912,8 +904,6 @@ mod tests {
 
     #[tokio::test]
     async fn ack_state_receiver_must_not_request_missing_frames_when_partial_acks_are_disabled() -> anyhow::Result<()> {
-        const FRAME_SIZE: usize = 1500;
-
         let cfg = AcknowledgementStateConfig {
             mode: AcknowledgementMode::Full,
             expected_packet_latency: Duration::from_millis(2),
@@ -957,8 +947,6 @@ mod tests {
     #[tokio::test]
     async fn ack_state_receiver_must_continue_requesting_missing_frames_when_frame_not_completed() -> anyhow::Result<()>
     {
-        const FRAME_SIZE: usize = 1500;
-
         let cfg = AcknowledgementStateConfig {
             mode: AcknowledgementMode::Partial,
             expected_packet_latency: Duration::from_millis(2),
@@ -1023,8 +1011,6 @@ mod tests {
     #[tokio::test]
     async fn ack_state_receiver_must_continue_requesting_missing_frames_and_acknowledge_once_complete()
     -> anyhow::Result<()> {
-        const FRAME_SIZE: usize = 1500;
-
         let cfg = AcknowledgementStateConfig {
             mode: AcknowledgementMode::Partial,
             expected_packet_latency: Duration::from_millis(2),
