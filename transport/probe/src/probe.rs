@@ -6,7 +6,7 @@ use futures_concurrency::stream::StreamExt as _;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_internal_types::protocol::HoprPseudonym;
-use hopr_network_types::types::{ResolvedTransportRouting, SurbMatcher, ValidatedPath};
+use hopr_network_types::types::{ResolvedTransportRouting, ValidatedPath};
 use hopr_platform::time::native::current_time;
 use hopr_primitive_types::{prelude::Address, traits::AsUnixTimestamp};
 use hopr_transport_packet::prelude::{ApplicationData, ReservedTag};
@@ -227,7 +227,7 @@ impl Probe {
                 let move_up = move_up.clone();
 
                 async move {
-                    // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occuring on random tags
+                    // TODO(v3.1): compare not only against ping tag, but also against telemetry that will be occurring on random tags
                     if data.application_tag == ReservedTag::Ping.into() {
                         let message: anyhow::Result<Message> = data.try_into().context("failed to convert data into message");
 
@@ -239,7 +239,7 @@ impl Probe {
                                     },
                                     Message::Probe(NeighborProbe::Ping(ping)) => {
                                         tracing::debug!(%pseudonym, nonce = hex::encode(ping), "received ping");
-                                        match db.find_surb(SurbMatcher::Pseudonym(pseudonym)).await.map(|(sender_id, surb)| ResolvedTransportRouting::Return(sender_id, surb)) {
+                                        match db.find_surb(pseudonym.into()).await.map(|(sender_id, surb)| ResolvedTransportRouting::Return(sender_id, surb)) {
                                             Ok(path) => {
                                                 let message = Message::Probe(NeighborProbe::Pong(ping));
                                                 let _ = push_to_network.send_message(path, message).await;
@@ -288,6 +288,7 @@ mod tests {
     use async_trait::async_trait;
     use futures::future::BoxFuture;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
+    use hopr_network_types::prelude::SurbMatcher;
     use hopr_transport_packet::prelude::Tag;
 
     use super::*;

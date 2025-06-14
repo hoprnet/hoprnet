@@ -102,7 +102,7 @@ pub trait IntoEndian<const N: usize> {
     fn to_be_bytes(self) -> [u8; N];
 }
 
-/// A trait that adds extension method to represent a time object as `Duration` since Unix epoch.
+/// A trait that adds an extension method to represent a time object as `Duration` since Unix epoch.
 pub trait AsUnixTimestamp {
     /// Represents self as `Duration` since Unix epoch.
     fn as_unix_timestamp(&self) -> std::time::Duration;
@@ -114,7 +114,7 @@ impl AsUnixTimestamp for std::time::SystemTime {
     }
 }
 
-/// A trait that adds extension method to perform saturated substractions on `SystemTime` instances.
+/// A trait that adds an extension method to perform saturated substractions on `SystemTime` instances.
 pub trait SaturatingSub {
     /// Performs saturated substraction on `SystemTime` instances.
     fn saturating_sub(&self, earlier: std::time::SystemTime) -> std::time::Duration;

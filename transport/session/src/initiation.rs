@@ -65,7 +65,6 @@ pub struct StartEstablished<T> {
 ///     Entry->>Exit: KeepAlive (SessionID)
 ///     Note over Entry,Exit: Data
 ///     Entry->>Exit: Close Session (SessionID)
-///     Exit->>Entry: Close Session (SessionID)
 ///     else If Exit cannot accept a new session
 ///     Exit->>Entry: SessionError (Challenge, Reason)
 ///     end

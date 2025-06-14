@@ -17,9 +17,26 @@
 
 /// Contains errors thrown from this module.
 pub mod errors;
-mod frame;
-pub mod protocol;
-pub mod state;
-mod utils;
+mod frames;
+mod processing;
+mod protocol;
+mod socket;
+pub mod utils;
 
-pub use frame::{Frame, FrameId, FrameInfo, FrameReassembler, Segment, SegmentId};
+pub use socket::{
+    SessionSocket, SessionSocketConfig,
+    ack_state::{AcknowledgementMode, AcknowledgementState, AcknowledgementStateConfig},
+    state::{SocketState, Stateless},
+};
+
+use crate::session::protocol::SessionMessage;
+
+/// Represents a stateless (and therefore unreliable) socket.
+pub type StatelessSocket<const C: usize> = SessionSocket<C, Stateless<C>>;
+
+/// Represents a socket with reliable delivery.
+pub type ReliableSocket<const C: usize> = SessionSocket<C, AcknowledgementState<C>>;
+
+pub const fn session_socket_mtu<const C: usize>() -> usize {
+    C - SessionMessage::<C>::SEGMENT_OVERHEAD
+}

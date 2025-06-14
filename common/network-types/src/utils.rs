@@ -8,48 +8,45 @@ use std::{
 
 use futures::io::{AsyncRead, AsyncWrite};
 
-/// Joins [futures::AsyncRead] and [futures::AsyncWrite] into a single object.
-pub struct DuplexIO<R, W>(pub R, pub W);
+/// Joins [`futures::AsyncRead`] and [`futures::AsyncWrite`] into a single object.
+#[pin_project::pin_project]
+pub struct DuplexIO<W, R>(#[pin] pub W, #[pin] pub R);
 
-impl<R, W> From<(R, W)> for DuplexIO<R, W>
+impl<R, W> From<(W, R)> for DuplexIO<W, R>
 where
     R: AsyncRead,
     W: AsyncWrite,
 {
-    fn from(value: (R, W)) -> Self {
+    fn from(value: (W, R)) -> Self {
         Self(value.0, value.1)
     }
 }
 
-impl<R, W> AsyncRead for DuplexIO<R, W>
+impl<R, W> AsyncRead for DuplexIO<W, R>
 where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    R: AsyncRead,
+    W: AsyncWrite,
 {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<std::io::Result<usize>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.0).poll_read(cx, buf)
+        self.project().1.poll_read(cx, buf)
     }
 }
 
-impl<R, W> AsyncWrite for DuplexIO<R, W>
+impl<R, W> AsyncWrite for DuplexIO<W, R>
 where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    R: AsyncRead,
+    W: AsyncWrite,
 {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.1).poll_write(cx, buf)
+        self.project().0.poll_write(cx, buf)
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.1).poll_flush(cx)
+        self.project().0.poll_flush(cx)
     }
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        let this = self.get_mut();
-        Pin::new(&mut this.1).poll_close(cx)
+        self.project().0.poll_close(cx)
     }
 }
 
@@ -332,15 +329,17 @@ mod tokio_utils {
 
 /// Converts a [`AsyncRead`] into [`Stream`] by reading at most `S` bytes
 /// in each call to [`Stream::poll_next`].
-pub struct AsyncReadStreamer<const S: usize, R>(pub R);
+#[pin_project::pin_project]
+pub struct AsyncReadStreamer<const S: usize, R>(#[pin] pub R);
 
-impl<const S: usize, R: AsyncRead + Unpin> futures::Stream for AsyncReadStreamer<S, R> {
+impl<const S: usize, R: AsyncRead> futures::Stream for AsyncReadStreamer<S, R> {
     type Item = std::io::Result<Box<[u8]>>;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut buffer = vec![0u8; S];
+        let mut this = self.project();
 
-        match futures::ready!(Pin::new(&mut self.0).poll_read(cx, &mut buffer)) {
+        match futures::ready!(this.0.as_mut().poll_read(cx, &mut buffer)) {
             Ok(0) => Poll::Ready(None),
             Ok(size) => {
                 buffer.truncate(size);
@@ -351,13 +350,43 @@ impl<const S: usize, R: AsyncRead + Unpin> futures::Stream for AsyncReadStreamer
     }
 }
 
-#[cfg(all(feature = "runtime-tokio", test))]
+/// Wraps a [`futures::Sink`] that accepts `Box<[u8]>` with an [`AsyncWrite`] interface,
+/// with each write to the underlying `Sink` being at most `C` bytes.
+#[pin_project::pin_project]
+pub struct AsyncWriteSink<const C: usize, S>(#[pin] pub S);
+
+impl<const C: usize, S> AsyncWrite for AsyncWriteSink<C, S>
+where
+    S: futures::Sink<Box<[u8]>>,
+    S::Error: Into<std::io::Error>,
+{
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
+        let mut this = self.project();
+
+        futures::ready!(this.0.as_mut().poll_ready(cx).map_err(Into::into))?;
+        let len = buf.len().min(C);
+
+        match this.0.as_mut().start_send(Box::from(&buf[..len])) {
+            Ok(()) => Poll::Ready(Ok(len)),
+            Err(e) => Poll::Ready(Err(e.into())),
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        self.project().0.poll_flush(cx).map_err(Into::into)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        self.project().0.poll_close(cx).map_err(Into::into)
+    }
+}
+
+#[cfg(test)]
 mod tests {
-    use futures::TryStreamExt;
+    use futures::{SinkExt, StreamExt, TryStreamExt};
     use tokio::io::AsyncWriteExt;
 
     use super::*;
-    use crate::utils::DuplexIO;
 
     #[tokio::test]
     async fn test_copy_duplex() -> anyhow::Result<()> {
@@ -369,8 +398,8 @@ mod tests {
         let bob_tx = hopr_crypto_random::random_bytes::<DATA_LEN>();
         let mut bob_rx = [0u8; DATA_LEN];
 
-        let alice = DuplexIO(alice_tx.as_ref(), futures::io::Cursor::new(alice_rx.as_mut()));
-        let bob = DuplexIO(bob_tx.as_ref(), futures::io::Cursor::new(bob_rx.as_mut()));
+        let alice = DuplexIO(futures::io::Cursor::new(alice_rx.as_mut()), alice_tx.as_ref());
+        let bob = DuplexIO(futures::io::Cursor::new(bob_rx.as_mut()), bob_tx.as_ref());
 
         let (a_to_b, b_to_a) = copy_duplex(
             &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(alice),
@@ -399,8 +428,8 @@ mod tests {
         let bob_tx = hopr_crypto_random::random_bytes::<DATA_LEN>();
         let mut bob_rx = [0u8; DATA_LEN];
 
-        let alice = DuplexIO(alice_tx.as_ref(), futures::io::Cursor::new(alice_rx.as_mut()));
-        let bob = DuplexIO(bob_tx.as_ref(), futures::io::Cursor::new(bob_rx.as_mut()));
+        let alice = DuplexIO(futures::io::Cursor::new(alice_rx.as_mut()), alice_tx.as_ref());
+        let bob = DuplexIO(futures::io::Cursor::new(bob_rx.as_mut()), bob_tx.as_ref());
 
         let (a_to_b, b_to_a) = copy_duplex(
             &mut tokio_util::compat::FuturesAsyncReadCompatExt::compat(alice),
@@ -508,6 +537,27 @@ mod tests {
         let mut streamer = AsyncReadStreamer::<14, _>(reader);
 
         assert_eq!(Some(Box::from(reader)), streamer.try_next().await?);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_async_write_sink_should_perform_write_in_chunks() -> anyhow::Result<()> {
+        let data = b"Hello, World!!";
+        let (tx, rx) = futures::channel::mpsc::unbounded::<Box<[u8]>>();
+
+        use futures::AsyncWriteExt;
+
+        let mut writer = AsyncWriteSink::<7, _>(tx.sink_map_err(|e| std::io::Error::other(e)));
+
+        AsyncWriteExt::write_all(&mut writer, data).await?;
+        AsyncWriteExt::flush(&mut writer).await?;
+        AsyncWriteExt::close(&mut writer).await?;
+
+        let rx_data = rx.collect::<Vec<_>>().await;
+        assert_eq!(2, rx_data.len());
+        assert_eq!(rx_data[0], (&data[0..7]).into());
+        assert_eq!(rx_data[1], (&data[7..]).into());
 
         Ok(())
     }
