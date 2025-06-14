@@ -16,6 +16,7 @@
 use std::time::Duration;
 
 use async_trait::async_trait;
+use futures::future::join_all;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
 use hopr_db_sql::HoprDbAllOperations;
@@ -30,7 +31,8 @@ use crate::{
     errors::{
         ChainActionsError::{
             BalanceTooLow, ChannelAlreadyClosed, ChannelAlreadyExists, ChannelDoesNotExist, ClosureTimeHasNotElapsed,
-            InvalidArguments, InvalidChannelStake, InvalidState, NotEnoughAllowance, PeerAccessDenied,
+            InvalidArguments, InvalidChannelStake, InvalidState, NoChannelToClose, NotEnoughAllowance,
+            PeerAccessDenied,
         },
         Result,
     },
@@ -48,10 +50,19 @@ pub trait ChannelActions {
 
     /// Closes the channel to counterparty in the given direction. Optionally can issue redeeming of all tickets in that
     /// channel, in case the `direction` is [`ChannelDirection::Incoming`].
-    async fn close_channel(
+    async fn close_channel_by_counterparty(
         &self,
         counterparty: Address,
         direction: ChannelDirection,
+        redeem_before_close: bool,
+    ) -> Result<PendingAction>;
+
+    /// Closes all channels, or those of a specific direction when given. Optionally can issue redeeming of all tickets
+    /// in those channels.
+    async fn close_channel_by_status(
+        &self,
+        direction: ChannelDirection,
+        status: ChannelStatus,
         redeem_before_close: bool,
     ) -> Result<PendingAction>;
 }
@@ -171,7 +182,7 @@ where
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn close_channel(
+    async fn close_channel_by_counterparty(
         &self,
         counterparty: Address,
         direction: ChannelDirection,
@@ -200,7 +211,9 @@ where
                         match remaining_closure_time {
                             Some(Duration::ZERO) => {
                                 info!(%channel, %direction, "initiating finalization of channel closure");
-                                self.tx_sender.send(Action::CloseChannel(channel, direction)).await
+                                self.tx_sender
+                                    .send(Action::CloseChannel(vec![channel], direction, channel.status))
+                                    .await
                             }
                             _ => Err(ClosureTimeHasNotElapsed(
                                 channel
@@ -219,12 +232,67 @@ where
                         }
 
                         info!(%channel, ?direction, "initiating channel closure");
-                        self.tx_sender.send(Action::CloseChannel(channel, direction)).await
+                        self.tx_sender
+                            .send(Action::CloseChannel(vec![channel], direction, channel.status))
+                            .await
                     }
                 }
             }
             None => Err(ChannelDoesNotExist),
         }
+    }
+
+    #[tracing::instrument(level = "debug", skip(self))]
+    async fn close_channel_by_status(
+        &self,
+        direction: ChannelDirection,
+        status: ChannelStatus,
+        redeem_before_close: bool,
+    ) -> Result<PendingAction> {
+        let channels = self
+            .db
+            .get_channels_via(None, direction, &self.self_address())
+            .await?
+            .into_iter()
+            .filter(|channel| match channel.status {
+                ChannelStatus::Open if matches!(status, ChannelStatus::Open) => true,
+                ChannelStatus::PendingToClose(closure_time) if matches!(status, ChannelStatus::PendingToClose(_)) => {
+                    if channel.source == self.self_address() {
+                        let remaining = channel.remaining_closure_time(closure_time);
+                        info!(%channel, ?remaining, "remaining closure time update for a channel");
+                        remaining.eq(&Some(Duration::ZERO))
+                    } else {
+                        true
+                    }
+                }
+                _ => false,
+            })
+            .collect::<Vec<_>>();
+
+        debug!(?channels, ?direction, ?status, "found channels to close");
+
+        if channels.is_empty() {
+            debug!(?direction, "no channels to close");
+            return Err(NoChannelToClose);
+        }
+
+        if redeem_before_close {
+            // TODO: trigger aggregation
+            // Do not await the redemption, just submit it to the queue
+            join_all(channels.iter().map(|channel| async {
+                // Do not await the redemption, just submit it to the queue
+                self.redeem_tickets_in_channel(channel, false).await
+            }))
+            .await;
+        }
+
+        info!(?channels, ?direction, "sending channel closure requests");
+
+        // depending on the number of channels, we can call either CloseChannel or CloseChannels
+        return self
+            .tx_sender
+            .send(Action::CloseChannel(channels, direction, status))
+            .await;
     }
 }
 #[cfg(test)]
@@ -268,15 +336,20 @@ mod tests {
             "48680484c6fc31bc881a0083e6e32b6dc789f9eaba0f8b981429fd346c697f8c"
         ))
         .expect("lazy static keypair should be constructible");
+        static ref EVE_KP: ChainKeypair = ChainKeypair::from_secret(&hex!(
+            "5bf21ea8cccd69aa784346b07bf79c84dac606e00eecaa68bf8c31aff397b1ca"
+        ))
+        .expect("lazy static keypair should be constructible");
         static ref ALICE: Address = ALICE_KP.public().to_address();
         static ref BOB: Address = BOB_KP.public().to_address();
+        static ref EVE: Address = EVE_KP.public().to_address();
     }
 
     async fn init_db(
         db: &HoprDb,
         safe_balance: HoprBalance,
         safe_allowance: HoprBalance,
-        channel: Option<ChannelEntry>,
+        channel: Option<Vec<ChannelEntry>>,
     ) -> anyhow::Result<()> {
         let db_clone = db.clone();
         Ok(db
@@ -291,8 +364,10 @@ mod tests {
                         .set_domain_separator(Some(tx), DomainSeparator::Channel, Default::default())
                         .await?;
 
-                    if let Some(channel) = channel {
-                        db_clone.upsert_channel(Some(tx), channel).await?;
+                    if let Some(channels) = channel {
+                        for channel in channels {
+                            db_clone.upsert_channel(Some(tx), channel).await?;
+                        }
                     }
 
                     Ok::<_, DbSqlError>(())
@@ -359,7 +434,7 @@ mod tests {
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(channel)).await?;
+        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(vec![channel])).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -510,7 +585,7 @@ mod tests {
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(channel)).await?;
+        init_db(&db, 5_000_000_u64.into(), 10_000_000_u64.into(), Some(vec![channel])).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         tx_exec
@@ -565,7 +640,13 @@ mod tests {
         );
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, U256::max_value().into(), U256::max_value().into(), Some(channel)).await?;
+        init_db(
+            &db,
+            U256::max_value().into(),
+            U256::max_value().into(),
+            Some(vec![channel]),
+        )
+        .await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -688,7 +769,7 @@ mod tests {
         let mut channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(vec![channel])).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -696,14 +777,14 @@ mod tests {
             .expect_initiate_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dsts: &Vec<Address>| dsts.len() == 1 && dsts[0].eq(&BOB))
             .returning(move |_| Ok(random_hash));
 
         tx_exec
             .expect_finalize_outgoing_channel_closure()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dsts: &Vec<Address>| dsts.len() == 1 && dsts[0].eq(&BOB))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -741,13 +822,13 @@ mod tests {
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .close_channel_by_counterparty(*BOB, ChannelDirection::Outgoing, false)
             .await?
             .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
-            matches!(tx_res.action, Action::CloseChannel(_, _)),
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
             "must be close channel action"
         );
         assert!(
@@ -761,13 +842,13 @@ mod tests {
         db.upsert_channel(None, channel).await?;
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Outgoing, false)
+            .close_channel_by_counterparty(*BOB, ChannelDirection::Outgoing, false)
             .await?
             .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
-            matches!(tx_res.action, Action::CloseChannel(_, _)),
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
             "must be close channel action"
         );
         assert!(
@@ -785,7 +866,7 @@ mod tests {
         let channel = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(vec![channel])).await?;
 
         let mut tx_exec = MockTransactionExecutor::new();
         let mut seq = Sequence::new();
@@ -793,7 +874,7 @@ mod tests {
             .expect_close_incoming_channel()
             .times(1)
             .in_sequence(&mut seq)
-            .withf(move |dst| BOB.eq(dst))
+            .withf(move |dsts: &Vec<Address>| dsts.len() == 1 && dsts[0].eq(&BOB))
             .returning(move |_| Ok(random_hash));
 
         let mut indexer_action_tracker = MockActionState::new();
@@ -816,13 +897,13 @@ mod tests {
         let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
 
         let tx_res = actions
-            .close_channel(*BOB, ChannelDirection::Incoming, false)
+            .close_channel_by_counterparty(*BOB, ChannelDirection::Incoming, false)
             .await?
             .await?;
 
         assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
         assert!(
-            matches!(tx_res.action, Action::CloseChannel(_, _)),
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
             "must be close channel action"
         );
         assert!(
@@ -846,7 +927,7 @@ mod tests {
         );
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(vec![channel])).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -860,7 +941,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel_by_counterparty(*BOB, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -887,7 +968,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel_by_counterparty(*BOB, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -904,7 +985,7 @@ mod tests {
         let channel = ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Closed, U256::zero());
 
         let db = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
-        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(channel)).await?;
+        init_db(&db, 5_000_000_u64.into(), 1000_u64.into(), Some(vec![channel])).await?;
 
         let tx_queue = ActionQueue::new(
             db.clone(),
@@ -918,7 +999,7 @@ mod tests {
         assert!(
             matches!(
                 actions
-                    .close_channel(*BOB, ChannelDirection::Outgoing, false)
+                    .close_channel_by_counterparty(*BOB, ChannelDirection::Outgoing, false)
                     .await
                     .err()
                     .expect("should be an error"),
@@ -926,6 +1007,192 @@ mod tests {
             ),
             "should fail when channel is already closed"
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_close_multiple_outgoing_channels_at_once() -> anyhow::Result<()> {
+        let stake: HoprBalance = 10_u32.into();
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
+
+        let mut channel_alice_bob =
+            ChannelEntry::new(*ALICE, *BOB, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let mut channel_alice_eve =
+            ChannelEntry::new(*ALICE, *EVE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+
+        let db: HoprDb = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        init_db(
+            &db,
+            5_000_000_u64.into(),
+            1000_u64.into(),
+            Some(vec![channel_alice_bob, channel_alice_eve]),
+        )
+        .await?;
+
+        let mut tx_exec = MockTransactionExecutor::new();
+        let mut seq = Sequence::new();
+        tx_exec
+            .expect_initiate_outgoing_channel_closure()
+            .times(1)
+            .in_sequence(&mut seq)
+            .withf(move |dsts: &Vec<Address>| vec![*BOB, *EVE].eq(dsts))
+            .returning(move |_| Ok(random_hash));
+
+        tx_exec
+            .expect_finalize_outgoing_channel_closure()
+            .times(1)
+            .in_sequence(&mut seq)
+            .withf(move |dsts: &Vec<Address>| vec![*BOB, *EVE].eq(dsts))
+            .returning(move |_| Ok(random_hash));
+
+        let mut indexer_action_tracker = MockActionState::new();
+        let mut seq2 = Sequence::new();
+
+        // Due to the limitation in register_expectation,
+        // currently cannot register multiple expectations for the same TX hash
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosureInitiated(channel_alice_bob),
+                })
+                .boxed())
+            });
+
+        // Due to the limitation in register_expectation,
+        // currently cannot register multiple expectations for the same TX hash
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel_alice_bob),
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_sender = tx_queue.new_sender();
+        tokio::task::spawn(async move {
+            tx_queue.start().await;
+        });
+
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+
+        let tx_res = actions
+            .close_channel_by_status(ChannelDirection::Outgoing, ChannelStatus::Open, false)
+            .await?
+            .await?;
+
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
+            "must be close channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelClosureInitiated(_))),
+            "must correspond to channel chain event"
+        );
+
+        // // Transition the channel to the PendingToClose state with the closure time already elapsed
+        channel_alice_bob.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
+        channel_alice_eve.status = ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10)));
+
+        db.upsert_channel(None, channel_alice_bob).await?;
+        db.upsert_channel(None, channel_alice_eve).await?;
+
+        let tx_res = actions
+            .close_channel_by_status(
+                ChannelDirection::Outgoing,
+                ChannelStatus::PendingToClose(SystemTime::now().sub(Duration::from_secs(10))),
+                false,
+            )
+            .await?
+            .await?;
+
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
+            "must be close channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelClosed(_))),
+            "must correspond to channel chain event"
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_close_multiple_incoming_channels_at_once() -> anyhow::Result<()> {
+        let stake: HoprBalance = 10_u32.into();
+        let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
+
+        let channel_bob_alice = ChannelEntry::new(*BOB, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+        let channel_eve_alice = ChannelEntry::new(*EVE, *ALICE, stake, U256::zero(), ChannelStatus::Open, U256::zero());
+
+        let db: HoprDb = HoprDb::new_in_memory(ALICE_KP.clone()).await?;
+        init_db(
+            &db,
+            5_000_000_u64.into(),
+            1000_u64.into(),
+            Some(vec![channel_bob_alice, channel_eve_alice]),
+        )
+        .await?;
+
+        let mut tx_exec = MockTransactionExecutor::new();
+        let mut seq = Sequence::new();
+        tx_exec
+            .expect_close_incoming_channel()
+            .times(1)
+            .in_sequence(&mut seq)
+            .withf(move |dsts: &Vec<Address>| vec![*BOB, *EVE].eq(dsts))
+            .returning(move |_| Ok(random_hash));
+
+        let mut indexer_action_tracker = MockActionState::new();
+        let mut seq2 = Sequence::new();
+
+        // Due to the limitation in register_expectation,
+        // currently cannot register multiple expectations for the same TX hash
+        indexer_action_tracker
+            .expect_register_expectation()
+            .once()
+            .in_sequence(&mut seq2)
+            .returning(move |_| {
+                Ok(futures::future::ok(SignificantChainEvent {
+                    tx_hash: random_hash,
+                    event_type: ChainEventType::ChannelClosed(channel_bob_alice),
+                })
+                .boxed())
+            });
+
+        let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
+        let tx_sender = tx_queue.new_sender();
+        tokio::task::spawn(async move {
+            tx_queue.start().await;
+        });
+
+        let actions = ChainActions::new(&ALICE_KP, db.clone(), tx_sender.clone());
+
+        let tx_res = actions
+            .close_channel_by_status(ChannelDirection::Incoming, ChannelStatus::Open, false)
+            .await?
+            .await?;
+
+        assert_eq!(tx_res.tx_hash, random_hash, "tx hashes must be equal");
+        assert!(
+            matches!(tx_res.action, Action::CloseChannel(_, _, _)),
+            "must be close channel action"
+        );
+        assert!(
+            matches!(tx_res.event, Some(ChainEventType::ChannelClosed(_))),
+            "must correspond to channel chain event"
+        );
+
         Ok(())
     }
 }

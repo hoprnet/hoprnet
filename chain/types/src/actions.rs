@@ -29,8 +29,8 @@ pub enum Action {
     /// Fund channel with the given ID and amount
     FundChannel(ChannelEntry, HoprBalance),
 
-    /// Close channel with the given source and destination
-    CloseChannel(ChannelEntry, ChannelDirection),
+    /// Close one or multiple channels with the given source and destination
+    CloseChannel(Vec<ChannelEntry>, ChannelDirection, ChannelStatus),
 
     /// Withdraw the given balance to the given address
     Withdraw(Address, HoprBalance),
@@ -55,10 +55,12 @@ impl Display for Action {
                 "fund channel action for channel from {} to {} with {amount}",
                 channel.source, channel.destination
             ),
-            Action::CloseChannel(channel, direction) => write!(
+            Action::CloseChannel(channels, direction, status) => write!(
                 f,
-                "closure action of {} channel from {} to {}",
-                direction, channel.source, channel.destination
+                "closure action of {} {} {} channels",
+                channels.len(),
+                direction,
+                status
             ),
             Action::Withdraw(destination, amount) => write!(f, "withdraw action of {amount} to {destination}"),
             Action::WithdrawNative(destination, amount) => {

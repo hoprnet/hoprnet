@@ -1,5 +1,6 @@
 use std::{
     fmt::{Display, Formatter},
+    str::FromStr,
     time::{Duration, SystemTime},
 };
 
@@ -49,6 +50,19 @@ impl PartialEq for ChannelStatus {
     }
 }
 impl Eq for ChannelStatus {}
+
+impl FromStr for ChannelStatus {
+    type Err = GeneralError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Closed" => Ok(ChannelStatus::Closed),
+            "Open" => Ok(ChannelStatus::Open),
+            "PendingToClose" => Ok(ChannelStatus::PendingToClose(SystemTime::now())),
+            _ => Err(GeneralError::InvalidInput),
+        }
+    }
+}
 
 /// Describes a direction of node's own channel.
 /// The direction of a channel that is not own is undefined.
@@ -334,5 +348,30 @@ mod tests {
             Duration::ZERO,
             ce.remaining_closure_time(current_time).expect("must have closure time")
         );
+    }
+
+    #[test]
+    fn channel_type_from_str() {
+        assert_eq!(ChannelStatus::Closed, ChannelStatus::from_str("Closed").unwrap());
+        assert_eq!(ChannelStatus::Open, ChannelStatus::from_str("Open").unwrap());
+        assert_eq!(
+            ChannelStatus::PendingToClose(SystemTime::now()),
+            ChannelStatus::from_str("PendingToClose").unwrap()
+        );
+    }
+
+    #[test]
+    fn test_channel_status_from_str_to_string_roundtrip() {
+        // Closed
+        let closed = ChannelStatus::Closed;
+        assert_eq!(ChannelStatus::from_str(&closed.to_string()), Ok(closed));
+
+        // Open
+        let open = ChannelStatus::Open;
+        assert_eq!(ChannelStatus::from_str(&open.to_string()), Ok(open));
+
+        // PendingToClose
+        // From string works, but we cannot compare the time
+        assert!(ChannelStatus::from_str("PendingToClose").is_ok());
     }
 }
