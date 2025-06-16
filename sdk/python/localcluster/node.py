@@ -2,9 +2,9 @@ import asyncio
 import logging
 import os
 import tempfile
-from decimal import Decimal
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
+from typing import Optional
 
 from ..api import HoprdAPI
 from . import utils
@@ -43,7 +43,7 @@ class Node:
         identity_path: str,
         cfg_file: str,
         base_port: int,
-        api_addr: str = None,
+        api_addr: Optional[str] = None,
         use_nat: bool = False,
         remove_temp_data: bool = True,
     ):
