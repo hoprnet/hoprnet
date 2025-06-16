@@ -49,6 +49,11 @@ def set_minimum_winning_probability_in_network(private_key: str, win_prob: float
     run_hopli_cmd(cmd, custom_env)
 
 
+# the value can disappear, once https://github.com/hoprnet/hoprnet/issues/7245
+# is fixed and the interfaces can accept precise Decimal values
+EXTRA_CHANNEL_FUNDING_MULTIPLIER = 2
+
+
 @pytest.mark.usefixtures("swarm7_reset")
 class TestWinProbWithSwarm:
     @pytest.mark.asyncio
@@ -87,7 +92,7 @@ class TestWinProbWithSwarm:
         self, route, swarm7: dict[str, Node], base_port: int
     ):
         ticket_price = await get_ticket_price(swarm7[route[0]])
-        ticket_count = 10
+        ticket_count = 100
         win_prob = 0.1
         win_ticket_tolerance = 0.3
         relay = route[1]
@@ -112,8 +117,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                2 * (ticket_count + 1) * ticket_price / Decimal(win_prob),
-                ticket_price / Decimal(win_prob),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / Decimal(win_prob)),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / Decimal(win_prob)),
             ) as channels:
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -190,8 +195,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                2 * (ticket_count + 1) * ticket_price / Decimal(win_prob),
-                ticket_price / Decimal(win_prob),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / Decimal(win_prob)),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / Decimal(win_prob)),
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -265,8 +270,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                2 * (ticket_count + 1) * ticket_price / Decimal(win_prob),
-                ticket_price / Decimal(win_prob),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / Decimal(win_prob)),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / Decimal(win_prob)),
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before_1 = await swarm7[relay_1].api.get_tickets_statistics()
@@ -317,7 +322,7 @@ class TestWinProbWithSwarm:
         self, route, swarm7: dict[str, Node], base_port: int
     ):
         ticket_price = await get_ticket_price(swarm7[route[0]])
-        ticket_count = 10
+        ticket_count = 100
         win_prob = 0.1
 
         relay = route[1]
@@ -329,8 +334,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                2 * (ticket_count + 1) * ticket_price / Decimal(win_prob),
-                ticket_price / Decimal(win_prob),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / Decimal(win_prob)),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / Decimal(win_prob)),
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -387,8 +392,8 @@ class TestWinProbWithSwarm:
 
         async with create_bidirectional_channels_for_route(
             [swarm7[hop] for hop in route],
-            3 * ticket_price / Decimal(win_prob),
-            ticket_price / Decimal(win_prob),
+            EXTRA_CHANNEL_FUNDING_MULTIPLIER * (3 * ticket_price / Decimal(win_prob)),
+            EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / Decimal(win_prob)),
         ):
             # ensure ticket stats are what we expect before starting
             statistics_before = await swarm7[relay].api.get_tickets_statistics()
