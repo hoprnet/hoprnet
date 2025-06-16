@@ -22,3 +22,4 @@ async-std = { version = "1.13.1", features = [
   "unstable",
 ], optional = true }
 tokio = { workspace = true, optional = true }
+futures = { workspace = true }
