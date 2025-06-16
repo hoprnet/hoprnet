@@ -44,7 +44,7 @@ class Snapshot:
         for entry in self.parent_dir.glob("*"):
             if entry.is_dir():
                 continue
-            elif not entry.name.endswith(".log"):
+            elif not entry.name.endswith(".log") and not entry.name.endswith(".env"):
                 logging.debug(f"Removing file: {entry}")
                 entry.unlink(missing_ok=True)
 
