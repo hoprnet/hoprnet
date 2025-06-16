@@ -29,7 +29,7 @@ def generate_anvil_endpoint(base_port: int) -> str:
     return f"http://127.0.0.1:{base_port}"
 
 
-def set_minimum_winning_probability_in_network(private_key: str, win_prob: float, base_port: int):
+def set_minimum_winning_probability_in_network(private_key: str, win_prob: Decimal, base_port: int):
     anvil_endpoint = generate_anvil_endpoint(base_port)
 
     custom_env = {"PRIVATE_KEY": private_key}
@@ -93,8 +93,8 @@ class TestWinProbWithSwarm:
     ):
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
-        win_prob = 0.1
-        win_ticket_tolerance = 0.3
+        win_prob = Decimal("0.1")
+        win_ticket_tolerance = Decimal("0.3")
         relay = route[1]
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
@@ -117,8 +117,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / Decimal(win_prob)),
-                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / Decimal(win_prob)),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / win_prob),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / win_prob),
             ) as channels:
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -166,7 +166,7 @@ class TestWinProbWithSwarm:
 
         finally:
             # Always return winning probability to 1.0 even if the test failed
-            set_minimum_winning_probability_in_network(private_key, 1.0, base_port)
+            set_minimum_winning_probability_in_network(private_key, Decimal("1"), base_port)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -184,8 +184,8 @@ class TestWinProbWithSwarm:
     ):
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
-        win_prob = 0.1
-        win_ticket_tolerance = 0.3
+        win_prob = Decimal("0.1")
+        win_ticket_tolerance = Decimal("0.3")
         relay = route[1]
 
         private_key = load_private_key(ANVIL_CONFIG_FILE)
@@ -241,7 +241,7 @@ class TestWinProbWithSwarm:
 
         finally:
             # Always return winning probability to 1.0 even if the test failed
-            set_minimum_winning_probability_in_network(private_key, 1.0, base_port)
+            set_minimum_winning_probability_in_network(private_key, Decimal("1.0"), base_port)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -257,8 +257,8 @@ class TestWinProbWithSwarm:
     async def test_hoprd_should_relay_with_increased_win_prob(self, route, swarm7: dict[str, Node], base_port: int):
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
-        win_prob = 0.1
-        win_ticket_tolerance = 0.3
+        win_prob = Decimal("0.1")
+        win_ticket_tolerance = Decimal("0.3")
 
         relay_1 = route[1]
         relay_2 = route[2]
@@ -270,8 +270,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / Decimal(win_prob)),
-                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / Decimal(win_prob)),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / win_prob),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / win_prob),
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before_1 = await swarm7[relay_1].api.get_tickets_statistics()
@@ -304,7 +304,7 @@ class TestWinProbWithSwarm:
                 assert abs(winning_count_1 - ticket_count * win_prob) <= win_ticket_tolerance * ticket_count
         finally:
             # Always return winning probability to 1.0 even if the test failed
-            set_minimum_winning_probability_in_network(private_key, 1.0, base_port)
+            set_minimum_winning_probability_in_network(private_key, Decimal("1.0"), base_port)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -323,7 +323,7 @@ class TestWinProbWithSwarm:
     ):
         ticket_price = await get_ticket_price(swarm7[route[0]])
         ticket_count = 100
-        win_prob = 0.1
+        win_prob = Decimal("0.1")
 
         relay = route[1]
 
@@ -334,8 +334,8 @@ class TestWinProbWithSwarm:
         try:
             async with create_bidirectional_channels_for_route(
                 [swarm7[hop] for hop in route],
-                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / Decimal(win_prob)),
-                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / Decimal(win_prob)),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (2 * (ticket_count + 1) * ticket_price / win_prob),
+                EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / win_prob),
             ):
                 # ensure ticket stats are what we expect before starting
                 statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -367,7 +367,7 @@ class TestWinProbWithSwarm:
                 # at this point the tickets become neglected, since the channel will be closed
         finally:
             # Always return winning probability to 1.0 even if the test failed
-            set_minimum_winning_probability_in_network(private_key, 1.0, base_port)
+            set_minimum_winning_probability_in_network(private_key, Decimal("1.0"), base_port)
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -384,7 +384,7 @@ class TestWinProbWithSwarm:
         self, route, swarm7: dict[str, Node], base_port: int
     ):
         ticket_price = await get_ticket_price(swarm7[route[0]])
-        win_prob = 0.1
+        win_prob = Decimal("0.1")
 
         src = route[0]
         relay = route[1]
@@ -392,8 +392,8 @@ class TestWinProbWithSwarm:
 
         async with create_bidirectional_channels_for_route(
             [swarm7[hop] for hop in route],
-            EXTRA_CHANNEL_FUNDING_MULTIPLIER * (3 * ticket_price / Decimal(win_prob)),
-            EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / Decimal(win_prob)),
+            EXTRA_CHANNEL_FUNDING_MULTIPLIER * (3 * ticket_price / win_prob),
+            EXTRA_CHANNEL_FUNDING_MULTIPLIER * (ticket_price / win_prob),
         ):
             # ensure ticket stats are what we expect before starting
             statistics_before = await swarm7[relay].api.get_tickets_statistics()
@@ -416,9 +416,7 @@ class TestWinProbWithSwarm:
 
                 # wait until the relay rejects the session establishment packet
                 await asyncio.wait_for(
-                    check_rejected_tickets_value(
-                        swarm7[relay], rejected_value_before + ticket_price / Decimal(win_prob)
-                    ),
+                    check_rejected_tickets_value(swarm7[relay], rejected_value_before + ticket_price / win_prob),
                     30.0,
                 )
 

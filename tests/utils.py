@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sdk.python.api import Protocol
+from sdk.python.api.balance import Balance
 from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.api.request_objects import SessionCapabilitiesBody
 from sdk.python.localcluster.constants import TICKET_PRICE_PER_HOP
@@ -33,7 +34,7 @@ def make_routes(routes_with_hops: list[int], nodes: list[Node]):
 
 
 @asynccontextmanager
-async def create_channel(src: Node, dest: Node, funding: Decimal, close_from_dest: bool = True):
+async def create_channel(src: Node, dest: Node, funding: Balance, close_from_dest: bool = True):
     channel = await src.api.open_channel(dest.address, funding)
     assert channel is not None
     await asyncio.wait_for(check_channel_status(src, dest, status=ChannelStatus.Open), 10.0)
@@ -140,8 +141,9 @@ async def check_native_balance_below(src: Node, value: Decimal):
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
-async def check_min_incoming_win_prob_eq(src: Node, value: float):
-    while round((await src.api.ticket_min_win_prob()).value, 5) != value:
+async def check_min_incoming_win_prob_eq(src: Node, value: Decimal):
+    # TODO (jean): check that this works as expected
+    while (await src.api.ticket_min_win_prob()).value != value:
         await asyncio.sleep(CHECK_RETRY_INTERVAL)
 
 
@@ -156,7 +158,7 @@ async def check_all_tickets_redeemed(src: Node):
 async def get_ticket_price(src: Node):
     ticket_price = await src.api.ticket_price()
     assert ticket_price is not None
-    logging.debug(f"Ticket price: {ticket_price}")
+    logging.debug(f"Ticket price: {ticket_price.value}")
     return ticket_price.value
 
 
