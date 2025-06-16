@@ -506,7 +506,7 @@
           ];
           };
           docsDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = with pkgs; [ html-tidy pandoc ]; useRustNightly = true; };
-          clusterDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd hopli ]; };
+          clusterDevShell = import ./nix/shell.nix { inherit pkgs config crane pre-commit-check solcDefault; extraPackages = [ hoprd-debug hopli-debug ]; };
           run-check = flake-utils.lib.mkApp {
             drv = pkgs.writeShellScriptBin "run-check" ''
               set -e
