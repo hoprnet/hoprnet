@@ -69,7 +69,7 @@ pub mod timer;
 use std::collections::HashMap;
 
 use futures::{SinkExt, StreamExt};
-use hopr_async_runtime::prelude::spawn;
+use hopr_async_runtime::spawn_as_abortable;
 use hopr_crypto_types::types::OffchainPublicKey;
 use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
 use hopr_internal_types::{prelude::HoprPseudonym, protocol::Acknowledgement};
@@ -152,7 +152,7 @@ pub async fn run_msg_ack_protocol<Db>(
         + Sync
         + 'static,
     ),
-) -> HashMap<ProtocolProcesses, hopr_async_runtime::prelude::JoinHandle<()>>
+) -> HashMap<ProtocolProcesses, hopr_async_runtime::AbortHandle>
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
@@ -177,7 +177,7 @@ where
         let tbf_2 = tbf.clone();
         processes.insert(
             ProtocolProcesses::BloomPersist,
-            spawn(Box::pin(execute_on_tick(
+            spawn_as_abortable(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
                 move || {
                     let tbf_clone = tbf_2.clone();
@@ -198,7 +198,7 @@ where
     let msg_to_send_tx = wire_msg.0.clone();
     processes.insert(
         ProtocolProcesses::MsgOut,
-        spawn(async move {
+        spawn_as_abortable(async move {
             let _neverending = api
                 .1
                 .then_concurrent(|(data, routing, finalizer)| {
@@ -235,7 +235,7 @@ where
     let me_for_recv = me.clone();
     processes.insert(
         ProtocolProcesses::MsgIn,
-        spawn(async move {
+        spawn_as_abortable(async move {
             let _neverending = wire_msg
                 .1
                 .then_concurrent(move |(peer, data)| {

@@ -4504,9 +4504,10 @@ dependencies = [
 
 [[package]]
 name = "hopr-async-runtime"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "async-std",
+ "futures",
  "tokio",
 ]
 
@@ -5099,7 +5100,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "async-lock 3.4.0",
  "async-trait",
@@ -5259,7 +5260,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-probe"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -5298,7 +5299,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-protocol"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
@@ -5344,7 +5345,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-transport-session"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "aquamarine",

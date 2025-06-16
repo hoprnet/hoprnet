@@ -98,7 +98,7 @@ impl Probe {
         store: W,         // peer store
         db: C,            // database for SURB & peer resolution
         move_up: Up,      // forward up non-probing messages from the network
-    ) -> HashMap<HoprProbeProcess, hopr_async_runtime::prelude::JoinHandle<()>>
+    ) -> HashMap<HoprProbeProcess, hopr_async_runtime::AbortHandle>
     where
         T: futures::Sink<(ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
             + Clone
@@ -161,7 +161,7 @@ impl Probe {
         let db_rx = db.clone();
         let push_to_network = api.0.clone();
 
-        let mut processes = HashMap::<HoprProbeProcess, hopr_async_runtime::prelude::JoinHandle<()>>::new();
+        let mut processes = HashMap::<HoprProbeProcess, hopr_async_runtime::AbortHandle>::new();
 
         // -- Emit probes --
         let direct_neighbors = neighbors_to_probe(store.clone(), self.cfg)
@@ -170,7 +170,7 @@ impl Probe {
 
         processes.insert(
             HoprProbeProcess::Emit,
-            hopr_async_runtime::prelude::spawn(direct_neighbors
+            hopr_async_runtime::spawn_as_abortable(direct_neighbors
                 .for_each_concurrent(max_parallel_probes, move |(peer, notifier)| {
                     let db = db.clone();
                     let cache_peer_routing = cache_peer_routing.clone();
@@ -219,7 +219,7 @@ impl Probe {
         // -- Process probes --
         processes.insert(
             HoprProbeProcess::Process,
-            hopr_async_runtime::prelude::spawn(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, data)| {
+            hopr_async_runtime::spawn_as_abortable(api.1.for_each_concurrent(max_parallel_probes, move |(pseudonym, data)| {
                 let active_probes = active_probes_rx.clone();
                 let push_to_network = Sender { downstream: api.0.clone() };
                 let db = db_rx.clone();

@@ -15,7 +15,8 @@ use alloy::{
 };
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
-use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
+use futures::future::AbortHandle;
+use hopr_async_runtime::{prelude::sleep, spawn_as_abortable};
 use hopr_chain_actions::{
     ChainActions,
     action_queue::{ActionQueue, ActionQueueConfig},
@@ -241,12 +242,12 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     ///
     /// This method will spawn the [`HoprChainProcess::Indexer`] and [`HoprChainProcess::OutgoingOnchainActionQueue`]
     /// processes and return join handles to the calling function.
-    pub async fn start(&self) -> errors::Result<HashMap<HoprChainProcess, JoinHandle<()>>> {
-        let mut processes: HashMap<HoprChainProcess, JoinHandle<()>> = HashMap::new();
+    pub async fn start(&self) -> errors::Result<HashMap<HoprChainProcess, AbortHandle>> {
+        let mut processes: HashMap<HoprChainProcess, AbortHandle> = HashMap::new();
 
         processes.insert(
             HoprChainProcess::OutgoingOnchainActionQueue,
-            spawn(self.action_queue.clone().start()),
+            spawn_as_abortable(self.action_queue.clone().start()),
         );
         processes.insert(
             HoprChainProcess::Indexer,
@@ -266,7 +267,6 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             .start()
             .await?,
         );
-
         Ok(processes)
     }
 

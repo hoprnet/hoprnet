@@ -1,5 +1,9 @@
 //! Executor API for HOPR which exposes the necessary async functions depending on the enabled
 //! runtime.
+
+pub use futures::future::AbortHandle;
+use futures::future::abortable;
+
 #[cfg(feature = "runtime-async-std")]
 #[deprecated(note = "Use `runtime-tokio` feature, the `async-std` crate is deprecated")]
 pub mod prelude {
@@ -7,10 +11,6 @@ pub mod prelude {
         future::timeout as timeout_fut,
         task::{JoinHandle, sleep, spawn, spawn_blocking, spawn_local},
     };
-
-    pub async fn cancel_join_handle<T>(handle: JoinHandle<T>) {
-        handle.cancel().await;
-    }
 }
 
 // Both features could be enabled during testing; therefore, we only use tokio when it's
@@ -21,10 +21,16 @@ pub mod prelude {
         task::{JoinHandle, spawn, spawn_blocking, spawn_local},
         time::{sleep, timeout as timeout_fut},
     };
+}
 
-    pub async fn cancel_join_handle<T>(handle: JoinHandle<T>) {
-        handle.abort()
-    }
+pub fn spawn_as_abortable<F, T>(f: F) -> AbortHandle
+where
+    F: std::future::Future<Output = T> + Send + 'static,
+    T: Send + 'static,
+{
+    let (proc, abort_handle) = abortable(f);
+    let _jh = prelude::spawn(proc);
+    abort_handle
 }
 
 // If no runtime is enabled, fail compilation
