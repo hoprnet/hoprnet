@@ -384,7 +384,7 @@ class HoprdAPI:
         target: str,
         listen_on: str = "127.0.0.1:0",
         service: bool = False,
-        capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
+        capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody.default(),
         sealed_target: bool = False,
         response_buffer: str = "4MiB",
     ) -> Optional[Session]:

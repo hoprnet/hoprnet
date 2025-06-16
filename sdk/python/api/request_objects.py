@@ -21,6 +21,9 @@ class ApiRequestObject:
     def as_header_string(self) -> str:
         return "&".join([f"{k}={v}" for k, v in self.as_dict.items()])
 
+    @classmethod
+    def default(cls):
+        return cls(**{f.name: f.default for f in fields(cls)})
 
 @dataclass
 class OpenChannelBody(ApiRequestObject):
@@ -59,7 +62,7 @@ class CreateSessionBody(ApiRequestObject):
 class SessionCapabilitiesBody(ApiRequestObject):
     retransmission: bool = api_field("Retransmission")
     segmentation: bool = api_field("Segmentation")
-    retransmission_ack_only = api_field("RetransmissionAckOnly")
+    retransmission_ack_only: bool = api_field("RetransmissionAckOnly")
     no_delay: bool = api_field("NoDelay")
 
     @property
