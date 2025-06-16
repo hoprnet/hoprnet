@@ -258,7 +258,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         match process {
                             HoprdProcesses::HoprLib(_, jh) | HoprdProcesses::RestApi(jh) => join_handles.push(jh),
                             HoprdProcesses::ListenerSockets(jhs) => {
-                                join_handles.extend(jhs.write().await.drain().map(|(_, entry)| entry.jh));
+                                join_handles.extend(jhs.write_arc().await.drain().map(|(_, entry)| entry.jh));
                             }
                         }
                         futures::stream::iter(join_handles)

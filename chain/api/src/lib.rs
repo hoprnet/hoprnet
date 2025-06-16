@@ -85,7 +85,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     let mut current_delay = Duration::from_secs(2).min(max_delay);
 
     while current_delay <= max_delay {
-        match rpc.get_balance(address).await {
+        match rpc.get_xdai_balance(address).await {
             Ok(current_balance) => {
                 info!(balance = %current_balance, "balance status");
                 if current_balance.ge(&min_balance) {
@@ -201,7 +201,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
         // Build RPC operations
         let rpc_operations =
-            RpcOperations::new(rpc_client, requestor, &me_onchain, rpc_cfg).expect("failed to initialize RPC");
+            RpcOperations::new(rpc_client, requestor, &me_onchain, rpc_cfg, None).expect("failed to initialize RPC");
 
         // Build the Ethereum Transaction Executor that uses RpcOperations as backend
         let ethereum_tx_executor = EthereumTransactionExecutor::new(
@@ -257,6 +257,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
                     self.safe_address,
                     self.me_onchain.clone(),
                     self.db.clone(),
+                    self.rpc_operations.clone(),
                 ),
                 self.db.clone(),
                 self.indexer_cfg,
@@ -326,12 +327,69 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         &self.rpc_operations
     }
 
+    /// Retrieves the balance of the node's on-chain account for the specified currency.
+    ///
+    /// This method queries the on-chain balance of the node's account for the given currency.
+    /// It supports querying balances for XDai and WxHOPR currencies. If the currency is unsupported,
+    /// an error is returned.
+    ///
+    /// # Returns
+    /// * `Result<Balance<C>>` - The balance of the node's account for the specified currency, or an error if the query
+    ///   fails.
     pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
-        Ok(self.rpc_operations.get_balance(self.me_onchain()).await?)
+        let bal = if C::is::<XDai>() {
+            self.rpc_operations
+                .get_xdai_balance(self.me_onchain())
+                .await?
+                .to_be_bytes()
+        } else if C::is::<WxHOPR>() {
+            self.rpc_operations
+                .get_hopr_balance(self.me_onchain())
+                .await?
+                .to_be_bytes()
+        } else {
+            return Err(HoprChainError::Api("unsupported currency".into()));
+        };
+
+        Ok(Balance::<C>::from(U256::from_be_bytes(bal)))
     }
 
+    /// Retrieves the balance of the specified address for the given currency.
+    ///
+    /// This method queries the on-chain balance of the provided address for the specified currency.
+    /// It supports querying balances for XDai and WxHOPR currencies. If the currency is unsupported,
+    /// an error is returned.
+    ///
+    /// # Arguments
+    /// * `address` - The address whose balance is to be retrieved.
+    ///
+    /// # Returns
+    /// * `Result<Balance<C>>` - The balance of the specified address for the given currency, or an error if the query
+    ///   fails.
     pub async fn get_safe_balance<C: Currency + Send>(&self, safe_address: Address) -> errors::Result<Balance<C>> {
-        Ok(self.rpc_operations.get_balance(safe_address).await?)
+        let bal = if C::is::<XDai>() {
+            self.rpc_operations.get_xdai_balance(safe_address).await?.to_be_bytes()
+        } else if C::is::<WxHOPR>() {
+            self.rpc_operations.get_hopr_balance(safe_address).await?.to_be_bytes()
+        } else {
+            return Err(HoprChainError::Api("unsupported currency".into()));
+        };
+
+        Ok(Balance::<C>::from(U256::from_be_bytes(bal)))
+    }
+
+    /// Retrieves the HOPR token allowance granted by the safe address to the channels contract.
+    ///
+    /// This method queries the on-chain HOPR token contract to determine how many tokens
+    /// the safe address has approved the channels contract to spend on its behalf.
+    ///
+    /// # Returns
+    /// * `Result<HoprBalance>` - The current allowance amount, or an error if the query fails
+    pub async fn get_safe_hopr_allowance(&self) -> Result<HoprBalance> {
+        Ok(self
+            .rpc_operations
+            .get_hopr_allowance(self.safe_address, self.contract_addresses.channels)
+            .await?)
     }
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
