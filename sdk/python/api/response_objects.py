@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, fields
 from decimal import Decimal
 
+from .balance import Balance
 from .channelstatus import ChannelStatus
 from .conversion import convert_unit
 
@@ -14,7 +15,12 @@ class ApiResponseObject:
                 v = v.get(subkey, None)
                 if v is None:
                     break
-            setattr(self, f.name, convert_unit(v))
+
+            if "type" in f.metadata:
+                setattr(self, f.name, f.metadata["type"](v))
+            else:
+                setattr(self, f.name, convert_unit(v))
+
         self.post_init()
 
     def post_init(self):
@@ -45,11 +51,11 @@ class Addresses(ApiResponseObject):
 
 @dataclass(init=False)
 class Balances(ApiResponseObject):
-    hopr: Decimal = field(metadata={"path": "hopr"})
-    native: Decimal = field(metadata={"path": "native"})
-    safe_native: Decimal = field(metadata={"path": "safeNative"})
-    safe_hopr: Decimal = field(metadata={"path": "safeHopr"})
-    safe_hopr_allowance: Decimal = field(metadata={"path": "safeHoprAllowance"})
+    hopr: Balance = field(metadata={"path": "hopr", "type": Balance})
+    native: Balance = field(metadata={"path": "native", "type": Balance})
+    safe_native: Balance = field(metadata={"path": "safeNative", "type": Balance})
+    safe_hopr: Balance = field(metadata={"path": "safeHopr", "type": Balance})
+    safe_hopr_allowance: Balance = field(metadata={"path": "safeHoprAllowance", "type": Balance})
 
 
 @dataclass(init=False)
@@ -66,7 +72,7 @@ class ConnectedPeer(ApiResponseObject):
 
 @dataclass(init=False)
 class Channel(ApiResponseObject):
-    balance: Decimal = field(metadata={"path": "balance"})
+    balance: Balance = field(metadata={"path": "balance", "type": Balance})
     channel_epoch: int = field(metadata={"path": "channelEpoch"})
     id: str = field(metadata={"path": "channelId"})
     closure_time: int = field(metadata={"path": "closureTime"})
@@ -81,34 +87,31 @@ class Channel(ApiResponseObject):
 
 @dataclass(init=False)
 class Ticket(ApiResponseObject):
-    amount: Decimal = field(metadata={"path": "amount"})
+    amount: Balance = field(metadata={"path": "amount", "type": Balance})
     channel_epoch: int = field(metadata={"path": "channelEpoch"})
     channel_id: str = field(metadata={"path": "channelId"})
     index: int = field(metadata={"path": "index"})
     index_offset: int = field(metadata={"path": "indexOffset"})
     signature: str = field(metadata={"path": "signature"})
-    winn_prob: float = field(metadata={"path": "winProb"})
+    winn_prob: Decimal = field(metadata={"path": "winProb", "type": Decimal})
 
 
 @dataclass(init=False)
 class TicketPrice(ApiResponseObject):
-    value: Decimal = field(metadata={"path": "value"})
+    value: Balance = field(metadata={"path": "value", "type": Balance})
 
 
 @dataclass(init=False)
 class TicketProbability(ApiResponseObject):
-    value: Decimal = field(metadata={"path": "value"})
-
-    def post_init(self):
-        self.value = Decimal(self.value)
+    value: Decimal = field(metadata={"path": "value", "type": Decimal})
 
 
 @dataclass(init=False)
 class TicketStatistics(ApiResponseObject):
-    neglected_value: Decimal = field(metadata={"path": "neglectedValue"})
-    redeemed_value: Decimal = field(metadata={"path": "redeemedValue"})
-    rejected_value: Decimal = field(metadata={"path": "rejectedValue"})
-    unredeemed_value: Decimal = field(metadata={"path": "unredeemedValue"})
+    neglected_value: Balance = field(metadata={"path": "neglectedValue", "type": Balance})
+    redeemed_value: Balance = field(metadata={"path": "redeemedValue", "type": Balance})
+    rejected_value: Balance = field(metadata={"path": "rejectedValue", "type": Balance})
+    unredeemed_value: Balance = field(metadata={"path": "unredeemedValue", "type": Balance})
     winning_count: int = field(metadata={"path": "winningCount"})
 
 

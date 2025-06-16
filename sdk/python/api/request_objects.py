@@ -27,18 +27,10 @@ class OpenChannelBody(ApiRequestObject):
     amount: str = api_field("amount")
     destination: str = api_field("destination")
 
-    # TODO (jean): Correct this
-    # def post_init(self):
-    #     self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
-
 
 @dataclass
 class FundChannelBody(ApiRequestObject):
     amount: str = api_field("amount")
-
-    # TODO (jean): Correct this
-    # def post_init(self):
-    #     self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
 
 
 @dataclass
