@@ -260,7 +260,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         match process {
                             HoprdProcesses::HoprLib(_, ah) | HoprdProcesses::RestApi(ah) => abort_handles.push(ah),
                             HoprdProcesses::ListenerSockets(ahs) => {
-                                abort_handles.extend(ahs.write_arc().await.drain().map(|(_, entry)| entry.abort_handle));
+                                abort_handles
+                                    .extend(ahs.write_arc().await.drain().map(|(_, entry)| entry.abort_handle));
                             }
                         }
                         futures::stream::iter(abort_handles)

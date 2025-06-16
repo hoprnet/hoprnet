@@ -3,12 +3,12 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
+use alloy::sol_types::SolEvent;
 use futures::{
-    FutureExt, StreamExt,
+    StreamExt,
     future::AbortHandle,
     stream::{self},
 };
-use hopr_async_runtime::prelude::{JoinHandle, spawn};
 use hopr_bindings::hoprtoken::HoprToken::{Approval, Transfer};
 use hopr_chain_rpc::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations};
 use hopr_chain_types::chain_events::SignificantChainEvent;
