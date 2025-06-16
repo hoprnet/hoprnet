@@ -6,7 +6,7 @@ use alloy::primitives::{B256, U256};
 use common::create_rpc_client_to_anvil_with_snapshot;
 use futures::{StreamExt, pin_mut};
 use hex_literal::hex;
-use hopr_async_runtime::prelude::{JoinHandle, cancel_join_handle, sleep, spawn};
+use hopr_async_runtime::{AbortHandle, prelude::sleep, spawn_as_abortable};
 use hopr_chain_actions::{
     ChainActions,
     action_queue::{ActionQueue, ActionQueueConfig},
@@ -73,7 +73,7 @@ struct ChainNode {
     db: HoprDb,
     actions: ChainActions<HoprDb>,
     _indexer: Indexer<TestRpc, ContractEventHandlers<TestRpc, HoprDb>, HoprDb>,
-    node_tasks: Vec<JoinHandle<()>>,
+    node_tasks: Vec<AbortHandle>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -140,13 +140,13 @@ async fn start_node_chain_logic(
 
     let mut node_tasks = Vec::new();
 
-    node_tasks.push(spawn(async move {
+    node_tasks.push(spawn_as_abortable(async move {
         action_queue.start().await;
     }));
 
     // Action state tracking
     let (sce_tx, sce_rx) = async_channel::unbounded();
-    node_tasks.push(spawn(async move {
+    node_tasks.push(spawn_as_abortable(async move {
         let rx = sce_rx.clone();
         pin_mut!(rx);
 
@@ -817,8 +817,8 @@ async fn integration_test_indexer() -> anyhow::Result<()> {
         "alice and bob must be at the same checksum"
     );
 
-    futures::future::join_all(alice_node.node_tasks.into_iter().map(cancel_join_handle)).await;
-    futures::future::join_all(bob_node.node_tasks.into_iter().map(cancel_join_handle)).await;
+    futures::future::join_all(alice_node.node_tasks.into_iter().map(|ah| async move { ah.abort() })).await;
+    futures::future::join_all(bob_node.node_tasks.into_iter().map(|ah| async move { ah.abort() })).await;
 
     Ok(())
 }

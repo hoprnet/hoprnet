@@ -11,7 +11,7 @@ use axum::{
 };
 use axum_extra::extract::Query;
 use base64::Engine;
-use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt, future::AbortHandle};
 use futures_concurrency::stream::Merge;
 use hopr_lib::{
     Address, HoprSession, SESSION_PAYLOAD_SIZE, ServiceId, SessionCapabilities, SessionClientConfig, SessionTarget,
@@ -129,7 +129,7 @@ pub struct StoredSessionEntry {
     /// Return path used for the Session.
     pub return_path: RoutingOptions,
     /// The join handle for the Session processing.
-    pub jh: hopr_async_runtime::prelude::JoinHandle<()>,
+    pub abort_handle: AbortHandle,
 }
 
 #[repr(u8)]
@@ -631,44 +631,6 @@ pub(crate) async fn create_client(
             // For each new TCP connection coming to the listener,
             // open a Session with the same parameters
             let hopr = state.hopr.clone();
-            let jh = hopr_async_runtime::prelude::spawn(
-                tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
-                    .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
-                    .for_each_concurrent(None, move |accepted_client| {
-                        let data = data.clone();
-                        let target = target.clone();
-                        let hopr = hopr.clone();
-                        async move {
-                            match accepted_client {
-                                Ok((sock_addr, stream)) => {
-                                    debug!(socket = ?sock_addr, "incoming TCP connection");
-                                    let session = match hopr.connect_to(dst, target, data).await {
-                                        Ok(s) => s,
-                                        Err(error) => {
-                                            error!(%error, "failed to establish session");
-                                            return;
-                                        }
-                                    };
-
-                                    debug!(
-                                        socket = ?sock_addr,
-                                        session_id = tracing::field::debug(*session.id()),
-                                        "new session for incoming TCP connection",
-                                    );
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
-
-                                    bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE).await;
-
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
-                                }
-                                Err(e) => error!(error = %e, "failed to accept connection"),
-                            }
-                        }
-                    }),
-            );
 
             state.open_listeners.write_arc().await.insert(
                 ListenerId(protocol.into(), bound_host),
@@ -677,7 +639,44 @@ pub(crate) async fn create_client(
                     target: target_spec.clone(),
                     forward_path: args.forward_path.clone(),
                     return_path: args.return_path.clone(),
-                    jh,
+                    abort_handle: hopr_async_runtime::spawn_as_abortable(
+                        tokio_stream::wrappers::TcpListenerStream::new(tcp_listener)
+                            .and_then(|sock| async { Ok((sock.peer_addr()?, sock)) })
+                            .for_each_concurrent(None, move |accepted_client| {
+                                let data = data.clone();
+                                let target = target.clone();
+                                let hopr = hopr.clone();
+                                async move {
+                                    match accepted_client {
+                                        Ok((sock_addr, stream)) => {
+                                            debug!(socket = ?sock_addr, "incoming TCP connection");
+                                            let session = match hopr.connect_to(dst, target, data).await {
+                                                Ok(s) => s,
+                                                Err(error) => {
+                                                    error!(%error, "failed to establish session");
+                                                    return;
+                                                }
+                                            };
+
+                                            debug!(
+                                                socket = ?sock_addr,
+                                                session_id = tracing::field::debug(*session.id()),
+                                                "new session for incoming TCP connection",
+                                            );
+
+                                            #[cfg(all(feature = "prometheus", not(test)))]
+                                            METRIC_ACTIVE_CLIENTS.increment(&["tcp"], 1.0);
+
+                                            bind_session_to_stream(session, stream, HOPR_TCP_BUFFER_SIZE).await;
+
+                                            #[cfg(all(feature = "prometheus", not(test)))]
+                                            METRIC_ACTIVE_CLIENTS.decrement(&["tcp"], 1.0);
+                                        }
+                                        Err(e) => error!(error = %e, "failed to accept connection"),
+                                    }
+                                }
+                            }),
+                    ),
                 },
             );
             bound_host
@@ -717,7 +716,7 @@ pub(crate) async fn create_client(
                     target: target_spec.clone(),
                     forward_path: args.forward_path.clone(),
                     return_path: args.return_path.clone(),
-                    jh: hopr_async_runtime::prelude::spawn(async move {
+                    abort_handle: hopr_async_runtime::spawn_as_abortable(async move {
                         #[cfg(all(feature = "prometheus", not(test)))]
                         METRIC_ACTIVE_CLIENTS.increment(&["udp"], 1.0);
 
@@ -903,7 +902,7 @@ pub(crate) async fn close_client(
                 .remove(&bound_addr)
                 .ok_or((StatusCode::NOT_FOUND, ApiErrorStatus::InvalidInput))?;
 
-            hopr_async_runtime::prelude::cancel_join_handle(entry.jh).await;
+            entry.abort_handle.abort();
         }
     }
 

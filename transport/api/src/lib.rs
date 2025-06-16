@@ -36,7 +36,7 @@ use futures::{
     channel::mpsc::{self, Sender, UnboundedReceiver, UnboundedSender, unbounded},
 };
 use helpers::PathPlanner;
-use hopr_async_runtime::prelude::{JoinHandle, spawn};
+use hopr_async_runtime::{AbortHandle, spawn_as_abortable};
 use hopr_crypto_packet::prelude::HoprPacket;
 pub use hopr_crypto_types::{
     keypairs::{ChainKeypair, Keypair, OffchainKeypair},
@@ -268,7 +268,7 @@ where
         on_incoming_data: UnboundedSender<ApplicationData>,
         discovery_updates: UnboundedReceiver<PeerDiscovery>,
         on_incoming_session: UnboundedSender<IncomingSession>,
-    ) -> crate::errors::Result<HashMap<HoprTransportProcess, JoinHandle<()>>> {
+    ) -> crate::errors::Result<HashMap<HoprTransportProcess, AbortHandle>> {
         let (mut internal_discovery_update_tx, internal_discovery_update_rx) =
             futures::channel::mpsc::unbounded::<PeerDiscovery>();
 
@@ -379,7 +379,7 @@ where
             }
         }
 
-        let mut processes: HashMap<HoprTransportProcess, JoinHandle<()>> = HashMap::new();
+        let mut processes: HashMap<HoprTransportProcess, AbortHandle> = HashMap::new();
 
         let ticket_agg_proc = TicketAggregationInteraction::new(self.db.clone(), me_onchain);
         let tkt_agg_writer = ticket_agg_proc.writer();
@@ -463,7 +463,7 @@ where
         let _mixing_process_before_sending_out =
             hopr_async_runtime::prelude::spawn(mixing_channel_rx.map(Ok).forward(wire_msg_tx));
 
-        processes.insert(HoprTransportProcess::Medium, spawn(transport_layer.run()));
+        processes.insert(HoprTransportProcess::Medium, spawn_as_abortable(transport_layer.run()));
 
         // -- msg-ack protocol over the wire transport
         let packet_cfg = PacketInteractionConfig {
@@ -541,7 +541,7 @@ where
         let smgr = self.smgr.clone();
         processes.insert(
             HoprTransportProcess::SessionsManagement(0),
-            spawn(async move {
+            spawn_as_abortable(async move {
                 let _the_process_should_not_end = StreamExt::filter_map(rx_from_probing, |(pseudonym, data)| {
                     let smgr = smgr.clone();
                     async move {

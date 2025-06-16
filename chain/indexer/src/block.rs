@@ -3,8 +3,11 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
 };
 
-use alloy::sol_types::SolEvent;
-use futures::{StreamExt, stream};
+use futures::{
+    FutureExt, StreamExt,
+    future::AbortHandle,
+    stream::{self},
+};
 use hopr_async_runtime::prelude::{JoinHandle, spawn};
 use hopr_bindings::hoprtoken::HoprToken::{Approval, Transfer};
 use hopr_chain_rpc::{BlockWithLogs, FilterSet, HoprIndexerRpcOperations};
@@ -106,7 +109,7 @@ where
         self
     }
 
-    pub async fn start(mut self) -> Result<JoinHandle<()>>
+    pub async fn start(mut self) -> Result<AbortHandle>
     where
         T: HoprIndexerRpcOperations + 'static,
         U: ChainLogHandler + 'static,
@@ -243,7 +246,7 @@ where
 
         info!(next_block_to_process, "Indexer start point");
 
-        let indexing_proc = spawn(async move {
+        let indexing_abort_handle = hopr_async_runtime::spawn_as_abortable(async move {
             // Update the chain head once again
             debug!("Updating chain head at indexer startup");
             Self::update_chain_head(&rpc, chain_head.clone()).await;
@@ -348,7 +351,7 @@ where
         });
 
         if rx.next().await.is_some() {
-            Ok(indexing_proc)
+            Ok(indexing_abort_handle)
         } else {
             Err(crate::errors::CoreEthereumIndexerError::ProcessError(
                 "Error during indexing start".into(),

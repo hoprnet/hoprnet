@@ -34,8 +34,9 @@ use errors::{HoprLibError, HoprStatusError};
 use futures::{
     SinkExt, Stream, StreamExt,
     channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded},
+    future::AbortHandle,
 };
-use hopr_async_runtime::prelude::{JoinHandle, sleep, spawn};
+use hopr_async_runtime::prelude::{sleep, spawn};
 pub use hopr_chain_actions::errors::ChainActionsError;
 use hopr_chain_actions::{
     action_state::{ActionState, IndexerActionTracker},
@@ -612,7 +613,7 @@ impl Hopr {
     pub async fn run<#[cfg(feature = "session-server")] T: HoprSessionReactor + Clone + Send + 'static>(
         &self,
         #[cfg(feature = "session-server")] serve_handler: T,
-    ) -> errors::Result<(HoprSocket, HashMap<HoprLibProcesses, JoinHandle<()>>)> {
+    ) -> errors::Result<(HoprSocket, HashMap<HoprLibProcesses, AbortHandle>)> {
         self.error_if_not_in_state(
             HoprState::Uninitialized,
             "Cannot start the hopr node multiple times".into(),
@@ -623,7 +624,7 @@ impl Hopr {
             "Node is not started, please fund this node",
         );
 
-        let mut processes: HashMap<HoprLibProcesses, JoinHandle<()>> = HashMap::new();
+        let mut processes: HashMap<HoprLibProcesses, AbortHandle> = HashMap::new();
 
         wait_for_funds(
             self.me_onchain(),
@@ -920,9 +921,10 @@ impl Hopr {
         let multi_strategy_ack_ticket = self.multistrategy.clone();
         let (on_ack_tkt_tx, mut on_ack_tkt_rx) = unbounded::<AcknowledgedTicket>();
         self.db.start_ticket_processing(Some(on_ack_tkt_tx))?;
+
         processes.insert(
             HoprLibProcesses::OnReceivedAcknowledgement,
-            spawn(async move {
+            hopr_async_runtime::spawn_as_abortable(async move {
                 while let Some(ack) = on_ack_tkt_rx.next().await {
                     if let Err(error) = hopr_strategy::strategy::SingularStrategy::on_acknowledged_winning_ticket(
                         &*multi_strategy_ack_ticket,
@@ -942,7 +944,7 @@ impl Hopr {
         {
             processes.insert(
                 HoprLibProcesses::SessionServer,
-                spawn(_session_rx.for_each_concurrent(None, move |session| {
+                hopr_async_runtime::spawn_as_abortable(_session_rx.for_each_concurrent(None, move |session| {
                     let serve_handler = serve_handler.clone();
                     async move {
                         let session_id = *session.session.id();
@@ -981,7 +983,7 @@ impl Hopr {
         let db_clone = self.db.clone();
         processes.insert(
             HoprLibProcesses::TicketIndexFlush,
-            spawn(Box::pin(execute_on_tick(
+            hopr_async_runtime::spawn_as_abortable(Box::pin(execute_on_tick(
                 Duration::from_secs(5),
                 move || {
                     let db_clone = db_clone.clone();
@@ -1011,7 +1013,7 @@ impl Hopr {
         let strategy_interval = self.cfg.strategy.execution_interval;
         processes.insert(
             HoprLibProcesses::StrategyTick,
-            spawn(async move {
+            hopr_async_runtime::spawn_as_abortable(async move {
                 execute_on_tick(
                     Duration::from_secs(strategy_interval),
                     move || {
