@@ -2,7 +2,6 @@ import asyncio
 import base64
 import logging
 import random
-from decimal import Decimal, ROUND_UP
 from typing import Optional
 
 import aiohttp
@@ -13,6 +12,7 @@ import nacl.signing  # Ensure nacl.signing is imported correctly
 import nacl.utils
 from nacl.public import SealedBox  # Import SealedBox explicitly
 
+from .balance import Balance
 from .http_method import HTTPMethod
 from .protocol import Protocol
 from .request_objects import (
@@ -104,7 +104,9 @@ class HoprdAPI:
     def log_prefix(cls) -> str:
         return "api"
 
-    async def __call(self, method: HTTPMethod, endpoint: str, data: ApiRequestObject = None, use_api_path: bool = True):
+    async def __call(
+        self, method: HTTPMethod, endpoint: str, data: Optional[ApiRequestObject] = None, use_api_path: bool = True
+    ):
         try:
             headers = {"Content-Type": "application/json"}
             async with aiohttp.ClientSession(headers=self.headers) as s:
@@ -134,7 +136,7 @@ class HoprdAPI:
         self,
         method: HTTPMethod,
         endpoint: str,
-        data: ApiRequestObject = None,
+        data: Optional[ApiRequestObject] = None,
         timeout: int = 60,
         use_api_path: bool = True,
     ) -> tuple[bool, Optional[object]]:
@@ -156,26 +158,26 @@ class HoprdAPI:
         is_ok, response = await self.__call_api(HTTPMethod.GET, "account/balances")
         return Balances(response) if is_ok else None
 
-    async def open_channel(self, destination: str, amount: Decimal) -> Optional[OpenedChannel]:
+    async def open_channel(self, destination: str, amount: Balance) -> Optional[OpenedChannel]:
         """
         Opens a channel with the given peer_address and amount.
         :param: peer_address: str
-        :param: amount: Decimal
+        :param: amount: Balance
         :return: channel id: str | undefined
         """
-        data = OpenChannelBody(amount, destination)
+        data = OpenChannelBody(amount.as_str, destination)
 
         is_ok, response = await self.__call_api(HTTPMethod.POST, "channels", data)
         return OpenedChannel(response) if is_ok else None
 
-    async def fund_channel(self, channel_id: str, amount: Decimal) -> bool:
+    async def fund_channel(self, channel_id: str, amount: Balance) -> bool:
         """
         Funds a given channel.
         :param: channel_id: str
         :param: amount: float
         :return: bool
         """
-        data = FundChannelBody(amount)
+        data = FundChannelBody(amount.as_str)
 
         is_ok, response = await self.__call_api(HTTPMethod.POST, f"channels/{channel_id}/fund", data)
         return is_ok
@@ -364,7 +366,7 @@ class HoprdAPI:
         is_ok, _ = await self.__call_api(HTTPMethod.DELETE, "tickets/statistics")
         return is_ok
 
-    async def session_list_clients(self, protocol: Protocol = Protocol.UDP) -> list[Session]:
+    async def session_list_clients(self, protocol: Protocol = Protocol.UDP) -> Optional[list[Session]]:
         """
         Lists existing Session listeners for the given IP protocol
         :param: protocol: Protocol
@@ -403,9 +405,7 @@ class HoprdAPI:
         actual_target = (
             {"Sealed": base64.b64encode(seal_with_address(destination, bytes(target, "utf-8"), 50)).decode("ascii")}
             if sealed_target
-            else {"Service": int(target)}
-            if service
-            else {"Plain": target}
+            else {"Service": int(target)} if service else {"Plain": target}
         )
 
         data = CreateSessionBody(

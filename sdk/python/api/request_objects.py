@@ -1,163 +1,99 @@
-from decimal import Decimal, ROUND_UP
+from dataclasses import dataclass, field, fields
+from typing import Any, List, Union
+
+
+def api_field(api_key: str, **kwargs):
+    metadata = kwargs.pop("metadata", {})
+    metadata["api_key"] = api_key
+    return field(metadata=metadata, **kwargs)
 
 
 class ApiRequestObject:
-    def __init__(self, *args, **kwargs):
-        if not hasattr(self, "keys"):
-            self.keys = {}
-
-        if args:
-            kwargs.update(args[0])
-
-        kwargs = {k: v for k, v in kwargs.items() if not k.startswith("__")}
-        kwargs.pop("self", None)
-
-        if set(kwargs.keys()) != set(self.keys.keys()):
-            raise ValueError(f"Keys mismatch: {set(kwargs.keys())} != {set(self.keys.keys())}")
-
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-        self.post_init()
-
     @property
     def as_dict(self) -> dict:
-        return {value: getattr(self, key) for key, value in self.keys.items()}
+        result = {}
+        for f in fields(self):
+            api_key = f.metadata.get("api_key", f.name)
+            result[api_key] = getattr(self, f.name)
+        return result
 
     @property
     def as_header_string(self) -> str:
-        attrs_as_dict = {value: getattr(self, key) for key, value in self.keys.items()}
-        return "&".join([f"{k}={v}" for k, v in attrs_as_dict.items()])
-
-    def post_init(self):
-        pass
+        return "&".join([f"{k}={v}" for k, v in self.as_dict.items()])
 
 
+@dataclass
 class OpenChannelBody(ApiRequestObject):
-    keys = {
-        "amount": "amount",
-        "destination": "destination",
-    }
+    amount: str = api_field("amount")
+    destination: str = api_field("destination")
 
-    def __init__(self, amount: Decimal, destination: str):
-        super().__init__(vars())
-
-    def post_init(self):
-        self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
+    # TODO (jean): Correct this
+    # def post_init(self):
+    #     self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
 
 
+@dataclass
 class FundChannelBody(ApiRequestObject):
-    keys = {"amount": "amount"}
+    amount: str = api_field("amount")
 
-    def __init__(self, amount: Decimal):
-        super().__init__(vars())
-
-    def post_init(self):
-        self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
+    # TODO (jean): Correct this
+    # def post_init(self):
+    #     self.amount = f"{self.amount.quantize(Decimal('1.0000000000'), rounding=ROUND_UP)} wxHOPR"
 
 
+@dataclass
 class GetChannelsBody(ApiRequestObject):
-    keys = {
-        "full_topology": "fullTopology",
-        "including_closed": "includingClosed",
-    }
-
-    def __init__(self, full_topology: str, including_closed: str):
-        super().__init__(vars())
+    full_topology: str = api_field("fullTopology")
+    including_closed: str = api_field("includingClosed")
 
 
+@dataclass
 class GetPeersBody(ApiRequestObject):
-    keys = {"quality": "quality"}
-
-    def __init__(self, quality: float):
-        super().__init__(vars())
+    quality: float = api_field("quality")
 
 
+@dataclass
 class CreateSessionBody(ApiRequestObject):
-    keys = {
-        "capabilities": "capabilities",
-        "destination": "destination",
-        "listen_host": "listenHost",
-        "forward_path": "forwardPath",
-        "return_path": "returnPath",
-        "target": "target",
-        "response_buffer": "responseBuffer",
-    }
-
-    def __init__(
-        self,
-        capabilities: list,
-        destination: str,
-        listen_host: str,
-        forward_path: str,
-        return_path: str,
-        target: str,
-        response_buffer: str,
-    ):
-        super().__init__(vars())
+    capabilities: List[Any] = api_field("capabilities")
+    destination: str = api_field("destination")
+    listen_host: str = api_field("listenHost")
+    forward_path: Union[str, dict] = api_field("forwardPath")
+    return_path: Union[str, dict] = api_field("returnPath")
+    target: Union[str, dict] = api_field("target")
+    response_buffer: str = api_field("responseBuffer")
 
 
+@dataclass
 class SessionCapabilitiesBody(ApiRequestObject):
-    keys = {
-        "retransmission": "Retransmission",
-        "segmentation": "Segmentation",
-        "retransmission_ack_only": "RetransmissionAckOnly",
-        "no_delay": "NoDelay",
-    }
-
-    def __init__(
-        self,
-        retransmission: bool = False,
-        segmentation: bool = False,
-        retransmission_ack_only: bool = False,
-        no_delay: bool = False,
-    ):
-        super().__init__(vars())
+    retransmission: bool = api_field("Retransmission")
+    segmentation: bool = api_field("Segmentation")
+    retransmission_ack_only = api_field("RetransmissionAckOnly")
+    no_delay: bool = api_field("NoDelay")
 
     @property
     def as_array(self) -> list:
-        return [self.keys[var] for var in vars(self) if var in self.keys and vars(self)[var]]
+        return [f.metadata["api_key"] for f in fields(self) if getattr(self, f.name)]
 
 
+@dataclass
 class SessionPathBodyRelayers(ApiRequestObject):
-    keys = {
-        "relayers": "IntermediatePath",
-    }
-
-    def __init__(self, relayers: list[str]):
-        super().__init__(vars())
+    relayers: List[str] = api_field("IntermediatePath")
 
 
+@dataclass
 class SessionPathBodyHops(ApiRequestObject):
-    keys = {
-        "hops": "Hops",
-    }
-
-    def __init__(self, hops: int = 0):
-        super().__init__(vars())
+    hops: int = api_field("Hops")
 
     def post_init(self):
         self.hops = int(self.hops)
 
 
+@dataclass
 class SessionTargetBody(ApiRequestObject):
-    keys = {
-        "service": "Service",
-    }
-
-    def __init__(self, service: int = 0):
-        super().__init__(vars())
+    service: int = api_field("Service")
 
 
-class SendMessageBody(ApiRequestObject):
-    keys = {"body": "body", "hops": "hops", "path": "path", "destination": "destination", "tag": "tag"}
-
-    def __init__(self, body: str, hops: int, path: list[str], destination: str, tag: int):
-        super().__init__(vars())
-
-
+@dataclass
 class WithdrawBody(ApiRequestObject):
-    keys = {"address": "address", "amount": "amount"}
-
-    def __init__(self, address: str, amount: str):
-        super().__init__(vars())
+    address: str = api_field("address")
+    amount: str = api_field("amount")

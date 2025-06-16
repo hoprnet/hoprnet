@@ -1,37 +1,8 @@
 from dataclasses import dataclass, field, fields
 from decimal import Decimal
-from typing import Any
 
 from .channelstatus import ChannelStatus
-
-
-def _convert(value: Any):
-    if value is None:
-        return None
-
-    if isinstance(value, int) or isinstance(value, float):
-        return value
-
-    if isinstance(value, str):
-        try:
-            float_value = float(value)
-        except ValueError:
-            return value
-
-        if "." in value:
-            return float_value
-        else:
-            return int(value)
-
-    return value
-
-
-def _parse_balance_string(balance_str) -> Decimal:
-    """Parse a balance string with currency units and return the amount as a big decimal"""
-    try:
-        return Decimal(balance_str.split()[0])
-    except (ValueError, AttributeError, IndexError) as e:
-        raise ValueError(f"Failed to parse balance string: {balance_str}") from e
+from .conversion import convert_unit
 
 
 class ApiResponseObject:
@@ -43,7 +14,7 @@ class ApiResponseObject:
                 v = v.get(subkey, None)
                 if v is None:
                     break
-            setattr(self, f.name, _convert(v))
+            setattr(self, f.name, convert_unit(v))
         self.post_init()
 
     def post_init(self):
@@ -64,9 +35,7 @@ class ApiResponseObject:
         return str(self)
 
     def __eq__(self, other):
-        return all(
-            getattr(self, key) == getattr(other, key) for key in [f.name for f in fields(self)]
-        )
+        return all(getattr(self, key) == getattr(other, key) for key in [f.name for f in fields(self)])
 
 
 @dataclass(init=False)
@@ -81,18 +50,12 @@ class Balances(ApiResponseObject):
     safe_native: Decimal = field(metadata={"path": "safeNative"})
     safe_hopr: Decimal = field(metadata={"path": "safeHopr"})
     safe_hopr_allowance: Decimal = field(metadata={"path": "safeHoprAllowance"})
-    
-    def post_init(self):
-        self.hopr = _parse_balance_string(self.hopr)
-        self.native = _parse_balance_string(self.native)
-        self.safe_native = _parse_balance_string(self.safe_native)
-        self.safe_hopr = _parse_balance_string(self.safe_hopr)
-        self.safe_hopr_allowance = _parse_balance_string(self.safe_hopr_allowance)
 
 
 @dataclass(init=False)
 class Infos(ApiResponseObject):
     hopr_node_safe: bool = field(metadata={"path": "hoprNodeSafe"})
+
 
 @dataclass(init=False)
 class ConnectedPeer(ApiResponseObject):
@@ -113,7 +76,6 @@ class Channel(ApiResponseObject):
     ticket_index: int = field(metadata={"path": "ticketIndex"})
 
     def post_init(self):
-        self.balance = _parse_balance_string(self.balance)
         self.status = ChannelStatus.fromString(self.status)
 
 
@@ -127,16 +89,10 @@ class Ticket(ApiResponseObject):
     signature: str = field(metadata={"path": "signature"})
     winn_prob: float = field(metadata={"path": "winProb"})
 
-    def post_init(self):
-        self.amount = _parse_balance_string(self.amount)
-
 
 @dataclass(init=False)
 class TicketPrice(ApiResponseObject):
     value: Decimal = field(metadata={"path": "value"})
-
-    def post_init(self):
-        self.value = _parse_balance_string(self.value)
 
 
 @dataclass(init=False)
@@ -155,27 +111,24 @@ class TicketStatistics(ApiResponseObject):
     unredeemed_value: Decimal = field(metadata={"path": "unredeemedValue"})
     winning_count: int = field(metadata={"path": "winningCount"})
 
-    def post_init(self):
-        self.rejected_value = _parse_balance_string(self.rejected_value)
-        self.neglected_value = _parse_balance_string(self.neglected_value)
-        self.redeemed_value = _parse_balance_string(self.redeemed_value)
-        self.unredeemed_value = _parse_balance_string(self.unredeemed_value)
-
 
 @dataclass(init=False)
 class Configuration(ApiResponseObject):
     safe_address: str = field(metadata={"path": "hopr/safe_module/safe_address"})
     module_address: str = field(metadata={"path": "hopr/safe_module/module_address"})
 
+
 @dataclass(init=False)
 class OpenedChannel(ApiResponseObject):
     id: str = field(metadata={"path": "channelId"})
     receipt: str = field(metadata={"path": "transactionReceipt"})
 
+
 @dataclass(init=False)
 class Ping(ApiResponseObject):
     latency: float = field(metadata={"path": "latency"})
     version: str = field(metadata={"path": "reportedVersion"})
+
 
 @dataclass(init=False)
 class Session(ApiResponseObject):
@@ -188,14 +141,14 @@ class Session(ApiResponseObject):
     return_path: str = field(metadata={"path": "returnPath"})
     mtu: int = field(metadata={"path": "mtu"})
 
+
 class Channels:
     def __init__(self, data: dict, category: str = "all"):
         self.all = []
         self.incoming = []
         self.outgoing = []
 
-        setattr(self, category, [Channel(channel)
-                for channel in data.get(category, [])])
+        setattr(self, category, [Channel(channel) for channel in data.get(category, [])])
 
     def __str__(self):
         return str(self.__dict__)
