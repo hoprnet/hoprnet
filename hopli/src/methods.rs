@@ -672,6 +672,51 @@ pub async fn force_sync_safes_on_network_registry<P: Provider>(
     Ok(())
 }
 
+pub async fn toggle_network_registry_status<P: Provider>(
+    network_registry: HoprNetworkRegistryInstance<Arc<P>>,
+    status: bool,
+) -> Result<(), HelperErrors> {
+    let current_status = network_registry
+        .enabled()
+        .call()
+        .await
+        .map_err(|e| HelperErrors::RpcError(e.into()))?;
+
+    info!(
+        current_status = ?current_status,
+        desired_status = ?status,
+        "Toggling network registry status",
+    );
+
+    if current_status == status {
+        info!("Network registry is already in the desired state: {:?}", status);
+        return Ok(());
+    }
+
+    if status {
+        info!("Enabling the network registry");
+        // enable network registry
+        network_registry
+            .enableRegistry()
+            .send()
+            .await?
+            .watch()
+            .await
+            .map_err(|e| HelperErrors::RpcError(e.into()))?;
+    } else {
+        info!("Disabling the network registry");
+        // disable network registry
+        network_registry
+            .disableRegistry()
+            .send()
+            .await?
+            .watch()
+            .await
+            .map_err(|e| HelperErrors::RpcError(e.into()))?;
+    }
+    Ok(())
+}
+
 /// Helper function to predict module address. Note that here the caller is the contract deployer
 pub fn predict_module_address(
     caller: Address,

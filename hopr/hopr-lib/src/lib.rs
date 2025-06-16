@@ -223,7 +223,11 @@ where
 
         async move {
             let resolved = indexer_action_tracker.match_and_resolve(&event).await;
-            debug!(count = resolved.len(), event = %event, "resolved indexer expectations", );
+            if resolved.is_empty() {
+                trace!(%event, "No indexer expectations resolved for the event");
+            } else {
+                debug!(count = resolved.len(), %event, "resolved indexer expectations");
+            }
 
             match event.event_type {
                 ChainEventType::Announcement{peer, multiaddresses, ..} => {
@@ -238,7 +242,7 @@ where
                     let maybe_direction = channel.direction(&me_onchain);
 
                     let change = channel_graph
-                        .write()
+                        .write_arc()
                         .await
                         .update_channel(channel);
 
@@ -676,6 +680,17 @@ impl Hopr {
             ))));
         }
 
+        // set safe and module addresses in the DB
+        self.db
+            .set_safe_info(
+                None,
+                SafeInfo {
+                    safe_address: self.cfg.safe_module.safe_address,
+                    module_address: self.cfg.safe_module.module_address,
+                },
+            )
+            .await?;
+
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
         let (indexer_peer_update_tx, indexer_peer_update_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
@@ -783,16 +798,6 @@ impl Hopr {
             }
         }
 
-        self.db
-            .set_safe_info(
-                None,
-                SafeInfo {
-                    safe_address: self.cfg.safe_module.safe_address,
-                    module_address: self.cfg.safe_module.module_address,
-                },
-            )
-            .await?;
-
         if self.is_public() {
             // At this point the node is already registered with Safe, so
             // we can announce via Safe-compliant TX
@@ -822,7 +827,7 @@ impl Hopr {
 
             // Sync the Channel graph
             let channel_graph = self.channel_graph.clone();
-            let mut cg = channel_graph.write().await;
+            let mut cg = channel_graph.write_arc().await;
 
             info!("Syncing channels from the previous runs");
             let mut channel_stream = self
@@ -1477,11 +1482,11 @@ impl Hopr {
     }
 
     pub async fn export_channel_graph(&self, cfg: GraphExportConfig) -> String {
-        self.channel_graph.read().await.as_dot(cfg)
+        self.channel_graph.read_arc().await.as_dot(cfg)
     }
 
     pub async fn export_raw_channel_graph(&self) -> errors::Result<String> {
-        let cg = self.channel_graph.read().await;
+        let cg = self.channel_graph.read_arc().await;
         serde_json::to_string(cg.deref()).map_err(|e| HoprLibError::GeneralError(e.to_string()))
     }
 }

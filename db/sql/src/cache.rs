@@ -221,32 +221,48 @@ impl CacheKeyMapper {
     /// is not consistent.
     pub fn update_key_id_binding(&self, account: &AccountEntry) -> Result<(), DbSqlError> {
         let id = account.key_id();
+        let key = account.public_key;
 
         // Lock entries in the maps to avoid concurrent modifications
         let id_entry = self.0.entry(id);
-        let key_entry = self.1.entry(account.public_key);
+        let key_entry = self.1.entry(key);
 
         match (id_entry, key_entry) {
             (Entry::Vacant(v_id), Entry::Vacant(v_key)) => {
-                v_id.insert(account.public_key);
-                v_key.insert(id);
-                tracing::debug!(%id, %account.public_key, "inserted key-id binding");
+                v_id.insert_entry(key);
+                v_key.insert_entry(id);
+                tracing::debug!(%id, %key, "inserted key-id binding");
                 Ok(())
             }
             (Entry::Occupied(v_id), Entry::Occupied(v_key)) => {
                 // Check if the existing binding is consistent with the new one.
                 if v_id.get() != v_key.key() {
                     Err(DbSqlError::LogicalError(format!(
-                        "attempt to insert key {} with key-id {id} already exists for the key {}",
+                        "attempt to insert key {key} with key-id {id}, but key-id already maps to key {} while {} is \
+                         expected",
+                        v_id.get(),
                         v_key.key(),
-                        v_id.get()
                     )))
                 } else {
                     Ok(())
                 }
             }
             // This should never happen.
-            _ => Err(DbSqlError::LogicalError("inconsistent key-id binding".into())),
+            (Entry::Vacant(_v_id), Entry::Occupied(v_key)) => {
+                tracing::debug!(
+                    "attempt to insert key {key} with key-id {id} failed because key is already set as {}",
+                    v_key.get()
+                );
+                Err(DbSqlError::LogicalError("inconsistent key-id binding".into()))
+            }
+            // This should never happen.
+            (Entry::Occupied(v_id), Entry::Vacant(_v_key)) => {
+                tracing::debug!(
+                    "attempt to insert key {key} with key-id {id} failed because key-id is already set as {}",
+                    v_id.get()
+                );
+                Err(DbSqlError::LogicalError("inconsistent key-id binding".into()))
+            }
         }
     }
 }

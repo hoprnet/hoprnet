@@ -100,6 +100,35 @@ class Node:
             + f"anvil {self.anvil_port}"
         )
 
+    def load_native_address(self):
+        logging.debug(f"Reading node_id {self}")
+
+        safe_custom_env = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "PATH": os.environ["PATH"],
+        }
+
+        res = run(
+            [
+                "hopli",
+                "identity",
+                "read",
+                "--identity-from-path",
+                self.dir.joinpath("hoprd.id"),
+            ],
+            env=os.environ | safe_custom_env,
+            check=True,
+            capture_output=True,
+            text=True,
+            cwd=PWD,
+        )
+
+        for el in res.stdout.split("\n"):
+            if el.startswith("Identity addresses:"):
+                logging.debug(f"Node {self.id} identity read line: {el}")
+                self.address = el.split("[")[-1].rstrip("]")
+
     def load_addresses(self):
         loaded_env = load_env_file(self.dir.joinpath(".env"))
         self.safe_address = loaded_env.get("HOPRD_SAFE_ADDRESS")

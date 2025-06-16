@@ -13,11 +13,12 @@ class AnvilState(Enum):
 
 
 class Anvil:
-    def __init__(self, log_file: Path, cfg_file: Path, state_file: Path, port: int):
+    def __init__(self, log_file: Path, cfg_file: Path, state_file: Path, port: int, use_staking_proxy: bool):
         self.log_file = log_file
         self.cfg_file = cfg_file
         self.state_file = state_file
         self.port = port
+        self.use_staking_proxy = use_staking_proxy
 
         self.log_file.parent.mkdir(parents=True, exist_ok=True)
         self.cfg_file.parent.mkdir(parents=True, exist_ok=True)
@@ -33,6 +34,7 @@ class Anvil:
             -c {self.cfg_file}
             -p {self.port}
             {'-ls' if state is AnvilState.LOAD else '-ds'} {self.state_file}
+            {'-sp' if self.use_staking_proxy else ''}
             """
 
         run(
