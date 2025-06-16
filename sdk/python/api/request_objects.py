@@ -1,11 +1,15 @@
 from dataclasses import dataclass, field, fields
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 
-def api_field(api_key: str, **kwargs):
+def api_field(api_key: str, default: Optional[Any] = None, **kwargs):
     metadata = kwargs.pop("metadata", {})
     metadata["api_key"] = api_key
-    return field(metadata=metadata, **kwargs)
+
+    if default is None:
+        return field(metadata=metadata, **kwargs)
+    else:
+        return field(default=default, metadata=metadata, **kwargs)
 
 
 class ApiRequestObject:
@@ -24,6 +28,7 @@ class ApiRequestObject:
     @classmethod
     def default(cls):
         return cls(**{f.name: f.default for f in fields(cls)})
+
 
 @dataclass
 class OpenChannelBody(ApiRequestObject):
@@ -60,10 +65,10 @@ class CreateSessionBody(ApiRequestObject):
 
 @dataclass
 class SessionCapabilitiesBody(ApiRequestObject):
-    retransmission: bool = api_field("Retransmission")
-    segmentation: bool = api_field("Segmentation")
-    retransmission_ack_only: bool = api_field("RetransmissionAckOnly")
-    no_delay: bool = api_field("NoDelay")
+    retransmission: bool = api_field("Retransmission", False)
+    segmentation: bool = api_field("Segmentation", False)
+    retransmission_ack_only: bool = api_field("RetransmissionAckOnly", False)
+    no_delay: bool = api_field("NoDelay", False)
 
     @property
     def as_array(self) -> list:
