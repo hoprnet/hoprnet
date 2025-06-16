@@ -44,7 +44,11 @@ async def bringup(
         config, ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("protocol-config.json"), use_nat, exposed, base_port
     )
     anvil = Anvil(
-        ANVIL_FOLDER.joinpath("anvil.log"), ANVIL_CONFIG_FILE, ANVIL_FOLDER.joinpath("anvil.state.json"), base_port
+        ANVIL_FOLDER.joinpath("anvil.log"),
+        ANVIL_CONFIG_FILE,
+        ANVIL_FOLDER.joinpath("anvil.state.json"),
+        base_port,
+        not test_mode,
     )
 
     snapshot = Snapshot(base_port, MAIN_DIR, cluster)
@@ -76,6 +80,10 @@ async def bringup(
         # wait before contract deployments are finalized
         await asyncio.sleep(2.5)
 
+        # enable network registry
+        cluster.enable_network_registry()
+        await asyncio.sleep(1)
+
         # fund nodes
         cluster.fund_nodes()
 
@@ -92,6 +100,11 @@ async def bringup(
     # SETUP NODES USING STORED IDENTITIES
     cluster.copy_identities()
     cluster.load_addresses()
+    cluster.load_native_addresses()
+
+    # add nodes to network registry
+    cluster.add_nodes_to_network_registry()
+    await asyncio.sleep(2.5)
 
     # wait before contract deployments are finalized
     await asyncio.sleep(2.5)

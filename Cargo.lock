@@ -4522,7 +4522,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-actions"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4586,7 +4586,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-indexer"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4619,7 +4619,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-chain-rpc"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4643,6 +4643,7 @@ dependencies = [
  "moka",
  "primitive-types 0.13.1",
  "reqwest",
+ "rust-stream-ext-concurrent",
  "serde",
  "serde_json",
  "serde_with",
@@ -4811,7 +4812,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-migration"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "hopr-internal-types",
  "hopr-primitive-types",
@@ -4821,7 +4822,7 @@ dependencies = [
 
 [[package]]
 name = "hopr-db-sql"
-version = "0.14.1"
+version = "0.14.2"
 dependencies = [
  "anyhow",
  "async-lock 3.4.0",

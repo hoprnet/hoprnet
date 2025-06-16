@@ -596,7 +596,7 @@ pub(crate) async fn create_client(
     if bind_host.port() > 0
         && state
             .open_listeners
-            .read()
+            .read_arc()
             .await
             .contains_key(&ListenerId(protocol.into(), bind_host))
     {
@@ -632,7 +632,7 @@ pub(crate) async fn create_client(
             // open a Session with the same parameters
             let hopr = state.hopr.clone();
 
-            state.open_listeners.write().await.insert(
+            state.open_listeners.write_arc().await.insert(
                 ListenerId(protocol.into(), bound_host),
                 StoredSessionEntry {
                     destination: dst,
@@ -709,7 +709,7 @@ pub(crate) async fn create_client(
             let open_listeners_clone = state.open_listeners.clone();
             let listener_id = ListenerId(protocol.into(), bound_host);
 
-            state.open_listeners.write().await.insert(
+            state.open_listeners.write_arc().await.insert(
                 listener_id,
                 StoredSessionEntry {
                     destination: dst,
@@ -726,7 +726,7 @@ pub(crate) async fn create_client(
                         METRIC_ACTIVE_CLIENTS.decrement(&["udp"], 1.0);
 
                         // Once the Session closes, remove it from the list
-                        open_listeners_clone.write().await.remove(&listener_id);
+                        open_listeners_clone.write_arc().await.remove(&listener_id);
                     }),
                 },
             );
@@ -789,7 +789,7 @@ pub(crate) async fn list_clients(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     let response = state
         .open_listeners
-        .read()
+        .read_arc()
         .await
         .iter()
         .filter(|(id, _)| id.0 == protocol.into())
@@ -880,7 +880,7 @@ pub(crate) async fn close_client(
         .map_err(|_| (StatusCode::BAD_REQUEST, ApiErrorStatus::InvalidInput))?;
 
     {
-        let mut open_listeners = state.open_listeners.write().await;
+        let mut open_listeners = state.open_listeners.write_arc().await;
 
         let mut to_remove = Vec::new();
 

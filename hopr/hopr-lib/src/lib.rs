@@ -32,7 +32,7 @@ use std::{
 use async_lock::RwLock;
 use errors::{HoprLibError, HoprStatusError};
 use futures::{
-    Stream, StreamExt,
+    SinkExt, Stream, StreamExt,
     channel::mpsc::{UnboundedReceiver, UnboundedSender, unbounded},
     future::AbortHandle,
 };
@@ -224,7 +224,11 @@ where
 
         async move {
             let resolved = indexer_action_tracker.match_and_resolve(&event).await;
-            debug!(count = resolved.len(), event = %event, "resolved indexer expectations", );
+            if resolved.is_empty() {
+                trace!(%event, "No indexer expectations resolved for the event");
+            } else {
+                debug!(count = resolved.len(), %event, "resolved indexer expectations");
+            }
 
             match event.event_type {
                 ChainEventType::Announcement{peer, multiaddresses, ..} => {
@@ -239,7 +243,7 @@ where
                     let maybe_direction = channel.direction(&me_onchain);
 
                     let change = channel_graph
-                        .write()
+                        .write_arc()
                         .await
                         .update_channel(channel);
 
@@ -677,9 +681,20 @@ impl Hopr {
             ))));
         }
 
+        // set safe and module addresses in the DB
+        self.db
+            .set_safe_info(
+                None,
+                SafeInfo {
+                    safe_address: self.cfg.safe_module.safe_address,
+                    module_address: self.cfg.safe_module.module_address,
+                },
+            )
+            .await?;
+
         self.state.store(HoprState::Indexing, Ordering::Relaxed);
 
-        let (indexer_peer_update_tx, indexer_peer_update_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
+        let (mut indexer_peer_update_tx, indexer_peer_update_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
 
         let indexer_event_pipeline = chain_events_to_transport_events(
             self.rx_indexer_significant_events.clone(),
@@ -692,10 +707,11 @@ impl Hopr {
         .await;
 
         // terminated once all senders are dropped and no items in the receiver remain
+        let indexer_peer_update_tx_2 = indexer_peer_update_tx.clone();
         spawn(async move {
             indexer_event_pipeline
                 .map(Ok)
-                .forward(indexer_peer_update_tx)
+                .forward(indexer_peer_update_tx_2)
                 .await
                 .expect("The index to transport event chain failed");
         });
@@ -784,16 +800,6 @@ impl Hopr {
             }
         }
 
-        self.db
-            .set_safe_info(
-                None,
-                SafeInfo {
-                    safe_address: self.cfg.safe_module.safe_address,
-                    module_address: self.cfg.safe_module.module_address,
-                },
-            )
-            .await?;
-
         if self.is_public() {
             // At this point the node is already registered with Safe, so
             // we can announce via Safe-compliant TX
@@ -823,7 +829,7 @@ impl Hopr {
 
             // Sync the Channel graph
             let channel_graph = self.channel_graph.clone();
-            let mut cg = channel_graph.write().await;
+            let mut cg = channel_graph.write_arc().await;
 
             info!("Syncing channels from the previous runs");
             let mut channel_stream = self
@@ -838,6 +844,38 @@ impl Hopr {
                         cg.update_channel(channel);
                     }
                     Err(error) => error!(%error, "Failed to sync channel into the graph"),
+                }
+            }
+
+            info!("Syncing peer announcements and network registry updates from previous runs");
+            let accounts = self.db.get_accounts(None, true).await?;
+            for account in accounts.into_iter() {
+                match account.entry_type {
+                    AccountType::NotAnnounced => {}
+                    AccountType::Announced { multiaddr, .. } => {
+                        indexer_peer_update_tx
+                            .send(PeerDiscovery::Announce(account.public_key.into(), vec![multiaddr]))
+                            .await
+                            .map_err(|e| {
+                                HoprLibError::GeneralError(format!("Failed to send peer discovery announcement: {e}"))
+                            })?;
+
+                        let allow_status = if self
+                            .db
+                            .is_allowed_in_network_registry(None, &account.chain_addr)
+                            .await?
+                        {
+                            PeerDiscovery::Allow(account.public_key.into())
+                        } else {
+                            PeerDiscovery::Ban(account.public_key.into())
+                        };
+
+                        indexer_peer_update_tx.send(allow_status).await.map_err(|e| {
+                            HoprLibError::GeneralError(format!(
+                                "Failed to send peer discovery network registry event: {e}"
+                            ))
+                        })?;
+                    }
                 }
             }
 
@@ -1479,11 +1517,11 @@ impl Hopr {
     }
 
     pub async fn export_channel_graph(&self, cfg: GraphExportConfig) -> String {
-        self.channel_graph.read().await.as_dot(cfg)
+        self.channel_graph.read_arc().await.as_dot(cfg)
     }
 
     pub async fn export_raw_channel_graph(&self) -> errors::Result<String> {
-        let cg = self.channel_graph.read().await;
+        let cg = self.channel_graph.read_arc().await;
         serde_json::to_string(cg.deref()).map_err(|e| HoprLibError::GeneralError(e.to_string()))
     }
 }

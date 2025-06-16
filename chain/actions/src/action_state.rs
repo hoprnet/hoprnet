@@ -14,7 +14,7 @@
 //! a log that matches [NodeSafeRegistered(`0x0123..ef`)](ChainEventType) event type.
 //! If such event is never encountered by the Indexer, the safe registration action naturally times out.
 use std::{
-    collections::{HashMap, hash_map::Entry},
+    collections::HashMap,
     fmt::{Debug, Formatter},
     future::Future,
     pin::Pin,
@@ -26,7 +26,7 @@ use async_trait::async_trait;
 use futures::{FutureExt, TryFutureExt, channel};
 use hopr_chain_types::chain_events::{ChainEventType, SignificantChainEvent};
 use hopr_crypto_types::types::Hash;
-use tracing::{debug, error};
+use tracing::{debug, error, trace};
 
 use crate::errors::{ChainActionsError, Result};
 
@@ -107,25 +107,29 @@ impl ActionState for IndexerActionTracker {
     async fn match_and_resolve(&self, event: &SignificantChainEvent) -> Vec<IndexerExpectation> {
         let matched_keys = self
             .expectations
-            .read()
+            .read_arc()
             .await
             .iter()
             .filter_map(|(k, (e, _))| e.test(event).then_some(*k))
             .collect::<Vec<_>>();
 
-        debug!(count = matched_keys.len(), ?event, "found expectations to match event",);
-
         if matched_keys.is_empty() {
+            trace!(%event, "no expectations matched for event");
             return Vec::new();
         }
-        let mut db = self.expectations.write().await;
+
+        debug!(count = matched_keys.len(), %event, "found expectations to match event",);
+
+        let mut db_write_locked = self.expectations.write_arc().await;
+
         matched_keys
             .into_iter()
             .filter_map(|key| {
-                db.remove(&key)
+                db_write_locked
+                    .remove(&key)
                     .and_then(|(exp, sender)| match sender.send(event.clone()) {
                         Ok(_) => {
-                            debug!(%event, "expectation resolved ");
+                            debug!(%event, tx_hash = %key, "expectation resolved");
                             Some(exp)
                         }
                         Err(_) => {
@@ -141,25 +145,23 @@ impl ActionState for IndexerActionTracker {
 
     #[tracing::instrument(level = "debug", skip(self))]
     async fn register_expectation(&self, exp: IndexerExpectation) -> Result<ExpectationResolver> {
-        match self.expectations.write().await.entry(exp.tx_hash) {
-            Entry::Occupied(_) => {
-                // TODO: currently cannot register multiple expectations for the same TX hash
-                return Err(ChainActionsError::InvalidState(format!(
-                    "expectation for tx {} already present",
-                    exp.tx_hash
-                )));
-            }
-            Entry::Vacant(e) => {
-                let (tx, rx) = channel::oneshot::channel();
-                e.insert((exp, tx));
-                Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
-            }
+        let mut db = self.expectations.write_arc().await;
+        if let std::collections::hash_map::Entry::Vacant(e) = db.entry(exp.tx_hash) {
+            let (tx, rx) = channel::oneshot::channel();
+            e.insert((exp, tx));
+            Ok(rx.map_err(|_| ChainActionsError::ExpectationUnregistered).boxed())
+        } else {
+            // TODO: currently cannot register multiple expectations for the same TX hash
+            Err(ChainActionsError::InvalidState(format!(
+                "expectation for tx {} already present",
+                exp.tx_hash
+            )))
         }
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
     async fn unregister_expectation(&self, tx_hash: Hash) {
-        self.expectations.write().await.remove(&tx_hash);
+        self.expectations.write_arc().await.remove(&tx_hash);
     }
 }
 
