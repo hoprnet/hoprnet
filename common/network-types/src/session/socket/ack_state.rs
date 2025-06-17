@@ -16,7 +16,7 @@ use crate::{
     session::{
         frames::{FrameId, FrameInspector, Segment, SegmentId, SeqNum},
         protocol::{FrameAcknowledgements, SegmentRequest, SessionMessage},
-        socket::state::{SocketComponents, SocketStateEvents},
+        socket::state::{SocketComponents},
     },
 };
 
@@ -235,7 +235,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
     }
 
     #[tracing::instrument(name = "AcknowledgementState", skip(self, socket_components), fields(session_id = self.id))]
-    fn run(&mut self, socket_components: SocketComponents<C>) -> Result<SocketStateEvents, SessionError> {
+    fn run(&mut self, socket_components: SocketComponents<C>) -> Result<(), SessionError> {
         if self.context.is_some() {
             return Err(SessionError::InvalidState("state is already running".into()));
         }
@@ -361,7 +361,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         );
 
         tracing::debug!("acknowledgement state has been started");
-        Ok(SocketStateEvents::full())
+        Ok(())
     }
 
     #[tracing::instrument(name = "AcknowledgementState", skip(self), fields(session_id = self.id))]

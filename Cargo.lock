@@ -4831,7 +4831,6 @@ dependencies = [
  "cfg-if",
  "criterion",
  "dashmap",
- "flagset",
  "flume",
  "futures",
  "futures-concurrency",

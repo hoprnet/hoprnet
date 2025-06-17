@@ -21,29 +21,6 @@ pub struct SocketComponents<const C: usize> {
     pub ctl_tx: UnboundedSender<SessionMessage<C>>,
 }
 
-flagset::flags! {
-    /// Lists all events that a [`SocketState`] would like to subscribe at [`SessionSocket`](crate::session::SessionSocket).
-    pub enum SocketStateEvent: u8 {
-        /// Subscribe to [`SocketState::incoming_segment`].
-        IncomingSegment,
-        /// Subscribe to [`SocketState::segment_sent`].
-        SegmentSent,
-        /// Subscribe to [`SocketState::incoming_retransmission_request`].
-        IncomingRetransmissionRequest,
-        /// Subscribe to [`SocketState::incoming_acknowledged_frames`].
-        IncomingAcknowledgedFrames,
-        /// Subscribe to [`SocketState::frame_emitted`].
-        FrameEmitted,
-        /// Subscribe to [`SocketState::frame_complete`].
-        FrameComplete,
-        /// Subscribe to [`SocketState::frame_discarded`].
-        FrameDiscarded
-    }
-}
-
-/// Type-alias for a set of [`SocketStateEvent`].
-pub type SocketStateEvents = flagset::FlagSet<SocketStateEvent>;
-
 /// Abstraction of the [`SessionSocket`] state.
 pub trait SocketState<const C: usize>: Send {
     /// Gets ID of this Session.
@@ -51,7 +28,7 @@ pub trait SocketState<const C: usize>: Send {
 
     /// Starts the necessary processes inside the state.
     /// Should be idempotent if called multiple times.
-    fn run(&mut self, components: SocketComponents<C>) -> Result<SocketStateEvents, SessionError>;
+    fn run(&mut self, components: SocketComponents<C>) -> Result<(), SessionError>;
 
     /// Stops processes inside the state for the given direction.
     fn stop(&mut self) -> Result<(), SessionError>;
@@ -97,8 +74,8 @@ impl<const C: usize> SocketState<C> for Stateless<C> {
         &self.0
     }
 
-    fn run(&mut self, _: SocketComponents<C>) -> Result<SocketStateEvents, SessionError> {
-        Ok(None.into())
+    fn run(&mut self, _: SocketComponents<C>) -> Result<(), SessionError> {
+        Ok(())
     }
 
     fn stop(&mut self) -> Result<(), SessionError> {
@@ -157,7 +134,7 @@ mod tests {
         SockState {}
         impl SocketState<MTU> for SockState {
             fn session_id(&self) -> &str;
-            fn run(&mut self, components: SocketComponents<MTU>) -> Result<SocketStateEvents, SessionError>;
+            fn run(&mut self, components: SocketComponents<MTU>) -> Result<(), SessionError>;
             fn stop(&mut self) -> Result<(), SessionError>;
             fn incoming_segment(&mut self, id: &SegmentId, segment_count: SeqNum) -> Result<(), SessionError>;
             fn incoming_retransmission_request(&mut self, request: SegmentRequest<MTU>) -> Result<(), SessionError>;
@@ -184,7 +161,7 @@ mod tests {
             self.1
         }
 
-        fn run(&mut self, components: SocketComponents<MTU>) -> Result<SocketStateEvents, SessionError> {
+        fn run(&mut self, components: SocketComponents<MTU>) -> Result<(), SessionError> {
             tracing::debug!(id = self.1, "run called");
             self.0.lock().unwrap().run(components)
         }
@@ -244,7 +221,7 @@ mod tests {
             .expect_run()
             .once()
             .in_sequence(&mut alice_seq)
-            .return_once(|_| Ok::<_, SessionError>(SocketStateEvents::full()));
+            .return_once(|_| Ok::<_, SessionError>(()));
         alice_state
             .expect_segment_sent()
             .times(NUM_SEGMENTS)
@@ -264,7 +241,7 @@ mod tests {
             .expect_run()
             .once()
             .in_sequence(&mut bob_seq)
-            .return_once(|_| Ok::<_, SessionError>(SocketStateEvents::full()));
+            .return_once(|_| Ok::<_, SessionError>(()));
         bob_state
             .expect_incoming_segment()
             .times(NUM_SEGMENTS - 1)
@@ -322,84 +299,6 @@ mod tests {
         bob_socket.read_exact(&mut bob_recv_data).await?;
 
         tracing::debug!("stopping");
-        alice_socket.close().await?;
-        bob_socket.close().await?;
-
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    async fn session_socket_must_not_dispatch_segment_and_frame_state_events_when_not_subscribed() -> anyhow::Result<()>
-    {
-        const NUM_FRAMES: usize = 2;
-
-        let mut alice_seq = mockall::Sequence::new();
-        let mut alice_state = MockSockState::new();
-        alice_state.expect_session_id().return_const("alice".into());
-
-        alice_state
-            .expect_run()
-            .once()
-            .in_sequence(&mut alice_seq)
-            .return_once(|_| Ok::<_, SessionError>(SocketStateEvents::empty()));
-        alice_state.expect_segment_sent().never();
-        alice_state
-            .expect_stop()
-            .once()
-            .in_sequence(&mut alice_seq)
-            .return_once(|| Ok::<_, SessionError>(()));
-
-        let mut bob_seq = mockall::Sequence::new();
-        let mut bob_state = MockSockState::new();
-        bob_state.expect_session_id().return_const("bob".into());
-
-        bob_state
-            .expect_run()
-            .once()
-            .in_sequence(&mut bob_seq)
-            .return_once(|_| Ok::<_, SessionError>(SocketStateEvents::empty()));
-        bob_state.expect_incoming_segment().never();
-        bob_state.expect_frame_complete().never();
-        bob_state.expect_frame_discarded().never();
-        bob_state.expect_frame_emitted().never();
-        bob_state
-            .expect_stop()
-            .once()
-            .in_sequence(&mut bob_seq)
-            .return_once(|| Ok::<_, SessionError>(()));
-
-        let (alice, bob) = setup_alice_bob::<MTU>(
-            FaultyNetworkConfig {
-                avg_delay: Duration::from_millis(10),
-                ids_to_drop: HashSet::from_iter([0_usize]),
-                ..Default::default()
-            },
-            None,
-            None,
-        );
-
-        let cfg = SessionSocketConfig {
-            frame_size: FRAME_SIZE,
-            frame_timeout: Duration::from_millis(55),
-            ..Default::default()
-        };
-
-        let mut alice_socket = SessionSocket::new(alice, CloneableMockState::new(alice_state, "alice"), cfg)?;
-        let mut bob_socket = SessionSocket::new(bob, CloneableMockState::new(bob_state, "bob"), cfg)?;
-
-        let alice_sent_data = hopr_crypto_random::random_bytes::<{ NUM_FRAMES * FRAME_SIZE }>();
-        alice_socket.write_all(&alice_sent_data).await?;
-        alice_socket.flush().await?;
-
-        // One entire frame is discarded
-        let mut bob_recv_data = [0u8; (NUM_FRAMES - 1) * FRAME_SIZE];
-        tokio::time::timeout(Duration::from_secs(3), bob_socket.read_exact(&mut bob_recv_data)).await??;
-
-        // Data must be still well received
-        assert_eq!(&alice_sent_data[1500..], &bob_recv_data);
-
-        tracing::debug!("stopping");
-
         alice_socket.close().await?;
         bob_socket.close().await?;
 

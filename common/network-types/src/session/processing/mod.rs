@@ -161,12 +161,12 @@ mod tests {
         let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
 
         let data_out = reassm_rx
-            .reassembler(Duration::from_secs(5), 1024)
+            .reassembler(Duration::from_secs(1), 1024)
             .filter_map(|maybe_frame| match maybe_frame {
                 Ok(frame) => futures::future::ready(Some(OrderedFrame(frame))),
                 Err(_) => futures::future::ready(None),
             })
-            .sequencer(Duration::from_secs(5), 1024)
+            .sequencer(Duration::from_secs(1), 1024)
             .and_then(|frame| futures::future::ok(frame.0));
 
         let mut data_in = reassm_tx
@@ -176,29 +176,29 @@ mod tests {
         let data_written = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
         let data_read = tokio::task::spawn(async move {
-            let mut count = 0;
+            let mut frame_count = 0;
             let mut out = Vec::new();
             let data_out = data_out
                 .inspect(|frame| {
                     tracing::debug!("{:?}", frame);
-                    count += 1;
+                    frame_count += 1;
                 })
                 .map_err(std::io::Error::other)
                 .into_async_read();
 
             pin_mut!(data_out);
             data_out.read_to_end(&mut out).await?;
-            Ok::<_, std::io::Error>((out, count))
+            Ok::<_, std::io::Error>((out, frame_count))
         })
         .timeout(futures_time::time::Duration::from_secs(5));
 
         data_in.write_all(&data_written).await?;
         data_in.close().await?;
 
-        let (data_read, count) = data_read.await???;
+        let (data_read, frame_count) = data_read.await???;
 
         assert_eq!(&data_written, data_read.as_slice());
-        assert_eq!(DATA_SIZE / FRAME_SIZE + 1, count);
+        assert_eq!(DATA_SIZE / FRAME_SIZE + 1, frame_count);
 
         Ok(())
     }

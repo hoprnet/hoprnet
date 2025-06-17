@@ -17,7 +17,7 @@ use crate::session::{
     frames::{FrameInspector, OrderedFrame},
     processing::{ReassemblerExt, SegmenterExt, SequencerExt},
     protocol::{SessionCodec, SessionMessage},
-    socket::state::{SocketComponents, SocketStateEvent, Stateless},
+    socket::state::{SocketComponents, Stateless},
 };
 
 /// Configuration object for [`SessionSocket`].
@@ -151,7 +151,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
         let inspector = FrameInspector::new(cfg.capacity);
 
         let (ctl_tx, ctl_rx) = futures::channel::mpsc::unbounded();
-        let sub_events = state.run(SocketComponents {
+        state.run(SocketComponents {
             inspector: Some(inspector.clone()),
             ctl_tx,
         })?;
@@ -165,10 +165,8 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
             .with(move |segment| {
                 // The segment_sent event is raised only for segments coming from Upstream,
                 // not for the segments from the Control stream (= segment resends).
-                if sub_events.contains(SocketStateEvent::SegmentSent) {
-                    if let Err(error) = st_1.segment_sent(&segment) {
-                        tracing::debug!(%error, "outgoing segment state update failed");
-                    }
+                if let Err(error) = st_1.segment_sent(&segment) {
+                    tracing::debug!(%error, "outgoing segment state update failed");
                 }
                 future::ok(SessionMessage::<C>::Segment(segment))
             })
@@ -204,20 +202,15 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 futures::future::ready(match packet {
                     Ok(packet) => {
                         if let Err(error) = match &packet {
-                            SessionMessage::Segment(s) if sub_events.contains(SocketStateEvent::IncomingSegment) => {
+                            SessionMessage::Segment(s) => {
                                 st_1.incoming_segment(&s.id(), s.seq_len)
                             }
-                            SessionMessage::Request(r)
-                                if sub_events.contains(SocketStateEvent::IncomingRetransmissionRequest) =>
-                            {
+                            SessionMessage::Request(r) => {
                                 st_1.incoming_retransmission_request(r.clone())
                             }
-                            SessionMessage::Acknowledge(a)
-                                if sub_events.contains(SocketStateEvent::IncomingAcknowledgedFrames) =>
-                            {
+                            SessionMessage::Acknowledge(a) => {
                                 st_1.incoming_acknowledged_frames(a.clone())
                             }
-                            _ => Ok(()),
                         } {
                             tracing::debug!(%error, "incoming message state update failed");
                         }
@@ -249,18 +242,14 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 // Filter out discarded Frames and dispatch events to the State if needed
                 future::ready(match maybe_frame {
                     Ok(frame) => {
-                        if sub_events.contains(SocketStateEvent::FrameEmitted) {
-                            if let Err(error) = st_3.frame_emitted(frame.0.frame_id) {
-                                tracing::error!(%error, "frame received state update failed");
-                            }
+                        if let Err(error) = st_3.frame_emitted(frame.0.frame_id) {
+                            tracing::error!(%error, "frame received state update failed");
                         }
                         Some(Ok(frame.0))
                     }
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
-                        if sub_events.contains(SocketStateEvent::FrameDiscarded) {
-                            if let Err(error) = st_3.frame_discarded(frame_id) {
-                                tracing::error!(%error, "frame discarded state update failed");
-                            }
+                        if let Err(error) = st_3.frame_discarded(frame_id) {
+                            tracing::error!(%error, "frame discarded state update failed");
                         }
                         None // Downstream skips discarded frames
                     }
@@ -317,6 +306,7 @@ mod tests {
     use std::collections::HashSet;
 
     use futures::{AsyncReadExt, AsyncWriteExt};
+    use futures_time::future::FutureExt;
 
     use super::*;
     use crate::{
@@ -344,11 +334,11 @@ mod tests {
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
-        alice_socket.write_all(&data).await?;
+        alice_socket.write_all(&data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let mut bob_data = [0u8; DATA_SIZE];
-        bob_socket.read_exact(&mut bob_data).await?;
+        bob_socket.read_exact(&mut bob_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(data, bob_data);
 
         alice_socket.close().await?;
@@ -378,11 +368,11 @@ mod tests {
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
-        alice_socket.write_all(&data).await?;
+        alice_socket.write_all(&data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let mut bob_data = [0u8; DATA_SIZE];
-        bob_socket.read_exact(&mut bob_data).await?;
+        bob_socket.read_exact(&mut bob_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(data, bob_data);
 
         alice_socket.close().await?;
@@ -404,19 +394,19 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket.write_all(&alice_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        bob_socket.write_all(&bob_sent_data).await?;
+        bob_socket.write_all(&bob_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         bob_socket.flush().await?;
 
         let mut bob_recv_data = [0u8; DATA_SIZE];
-        bob_socket.read_exact(&mut bob_recv_data).await?;
+        bob_socket.read_exact(&mut bob_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(alice_sent_data, bob_recv_data);
 
         let mut alice_recv_data = [0u8; DATA_SIZE];
-        alice_socket.read_exact(&mut alice_recv_data).await?;
+        alice_socket.read_exact(&mut alice_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(bob_sent_data, alice_recv_data);
 
         Ok(())
@@ -442,19 +432,19 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket.write_all(&alice_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        bob_socket.write_all(&bob_sent_data).await?;
+        bob_socket.write_all(&bob_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         bob_socket.flush().await?;
 
         let mut bob_recv_data = [0u8; DATA_SIZE];
-        bob_socket.read_exact(&mut bob_recv_data).await?;
+        bob_socket.read_exact(&mut bob_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(alice_sent_data, bob_recv_data);
 
         let mut alice_recv_data = [0u8; DATA_SIZE];
-        alice_socket.read_exact(&mut alice_recv_data).await?;
+        alice_socket.read_exact(&mut alice_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(bob_sent_data, alice_recv_data);
 
         Ok(())
@@ -478,11 +468,11 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&data).await?;
+        alice_socket.write_all(&data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let mut bob_recv_data = [0u8; DATA_SIZE];
-        bob_socket.read_exact(&mut bob_recv_data).await?;
+        bob_socket.read_exact(&mut bob_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(data, bob_recv_data);
 
         alice_socket.close().await?;
@@ -516,11 +506,11 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&data).await?;
+        alice_socket.write_all(&data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let mut bob_recv_data = [0u8; DATA_SIZE];
-        bob_socket.read_exact(&mut bob_recv_data).await?;
+        bob_socket.read_exact(&mut bob_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(data, bob_recv_data);
 
         alice_socket.close().await?;
@@ -547,19 +537,19 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, sock_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket.write_all(&alice_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        bob_socket.write_all(&bob_sent_data).await?;
+        bob_socket.write_all(&bob_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         bob_socket.flush().await?;
 
         let mut bob_recv_data = [0u8; DATA_SIZE];
-        bob_socket.read_exact(&mut bob_recv_data).await?;
+        bob_socket.read_exact(&mut bob_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(alice_sent_data, bob_recv_data);
 
         let mut alice_recv_data = [0u8; DATA_SIZE];
-        alice_socket.read_exact(&mut alice_recv_data).await?;
+        alice_socket.read_exact(&mut alice_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(bob_sent_data, alice_recv_data);
 
         alice_socket.close().await?;
@@ -593,19 +583,19 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), sock_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket.write_all(&alice_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        bob_socket.write_all(&bob_sent_data).await?;
+        bob_socket.write_all(&bob_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         bob_socket.flush().await?;
 
         let mut bob_recv_data = [0u8; DATA_SIZE];
-        bob_socket.read_exact(&mut bob_recv_data).await?;
+        bob_socket.read_exact(&mut bob_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(alice_sent_data, bob_recv_data);
 
         let mut alice_recv_data = [0u8; DATA_SIZE];
-        alice_socket.read_exact(&mut alice_recv_data).await?;
+        alice_socket.read_exact(&mut alice_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(bob_sent_data, alice_recv_data);
 
         alice_socket.close().await?;
@@ -641,12 +631,12 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, bob_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&data).await?;
+        alice_socket.write_all(&data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
         alice_socket.close().await?;
 
         let mut bob_data = Vec::with_capacity(DATA_SIZE);
-        bob_socket.read_to_end(&mut bob_data).await?;
+        bob_socket.read_to_end(&mut bob_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
 
         // The whole first frame is discarded due to the missing first segment
         assert_eq!(data.len() - 1500, bob_data.len());
@@ -691,11 +681,11 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&data).await?;
+        alice_socket.write_all(&data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let mut bob_data = [0u8; DATA_SIZE];
-        tokio::time::timeout(Duration::from_secs(3), bob_socket.read_exact(&mut bob_data)).await??;
+        bob_socket.read_exact(&mut bob_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(data, bob_data);
 
         bob_socket.close().await?;
@@ -732,21 +722,21 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new_stateless("bob", bob, bob_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket.write_all(&alice_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        bob_socket.write_all(&bob_sent_data).await?;
+        bob_socket.write_all(&bob_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         bob_socket.flush().await?;
 
         alice_socket.close().await?;
         bob_socket.close().await?;
 
         let mut alice_recv_data = Vec::with_capacity(DATA_SIZE);
-        alice_socket.read_to_end(&mut alice_recv_data).await?;
+        alice_socket.read_to_end(&mut alice_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
 
         let mut bob_recv_data = Vec::with_capacity(DATA_SIZE);
-        bob_socket.read_to_end(&mut bob_recv_data).await?;
+        bob_socket.read_to_end(&mut bob_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
 
         // The whole first frame is discarded due to the missing first segment
         assert_eq!(bob_sent_data.len() - 1500, alice_recv_data.len());
@@ -793,19 +783,19 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
 
         let alice_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&alice_sent_data).await?;
+        alice_socket.write_all(&alice_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         alice_socket.flush().await?;
 
         let bob_sent_data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        bob_socket.write_all(&bob_sent_data).await?;
+        bob_socket.write_all(&bob_sent_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         bob_socket.flush().await?;
 
         let mut bob_recv_data = [0u8; DATA_SIZE];
-        bob_socket.read_exact(&mut bob_recv_data).await?;
+        bob_socket.read_exact(&mut bob_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(alice_sent_data, bob_recv_data);
 
         let mut alice_recv_data = [0u8; DATA_SIZE];
-        alice_socket.read_exact(&mut alice_recv_data).await?;
+        alice_socket.read_exact(&mut alice_recv_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
         assert_eq!(bob_sent_data, alice_recv_data);
 
         alice_socket.close().await?;
