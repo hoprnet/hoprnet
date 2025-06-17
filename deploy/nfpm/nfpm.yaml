@@ -1,0 +1,30 @@
+name: hoprd
+arch: "x86_64-linux"
+platform: linux
+version: "3.0.0"
+section: default
+priority: optional
+maintainer: Hoprnet <contact@hoprnet.org>
+description: HOPR is a privacy-preserving messaging protocol which enables the creation of a secure communication network via relay nodes powered by economic incentives using digital tokens.
+license: GNU Lesser General Public License v3.0
+homepage: https://hoprnet.org
+depends:
+  - wireguard-tools
+  - systemd
+  - curl
+  - gettext
+
+contents:
+  - src: ./artifacts/hoprd
+    dst: /usr/bin/hoprd
+  - src: ./artifacts/hopli
+    dst: /usr/bin/hopli
+  - src: ./deploy/nfpm/hoprd-template.cfg.yaml
+    dst: /etc/hoprd/hoprd-template.cfg.yaml
+    type: config
+  - src: ./nfpm/hoprd.service
+    dst: /etc/systemd/system/hoprd.service
+
+scripts:
+  postinstall: ./nfpm/install.sh
+  preremove: ./nfpm/uninstall.sh

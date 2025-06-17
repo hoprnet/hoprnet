@@ -15,6 +15,7 @@ let
     swagger-codegen3
     vacuum-go
     zizmor
+    nfpm
 
     # testing utilities
     cargo-audit

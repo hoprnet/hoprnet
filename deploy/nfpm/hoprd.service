@@ -1,0 +1,11 @@
+[Unit]
+Description=Hoprd Node
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/hoprd -c /etc/hoprd/hoprd.cfg.yaml
+Restart=on-failure
+User=root
+
+[Install]
+WantedBy=multi-user.target

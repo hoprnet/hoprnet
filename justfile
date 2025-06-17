@@ -22,3 +22,19 @@ run-smoke-test-all:
 # run a single smoke test
 run-smoke-test TEST:
     nix develop .#citest -c uv run --frozen -m pytest tests/test_{{TEST}}.py
+
+package distro arch: |
+    #! /usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    release_version=$(./scripts/get-current-version.sh)
+    sed -i.bak "s/version:.*/version: \"${release_version}\"/" deploy/nfpm/nfpm.yaml
+    sed -i.bak "s/arch:.*/arch: \"{{arch}}\"/" deploy/nfpm/nfpm.yaml
+    nfpm package --config deploy/nfpm/nfpm.yaml --packager "{{distro}}" --target "target/hoprd-{{arch}}.{{distro}}"
+    mv nfpm/nfpm.yaml.bak nfpm/nfpm.yaml
+
+package-all arch: |
+    #! /usr/bin/env bash
+    set -o errexit -o nounset -o pipefail
+    just package deb {{arch}}
+    just package rpm {{arch}}
+    just package apk {{arch}}
