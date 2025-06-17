@@ -77,8 +77,11 @@ where
             tracing::trace!("frame flushed out");
         }
 
-        *this.next_frame_id += 1;
-        *this.current_frame_len = 0;
+        // Increase Frame ID only if there were segments to send
+        if seq_len > 0 {
+            *this.next_frame_id += 1;
+            *this.current_frame_len = 0;
+        }
 
         Poll::Ready(Ok(()))
     }
@@ -173,6 +176,7 @@ where
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
 
+        // Make sure no segment part is buffered
         if !self.seg_buffer.is_empty() {
             tracing::trace!(
                 frame_id = self.next_frame_id,
@@ -181,6 +185,7 @@ where
             );
             self.as_mut().complete_segment();
         }
+
         self.as_mut().poll_flush_segments(cx).map_err(std::io::Error::other)
     }
 
@@ -226,7 +231,7 @@ impl<T: ?Sized> SegmenterExt for T where T: futures::Sink<Segment, Error = Sessi
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
-    use futures::{AsyncWriteExt, SinkExt, StreamExt, pin_mut};
+    use futures::{AsyncWriteExt, SinkExt, Stream, StreamExt, pin_mut};
     use futures_time::future::FutureExt;
 
     use super::*;
@@ -235,6 +240,41 @@ mod tests {
     const MTU: usize = 1000;
     const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
     const FRAME_SIZE: usize = 1500;
+
+    const SEGMENTS_PER_FRAME: usize = FRAME_SIZE / MTU + 1;
+
+    async fn assert_frame_segments(
+        start_frame_id: FrameId,
+        num_frames: usize,
+        segments: &mut (impl Stream<Item = Segment> + Unpin),
+        data: &[u8],
+    ) -> anyhow::Result<()> {
+        for i in 0..num_frames * SEGMENTS_PER_FRAME {
+            let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
+            let start_frame_id = start_frame_id as usize;
+            let frame_id = i / SEGMENTS_PER_FRAME + start_frame_id;
+            assert_eq!(frame_id as FrameId, seg.frame_id);
+            assert_eq!((i % SEGMENTS_PER_FRAME) as SeqNum, seg.seq_idx);
+            assert_eq!((FRAME_SIZE / MTU + 1) as SeqNum, seg.seq_len);
+            if i % SEGMENTS_PER_FRAME == 0 {
+                assert_eq!(SMTU, seg.data.len());
+                assert_eq!(
+                    &data[(frame_id - start_frame_id) * FRAME_SIZE + i % SEGMENTS_PER_FRAME * SMTU
+                        ..(frame_id - start_frame_id) * FRAME_SIZE + i % SEGMENTS_PER_FRAME * SMTU + SMTU],
+                    seg.data.as_ref()
+                );
+            } else {
+                assert_eq!(FRAME_SIZE % SMTU, seg.data.len());
+                assert_eq!(
+                    &data[(frame_id - start_frame_id) * FRAME_SIZE + i % SEGMENTS_PER_FRAME * SMTU
+                        ..(frame_id - start_frame_id) * FRAME_SIZE + i % SEGMENTS_PER_FRAME * SMTU + FRAME_SIZE % SMTU],
+                    seg.data.as_ref()
+                );
+            }
+        }
+
+        Ok(())
+    }
 
     #[tokio::test]
     async fn segmenter_should_not_segment_small_data_unless_flushed() -> anyhow::Result<()> {
@@ -263,32 +303,29 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn segmenter_should_segment_complete_frame() -> anyhow::Result<()> {
+    #[parameterized::parameterized(num_frames = { 1, 3, 5, 11 })]
+    #[parameterized_macro(tokio::test)]
+    async fn segmenter_should_segment_complete_frames(num_frames: usize) -> anyhow::Result<()> {
         let (segments_tx, segments) = futures::channel::mpsc::unbounded();
         let mut writer = segments_tx
             .sink_map_err(|_| SessionError::InvalidSegment)
             .segmenter::<MTU>(FRAME_SIZE);
 
-        let mut offset = 0;
-        let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
+        let mut all_data = Vec::new();
+        for _ in 0..num_frames {
+            let mut offset = 0;
+            let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
 
-        while offset < data.len() {
-            let written = writer.write(&data[offset..]).await?;
-            assert_eq!(written, SMTU);
-            offset += SMTU;
+            while offset < data.len() {
+                let written = writer.write(&data[offset..]).await?;
+                assert!(written <= SMTU);
+                offset += written;
+            }
+            all_data.extend(data);
         }
 
         pin_mut!(segments);
-
-        for i in 0..FRAME_SIZE / MTU {
-            let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-            assert_eq!(1, seg.frame_id);
-            assert_eq!(i as SeqNum, seg.seq_idx);
-            assert_eq!((FRAME_SIZE / MTU) as SeqNum, seg.seq_len);
-            assert_eq!(SMTU, seg.data.len());
-            assert_eq!(&data[i * SMTU..i * SMTU + SMTU], seg.data.as_ref());
-        }
+        assert_frame_segments(1, num_frames, &mut segments, &all_data).await?;
 
         writer.close().await?;
 
@@ -359,38 +396,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn segmenter_should_segment_multiple_complete_frames() -> anyhow::Result<()> {
-        const NUM_FRAMES: usize = 3;
-
-        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
-        let mut writer = segments_tx
-            .sink_map_err(|_| SessionError::InvalidSegment)
-            .segmenter::<MTU>(FRAME_SIZE);
-        let data = hopr_crypto_random::random_bytes::<{ NUM_FRAMES * FRAME_SIZE }>();
-
-        writer.write_all(&data).await?;
-
-        pin_mut!(segments);
-
-        let count_segments = (NUM_FRAMES * FRAME_SIZE) / MTU;
-
-        for i in 0..count_segments {
-            let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-            assert_eq!((i / count_segments + 1) as FrameId, seg.frame_id);
-            assert_eq!((i % count_segments) as SeqNum, seg.seq_idx);
-            assert_eq!((FRAME_SIZE / MTU) as SeqNum, seg.seq_len);
-            assert_eq!(SMTU, seg.data.len());
-            assert_eq!(&data[i * SMTU..i * SMTU + SMTU], seg.data.as_ref());
-        }
-
-        writer.close().await?;
-
-        assert_eq!(None, segments.next().await);
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn segmenter_should_segment_multiple_complete_frames_and_incomplete_frame_on_close() -> anyhow::Result<()> {
         let (segments_tx, segments) = futures::channel::mpsc::unbounded();
         let mut writer = segments_tx
@@ -403,14 +408,7 @@ mod tests {
 
         pin_mut!(segments);
 
-        for i in 0..9 {
-            let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-            assert_eq!((i / 3 + 1) as FrameId, seg.frame_id);
-            assert_eq!((i % 3) as SeqNum, seg.seq_idx);
-            assert_eq!(3, seg.seq_len);
-            assert_eq!(500, seg.data.len());
-            assert_eq!(&data[i * 500..i * 500 + 500], seg.data.as_ref());
-        }
+        assert_frame_segments(1, 1, &mut segments, &data).await?;
 
         segments
             .next()
@@ -421,11 +419,11 @@ mod tests {
         writer.close().await?;
 
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-        assert_eq!(4, seg.frame_id);
+        assert_eq!(2, seg.frame_id);
         assert_eq!(0, seg.seq_idx);
         assert_eq!(1, seg.seq_len);
         assert_eq!(4, seg.data.len());
-        assert_eq!(&data[4500..], seg.data.as_ref());
+        assert_eq!(&data[FRAME_SIZE..], seg.data.as_ref());
 
         assert_eq!(None, segments.next().await);
 
@@ -439,20 +437,13 @@ mod tests {
             .sink_map_err(|_| SessionError::InvalidSegment)
             .segmenter::<MTU>(FRAME_SIZE);
 
-        let data = hopr_crypto_random::random_bytes::<4504>();
+        let data = hopr_crypto_random::random_bytes::<{ FRAME_SIZE + 4 }>();
 
         writer.write_all(&data).await?;
 
         pin_mut!(segments);
 
-        for i in 0..9 {
-            let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-            assert_eq!((i / 3 + 1) as FrameId, seg.frame_id);
-            assert_eq!((i % 3) as SeqNum, seg.seq_idx);
-            assert_eq!(3, seg.seq_len);
-            assert_eq!(500, seg.data.len());
-            assert_eq!(&data[i * 500..i * 500 + 500], seg.data.as_ref());
-        }
+        assert_frame_segments(1, 1, &mut segments, &data).await?;
 
         segments
             .next()
@@ -463,23 +454,16 @@ mod tests {
         writer.flush().await?;
 
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-        assert_eq!(4, seg.frame_id);
+        assert_eq!(2, seg.frame_id);
         assert_eq!(0, seg.seq_idx);
         assert_eq!(1, seg.seq_len);
         assert_eq!(4, seg.data.len());
-        assert_eq!(&data[4500..], seg.data.as_ref());
+        assert_eq!(&data[FRAME_SIZE..], seg.data.as_ref());
 
-        let data = hopr_crypto_random::random_bytes::<1500>();
+        let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
         writer.write_all(&data).await?;
 
-        for i in 0..3 {
-            let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-            assert_eq!(5, seg.frame_id);
-            assert_eq!((i % 3) as SeqNum, seg.seq_idx);
-            assert_eq!(3, seg.seq_len);
-            assert_eq!(500, seg.data.len());
-            assert_eq!(&data[i * 500..i * 500 + 500], seg.data.as_ref());
-        }
+        assert_frame_segments(3, 1, &mut segments, &data).await?;
 
         Ok(())
     }

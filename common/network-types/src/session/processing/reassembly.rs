@@ -5,7 +5,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use futures::Stream;
 use futures_time::future::Timer;
 use tracing::instrument;
 
@@ -31,7 +30,7 @@ pub struct Reassembler<S, M> {
     last_expiration: Instant,
 }
 
-impl<S: Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
+impl<S: futures::Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
     fn new(inner: S, incomplete_frames: M, max_age: Duration, capacity: usize) -> Self {
         Self {
             inner,
@@ -45,7 +44,7 @@ impl<S: Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
     }
 }
 
-impl<S: Stream<Item = Segment>, M: FrameMap> futures::Stream for Reassembler<S, M> {
+impl<S: futures::Stream<Item = Segment>, M: FrameMap> futures::Stream for Reassembler<S, M> {
     type Item = Result<Frame, SessionError>;
 
     #[instrument(name = "Reassembler::poll_next", level = "trace", skip(self, cx))]
@@ -57,12 +56,27 @@ impl<S: Stream<Item = Segment>, M: FrameMap> futures::Stream for Reassembler<S, 
                 return Poll::Ready(Some(Err(SessionError::FrameDiscarded(frame_id))));
             }
 
+            // Poll the timer only if there are incomplete frames
+            let timer_poll = if this.incomplete_frames.len() > 0 {
+                this.timer.as_mut().poll(cx)
+            } else {
+                Poll::Pending
+            };
+
+            // Poll the inner stream only if there's space in the reassembler
+            let inner_poll = if this.incomplete_frames.len() <= *this.capacity {
+                this.inner.as_mut().poll_next(cx)
+            } else {
+                // This essentially forces the incomplete frames to be expired
+                tracing::warn!("reassembler has reached its capacity");
+                Poll::Pending
+            };
+
             tracing::trace!("polling next");
-            match (this.inner.as_mut().poll_next(cx), this.timer.as_mut().poll(cx)) {
+            match (inner_poll, timer_poll) {
                 (Poll::Ready(Some(item)), timer) => {
                     if timer.is_ready() {
                         this.timer.as_mut().reset_timer();
-                        //*this.timer = futures_time::task::sleep((*this.max_age).into());
                     }
 
                     // Since the retaining operation is potentially expensive,
@@ -129,6 +143,7 @@ impl<S: Stream<Item = Segment>, M: FrameMap> futures::Stream for Reassembler<S, 
                         }
                     });
                     *this.last_expiration = Instant::now();
+                    this.timer.as_mut().reset_timer();
                 }
                 (Poll::Pending, Poll::Pending) => return Poll::Pending,
             }
@@ -136,7 +151,7 @@ impl<S: Stream<Item = Segment>, M: FrameMap> futures::Stream for Reassembler<S, 
     }
 }
 
-pub trait ReassemblerExt: Stream<Item = Segment> {
+pub trait ReassemblerExt: futures::Stream<Item = Segment> {
     fn reassembler(self, timeout: Duration, capacity: usize) -> Reassembler<Self, FrameHashMap>
     where
         Self: Sized,
@@ -162,10 +177,13 @@ pub trait ReassemblerExt: Stream<Item = Segment> {
     }
 }
 
-impl<T: ?Sized> ReassemblerExt for T where T: Stream<Item = Segment> {}
+impl<T: ?Sized> ReassemblerExt for T where T: futures::Stream<Item = Segment> {}
 
 #[cfg(test)]
 mod tests {
+    use std::cmp::Ordering;
+
+    use anyhow::anyhow;
     use futures::{SinkExt, StreamExt, TryStreamExt, pin_mut};
     use futures_time::future::FutureExt;
     use hex_literal::hex;
@@ -175,6 +193,16 @@ mod tests {
     use crate::session::processing::segment;
 
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
+
+    fn result_comparator(a: &Result<Frame, SessionError>, b: &Result<Frame, SessionError>) -> Ordering {
+        match (a, b) {
+            (Ok(a), Ok(b)) => a.frame_id.cmp(&b.frame_id),
+            (Err(SessionError::FrameDiscarded(a)), Ok(b)) => a.cmp(&b.frame_id),
+            (Ok(a), Err(SessionError::FrameDiscarded(b))) => a.frame_id.cmp(b),
+            (Err(SessionError::FrameDiscarded(a)), Err(SessionError::FrameDiscarded(b))) => a.cmp(b),
+            _ => panic!("unexpected result"),
+        }
+    }
 
     #[test_log::test(tokio::test)]
     pub async fn reassembler_should_reassemble_frames() -> anyhow::Result<()> {
@@ -262,19 +290,13 @@ mod tests {
 
         assert_eq!(actual.len(), expected.len());
 
-        actual.sort_by(|a, b| match (a, b) {
-            (Ok(a), Ok(b)) => a.frame_id.cmp(&b.frame_id),
-            (Err(SessionError::FrameDiscarded(a)), Ok(b)) => a.cmp(&b.frame_id),
-            (Ok(a), Err(SessionError::FrameDiscarded(b))) => a.frame_id.cmp(b),
-            (Err(SessionError::FrameDiscarded(a)), Err(SessionError::FrameDiscarded(b))) => a.cmp(b),
-            _ => panic!("unexpected result"),
-        });
+        actual.sort_by(result_comparator);
 
         for i in 0..expected.len() {
             if i != 1 {
                 assert!(matches!(&actual[i], Ok(f) if *f == expected[i]));
             } else {
-                // Frame 2 had missing segment, therefore there should be an error
+                // Frame 2 had a missing segment, therefore there should be an error
                 assert!(matches!(actual[i], Err(SessionError::FrameDiscarded(2))));
             }
         }
@@ -315,13 +337,7 @@ mod tests {
         // Since `forward` closed the sink, even the incomplete Frame 5 should be yielded as error
         assert_eq!(actual.len(), expected.len());
 
-        actual.sort_by(|a, b| match (a, b) {
-            (Ok(a), Ok(b)) => a.frame_id.cmp(&b.frame_id),
-            (Err(SessionError::FrameDiscarded(a)), Ok(b)) => a.cmp(&b.frame_id),
-            (Ok(a), Err(SessionError::FrameDiscarded(b))) => a.frame_id.cmp(b),
-            (Err(SessionError::FrameDiscarded(a)), Err(SessionError::FrameDiscarded(b))) => a.cmp(b),
-            _ => panic!("unexpected result"),
-        });
+        actual.sort_by(result_comparator);
 
         for i in 0..expected.len() {
             if i != 4 {
@@ -337,7 +353,7 @@ mod tests {
     }
 
     #[test_log::test(tokio::test)]
-    pub async fn reassembler_should_wait_if_full() -> anyhow::Result<()> {
+    pub async fn reassembler_should_wait_and_discard_if_full() -> anyhow::Result<()> {
         let expected = (1u32..=5)
             .map(|frame_id| Frame {
                 frame_id,
@@ -346,66 +362,70 @@ mod tests {
             .collect::<Vec<_>>();
 
         let (r_sink, r_stream) = futures::channel::mpsc::unbounded();
-        let r_stream = r_stream.reassembler(Duration::from_secs(5), 1024);
+        let r_stream = r_stream.reassembler(Duration::from_millis(200), 3);
 
         pin_mut!(r_sink);
         pin_mut!(r_stream);
 
+        // This creates 5 frames with 2 segments each
         let segments = expected
             .iter()
             .cloned()
-            .flat_map(|f| segment(f.data, 22, f.frame_id).unwrap())
+            .flat_map(|f| segment(f.data, 20, f.frame_id).unwrap())
             .collect::<Vec<_>>();
 
-        // Frame 1
-        r_sink.send(segments[1].clone()).await?;
-        r_sink.send(segments[0].clone()).await?;
+        let to_send = [
+            // Frame 1: Segment 2, Segment 1 missing
+            segments[1].clone(),
+            // Frame 2: Segment 1, Segment 2 missing
+            segments[2].clone(),
+            // Frame 3: Segment 2, Segment 1 missing
+            segments[5].clone(),
+        ];
 
-        // Frame 2
-        r_sink.send(segments[2].clone()).await?;
-        r_sink.send(segments[3].clone()).await?;
+        let start = Instant::now();
 
-        // Frame 3
-        r_sink.send(segments[5].clone()).await?;
-        r_sink.send(segments[4].clone()).await?;
+        // Reassembler now contains 3 incomplete frames
+        r_sink.send_all(&mut futures::stream::iter(to_send).map(Ok)).await?;
 
-        // Cannot insert more segments until some frames are yielded
+        // It must not yield anything
         assert!(
-            r_sink
-                .send(segments[7].clone())
-                .timeout(futures_time::time::Duration::from_millis(50))
+            r_stream
+                .next()
+                .timeout(futures_time::time::Duration::from_millis(20))
                 .await
                 .is_err()
         );
 
-        // Yield Frame 1
-        assert_eq!(Some(expected[0].clone()), r_stream.try_next().await?);
+        // Entire Frames 4 & 5
+        r_sink
+            .send_all(
+                &mut futures::stream::iter([
+                    segments[6].clone(),
+                    segments[7].clone(),
+                    segments[8].clone(),
+                    segments[9].clone(),
+                ])
+                .map(Ok),
+            )
+            .await?;
 
-        // This inserts segment 7 (from SplitSink's slot) and segment 6, thus completing Frame 4
-        r_sink.send(segments[6].clone()).await?;
+        let mut reassembled = Vec::new();
+        for _ in 0..5 {
+            reassembled.push(r_stream.next().await.ok_or(anyhow!("missing frame"))?);
+        }
+        reassembled.sort_by(result_comparator);
 
-        // Cannot insert more segments until some frames are yielded
-        assert!(
-            r_sink
-                .send(segments[8].clone())
-                .timeout(futures_time::time::Duration::from_millis(50))
-                .await
-                .is_err()
-        );
+        assert!(matches!(reassembled[0], Err(SessionError::FrameDiscarded(1))));
+        assert!(matches!(reassembled[1], Err(SessionError::FrameDiscarded(2))));
+        assert!(matches!(reassembled[2], Err(SessionError::FrameDiscarded(3))));
+        assert!(matches!(&reassembled[3], Ok(f) if f == &expected[3].clone()));
+        assert!(matches!(&reassembled[4], Ok(f) if f == &expected[4].clone()));
 
-        // Yield Frame 2
-        assert_eq!(Some(expected[1].clone()), r_stream.try_next().await?);
-
-        // Yield Frame 3
-        assert_eq!(Some(expected[2].clone()), r_stream.try_next().await?);
-
-        // Completes Frame 5 (via SplitSink's slot)
-        r_sink.send(segments[9].clone()).await?;
         r_sink.close().await?;
-
-        assert_eq!(Some(expected[3].clone()), r_stream.try_next().await?);
-        assert_eq!(Some(expected[4].clone()), r_stream.try_next().await?);
         assert_eq!(None, r_stream.try_next().await?);
+
+        assert!(start.elapsed() >= Duration::from_millis(200));
 
         Ok(())
     }

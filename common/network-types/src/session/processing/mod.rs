@@ -175,8 +175,8 @@ mod tests {
 
         let data_written = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
-        let mut count = 0;
         let data_read = tokio::task::spawn(async move {
+            let mut count = 0;
             let mut out = Vec::new();
             let data_out = data_out
                 .inspect(|frame| {
@@ -188,14 +188,14 @@ mod tests {
 
             pin_mut!(data_out);
             data_out.read_to_end(&mut out).await?;
-            Ok::<_, std::io::Error>(out)
+            Ok::<_, std::io::Error>((out, count))
         })
         .timeout(futures_time::time::Duration::from_secs(5));
 
         data_in.write_all(&data_written).await?;
         data_in.close().await?;
 
-        let data_read = data_read.await???;
+        let (data_read, count) = data_read.await???;
 
         assert_eq!(&data_written, data_read.as_slice());
         assert_eq!(DATA_SIZE / FRAME_SIZE + 1, count);

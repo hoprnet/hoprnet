@@ -1,20 +1,22 @@
 use std::{
     collections::BinaryHeap,
+    future::Future,
     pin::Pin,
     task::{Context, Poll},
     time::{Duration, Instant},
 };
 
-use futures::{FutureExt, Stream};
+use futures_time::future::Timer;
 use tracing::instrument;
 
 use crate::{prelude::errors::SessionError, session::frames::FrameId};
 
 #[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
-pub struct Sequencer<S: Stream> {
+pub struct Sequencer<S: futures::Stream> {
     #[pin]
     inner: S,
+    #[pin]
     timer: futures_time::task::Sleep,
     buffer: BinaryHeap<std::cmp::Reverse<S::Item>>,
     next_id: FrameId,
@@ -25,7 +27,7 @@ pub struct Sequencer<S: Stream> {
 
 impl<S> Sequencer<S>
 where
-    S: Stream,
+    S: futures::Stream,
     S::Item: Ord + PartialOrd<FrameId>,
 {
     fn new(inner: S, max_wait: Duration, capacity: usize) -> Self {
@@ -42,9 +44,9 @@ where
     }
 }
 
-impl<S> Stream for Sequencer<S>
+impl<S> futures::Stream for Sequencer<S>
 where
-    S: Stream,
+    S: futures::Stream,
     S::Item: Ord + PartialOrd<FrameId>,
 {
     type Item = Result<S::Item, SessionError>;
@@ -54,10 +56,17 @@ where
         let mut this = self.project();
         loop {
             if this.buffer.len() < this.buffer.capacity() {
-                match (this.inner.as_mut().poll_next(cx), this.timer.poll_unpin(cx)) {
+                // Poll the timer only if the buffer is not empty
+                let timer_poll = if !this.buffer.is_empty() {
+                    this.timer.as_mut().poll(cx)
+                } else {
+                    Poll::Pending
+                };
+
+                match (this.inner.as_mut().poll_next(cx), timer_poll) {
                     (Poll::Ready(Some(next)), timer) => {
                         if timer.is_ready() {
-                            *this.timer = futures_time::task::sleep((*this.max_wait).into());
+                            this.timer.as_mut().reset_timer();
                             tracing::trace!("new frame and timer reset");
                         }
                         if next < *this.next_id {
@@ -69,7 +78,7 @@ where
                     }
                     (Poll::Ready(None), _) => *this.is_closed = true,
                     (Poll::Pending, Poll::Ready(_)) => {
-                        *this.timer = futures_time::task::sleep((*this.max_wait).into());
+                        this.timer.as_mut().reset_timer();
                         tracing::trace!("timer reset");
                     }
                     (Poll::Pending, Poll::Pending) => return Poll::Pending,
@@ -102,7 +111,7 @@ where
     }
 }
 
-pub trait SequencerExt: Stream {
+pub trait SequencerExt: futures::Stream {
     fn sequencer(self, timeout: Duration, capacity: usize) -> Sequencer<Self>
     where
         Self::Item: Ord + PartialOrd<FrameId>,
@@ -112,7 +121,7 @@ pub trait SequencerExt: Stream {
     }
 }
 
-impl<T: ?Sized> SequencerExt for T where T: Stream {}
+impl<T: ?Sized> SequencerExt for T where T: futures::Stream {}
 
 #[cfg(test)]
 mod tests {
