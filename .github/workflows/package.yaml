@@ -23,12 +23,6 @@ jobs:
   package:
     name: Package binaries
     runs-on: self-hosted-hoprnet-small
-    strategy:
-      matrix:
-        target:
-          - x86_64-linux
-          - aarch64-linux
-          - armv7l-linux
     steps:
 
       - name: Checkout hoprnet repository
@@ -40,13 +34,13 @@ jobs:
       # - name: Download hoprd artifacts
       #   uses: actions/download-artifact@v3
       #   with:
-      #     name: hoprd-${{ matrix.target }}
+      #     name: hoprd-${{ inputs.target }}
       #     path: ./artifacts/hoprd
 
       # - name: Download hopli artifacts
       #   uses: actions/download-artifact@v3
       #   with:
-      #     name: hopli-${{ matrix.target }}
+      #     name: hopli-${{ inputs.target }}
       #     path: ./artifacts/hopli
 
       - name: Install Nix
