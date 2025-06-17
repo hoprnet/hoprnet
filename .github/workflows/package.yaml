@@ -58,8 +58,7 @@ jobs:
           echo "This is a dummy binary" > ./artifacts/hoprd/hoprd
           echo "This is a dummy binary" > ./artifacts/hopli/hopli
           ls -alR ./artifacts
-
-          just package-all {{ matrix.target }}
+          nix develop -c just package-all {{ matrix.target }}
 
 
 
