@@ -2,138 +2,9 @@ mod reassembly;
 mod segmenter;
 mod sequencer;
 
-use futures::{SinkExt, pin_mut};
-pub(crate) use reassembly::Reassembler;
-pub(crate) use segmenter::Segmenter;
-pub(crate) use sequencer::Sequencer;
-use tracing::Instrument;
-
-use crate::session::{
-    errors::SessionError,
-    frames::{Frame, FrameDashMap, FrameHashMap, FrameId, FrameInspector, FrameMap, OrderedFrame, Segment},
-};
-
-fn build_reconstructor<M, R>(
-    id: &str,
-    reassembler: Reassembler<M>,
-    sequencer: Sequencer<OrderedFrame>,
-    reassembled_ids: R,
-) -> (
-    impl futures::Sink<Segment, Error = SessionError>,
-    impl futures::Stream<Item = Result<Frame, SessionError>>,
-)
-where
-    M: FrameMap + Send + 'static,
-    R: futures::Sink<FrameId> + Clone + Send + Sync + 'static,
-    R::Error: std::error::Error,
-{
-    use futures::StreamExt;
-
-    // TODO: replace with Sequencer adapter, and remove this task
-
-    let (sink, rs_stream) = reassembler.split();
-    let (seq_sink, stream) = sequencer.split();
-
-    let id = id.to_string();
-    hopr_async_runtime::prelude::spawn(
-        async move {
-            match rs_stream
-                .filter_map(|maybe_frame| async {
-                    // Frames that fail to reassemble will eventually be
-                    // discarded in the sequencer as missing,
-                    // so we're safe to filter them out here and only log them.
-                    maybe_frame
-                        .inspect_err(|error| tracing::error!(%error, "failed to reassemble frame"))
-                        .ok()
-                        .map(|f| Ok::<_, SessionError>(OrderedFrame(f)))
-                })
-                .forward(seq_sink.with(|frame: OrderedFrame| {
-                    // We cannot use Fanout here, because it would imply either cloning each
-                    // packet or allocating it inside a new Arc (= heap alloc per packet)
-                    let reassembled_ids = reassembled_ids.clone();
-                    async move {
-                        pin_mut!(reassembled_ids);
-                        if let Err(error) = reassembled_ids.send(frame.0.frame_id).await {
-                            tracing::error!(%error, frame_id = frame.0.frame_id, "failed to notify reassembled frame");
-                        }
-                        Ok(frame)
-                    }
-                }))
-                .await
-            {
-                Ok(_) => tracing::debug!("frame reconstructor finished"),
-                Err(error) => tracing::error!(%error, "frame reconstructor finished with error"),
-            }
-        }
-        .instrument(tracing::debug_span!("FrameReconstructor", session_id = %id)),
-    );
-    (sink, stream.map(|f| f.map(|of| of.0)))
-}
-
-/// Builds a frame reconstructor - a [`Reassembler`] followed by [`Sequencer`].
-///
-/// The incoming segments are first reassembled into complete frames by the [`Reassembler`],
-/// and then passed into the [`Sequencer`] which returns them in the right order by the Frame ID.
-pub fn frame_reconstructor<R>(
-    id: &str,
-    frame_timeout: std::time::Duration,
-    capacity: usize,
-    reassembled_ids: R,
-) -> (
-    impl futures::Sink<Segment, Error = SessionError>,
-    impl futures::Stream<Item = Result<Frame, SessionError>>,
-)
-where
-    R: futures::Sink<FrameId> + Clone + Send + Sync + 'static,
-    R::Error: std::error::Error,
-{
-    build_reconstructor(
-        id,
-        Reassembler::<FrameHashMap>::new(frame_timeout, capacity),
-        Sequencer::new(sequencer::SequencerConfig {
-            timeout: frame_timeout,
-            capacity,
-            ..Default::default()
-        }),
-        reassembled_ids,
-    )
-}
-
-/// Similar to [`frame_reconstructor`], but returns also a [`FrameInspector`] that can be used to
-/// inspect the incomplete frames in the reassembler.
-///
-/// This reconstructor is slower than the one created via [`frame_reconstructor`], but is required
-/// in stateful sockets.
-pub fn frame_reconstructor_with_inspector<R>(
-    id: &str,
-    frame_timeout: std::time::Duration,
-    capacity: usize,
-    reassembled_ids: R,
-) -> (
-    impl futures::Sink<Segment, Error = SessionError>,
-    impl futures::Stream<Item = Result<Frame, SessionError>>,
-    FrameInspector,
-)
-where
-    R: futures::Sink<FrameId> + Clone + Send + Sync + 'static,
-    R::Error: std::error::Error,
-{
-    let reassembler = Reassembler::<FrameDashMap>::new(frame_timeout, capacity);
-    let inspector = reassembler.new_inspector();
-
-    let (sink, stream) = build_reconstructor(
-        id,
-        reassembler,
-        Sequencer::new(sequencer::SequencerConfig {
-            timeout: frame_timeout,
-            capacity,
-            ..Default::default()
-        }),
-        reassembled_ids,
-    );
-
-    (sink, stream, inspector)
-}
+pub(crate) use reassembly::ReassemblerExt;
+pub(crate) use segmenter::SegmenterExt;
+pub(crate) use sequencer::SequencerExt;
 
 /// Helper function to segment `data` into segments of a given ` max_segment_size ` length.
 /// All segments are tagged with the same `frame_id`.
@@ -142,22 +13,22 @@ pub fn segment<T: AsRef<[u8]>>(
     data: T,
     max_segment_size: usize,
     frame_id: u32,
-) -> crate::session::errors::Result<Vec<Segment>> {
+) -> crate::session::errors::Result<Vec<crate::session::frames::Segment>> {
     use crate::session::frames::SeqNum;
 
     if frame_id == 0 {
-        return Err(SessionError::InvalidFrameId);
+        return Err(crate::session::errors::SessionError::InvalidFrameId);
     }
 
     if max_segment_size == 0 {
-        return Err(SessionError::InvalidSegmentSize);
+        return Err(crate::session::errors::SessionError::InvalidSegmentSize);
     }
 
     let data = data.as_ref();
 
     let num_chunks = data.len().div_ceil(max_segment_size);
     if num_chunks > SeqNum::MAX as usize {
-        return Err(SessionError::DataTooLong);
+        return Err(crate::session::errors::SessionError::DataTooLong);
     }
 
     let chunks = data.chunks(max_segment_size);
@@ -165,7 +36,7 @@ pub fn segment<T: AsRef<[u8]>>(
     let seq_len = chunks.len() as SeqNum;
     Ok(chunks
         .enumerate()
-        .map(|(idx, data)| Segment {
+        .map(|(idx, data)| crate::session::frames::Segment {
             frame_id,
             seq_len,
             seq_idx: idx as u8,
@@ -178,12 +49,15 @@ pub fn segment<T: AsRef<[u8]>>(
 mod tests {
     use std::time::Duration;
 
-    use futures::{AsyncReadExt, AsyncWriteExt, StreamExt, TryStreamExt};
+    use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt, TryStreamExt, pin_mut};
     use futures_time::future::FutureExt;
     use rand::prelude::*;
 
     use super::*;
-    use crate::prelude::errors::SessionError;
+    use crate::{
+        prelude::errors::SessionError,
+        session::frames::{Frame, OrderedFrame},
+    };
 
     const RNG_SEED: [u8; 32] = hex_literal::hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
 
@@ -198,7 +72,14 @@ mod tests {
 
         let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
 
-        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_secs(5), 1024, reassm_tx);
+        let reassm_rx = reassm_rx
+            .reassembler(Duration::from_secs(5), 1024)
+            .filter_map(|maybe_frame| match maybe_frame {
+                Ok(frame) => futures::future::ready(Some(OrderedFrame(frame))),
+                Err(_) => futures::future::ready(None),
+            })
+            .sequencer(Duration::from_secs(5), 1024)
+            .and_then(|frame| futures::future::ok(frame.0));
 
         let mut segments = expected
             .iter()
@@ -209,21 +90,14 @@ mod tests {
         let mut rng = StdRng::from_seed(RNG_SEED);
         segments.shuffle(&mut rng);
 
-        let jh = hopr_async_runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(r_sink));
+        hopr_async_runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(reassm_tx)).await??;
 
-        let actual = seq_stream
+        let actual = reassm_rx
             .try_collect::<Vec<_>>()
             .timeout(futures_time::time::Duration::from_secs(5))
             .await??;
 
         assert_eq!(actual, expected);
-
-        let mut shuffled_frames = reassm_rx.collect::<Vec<_>>().await;
-        shuffled_frames.sort();
-
-        assert_eq!(shuffled_frames, (1..=10u32).collect::<Vec<_>>());
-
-        let _ = jh.await?;
 
         Ok(())
     }
@@ -239,7 +113,14 @@ mod tests {
 
         let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
 
-        let (r_sink, seq_stream) = frame_reconstructor("test", Duration::from_millis(50), 1024, reassm_tx);
+        let reassm_rx = reassm_rx
+            .reassembler(Duration::from_secs(5), 1024)
+            .filter_map(|maybe_frame| match maybe_frame {
+                Ok(frame) => futures::future::ready(Some(OrderedFrame(frame))),
+                Err(_) => futures::future::ready(None),
+            })
+            .sequencer(Duration::from_secs(5), 1024)
+            .and_then(|frame| futures::future::ok(frame.0));
 
         let mut segments = expected
             .iter()
@@ -251,9 +132,9 @@ mod tests {
         let mut rng = StdRng::from_seed(RNG_SEED);
         segments.shuffle(&mut rng);
 
-        let jh = hopr_async_runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(r_sink));
+        hopr_async_runtime::prelude::spawn(futures::stream::iter(segments).map(Ok).forward(reassm_tx)).await??;
 
-        let actual = seq_stream
+        let actual = reassm_rx
             .collect::<Vec<_>>()
             .timeout(futures_time::time::Duration::from_secs(5))
             .await?;
@@ -266,12 +147,7 @@ mod tests {
                 assert!(matches!(actual[i], Err(SessionError::FrameDiscarded(4))))
             }
         }
-        let mut shuffled_frame_ids = reassm_rx.collect::<Vec<_>>().await;
-        shuffled_frame_ids.sort();
 
-        assert_eq!(shuffled_frame_ids, (1..=10u32).filter(|&i| i != 4).collect::<Vec<_>>());
-
-        let _ = jh.await?;
         Ok(())
     }
 
@@ -280,21 +156,37 @@ mod tests {
         const DATA_SIZE: usize = 9001;
         const FRAME_SIZE: usize = 1500;
 
-        let (mut data_in, segments_out) = Segmenter::<462>::new(FRAME_SIZE, 1024);
-        let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
-        let (segments_in, data_out) = frame_reconstructor("test", Duration::from_secs(10), 1024, reassm_tx);
+        const MTU: usize = 1000;
 
-        let jh = tokio::task::spawn(segments_out.map(Ok).forward(segments_in));
+        let (reassm_tx, reassm_rx) = futures::channel::mpsc::unbounded();
+
+        let data_out = reassm_rx
+            .reassembler(Duration::from_secs(5), 1024)
+            .filter_map(|maybe_frame| match maybe_frame {
+                Ok(frame) => futures::future::ready(Some(OrderedFrame(frame))),
+                Err(_) => futures::future::ready(None),
+            })
+            .sequencer(Duration::from_secs(5), 1024)
+            .and_then(|frame| futures::future::ok(frame.0));
+
+        let mut data_in = reassm_tx
+            .sink_map_err(|_| SessionError::InvalidSegment)
+            .segmenter::<MTU>(FRAME_SIZE);
 
         let data_written = hopr_crypto_random::random_bytes::<DATA_SIZE>();
 
+        let mut count = 0;
         let data_read = tokio::task::spawn(async move {
             let mut out = Vec::new();
-            let mut data_out = data_out
-                .inspect(|frame| tracing::debug!("{:?}", frame))
+            let data_out = data_out
+                .inspect(|frame| {
+                    tracing::debug!("{:?}", frame);
+                    count += 1;
+                })
                 .map_err(std::io::Error::other)
                 .into_async_read();
 
+            pin_mut!(data_out);
             data_out.read_to_end(&mut out).await?;
             Ok::<_, std::io::Error>(out)
         })
@@ -304,8 +196,6 @@ mod tests {
         data_in.close().await?;
 
         let data_read = data_read.await???;
-        let count = reassm_rx.collect::<Vec<_>>().await.len();
-        jh.await??;
 
         assert_eq!(&data_written, data_read.as_slice());
         assert_eq!(DATA_SIZE / FRAME_SIZE + 1, count);

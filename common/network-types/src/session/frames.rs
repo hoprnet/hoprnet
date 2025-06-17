@@ -288,6 +288,11 @@ impl FrameBuilder {
     }
 
     #[inline]
+    pub fn frame_id(&self) -> FrameId {
+        self.frame_id
+    }
+
+    #[inline]
     pub fn is_complete(&self) -> bool {
         self.seg_remaining == 0
     }
@@ -298,6 +303,13 @@ impl FrameBuilder {
 pub struct FrameInspector(pub(crate) FrameDashMap);
 
 impl FrameInspector {
+    /// Indicates how many incomplete frames there could be per one complete/discarded frame.
+    pub const INCOMPLETE_FRAME_RATIO: usize = 2;
+
+    pub fn new(capacity: usize) -> Self {
+        Self(FrameDashMap::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1))
+    }
+
     /// Returns a [`MissingSegmentsBitmap`] of missing segments in a frame.
     pub fn missing_segments(&self, frame_id: &FrameId) -> Option<MissingSegmentsBitmap> {
         self.0.0.get(frame_id).map(|f| f.as_missing())

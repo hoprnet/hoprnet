@@ -230,17 +230,12 @@ impl<const C: usize> AcknowledgementState<C> {
 }
 
 impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
-    #[inline]
-    fn subscribed_events() -> SocketStateEvents {
-        SocketStateEvents::full()
-    }
-
     fn session_id(&self) -> &str {
         &self.id
     }
 
     #[tracing::instrument(name = "AcknowledgementState", skip(self, socket_components), fields(session_id = self.id))]
-    fn run(&mut self, socket_components: SocketComponents<C>) -> Result<(), SessionError> {
+    fn run(&mut self, socket_components: SocketComponents<C>) -> Result<SocketStateEvents, SessionError> {
         if self.context.is_some() {
             return Err(SessionError::InvalidState("state is already running".into()));
         }
@@ -366,7 +361,7 @@ impl<const C: usize> SocketState<C> for AcknowledgementState<C> {
         );
 
         tracing::debug!("acknowledgement state has been started");
-        Ok(())
+        Ok(SocketStateEvents::full())
     }
 
     #[tracing::instrument(name = "AcknowledgementState", skip(self), fields(session_id = self.id))]

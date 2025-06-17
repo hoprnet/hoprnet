@@ -1,235 +1,168 @@
 use std::{
-    collections::VecDeque,
+    future::Future,
     pin::Pin,
-    task::{Context, Poll, Waker},
+    task::{Context, Poll},
     time::{Duration, Instant},
 };
 
+use futures::Stream;
+use futures_time::future::Timer;
 use tracing::instrument;
 
 use crate::session::{
     errors::SessionError,
     frames::{
-        Frame, FrameBuilder, FrameDashMap, FrameInspector, FrameMap, FrameMapEntry, FrameMapOccupiedEntry,
-        FrameMapVacantEntry, Segment,
+        Frame, FrameBuilder, FrameDashMap, FrameHashMap, FrameId, FrameInspector, FrameMap, FrameMapEntry,
+        FrameMapOccupiedEntry, FrameMapVacantEntry, Segment,
     },
 };
 
-#[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 #[pin_project::pin_project]
-pub struct Reassembler<M> {
+pub struct Reassembler<S, M> {
+    #[pin]
+    inner: S,
+    #[pin]
+    timer: futures_time::task::Sleep,
     incomplete_frames: M,
-    complete_frames: VecDeque<Result<Frame, SessionError>>,
-    tx_waker: Option<Waker>,
-    rx_waker: Option<Waker>,
-    is_closed: bool,
+    expired_frames: Vec<FrameId>,
     max_age: Duration,
     capacity: usize,
     last_expiration: Instant,
 }
 
-impl<M: FrameMap> Reassembler<M> {
-    /// Indicates how many incomplete frames there could be per one complete/discarded frame.
-    const INCOMPLETE_FRAME_RATIO: usize = 2;
-
-    pub fn new(max_age: Duration, capacity: usize) -> Self {
+impl<S: Stream<Item = Segment>, M: FrameMap> Reassembler<S, M> {
+    fn new(inner: S, incomplete_frames: M, max_age: Duration, capacity: usize) -> Self {
         Self {
-            incomplete_frames: M::with_capacity(Self::INCOMPLETE_FRAME_RATIO * capacity + 1),
-            complete_frames: VecDeque::with_capacity(capacity),
-            tx_waker: None,
-            rx_waker: None,
-            is_closed: false,
+            inner,
+            timer: futures_time::task::sleep(max_age.into()),
+            incomplete_frames,
+            expired_frames: Vec::with_capacity(capacity),
             last_expiration: Instant::now(),
             max_age,
             capacity,
         }
     }
-
-    fn expire_frames(&mut self) -> usize {
-        let mut expired = 0;
-
-        // Since the retaining operation is potentially expensive,
-        // we do it actually only if there's a real chance that a frame is expired
-        // or if the reassembler is closing (= everything is expired right away).
-        if self.is_closed || self.last_expiration.elapsed() >= self.max_age {
-            self.incomplete_frames.retain(|id, b| {
-                if b.last_recv.elapsed() >= self.max_age || self.is_closed {
-                    self.complete_frames.push_back(Err(SessionError::FrameDiscarded(*id)));
-                    tracing::trace!(frame_id = id, "frame discarded");
-                    expired += 1;
-                    false
-                } else {
-                    true
-                }
-            });
-
-            self.last_expiration = Instant::now();
-        }
-
-        expired
-    }
 }
 
-impl Reassembler<FrameDashMap> {
-    pub fn new_inspector(&self) -> FrameInspector {
-        FrameInspector(self.incomplete_frames.clone())
-    }
-}
-
-impl<M: FrameMap> futures::Sink<Segment> for Reassembler<M> {
-    type Error = SessionError;
-
-    #[instrument(name = "Reassembler::poll_ready", level = "trace", skip(self, cx), fields(capacity = self.capacity, remaining = self.capacity - self.complete_frames.len()))]
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        tracing::trace!("checking ready");
-        if self.is_closed {
-            return Poll::Ready(Err(SessionError::ReassemblerClosed));
-        }
-
-        // If we're at the capacity of incomplete frames,
-        // check if we can expire more than the amount that's over the capacity.
-        if self.incomplete_frames.len() >= self.capacity * Self::INCOMPLETE_FRAME_RATIO
-            && self.expire_frames() <= self.incomplete_frames.len() - self.capacity
-        {
-            return Poll::Ready(Err(SessionError::TooManyIncompleteFrames));
-        }
-
-        if self.complete_frames.len() >= self.capacity {
-            self.rx_waker = Some(cx.waker().clone());
-
-            // Give the stream a chance to yield an element
-            if let Some(waker) = self.tx_waker.take() {
-                waker.wake();
-            }
-
-            tracing::trace!("pending");
-            Poll::Pending
-        } else {
-            tracing::trace!("ready",);
-            Poll::Ready(Ok(()))
-        }
-    }
-
-    #[instrument(name = "Reassembler::start_send", level = "trace", skip(self, item), fields(frame_id = item.frame_id, seq_idx = item.seq_idx))]
-    fn start_send(mut self: Pin<&mut Self>, item: Segment) -> Result<(), Self::Error> {
-        tracing::trace!("starting send");
-        if self.is_closed {
-            return Err(SessionError::ReassemblerClosed);
-        }
-
-        let maybe_frame = match self.incomplete_frames.entry(item.frame_id) {
-            FrameMapEntry::Occupied(mut e) => {
-                let builder = e.get_builder_mut();
-                match builder.add_segment(item) {
-                    Ok(_) => {
-                        if builder.is_complete() {
-                            tracing::trace!("frame is complete");
-                            Some(e.finalize().try_into())
-                        } else {
-                            None
-                        }
-                    }
-                    Err(error) => {
-                        tracing::error!(%error, "encountered invalid segment");
-                        None
-                    }
-                }
-            }
-            FrameMapEntry::Vacant(e) => {
-                let builder = FrameBuilder::from(item);
-                if builder.is_complete() {
-                    tracing::trace!("segment frame is complete");
-                    Some(builder.try_into())
-                } else {
-                    e.insert_builder(builder);
-                    None
-                }
-            }
-        };
-
-        if let Some(frame) = maybe_frame {
-            self.complete_frames.push_back(frame);
-            tracing::trace!("pushed new");
-            if let Some(waker) = self.tx_waker.take() {
-                waker.wake();
-            }
-        }
-
-        Ok(())
-    }
-
-    #[instrument(name = "Reassembler::poll_flush", level = "trace", skip(self))]
-    fn poll_flush(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        tracing::trace!("polling flush");
-        if self.is_closed {
-            return Poll::Ready(Err(SessionError::ReassemblerClosed));
-        }
-
-        if let Some(waker) = self.tx_waker.take() {
-            waker.wake();
-        }
-
-        Poll::Ready(Ok(()))
-    }
-
-    #[instrument(name = "Reassembler::poll_close", level = "trace", skip(self))]
-    fn poll_close(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        tracing::trace!("polling close");
-        if self.is_closed {
-            return Poll::Ready(Err(SessionError::ReassemblerClosed));
-        }
-
-        self.is_closed = true;
-        if let Some(waker) = self.tx_waker.take() {
-            waker.wake();
-        }
-        if let Some(waker) = self.rx_waker.take() {
-            waker.wake();
-        }
-
-        Poll::Ready(Ok(()))
-    }
-}
-
-impl<M: FrameMap> futures::Stream for Reassembler<M> {
+impl<S: Stream<Item = Segment>, M: FrameMap> futures::Stream for Reassembler<S, M> {
     type Item = Result<Frame, SessionError>;
 
     #[instrument(name = "Reassembler::poll_next", level = "trace", skip(self, cx))]
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        tracing::trace!("polling next");
-        self.expire_frames();
-
-        if self.is_closed && self.complete_frames.is_empty() {
-            tracing::trace!("done - closed");
-            return Poll::Ready(None);
-        }
-
-        if let Some(complete) = self.complete_frames.pop_front() {
-            if let Some(waker) = self.rx_waker.take() {
-                waker.wake();
-            }
-            Poll::Ready(Some(
-                complete
-                    .inspect(|f| tracing::trace!(frame_id = f.frame_id, "ready"))
-                    .inspect_err(|e| tracing::trace!(error = %e, "ready error")),
-            ))
-        } else if !self.is_closed {
-            // The next sink operation will wake us up, but only if we give it a chance
-            self.tx_waker = Some(cx.waker().clone());
-
-            if let Some(waker) = self.rx_waker.take() {
-                waker.wake();
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        loop {
+            if let Some(frame_id) = this.expired_frames.pop() {
+                tracing::trace!(frame_id, "emit discarded frame");
+                return Poll::Ready(Some(Err(SessionError::FrameDiscarded(frame_id))));
             }
 
-            tracing::trace!("pending");
-            Poll::Pending
-        } else {
-            tracing::trace!("done");
-            Poll::Ready(None)
+            tracing::trace!("polling next");
+            match (this.inner.as_mut().poll_next(cx), this.timer.as_mut().poll(cx)) {
+                (Poll::Ready(Some(item)), timer) => {
+                    if timer.is_ready() {
+                        this.timer.as_mut().reset_timer();
+                        //*this.timer = futures_time::task::sleep((*this.max_age).into());
+                    }
+
+                    // Since the retaining operation is potentially expensive,
+                    // we do it actually only if there's a real chance that a frame is expired
+                    if this.last_expiration.elapsed() >= *this.max_age {
+                        this.incomplete_frames.retain(|id, builder| {
+                            if builder.last_recv.elapsed() >= *this.max_age && *id != item.frame_id {
+                                this.expired_frames.push(*id);
+                                false
+                            } else {
+                                true
+                            }
+                        });
+                        *this.last_expiration = Instant::now();
+                    }
+
+                    match this.incomplete_frames.entry(item.frame_id) {
+                        FrameMapEntry::Occupied(mut e) => {
+                            let builder = e.get_builder_mut();
+                            match builder.add_segment(item) {
+                                Ok(_) => {
+                                    if builder.is_complete() {
+                                        tracing::trace!(frame_id = builder.frame_id(), "frame is complete");
+                                        return Poll::Ready(Some(e.finalize().try_into()));
+                                    }
+                                }
+                                Err(error) => {
+                                    tracing::error!(%error, "encountered invalid segment");
+                                }
+                            }
+                        }
+                        FrameMapEntry::Vacant(e) => {
+                            let builder = FrameBuilder::from(item);
+                            if builder.is_complete() {
+                                tracing::trace!(frame_id = builder.frame_id(), "segment frame is complete");
+                                return Poll::Ready(Some(builder.try_into()));
+                            } else {
+                                e.insert_builder(builder);
+                            }
+                        }
+                    };
+                }
+                (Poll::Ready(None), _) => {
+                    // Inner stream closed, dump all incomplete frames
+                    tracing::trace!("inner stream closed, dumping incomplete frames");
+                    if this.incomplete_frames.len() > 0 {
+                        this.incomplete_frames.retain(|id, _| {
+                            this.expired_frames.push(*id);
+                            false
+                        });
+                    } else {
+                        tracing::trace!("done");
+                        return Poll::Ready(None);
+                    }
+                }
+                (Poll::Pending, Poll::Ready(_)) => {
+                    // Check if some frames are expired
+                    this.incomplete_frames.retain(|id, builder| {
+                        if builder.last_recv.elapsed() >= *this.max_age {
+                            this.expired_frames.push(*id);
+                            false
+                        } else {
+                            true
+                        }
+                    });
+                    *this.last_expiration = Instant::now();
+                }
+                (Poll::Pending, Poll::Pending) => return Poll::Pending,
+            }
         }
     }
 }
+
+pub trait ReassemblerExt: Stream<Item = Segment> {
+    fn reassembler(self, timeout: Duration, capacity: usize) -> Reassembler<Self, FrameHashMap>
+    where
+        Self: Sized,
+    {
+        Reassembler::new(
+            self,
+            FrameHashMap::with_capacity(FrameInspector::INCOMPLETE_FRAME_RATIO * capacity + 1),
+            timeout,
+            capacity,
+        )
+    }
+
+    fn reassembler_with_inspector(
+        self,
+        timeout: Duration,
+        capacity: usize,
+        inspector: FrameInspector,
+    ) -> Reassembler<Self, FrameDashMap>
+    where
+        Self: Sized,
+    {
+        Reassembler::new(self, inspector.0.clone(), timeout, capacity)
+    }
+}
+
+impl<T: ?Sized> ReassemblerExt for T where T: Stream<Item = Segment> {}
 
 #[cfg(test)]
 mod tests {
@@ -239,11 +172,9 @@ mod tests {
     use rand::{SeedableRng, prelude::SliceRandom, rngs::StdRng};
 
     use super::*;
-    use crate::session::{frames::FrameHashMap, processing::segment};
+    use crate::session::processing::segment;
 
     const RNG_SEED: [u8; 32] = hex!("d8a471f1c20490a3442b96fdde9d1807428096e1601b0cef0eea7e6d44a24c01");
-
-    type BasicReassembler = Reassembler<FrameHashMap>;
 
     #[test_log::test(tokio::test)]
     pub async fn reassembler_should_reassemble_frames() -> anyhow::Result<()> {
@@ -254,7 +185,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = BasicReassembler::new(Duration::from_secs(5), 1024).split();
+        let (r_sink, r_stream) = futures::channel::mpsc::unbounded();
+        let r_stream = r_stream.reassembler(Duration::from_secs(5), 1024);
 
         let mut segments = expected
             .iter()
@@ -290,7 +222,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = BasicReassembler::new(Duration::from_millis(45), 1024).split();
+        let (r_sink, r_stream) = futures::channel::mpsc::unbounded();
+        let r_stream = r_stream.reassembler(Duration::from_millis(45), 1024);
 
         let mut segments = expected
             .iter()
@@ -359,7 +292,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = BasicReassembler::new(Duration::from_millis(100), 1024).split();
+        let (r_sink, r_stream) = futures::channel::mpsc::unbounded();
+        let r_stream = r_stream.reassembler(Duration::from_millis(100), 1024);
 
         let mut segments = expected
             .iter()
@@ -411,7 +345,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (r_sink, r_stream) = BasicReassembler::new(Duration::from_secs(5), 3).split();
+        let (r_sink, r_stream) = futures::channel::mpsc::unbounded();
+        let r_stream = r_stream.reassembler(Duration::from_secs(5), 1024);
 
         pin_mut!(r_sink);
         pin_mut!(r_stream);
@@ -471,41 +406,6 @@ mod tests {
         assert_eq!(Some(expected[3].clone()), r_stream.try_next().await?);
         assert_eq!(Some(expected[4].clone()), r_stream.try_next().await?);
         assert_eq!(None, r_stream.try_next().await?);
-
-        Ok(())
-    }
-
-    #[test_log::test(tokio::test)]
-    pub async fn reassembler_should_fail_with_too_many_incomplete_frames() -> anyhow::Result<()> {
-        let expected = (1u32..=5)
-            .map(|frame_id| Frame {
-                frame_id,
-                data: hopr_crypto_random::random_bytes::<30>().into(),
-            })
-            .collect::<Vec<_>>();
-
-        let reassembler = BasicReassembler::new(
-            Duration::from_secs(5),
-            2, // = max 4 incomplete frames before fail
-        );
-
-        pin_mut!(reassembler);
-
-        let segments = expected
-            .iter()
-            .cloned()
-            .flat_map(|f| segment(f.data, 22, f.frame_id).unwrap())
-            .collect::<Vec<_>>();
-
-        reassembler.send(segments[0].clone()).await?;
-        reassembler.send(segments[2].clone()).await?;
-        reassembler.send(segments[4].clone()).await?;
-        reassembler.send(segments[6].clone()).await?;
-
-        assert!(matches!(
-            reassembler.send(segments[7].clone()).await,
-            Err(SessionError::TooManyIncompleteFrames)
-        ));
 
         Ok(())
     }

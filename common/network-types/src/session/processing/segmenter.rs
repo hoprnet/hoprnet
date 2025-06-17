@@ -3,7 +3,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{Sink, SinkExt, ready};
+use futures::ready;
 use tracing::instrument;
 
 use crate::session::{
@@ -12,99 +12,105 @@ use crate::session::{
     protocol::SessionMessage,
 };
 
-/// `C` is MTU size, `F` is frame size.
-pub struct Segmenter<const C: usize> {
+/// `C` is MTU size.
+#[pin_project::pin_project]
+pub struct Segmenter<const C: usize, S> {
+    #[pin]
+    tx: S,
     seg_buffer: Vec<u8>,
     ready_segments: Vec<Segment>,
     next_frame_id: FrameId,
     current_frame_len: usize,
     frame_size: usize,
     closed: bool,
-    tx: Pin<Box<dyn Sink<Segment, Error = SessionError> + Send>>,
     flush_each_segment: bool,
 }
 
-impl<const C: usize> Segmenter<C> {
+impl<const C: usize, S> Segmenter<C, S>
+where
+    S: futures::sink::Sink<Segment, Error = SessionError>,
+{
     const PAYLOAD_CAPACITY: usize = C - SessionMessage::<C>::SEGMENT_OVERHEAD;
 
-    /// Creates a new instance.
+    /// Creates a new instance, wrapping the given `inner` Segment sink.
     ///
     /// The `frame_size` value will be clamped into the `[C, C * SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME]` interval.
-    pub fn new(frame_size: usize, capacity: usize) -> (Self, impl futures::Stream<Item = Segment> + Send) {
-        let (tx, rx) = futures::channel::mpsc::channel::<Segment>(capacity);
+    pub fn new(inner: S, frame_size: usize) -> Self {
         let frame_size = frame_size.clamp(C, C * SessionMessage::<C>::MAX_SEGMENTS_PER_FRAME);
 
-        (
-            Self {
-                seg_buffer: Vec::with_capacity(Self::PAYLOAD_CAPACITY),
-                ready_segments: Vec::with_capacity(frame_size / C + 1),
-                next_frame_id: 1,
-                current_frame_len: 0,
-                closed: false,
-                tx: Box::pin(tx.sink_map_err(|e| SessionError::ProcessingError(e.to_string()))),
-                frame_size,
-                flush_each_segment: false,
-            },
-            rx,
-        )
+        Self {
+            seg_buffer: Vec::with_capacity(Self::PAYLOAD_CAPACITY),
+            ready_segments: Vec::with_capacity(frame_size / C + 1),
+            next_frame_id: 1,
+            current_frame_len: 0,
+            closed: false,
+            tx: inner,
+            frame_size,
+            flush_each_segment: false,
+        }
     }
 
     #[instrument(name = "Segmenter::poll_flush_segments", level = "trace", skip(self, cx), fields(frame_id = self.next_frame_id, seq_len = self.ready_segments.len()))]
-    fn poll_flush_segments(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SessionError>> {
+    fn poll_flush_segments(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SessionError>> {
         let seq_len = self.ready_segments.len();
+        let mut this = self.project();
         tracing::trace!("flushing segments");
 
-        let all_segments = self.ready_segments.drain(..).collect::<Vec<_>>();
+        let all_segments = this.ready_segments.drain(..).collect::<Vec<_>>();
         for (i, mut seg) in all_segments.into_iter().enumerate() {
             seg.seq_idx = i as SeqNum;
             seg.seq_len = seq_len as SeqNum;
 
-            ready!(self.tx.as_mut().poll_ready(cx))?;
+            ready!(this.tx.as_mut().poll_ready(cx))?;
 
             tracing::trace!(seq_idx = seg.seq_idx, "segment out");
-            self.tx.as_mut().start_send(seg)?;
+            this.tx.as_mut().start_send(seg)?;
 
-            if self.flush_each_segment {
-                ready!(self.tx.as_mut().poll_flush(cx))?;
+            if *this.flush_each_segment {
+                ready!(this.tx.as_mut().poll_flush(cx))?;
                 tracing::trace!(seg_idx = i, "segment flushed out");
             }
         }
 
-        if !self.flush_each_segment {
-            ready!(self.tx.as_mut().poll_flush(cx))?;
+        if !*this.flush_each_segment {
+            ready!(this.tx.as_mut().poll_flush(cx))?;
             tracing::trace!("frame flushed out");
         }
 
-        self.next_frame_id += 1;
-        self.current_frame_len = 0;
+        *this.next_frame_id += 1;
+        *this.current_frame_len = 0;
 
         Poll::Ready(Ok(()))
     }
 
     #[instrument(name = "Segmenter::complete_segment", level = "trace", skip(self), fields(frame_id = self.next_frame_id, seq_len = self.ready_segments.len()))]
-    fn complete_segment(&mut self) {
+    fn complete_segment(self: Pin<&mut Self>) {
+        let this = self.project();
         let new_segment = Segment {
-            frame_id: self.next_frame_id,
+            frame_id: *this.next_frame_id,
             seq_idx: 0,
             seq_len: 0,
-            data: self.seg_buffer.clone().into_boxed_slice(),
+            data: this.seg_buffer.clone().into_boxed_slice(),
         };
-        self.seg_buffer.clear();
+        this.seg_buffer.clear();
 
         let seg_len = new_segment.data.len();
-        self.current_frame_len += seg_len;
+        *this.current_frame_len += seg_len;
 
         tracing::trace!(
             bytes_added = seg_len,
-            remaining_in_frame = self.frame_size - self.current_frame_len,
+            remaining_in_frame = *this.frame_size - *this.current_frame_len,
             "completed segment"
         );
 
-        self.ready_segments.push(new_segment);
+        this.ready_segments.push(new_segment);
     }
 }
 
-impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
+impl<const C: usize, S> futures::io::AsyncWrite for Segmenter<C, S>
+where
+    S: futures::sink::Sink<Segment, Error = SessionError>,
+{
     #[instrument(name = "Segmenter::poll_write", level = "trace", skip(self, cx, buf), fields(len = buf.len()))]
     fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         tracing::trace!("polling write");
@@ -125,7 +131,11 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
             .min(self.frame_size - self.current_frame_len);
 
         if new_len_in_buffer > 0 {
-            self.seg_buffer.extend_from_slice(&buf[..new_len_in_buffer]);
+            self.as_mut()
+                .project()
+                .seg_buffer
+                .extend_from_slice(&buf[..new_len_in_buffer]);
+
             tracing::trace!(
                 buf_len = self.seg_buffer.len(),
                 len = new_len_in_buffer,
@@ -138,11 +148,11 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
         // If the chunk finishes the frame, flush it
         if self.current_frame_len + new_len_in_buffer == self.frame_size {
             tracing::trace!("frame is complete");
-            self.complete_segment();
+            self.as_mut().complete_segment();
             ready!(self.as_mut().poll_flush_segments(cx)).map_err(std::io::Error::other)?;
         } else if self.seg_buffer.len() == Self::PAYLOAD_CAPACITY {
             tracing::trace!("segment is complete");
-            self.complete_segment();
+            self.as_mut().complete_segment();
 
             if self.current_frame_len == self.frame_size {
                 tracing::trace!("frame is complete by the completed segment");
@@ -169,7 +179,7 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
                 len = self.seg_buffer.len(),
                 "partial frame"
             );
-            self.complete_segment();
+            self.as_mut().complete_segment();
         }
         self.as_mut().poll_flush_segments(cx).map_err(std::io::Error::other)
     }
@@ -183,34 +193,56 @@ impl<const C: usize> futures::io::AsyncWrite for Segmenter<C> {
             return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
         }
 
-        self.closed = true;
-
         if !self.seg_buffer.is_empty() {
             tracing::trace!(
                 frame_id = self.next_frame_id,
                 len = self.seg_buffer.len(),
                 "partial frame"
             );
-            self.complete_segment();
+            self.as_mut().complete_segment();
         }
 
         ready!(self.as_mut().poll_flush_segments(cx).map_err(std::io::Error::other))?;
-        self.tx.as_mut().poll_close(cx).map_err(std::io::Error::other)
+
+        let this = self.project();
+        ready!(this.tx.poll_close(cx).map_err(std::io::Error::other))?;
+
+        *this.closed = true;
+        Poll::Ready(Ok(()))
     }
 }
+
+pub trait SegmenterExt: futures::Sink<Segment, Error = SessionError> {
+    fn segmenter<const C: usize>(self, frame_size: usize) -> Segmenter<C, Self>
+    where
+        Self: Sized,
+    {
+        Segmenter::new(self, frame_size)
+    }
+}
+
+impl<T: ?Sized> SegmenterExt for T where T: futures::Sink<Segment, Error = SessionError> {}
 
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
-    use futures::{AsyncWriteExt, StreamExt, pin_mut};
+    use futures::{AsyncWriteExt, SinkExt, StreamExt, pin_mut};
     use futures_time::future::FutureExt;
 
     use super::*;
     use crate::session::processing::segment;
 
+    const MTU: usize = 1000;
+    const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
+    const FRAME_SIZE: usize = 1500;
+
     #[tokio::test]
     async fn segmenter_should_not_segment_small_data_unless_flushed() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx
+            .sink_map_err(|_| SessionError::InvalidSegment)
+            .segmenter::<MTU>(FRAME_SIZE);
+
         writer.write_all(b"test").await?;
 
         pin_mut!(segments);
@@ -233,26 +265,29 @@ mod tests {
 
     #[tokio::test]
     async fn segmenter_should_segment_complete_frame() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx
+            .sink_map_err(|_| SessionError::InvalidSegment)
+            .segmenter::<MTU>(FRAME_SIZE);
 
         let mut offset = 0;
-        let data = hopr_crypto_random::random_bytes::<1500>();
+        let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
 
         while offset < data.len() {
             let written = writer.write(&data[offset..]).await?;
-            assert_eq!(written, 500);
-            offset += 500;
+            assert_eq!(written, SMTU);
+            offset += SMTU;
         }
 
         pin_mut!(segments);
 
-        for i in 0..3 {
+        for i in 0..FRAME_SIZE / MTU {
             let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
             assert_eq!(1, seg.frame_id);
             assert_eq!(i as SeqNum, seg.seq_idx);
-            assert_eq!(3, seg.seq_len);
-            assert_eq!(500, seg.data.len());
-            assert_eq!(&data[i * 500..i * 500 + 500], seg.data.as_ref());
+            assert_eq!((FRAME_SIZE / MTU) as SeqNum, seg.seq_len);
+            assert_eq!(SMTU, seg.data.len());
+            assert_eq!(&data[i * SMTU..i * SMTU + SMTU], seg.data.as_ref());
         }
 
         writer.close().await?;
@@ -263,10 +298,10 @@ mod tests {
 
     #[tokio::test]
     async fn segmenter_full_frame_segmentation_must_be_consistent() -> anyhow::Result<()> {
-        const SEG_SIZE: usize = 510;
-        const FRAME_SIZE: usize = 1500;
-
-        let (mut writer, segments) = Segmenter::<SEG_SIZE>::new(FRAME_SIZE, 1024);
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx
+            .sink_map_err(|_| SessionError::InvalidSegment)
+            .segmenter::<MTU>(FRAME_SIZE);
 
         let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
 
@@ -274,7 +309,7 @@ mod tests {
         writer.close().await?;
 
         // Segmenter already takes into account the SessionMessage overhead
-        let expected = segment(&data, SEG_SIZE - SessionMessage::<SEG_SIZE>::SEGMENT_OVERHEAD, 1)?;
+        let expected = segment(&data, SMTU, 1)?;
         let actual = segments.collect::<Vec<_>>().await;
 
         assert_eq!(expected, actual);
@@ -284,11 +319,10 @@ mod tests {
 
     #[test_log::test(tokio::test)]
     async fn segmenter_should_segment_complete_frame_with_misaligned_mtu() -> anyhow::Result<()> {
-        const MTU: usize = 462;
-        const SMTU: usize = MTU - SessionMessage::<MTU>::SEGMENT_OVERHEAD;
-        const FRAME_SIZE: usize = 1500;
-
-        let (mut writer, segments) = Segmenter::<MTU>::new(FRAME_SIZE, 1024);
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx
+            .sink_map_err(|_| SessionError::InvalidSegment)
+            .segmenter::<MTU>(FRAME_SIZE);
 
         let mut offset = 0;
         let data = hopr_crypto_random::random_bytes::<FRAME_SIZE>();
@@ -315,7 +349,7 @@ mod tests {
 
         let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
         assert_eq!(1, seg.frame_id);
-        assert_eq!(3, seg.seq_idx);
+        assert_eq!((FRAME_SIZE / SMTU) as SeqNum, seg.seq_idx);
         assert_eq!(((FRAME_SIZE / SMTU) + 1) as SeqNum, seg.seq_len);
         assert_eq!(FRAME_SIZE % SMTU, seg.data.len());
         assert_eq!(&data[FRAME_SIZE - FRAME_SIZE % SMTU..], seg.data.as_ref());
@@ -326,21 +360,27 @@ mod tests {
 
     #[tokio::test]
     async fn segmenter_should_segment_multiple_complete_frames() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
+        const NUM_FRAMES: usize = 3;
 
-        let data = hopr_crypto_random::random_bytes::<4500>();
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx
+            .sink_map_err(|_| SessionError::InvalidSegment)
+            .segmenter::<MTU>(FRAME_SIZE);
+        let data = hopr_crypto_random::random_bytes::<{ NUM_FRAMES * FRAME_SIZE }>();
 
         writer.write_all(&data).await?;
 
         pin_mut!(segments);
 
-        for i in 0..9 {
+        let count_segments = (NUM_FRAMES * FRAME_SIZE) / MTU;
+
+        for i in 0..count_segments {
             let seg = segments.next().await.ok_or(anyhow!("no more segments"))?;
-            assert_eq!((i / 3 + 1) as FrameId, seg.frame_id);
-            assert_eq!((i % 3) as SeqNum, seg.seq_idx);
-            assert_eq!(3, seg.seq_len);
-            assert_eq!(500, seg.data.len());
-            assert_eq!(&data[i * 500..i * 500 + 500], seg.data.as_ref());
+            assert_eq!((i / count_segments + 1) as FrameId, seg.frame_id);
+            assert_eq!((i % count_segments) as SeqNum, seg.seq_idx);
+            assert_eq!((FRAME_SIZE / MTU) as SeqNum, seg.seq_len);
+            assert_eq!(SMTU, seg.data.len());
+            assert_eq!(&data[i * SMTU..i * SMTU + SMTU], seg.data.as_ref());
         }
 
         writer.close().await?;
@@ -352,9 +392,12 @@ mod tests {
 
     #[tokio::test]
     async fn segmenter_should_segment_multiple_complete_frames_and_incomplete_frame_on_close() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx
+            .sink_map_err(|_| SessionError::InvalidSegment)
+            .segmenter::<MTU>(FRAME_SIZE);
 
-        let data = hopr_crypto_random::random_bytes::<4504>();
+        let data = hopr_crypto_random::random_bytes::<{ FRAME_SIZE + 4 }>();
 
         writer.write_all(&data).await?;
 
@@ -391,7 +434,10 @@ mod tests {
 
     #[tokio::test]
     async fn segmenter_should_segment_multiple_complete_frames_and_incomplete_frame_on_flush() -> anyhow::Result<()> {
-        let (mut writer, segments) = Segmenter::<510>::new(1500, 1024);
+        let (segments_tx, segments) = futures::channel::mpsc::unbounded();
+        let mut writer = segments_tx
+            .sink_map_err(|_| SessionError::InvalidSegment)
+            .segmenter::<MTU>(FRAME_SIZE);
 
         let data = hopr_crypto_random::random_bytes::<4504>();
 
