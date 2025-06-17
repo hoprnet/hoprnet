@@ -25,10 +25,6 @@ class ApiRequestObject:
     def as_header_string(self) -> str:
         return "&".join([f"{k}={v}" for k, v in self.as_dict.items()])
 
-    @classmethod
-    def default(cls):
-        return cls(**{f.name: f.default for f in fields(cls)})
-
 
 @dataclass
 class OpenChannelBody(ApiRequestObject):
@@ -43,8 +39,8 @@ class FundChannelBody(ApiRequestObject):
 
 @dataclass
 class GetChannelsBody(ApiRequestObject):
-    full_topology: str = api_field("fullTopology")
-    including_closed: str = api_field("includingClosed")
+    full_topology: bool = api_field("fullTopology", False)
+    including_closed: bool = api_field("includingClosed", False)
 
 
 @dataclass

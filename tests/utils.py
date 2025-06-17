@@ -283,7 +283,7 @@ class HoprSession:
         dest: Node,
         fwd_path: dict,
         return_path: dict,
-        capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody.default(),
+        capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
         use_response_buffer: Optional[str] = "1 MiB",
         target_port: Optional[int] = None,
         loopback: bool = False,
