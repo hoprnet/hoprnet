@@ -656,6 +656,9 @@
               pre-commit-check
               solcDefault
               ;
+            extraPackages = with pkgs; [
+              nfpm
+            ];
           };
           ciShell = import ./nix/ciShell.nix { inherit pkgs config crane; };
           testShell = import ./nix/testShell.nix {

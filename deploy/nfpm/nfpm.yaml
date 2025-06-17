@@ -15,16 +15,16 @@ depends:
   - gettext
 
 contents:
-  - src: ./artifacts/hoprd
+  - src: ./artifacts/hoprd/hoprd
     dst: /usr/bin/hoprd
-  - src: ./artifacts/hopli
+  - src: ./artifacts/hopli/hopli
     dst: /usr/bin/hopli
   - src: ./deploy/nfpm/hoprd-template.cfg.yaml
     dst: /etc/hoprd/hoprd-template.cfg.yaml
     type: config
-  - src: ./nfpm/hoprd.service
+  - src: ./deploy/nfpm/hoprd.service
     dst: /etc/systemd/system/hoprd.service
 
 scripts:
-  postinstall: ./nfpm/install.sh
-  preremove: ./nfpm/uninstall.sh
+  postinstall: ./deploy/nfpm/install.sh
+  preremove: ./deploy/nfpm/uninstall.sh

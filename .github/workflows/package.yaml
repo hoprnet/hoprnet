@@ -27,17 +27,17 @@ jobs:
           - aarch64-linux
           - armv7l-linux
     steps:
-      - name: Download hoprd artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: hoprd-${{ matrix.target }}
-          path: ./artifacts/hoprd
+      # - name: Download hoprd artifacts
+      #   uses: actions/download-artifact@v3
+      #   with:
+      #     name: hoprd-${{ matrix.target }}
+      #     path: ./artifacts/hoprd
 
-      - name: Download hopli artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: hopli-${{ matrix.target }}
-          path: ./artifacts/hopli
+      # - name: Download hopli artifacts
+      #   uses: actions/download-artifact@v3
+      #   with:
+      #     name: hopli-${{ matrix.target }}
+      #     path: ./artifacts/hopli
 
       - name: Install Nix
         uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
@@ -54,6 +54,11 @@ jobs:
 
       - name: Package binaries
         run: |
+          mkdir -p ./artifacts/hoprd ./artifacts/hopli target
+          echo "This is a dummy binary" > ./artifacts/hoprd/hoprd
+          echo "This is a dummy binary" > ./artifacts/hopli/hopli
+          ls -alR ./artifacts
+
           just package-all {{ matrix.target }}
 
 
