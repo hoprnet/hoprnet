@@ -21,7 +21,6 @@ concurrency:
 
 jobs:
   package:
-    name: Package binaries
     runs-on: self-hosted-hoprnet-small
     steps:
 
@@ -63,7 +62,7 @@ jobs:
           echo "This is a dummy binary" > ./artifacts/hoprd/hoprd
           echo "This is a dummy binary" > ./artifacts/hopli/hopli
           ls -alR ./artifacts
-          nix develop -c just package-all {{ inputs.target }}
+          nix develop -c just package-all ${{ inputs.target }}
 
 
 
