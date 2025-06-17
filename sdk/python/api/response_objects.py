@@ -3,7 +3,6 @@ from decimal import Decimal
 
 from .balance import Balance
 from .channelstatus import ChannelStatus
-from .conversion import convert_unit
 
 
 class ApiResponseObject:
@@ -16,10 +15,7 @@ class ApiResponseObject:
                 if v is None:
                     break
 
-            if "type" in f.metadata:
-                setattr(self, f.name, f.metadata["type"](v))
-            else:
-                setattr(self, f.name, convert_unit(v))
+            setattr(self, f.name, f.type(v))
 
         self.post_init()
 
@@ -44,18 +40,55 @@ class ApiResponseObject:
         return all(getattr(self, key) == getattr(other, key) for key in [f.name for f in fields(self)])
 
 
+class ApiMetricResponseObject(ApiResponseObject):
+    def __init__(self, data: str):
+        self.data = data.split("\n")
+
+        for f in fields(self):
+            values = {}
+            labels = f.metadata.get("labels", [])
+
+            for line in self.data:
+                if not line.startswith(f.name):
+                    continue
+
+                value = line.split(" ")[-1]
+
+                if len(labels) == 0:
+                    setattr(self, f.name, f.type(value))
+                else:
+                    labels_values = {
+                        pair.split("=")[0].strip('"'): pair.split("=")[1].strip('"')
+                        for pair in line.split("{")[1].split("}")[0].split(",")
+                    }
+
+                    dict_path = [labels_values[label] for label in labels]
+                    current = values
+
+                    for part in dict_path[:-1]:
+                        if part not in current:
+                            current[part] = {}
+                        current = current[part]
+                    if dict_path[-1] not in current:
+                        current[dict_path[-1]] = Decimal("0")
+                    current[dict_path[-1]] += Decimal(value)
+
+            if len(labels) > 0:
+                setattr(self, f.name, f.type(values))
+
+
 @dataclass(init=False)
 class Addresses(ApiResponseObject):
-    native: str = field(metadata={"path": "native"})
+    native: str = field()
 
 
 @dataclass(init=False)
 class Balances(ApiResponseObject):
-    hopr: Balance = field(metadata={"path": "hopr", "type": Balance})
-    native: Balance = field(metadata={"path": "native", "type": Balance})
-    safe_native: Balance = field(metadata={"path": "safeNative", "type": Balance})
-    safe_hopr: Balance = field(metadata={"path": "safeHopr", "type": Balance})
-    safe_hopr_allowance: Balance = field(metadata={"path": "safeHoprAllowance", "type": Balance})
+    hopr: Balance = field()
+    native: Balance = field()
+    safe_native: Balance = field(metadata={"path": "safeNative"})
+    safe_hopr: Balance = field(metadata={"path": "safeHopr"})
+    safe_hopr_allowance: Balance = field(metadata={"path": "safeHoprAllowance"})
 
 
 @dataclass(init=False)
@@ -65,53 +98,50 @@ class Infos(ApiResponseObject):
 
 @dataclass(init=False)
 class ConnectedPeer(ApiResponseObject):
-    address: str = field(metadata={"path": "address"})
+    address: str = field()
     version: str = field(metadata={"path": "reportedVersion"})
-    quality: str = field(metadata={"path": "quality"})
+    quality: str = field()
 
 
 @dataclass(init=False)
 class Channel(ApiResponseObject):
-    balance: Balance = field(metadata={"path": "balance", "type": Balance})
+    balance: Balance = field()
     channel_epoch: int = field(metadata={"path": "channelEpoch"})
     id: str = field(metadata={"path": "channelId"})
     closure_time: int = field(metadata={"path": "closureTime"})
-    destination: str = field(default="", metadata={"path": "destination"})
-    source: str = field(default="", metadata={"path": "source"})
-    status: ChannelStatus = field(metadata={"path": "status"})
+    destination: str = field()
+    source: str = field()
+    status: ChannelStatus = field()
     ticket_index: int = field(metadata={"path": "ticketIndex"})
-
-    def post_init(self):
-        self.status = ChannelStatus.fromString(self.status)
 
 
 @dataclass(init=False)
 class Ticket(ApiResponseObject):
-    amount: Balance = field(metadata={"path": "amount", "type": Balance})
+    amount: Balance = field()
     channel_epoch: int = field(metadata={"path": "channelEpoch"})
     channel_id: str = field(metadata={"path": "channelId"})
-    index: int = field(metadata={"path": "index"})
+    index: int = field()
     index_offset: int = field(metadata={"path": "indexOffset"})
-    signature: str = field(metadata={"path": "signature"})
-    winn_prob: Decimal = field(metadata={"path": "winProb", "type": Decimal})
+    signature: str = field()
+    winn_prob: Decimal = field(metadata={"path": "winProb"})
 
 
 @dataclass(init=False)
 class TicketPrice(ApiResponseObject):
-    value: Balance = field(metadata={"path": "value", "type": Balance})
+    value: Balance = field()
 
 
 @dataclass(init=False)
 class TicketProbability(ApiResponseObject):
-    value: Decimal = field(metadata={"path": "value", "type": Decimal})
+    value: Decimal = field()
 
 
 @dataclass(init=False)
 class TicketStatistics(ApiResponseObject):
-    neglected_value: Balance = field(metadata={"path": "neglectedValue", "type": Balance})
-    redeemed_value: Balance = field(metadata={"path": "redeemedValue", "type": Balance})
-    rejected_value: Balance = field(metadata={"path": "rejectedValue", "type": Balance})
-    unredeemed_value: Balance = field(metadata={"path": "unredeemedValue", "type": Balance})
+    neglected_value: Balance = field(metadata={"path": "neglectedValue"})
+    redeemed_value: Balance = field(metadata={"path": "redeemedValue"})
+    rejected_value: Balance = field(metadata={"path": "rejectedValue"})
+    unredeemed_value: Balance = field(metadata={"path": "unredeemedValue"})
     winning_count: int = field(metadata={"path": "winningCount"})
 
 
@@ -129,20 +159,25 @@ class OpenedChannel(ApiResponseObject):
 
 @dataclass(init=False)
 class Ping(ApiResponseObject):
-    latency: float = field(metadata={"path": "latency"})
+    latency: float = field()
     version: str = field(metadata={"path": "reportedVersion"})
 
 
 @dataclass(init=False)
 class Session(ApiResponseObject):
-    destination: str = field(metadata={"path": "destination"})
-    ip: str = field(metadata={"path": "ip"})
-    port: int = field(metadata={"path": "port"})
-    protocol: str = field(metadata={"path": "protocol"})
-    target: str = field(metadata={"path": "target"})
+    destination: str = field()
+    ip: str = field()
+    port: int = field()
+    protocol: str = field()
+    target: str = field()
     forward_path: str = field(metadata={"path": "forwardPath"})
     return_path: str = field(metadata={"path": "returnPath"})
-    mtu: int = field(metadata={"path": "mtu"})
+    mtu: int = field()
+
+
+@dataclass(init=False)
+class Metrics(ApiMetricResponseObject):
+    hopr_tickets_incoming_statistics: dict = field(metadata={"labels": ["statistic"]})
 
 
 class Channels:

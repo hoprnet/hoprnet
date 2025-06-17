@@ -32,6 +32,7 @@ from .response_objects import (
     Configuration,
     ConnectedPeer,
     Infos,
+    Metrics,
     OpenedChannel,
     Ping,
     Session,
@@ -205,7 +206,7 @@ class HoprdAPI:
         Returns all channels.
         :return: channels: list
         """
-        params = GetChannelsBody("true", "true" if include_closed else "false")
+        params = GetChannelsBody(True, include_closed)
 
         is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
         return Channels(response, "all") if is_ok else None
@@ -215,7 +216,7 @@ class HoprdAPI:
         Returns all incoming channels.
         :return: channels: list
         """
-        params = GetChannelsBody("true", "true" if include_closed else "false")
+        params = GetChannelsBody(True, include_closed)
 
         is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
         return Channels(response, "incoming") if is_ok else None
@@ -225,7 +226,7 @@ class HoprdAPI:
         Returns all outgoing channels.
         :return: channels: list
         """
-        params = GetChannelsBody("true", "true" if include_closed else "false")
+        params = GetChannelsBody(True, include_closed)
 
         is_ok, response = await self.__call_api(HTTPMethod.GET, f"channels?{params.as_header_string}")
         return Channels(response, "outgoing") if is_ok else None
@@ -345,10 +346,10 @@ class HoprdAPI:
         is_ok, _ = await self.__call_api(HTTPMethod.POST, "account/withdraw", data=data)
         return is_ok
 
-    async def metrics(self):
+    async def metrics(self) -> Optional[Metrics]:
         is_ok, response = await self.__call_api(HTTPMethod.GET, "metrics", use_api_path=False)
 
-        return response if is_ok else None
+        return Metrics(response) if is_ok else None
 
     async def get_tickets_statistics(self) -> Optional[TicketStatistics]:
         """
@@ -384,7 +385,7 @@ class HoprdAPI:
         target: str,
         listen_on: str = "127.0.0.1:0",
         service: bool = False,
-        capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody.default(),
+        capabilities: SessionCapabilitiesBody = SessionCapabilitiesBody(),
         sealed_target: bool = False,
         response_buffer: str = "4MiB",
     ) -> Optional[Session]:

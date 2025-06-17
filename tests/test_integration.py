@@ -9,6 +9,7 @@ import pytest
 from sdk.python.api import Protocol
 from sdk.python.api.channelstatus import ChannelStatus
 from sdk.python.api.request_objects import SessionCapabilitiesBody
+from sdk.python.api.response_objects import Metrics
 from sdk.python.localcluster.constants import OPEN_CHANNEL_FUNDING_VALUE_HOPR
 from sdk.python.localcluster.node import Node
 
@@ -166,16 +167,9 @@ class TestIntegrationWithSwarm:
         "src,mid,dest", [tuple(shuffled(barebone_nodes())[:3]) for _ in range(PARAMETERIZED_SAMPLE_SIZE)]
     )
     async def test_reset_ticket_statistics_from_metrics(self, src: str, mid: str, dest: str, swarm7: dict[str, Node]):
-        def count_metrics(metrics: str):
+        def count_metrics(metrics: Metrics):
             types = ["neglected", "redeemed", "rejected"]
-            count = 0
-            for line in metrics.splitlines():
-                count += (
-                    line.startswith("hopr_tickets_incoming_statistics")
-                    and any(t in line for t in types)
-                    and line.split()[-1] != "0"
-                )
-            return count
+            return sum(getattr(metrics.hopr_tickets_incoming_statistics, t) for t in types)
 
         ticket_price = await get_ticket_price(swarm7[src])
 
