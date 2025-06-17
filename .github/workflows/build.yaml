@@ -86,6 +86,7 @@ jobs:
 
     uses: ./.github/workflows/package.yaml
     with:
+      branch: ${{ github.event.pull_request.head.ref }}
       target: ${{ matrix.target }}
     secrets: inherit
 

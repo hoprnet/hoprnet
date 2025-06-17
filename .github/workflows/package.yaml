@@ -8,6 +8,9 @@ name: Package
 on:
   workflow_call:
     inputs:
+      branch:
+        required: true
+        type: string
       target:
         required: true
         type: string
@@ -27,6 +30,13 @@ jobs:
           - aarch64-linux
           - armv7l-linux
     steps:
+
+      - name: Checkout hoprnet repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.branch }}
+
       # - name: Download hoprd artifacts
       #   uses: actions/download-artifact@v3
       #   with:
