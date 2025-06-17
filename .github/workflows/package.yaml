@@ -58,11 +58,12 @@ jobs:
 
       - name: Package binaries
         run: |
+          set -x
           mkdir -p ./artifacts/hoprd ./artifacts/hopli target
           echo "This is a dummy binary" > ./artifacts/hoprd/hoprd
           echo "This is a dummy binary" > ./artifacts/hopli/hopli
           ls -alR ./artifacts
-          nix develop -c just package-all {{ matrix.target }}
+          nix develop -c just package-all {{ inputs.target }}
 
 
 
