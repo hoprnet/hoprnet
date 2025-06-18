@@ -26,9 +26,9 @@ overrides:
       - gettext
 
 contents:
-  - src: ./artifacts/hoprd/hoprd
+  - src: ./artifacts/hoprd
     dst: /usr/bin/hoprd
-  - src: ./artifacts/hopli/hopli
+  - src: ./artifacts/hopli
     dst: /usr/bin/hopli
   - src: ./deploy/nfpm/hoprd-sample.cfg.yaml
     dst: /etc/hoprd/hoprd-sample.cfg.yaml

@@ -30,17 +30,27 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.branch }}
 
-      - name: Download hoprd artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: hoprd-x86_64-linux # hoprd-${{ inputs.target }}
-          path: ./artifacts/hoprd
+      - name: Fetch binaries subworkflow run_id
+        run: |
+          curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/build-binaries.yaml/runs \
+            -o runs.json
+          run_id=$(jq -r '.workflow_runs[] | select(.head_branch == ${{ github.event.pull_request.head.ref }} and .status == "completed") | .id' runs.json)
+          echo "run_id=${run_id}" >> $GITHUB_ENV
 
-      - name: Download hopli artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: hopli-x86_64-linux # hopli-${{ inputs.target }}
-          path: ./artifacts/hopli
+          curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/runs/${run_id}/artifacts \
+            -o artifacts.json
+
+          hoprd_url=$(jq -r '.artifacts[] | select(.name == "hoprd-${{ inputs.target }}").archive_download_url' artifacts.json)
+          curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hoprd_url" -o hoprd.zip
+          unzip hoprd.zip -d ./artifacts
+
+          hopli_url=$(jq -r '.artifacts[] | select(.name == "hopli-${{ inputs.target }}").archive_download_url' artifacts.json)
+          curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hopli_url" -o hopli.zip
+          unzip hopli.zip -d ./artifacts
+          ls -alR ./artifacts
+
 
       - name: Install Nix
         uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
@@ -59,8 +69,8 @@ jobs:
         run: |
           # set -x
           # mkdir -p ./artifacts/hoprd ./artifacts/hopli target
-          # echo "This is a dummy binary" > ./artifacts/hoprd/hoprd
-          # echo "This is a dummy binary" > ./artifacts/hopli/hopli
+          # echo "This is a dummy binary" > ./artifacts/hoprd
+          # echo "This is a dummy binary" > ./artifacts/hopli
           # ls -alR ./artifacts
           nix develop -c just package ${{ inputs.target }}
 
