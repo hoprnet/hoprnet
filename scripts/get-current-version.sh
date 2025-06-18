@@ -22,7 +22,7 @@ usage() {
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 
-version_type=${1-semver}
+version_type=${1:-semver}
 current_version=$(grep -E '^version\s*=' ${mydir}/../hopr/hopr-lib/Cargo.toml | awk -F\" '{print $2}')
 
 if [ "${version_type}" == "docker" ]; then
