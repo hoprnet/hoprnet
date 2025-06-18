@@ -6,7 +6,8 @@ After=network.target
 EnvironmentFile=/etc/hoprd/hoprd.env
 ExecStart=/usr/bin/hoprd --configurationFilePath /etc/hoprd/hoprd.cfg.yaml
 Restart=on-failure
-User=root
+User=hoprd
+Group=hoprd
 
 [Install]
 WantedBy=multi-user.target

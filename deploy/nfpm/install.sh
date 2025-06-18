@@ -11,7 +11,7 @@ append_env_data() {
 # Function to identify the public IP
 get_public_ip() {
   # Get the public IP using a service like `curl` or `dig`
-  public_ip=$(curl -s http://checkip.amazonaws.com)
+  public_ip=$(curl -s https://checkip.amazonaws.com)
 
   # Check if the public IP was retrieved successfully
   if [ -z "$public_ip" ]; then
@@ -208,6 +208,34 @@ generate_identity_file() {
     fi
 }
 
+create_user_group() {
+  # Create a user and group for the HOPR node if they do not exist
+  if ! id -u hopr >/dev/null 2>&1; then
+    echo "Creating user and group for HOPR node..."
+    groupadd -r hopr
+    useradd --system -g hopr --home /var/lib/hoprd --shell /usr/sbin/nologin -c "HOPR Node User" hopr
+    echo "Setting ownership and permissions for hoprd files..."
+    chown -R hoprd:hoprd /etc/hoprd
+    chown -R hoprd:hoprd /var/lib/hoprd
+    chown hoprd:hoprd /usr/bin/hoprd
+    chown hoprd:hoprd /usr/bin/hopli
+    chmod 770 /etc/hoprd
+    chmod 755 /usr/bin/hoprd
+    chmod 755 /usr/bin/hopli
+    # Add the logged-in user to the hoprd group
+    if [ -n "$SUDO_USER" ]; then
+      echo "Adding user '$SUDO_USER' to the hoprd group..."
+      usermod -aG hopr "$SUDO_USER"
+    else
+      echo "Could not identify the user who initiated the installation."
+    fi
+  else
+    echo "User and group for HOPR node already exist."
+  fi
+
+
+}
+
 # Function to start the HOPR node service
 start_service() {
   systemctl daemon-reexec
@@ -234,8 +262,12 @@ show_node_address() {
   echo "Finish the onboarding of this node at https://hub.hoprnet.org by registering it and adding it to your safe."
 }
 
+# Main script execution starts here
+echo "Starting HOPR node installation..."
 generate_env_file
 generate_config_file
 generate_identity_file
+create_user_group
 start_service
 show_node_address
+echo "HOPR package installation completed successfully."

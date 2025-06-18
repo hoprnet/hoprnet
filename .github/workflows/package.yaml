@@ -33,13 +33,13 @@ jobs:
       - name: Download hoprd artifacts
         uses: actions/download-artifact@v3
         with:
-          name: hoprd-${{ inputs.target }}
+          name: hoprd-x86_64-linux # hoprd-${{ inputs.target }}
           path: ./artifacts/hoprd
 
       - name: Download hopli artifacts
         uses: actions/download-artifact@v3
         with:
-          name: hopli-${{ inputs.target }}
+          name: hopli-x86_64-linux # hopli-${{ inputs.target }}
           path: ./artifacts/hopli
 
       - name: Install Nix
