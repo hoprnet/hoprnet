@@ -56,13 +56,13 @@ use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{
-    HoprDbAllOperations, HoprDbGeneralModelOperations,
+    HoprDbAllOperations,
     accounts::HoprDbAccountOperations,
     api::{info::SafeInfo, resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations},
     channels::HoprDbChannelOperations,
     db::{HoprDb, HoprDbConfig},
     info::{HoprDbInfoOperations, IndexerStateInfo},
-    prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
+    prelude::{ChainOrPacketKey::ChainKey, HoprDbPeersOperations},
     registry::HoprDbRegistryOperations,
 };
 pub use hopr_internal_types::prelude::*;
