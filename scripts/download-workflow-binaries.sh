@@ -34,4 +34,16 @@ while IFS= read -r line; do
   else
     echo "Downloaded binary file ${artifact_name}..."
   fi
+  # Extract the zip file
+  unzip -o "binaries/${artifact_name}.zip" -d "./binaries/${artifact_name}"
 done <<<"$artifacts"
+
+# Remove zip files after extraction
+rm binaries/*.zip
+
+# Group files by platform and create a single zip file for each platform
+platforms=$(find ./binaries -type d -name '*-*' | grep -v '\..*\.' | awk -F '-' '{print $2"-"$3}' | sort -u)
+for platform in $platforms; do
+  echo "Creating zip for platform: $platform"
+  zip -r "binaries/hopr-binaries-${platform}.zip" ./binaries/*-${platform}/*
+done

@@ -1,8 +1,5 @@
 ---
 hopr:
-  host:
-    address: !IPv4 ${HOPRD_HOST_ADDRESS}
-    port: ${HOPRD_HOST_PORT}
   db:
     data: /var/lib/hoprd/data
   strategy:
@@ -20,20 +17,12 @@ hopr:
         max_closure_overdue: 300
   chain:
     network: dufour
-    provider: ${HOPRD_PROVIDER}
     announce: true
     keep_logs: true
     fast_sync: true
   safe_module:
-    safe_address: ${HOPRD_SAFE_ADDRESS}
-    module_address: ${HOPRD_MODULE_ADDRESS}
     safe_transaction_service_provider: https://safe-transaction.prod.hoprnet.link/
 identity:
   file: "/etc/hoprd/hopr.id"
-  password: "${HOPRD_PASSWORD}"
 api:
   enable: true
-  auth: !Token ${HOPRD_API_TOKEN}
-  host:
-    address: !IPv4 ${HOPRD_API_HOST}
-    port: ${HOPRD_API_PORT}

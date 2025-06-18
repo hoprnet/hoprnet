@@ -76,7 +76,7 @@ jobs:
 
   package:
     name: package-${{ matrix.target }}
-    # needs: build-binaries
+    needs: build-binaries
     strategy:
       matrix:
         target:

@@ -3,7 +3,8 @@ Description=Hoprd Node
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/hoprd -c /etc/hoprd/hoprd.cfg.yaml
+EnvironmentFile=/etc/hoprd/hoprd.env
+ExecStart=/usr/bin/hoprd --configurationFilePath /etc/hoprd/hoprd.cfg.yaml
 Restart=on-failure
 User=root
 
