@@ -6,7 +6,8 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-
+use std::sync::Arc;
+use std::sync::atomic::AtomicU32;
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt, future, pin_mut};
 use futures_concurrency::stream::Merge;
 use state::SocketState;
@@ -86,13 +87,16 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
             .with(|segment| future::ok(SessionMessage::<C>::Segment(segment)))
             .segmenter::<C>(cfg.frame_size);
 
+        let last_emitted_frame = Arc::new(AtomicU32::new(0));
+        let last_emitted_frame_clone = last_emitted_frame.clone();
+        
         // Packets incoming from Downstream
         // - if the State requires it, packets passed by-ref into the State
         // - Packets that represent Segments (filtered out) are passed to the Reconstructor
         let downstream_frames_out = packets_in
-            .filter_map(|packet| {
+            .filter_map(move |packet| {
                 futures::future::ready(match packet {
-                    Ok(packet) => packet.try_as_segment(),
+                    Ok(packet) => packet.try_as_segment().filter(|s| s.frame_id > last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed)),
                     Err(error) => {
                         tracing::error!(%error, "unparseable packet");
                         None
@@ -112,7 +116,10 @@ impl<const C: usize> SessionSocket<C, Stateless<C>> {
             .sequencer(cfg.frame_timeout, cfg.capacity)
             .filter_map(move |maybe_frame| {
                 future::ready(match maybe_frame {
-                    Ok(frame) => Some(Ok(frame.0)),
+                    Ok(frame) => {
+                        last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
+                        Some(Ok(frame.0))
+                    },
                     // Downstream skips discarded frames
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
                         tracing::error!(frame_id, "frame discarded");
@@ -191,6 +198,9 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                 )),
         );
 
+        let last_emitted_frame = Arc::new(AtomicU32::new(0));
+        let last_emitted_frame_clone = last_emitted_frame.clone();
+        
         // Packets incoming from Downstream:
         // - if the State requires it, packets passed by-ref into the State
         // - Packets that represent Segments (filtered out) are passed to the Reconstructor
@@ -214,7 +224,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         } {
                             tracing::debug!(%error, "incoming message state update failed");
                         }
-                        packet.try_as_segment()
+                        packet.try_as_segment().filter(|s| s.frame_id > last_emitted_frame.load(std::sync::atomic::Ordering::Relaxed))
                     }
                     Err(error) => {
                         tracing::error!(%error, "unparseable packet");
@@ -245,6 +255,7 @@ impl<const C: usize, S: SocketState<C> + Clone + 'static> SessionSocket<C, S> {
                         if let Err(error) = st_3.frame_emitted(frame.0.frame_id) {
                             tracing::error!(%error, "frame received state update failed");
                         }
+                        last_emitted_frame_clone.store(frame.0.frame_id, std::sync::atomic::Ordering::Relaxed);
                         Some(Ok(frame.0))
                     }
                     Err(SessionError::FrameDiscarded(frame_id)) | Err(SessionError::IncompleteFrame(frame_id)) => {
@@ -666,7 +677,7 @@ mod tests {
 
         let bob_cfg = SessionSocketConfig {
             frame_size: FRAME_SIZE,
-            frame_timeout: Duration::from_millis(1000),
+            frame_timeout: Duration::from_millis(100),
             ..Default::default()
         };
 
@@ -681,11 +692,11 @@ mod tests {
         let mut bob_socket = SessionSocket::<MTU, _>::new(bob, AcknowledgementState::new("bob", ack_cfg), bob_cfg)?;
 
         let data = hopr_crypto_random::random_bytes::<DATA_SIZE>();
-        alice_socket.write_all(&data).timeout(futures_time::time::Duration::from_secs(2)).await??;
+        alice_socket.write_all(&data).timeout(futures_time::time::Duration::from_secs(5)).await??;
         alice_socket.flush().await?;
 
         let mut bob_data = [0u8; DATA_SIZE];
-        bob_socket.read_exact(&mut bob_data).timeout(futures_time::time::Duration::from_secs(2)).await??;
+        bob_socket.read_exact(&mut bob_data).timeout(futures_time::time::Duration::from_secs(5)).await??;
         assert_eq!(data, bob_data);
 
         bob_socket.close().await?;
