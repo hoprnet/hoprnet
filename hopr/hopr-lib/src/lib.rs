@@ -56,13 +56,13 @@ use hopr_chain_types::{ContractAddresses, chain_events::ChainEventType};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::logs::HoprDbLogOperations;
 use hopr_db_sql::{
-    HoprDbAllOperations, HoprDbGeneralModelOperations,
+    HoprDbAllOperations,
     accounts::HoprDbAccountOperations,
     api::{info::SafeInfo, resolver::HoprDbResolverOperations, tickets::HoprDbTicketOperations},
     channels::HoprDbChannelOperations,
     db::{HoprDb, HoprDbConfig},
     info::{HoprDbInfoOperations, IndexerStateInfo},
-    prelude::{ChainOrPacketKey::ChainKey, DbSqlError, HoprDbPeersOperations},
+    prelude::{ChainOrPacketKey::ChainKey, HoprDbPeersOperations},
     registry::HoprDbRegistryOperations,
 };
 pub use hopr_internal_types::prelude::*;
@@ -561,31 +561,6 @@ impl Hopr {
             .hopr_chain_api
             .get_safe_balance(self.cfg.safe_module.safe_address)
             .await?;
-
-        if WxHOPR::is::<C>() {
-            let my_db = self.db.clone();
-            let amount = safe_balance.amount();
-            self.db
-                .begin_transaction()
-                .await?
-                .perform(|tx| {
-                    Box::pin(async move {
-                        let db_safe_balance = my_db.get_safe_hopr_balance(Some(tx)).await?;
-                        if amount != db_safe_balance.amount() {
-                            warn!(
-                                %db_safe_balance,
-                                %amount,
-                                "Safe balance in the DB mismatches on chain balance"
-                            );
-                            my_db
-                                .set_safe_hopr_balance(Some(tx), HoprBalance::new_base(amount))
-                                .await?;
-                        }
-                        Ok::<_, DbSqlError>(())
-                    })
-                })
-                .await?;
-        }
         Ok(safe_balance)
     }
 
