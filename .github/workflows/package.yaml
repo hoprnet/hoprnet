@@ -14,6 +14,9 @@ on:
       target:
         required: true
         type: string
+      workflow_run_id:
+        required: true
+        type: string
 
 concurrency:
   group: ${{ github.ref }}-package-${{ inputs.target }}
@@ -22,6 +25,7 @@ concurrency:
 jobs:
   package:
     runs-on: self-hosted-hoprnet-small
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, format('binary:{0}', inputs.target))
     steps:
 
       - name: Checkout hoprnet repository
@@ -30,25 +34,20 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.branch }}
 
-      - name: Fetch binaries subworkflow run_id
+      - name: Download artifacts from parent workflow run
         run: |
-          curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/build-binaries.yaml/runs \
-            -o runs.json
-          run_id=$(jq -r '.workflow_runs[] | select(.head_branch == ${{ github.event.pull_request.head.ref }} and .status == "completed") | .id' runs.json)
-          echo "run_id=${run_id}" >> $GITHUB_ENV
-
-          curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/runs/${run_id}/artifacts \
+          set -x
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ inputs.workflow_run_id }}/artifacts \
             -o artifacts.json
 
           hoprd_url=$(jq -r '.artifacts[] | select(.name == "hoprd-${{ inputs.target }}").archive_download_url' artifacts.json)
-          curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hoprd_url" -o hoprd.zip
-          unzip hoprd.zip -d ./artifacts
+          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hoprd_url" -o hoprd-${{ inputs.target }}.zip
+          unzip hoprd-${{ inputs.target }}.zip -d ./artifacts
 
           hopli_url=$(jq -r '.artifacts[] | select(.name == "hopli-${{ inputs.target }}").archive_download_url' artifacts.json)
-          curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hopli_url" -o hopli.zip
-          unzip hopli.zip -d ./artifacts
+          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hopli_url" -o hopli-${{ inputs.target }}.zip
+          unzip hopli-${{ inputs.target }}.zip -d ./artifacts
           ls -alR ./artifacts
 
 
@@ -66,13 +65,7 @@ jobs:
           USER: runner
 
       - name: Package binaries
-        run: |
-          # set -x
-          # mkdir -p ./artifacts/hoprd ./artifacts/hopli target
-          # echo "This is a dummy binary" > ./artifacts/hoprd
-          # echo "This is a dummy binary" > ./artifacts/hopli
-          # ls -alR ./artifacts
-          nix develop -c just package ${{ inputs.target }}
+        run: nix develop -c just package ${{ inputs.target }}
 
       - name: Upload debian packaged artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
