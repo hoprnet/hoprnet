@@ -65,7 +65,7 @@ jobs:
             runner: macos-13 # Intel machine
           - name: armv7l-linux
             runner: self-hosted-hoprnet-bigger
-    name: build-${{ matrix.binary }}-${{ matrix.target.name }}
+    name: ${{ matrix.binary }}-${{ matrix.target.name }}
     uses: ./.github/workflows/build-binaries.yaml
     with:
       branch: ${{ github.event.pull_request.head.ref }}
@@ -75,7 +75,7 @@ jobs:
     secrets: inherit
 
   package:
-    name: package-${{ matrix.target }}
+    name: ${{ matrix.target }}
     needs: build-binaries
     strategy:
       matrix:

@@ -30,17 +30,17 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.branch }}
 
-      # - name: Download hoprd artifacts
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: hoprd-${{ inputs.target }}
-      #     path: ./artifacts/hoprd
+      - name: Download hoprd artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: hoprd-${{ inputs.target }}
+          path: ./artifacts/hoprd
 
-      # - name: Download hopli artifacts
-      #   uses: actions/download-artifact@v3
-      #   with:
-      #     name: hopli-${{ inputs.target }}
-      #     path: ./artifacts/hopli
+      - name: Download hopli artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: hopli-${{ inputs.target }}
+          path: ./artifacts/hopli
 
       - name: Install Nix
         uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
