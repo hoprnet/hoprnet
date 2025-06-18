@@ -55,7 +55,7 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         loop {
-            if this.buffer.len() < this.buffer.capacity() {
+            if this.buffer.len() < this.buffer.capacity() && !*this.is_closed {
                 // Poll the timer only if the buffer is not empty
                 let timer_poll = if !this.buffer.is_empty() {
                     this.timer.as_mut().poll(cx)
