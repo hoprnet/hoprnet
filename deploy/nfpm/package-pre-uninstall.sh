@@ -13,7 +13,6 @@ delete_user_group() {
     gpasswd -d "$SUDO_USER" hoprd || true
     chown -R "$SUDO_USER:$SUDO_USER" /etc/hoprd || true
     userdel -r hoprd
-    groupdel hoprd || true
   else
     echo "User and group for HOPR node already deleted."
   fi
@@ -21,6 +20,7 @@ delete_user_group() {
 
 delete_folders() {
   rm -rf /var/lib/hoprd || true
+  rm -rf /var/log/hoprd || true
 }
 
 stop_service

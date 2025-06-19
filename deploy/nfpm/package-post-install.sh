@@ -60,12 +60,12 @@ find_available_port() {
 # Function to add the host address environment variable
 add_host_address_env_var() {
   if [ -z "${HOPRD_HOST}" ]; then
-       # Call the function to get the public IP
-      public_ip=$(get_public_ip)
-      # Find port available for p2p
-      p2p_port=$(find_available_port 9091)
-      # Set the HOPRD_HOST variable
-      HOPRD_HOST="${public_ip}:${p2p_port}"
+    # Call the function to get the public IP
+    public_ip=$(get_public_ip)
+    # Find port available for p2p
+    p2p_port=$(find_available_port 9091)
+    # Set the HOPRD_HOST variable
+    HOPRD_HOST="${public_ip}:${p2p_port}"
   fi
   append_env_data "# HOPRD_HOST is the public address and port of the HOPR node."
   append_env_data "HOPRD_HOST=${HOPRD_HOST}\n"
@@ -79,7 +79,6 @@ add_hoprd_password_var() {
       HOPRD_PASSWORD=$(openssl rand -hex 32)
     fi
   fi
-
   append_env_data "# HOPRD_PASSWORD is the password used to access the HOPR node identity file"
   append_env_data "HOPRD_PASSWORD=${HOPRD_PASSWORD}\n"
 }
@@ -92,7 +91,6 @@ add_api_token_var() {
       HOPRD_API_TOKEN=$(openssl rand -hex 32)
     fi
   fi
-
   append_env_data "# HOPRD_API_TOKEN is the token use to access the HOPR rest API"
   append_env_data "HOPRD_API_TOKEN=${HOPRD_API_TOKEN}\n"
 }
@@ -104,11 +102,10 @@ add_safe_address_var() {
     read -r -p "Enter HOPRD_SAFE_ADDRESS: " HOPRD_SAFE_ADDRESS
     # Validate that HOPRD_SAFE_ADDRESS is a valid Ethereum address
     if ! echo "$HOPRD_SAFE_ADDRESS" | grep -Eq "^0x[a-fA-F0-9]{40}$"; then
-        echo "Invalid Safe Ethereum address format. Please enter a valid address."
-        exit 1
+      echo "Invalid Safe Ethereum address format. Please enter a valid address."
+      exit 1
     fi
   fi
-
   append_env_data "# HOPRD_SAFE_ADDRESS is ethereum address link to your safe"
   append_env_data "HOPRD_SAFE_ADDRESS=${HOPRD_SAFE_ADDRESS}\n"
 }
@@ -120,11 +117,10 @@ add_module_address_var() {
     read -r -p "Enter HOPRD_MODULE_ADDRESS: " HOPRD_MODULE_ADDRESS
     # Validate that HOPRD_MODULE_ADDRESS is a valid Ethereum address
     if ! echo "$HOPRD_MODULE_ADDRESS" | grep -Eq "^0x[a-fA-F0-9]{40}$"; then
-        echo "Invalid Safe Module Ethereum address format. Please enter a valid address."
-        exit 1
+      echo "Invalid Safe Module Ethereum address format. Please enter a valid address."
+      exit 1
     fi
   fi
-
   append_env_data "# HOPRD_MODULE_ADDRESS is ethereum address link to your safe module"
   append_env_data "HOPRD_MODULE_ADDRESS=${HOPRD_MODULE_ADDRESS}\n"
 }
@@ -161,7 +157,6 @@ add_network() {
   append_env_data "HOPRD_NETWORK=${HOPRD_NETWORK}\n"
 }
 
-
 #Function to add the HOPRD_API_PORT environment variable
 add_hoprd_api_port_var() {
   if [ -z "${HOPRD_API_PORT}" ]; then
@@ -173,51 +168,50 @@ add_hoprd_api_port_var() {
 
 # Function to generate the environment file
 generate_env_file() {
-    # If the environment vars file not exists, automatically create it
-    HOPRD_ENV_FILE="/etc/hoprd/hoprd.env"
-    if [ ! -f "${HOPRD_ENV_FILE}" ]; then
-        append_env_data "# This file contains custom installation configuration for HOPR node.\n"
-        add_host_address_env_var
-        add_hoprd_password_var
-        add_api_token_var
-        add_safe_address_var
-        add_module_address_var
-        add_rpc_provider_var
-        add_hoprd_api_host_var
-        add_hoprd_api_port_var
-        add_network
-
-        # Write collected data to the environment file
-        printf '%b\n' "$env_data" > "${HOPRD_ENV_FILE}"
-        chmod 600 "${HOPRD_ENV_FILE}"
-    else
-        echo "The environment file located at ${HOPRD_ENV_FILE} already exists. Skipping generation."
-    fi
+  # If the environment vars file not exists, automatically create it
+  HOPRD_ENV_FILE="/etc/hoprd/hoprd.env"
+  if [ ! -f "${HOPRD_ENV_FILE}" ]; then
+    append_env_data "# This file contains custom installation configuration for HOPR node.\n"
+    add_host_address_env_var
+    add_hoprd_password_var
+    add_api_token_var
+    add_safe_address_var
+    add_module_address_var
+    add_rpc_provider_var
+    add_hoprd_api_host_var
+    add_hoprd_api_port_var
+    add_network
+    # Write collected data to the environment file
+    printf '%b\n' "$env_data" >"${HOPRD_ENV_FILE}"
+    chmod 600 "${HOPRD_ENV_FILE}"
+  else
+    echo "The environment file located at ${HOPRD_ENV_FILE} already exists. Skipping generation."
+  fi
 }
 
 # Function to generate the config file
 generate_config_file() {
-    # If the config file not exists, automatically create it
-    if [ ! -f "${HOPRD_CONFIG_FILE}" ]; then
-        echo "Generating HOPR node config file at ${HOPRD_CONFIG_FILE}..."
-        cp /etc/hoprd/hoprd-sample.cfg.yaml "${HOPRD_CONFIG_FILE}"
-        chmod 600 "${HOPRD_CONFIG_FILE}"
-    else
-        echo "The config file located at ${HOPRD_CONFIG_FILE} already exists. Some default config attributes might have changed in the new version. You might need to update it manually from sample config file located at /etc/hoprd/hoprd-sample.cfg.yaml"
-    fi
+  # If the config file not exists, automatically create it
+  if [ ! -f "${HOPRD_CONFIG_FILE}" ]; then
+    echo "Generating HOPR node config file at ${HOPRD_CONFIG_FILE}..."
+    cp /etc/hoprd/hoprd-sample.cfg.yaml "${HOPRD_CONFIG_FILE}"
+    chmod 600 "${HOPRD_CONFIG_FILE}"
+  else
+    echo "The config file located at ${HOPRD_CONFIG_FILE} already exists. Some default config attributes might have changed in the new version. You might need to update it manually from sample config file located at /etc/hoprd/hoprd-sample.cfg.yaml"
+  fi
 }
 
 # Function to generate the identity file
 generate_identity_file() {
-    # If the identity file not exists, automatically create it
-    if [ ! -f "/etc/hoprd/hopr.id" ]; then
-        echo "Generating HOPR node identity file at /etc/hoprd/hopr.id..."
-        chmod 700 /etc/hoprd/
-        IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity create -x hopr -d /etc/hoprd/
-        mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id
-    else
-        echo "The identity file located at /etc/hoprd/hopr.id already exists. Skipping generation."
-    fi
+  # If the identity file not exists, automatically create it
+  if [ ! -f "/etc/hoprd/hopr.id" ]; then
+    echo "Generating HOPR node identity file at /etc/hoprd/hopr.id..."
+    chmod 700 /etc/hoprd/
+    IDENTITY_PASSWORD=${HOPRD_PASSWORD} hopli identity create -x hopr -d /etc/hoprd/
+    mv /etc/hoprd/hopr0.id /etc/hoprd/hopr.id
+  else
+    echo "The identity file located at /etc/hoprd/hopr.id already exists. Skipping generation."
+  fi
 }
 
 create_user_group() {
@@ -225,16 +219,14 @@ create_user_group() {
   if ! id -u hoprd >/dev/null 2>&1; then
     echo "Creating user and group for HOPR node..."
     groupadd -r hoprd
-    mkdir -p /var/lib/hoprd
+    mkdir -p /var/lib/hoprd /var/log/hoprd
     useradd --system -g hoprd --home /var/lib/hoprd --shell /usr/sbin/nologin -c "HOPR Node User" hoprd
     echo "Setting ownership and permissions for hoprd files..."
     chown -R hoprd:hoprd /etc/hoprd
-    chown -R hoprd:hoprd /var/lib/hoprd
-    chown hoprd:hoprd /usr/bin/hoprd
-    chown hoprd:hoprd /usr/bin/hopli
+    chown -R hoprd:hoprd /var/lib/hoprd /var/log/hoprd
+    chown hoprd:hoprd /usr/bin/hoprd /usr/bin/hopli
     chmod 770 /etc/hoprd
-    chmod 755 /usr/bin/hoprd
-    chmod 755 /usr/bin/hopli
+    chmod 755 /usr/bin/hoprd /usr/bin/hopli
     # Add the logged-in user to the hoprd group
     if [ -n "$SUDO_USER" ]; then
       echo "Adding user '$SUDO_USER' to the hoprd group..."
@@ -245,8 +237,6 @@ create_user_group() {
   else
     echo "User and group for HOPR node already exist."
   fi
-
-
 }
 
 # Function to start the HOPR node service
@@ -256,7 +246,6 @@ start_service() {
   systemctl enable hoprd.service
   systemctl start hoprd.service
   echo "HOPR node installed successfully."
-  
   # Wait for a few seconds to allow the service to initialize
   echo "Waiting for the HOPR node service to start..."
   sleep 30

@@ -14,8 +14,8 @@ RestartSec=30s
 KillMode=process
 KillSignal=SIGTERM
 TimeoutStopSec=90
-StandardOutput=file:/var/log/hoprd.log
-StandardError=file:/var/log/hoprd.log
+StandardOutput=file:/var/log/hoprd/hoprd.log
+StandardError=file:/var/log/hoprd/hoprd.log
 Type=simple
 
 [Install]
