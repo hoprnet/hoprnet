@@ -123,14 +123,16 @@ sudo cp result/bin/* /usr/local/bin/
 
 Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
 
-```
+```bash
 arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
 curl -s -o hoprd-${arch}-${os}.deb https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-linux.deb
 dpkg -i ./hoprd-${arch}-linux.deb
 
 ```
+
 Uninstall:
-```
+
+```bash
 dpkg --purge --force-remove-reinstreq hoprd
 ```
 
