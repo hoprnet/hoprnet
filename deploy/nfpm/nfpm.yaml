@@ -44,5 +44,5 @@ contents:
     packager: apk
 
 scripts:
-  postinstall: ./deploy/nfpm/install.sh
-  preremove: ./deploy/nfpm/uninstall.sh
+  postinstall: ./deploy/nfpm/package-post-install.sh
+  preremove: ./deploy/nfpm/package-pre-uninstall.sh

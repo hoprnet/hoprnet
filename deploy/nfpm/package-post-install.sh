@@ -174,9 +174,12 @@ generate_env_file() {
         add_api_token_var
         add_safe_address_var
         add_module_address_var
+        add_rpc_provider_var
+        add_hoprd_api_host_var
+        add_hoprd_api_port_var
 
         # Write collected data to the environment file
-        echo -e "$env_data" > "${HOPRD_ENV_FILE}"
+        printf '%b\n' "$env_data" > "${HOPRD_ENV_FILE}"
         chmod 600 "${HOPRD_ENV_FILE}"
     else
         echo "The environment file located at ${HOPRD_ENV_FILE} already exists. Skipping generation."

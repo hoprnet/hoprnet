@@ -16,7 +16,7 @@ usage() {
   usage
   exit 0
 }
-set -x
+
 # set mydir
 declare mydir
 mydir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)

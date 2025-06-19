@@ -19,7 +19,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.ref }}-package-${{ inputs.target }}
+  group: ${{ inputs.branch }}-package-${{ inputs.target }}
   cancel-in-progress: true
 
 jobs:
