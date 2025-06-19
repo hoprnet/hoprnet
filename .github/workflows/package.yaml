@@ -36,19 +36,36 @@ jobs:
 
       - name: Download artifacts from parent workflow run
         run: |
-          set -x
-          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ inputs.workflow_run_id }}/artifacts \
-            -o artifacts.json
+          set -euo pipefail  # Enable strict error handling
           mkdir -p ./dist/bin
 
-          hoprd_url=$(jq -r '.artifacts[] | select(.name == "hoprd-${{ inputs.target }}").archive_download_url' artifacts.json)
-          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hoprd_url" -o hoprd-${{ inputs.target }}.zip
-          unzip hoprd-${{ inputs.target }}.zip -d ./dist/bin
+          # Fetch artifacts metadata
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ inputs.workflow_run_id }}/artifacts \
+            -o artifacts.json || { echo "Failed to fetch artifacts metadata"; exit 1; }
+          mkdir -p ./dist/bin
 
+          # Extract hoprd artifact URL
+          hoprd_url=$(jq -r '.artifacts[] | select(.name == "hoprd-${{ inputs.target }}").archive_download_url' artifacts.json)
+          if [[ -z "$hoprd_url" ]]; then
+            echo "Error: hoprd artifact URL not found for target '${{ inputs.target }}'"
+            exit 1
+          fi
+
+          # Download and unzip hoprd artifact
+          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hoprd_url" -o hoprd-${{ inputs.target }}.zip || { echo "Failed to download hoprd artifact"; exit 1; }
+          unzip -o hoprd-${{ inputs.target }}.zip -d ./dist/bin || { echo "Failed to unzip hoprd artifact"; exit 1; }
+
+          # Extract hopli artifact URL
           hopli_url=$(jq -r '.artifacts[] | select(.name == "hopli-${{ inputs.target }}").archive_download_url' artifacts.json)
-          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hopli_url" -o hopli-${{ inputs.target }}.zip
-          unzip hopli-${{ inputs.target }}.zip -d ./dist/bin
+          if [[ -z "$hopli_url" ]]; then
+            echo "Error: hopli artifact URL not found for target '${{ inputs.target }}'"
+            exit 1
+          fi
+
+          # Download and unzip hopli artifact
+          curl -s -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" "$hopli_url" -o hopli-${{ inputs.target }}.zip || { echo "Failed to download hopli artifact"; exit 1; }
+          unzip -o hopli-${{ inputs.target }}.zip -d ./dist/bin || { echo "Failed to unzip hopli artifact"; exit 1; }
 
       - name: Install Nix
         uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
