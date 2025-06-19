@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -Eeuo pipefail
+set -Eeo pipefail
 
 env_data=""
 HOPRD_CONFIG_FILE="/etc/hoprd/hoprd.cfg.yaml"
@@ -49,13 +49,21 @@ find_available_port_range() {
   done
 }
 
+find_available_port() {
+  local initial_port="$1"
+  local required_ports=1
+
+  port_range=$(find_available_port_range "$initial_port" "$required_ports")
+  echo "$port_range" | cut -d':' -f1
+}
+
 # Function to add the host address environment variable
 add_host_address_env_var() {
   if [ -z "${HOPRD_HOST}" ]; then
        # Call the function to get the public IP
       public_ip=$(get_public_ip)
       # Find port available for p2p
-      p2p_port=$(find_available_port_range 9091 1)
+      p2p_port=$(find_available_port 9091)
       # Set the HOPRD_HOST variable
       HOPRD_HOST="${public_ip}:${p2p_port}"
   fi
@@ -132,21 +140,13 @@ add_rpc_provider_var() {
     fi
   fi
   append_env_data "# HOPRD_PROVIDER is the RPC provider URL"
-  append_env_data "HOPRD_PROVIDER=${HOPRD_PROVIDER}"
+  append_env_data "HOPRD_PROVIDER=${HOPRD_PROVIDER}\n"
 }
 
 # Function to add the HOPRD_API_HOST environment variable
 add_hoprd_api_host_var() {
   if [ -z "${HOPRD_API_HOST}" ]; then
-    read -r -p "Enter HOPRD_API_HOST (default: 0.0.0.0): " HOPRD_API_HOST
-    if [ -z "$HOPRD_API_HOST" ]; then
-      HOPRD_API_HOST="0.0.0.0"
-    fi
-    # Validate that HOPRD_API_HOST is a standard IPv4 address
-    if ! echo "$HOPRD_API_HOST" | grep -Eq "^([0-9]{1,3}\.){3}[0-9]{1,3}$"; then
-      echo "Invalid IP address format for HOPRD_API_HOST. Please enter a valid IPv4 address."
-      exit 1
-    fi
+    HOPRD_API_HOST="0.0.0.0"
   fi
   append_env_data "# HOPRD_API_HOST is the host interface for the HOPR API"
   append_env_data "HOPRD_API_HOST=${HOPRD_API_HOST}\n"
@@ -155,13 +155,7 @@ add_hoprd_api_host_var() {
 #Function to add the HOPRD_API_PORT environment variable
 add_hoprd_api_port_var() {
   if [ -z "${HOPRD_API_PORT}" ]; then
-    api_port=$(find_available_port_range 3001 1)
-    read -r -p "Enter HOPRD_API_PORT (default: ${api_port}): " HOPRD_API_PORT
-    # Validate that HOPRD_API_PORT is a valid port number
-    if ! echo "$HOPRD_API_PORT" | grep -Eq "^[0-9]{1,5}$" || [ "$HOPRD_API_PORT" -lt 1 ] || [ "$HOPRD_API_PORT" -gt 65535 ]; then
-      echo "Invalid port number for HOPRD_API_PORT. Please enter a valid port number between 1 and 65535."
-      exit 1
-    fi
+    HOPRD_API_PORT=$(find_available_port 3001)
   fi
   append_env_data "# HOPRD_API_PORT is the port for the HOPR API"
   append_env_data "HOPRD_API_PORT=${HOPRD_API_PORT}\n"
@@ -172,7 +166,7 @@ generate_env_file() {
     # If the environment vars file not exists, automatically create it
     HOPRD_ENV_FILE="/etc/hoprd/hoprd.env"
     if [ ! -f "${HOPRD_ENV_FILE}" ]; then
-        append_env_data "# This file contains custom installation configuration for HOPR node.\n\n"
+        append_env_data "# This file contains custom installation configuration for HOPR node.\n"
         add_host_address_env_var
         add_hoprd_password_var
         add_api_token_var
