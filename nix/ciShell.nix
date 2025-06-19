@@ -16,6 +16,7 @@ let
     vacuum-go
     zizmor
     nfpm
+    envsubst
 
     # testing utilities
     cargo-audit
