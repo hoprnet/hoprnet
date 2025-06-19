@@ -22,7 +22,7 @@ concurrency:
 jobs:
   create_release:
     name: Create Release
-    runs-on: ubuntu-latest-4-cores # Cannot use a self-hosted runner because of the docker daemon not running
+    runs-on: ubuntu-latest # Cannot use a self-hosted runner because of the docker daemon not running
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
