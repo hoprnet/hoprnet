@@ -16,7 +16,6 @@ hopr:
       - !ClosureFinalizer
         max_closure_overdue: 300
   chain:
-    network: dufour
     announce: true
     keep_logs: true
     fast_sync: true

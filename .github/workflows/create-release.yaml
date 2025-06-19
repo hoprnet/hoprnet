@@ -89,18 +89,18 @@ jobs:
           do
             echo "Tagging ${image}:${{ steps.tag.outputs.release_name }}"
             gcloud artifacts docker tags add \
-              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
-              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.tag.outputs.release_name }}
-            docker pull ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }}
+              "${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }}" \
+              "${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.tag.outputs.release_name }}"
+            docker pull "${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }}"
             docker tag \
-              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
-              ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
+              "${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }}" \
+              "${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}"
             docker tag \
-              ${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }} \
-              ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
+              "${{ vars.DOCKER_IMAGE_REGISTRY }}/${image}:${{ steps.setup.outputs.current_version }}" \
+              "${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}"
             echo "Pushing images into Docker Hub"
-            docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}
-            docker push ${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}
+            docker push "${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.setup.outputs.current_version }}"
+            docker push "${{ vars.DOCKER_HUB_ORGANIZATION_NAME }}/${image}:${{ steps.tag.outputs.release_name }}"
           done
 
       - name: Create Release

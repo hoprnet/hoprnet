@@ -3,11 +3,20 @@ Description=Hoprd Node
 After=network.target
 
 [Service]
-EnvironmentFile=/etc/hoprd/hoprd.env
-ExecStart=/usr/bin/hoprd --configurationFilePath /etc/hoprd/hoprd.cfg.yaml
-Restart=on-failure
 User=hoprd
 Group=hoprd
+EnvironmentFile=/etc/hoprd/hoprd.env
+ExecStartPre=/bin/bash -c 'touch /var/log/hoprd.log && chown hoprd:hoprd /var/log/hoprd.log'
+ExecStart=/usr/bin/hoprd --configurationFilePath /etc/hoprd/hoprd.cfg.yaml
+ExecStop=/bin/kill -SIGTERM $MAINPID
+Restart=always
+RestartSec=30s
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=90
+StandardOutput=file:/var/log/hoprd.log
+StandardError=file:/var/log/hoprd.log
+Type=simple
 
 [Install]
 WantedBy=multi-user.target

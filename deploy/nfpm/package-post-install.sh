@@ -152,6 +152,16 @@ add_hoprd_api_host_var() {
   append_env_data "HOPRD_API_HOST=${HOPRD_API_HOST}\n"
 }
 
+# Function to add the HOPRD_NETWORK environment variable
+add_network() {
+  if [ -z "${HOPRD_NETWORK}" ]; then
+    HOPRD_NETWORK="dufour"
+  fi
+  append_env_data "# HOPRD_NETWORK posible values are: dufour, rotsee"
+  append_env_data "HOPRD_NETWORK=${HOPRD_NETWORK}\n"
+}
+
+
 #Function to add the HOPRD_API_PORT environment variable
 add_hoprd_api_port_var() {
   if [ -z "${HOPRD_API_PORT}" ]; then
@@ -175,6 +185,7 @@ generate_env_file() {
         add_rpc_provider_var
         add_hoprd_api_host_var
         add_hoprd_api_port_var
+        add_network
 
         # Write collected data to the environment file
         printf '%b\n' "$env_data" > "${HOPRD_ENV_FILE}"
@@ -211,9 +222,10 @@ generate_identity_file() {
 
 create_user_group() {
   # Create a user and group for the HOPR node if they do not exist
-  if ! id -u hopr >/dev/null 2>&1; then
+  if ! id -u hoprd >/dev/null 2>&1; then
     echo "Creating user and group for HOPR node..."
     groupadd -r hoprd
+    mkdir -p /var/lib/hoprd
     useradd --system -g hoprd --home /var/lib/hoprd --shell /usr/sbin/nologin -c "HOPR Node User" hoprd
     echo "Setting ownership and permissions for hoprd files..."
     chown -R hoprd:hoprd /etc/hoprd

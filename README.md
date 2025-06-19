@@ -21,6 +21,7 @@
 - [Install](#install)
   - [Install via Docker](#install-via-docker)
   - [Install via Nix package manager](#install-via-nix-package-manager)
+  - [Install via debian package manager](#install-via-debian-package-manager)
 - [Usage](#usage)
   - [Environment variables](#environment-variables)
   - [Example execution](#example-execution)
@@ -117,6 +118,18 @@ Build and install the `hoprd` binary, e.g. on a UNIX platform:
 nix build
 sudo cp result/bin/* /usr/local/bin/
 ```
+
+### Install via debian package manager
+
+Download the latest package from https://github.com/hoprnet/hoprnet/releases/latest
+
+````
+arch=$(uname -m); [[ "$arch" == "arm64" ]] && arch="aarch64"
+os=$(uname -s | tr '[:upper:]' '[:lower:]')
+curl -s -o hoprd-${arch}-${os}.deb https://github.com/hoprnet/hoprnet/releases/download/latest/hoprd-${arch}-${os}.deb
+dpkg -i ./hoprd-${arch}-${os}.deb
+
+````
 
 ## Usage
 

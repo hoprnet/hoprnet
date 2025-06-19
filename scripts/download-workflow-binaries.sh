@@ -37,7 +37,7 @@ while IFS= read -r line; do
   fi
   # Extract the zip file
   # Check if artifact_name contains an extension (a dot)
-  if [[ "$artifact_name" == *.* ]]; then
+  if [[ $artifact_name == *.* ]]; then
     # Extract to ./dist/packages/${artifact_name}
     unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/packages"
   else
@@ -46,7 +46,6 @@ while IFS= read -r line; do
     unzip -o "dist/zip/${artifact_name}.zip" -d "./dist/bin/${platform}"
   fi
 done <<<"$artifacts"
-
 
 # Group files by platform and create a single zip file for each platform
 platforms=$(ls -1 dist/bin/)
