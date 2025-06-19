@@ -1,16 +1,22 @@
-use chrono::serde::ts_seconds_option;
-use chrono::{DateTime, Utc};
-use regex::Regex;
+use std::{
+    cmp::Ordering,
+    fmt::{Debug, Display, Formatter},
+    str::FromStr,
+};
+
+use chrono::{DateTime, Utc, serde::ts_seconds_option};
 use serde::{Deserialize, Serialize};
 use sha3::Digest;
-use std::cmp::Ordering;
-use std::fmt::{Debug, Display, Formatter};
-use std::ops::{Add, Mul, Sub};
-use std::str::FromStr;
 
-use crate::errors::{GeneralError, GeneralError::InvalidInput, GeneralError::ParseError, Result};
-use crate::prelude::BytesRepresentable;
-use crate::traits::{IntoEndian, ToHex, UnitaryFloatOps};
+use crate::{
+    errors::{
+        GeneralError,
+        GeneralError::{InvalidInput, ParseError},
+        Result,
+    },
+    prelude::BytesRepresentable,
+    traits::{IntoEndian, ToHex, UnitaryFloatOps},
+};
 
 pub type U256 = primitive_types::U256;
 
@@ -52,7 +58,7 @@ impl Address {
     }
 
     /// Turns the address into a checksum-ed address string
-    /// according to https://eips.ethereum.org/EIPS/eip-55>
+    /// according to [EIP-55](https://eips.ethereum.org/EIPS/eip-55).
     pub fn to_checksum(&self) -> String {
         let address_hex = hex::encode(self.0);
 
@@ -88,7 +94,7 @@ impl TryFrom<&[u8]> for Address {
 }
 
 impl BytesRepresentable for Address {
-    /// Fixed size of the address when encoded as bytes (e.g., via `as_ref()`).
+    /// Fixed the size of the address when encoded as bytes (e.g., via `as_ref()`).
     const SIZE: usize = 20;
 }
 
@@ -124,222 +130,14 @@ impl FromStr for Address {
     }
 }
 
-/// Represents a type of the balance: native or HOPR tokens.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString)]
-pub enum BalanceType {
-    /// Native tokens of the underlying chain.
-    Native,
-    /// HOPR tokens.
-    HOPR,
-}
-
-impl BalanceType {
-    /// Creates [Balance] of 1 of this type.
-    pub fn one(self) -> Balance {
-        self.balance(1)
-    }
-
-    /// Creates zero [Balance] of this type.
-    pub fn zero(self) -> Balance {
-        self.balance(0)
-    }
-
-    /// Creates [Balance] of the given `amount` of this type.
-    pub fn balance<T: Into<U256>>(self, amount: T) -> Balance {
-        Balance::new(amount, self)
-    }
-
-    /// Deserializes the given amount and creates a new [Balance] instance.
-    /// The bytes are assumed to be in Big Endian order.
-    /// The method panics if more than 32 `bytes` were given.
-    pub fn balance_bytes<T: AsRef<[u8]>>(self, bytes: T) -> Balance {
-        Balance::new(U256::from_be_bytes(bytes), self)
+impl From<alloy::primitives::Address> for Address {
+    fn from(a: alloy::primitives::Address) -> Self {
+        Address::from(a.0.0)
     }
 }
-
-/// Represents balance of some coin or token.
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Balance(U256, BalanceType);
-
-impl Balance {
-    /// Number of digits in the base unit
-    pub const SCALE: usize = 19;
-
-    /// Creates a new balance given the value and type
-    pub fn new<T: Into<U256>>(value: T, balance_type: BalanceType) -> Self {
-        Self(value.into(), balance_type)
-    }
-
-    /// Creates new balance of the given type from the base 10 integer string
-    pub fn new_from_str(value: &str, balance_type: BalanceType) -> Self {
-        Self(
-            U256::from_dec_str(value).unwrap_or_else(|_| panic!("invalid decimal number {value}")),
-            balance_type,
-        )
-    }
-
-    /// Creates zero balance of the given type
-    pub fn zero(balance_type: BalanceType) -> Self {
-        Self(U256::zero(), balance_type)
-    }
-
-    /// Retrieves the type (symbol) of the balance
-    pub fn balance_type(&self) -> BalanceType {
-        self.1
-    }
-
-    /// Creates balance of the given value with the same symbol
-    pub fn of_same(&self, value: &str) -> Self {
-        Self::new_from_str(value, self.1)
-    }
-
-    pub fn amount(&self) -> U256 {
-        self.0
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.0.is_zero()
-    }
-
-    pub fn amount_base_units(&self) -> String {
-        let val = self.0.to_string();
-
-        match val.len().cmp(&Self::SCALE) {
-            Ordering::Greater => {
-                let (l, r) = val.split_at(val.len() - Self::SCALE + 1);
-                format!("{l}.{}", &r[..r.len() - (val.len() - Self::SCALE)],)
-            }
-            Ordering::Less => format!("0.{empty:0>width$}", empty = &val, width = Self::SCALE - 1,),
-            Ordering::Equal => {
-                let (l, r) = val.split_at(1);
-                format!("{l}.{r}")
-            }
-        }
-    }
-
-    pub fn to_formatted_string(&self) -> String {
-        format!("{} {}", self.amount_base_units(), self.1)
-    }
-
-    pub fn to_value_string(&self) -> String {
-        self.0.to_string()
-    }
-}
-
-impl<T: Into<U256>> From<(T, BalanceType)> for Balance {
-    fn from(value: (T, BalanceType)) -> Self {
-        Self(value.0.into(), value.1)
-    }
-}
-
-impl PartialOrd for Balance {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.1.eq(&other.1).then(|| self.0.partial_cmp(&other.0)).flatten()
-    }
-}
-
-impl<T: Into<U256>> Add<T> for Balance {
-    type Output = Balance;
-
-    fn add(self, rhs: T) -> Self::Output {
-        Self(self.0.saturating_add(rhs.into()), self.1)
-    }
-}
-
-impl Add for Balance {
-    type Output = Balance;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        self.add(rhs.0)
-    }
-}
-
-impl Add<&Balance> for Balance {
-    type Output = Balance;
-
-    fn add(self, rhs: &Balance) -> Self::Output {
-        self.add(rhs.0)
-    }
-}
-
-impl<T: Into<U256>> Sub<T> for Balance {
-    type Output = Balance;
-
-    fn sub(self, rhs: T) -> Self::Output {
-        Self(self.0.saturating_sub(rhs.into()), self.1)
-    }
-}
-
-impl Sub for Balance {
-    type Output = Balance;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        self.sub(rhs.0)
-    }
-}
-
-impl Sub<&Balance> for Balance {
-    type Output = Balance;
-
-    fn sub(self, rhs: &Balance) -> Self::Output {
-        self.sub(rhs.0)
-    }
-}
-
-impl<T: Into<U256>> Mul<T> for Balance {
-    type Output = Balance;
-
-    fn mul(self, rhs: T) -> Self::Output {
-        Self(self.0.saturating_mul(rhs.into()), self.1)
-    }
-}
-
-impl Mul for Balance {
-    type Output = Balance;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        self.mul(rhs.0)
-    }
-}
-
-impl UnitaryFloatOps for Balance {
-    fn mul_f64(&self, rhs: f64) -> Result<Self> {
-        self.0.mul_f64(rhs).map(|v| Self(v, self.1))
-    }
-
-    fn div_f64(&self, rhs: f64) -> Result<Self> {
-        self.0.div_f64(rhs).map(|v| Self(v, self.1))
-    }
-}
-
-impl Debug for Balance {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        // Intentionally same as Display
-        write!(f, "{} {}", self.0, self.1)
-    }
-}
-
-impl Display for Balance {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.0, self.1)
-    }
-}
-
-impl FromStr for Balance {
-    type Err = GeneralError;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let regex = Regex::new(r"^\s*(\d+)\s*([A-z]+)\s*$").expect("should use valid regex pattern");
-        let cap = regex.captures(s).ok_or(ParseError("Balance".into()))?;
-
-        if cap.len() == 3 {
-            Ok(Self::new_from_str(
-                &cap[1],
-                BalanceType::from_str(&cap[2]).map_err(|_| ParseError("Balance".into()))?,
-            ))
-        } else {
-            Err(ParseError("Balance".into()))
-        }
+impl From<Address> for alloy::primitives::Address {
+    fn from(a: Address) -> Self {
+        alloy::primitives::Address::from_slice(a.as_ref())
     }
 }
 
@@ -388,15 +186,11 @@ impl IntoEndian<32> for U256 {
     }
 
     fn to_le_bytes(self) -> [u8; 32] {
-        let mut ret = [0u8; 32];
-        self.to_little_endian(&mut ret);
-        ret
+        self.to_little_endian()
     }
 
     fn to_be_bytes(self) -> [u8; 32] {
-        let mut ret = [0u8; 32];
-        self.to_big_endian(&mut ret);
-        ret
+        self.to_big_endian()
     }
 }
 
@@ -504,18 +298,77 @@ impl PartialOrd<Self> for SerializableLog {
     }
 }
 
+/// Identifier of public keys.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct KeyIdent<const N: usize = 4>(#[serde(with = "serde_bytes")] [u8; N]);
+
+impl<const N: usize> Display for KeyIdent<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl From<u32> for KeyIdent<4> {
+    fn from(value: u32) -> Self {
+        Self(value.to_be_bytes())
+    }
+}
+
+impl From<KeyIdent<4>> for u32 {
+    fn from(value: KeyIdent<4>) -> Self {
+        u32::from_be_bytes(value.0)
+    }
+}
+
+impl From<u64> for KeyIdent<8> {
+    fn from(value: u64) -> Self {
+        Self(value.to_be_bytes())
+    }
+}
+
+impl From<KeyIdent<8>> for u64 {
+    fn from(value: KeyIdent<8>) -> Self {
+        u64::from_be_bytes(value.0)
+    }
+}
+
+impl<const N: usize> TryFrom<&[u8]> for KeyIdent<N> {
+    type Error = GeneralError;
+
+    fn try_from(value: &[u8]) -> std::result::Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| ParseError("KeyIdent".into()))?))
+    }
+}
+
+impl<const N: usize> AsRef<[u8]> for KeyIdent<N> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<const N: usize> Default for KeyIdent<N> {
+    fn default() -> Self {
+        Self([0u8; N])
+    }
+}
+
+impl<const N: usize> BytesRepresentable for KeyIdent<N> {
+    const SIZE: usize = N;
+}
+
 /// Unit tests of pure Rust code
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::str::FromStr;
+
     use hex_literal::hex;
     use primitive_types::U256;
-    use std::cmp::Ordering;
-    use std::str::FromStr;
+
+    use super::*;
 
     #[test]
     fn address_tests() -> anyhow::Result<()> {
-        let addr_1 = Address::try_from(hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"))?;
+        let addr_1 = Address::from(hex!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"));
         let addr_2 = Address::try_from(addr_1.as_ref())?;
 
         assert_eq!(addr_1, addr_2, "deserialized address does not match");
@@ -526,83 +379,6 @@ mod tests {
         assert_eq!(addr_1, Address::from_str(&addr_1.to_hex())?);
 
         Ok(())
-    }
-
-    #[test]
-    fn balance_test_arithmetic() {
-        let test_1 = 100_u32;
-        let test_2 = 200_u32;
-
-        let b3 = Balance::new(test_1, BalanceType::HOPR);
-        let b4 = Balance::new(test_2, BalanceType::HOPR);
-
-        assert_eq!(test_1 + test_2, b3.add(b4).amount().as_u32(), "add test failed");
-        assert_eq!(test_2 - test_1, b4.sub(b3).amount().as_u32(), "sub test failed");
-        assert_eq!(test_2 - 10, b4.sub(10).amount().as_u32(), "sub test failed");
-
-        assert_eq!(0_u32, b3.sub(b4).amount().as_u32(), "negative test failed");
-        assert_eq!(0_u32, b3.sub(test_2 as u64).amount().as_u32(), "negative test failed");
-
-        assert_eq!(
-            test_1 * test_2,
-            b3.mul(b4).amount().as_u32(),
-            "multiplication test failed"
-        );
-        assert_eq!(
-            test_2 * test_1,
-            b4.mul(b3).amount().as_u32(),
-            "multiplication test failed"
-        );
-        assert_eq!(
-            test_2 * test_1,
-            b4.mul(test_1 as u64).amount().as_u32(),
-            "multiplication test failed"
-        );
-
-        assert!(matches!(b3.partial_cmp(&b4), Some(Ordering::Less)));
-        assert!(matches!(b4.partial_cmp(&b3), Some(Ordering::Greater)));
-
-        assert!(matches!(b3.partial_cmp(&b3), Some(Ordering::Equal)));
-        assert!(matches!(b4.partial_cmp(&b4), Some(Ordering::Equal)));
-
-        let other: Balance = (b4.amount(), BalanceType::Native).into();
-        assert!(other.partial_cmp(&b4).is_none());
-    }
-
-    #[test]
-    fn balance_test_formatted_string() {
-        let mut base = "123".to_string();
-        for _ in 0..Balance::SCALE - 3 {
-            base += "0";
-        }
-
-        let b1 = Balance::new_from_str(&base, BalanceType::HOPR);
-        let b2 = b1.mul(100);
-        let b3 = Balance::new_from_str(&base[..Balance::SCALE - 3], BalanceType::HOPR);
-        let b4 = Balance::new_from_str(&base[..Balance::SCALE - 1], BalanceType::HOPR);
-
-        assert_eq!("1.230000000000000000 HOPR", b1.to_formatted_string());
-        assert_eq!("123.0000000000000000 HOPR", b2.to_formatted_string());
-        assert_eq!("0.001230000000000000 HOPR", b3.to_formatted_string());
-        assert_eq!("0.123000000000000000 HOPR", b4.to_formatted_string());
-    }
-
-    #[test]
-    fn balance_test_value_string() {
-        let mut base = "123".to_string();
-        for _ in 0..Balance::SCALE - 3 {
-            base += "0";
-        }
-
-        let b1 = Balance::new_from_str(&base, BalanceType::HOPR);
-        let b2 = b1.mul(100);
-        let b3 = Balance::new_from_str(&base[..Balance::SCALE - 3], BalanceType::HOPR);
-        let b4 = Balance::new_from_str(&base[..Balance::SCALE - 1], BalanceType::HOPR);
-
-        assert_eq!("1230000000000000000", b1.to_value_string());
-        assert_eq!("123000000000000000000", b2.to_value_string());
-        assert_eq!("1230000000000000", b3.to_value_string());
-        assert_eq!("123000000000000000", b4.to_value_string());
     }
 
     #[test]

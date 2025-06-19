@@ -1,18 +1,18 @@
 from enum import Enum
 
 
-class ProcolTemplate:
+class ProtocolTemplate:
     def __init__(self, retransmit: bool, segment: bool):
         self.retransmit = retransmit
         self.segment = segment
 
 
-class TCPProtocol(ProcolTemplate):
+class TCPProtocol(ProtocolTemplate):
     def __init__(self):
         super().__init__(retransmit=True, segment=True)
 
 
-class UDPProtocol(ProcolTemplate):
+class UDPProtocol(ProtocolTemplate):
     def __init__(self):
         super().__init__(retransmit=False, segment=False)
 

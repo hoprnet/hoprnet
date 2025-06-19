@@ -14,29 +14,38 @@
 //! (= they are not marked as [BeingRedeemed](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingRedeemed) or
 //! [BeingAggregated](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingAggregated) in the DB),
 //! If they are redeemable, their state is changed to
-//! [BeingRedeemed](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the exclusive DB write lock).
-//! Subsequently, the ticket in such a state is transmitted into the [ActionQueue](crate::action_queue::ActionQueue) so the redemption is soon executed on-chain.
-//! The functions return immediately but provide futures that can be awaited in case the callers wish to await the on-chain
-//! confirmation of each ticket redemption.
+//! [BeingRedeemed](hopr_internal_types::tickets::AcknowledgedTicketStatus::BeingRedeemed) (while having acquired the
+//! exclusive DB write lock). Subsequently, the ticket in such a state is transmitted into the
+//! [ActionQueue](crate::action_queue::ActionQueue) so the redemption is soon executed on-chain. The functions return
+//! immediately but provide futures that can be awaited in case the callers wish to await the on-chain confirmation of
+//! each ticket redemption.
 //!
-//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent).
-//! by the Indexer.
+//! See the details in [ActionQueue](crate::action_queue::ActionQueue) on how the confirmation is realized by awaiting
+//! the respective [SignificantChainEvent](hopr_chain_types::chain_events::SignificantChainEvent). by the Indexer.
 use async_trait::async_trait;
 use futures::StreamExt;
 use hopr_chain_types::actions::Action;
 use hopr_crypto_types::types::Hash;
-use hopr_db_sql::api::info::DomainSeparator;
-use hopr_db_sql::api::tickets::{HoprDbTicketOperations, TicketSelector};
-use hopr_db_sql::channels::HoprDbChannelOperations;
-use hopr_db_sql::prelude::HoprDbInfoOperations;
+use hopr_db_sql::{
+    api::{
+        info::DomainSeparator,
+        tickets::{HoprDbTicketOperations, TicketSelector},
+    },
+    channels::HoprDbChannelOperations,
+    prelude::HoprDbInfoOperations,
+};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
 use tracing::{debug, error, info, warn};
 
-use crate::action_queue::PendingAction;
-use crate::errors::ChainActionsError::{ChannelDoesNotExist, InvalidState, OldTicket};
-use crate::errors::{ChainActionsError::WrongTicketState, Result};
-use crate::ChainActions;
+use crate::{
+    ChainActions,
+    action_queue::PendingAction,
+    errors::{
+        ChainActionsError::{ChannelDoesNotExist, InvalidState, OldTicket, WrongTicketState},
+        Result,
+    },
+};
 
 lazy_static::lazy_static! {
     /// Used as a placeholder when the redeem transaction has not yet been published on-chain
@@ -249,21 +258,21 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use futures::FutureExt;
     use hex_literal::hex;
-    use hopr_chain_types::chain_events::ChainEventType::TicketRedeemed;
-    use hopr_chain_types::chain_events::SignificantChainEvent;
-    use hopr_crypto_random::random_bytes;
+    use hopr_chain_types::chain_events::{ChainEventType::TicketRedeemed, SignificantChainEvent};
+    use hopr_crypto_random::{Randomizable, random_bytes};
     use hopr_crypto_types::prelude::*;
-    use hopr_db_sql::api::info::DomainSeparator;
-    use hopr_db_sql::db::HoprDb;
-    use hopr_db_sql::errors::DbSqlError;
-    use hopr_db_sql::info::HoprDbInfoOperations;
-    use hopr_db_sql::{HoprDbGeneralModelOperations, TargetDb};
+    use hopr_db_sql::{
+        HoprDbGeneralModelOperations, TargetDb, api::info::DomainSeparator, db::HoprDb, errors::DbSqlError,
+        info::HoprDbInfoOperations,
+    };
 
-    use crate::action_queue::{ActionQueue, MockTransactionExecutor};
-    use crate::action_state::MockActionState;
+    use super::*;
+    use crate::{
+        action_queue::{ActionQueue, MockTransactionExecutor},
+        action_state::MockActionState,
+    };
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("492057cf93e99b31d2a85bc5e98a9c3aa0021feec52c227cc8170e8f7d047775")).expect("lazy static keypair should be constructible");
@@ -290,7 +299,7 @@ mod tests {
             .amount(price_per_packet.div_f64(1.0f64)? * 5u32)
             .index(idx)
             .index_offset(1)
-            .win_prob(1.0)
+            .win_prob(WinningProbability::ALWAYS)
             .channel_epoch(channel_epoch)
             .challenge(Challenge::from(cp_sum).to_ethereum_challenge())
             .build_signed(counterparty, &Hash::default())?
@@ -317,7 +326,7 @@ mod tests {
                     let channel = ChannelEntry::new(
                         ckp.public().to_address(),
                         ALICE.public().to_address(),
-                        Balance::zero(BalanceType::HOPR),
+                        0.into(),
                         U256::zero(),
                         ChannelStatus::Open,
                         channel_epoch.into(),
@@ -349,7 +358,7 @@ mod tests {
         Ok((channel, input_tickets))
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_redeem_flow() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
@@ -415,7 +424,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -449,7 +458,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_ticket_redeem_in_channel() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
@@ -464,12 +473,13 @@ mod tests {
 
         // Tickets with index 0 will be skipped, as that is already past
         channel_from_bob.ticket_index = 1_u32.into();
-        db.upsert_channel(None, channel_from_bob.clone()).await?;
+        db.upsert_channel(None, channel_from_bob).await?;
 
         let mut indexer_action_tracker = MockActionState::new();
         let mut seq2 = mockall::Sequence::new();
 
-        for tkt in bob_tickets.iter().cloned() {
+        // Skipping ticket with index 0
+        for tkt in bob_tickets.iter().skip(1).cloned() {
             indexer_action_tracker
                 .expect_register_expectation()
                 .once()
@@ -483,18 +493,21 @@ mod tests {
                 });
         }
 
-        // Expect only Bob's tickets to get redeemed
         let mut tx_exec = MockTransactionExecutor::new();
+        let mut seq = mockall::Sequence::new();
+
+        // Expect only Bob's tickets to get redeemed
         tx_exec
             .expect_redeem_ticket()
             .times(ticket_count - 1)
+            .in_sequence(&mut seq)
             .withf(move |t| bob_tickets.iter().any(|tk| tk.ticket.eq(&t.ticket)))
             .returning(move |_| Ok(random_hash));
 
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -536,7 +549,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_redeem_must_not_work_for_tickets_being_aggregated_and_being_redeemed() -> anyhow::Result<()> {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
 
@@ -584,7 +597,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -617,9 +630,9 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
-    async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed(
-    ) -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn test_redeem_must_not_work_for_tickets_of_previous_epoch_being_aggregated_and_being_redeemed()
+    -> anyhow::Result<()> {
         let ticket_count = 3;
         let ticket_from_previous_epoch_count = 2;
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
@@ -666,7 +679,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -688,9 +701,9 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_redeem_must_not_work_for_tickets_of_next_epoch_being_redeemed() -> anyhow::Result<()> {
-        let ticket_count = 4;
+        let ticket_count = 3;
         let ticket_from_next_epoch_count = 2;
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -736,7 +749,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -750,12 +763,9 @@ mod tests {
         )
         .await;
 
-        for unredeemable_index in 0..ticket_from_next_epoch_count {
+        for ticket in tickets.iter().take(ticket_from_next_epoch_count) {
             assert!(
-                actions
-                    .redeem_ticket(tickets[unredeemable_index].clone())
-                    .await
-                    .is_err(),
+                actions.redeem_ticket(ticket.clone()).await.is_err(),
                 "cannot redeem a ticket that's from the next epoch"
             );
         }
@@ -763,7 +773,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_redeem_single_ticket() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -796,7 +806,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 
@@ -817,7 +827,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_redeem_single_ticket_with_lower_index_than_channel_index() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ALICE.clone()).await?;
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
@@ -825,7 +835,7 @@ mod tests {
         let (mut channel_from_bob, tickets) = create_channel_with_ack_tickets(db.clone(), 1, &BOB, 1u32).await?;
 
         channel_from_bob.ticket_index = 2_u32.into();
-        db.upsert_channel(None, channel_from_bob.clone()).await?;
+        db.upsert_channel(None, channel_from_bob).await?;
 
         let ticket = tickets.into_iter().next().unwrap();
 
@@ -853,7 +863,7 @@ mod tests {
         // Start the ActionQueue with the mock TransactionExecutor
         let tx_queue = ActionQueue::new(db.clone(), indexer_action_tracker, tx_exec, Default::default());
         let tx_sender = tx_queue.new_sender();
-        async_std::task::spawn(async move {
+        tokio::task::spawn(async move {
             tx_queue.start().await;
         });
 

@@ -24,13 +24,6 @@ prometheus = [
   "hoprd-api/prometheus",
   "hopr-network-types/prometheus",
 ]
-runtime-async-std = [
-  "dep:async-std",
-  "hopr-lib/runtime-async-std",
-  "hopr-network-types/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-  "opentelemetry_sdk?/rt-async-std",
-]
 runtime-tokio = [
   "dep:tokio",
   "dep:tokio-retry",
@@ -58,14 +51,9 @@ prof = [
 anyhow = { workspace = true }
 async-lock = { workspace = true }
 async-signal = { workspace = true }
-async-std = { workspace = true, features = [
-  "attributes",
-  "tokio1",
-], optional = true }
-chrono = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
-home = "0.5.9"
+home = "0.5.11"
 lazy_static = { workspace = true, optional = true }
 proc-macro-regex = { workspace = true }
 serde = { workspace = true }
@@ -74,7 +62,6 @@ serde_yaml = { workspace = true }
 serde_json = { workspace = true }
 signal-hook = { workspace = true }
 smart-default = { workspace = true }
-strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true }
 tokio-retry = { workspace = true, optional = true }
@@ -100,9 +87,7 @@ hopr-lib = { workspace = true, features = [
   "session-client",
   "session-server",
 ] }
-hoprd-db-api = { workspace = true }
 hoprd-api = { workspace = true }
-hoprd-inbox = { workspace = true }
 hoprd-keypair = { workspace = true }
 hopr-platform = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }

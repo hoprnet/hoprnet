@@ -1,26 +1,27 @@
-use futures::channel::mpsc::UnboundedSender;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
-use sea_query::Expr;
-use sqlx::pool::PoolOptions;
-use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous};
-use sqlx::{ConnectOptions, SqlitePool};
-use std::path::Path;
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::debug;
-use tracing::log::LevelFilter;
+use std::{path::Path, sync::Arc, time::Duration};
 
-use hopr_crypto_types::keypairs::Keypair;
-use hopr_crypto_types::prelude::ChainKeypair;
-use hopr_db_entity::ticket;
+use futures::channel::mpsc::UnboundedSender;
+use hopr_crypto_types::{keypairs::Keypair, prelude::ChainKeypair};
+use hopr_db_entity::{
+    prelude::{Account, Announcement},
+    ticket,
+};
 use hopr_internal_types::prelude::{AcknowledgedTicket, AcknowledgedTicketStatus};
 use hopr_primitive_types::primitives::Address;
 use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, SqlxSqliteConnector};
+use sea_query::Expr;
+use sqlx::{
+    ConnectOptions, SqlitePool,
+    pool::PoolOptions,
+    sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
+};
+use tracing::{debug, log::LevelFilter};
 
-use crate::cache::HoprDbCaches;
-use crate::errors::Result;
-use crate::ticket_manager::TicketManager;
-use crate::HoprDbAllOperations;
+use crate::{
+    HoprDbAllOperations, accounts::model_to_account_entry, cache::HoprDbCaches, errors::Result,
+    ticket_manager::TicketManager,
+};
 
 pub const HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS: u64 = 5 * 60; // 5 minutes
 
@@ -53,6 +54,13 @@ pub const SQL_DB_LOGS_FILE_NAME: &str = "hopr_logs.db";
 
 impl HoprDb {
     pub async fn new(directory: &Path, chain_key: ChainKeypair, cfg: HoprDbConfig) -> Result<Self> {
+        #[cfg(all(feature = "prometheus", not(test)))]
+        {
+            lazy_static::initialize(&crate::protocol::METRIC_RECEIVED_ACKS);
+            lazy_static::initialize(&crate::protocol::METRIC_SENT_ACKS);
+            lazy_static::initialize(&crate::protocol::METRIC_TICKETS_COUNT);
+        }
+
         std::fs::create_dir_all(directory).map_err(|_e| {
             crate::errors::DbSqlError::Construction(format!("cannot create main database directory {directory:?}"))
         })?;
@@ -193,6 +201,21 @@ impl HoprDb {
         let caches = Arc::new(HoprDbCaches::default());
         caches.invalidate_all();
 
+        // Initialize KeyId mapping for accounts
+        Account::find()
+            .find_with_related(Announcement)
+            .all(&index_db)
+            .await?
+            .into_iter()
+            .try_for_each(|(a, b)| match model_to_account_entry(a, b) {
+                Ok(account) => caches.key_id_mapper.update_key_id_binding(&account),
+                Err(error) => {
+                    // Undecodeable accounts are skipped and will be unreachable
+                    tracing::error!(%error, "undecodeable account");
+                    Ok(())
+                }
+            })?;
+
         Ok(Self {
             me_onchain: chain_key.public().to_address(),
             chain_key,
@@ -223,22 +246,25 @@ impl HoprDbAllOperations for HoprDb {}
 
 #[cfg(test)]
 mod tests {
-    use crate::db::HoprDb;
-    use crate::{HoprDbGeneralModelOperations, TargetDb};
-    use hopr_crypto_types::keypairs::{ChainKeypair, OffchainKeypair};
-    use hopr_crypto_types::prelude::Keypair;
+    use hopr_crypto_types::{
+        keypairs::{ChainKeypair, OffchainKeypair},
+        prelude::Keypair,
+    };
     use hopr_db_api::peers::{HoprDbPeersOperations, PeerOrigin};
     use hopr_primitive_types::sma::SingleSumSMA;
     use libp2p_identity::PeerId;
     use migration::{MigratorChainLogs, MigratorIndex, MigratorPeers, MigratorTickets, MigratorTrait};
     use multiaddr::Multiaddr;
-    use rand::{distributions::Alphanumeric, Rng}; // 0.8
+    use rand::{Rng, distributions::Alphanumeric};
 
-    #[async_std::test]
+    use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb}; // 0.8
+
+    #[tokio::test]
     async fn test_basic_db_init() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
-        // NOTE: cfg-if this on Postgres to do only `Migrator::status(db.conn(Default::default)).await.expect("status must be ok");`
+        // NOTE: cfg-if this on Postgres to do only `Migrator::status(db.conn(Default::default)).await.expect("status
+        // must be ok");`
         MigratorIndex::status(db.conn(TargetDb::Index)).await?;
         MigratorTickets::status(db.conn(TargetDb::Tickets)).await?;
         MigratorPeers::status(db.conn(TargetDb::Peers)).await?;
@@ -247,7 +273,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn peers_without_any_recent_updates_should_be_discarded_on_restarts() -> anyhow::Result<()> {
         let random_filename: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)
@@ -285,7 +311,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn peers_with_a_recent_update_should_be_retained_in_the_database() -> anyhow::Result<()> {
         let random_filename: String = rand::thread_rng()
             .sample_iter(&Alphanumeric)

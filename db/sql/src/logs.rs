@@ -1,25 +1,26 @@
 use async_trait::async_trait;
-use futures::{stream, StreamExt};
-use sea_orm::entity::Set;
-use sea_orm::query::QueryTrait;
-use sea_orm::sea_query::{Expr, OnConflict, Value};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect,
-};
-use tracing::{error, trace};
-
+use futures::{StreamExt, stream};
 use hopr_crypto_types::prelude::Hash;
-use hopr_db_api::errors::{DbError, Result};
-use hopr_db_api::logs::HoprDbLogOperations;
-use hopr_db_entity::errors::DbEntityError;
-use hopr_db_entity::prelude::{Log, LogStatus, LogTopicInfo};
-use hopr_db_entity::{log, log_status, log_topic_info};
+use hopr_db_api::{
+    errors::{DbError, Result},
+    logs::HoprDbLogOperations,
+};
+use hopr_db_entity::{
+    errors::DbEntityError,
+    log, log_status, log_topic_info,
+    prelude::{Log, LogStatus, LogTopicInfo},
+};
 use hopr_primitive_types::prelude::*;
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DbErr, EntityTrait, FromQueryResult, IntoActiveModel, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect,
+    entity::Set,
+    query::QueryTrait,
+    sea_query::{Expr, OnConflict, Value},
+};
+use tracing::{error, trace, warn};
 
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::{HoprDbGeneralModelOperations, TargetDb};
+use crate::{HoprDbGeneralModelOperations, TargetDb, db::HoprDb, errors::DbSqlError};
 
 #[derive(FromQueryResult)]
 struct BlockNumber {
@@ -47,6 +48,7 @@ impl HoprDbLogOperations for HoprDb {
             .perform(|tx| {
                 Box::pin(async move {
                     let results = stream::iter(logs).then(|log| async {
+                        let log_id = log.to_string();
                         let model = log::ActiveModel::from(log.clone());
                         let status_model = log_status::ActiveModel::from(log);
                         let log_status_query = LogStatus::insert(status_model).on_conflict(
@@ -71,13 +73,23 @@ impl HoprDbLogOperations for HoprDb {
                         match log_status_query.exec(tx.as_ref()).await {
                             Ok(_) => match log_query.exec(tx.as_ref()).await {
                                 Ok(_) => Ok(()),
+                                Err(DbErr::RecordNotInserted) => {
+                                    warn!(log_id, "log already in the DB");
+                                    Err(DbError::General(format!("log already exists in the DB: {log_id}")))
+                                }
                                 Err(e) => {
                                     error!("Failed to insert log into db: {:?}", e);
                                     Err(DbError::General(e.to_string()))
                                 }
                             },
+                            Err(DbErr::RecordNotInserted) => {
+                                warn!(log_id, "log already in the DB");
+                                Err(DbError::General(format!(
+                                    "log status already exists in the DB: {log_id}"
+                                )))
+                            }
                             Err(e) => {
-                                error!("Failed to insert log status into db: {:?}", e);
+                                error!(%log_id, "Failed to insert log status into db: {:?}", e);
                                 Err(DbError::General(e.to_string()))
                             }
                         }
@@ -448,11 +460,11 @@ fn create_log(raw_log: log::Model, status: log_status::Model) -> crate::errors::
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair};
 
-    #[async_std::test]
+    use super::*;
+
+    #[tokio::test]
     async fn test_store_single_log() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -478,7 +490,7 @@ mod tests {
         assert_eq!(logs[0], log);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_store_multiple_logs() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -527,7 +539,7 @@ mod tests {
         assert_eq!(log_2, log_2_retrieved);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_store_duplicate_log() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -555,7 +567,7 @@ mod tests {
         assert_eq!(logs.len(), 1);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_log_processed() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -587,7 +599,7 @@ mod tests {
         assert!(log_db_updated.processed_at.is_some());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_list_logs_ordered() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -650,7 +662,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_nonexistent_log() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -659,7 +671,7 @@ mod tests {
         assert!(result.is_err());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_logs_with_block_offset() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -703,7 +715,7 @@ mod tests {
         assert_eq!(logs[0], log_1);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_set_logs_unprocessed() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -732,7 +744,7 @@ mod tests {
         assert!(log_db.processed_at.is_none());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_logs_block_numbers() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -805,7 +817,7 @@ mod tests {
         assert_eq!(block_numbers_unprocessed_second[0], 2);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_update_logs_checksums() {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await.unwrap();
 
@@ -870,7 +882,7 @@ mod tests {
         assert_ne!(updated_log_1, updated_log_3);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_allow_inconsistent_logs_in_the_db() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
         let addr_1 = Address::new(b"my address 123456789");

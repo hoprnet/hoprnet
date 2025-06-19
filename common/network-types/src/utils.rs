@@ -1,9 +1,12 @@
+use std::{
+    fmt::{Debug, Display, Formatter},
+    hash::{Hash, Hasher},
+    net::SocketAddr,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use futures::io::{AsyncRead, AsyncWrite};
-use std::fmt::{Debug, Display, Formatter};
-use std::hash::{Hash, Hasher};
-use std::net::SocketAddr;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 /// Joins [futures::AsyncRead] and [futures::AsyncWrite] into a single object.
 pub struct DuplexIO<R, W>(pub R, pub W);
@@ -115,8 +118,9 @@ pub use tokio_utils::copy_duplex;
 
 #[cfg(feature = "runtime-tokio")]
 mod tokio_utils {
-    use super::*;
     use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+
+    use super::*;
 
     #[derive(Debug)]
     enum TransferState {
@@ -152,10 +156,10 @@ mod tokio_utils {
         }
     }
 
-    /// This is a proper re-implementation of Tokio's [`copy_bidirectional_with_sizes`](tokio::io::copy_bidirectional_with_sizes),
-    /// which does not leave the stream in half-open-state when one side closes read or write side.
-    /// Instead, if either side encounters and empty read (EOF indication), the write-side is closed as well
-    /// and vice versa.
+    /// This is a proper re-implementation of Tokio's
+    /// [`copy_bidirectional_with_sizes`](tokio::io::copy_bidirectional_with_sizes), which does not leave the stream
+    /// in half-open-state when one side closes read or write side. Instead, if either side encounters and empty
+    /// read (EOF indication), the write-side is closed as well and vice versa.
     pub async fn copy_duplex<A, B>(
         a: &mut A,
         b: &mut B,
@@ -281,7 +285,7 @@ mod tokio_utils {
                     match self.poll_fill_buf(cx, reader.as_mut()) {
                         Poll::Ready(Ok(())) => (),
                         Poll::Ready(Err(err)) => {
-                            return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, err)))
+                            return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, err)));
                         }
                         Poll::Pending => {
                             // Try flushing when the reader has no progress to avoid deadlock
@@ -349,10 +353,11 @@ impl<const S: usize, R: AsyncRead + Unpin> futures::Stream for AsyncReadStreamer
 
 #[cfg(all(feature = "runtime-tokio", test))]
 mod tests {
-    use super::*;
-    use crate::utils::DuplexIO;
     use futures::TryStreamExt;
     use tokio::io::AsyncWriteExt;
+
+    use super::*;
+    use crate::utils::DuplexIO;
 
     #[tokio::test]
     async fn test_copy_duplex() -> anyhow::Result<()> {
@@ -455,7 +460,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_async_read_streamer_complete_chunk() {
         let data = b"Hello, World!!";
         let mut streamer = AsyncReadStreamer::<14, _>(&data[..]);
@@ -468,7 +473,7 @@ mod tests {
         assert_eq!(results, vec![Box::from(*data)]);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_async_read_streamer_complete_more_chunks() {
         let data = b"Hello, World and do it twice";
         let mut streamer = AsyncReadStreamer::<14, _>(&data[..]);
@@ -482,7 +487,7 @@ mod tests {
         assert_eq!(results, vec![Box::from(data1), Box::from(data2)]);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_async_read_streamer_complete_more_chunks_with_incomplete() -> anyhow::Result<()> {
         let data = b"Hello, World and do it twice, ...";
         let streamer = AsyncReadStreamer::<14, _>(&data[..]);
@@ -496,7 +501,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_async_read_streamer_incomplete_chunk() -> anyhow::Result<()> {
         let data = b"Hello, World!!";
         let reader = &data[0..8]; // An incomplete chunk

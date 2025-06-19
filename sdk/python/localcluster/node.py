@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import os
+import tempfile
+from decimal import Decimal
 from pathlib import Path
 from subprocess import STDOUT, Popen, run
 
@@ -11,7 +13,6 @@ from .constants import (
     NODE_NAME_PREFIX,
     OPEN_CHANNEL_FUNDING_VALUE_HOPR,
     PASSWORD,
-    PORT_BASE,
     PWD,
 )
 
@@ -41,20 +42,27 @@ class Node:
         network: str,
         identity_path: str,
         cfg_file: str,
-        alias: str,
-        use_nat: bool,
+        base_port: int,
+        api_addr: str = None,
+        use_nat: bool = False,
+        remove_temp_data: bool = True,
     ):
         # initialized
         self.id = id
-        self.alias = alias
         self.host_addr: str = host_addr
         self.api_token: str = api_token
         self.network: str = network
         self.identity_path: str = identity_path
         self.use_nat: bool = use_nat
+        self.remove_temp_data: bool = remove_temp_data
+        self.base_port: int = base_port
+        self.temp_data_dir = tempfile.TemporaryDirectory(prefix=f"{NODE_NAME_PREFIX}_{self.id}_")
 
         # optional
         self.cfg_file: str = cfg_file
+        self.api_addr: str = api_addr
+        if api_addr is None:
+            self.api_addr = host_addr
 
         # generated
         self.safe_address: str = None
@@ -62,26 +70,64 @@ class Node:
         self.proc: Popen = None
 
         # private
-        self.peer_id: str = None
         self.address: str = None
         self.dir: Path = None
         self.cfg_file_path: Path = None
         self.api_port: int = 0
         self.p2p_port: int = 0
         self.anvil_port: int = 0
+        self.tokio_console_port: int = 0
 
         self.prepare()
 
     @property
     def api(self):
-        return HoprdAPI(f"http://{self.host_addr}:{self.api_port}", self.api_token)
+        return HoprdAPI(f"http://{self.api_addr}:{self.api_port}", self.api_token)
 
     def prepare(self):
-        self.anvil_port = PORT_BASE
         self.dir = MAIN_DIR.joinpath(f"{NODE_NAME_PREFIX}_{self.id}")
         self.cfg_file_path = MAIN_DIR.joinpath(self.cfg_file)
-        self.api_port = PORT_BASE + (self.id * 10) + 1
-        self.p2p_port = PORT_BASE + (self.id * 10) + 2
+        self.anvil_port = self.base_port
+        self.api_port = self.base_port + (self.id * 3)
+        self.p2p_port = self.api_port + 1
+        self.tokio_console_port = self.p2p_port + 1
+
+        logging.info(
+            f"Node {self.id} ports: "
+            + f"api {self.api_port}, "
+            + f"p2p {self.p2p_port}, "
+            + f"tokio console {self.tokio_console_port}, "
+            + f"anvil {self.anvil_port}"
+        )
+
+    def load_native_address(self):
+        logging.debug(f"Reading node_id {self}")
+
+        safe_custom_env = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "PATH": os.environ["PATH"],
+        }
+
+        res = run(
+            [
+                "hopli",
+                "identity",
+                "read",
+                "--identity-from-path",
+                self.dir.joinpath("hoprd.id"),
+            ],
+            env=os.environ | safe_custom_env,
+            check=True,
+            capture_output=True,
+            text=True,
+            cwd=PWD,
+        )
+
+        for el in res.stdout.split("\n"):
+            if el.startswith("Identity addresses:"):
+                logging.debug(f"Node {self.id} identity read line: {el}")
+                self.address = el.split("[")[-1].rstrip("]")
 
     def load_addresses(self):
         loaded_env = load_env_file(self.dir.joinpath(".env"))
@@ -115,7 +161,7 @@ class Node:
                 "--contracts-root",
                 "./ethereum/contracts",
                 "--hopr-amount",
-                "20000.0",
+                "200000000000.0",
                 "--native-amount",
                 "10.0",
                 "--private-key",
@@ -150,7 +196,7 @@ class Node:
         logging.error(f"Failed to create safe for node {self.id}: {res.stdout} - {res.stderr}")
         return False
 
-    def setup(self, password: str, config_file: Path, dir: Path):
+    def setup(self, password: str, config_file: Path, dir: Path, log_tag: str):
         trace_telemetry = "true" if os.getenv("TRACE_TELEMETRY") is not None else "false"
         log_level = "trace" if os.getenv("TRACE_TELEMETRY") is not None else "debug"
 
@@ -159,22 +205,22 @@ class Node:
             "RUST_LOG": ",".join(
                 [
                     log_level,
-                    "libp2p_swarm=info",
-                    "multistream_select=info",
-                    "isahc=error",
-                    "sea_orm=warn",
-                    "sqlx=warn",
                     "hyper_util=warn",
+                    "hickory_resolver=warn",
+                    "isahc=error",
+                    "libp2p_swarm=info",
                     "libp2p_tcp=info",
                     "libp2p_dns=info",
-                    "hickory_resolver=warn",
+                    "multistream_select=info",
+                    "sea_orm=warn",
+                    "sqlx=warn",
                 ]
             ),
             "RUST_BACKTRACE": "full",
             "HOPR_TEST_DISABLE_CHECKS": "true",
             "HOPRD_USE_OPENTELEMETRY": trace_telemetry,
             "OTEL_SERVICE_NAME": f"hoprd-{self.p2p_port}",
-            "TOKIO_CONSOLE_BIND": f"localhost:{self.p2p_port+100}",
+            "TOKIO_CONSOLE_BIND": f"localhost:{self.tokio_console_port}",
             "HOPRD_NAT": "true" if self.use_nat else "false",
         }
         loaded_env = load_env_file(self.dir.joinpath(".env"))
@@ -186,8 +232,9 @@ class Node:
             "--init",
             "--testAnnounceLocalAddresses",
             "--testPreferLocalAddresses",
+            f"--apiHost={self.api_addr}",
             f"--apiPort={self.api_port}",
-            f"--data={self.dir}",
+            f"--data={self.temp_data_dir.name}",
             f"--host={self.host_addr}:{self.p2p_port}",
             f"--identity={self.dir.joinpath('hoprd.id')}",
             f"--network={self.network}",
@@ -198,8 +245,9 @@ class Node:
         ]
         if self.cfg_file_path is not None:
             cmd += [f"--configurationFilePath={self.cfg_file_path}"]
+        log_file_name = f"hoprd.{log_tag}.log" if log_tag else "hoprd.log"
 
-        with open(self.dir.joinpath("hoprd.log"), "w") as log_file:
+        with open(self.dir.joinpath(log_file_name), "w") as log_file:
             self.proc = Popen(
                 cmd,
                 stdout=log_file,
@@ -214,11 +262,12 @@ class Node:
         ready = False
 
         while not ready:
-            peers_info = await asyncio.wait_for(self.api.peers(), timeout=1)
+            # we choose a long timeout here to accomodate the node just starting
+            peers_info = await asyncio.wait_for(self.api.peers(), timeout=10)
             logging.debug(f"Peers info on {self.id}: {peers_info}")
 
-            # filter out peers that are not not well connection yet
-            connected_peers = [p.peer_id for p in peers_info if p.quality >= 0.25]
+            # filter out peers that are not well-connected yet
+            connected_peers = [p.address for p in peers_info if p.quality >= 0.25]
             connected_peers.sort()
             logging.debug(f"Peers connected on {self.id}: {connected_peers}")
 
@@ -229,59 +278,71 @@ class Node:
 
             if not ready:
                 await asyncio.sleep(0.5)
+            else:
+                logging.info(f"All peers connected on {self.id}")
 
         return ready
 
     def clean_up(self):
         self.proc.kill()
+        if self.remove_temp_data:
+            try:
+                self.temp_data_dir.cleanup()
+            except OSError as e:
+                logging.warning(f"Failed to cleanup temporary directory for node {self.id}: {e}")
 
     @classmethod
-    def fromConfig(cls, index: int, alias: str, config: dict, api_token: dict, network: str, use_nat: bool):
-        token = api_token["default"]
-
-        if "api_token" in config:
-            token = config["api_token"]
+    def fromConfig(
+        cls,
+        index: int,
+        config: dict,
+        defaults: dict,
+        network: str,
+        use_nat: bool,
+        exposed: bool,
+        base_port: int,
+    ):
+        token = config.get("api_token", defaults.get("api_token"))
 
         return cls(
-            index, token, config["host"], network, config["identity_path"], config["config_file"], alias, use_nat
+            index,
+            token,
+            config["host"],
+            network,
+            config["identity_path"],
+            config["config_file"],
+            api_addr="0.0.0.0" if exposed else None,
+            use_nat=use_nat,
+            base_port=base_port,
         )
 
-    async def alias_peers(self, aliases_dict: dict[str, str]):
-        for peer_id, alias in aliases_dict.items():
-            if peer_id == self.peer_id:
-                continue
-            await self.api.aliases_set_alias(alias, peer_id)
-
-    async def connect_peers(self, peer_ids: list[str]):
+    async def connect_peers(self, addresses: list[str]):
         tasks = []
 
-        for peer_id in peer_ids:
-            if peer_id == self.peer_id:
+        for address in addresses:
+            if address == self.address:
                 continue
-            tasks.append(
-                asyncio.create_task(self.api.open_channel(peer_id, f"{OPEN_CHANNEL_FUNDING_VALUE_HOPR*1e18:.0f}"))
-            )
+            tasks.append(asyncio.create_task(self.api.open_channel(address, OPEN_CHANNEL_FUNDING_VALUE_HOPR)))
 
         await asyncio.gather(*tasks)
 
     async def links(self):
         addresses = await self.api.addresses()
-        admin_ui_params = f"apiEndpoint=http://{self.host_addr}:{self.api_port}&apiToken={self.api_token}"
+        admin_ui_params = f"apiEndpoint=http://{self.api_addr}:{self.api_port}&apiToken={self.api_token}"
 
         output_strings = []
 
         output_strings.append(f"\t{self}")
-        output_strings.append(f"\t\tPeer Id:\t{addresses.hopr}")
         output_strings.append(f"\t\tAddress:\t{addresses.native}")
         output_strings.append(
-            f"\t\tRest API:\thttp://{self.host_addr}:{self.api_port}/scalar | http://{self.host_addr}:{self.api_port}/swagger-ui/index.html"
+            f"\t\tRest API:\thttp://{self.api_addr}:{self.api_port}/scalar | http://{self.api_addr}:{self.api_port}/swagger-ui/index.html"
         )
         output_strings.append(f"\t\tAdmin UI:\thttp://{self.host_addr}:4677/?{admin_ui_params}\n\n")
 
         return "\n".join(output_strings)
 
     def __eq__(self, other):
-        return self.peer_id == other.peer_id
+        return self.address == other.address
 
     def __str__(self):
-        return f"{self.alias} @ {self.host_addr}:{self.api_port}"
+        return f"node @ {self.api_addr}:{self.api_port}"

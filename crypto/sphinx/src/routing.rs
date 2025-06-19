@@ -1,361 +1,568 @@
+use std::{
+    fmt::{Debug, Formatter},
+    marker::PhantomData,
+    num::NonZeroUsize,
+};
+
 use hopr_crypto_random::random_fill;
-use hopr_crypto_types::prelude::*;
+use hopr_crypto_types::{
+    crypto_traits::{StreamCipher, StreamCipherSeek, UniversalHash},
+    prelude::*,
+    types::Pseudonym,
+};
 use hopr_primitive_types::prelude::*;
+use typenum::Unsigned;
 
-use crate::derivation::derive_mac_key;
-use crate::prg::{PRGParameters, PRG};
-use crate::routing::ForwardedHeader::{FinalNode, RelayNode};
-use crate::shared_keys::{SharedSecret, SphinxSuite};
+use crate::{
+    derivation::{generate_key, generate_key_iv},
+    shared_keys::SharedSecret,
+};
 
-const RELAYER_END_PREFIX: u8 = 0xff;
+/// Current version of the header
+const SPHINX_HEADER_VERSION: u8 = 1;
 
-const PATH_POSITION_LEN: usize = 1;
+const HASH_KEY_PRG: &str = "HASH_KEY_PRG";
 
-/// Length of the header routing information per hop
-const fn routing_information_length<S: SphinxSuite>(additional_data_relayer_len: usize) -> usize {
-    <S::P as Keypair>::Public::SIZE + PATH_POSITION_LEN + SimpleMac::SIZE + additional_data_relayer_len
-}
+const HASH_KEY_TAG: &str = "HASH_KEY_TAG";
 
-/// Returns the size of the packet header given the information about the number of hops and additional relayer info.
-pub const fn header_length<S: SphinxSuite>(
-    max_hops: usize,
-    additional_data_relayer_len: usize,
-    additional_data_last_hop_len: usize,
-) -> usize {
-    let last_hop = additional_data_last_hop_len + 1; // 1 = end prefix length
-    last_hop + (max_hops - 1) * routing_information_length::<S>(additional_data_relayer_len)
-}
+/// Contains the necessary size and type specifications for the Sphinx packet header.
+pub trait SphinxHeaderSpec {
+    /// Maximum number of hops.
+    const MAX_HOPS: NonZeroUsize;
 
-fn generate_filler(
-    max_hops: usize,
-    routing_info_len: usize,
-    routing_info_last_hop_len: usize,
-    secrets: &[SharedSecret],
-) -> Box<[u8]> {
-    if secrets.len() < 2 {
-        return vec![].into_boxed_slice();
+    /// Public key identifier type.
+    type KeyId: BytesRepresentable + Clone;
+
+    /// Pseudonym used to represent node for SURBs.
+    type Pseudonym: Pseudonym;
+
+    /// Type representing additional data for relayers.
+    type RelayerData: BytesRepresentable;
+
+    /// Type representing additional data delivered to the packet receiver.
+    ///
+    /// It is delivered on both forward and return paths.
+    type PacketReceiverData: BytesRepresentable;
+
+    /// Type representing additional data delivered with each SURB to the packet receiver.
+    ///
+    /// It is delivered only on the forward path.
+    type SurbReceiverData: BytesRepresentable;
+
+    /// Pseudo-Random Generator function used to encrypt and decrypt the Sphinx header.
+    type PRG: crypto_traits::StreamCipher + crypto_traits::StreamCipherSeek + crypto_traits::KeyIvInit;
+
+    /// One-time authenticator used for Sphinx header tag.
+    type UH: crypto_traits::UniversalHash + crypto_traits::KeyInit;
+
+    /// Size of the additional data for relayers.
+    const RELAYER_DATA_SIZE: usize = Self::RelayerData::SIZE;
+
+    /// Size of the additional data included in SURBs.
+    const SURB_RECEIVER_DATA_SIZE: usize = Self::SurbReceiverData::SIZE;
+
+    /// Size of the additional data for the packet receiver.
+    const RECEIVER_DATA_SIZE: usize = Self::PacketReceiverData::SIZE;
+
+    /// Size of the public key identifier
+    const KEY_ID_SIZE: NonZeroUsize = NonZeroUsize::new(Self::KeyId::SIZE).unwrap();
+
+    /// Size of the one-time authenticator tag.
+    const TAG_SIZE: usize = <Self::UH as crypto_traits::BlockSizeUser>::BlockSize::USIZE;
+
+    /// Length of the header routing information per hop.
+    ///
+    /// **The value shall not be overridden**.
+    const ROUTING_INFO_LEN: usize =
+        HeaderPrefix::SIZE + Self::KEY_ID_SIZE.get() + Self::TAG_SIZE + Self::RELAYER_DATA_SIZE;
+
+    /// Length of the whole Sphinx header.
+    ///
+    /// **The value shall not be overridden**.
+    const HEADER_LEN: usize =
+        HeaderPrefix::SIZE + Self::RECEIVER_DATA_SIZE + (Self::MAX_HOPS.get() - 1) * Self::ROUTING_INFO_LEN;
+
+    /// Extended header size used for computations.
+    ///
+    /// **The value shall not be overridden**.
+    const EXT_HEADER_LEN: usize =
+        HeaderPrefix::SIZE + Self::RECEIVER_DATA_SIZE + Self::MAX_HOPS.get() * Self::ROUTING_INFO_LEN;
+
+    fn generate_filler(secrets: &[SharedSecret]) -> hopr_crypto_types::errors::Result<Box<[u8]>> {
+        if secrets.len() < 2 {
+            return Ok(vec![].into_boxed_slice());
+        }
+
+        if secrets.len() > Self::MAX_HOPS.into() {
+            return Err(CryptoError::InvalidInputValue("secrets.len"));
+        }
+
+        let padding_len = (Self::MAX_HOPS.get() - secrets.len()) * Self::ROUTING_INFO_LEN;
+
+        let mut ret = vec![0u8; Self::HEADER_LEN - padding_len - Self::Pseudonym::SIZE - 1];
+        let mut length = Self::ROUTING_INFO_LEN;
+        let mut start = Self::HEADER_LEN;
+
+        for secret in secrets.iter().take(secrets.len() - 1) {
+            let mut prg = Self::new_prg(secret)?;
+            prg.seek(start);
+            prg.apply_keystream(&mut ret[0..length]);
+
+            length += Self::ROUTING_INFO_LEN;
+            start -= Self::ROUTING_INFO_LEN;
+        }
+
+        Ok(ret.into_boxed_slice())
     }
 
-    assert!(max_hops >= secrets.len(), "too few hops");
-    assert!(routing_info_len > 0, "invalid routing info length");
+    /// Instantiates a new Pseudo-Random Generator.
+    fn new_prg(secret: &SecretKey) -> hopr_crypto_types::errors::Result<Self::PRG> {
+        generate_key_iv(secret, HASH_KEY_PRG, None)
+    }
+}
 
-    let header_len = routing_info_last_hop_len + (max_hops - 1) * routing_info_len;
-    let padding_len = (max_hops - secrets.len()) * routing_info_len;
+/// Sphinx header byte prefix
+///
+/// ### Layout (MSB first)
+/// `Version (3 bits), No Ack flag (1 bit), Reply flag (1 bit), Path position (3 bits)`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct HeaderPrefix(u8);
 
-    let mut ret = vec![0u8; header_len - padding_len - routing_info_last_hop_len];
+impl HeaderPrefix {
+    pub const SIZE: usize = 1;
 
-    let mut length = routing_info_len;
-    let mut start = header_len;
+    pub fn new(is_reply: bool, no_ack: bool, path_pos: u8) -> Result<Self, GeneralError> {
+        // Due to size restriction, we do not allow greater than 7 hop paths.
+        if path_pos > 7 {
+            return Err(GeneralError::ParseError("HeaderPrefixByte".into()));
+        }
 
-    for secret in secrets.iter().take(secrets.len() - 1) {
-        let prg = PRG::from_parameters(PRGParameters::new(secret));
-
-        let digest = prg.digest(start, header_len + routing_info_len);
-        xor_inplace(&mut ret[0..length], digest.as_ref());
-
-        length += routing_info_len;
-        start -= routing_info_len;
+        let mut out = 0;
+        out |= (SPHINX_HEADER_VERSION & 0x07) << 5;
+        out |= (no_ack as u8) << 4;
+        out |= (is_reply as u8) << 3;
+        out |= path_pos & 0x07;
+        Ok(Self(out))
     }
 
-    ret.into_boxed_slice()
+    #[inline]
+    pub fn is_reply(&self) -> bool {
+        (self.0 & 0x08) != 0
+    }
+
+    #[inline]
+    pub fn is_no_ack(&self) -> bool {
+        (self.0 & 0x10) != 0
+    }
+
+    #[inline]
+    pub fn path_position(&self) -> u8 {
+        self.0 & 0x07
+    }
+
+    #[inline]
+    pub fn is_final_hop(&self) -> bool {
+        self.path_position() == 0
+    }
 }
 
-/// Carries routing information for the mixnet packet.
-pub struct RoutingInfo {
-    pub routing_information: Box<[u8]>,
-    pub mac: [u8; SimpleMac::SIZE],
+impl From<HeaderPrefix> for u8 {
+    fn from(value: HeaderPrefix) -> Self {
+        value.0
+    }
 }
 
-impl Default for RoutingInfo {
-    fn default() -> Self {
-        Self {
-            routing_information: Box::default(),
-            mac: [0u8; SimpleMac::SIZE],
+impl TryFrom<u8> for HeaderPrefix {
+    type Error = GeneralError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if (value & 0xe0) >> 5 == SPHINX_HEADER_VERSION {
+            Ok(Self(value))
+        } else {
+            Err(GeneralError::ParseError("invalid header version".into()))
         }
     }
 }
 
-impl RoutingInfo {
-    /// Creates the routing information of the mixnet packet
+/// Carries routing information for the mixnet packet.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RoutingInfo<H: SphinxHeaderSpec>(Box<[u8]>, PhantomData<H>);
+
+impl<H: SphinxHeaderSpec> Debug for RoutingInfo<H> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_hex())
+    }
+}
+
+impl<H: SphinxHeaderSpec> Clone for RoutingInfo<H> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), PhantomData)
+    }
+}
+
+impl<H: SphinxHeaderSpec> PartialEq for RoutingInfo<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<H: SphinxHeaderSpec> Eq for RoutingInfo<H> {}
+
+impl<H: SphinxHeaderSpec> Default for RoutingInfo<H> {
+    fn default() -> Self {
+        Self(vec![0u8; Self::SIZE].into_boxed_slice(), PhantomData)
+    }
+}
+
+impl<H: SphinxHeaderSpec> AsRef<[u8]> for RoutingInfo<H> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a, H: SphinxHeaderSpec> TryFrom<&'a [u8]> for RoutingInfo<H> {
+    type Error = GeneralError;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        if value.len() == Self::SIZE {
+            Ok(Self(value.into(), PhantomData))
+        } else {
+            Err(GeneralError::ParseError("RoutingInfo".into()))
+        }
+    }
+}
+
+impl<H: SphinxHeaderSpec> BytesRepresentable for RoutingInfo<H> {
+    const SIZE: usize = H::HEADER_LEN + H::TAG_SIZE;
+}
+
+impl<H: SphinxHeaderSpec> RoutingInfo<H> {
+    /// Creates the routing information of the mixnet packet.
+    ///
     /// # Arguments
-    /// * `max_hops` maximal number of hops
-    /// * `path` IDs of the nodes along the path
+    /// * `path` IDs of the nodes along the path (usually its public key or public key identifier).
     /// * `secrets` shared secrets with the nodes along the path
-    /// * `additional_data_relayer_len` length of each additional data for all relayers
     /// * `additional_data_relayer` additional data for each relayer
-    /// * `additional_data_last_hop` additional data for the final recipient
-    pub fn new<S: SphinxSuite>(
-        max_hops: usize,
-        path: &[<S::P as Keypair>::Public],
+    /// * `receiver_data` data for the packet receiver (this usually contains also `H::Pseudonym`).
+    /// * `is_reply` flag indicating whether this is a reply packet
+    /// * `no_ack` special flag used for acknowledgement signaling to the recipient
+    pub fn new(
+        path: &[H::KeyId],
         secrets: &[SharedSecret],
-        additional_data_relayer_len: usize,
-        additional_data_relayer: &[&[u8]],
-        additional_data_last_hop: Option<&[u8]>,
-    ) -> Self {
-        assert!(
-            secrets.len() <= max_hops && !secrets.is_empty(),
-            "invalid number of secrets given"
-        );
-        assert!(
-            additional_data_relayer
-                .iter()
-                .all(|r| r.len() == additional_data_relayer_len),
-            "invalid relayer data length"
-        );
-        assert!(
-            additional_data_last_hop.is_none() || !additional_data_last_hop.unwrap().is_empty(),
-            "invalid additional data for last hop"
-        );
+        additional_data_relayer: &[H::RelayerData],
+        receiver_data: &H::PacketReceiverData,
+        is_reply: bool,
+        no_ack: bool,
+    ) -> hopr_crypto_types::errors::Result<Self> {
+        assert!(H::MAX_HOPS.get() <= 7, "maximum number of hops supported is 7");
 
-        let routing_info_len = routing_information_length::<S>(additional_data_relayer_len);
-        let last_hop_len = additional_data_last_hop.map(|d| d.len()).unwrap_or(0) + 1; // end prefix length
-        let header_len = header_length::<S>(max_hops, additional_data_relayer_len, last_hop_len - 1);
+        if path.len() != secrets.len() {
+            return Err(CryptoError::InvalidParameterSize {
+                name: "path",
+                expected: secrets.len(),
+            });
+        }
 
-        let extended_header_len = last_hop_len + max_hops * routing_info_len;
+        if secrets.len() > H::MAX_HOPS.get() {
+            return Err(CryptoError::InvalidInputValue("secrets.len"));
+        }
 
-        let mut extended_header = vec![0u8; extended_header_len];
+        let mut extended_header = vec![0u8; H::EXT_HEADER_LEN];
         let mut ret = RoutingInfo::default();
 
         for idx in 0..secrets.len() {
             let inverted_idx = secrets.len() - idx - 1;
-            let prg = PRG::from_parameters(PRGParameters::new(&secrets[inverted_idx]));
+            let prefix = HeaderPrefix::new(is_reply, no_ack, idx as u8)?;
+
+            let mut prg = H::new_prg(&secrets[inverted_idx])?;
 
             if idx == 0 {
-                extended_header[0] = RELAYER_END_PREFIX;
+                // Prefix byte
+                extended_header[0] = prefix.into();
 
-                if let Some(data) = additional_data_last_hop {
-                    extended_header[1..data.len()].copy_from_slice(data);
-                }
+                // Last hop additional data
+                extended_header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::PacketReceiverData::SIZE]
+                    .copy_from_slice(receiver_data.as_ref());
 
-                let padding_len = (max_hops - secrets.len()) * routing_info_len;
+                // Random padding for the rest of the extended header
+                let padding_len = (H::MAX_HOPS.get() - secrets.len()) * H::ROUTING_INFO_LEN;
                 if padding_len > 0 {
-                    random_fill(&mut extended_header[last_hop_len..padding_len]);
+                    random_fill(
+                        &mut extended_header[HeaderPrefix::SIZE + H::PacketReceiverData::SIZE
+                            ..HeaderPrefix::SIZE + H::PacketReceiverData::SIZE + padding_len],
+                    );
                 }
 
-                let key_stream = prg.digest(0, last_hop_len + padding_len);
-                xor_inplace(&mut extended_header[0..last_hop_len + padding_len], &key_stream);
+                // Encrypt last hop data and padding
+                prg.apply_keystream(
+                    &mut extended_header[0..HeaderPrefix::SIZE + H::PacketReceiverData::SIZE + padding_len],
+                );
 
                 if secrets.len() > 1 {
-                    let filler = generate_filler(max_hops, routing_info_len, last_hop_len, secrets);
-                    extended_header[last_hop_len + padding_len..last_hop_len + padding_len + filler.len()]
+                    let filler = H::generate_filler(secrets)?;
+                    extended_header[HeaderPrefix::SIZE + H::PacketReceiverData::SIZE + padding_len
+                        ..HeaderPrefix::SIZE + H::PacketReceiverData::SIZE + padding_len + filler.len()]
                         .copy_from_slice(&filler);
                 }
             } else {
-                extended_header.copy_within(0..header_len, routing_info_len);
+                // Shift everything to the right to make space for the next hop's routing info
+                extended_header.copy_within(0..H::HEADER_LEN, H::ROUTING_INFO_LEN);
 
-                let pub_key_size = <S::P as Keypair>::Public::SIZE;
-
-                // Path position must come first,to ensure prefix RELAYER_END_PREFIX prefix safety
+                // Prefix byte must come first to ensure prefix RELAYER_END_PREFIX prefix safety
                 // of Ed25519 public keys.
-                extended_header[0] = idx as u8;
-                extended_header[PATH_POSITION_LEN..PATH_POSITION_LEN + pub_key_size]
-                    .copy_from_slice(path[inverted_idx + 1].as_ref());
-                extended_header[PATH_POSITION_LEN + pub_key_size..PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE]
-                    .copy_from_slice(&ret.mac);
-                extended_header[PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE
-                    ..PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE + additional_data_relayer[inverted_idx].len()]
-                    .copy_from_slice(additional_data_relayer[inverted_idx]);
+                extended_header[0] = prefix.into();
 
-                let key_stream = prg.digest(0, header_len);
-                xor_inplace(&mut extended_header, &key_stream);
+                // Each public key identifier must have an equal length
+                let key_ident = path[inverted_idx + 1].as_ref();
+                if key_ident.len() != H::KEY_ID_SIZE.get() {
+                    return Err(CryptoError::InvalidParameterSize {
+                        name: "path[..]",
+                        expected: H::KEY_ID_SIZE.into(),
+                    });
+                }
+                // Copy the public key identifier
+                extended_header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get()]
+                    .copy_from_slice(key_ident);
+
+                // Include the last computed authentication tag
+                extended_header[HeaderPrefix::SIZE + H::KEY_ID_SIZE.get()
+                    ..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE]
+                    .copy_from_slice(ret.mac());
+
+                // The additional relayer data is optional
+                if H::RELAYER_DATA_SIZE > 0 {
+                    if let Some(relayer_data) = additional_data_relayer.get(inverted_idx).map(|d| d.as_ref()) {
+                        if relayer_data.len() != H::RELAYER_DATA_SIZE {
+                            return Err(CryptoError::InvalidParameterSize {
+                                name: "additional_data_relayer[..]",
+                                expected: H::RELAYER_DATA_SIZE,
+                            });
+                        }
+
+                        extended_header[HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE
+                            ..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE + H::RELAYER_DATA_SIZE]
+                            .copy_from_slice(relayer_data);
+                    }
+                }
+
+                // Encrypt the entire extended header
+                prg.apply_keystream(&mut extended_header[0..H::HEADER_LEN]);
             }
 
-            let mut m = SimpleMac::new(&derive_mac_key(&secrets[inverted_idx]));
-            m.update(&extended_header[0..header_len]);
-            m.finalize_into(&mut ret.mac);
+            let mut uh: H::UH = generate_key(&secrets[inverted_idx], HASH_KEY_TAG, None)
+                .map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
+            uh.update_padded(&extended_header[0..H::HEADER_LEN]);
+            ret.mac_mut().copy_from_slice(&uh.finalize());
         }
 
-        ret.routing_information = (&extended_header[0..header_len]).into();
-        ret
+        ret.routing_mut().copy_from_slice(&extended_header[0..H::HEADER_LEN]);
+        Ok(ret)
+    }
+
+    fn mac(&self) -> &[u8] {
+        &self.0[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE]
+    }
+
+    fn routing_mut(&mut self) -> &mut [u8] {
+        &mut self.0[0..H::HEADER_LEN]
+    }
+
+    fn mac_mut(&mut self) -> &mut [u8] {
+        &mut self.0[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE]
     }
 }
 
 /// Enum carry information about the packet based on whether it is destined for the current node (`FinalNode`)
 /// or if the packet is supposed to be only relayed (`RelayNode`).
-pub enum ForwardedHeader {
-    /// Packet is supposed to be relayed
-    RelayNode {
+pub enum ForwardedHeader<H: SphinxHeaderSpec> {
+    /// The packet is supposed to be relayed
+    Relayed {
         /// Transformed header
-        header: Box<[u8]>,
-        /// Authentication tag
-        mac: [u8; SimpleMac::SIZE],
+        next_header: RoutingInfo<H>,
         /// Position of the relay in the path
         path_pos: u8,
         /// Public key of the next node
-        next_node: Box<[u8]>,
+        next_node: H::KeyId,
         /// Additional data for the relayer
-        additional_info: Box<[u8]>,
+        additional_info: H::RelayerData,
     },
 
-    /// Packet is at its final destination
-    FinalNode {
-        /// Additional data for the final destination
-        additional_data: Box<[u8]>,
+    /// The packet is at its final destination
+    Final {
+        /// Data from the sender to the packet receiver.
+        /// This usually contains also `H::Pseudonym`.
+        receiver_data: H::PacketReceiverData,
+        /// Indicates whether this message is a reply and a [`ReplyOpener`](crate::surb::ReplyOpener)
+        /// should be used to further decrypt the message.
+        is_reply: bool,
+        /// Special flag used for acknowledgement signaling.
+        no_ack: bool,
     },
 }
 
 /// Applies the forward transformation to the header.
-/// If the packet is destined for this node, returns the additional data
-/// for the final destination (`FinalNode`), otherwise it returns the transformed header, the
+/// If the packet is destined for this node, it returns the additional data
+/// for the final destination ([`ForwardedHeader::Final`]).
+/// Otherwise, it returns the transformed header, the
 /// next authentication tag, the public key of the next node, and the additional data
-/// for the relayer (`RelayNode`).
+/// for the relayer ([`ForwardedHeader::Relayed`]).
+///
 /// # Arguments
-/// * `secret` shared secret with the creator of the packet
-/// * `header` u8a containing the header
-/// * `mac` current mac
-/// * `max_hops` maximal number of hops
-/// * `additional_data_relayer_len` length of the additional data for each relayer
-/// * `additional_data_last_hop_len` length of the additional data for the final destination
-pub fn forward_header<S: SphinxSuite>(
+/// * `secret` - the shared secret with the creator of the packet
+/// * `header` - entire sphinx header to be forwarded
+pub fn forward_header<H: SphinxHeaderSpec>(
     secret: &SecretKey,
     header: &mut [u8],
-    mac: &[u8],
-    max_hops: usize,
-    additional_data_relayer_len: usize,
-    additional_data_last_hop_len: usize,
-) -> hopr_crypto_types::errors::Result<ForwardedHeader> {
-    assert_eq!(SimpleMac::SIZE, mac.len(), "invalid mac length");
-
-    let routing_info_len = routing_information_length::<S>(additional_data_relayer_len);
-    let last_hop_len = additional_data_last_hop_len + 1; // end prefix
-    let header_len = header_length::<S>(max_hops, additional_data_relayer_len, last_hop_len - 1);
-
-    assert_eq!(header_len, header.len(), "invalid pre-header length");
-
-    let mut computed_mac = SimpleMac::new(&derive_mac_key(secret));
-    computed_mac.update(header);
-    if !mac.eq(computed_mac.finalize().as_slice()) {
-        return Err(CryptoError::TagMismatch);
+) -> hopr_crypto_types::errors::Result<ForwardedHeader<H>> {
+    if header.len() != RoutingInfo::<H>::SIZE {
+        return Err(CryptoError::InvalidParameterSize {
+            name: "header",
+            expected: H::HEADER_LEN,
+        });
     }
 
-    // Unmask the header using the keystream
-    let prg = PRG::from_parameters(PRGParameters::new(secret));
-    let key_stream = prg.digest(0, header_len);
-    xor_inplace(header, &key_stream);
+    // Compute and verify the authentication tag
+    let mut uh: H::UH =
+        generate_key(secret, HASH_KEY_TAG, None).map_err(|_| CryptoError::InvalidInputValue("mac_key"))?;
+    uh.update_padded(&header[0..H::HEADER_LEN]);
+    uh.verify(header[H::HEADER_LEN..H::HEADER_LEN + H::TAG_SIZE].into())
+        .map_err(|_| CryptoError::TagMismatch)?;
 
-    if header[0] != RELAYER_END_PREFIX {
-        // Path position
-        let path_pos: u8 = header[0];
+    // Decrypt the header using the key=stream
+    let mut prg = H::new_prg(secret)?;
+    prg.apply_keystream(&mut header[0..H::HEADER_LEN]);
 
-        let pub_key_size = <S::P as Keypair>::Public::SIZE;
+    let prefix = HeaderPrefix::try_from(header[0])?;
 
+    if !prefix.is_final_hop() {
         // Try to deserialize the public key to validate it
-        let next_node: Box<[u8]> = (&header[PATH_POSITION_LEN..PATH_POSITION_LEN + pub_key_size]).into();
+        let next_node = (&header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get()])
+            .try_into()
+            .map_err(|_| CryptoError::InvalidInputValue("next_node"))?;
+
+        let mut next_header = RoutingInfo::<H>::default();
 
         // Authentication tag
-        let mac: [u8; SimpleMac::SIZE] = (&header
-            [PATH_POSITION_LEN + pub_key_size..PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE])
+        next_header.mac_mut().copy_from_slice(
+            &header[HeaderPrefix::SIZE + H::KEY_ID_SIZE.get()..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE],
+        );
+
+        // Optional additional relayer data
+        let additional_info = (&header[HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE
+            ..HeaderPrefix::SIZE + H::KEY_ID_SIZE.get() + H::TAG_SIZE + H::RELAYER_DATA_SIZE])
             .try_into()
-            .unwrap();
+            .map_err(|_| CryptoError::InvalidInputValue("additional_relayer_data"))?;
 
-        let additional_info: Box<[u8]> = (&header[PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE
-            ..PATH_POSITION_LEN + pub_key_size + SimpleMac::SIZE + additional_data_relayer_len])
-            .into();
+        // Shift the entire header to the left to discard the data we just read
+        header.copy_within(H::ROUTING_INFO_LEN..H::HEADER_LEN, 0);
 
-        header.copy_within(routing_info_len.., 0);
-        let key_stream = prg.digest(header_len, header_len + routing_info_len);
-        header[header_len - routing_info_len..].copy_from_slice(&key_stream);
+        // Erase the read data from the header to apply the raw key-stream
+        header[H::HEADER_LEN - H::ROUTING_INFO_LEN..H::HEADER_LEN].fill(0);
+        prg.seek(H::HEADER_LEN);
+        prg.apply_keystream(&mut header[H::HEADER_LEN - H::ROUTING_INFO_LEN..H::HEADER_LEN]);
 
-        Ok(RelayNode {
-            header: (&header[..header_len]).into(),
-            mac,
-            path_pos,
+        next_header.routing_mut().copy_from_slice(&header[0..H::HEADER_LEN]);
+
+        Ok(ForwardedHeader::Relayed {
+            next_header,
+            path_pos: prefix.path_position(),
             next_node,
             additional_info,
         })
     } else {
-        Ok(FinalNode {
-            additional_data: (&header[1..1 + additional_data_last_hop_len]).into(),
+        Ok(ForwardedHeader::Final {
+            receiver_data: (&header[HeaderPrefix::SIZE..HeaderPrefix::SIZE + H::PacketReceiverData::SIZE])
+                .try_into()
+                .map_err(|_| CryptoError::InvalidInputValue("receiver_data"))?,
+            is_reply: prefix.is_reply(),
+            no_ack: prefix.is_no_ack(),
         })
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use hopr_crypto_types::keypairs::OffchainKeypair;
+pub(crate) mod tests {
+    use hopr_crypto_random::Randomizable;
+    use hopr_crypto_types::{crypto_traits::BlockSizeUser, keypairs::OffchainKeypair};
     use parameterized::parameterized;
 
-    #[parameterized(hops = { 3, 4 })]
-    fn test_filler_generate_verify(hops: usize) {
-        let per_hop = 3;
-        let last_hop = 5;
-        let max_hops = hops;
+    use super::*;
+    use crate::{shared_keys::SphinxSuite, tests::*};
 
-        let secrets = (0..hops).map(|_| SharedSecret::random()).collect::<Vec<_>>();
-        let extended_header_len = per_hop * max_hops + last_hop;
-        let header_len = per_hop * (max_hops - 1) + last_hop;
+    #[test]
+    fn test_filler_generate_verify() -> anyhow::Result<()> {
+        let per_hop = 3 + OffchainPublicKey::SIZE + <Poly1305 as BlockSizeUser>::BlockSize::USIZE + 1;
+        let last_hop = SimplePseudonym::SIZE;
+        let max_hops = 4;
 
-        let mut extended_header = vec![0u8; per_hop * max_hops + last_hop];
+        let secrets = (0..max_hops).map(|_| SharedSecret::random()).collect::<Vec<_>>();
+        let extended_header_len = per_hop * max_hops + last_hop + 1;
+        let header_len = per_hop * (max_hops - 1) + last_hop + 1;
 
-        let filler = generate_filler(max_hops, per_hop, last_hop, &secrets);
+        let mut extended_header = vec![0u8; extended_header_len];
 
-        extended_header[last_hop..last_hop + filler.len()].copy_from_slice(&filler);
+        let filler = TestSpec::<OffchainPublicKey, 4, 3>::generate_filler(&secrets)?;
+
+        extended_header[1 + last_hop..1 + last_hop + filler.len()].copy_from_slice(&filler);
         extended_header.copy_within(0..header_len, per_hop);
 
-        for i in 0..hops - 1 {
+        for i in 0..max_hops - 1 {
             let idx = secrets.len() - i - 2;
-            let mask = PRG::from_parameters(PRGParameters::new(&secrets[idx])).digest(0, extended_header_len);
 
-            xor_inplace(&mut extended_header, &mask);
+            let mut prg = generate_key_iv::<ChaCha20, _>(&secrets[idx], HASH_KEY_PRG, None)?;
+            prg.apply_keystream(&mut extended_header);
 
-            assert!(
-                extended_header[header_len..].iter().all(|x| *x == 0),
-                "xor blinding must erase last bits"
-            );
+            let mut erased = extended_header.clone();
+            erased[header_len..].iter_mut().for_each(|x| *x = 0);
+            assert_eq!(erased, extended_header, "xor blinding must erase last bits {i}");
 
             extended_header.copy_within(0..header_len, per_hop);
         }
+
+        Ok(())
     }
 
     #[test]
-    fn test_filler_edge_case() {
-        let per_hop = 23;
-        let last_hop = 31;
+    fn test_filler_edge_case() -> anyhow::Result<()> {
         let hops = 1;
-        let max_hops = hops;
 
         let secrets = (0..hops).map(|_| SharedSecret::random()).collect::<Vec<_>>();
 
-        let first_filler = generate_filler(max_hops, per_hop, last_hop, &secrets);
+        let first_filler = TestSpec::<OffchainPublicKey, 1, 0>::generate_filler(&secrets)?;
         assert_eq!(0, first_filler.len());
 
-        let second_filler = generate_filler(0, per_hop, last_hop, &[]);
-        assert_eq!(0, second_filler.len());
+        Ok(())
     }
 
-    fn generic_test_generate_routing_info_and_forward<S>(keypairs: Vec<S::P>) -> anyhow::Result<()>
+    fn generic_test_generate_routing_info_and_forward<S>(keypairs: Vec<S::P>, reply: bool) -> anyhow::Result<()>
     where
         S: SphinxSuite,
     {
-        const MAX_HOPS: usize = 3;
-        let mut additional_data: Vec<&[u8]> = Vec::with_capacity(keypairs.len());
-        for _ in 0..keypairs.len() {
-            let e: &[u8] = &[];
-            additional_data.push(e);
-        }
-
         let pub_keys = keypairs.iter().map(|kp| kp.public().clone()).collect::<Vec<_>>();
-        let shares = S::new_shared_keys(&pub_keys).unwrap();
+        let shares = S::new_shared_keys(&pub_keys)?;
+        let pseudonym = SimplePseudonym::random();
+        let no_ack_flag = true;
 
-        let rinfo = RoutingInfo::new::<S>(MAX_HOPS, &pub_keys, &shares.secrets, 0, &additional_data, None);
-
-        let mut header: Vec<u8> = rinfo.routing_information.into();
-
-        let mut last_mac = [0u8; SimpleMac::SIZE];
-        last_mac.copy_from_slice(&rinfo.mac);
+        let mut rinfo = RoutingInfo::<TestSpec<<S::P as Keypair>::Public, 3, 0>>::new(
+            &pub_keys,
+            &shares.secrets,
+            &[],
+            &pseudonym,
+            reply,
+            no_ack_flag,
+        )?;
 
         for (i, secret) in shares.secrets.iter().enumerate() {
-            let fwd = forward_header::<S>(secret, &mut header, &last_mac, MAX_HOPS, 0, 0)?;
+            let fwd = forward_header::<TestSpec<<S::P as Keypair>::Public, 3, 0>>(secret, &mut rinfo.0)?;
 
             match fwd {
-                ForwardedHeader::RelayNode {
-                    mac,
+                ForwardedHeader::Relayed {
+                    next_header,
                     next_node,
                     path_pos,
                     ..
                 } => {
-                    last_mac.copy_from_slice(&mac);
+                    rinfo = next_header;
                     assert!(i < shares.secrets.len() - 1, "cannot be a relay node");
                     assert_eq!(
                         path_pos,
@@ -368,9 +575,15 @@ mod tests {
                         "invalid public key of the next node"
                     );
                 }
-                ForwardedHeader::FinalNode { additional_data } => {
+                ForwardedHeader::Final {
+                    receiver_data,
+                    is_reply,
+                    no_ack,
+                } => {
                     assert_eq!(shares.secrets.len() - 1, i, "cannot be a final node");
-                    assert_eq!(0, additional_data.len(), "final node must not have any additional data");
+                    assert_eq!(pseudonym, receiver_data, "invalid pseudonym");
+                    assert_eq!(is_reply, reply, "invalid reply flag");
+                    assert_eq!(no_ack, no_ack_flag, "invalid no_ack flag");
                 }
             }
         }
@@ -379,26 +592,29 @@ mod tests {
     }
 
     #[cfg(feature = "ed25519")]
-    #[parameterized(amount = { 3, 2, 1 })]
-    fn test_ed25519_generate_routing_info_and_forward(amount: usize) -> anyhow::Result<()> {
+    #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
+    fn test_ed25519_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
         generic_test_generate_routing_info_and_forward::<crate::ec_groups::Ed25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
+            reply,
         )
     }
 
     #[cfg(feature = "x25519")]
-    #[parameterized(amount = { 3, 2, 1 })]
-    fn test_x25519_generate_routing_info_and_forward(amount: usize) -> anyhow::Result<()> {
+    #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
+    fn test_x25519_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
         generic_test_generate_routing_info_and_forward::<crate::ec_groups::X25519Suite>(
             (0..amount).map(|_| OffchainKeypair::random()).collect(),
+            reply,
         )
     }
 
     #[cfg(feature = "secp256k1")]
-    #[parameterized(amount = { 3, 2, 1 })]
-    fn test_secp256k1_generate_routing_info_and_forward(amount: usize) -> anyhow::Result<()> {
+    #[parameterized(amount = { 3, 2, 1, 3, 2, 1 }, reply = { true, true, true, false, false, false })]
+    fn test_secp256k1_generate_routing_info_and_forward(amount: usize, reply: bool) -> anyhow::Result<()> {
         generic_test_generate_routing_info_and_forward::<crate::ec_groups::Secp256k1Suite>(
             (0..amount).map(|_| ChainKeypair::random()).collect(),
+            reply,
         )
     }
 }

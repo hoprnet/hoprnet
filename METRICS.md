@@ -14,7 +14,7 @@ scrape_configs:
     scrape_interval: 5s
     static_configs:
       - targets: ["localhost:3001"]
-    metrics_path: /api/v3/node/metrics
+    metrics_path: /api/v4/node/metrics
     basic_auth:
       username: ^MYtoken4testing^
       password: ""
@@ -34,7 +34,7 @@ scrape_configs:
 - `hopr_sent_acks_count`: Number of sent message acknowledgements
 - `hopr_tickets_count`: Number of tickets (winning, losing), keys: `type`
 - `hopr_ping_time_sec`: Measures total time it takes to ping a single node (seconds), buckets: 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0
-- `hopr_heartbeat_pings_count`: Total number of pings by result, keys: `success`
+- `hopr_probe_count`: Total number of probes by result, keys: `success`
 - `hopr_heartbeat_round_time_sec`: Measures total time in seconds it takes to probe all other nodes, buckets: 0.5, 1.0, 2.5, 5.0, 10.0, 15.0, 30.0
 - `hopr_network_health`: Connectivity health indicator
 - `hopr_relayed_packet_processing_time_with_mixing_sec`: Histogram of measured processing and mixing time for a relayed packet in seconds, buckets: 0.01, 0.025, 0.050, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
@@ -55,7 +55,8 @@ scrape_configs:
 - `hopr_transport_p2p_opened_connection_count`: Count of the currently active p2p connections as observed from the rust-libp2p events
 - `hopr_http_api_call_count`: Number of different REST API calls and their statuses, keys: `endpoint`, `method`, `status`
 - `hopr_http_api_call_timing_sec`: Timing of different REST API calls in seconds, keys: `endpoint`, `method`, buckets: 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0
-- `hopr_up`: The unix timestamp in seconds at which the process was started
+- `hopr_http_api_last_used_time`: The unix timestamp in seconds at which any API endpoint was last fetched
+- `hopr_start_time`: The unix timestamp in seconds at which the process was started
 - `hopr_lib_version`: Executed version of hopr-lib, keys: `version`
 - `hopr_node_addresses`: Node on-chain and off-chain addresses, keys: `peerid`, `address`, `safe_address`, `module_address`
 - `hopr_rpc_call_count`: Number of Ethereum RPC calls over HTTP and their result, key: `call`, `result`
@@ -81,3 +82,7 @@ scrape_configs:
 - `hopr_udp_ingress_packet_len`: UDP packet lengths on ingress per counterparty, keys: `counterparty`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
 - `hopr_udp_egress_packet_len`: UDP packet lengths on egress per counterparty, keys: `counterparty`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0, 2560.0, 5120.0
 - `hopr_session_inner_sizes`: Sizes of data chunks fed from inner session to HOPR protocol, keys: `session_id`, buckets: 20.0, 40.0, 80.0, 160.0, 320.0, 640.0, 1280.0
+- `hopr_surb_balancer_target_error_estimate`: Target error estimation by the SURB balancer, keys: `session_id`
+- `hopr_surb_balancer_control_output`: hopr_surb_balancer_control_output, keys: `session_id`
+- `hopr_surb_balancer_surbs_consumed`: Estimations of the number of SURBs consumed by the counterparty, keys: `session_id`
+- `hopr_surb_balancer_surbs_produced`: Estimations of the number of SURBs produced for the counterparty, keys: `session_id`

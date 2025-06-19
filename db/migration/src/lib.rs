@@ -21,6 +21,12 @@ mod m20241112_000018_logs_add_index;
 mod m20250107_000019_logs_meta_table;
 mod m20250219_000020_logs_add_index;
 mod m20250219_000021_channels_add_index;
+mod m20250419_000022_account_add_published_block;
+mod m20250528_000023_peers_reset;
+mod m20250603_000024_index_reset;
+mod m20250603_000025_peers_reset;
+mod m20250603_000026_logs_reset;
+mod m20250604_000027_index_initial_seed;
 
 #[derive(PartialEq)]
 pub enum BackendType {
@@ -65,6 +71,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20250107_000019_logs_meta_table::Migration),
             Box::new(m20250219_000020_logs_add_index::Migration),
             Box::new(m20250219_000021_channels_add_index::Migration),
+            Box::new(m20250419_000022_account_add_published_block::Migration),
+            Box::new(m20250528_000023_peers_reset::Migration),
+            Box::new(m20250603_000024_index_reset::Migration),
+            Box::new(m20250603_000025_peers_reset::Migration),
+            Box::new(m20250603_000026_logs_reset::Migration),
+            Box::new(m20250604_000027_index_initial_seed::Migration),
         ]
     }
 }
@@ -91,6 +103,9 @@ impl MigratorTrait for MigratorIndex {
             Box::new(m20240810_000014_index_extend_chain_info_with_pre_checksum_block::Migration),
             Box::new(m20240917_000015_add_minimum_incoming_ticket_win_prob_column::Migration),
             Box::new(m20250219_000021_channels_add_index::Migration),
+            Box::new(m20250419_000022_account_add_published_block::Migration),
+            Box::new(m20250603_000024_index_reset::Migration),
+            Box::new(m20250604_000027_index_initial_seed::Migration),
         ]
     }
 }
@@ -105,6 +120,8 @@ impl MigratorTrait for MigratorPeers {
             Box::new(m20240926_000016_peers_create_peer_store_with_new_sea_orm::Migration(
                 BackendType::SQLite,
             )),
+            Box::new(m20250528_000023_peers_reset::Migration),
+            Box::new(m20250603_000025_peers_reset::Migration),
         ]
     }
 }
@@ -140,6 +157,7 @@ impl MigratorTrait for MigratorChainLogs {
             Box::new(m20241112_000018_logs_add_index::Migration),
             Box::new(m20250107_000019_logs_meta_table::Migration),
             Box::new(m20250219_000020_logs_add_index::Migration),
+            Box::new(m20250603_000026_logs_reset::Migration),
         ]
     }
 }

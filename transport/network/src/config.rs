@@ -1,10 +1,11 @@
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DurationSeconds};
-use smart_default::SmartDefault;
 use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
+use serde_with::{DurationSeconds, serde_as};
+use smart_default::SmartDefault;
 use validator::Validate;
 
-/// Network quality threshold since which a node is considered
+/// Network quality threshold since when a node is considered
 /// available enough to be used
 pub const DEFAULT_NETWORK_OFFLINE_QUALITY_THRESHOLD: f64 = 0.0;
 pub const DEFAULT_NETWORK_BAD_QUALITY_THRESHOLD: f64 = 0.1;
@@ -15,7 +16,7 @@ pub const DEFAULT_NETWORK_BACKOFF_MIN: f64 = 2.0;
 
 pub const DEFAULT_AUTO_PATH_QUALITY_THRESHOLD: f64 = 0.95;
 
-pub const DEFAULT_MAX_FIRST_HOP_LATENCY_THRESHOLD: Duration = Duration::from_millis(100);
+pub const DEFAULT_MAX_FIRST_HOP_LATENCY_THRESHOLD: Duration = Duration::from_millis(250);
 
 /// Configuration for the [`crate::network::Network`] object
 #[serde_as]
@@ -133,6 +134,14 @@ impl Validate for NetworkConfig {
             );
         }
 
+        // #[validate(range(min = 0.0))]
+        if self.backoff_min < 0.0 {
+            errors.add(
+                "backoff_min",
+                validator::ValidationError::new("backoff_min must be greater or equal 0"),
+            );
+        }
+
         if self.backoff_min >= self.backoff_max {
             errors.add(
                 "backoff_min and backoff_max",
@@ -140,11 +149,7 @@ impl Validate for NetworkConfig {
             );
         }
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
     }
 }
 

@@ -2,14 +2,7 @@ use std::time::Duration;
 
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::{stream::BoxStream, TryStreamExt};
-use libp2p_identity::PeerId;
-use multiaddr::Multiaddr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
-use sea_query::{Condition, Expr, IntoCondition, Order};
-use sqlx::types::chrono::{self, DateTime, Utc};
-use tracing::{error, trace};
-
+use futures::{TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::{
     errors::Result,
@@ -17,8 +10,18 @@ use hopr_db_api::{
 };
 use hopr_db_entity::network_peer;
 use hopr_primitive_types::prelude::*;
+use libp2p_identity::PeerId;
+use multiaddr::Multiaddr;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
+use sea_query::{Condition, Expr, IntoCondition, Order};
+use sqlx::types::chrono::{self, DateTime, Utc};
+use tracing::{error, trace};
 
 use crate::{db::HoprDb, prelude::DbSqlError};
+
+const DB_BINCODE_CONFIGURATION: bincode::config::Configuration = bincode::config::standard()
+    .with_little_endian()
+    .with_variable_int_encoding();
 
 struct WrappedPeerSelector(PeerSelector);
 
@@ -74,8 +77,11 @@ impl HoprDbPeersOperations for HoprDb {
             origin: sea_orm::ActiveValue::Set(origin as i8),
             backoff: sea_orm::ActiveValue::Set(Some(backoff)),
             quality_sma: sea_orm::ActiveValue::Set(Some(
-                bincode::serialize(&SingleSumSMA::<f64>::new(quality_window as usize))
-                    .map_err(|_| crate::errors::DbSqlError::DecodingError)?,
+                bincode::serde::encode_to_vec(
+                    SingleSumSMA::<f64>::new(quality_window as usize),
+                    DB_BINCODE_CONFIGURATION,
+                )
+                .map_err(|_| crate::errors::DbSqlError::DecodingError)?,
             )),
             ..Default::default()
         };
@@ -134,7 +140,7 @@ impl HoprDbPeersOperations for HoprDb {
             peer_data.public = sea_orm::ActiveValue::Set(new_status.is_public);
             peer_data.quality = sea_orm::ActiveValue::Set(new_status.quality);
             peer_data.quality_sma = sea_orm::ActiveValue::Set(Some(
-                bincode::serialize(&new_status.quality_avg)
+                bincode::serde::encode_to_vec(&new_status.quality_avg, DB_BINCODE_CONFIGURATION)
                     .map_err(|e| crate::errors::DbSqlError::LogicalError(format!("cannot serialize sma: {e}")))?,
             ));
             peer_data.backoff = sea_orm::ActiveValue::Set(Some(new_status.backoff));
@@ -303,12 +309,14 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
                 }?
             },
             quality: value.quality,
-            quality_avg: bincode::deserialize(
+            quality_avg: bincode::serde::borrow_decode_from_slice(
                 value
                     .quality_sma
                     .ok_or_else(|| Self::Error::LogicalError("the SMA should always be present for every peer".into()))?
                     .as_slice(),
+                DB_BINCODE_CONFIGURATION,
             )
+            .map(|(v, _bytes)| v)
             .map_err(|_| Self::Error::DecodingError)?,
         }
         .into())
@@ -317,15 +325,19 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{
+        ops::Add,
+        time::{Duration, SystemTime},
+    };
+
     use futures::StreamExt;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use libp2p_identity::PeerId;
     use multiaddr::Multiaddr;
-    use std::ops::Add;
-    use std::time::{Duration, SystemTime};
 
-    #[async_std::test]
+    use super::*;
+
+    #[tokio::test]
     async fn test_add_get() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -353,7 +365,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_remove_peer() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -373,7 +385,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_remove_non_existing_peer() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -386,7 +398,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_not_add_duplicate_peers() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -402,7 +414,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_return_none_on_non_existing_peer() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -412,7 +424,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_update() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -437,7 +449,7 @@ mod tests {
         peer_status.backoff = 2.0;
         peer_status.ignored = None;
         peer_status.peer_version = Some("1.2.3".into());
-        for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+        for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
         peer_status.quality = peer_status.quality as f32 as f64;
@@ -455,7 +467,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_fail_to_update_non_existing_peer() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -468,7 +480,7 @@ mod tests {
         peer_status.ignored = None;
         peer_status.peer_version = Some("1.2.3".into());
         peer_status.multiaddresses = vec![];
-        for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+        for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
 
@@ -478,7 +490,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_multiple_should_return_all_peers() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -507,7 +519,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_get_multiple_should_return_filtered_peers() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -532,7 +544,7 @@ mod tests {
                 peer_status.backoff = 1.0;
                 peer_status.ignored = None;
                 peer_status.peer_version = Some("1.2.3".into());
-                for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+                for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
                     peer_status.update_quality(i);
                 }
 
@@ -557,7 +569,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_should_update_stats_when_updating_peers() -> anyhow::Result<()> {
         let db = HoprDb::new_in_memory(ChainKeypair::random()).await?;
 
@@ -606,7 +618,7 @@ mod tests {
         peer_status.backoff = 1.0;
         peer_status.ignored = None;
         peer_status.peer_version = Some("1.2.3".into());
-        for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+        for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
 

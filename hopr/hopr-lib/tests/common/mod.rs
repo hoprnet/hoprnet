@@ -1,25 +1,60 @@
-use async_std::task::sleep;
-use ethers::utils::AnvilInstance;
-use hopr_chain_rpc::client::surf_client::SurfRequestor;
-use hopr_chain_rpc::client::{
-    create_rpc_client_to_anvil, JsonRpcProviderClient, SimpleJsonRpcRetryPolicy, SnapshotRequestor,
+use std::{sync::Arc, time::Duration};
+
+use alloy::{
+    node_bindings::AnvilInstance, primitives::U256, rpc::client::RpcClient, transports::http::ReqwestTransport,
 };
-use hopr_chain_types::utils::{
-    add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
+use hopr_chain_rpc::client::{AnvilRpcClient, SnapshotRequestor};
+use hopr_chain_types::{
+    ContractAddresses, ContractInstances,
+    utils::{
+        add_announcement_as_target, approve_channel_transfer_from_safe, create_anvil, include_node_to_module_by_safe,
+    },
 };
-use hopr_chain_types::{ContractAddresses, ContractInstances};
 use hopr_crypto_types::prelude::*;
 use hopr_primitive_types::prelude::*;
-use std::time::Duration;
+use tokio::time::sleep;
 use tracing::info;
 
-pub type AnvilRpcClient<R> = ethers::middleware::SignerMiddleware<
-    ethers::providers::Provider<JsonRpcProviderClient<R, SimpleJsonRpcRetryPolicy>>,
-    ethers::signers::Wallet<ethers::core::k256::ecdsa::SigningKey>,
->;
+/// Used for testing. Creates RPC client to the local Anvil instance.
+#[allow(dead_code)]
+#[cfg(not(target_arch = "wasm32"))]
+pub fn create_rpc_client_to_anvil_with_snapshot(
+    snapshot_requestor: SnapshotRequestor,
+    anvil: &alloy::node_bindings::AnvilInstance,
+) -> RpcClient {
+    use alloy::rpc::client::ClientBuilder;
+    use hopr_chain_rpc::client::SnapshotRequestorLayer;
 
-/// Snapshot requestor used for testing.
-pub type Requestor = SnapshotRequestor<SurfRequestor>;
+    let transport_client = ReqwestTransport::new(anvil.endpoint_url());
+
+    ClientBuilder::default()
+        .layer(SnapshotRequestorLayer::from_requestor(snapshot_requestor))
+        .transport(transport_client.clone(), transport_client.guess_local())
+}
+
+/// Used for testing. Creates an RPC client to the local Anvil instance.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn create_provider_to_anvil_with_snapshot(
+    snapshot_requestor: SnapshotRequestor,
+    anvil: &alloy::node_bindings::AnvilInstance,
+    signer: &hopr_crypto_types::keypairs::ChainKeypair,
+) -> Arc<AnvilRpcClient> {
+    use alloy::{providers::ProviderBuilder, rpc::client::ClientBuilder, signers::local::PrivateKeySigner};
+    use hopr_chain_rpc::client::SnapshotRequestorLayer;
+    use hopr_crypto_types::keypairs::Keypair;
+
+    let wallet = PrivateKeySigner::from_slice(signer.secret().as_ref()).expect("failed to construct wallet");
+
+    let transport_client = ReqwestTransport::new(anvil.endpoint_url());
+
+    let rpc_client = ClientBuilder::default()
+        .layer(SnapshotRequestorLayer::from_requestor(snapshot_requestor))
+        .transport(transport_client.clone(), transport_client.guess_local());
+
+    let provider = ProviderBuilder::new().wallet(wallet).connect_client(rpc_client);
+
+    Arc::new(provider)
+}
 
 /// Represents a HOPR environment deployment into Anvil.
 #[allow(unused)]
@@ -31,24 +66,28 @@ pub struct TestChainEnv {
     /// Chain keys of 9 possible HOPR nodes
     pub node_chain_keys: Vec<ChainKeypair>,
     /// Instances of deployed smart contracts
-    pub contract_instances: ContractInstances<AnvilRpcClient<Requestor>>,
+    pub contract_instances: ContractInstances<Arc<AnvilRpcClient>>,
     /// Addresses of deployed smart contracts
     pub contract_addresses: ContractAddresses,
 }
 
 /// Deploys Anvil and all HOPR smart contracts as a testing environment
-pub async fn deploy_test_environment(requestor: Requestor, block_time: Duration, finality: u32) -> TestChainEnv {
-    let anvil = create_anvil(Some(block_time));
+pub async fn deploy_test_environment(
+    requestor: SnapshotRequestor,
+    block_time: Duration,
+    finality: u32,
+) -> TestChainEnv {
+    let anvil: AnvilInstance = create_anvil(Some(block_time));
     let contract_deployer = ChainKeypair::from_secret(anvil.keys()[0].to_bytes().as_ref()).unwrap();
 
-    let client = create_rpc_client_to_anvil(requestor, &anvil, &contract_deployer);
+    let provider = create_provider_to_anvil_with_snapshot(requestor, &anvil, &contract_deployer);
     info!("Deploying SCs to Anvil...");
-    let contract_instances = ContractInstances::deploy_for_testing(client.clone(), &contract_deployer)
+    let contract_instances = ContractInstances::deploy_for_testing(provider.clone(), &contract_deployer)
         .await
         .expect("failed to deploy");
 
     // Mint some tokens
-    hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), 1_000_000_u128.into()).await;
+    let _ = hopr_chain_types::utils::mint_tokens(contract_instances.token.clone(), U256::from(1_000_000_u128)).await;
 
     sleep((1 + finality) * block_time).await;
 
@@ -80,16 +119,17 @@ pub async fn onboard_node(
     fund_native: U256,
     fund_hopr: U256,
 ) -> NodeSafeConfig {
-    let client = chain_env.contract_instances.token.client();
+    let provider = chain_env.contract_instances.token.provider();
 
     // Deploy Safe and Module for node
-    let (module, safe) = hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing(
-        &chain_env.contract_instances,
-        client.clone(),
-        &chain_env.contract_deployer,
-    )
-    .await
-    .expect("could not deploy safe and module");
+    let (module, safe) =
+        hopr_chain_types::utils::deploy_one_safe_one_module_and_setup_for_testing::<Arc<AnvilRpcClient>>(
+            &chain_env.contract_instances,
+            provider.clone(),
+            &chain_env.contract_deployer,
+        )
+        .await
+        .expect("could not deploy safe and module");
 
     // ----------------
     // Onboarding:
@@ -100,7 +140,7 @@ pub async fn onboard_node(
 
     // Include node to the module
     include_node_to_module_by_safe(
-        client.clone(),
+        provider.clone(),
         safe,
         module,
         node_chain_key.public().to_address(),
@@ -111,33 +151,35 @@ pub async fn onboard_node(
 
     // Add an announcement as target into the module
     add_announcement_as_target(
-        client.clone(),
+        provider.clone(),
         safe,
         module,
-        chain_env.contract_instances.announcements.address().into(),
+        chain_env.contract_instances.announcements.address().0.0.into(),
         &chain_env.contract_deployer,
     )
     .await
     .expect("could not add announcement to module");
 
     // Fund the node's Safe with native tokens and HOPR token
-    hopr_chain_types::utils::fund_node(safe, fund_native, fund_hopr, chain_env.contract_instances.token.clone()).await;
+    let _ =
+        hopr_chain_types::utils::fund_node(safe, fund_native, fund_hopr, chain_env.contract_instances.token.clone())
+            .await;
 
     // Fund node's address with 10 native tokens
-    hopr_chain_types::utils::fund_node(
+    let _ = hopr_chain_types::utils::fund_node(
         node_chain_key.public().to_address(),
         fund_native,
-        0.into(),
+        U256::from(0_u32),
         chain_env.contract_instances.token.clone(),
     )
     .await;
 
     // Approve token transfer for HOPR Channels contract
     approve_channel_transfer_from_safe(
-        client.clone(),
+        provider.clone(),
         safe,
-        chain_env.contract_instances.token.address().into(),
-        chain_env.contract_instances.channels.address().into(),
+        chain_env.contract_instances.token.address().0.0.into(),
+        chain_env.contract_instances.channels.address().0.0.into(),
         &chain_env.contract_deployer,
     )
     .await

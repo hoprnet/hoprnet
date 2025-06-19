@@ -1,5 +1,5 @@
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use futures::{future::BoxFuture, StreamExt};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use futures::{StreamExt, future::BoxFuture};
 use hopr_transport_mixer::{channel, config::MixerConfig};
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
 
@@ -34,13 +34,13 @@ pub fn mixer_throughput(
         group.throughput(Throughput::Bytes(*bytes as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(format!(
-                "random data with size {} through a {}",
-                bytesize::ByteSize::b(*bytes as u64),
+                "random_data_size_{}_through_{}",
+                bytesize::ByteSize::b(*bytes as u64).to_string().replace(" ", "_"),
                 description
             )),
             bytes,
             |b, _| {
-                let runtime = criterion::async_executor::AsyncStdExecutor {};
+                let runtime = tokio::runtime::Runtime::new().expect("failed to create runtime");
 
                 b.to_async(runtime)
                     .iter(|| f(RANDOM_GIBBERISH, bytes / RANDOM_GIBBERISH.len(), cfg));
@@ -74,7 +74,7 @@ fn send_continuous_channel_load_through_sink_pipe(
         let (o_tx, o_rx) = futures::channel::mpsc::unbounded();
         let (tx, mut rx) = channel(cfg);
 
-        let pipe = async_std::task::spawn(o_rx.map(Ok).forward(tx));
+        let pipe = tokio::task::spawn(o_rx.map(Ok).forward(tx));
 
         for _ in 0..iterations {
             o_tx.unbounded_send(item).expect("send must succeed");
@@ -84,7 +84,7 @@ fn send_continuous_channel_load_through_sink_pipe(
             rx.next().await.expect("receive must succeed");
         }
 
-        pipe.cancel().await;
+        pipe.abort();
     })
 }
 
@@ -92,7 +92,7 @@ pub fn mixer_channel_throughput_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
         minimal_delay_mixer_cfg(),
-        "mixer channel",
+        "mixer_channel",
         send_continuous_channel_load,
     );
 }
@@ -101,7 +101,7 @@ pub fn mixer_channel_throughput_through_sink_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
         minimal_delay_mixer_cfg(),
-        "mixer channel through sink pipe",
+        "mixer_channel_sink_pipe",
         send_continuous_channel_load_through_sink_pipe,
     );
 }
@@ -110,16 +110,12 @@ fn send_continuous_stream_load(item: &str, iterations: usize, cfg: MixerConfig) 
     Box::pin(async move {
         let (tx, rx) = futures::channel::mpsc::unbounded();
 
-        let mut rx = rx.then_concurrent(|v| {
-            let cfg = cfg;
+        let mut rx = rx.then_concurrent(|v| async move {
+            let random_delay = cfg.random_delay();
 
-            async move {
-                let random_delay = cfg.random_delay();
+            tokio::time::sleep(random_delay).await;
 
-                async_std::task::sleep(random_delay).await;
-
-                v
-            }
+            v
         });
 
         for _ in 0..iterations {
@@ -136,7 +132,7 @@ pub fn mixer_stream_throughput_minimal_mixing(c: &mut Criterion) {
     mixer_throughput(
         c,
         minimal_delay_mixer_cfg(),
-        "mixer stream",
+        "mixer_stream",
         send_continuous_stream_load,
     );
 }

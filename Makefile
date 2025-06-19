@@ -29,53 +29,28 @@ init: ## initialize repository (idempotent operation)
 		ln -sf "../../$${gh}" .git/hooks/; \
 	done
 
-.PHONY: deps
-deps: ## Installs dependencies for local setup
-	if [[ ! "${name}" =~ nix-shell* ]]; then \
-		command -v rustup && rustup update || echo "No rustup installed, ignoring"; \
-	fi
-	# we need to ensure cargo has built its local metadata for vendoring correctly, this is normally a no-op
-	mkdir -p .cargo/bin
-
-.PHONY: build
-build: ## build all packages
-	$(cargo) build
-
 .PHONY: build-yellowpaper
 build-yellowpaper: ## build the yellowpaper in docs/yellowpaper
 	$(MAKE) -C docs/yellowpaper
-
-.PHONY: build-docs
-build-docs: ## build typedocs, Rest API docs
-	echo "Deprecated"
 
 .PHONY: install
 install:
 	$(cargo) install --path hopli
 	$(cargo) install --path hoprd/hoprd
 
-.PHONY: clean
-clean: # Cleanup build directories
-	cargo clean
-	find ethereum/bindings/src -type f ! -name "lib.rs" -delete
-
 .PHONY: test
 test: smart-contract-test ## run unit tests for all packages, or a single package if package= is set
-	$(cargo) test --features runtime-async-std
-
-.PHONY: smoke-tests
-smoke-tests: ## run smoke tests
-	source .venv/bin/activate && python3 -m pytest tests/
+	$(cargo) test --features runtime-tokio
 
 .PHONY: stress-test-local-swarm
 stress-test-local-swarm: ## run stress tests on a local node swarm
-	source .venv/bin/activate && \
-		python3 -m pytest tests/test_stress.py \
+	uv run -m pytest tests/test_stress.py \
 		--stress-request-count=3000 \
 		--stress-sources='[{"url": "localhost:3011", "token": "e2e-API-token^^"}]' \
 		--stress-target='{"url": "localhost:3031", "token": "e2e-API-token^^"}'
 
 .PHONY: smart-contract-test
+# Remove `--no-match-test` when https://github.com/foundry-rs/foundry/issues/10586 is fixed
 smart-contract-test: # forge test smart contracts
 	$(MAKE) -C ethereum/contracts/ sc-test
 
@@ -95,8 +70,13 @@ kill-anvil: ## kill process running at port 8545 (default port of anvil)
 	lsof -i :$(port) -s TCP:LISTEN -t | xargs -I {} -n 1 kill {} || :
 
 .PHONY: localcluster
+localcluster: args=
 localcluster: ## spin up the localcluster using the default configuration file
-	@python -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected
+	@uv run -m sdk.python.localcluster --config ./sdk/python/localcluster.params.yml --fully_connected $(args)
+
+.PHONY: localcluster-exposed
+localcluster-exposed: ## spin up the localcluster using the default configuration file, exposing all nodes in the local network
+	@make localcluster args="--exposed"
 
 .PHONY: create-local-identity
 create-local-identity: id_dir=/tmp/
@@ -201,14 +181,6 @@ endif
 		--identity-from-path "${id_path}" \
 		--contracts-root "./ethereum/contracts" \
 		--manager-private-key ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-
-.PHONY: docker-build-local
-docker-build-local: ## build Docker images locally, or single image if image= is set
-ifeq ($(image),)
-	./scripts/build-docker.sh --local --force
-else
-	./scripts/build-docker.sh --local --force -i $(image)
-endif
 
 .PHONY: request-funds
 request-funds: ensure-environment-and-network-are-set
@@ -365,7 +337,7 @@ ifeq ($(script),)
 	echo "parameter <script> missing" >&2 && exit 1
 endif
 	bash "${script}"
-	
+
 .PHONY: help
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

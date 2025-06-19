@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-indexer"
-version = "0.6.2"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "Core-Ethereum-specific interaction with the backend database"
@@ -13,11 +13,8 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = [
-  "hopr-db-sql/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-]
 runtime-tokio = [
+  "hopr-chain-rpc/runtime-tokio",
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
 ]
@@ -28,9 +25,13 @@ prometheus = [
 ]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = [
+  "essentials",
+  "json-rpc",
+  "node-bindings",
+] }
 async-channel = { workspace = true }
 async-trait = { workspace = true }
-ethers = { workspace = true, default-features = false, features = ["abigen"] }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 multiaddr = { workspace = true }
@@ -52,10 +53,12 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
-hopr-db-sql = { workspace = true, features = ["runtime-async-std"] }
 hex-literal = { workspace = true }
 mockall = { workspace = true }
 primitive-types = { workspace = true }
-hopr-crypto-random = { workspace = true }
 test-log = { workspace = true }
+tokio = { workspace = true }
+
+hopr-crypto-random = { workspace = true }
+hopr-chain-rpc = { workspace = true, features = ["runtime-tokio"] }
+hopr-db-sql = { workspace = true, features = ["runtime-tokio"] }

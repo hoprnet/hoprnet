@@ -1,10 +1,11 @@
-//! Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic layers.
+//! Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic
+//! layers.
 //!
 //! ## Contents
 //!
 //! Supported protocol configurations:
 //!
-//! - `msg`
+//! - `mix`
 //! - `ack`
 //! - `heartbeat`
 //! - `ticket_aggregation`
@@ -21,82 +22,78 @@
 //! - `Reply(PeerId, std::result::Result<Ticket, String>, T)`,
 //! - `Send(PeerId, Vec<AcknowledgedTicket>, TicketAggregationFinalizer)`,
 //!
-//! where `U` is the type of an aggregated ticket extractable (`ResponseChannel<Result<Ticket, String>>`) and `T` represents a network negotiated identifier (`RequestId`).
+//! where `U` is the type of an aggregated ticket extractable (`ResponseChannel<Result<Ticket, String>>`) and `T`
+//! represents a network negotiated identifier (`RequestId`).
 //!
 //! In broader context the protocol flow is as follows:
 //!
 //! 1. requesting ticket aggregation
 //!
-//!    - the peer A desires to aggregate tickets, collects the tickets into a data collection and sends a request containing the collection to aggregate `Vec<AcknowledgedTicket>` to peer B using the `Send` mechanism
+//!    - the peer A desires to aggregate tickets, collects the tickets into a data collection and sends a request
+//!      containing the collection to aggregate `Vec<AcknowledgedTicket>` to peer B using the `Send` mechanism
 //!
 //! 2. responding to ticket aggregation
 //!
-//!    - peer B obtains the request from peer A, performs the ticket aggregation and returns a result of that operation in the form of `std::result::Result<Ticket, String>` using the `Reply` mechanism
+//!    - peer B obtains the request from peer A, performs the ticket aggregation and returns a result of that operation
+//!      in the form of `std::result::Result<Ticket, String>` using the `Reply` mechanism
 //!
 //! 3. accepting the aggregated ticket
 //!    - peer A receives the aggregated ticket using the `Receive` mechanism
 //!
 //! Furthermore, apart from the basic positive case scenario, standard mechanics of protocol communication apply:
 //!
-//! - the requesting side can time out, if the responding side takes too long to provide an aggregated ticket, in which case the ticket is not considered aggregated, even if eventually an aggregated ticket is delivered
-//! - the responder can fail to aggregate tickets in which case it replies with an error string describing the failure reason and it is the requester's responsibility to handle the negative case as well
+//! - the requesting side can time out, if the responding side takes too long to provide an aggregated ticket, in which
+//!   case the ticket is not considered aggregated, even if eventually an aggregated ticket is delivered
+//! - the responder can fail to aggregate tickets in which case it replies with an error string describing the failure
+//!   reason and it is the requester's responsibility to handle the negative case as well
 //!   - in the absence of response, the requester will time out
-//!
+
+/// Coder and decoder for the transport binary protocol layer
+mod codec;
 
 /// Configuration of the protocol components.
 pub mod config;
 /// Errors produced by the crate.
 pub mod errors;
 
-/// Bloom filter for the transport layer.
-pub mod bloom;
 // protocols
-/// `ack` p2p protocol
-pub mod ack;
 /// `heartbeat` p2p protocol
 pub mod heartbeat;
-/// `msg` p2p protocol
-pub mod msg;
-/// `ticket_aggregation` p2p protocol
-pub mod ticket_aggregation;
+/// processor for the protocol
+pub mod processor;
 
 /// Stream processing utilities
 pub mod stream;
 
 pub mod timer;
-use hopr_transport_identity::Multiaddr;
-pub use timer::execute_on_tick;
+use std::collections::HashMap;
 
 use futures::{SinkExt, StreamExt};
+use hopr_async_runtime::spawn_as_abortable;
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
+use hopr_internal_types::{prelude::HoprPseudonym, protocol::Acknowledgement};
+use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
+use hopr_transport_identity::{Multiaddr, PeerId};
+use hopr_transport_packet::prelude::ApplicationData;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use std::collections::HashMap;
-use tracing::error;
+use tracing::{error, trace, warn};
 
-use hopr_async_runtime::prelude::spawn;
-use hopr_db_api::protocol::HoprDbProtocolOperations;
-use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
-use hopr_path::path::TransportPath;
-use hopr_transport_identity::PeerId;
+use crate::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+pub use crate::{processor::DEFAULT_PRICE_PER_PACKET, timer::execute_on_tick};
 
-pub use msg::processor::DEFAULT_PRICE_PER_PACKET;
-use msg::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
+const SLOW_OP_MS: u128 = 150;
+
+pub type HoprBinaryCodec = crate::codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
+pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
 
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    // acknowledgement
-    static ref METRIC_RECEIVED_ACKS: MultiCounter = MultiCounter::new(
-        "hopr_received_ack_count",
-        "Number of received acknowledgements",
-        &["valid"]
-    )
-    .unwrap();
-    static ref METRIC_SENT_ACKS: SimpleCounter =
-        SimpleCounter::new("hopr_sent_acks_count", "Number of sent message acknowledgements").unwrap();
-    static ref METRIC_TICKETS_COUNT: MultiCounter =
-        MultiCounter::new("hopr_tickets_count", "Number of winning tickets", &["type"]).unwrap();
     // packet
     static ref METRIC_PACKET_COUNT: MultiCounter = MultiCounter::new(
         "hopr_packets_count",
@@ -118,10 +115,6 @@ lazy_static::lazy_static! {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
 pub enum ProtocolProcesses {
-    #[strum(to_string = "HOPR [ack] - ingress")]
-    AckIn,
-    #[strum(to_string = "HOPR [ack] - egress")]
-    AckOut,
     #[strum(to_string = "HOPR [msg] - ingress")]
     MsgIn,
     #[strum(to_string = "HOPR [msg] - egress")]
@@ -145,36 +138,34 @@ pub enum PeerDiscovery {
 /// overlayed on top of the `wire_msg` Stream or Sink.
 #[allow(clippy::too_many_arguments)]
 pub async fn run_msg_ack_protocol<Db>(
-    packet_cfg: msg::processor::PacketInteractionConfig,
+    packet_cfg: processor::PacketInteractionConfig,
     db: Db,
     bloom_filter_persistent_path: Option<String>,
-    wire_ack: (
-        impl futures::Sink<(PeerId, Acknowledgement)> + Send + Sync + 'static,
-        impl futures::Stream<Item = (PeerId, Acknowledgement)> + Send + Sync + 'static,
-    ),
     wire_msg: (
         impl futures::Sink<(PeerId, Box<[u8]>)> + Clone + Unpin + Send + Sync + 'static,
         impl futures::Stream<Item = (PeerId, Box<[u8]>)> + Send + Sync + 'static,
     ),
     api: (
-        impl futures::Sink<ApplicationData> + Send + Sync + 'static,
-        impl futures::Stream<Item = (ApplicationData, TransportPath, PacketSendFinalizer)> + Send + Sync + 'static,
+        impl futures::Sink<(HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
+        impl futures::Stream<Item = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
+        + Send
+        + Sync
+        + 'static,
     ),
-) -> HashMap<ProtocolProcesses, hopr_async_runtime::prelude::JoinHandle<()>>
+) -> HashMap<ProtocolProcesses, hopr_async_runtime::AbortHandle>
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
     let me = packet_cfg.packet_keypair.clone();
-    let me_onchain = &packet_cfg.chain_keypair.clone();
 
     let mut processes = HashMap::new();
 
     #[cfg(all(feature = "prometheus", not(test)))]
     {
         // Initialize the lazy statics here
-        lazy_static::initialize(&METRIC_RECEIVED_ACKS);
-        lazy_static::initialize(&METRIC_SENT_ACKS);
-        lazy_static::initialize(&METRIC_TICKETS_COUNT);
+        // lazy_static::initialize(&METRIC_RECEIVED_ACKS);
+        // lazy_static::initialize(&METRIC_SENT_ACKS);
+        // lazy_static::initialize(&METRIC_TICKETS_COUNT);
         lazy_static::initialize(&METRIC_PACKET_COUNT);
         lazy_static::initialize(&METRIC_PACKET_COUNT_PER_PEER);
         lazy_static::initialize(&METRIC_REPLAYED_PACKET_COUNT);
@@ -182,11 +173,11 @@ where
     }
 
     let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
-        let tbf = bloom::WrappedTagBloomFilter::new(bloom_filter_persistent_path);
+        let tbf = WrappedTagBloomFilter::new(bloom_filter_persistent_path);
         let tbf_2 = tbf.clone();
         processes.insert(
             ProtocolProcesses::BloomPersist,
-            spawn(Box::pin(execute_on_tick(
+            spawn_as_abortable(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
                 move || {
                     let tbf_clone = tbf_2.clone();
@@ -198,79 +189,25 @@ where
         );
         tbf
     } else {
-        bloom::WrappedTagBloomFilter::new("no_tbf".into())
+        WrappedTagBloomFilter::new("no_tbf".into())
     };
 
-    let ack_processor_read = ack::processor::AcknowledgementProcessor::new(db.clone(), me_onchain);
-    let ack_processor_write = ack_processor_read.clone();
-    let msg_processor_read = msg::processor::PacketProcessor::new(db.clone(), tbf, packet_cfg);
+    let msg_processor_read = processor::PacketProcessor::new(db.clone(), packet_cfg);
     let msg_processor_write = msg_processor_read.clone();
-
-    processes.insert(
-        ProtocolProcesses::AckIn,
-        spawn(async move {
-            let _neverending = wire_ack
-                .1
-                .for_each_concurrent(None, move |(peer, ack)| {
-                    let ack_processor = ack_processor_read.clone();
-
-                    async move {
-                        let _ack_result = ack_processor.recv(&peer, ack).await;
-                        #[cfg(all(feature = "prometheus", not(test)))]
-                        match &_ack_result {
-                            Ok(hopr_db_api::prelude::AckResult::Sender(_)) => {
-                                METRIC_RECEIVED_ACKS.increment(&["true"]);
-                            }
-                            Ok(hopr_db_api::prelude::AckResult::RelayerWinning(_)) => {
-                                METRIC_RECEIVED_ACKS.increment(&["true"]);
-                                METRIC_TICKETS_COUNT.increment(&["winning"]);
-                            }
-                            Ok(hopr_db_api::prelude::AckResult::RelayerLosing) => {
-                                METRIC_RECEIVED_ACKS.increment(&["true"]);
-                                METRIC_TICKETS_COUNT.increment(&["losing"]);
-                            }
-                            Err(_) => {
-                                METRIC_RECEIVED_ACKS.increment(&["false"]);
-                            }
-                        }
-                    }
-                })
-                .await;
-        }),
-    );
-
-    let (internal_ack_send, internal_ack_rx) = futures::channel::mpsc::unbounded::<(PeerId, Acknowledgement)>();
-
-    processes.insert(
-        ProtocolProcesses::AckOut,
-        spawn(async move {
-            let _neverending = internal_ack_rx
-                .then_concurrent(move |(peer, ack)| {
-                    let ack_processor = ack_processor_write.clone();
-
-                    #[cfg(all(feature = "prometheus", not(test)))]
-                    METRIC_SENT_ACKS.increment();
-
-                    async move { (peer, ack_processor.send(&peer, ack).await) }
-                })
-                .map(Ok)
-                .forward(wire_ack.0)
-                .await;
-        }),
-    );
 
     let msg_to_send_tx = wire_msg.0.clone();
     processes.insert(
         ProtocolProcesses::MsgOut,
-        spawn(async move {
+        spawn_as_abortable(async move {
             let _neverending = api
                 .1
-                .then_concurrent(|(data, path, finalizer)| {
+                .then_concurrent(|(data, routing, finalizer)| {
                     let msg_processor = msg_processor_write.clone();
 
                     async move {
-                        match PacketWrapping::send(&msg_processor, data, path).await {
+                        match PacketWrapping::send(&msg_processor, data, routing).await {
                             Ok(v) => {
+                                let v: (PeerId, Box<[u8]>) = (v.next_hop.into(), v.data);
                                 #[cfg(all(feature = "prometheus", not(test)))]
                                 {
                                     METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &v.0.to_string()]);
@@ -293,80 +230,177 @@ where
         }),
     );
 
-    let me = me.clone();
+    let msg_to_send_tx = wire_msg.0.clone();
+    let db_for_recv = db.clone();
+    let me_for_recv = me.clone();
     processes.insert(
         ProtocolProcesses::MsgIn,
-        spawn(async move {
+        spawn_as_abortable(async move {
             let _neverending = wire_msg
                 .1
                 .then_concurrent(move |(peer, data)| {
                     let msg_processor = msg_processor_read.clone();
-
-                    async move { msg_processor.recv(&peer, data).await.map_err(|e| (peer, e)) }
-                })
-                .filter_map(move |v| {
-                    let mut internal_ack_send = internal_ack_send.clone();
-                    let mut msg_to_send_tx = wire_msg.0.clone();
+                    let db = db_for_recv.clone();
+                    let mut msg_to_send_tx = msg_to_send_tx.clone();
                     let me = me.clone();
 
                     async move {
-                        match v {
-                            Ok(v) => match v {
-                                msg::processor::RecvOperation::Receive { data, ack } => {
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    {
-                                        METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
-                                        METRIC_PACKET_COUNT.increment(&["received"]);
-                                    }
-                                    internal_ack_send.send((ack.peer, ack.ack)).await.unwrap_or_else(|e| {
-                                        error!(error = %e, "Failed to forward an acknowledgement to the transport layer");
-                                    });
-                                    Some(data)
-                                }
-                                msg::processor::RecvOperation::Forward { msg, ack } => {
-                                    #[cfg(all(feature = "prometheus", not(test)))]
-                                    {
-                                        METRIC_PACKET_COUNT_PER_PEER.increment(&["in", &ack.peer.to_string()]);
-                                        METRIC_PACKET_COUNT_PER_PEER.increment(&["out", &msg.peer.to_string()]);
-                                        METRIC_PACKET_COUNT.increment(&["forwarded"]);
-                                    }
+                        let now = std::time::Instant::now();
+                        let res = msg_processor.recv(&peer, data).await.map_err(move |e| (peer, e));
+                        let elapsed = now.elapsed();
+                        if elapsed.as_millis() > SLOW_OP_MS {
+                            tracing::warn!("msg_processor.recv took {}ms", elapsed.as_millis());
+                        }
+                        if let Err((peer, e)) = &res {
+                            #[cfg(all(feature = "prometheus", not(test)))]
+                            if let hopr_crypto_packet::errors::PacketError::TicketValidation(_) = e {
+                                METRIC_REJECTED_TICKETS_COUNT.increment();
+                            }
 
-                                    msg_to_send_tx.send((msg.peer, msg.data)).await.unwrap_or_else(|_e| {
-                                        error!("Failed to forward a message to the transport layer");
-                                    });
-                                    internal_ack_send.send((ack.peer, ack.ack)).await.unwrap_or_else(|e| {
-                                        error!(error = %e, "Failed to forward an acknowledgement to the transport layer");
-                                    });
+                            error!(peer = %peer, error = %e, "Failed to process the received message");
+
+                            let peer: OffchainPublicKey = match peer.try_into() {
+                                Ok(p) => p,
+                                Err(error) => {
+                                    tracing::warn!(%peer, %error, "Dropping packet – cannot convert peer id");
+                                    return None;
+                                }
+                            };
+
+                            // send random signed acknowledgement to give feedback to the sender
+                            let ack = Acknowledgement::random(&me);
+
+                            match db
+                                .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), peer)
+                                .await {
+                                    Ok(ack_packet) => {
+                                        let now = std::time::Instant::now();
+                                        msg_to_send_tx
+                                            .send((
+                                                ack_packet.next_hop.into(),
+                                                ack_packet.data,
+                                            ))
+                                            .await
+                                            .unwrap_or_else(|_e| {
+                                                error!("Failed to forward an acknowledgement for a failed packet recv to the transport layer");
+                                            });
+                                        let elapsed = now.elapsed();
+                                        if elapsed.as_millis() > SLOW_OP_MS {
+                                            tracing::warn!("msg_to_send_tx.send took {}ms", elapsed.as_millis());
+                                        }
+                                    },
+                                    Err(error) => tracing::error!(%error, "Failed to create random ack packet for a failed receive"),
+                                }
+                        }
+
+                        res.ok().flatten()
+                    }
+                })
+                .filter_map(move |maybe_packet| {
+                    let tbf = tbf.clone();
+
+                    async move {
+                    if let Some(packet) = maybe_packet {
+                        match packet {
+                            IncomingPacket::Final { packet_tag, previous_hop,.. }
+                            | IncomingPacket::Forwarded { packet_tag, previous_hop, .. } => {
+                                if tbf.is_tag_replay(&packet_tag).await {
+                                    warn!("replayed packet received from {previous_hop}");
+                                    #[cfg(all(feature = "prometheus", not(test)))]
+                                    METRIC_REPLAYED_PACKET_COUNT.increment();
+
                                     None
+                                } else {
+                                    Some(packet)
                                 }
-                            },
-                            Err((peer, e)) => {
-                                #[cfg(all(feature = "prometheus", not(test)))]
-                                match e {
-                                    hopr_crypto_packet::errors::PacketError::TagReplay => {
-                                        METRIC_REPLAYED_PACKET_COUNT.increment();
-                                    },
-                                    hopr_crypto_packet::errors::PacketError::TicketValidation(_) => {
-                                        METRIC_REJECTED_TICKETS_COUNT.increment();
-                                    },
-                                    _ => {}
-                                }
-
-                                error!(peer = %peer, error = %e, "Failed to process the received message");
-                                // send random signed acknowledgement to give feedback to the sender
-                                internal_ack_send
-                                    .send((
-                                        peer,
-                                        Acknowledgement::random(&me),
-                                    ))
-                                    .await
-                                    .unwrap_or_else(|e| {
-                                        error!(error = %e, "Failed to forward an acknowledgement for a failed packet recv to the transport layer");
-                                    });
-
-                                None
                             }
                         }
+                    } else {
+                        trace!("received empty packet");
+                        None
+                    }
+                }
+                })
+                .then_concurrent(move |packet| {
+                    let mut msg_to_send_tx = wire_msg.0.clone();
+                    let db = db.clone();
+                    let me = me_for_recv.clone();
+
+                    async move {
+
+                    match packet {
+                        IncomingPacket::Final {
+                            previous_hop,
+                            sender,
+                            plain_text,
+                            ack_key,
+                            ..
+                        } => {
+                            trace!("acknowledging final packet to {previous_hop}");
+                            let ack = Acknowledgement::new(ack_key, &me);
+                            if let Ok(ack_packet) = db
+                                .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
+                                .await
+                                .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a received message"))
+                                {
+                                    msg_to_send_tx
+                                        .send((
+                                            ack_packet.next_hop.into(),
+                                            ack_packet.data,
+                                        ))
+                                        .await
+                                        .unwrap_or_else(|_e| {
+                                            error!("Failed to send an acknowledgement for a received packet to the transport layer");
+                                        });
+                                }
+
+                                Some((sender, plain_text))
+                        }
+                        IncomingPacket::Forwarded {
+                            previous_hop,
+                            next_hop,
+                            data,
+                            ack,
+                            ..
+                        } => {
+                            trace!("acknowledging forwarded packet {previous_hop}->{next_hop}");
+                            msg_to_send_tx
+                                .send((
+                                    next_hop.into(),
+                                    data,
+                                ))
+                                .await
+                                .unwrap_or_else(|_e| {
+                                    error!("Failed to forward a packet to the transport layer");
+                                });
+
+                            if let Ok(ack_packet) = db
+                                .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), previous_hop)
+                                .await
+                                .inspect_err(|error| tracing::error!(error = %error, "Failed to create ack packet for a relayed message"))
+                            {
+                                msg_to_send_tx
+                                    .send((
+                                        ack_packet.next_hop.into(),
+                                        ack_packet.data,
+                                    ))
+                                    .await
+                                    .unwrap_or_else(|_e| {
+                                        error!("Failed to send an acknowledgement for a relayed packet to the transport layer");
+                                    });
+                            }
+                            None
+                        }
+                    }
+                }})
+                .filter_map(|maybe_data| async move {
+                    if let Some((sender, data)) = maybe_data {
+                        ApplicationData::from_bytes(data.as_ref())
+                            .inspect_err(|error| tracing::error!(error = %error, "Failed to decode application data"))
+                            .ok()
+                            .map(|data| (sender, data))
+                    } else {
+                        None
                     }
                 })
                 .map(Ok)

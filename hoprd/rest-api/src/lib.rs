@@ -2,18 +2,15 @@
 pub mod config;
 
 mod account;
-mod alias;
 mod channels;
 mod checks;
-mod messages;
+mod middleware;
 mod network;
 mod node;
 mod peers;
-mod preconditions;
-mod prometheus;
+mod root;
 mod session;
 mod tickets;
-mod types;
 
 pub(crate) mod env {
     /// Name of the environment variable specifying automatic port range selection for Sessions.
@@ -21,22 +18,25 @@ pub(crate) mod env {
     pub const HOPRD_SESSION_PORT_RANGE: &str = "HOPRD_SESSION_PORT_RANGE";
 }
 
-pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
+use std::{
+    collections::HashMap,
+    error::Error,
+    iter::once,
+    sync::{Arc, atomic::AtomicU16},
+};
 
 use async_lock::RwLock;
 use axum::{
+    Router,
     extract::Json,
-    http::{header::AUTHORIZATION, status::StatusCode, Method},
-    middleware,
+    http::{Method, header::AUTHORIZATION, status::StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Router,
 };
+use hopr_lib::{Address, Hopr, errors::HoprLibError};
+use hopr_network_types::prelude::IpProtocol;
 use serde::Serialize;
-use std::error::Error;
-use std::iter::once;
-use std::sync::Arc;
-use std::{collections::HashMap, sync::atomic::AtomicU16};
+pub use session::{HOPR_TCP_BUFFER_SIZE, HOPR_UDP_BUFFER_SIZE, HOPR_UDP_QUEUE_SIZE};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -46,18 +46,16 @@ use tower_http::{
     trace::TraceLayer,
     validate_request::ValidateRequestHeaderLayer,
 };
-use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
-use utoipa::{Modify, OpenApi};
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
+};
 use utoipa_scalar::{Scalar, Servable as ScalarServable};
 use utoipa_swagger_ui::SwaggerUi;
 
-use hopr_lib::{errors::HoprLibError, Address, Hopr};
-use hopr_network_types::prelude::IpProtocol;
+use crate::{config::Auth, session::StoredSessionEntry};
 
-use crate::config::Auth;
-use crate::session::StoredSessionEntry;
-
-pub(crate) const BASE_PATH: &str = "/api/v3";
+pub(crate) const BASE_PATH: &str = const_format::formatcp!("/api/v{}", env!("CARGO_PKG_VERSION_MAJOR"));
 
 #[derive(Clone)]
 pub(crate) struct AppState {
@@ -73,11 +71,9 @@ pub type ListenerJoinHandles = Arc<RwLock<HashMap<ListenerId, StoredSessionEntry
 
 #[derive(Clone)]
 pub(crate) struct InternalState {
-    pub hoprd_cfg: String,
+    pub hoprd_cfg: serde_json::Value,
     pub auth: Arc<Auth>,
     pub hopr: Arc<Hopr>,
-    pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     pub websocket_active_count: Arc<AtomicU16>,
     pub open_listeners: ListenerJoinHandles,
     pub default_listen_host: std::net::SocketAddr,
@@ -89,13 +85,6 @@ pub(crate) struct InternalState {
         account::addresses,
         account::balances,
         account::withdraw,
-        alias::aliases,
-        alias::aliases_addresses,
-        alias::set_alias,
-        alias::get_alias,
-        alias::get_alias_address,
-        alias::delete_alias,
-        alias::clear_aliases,
         channels::close_channel,
         channels::fund_channel,
         channels::list_channels,
@@ -105,13 +94,6 @@ pub(crate) struct InternalState {
         checks::healthyz,
         checks::readyz,
         checks::startedz,
-        messages::delete_messages,
-        messages::peek,
-        messages::peek_all,
-        messages::pop,
-        messages::pop_all,
-        messages::send_message,
-        messages::size,
         network::price,
         network::probability,
         node::configuration,
@@ -122,6 +104,7 @@ pub(crate) struct InternalState {
         node::version,
         peers::ping_peer,
         peers::show_peer_info,
+        root::metrics,
         session::create_client,
         session::list_clients,
         session::close_client,
@@ -137,15 +120,12 @@ pub(crate) struct InternalState {
         schemas(
             ApiError,
             account::AccountAddressesResponse, account::AccountBalancesResponse, account::WithdrawBodyRequest, account::WithdrawResponse,
-            alias::PeerIdResponse, alias::AliasDestinationBodyRequest,
-            channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse,
+            channels::ChannelsQueryRequest,channels::CloseChannelResponse, channels::OpenChannelBodyRequest, channels::OpenChannelResponse, channels::FundChannelResponse,
             channels::NodeChannel, channels::NodeChannelsResponse, channels::ChannelInfoResponse, channels::FundBodyRequest,
-            messages::MessagePopAllResponse,
-            messages::MessagePopResponse, messages::SendMessageResponse, messages::SendMessageBodyRequest, messages::SizeResponse, messages::TagQueryRequest, messages::GetMessageBodyRequest,
             network::TicketPriceResponse,
             network::TicketProbabilityResponse,
             node::EntryNode, node::NodeInfoResponse, node::NodePeersQueryRequest,
-            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery,
+            node::HeartbeatInfo, node::PeerInfo, node::AnnouncedPeer, node::NodePeersResponse, node::NodeVersionResponse, node::GraphExportQuery, node::NodeGraphResponse,
             peers::NodePeerInfoResponse, peers::PingResponse,
             session::SessionClientRequest, session::SessionCapability, session::RoutingOptions, session::SessionTargetSpec, session::SessionClientResponse, session::IpProtocol,
             tickets::NodeTicketStatisticsResponse, tickets::ChannelTicket,
@@ -154,13 +134,15 @@ pub(crate) struct InternalState {
     modifiers(&SecurityAddon),
     tags(
         (name = "Account", description = "HOPR node account endpoints"),
-        (name = "Alias", description = "HOPR node internal non-persistent alias endpoints"),
         (name = "Channels", description = "HOPR node chain channels manipulation endpoints"),
+        (name = "Configuration", description = "HOPR node configuration endpoints"),
         (name = "Checks", description = "HOPR node functionality checks"),
-        (name = "Messages", description = "HOPR node message manipulation endpoints"),
+        (name = "Network", description = "HOPR node network endpoints"),
         (name = "Node", description = "HOPR node information endpoints"),
         (name = "Peers", description = "HOPR node peer manipulation endpoints"),
+        (name = "Session", description = "HOPR node session management endpoints"),
         (name = "Tickets", description = "HOPR node ticket management endpoints"),
+        (name = "Metrics", description = "HOPR node metrics endpoints"),
     )
 )]
 pub struct ApiDoc;
@@ -173,18 +155,23 @@ impl Modify for SecurityAddon {
             .components
             .as_mut()
             .expect("components should be registered at this point");
+
         components.add_security_scheme(
             "bearer_token",
             SecurityScheme::Http(
                 HttpBuilder::new()
                     .scheme(HttpAuthScheme::Bearer)
                     .bearer_format("token")
+                    .description(Some("Bearer token authentication".to_string()))
                     .build(),
             ),
         );
         components.add_security_scheme(
             "api_token",
-            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Auth-Token"))),
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::with_description(
+                "X-Auth-Token",
+                "API Token",
+            ))),
         );
     }
 }
@@ -192,11 +179,9 @@ impl Modify for SecurityAddon {
 /// Parameters needed to construct the Rest API via [`serve_api`].
 pub struct RestApiParameters {
     pub listener: TcpListener,
-    pub hoprd_cfg: String,
+    pub hoprd_cfg: serde_json::Value,
     pub cfg: crate::config::Api,
     pub hopr: Arc<hopr_lib::Hopr>,
-    pub hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
-    pub inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
     pub session_listener_sockets: ListenerJoinHandles,
     pub default_session_listen_host: std::net::SocketAddr,
 }
@@ -208,8 +193,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         hoprd_cfg,
         cfg,
         hopr,
-        hoprd_db,
-        inbox,
         session_listener_sockets,
         default_session_listen_host,
     } = params;
@@ -218,8 +201,6 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
         hoprd_cfg,
         cfg,
         hopr,
-        inbox,
-        hoprd_db,
         session_listener_sockets,
         default_session_listen_host,
     )
@@ -229,11 +210,9 @@ pub async fn serve_api(params: RestApiParameters) -> Result<(), std::io::Error> 
 
 #[allow(clippy::too_many_arguments)]
 async fn build_api(
-    hoprd_cfg: String,
+    hoprd_cfg: serde_json::Value,
     cfg: crate::config::Api,
     hopr: Arc<hopr_lib::Hopr>,
-    inbox: Arc<RwLock<hoprd_inbox::Inbox>>,
-    hoprd_db: Arc<hoprd_db_api::db::HoprdDb>,
     open_listeners: ListenerJoinHandles,
     default_listen_host: std::net::SocketAddr,
 ) -> Router {
@@ -242,8 +221,6 @@ async fn build_api(
         auth: Arc::new(cfg.auth.clone()),
         hoprd_cfg,
         hopr: state.hopr.clone(),
-        inbox,
-        hoprd_db,
         open_listeners,
         default_listen_host,
         websocket_active_count: Arc::new(AtomicU16::new(0)),
@@ -261,18 +238,27 @@ async fn build_api(
                 .route("/readyz", get(checks::readyz))
                 .route("/healthyz", get(checks::healthyz))
                 .route("/eligiblez", get(checks::eligiblez))
+                .layer(
+                    ServiceBuilder::new().layer(
+                        CorsLayer::new()
+                            .allow_methods([Method::GET])
+                            .allow_origin(Any)
+                            .allow_headers(Any)
+                            .max_age(std::time::Duration::from_secs(86400)),
+                    ),
+                )
                 .with_state(state.into()),
         )
         .merge(
             Router::new()
-                .route("/metrics", get(node::metrics))
-                .layer(middleware::from_fn_with_state(
+                .route("/metrics", get(root::metrics))
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::authenticate,
+                    middleware::preconditions::authenticate,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::cap_websockets,
+                    middleware::preconditions::cap_websockets,
                 ))
                 .layer(
                     ServiceBuilder::new()
@@ -284,7 +270,7 @@ async fn build_api(
                                 .allow_headers(Any)
                                 .max_age(std::time::Duration::from_secs(86400)),
                         )
-                        .layer(middleware::from_fn(prometheus::record))
+                        .layer(axum::middleware::from_fn(middleware::prometheus::record))
                         .layer(CompressionLayer::new())
                         .layer(ValidateRequestHeaderLayer::accept("text/plain"))
                         .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
@@ -293,13 +279,6 @@ async fn build_api(
         .nest(
             BASE_PATH,
             Router::new()
-                .route("/aliases", get(alias::aliases))
-                .route("/aliases_addresses", get(alias::aliases_addresses))
-                .route("/aliases", post(alias::set_alias))
-                .route("/aliases", delete(alias::clear_aliases))
-                .route("/aliases/{alias}", get(alias::get_alias))
-                .route("/aliases_addresses/{alias}", get(alias::get_alias_address))
-                .route("/aliases/{alias}", delete(alias::delete_alias))
                 .route("/account/addresses", get(account::addresses))
                 .route("/account/balances", get(account::balances))
                 .route("/account/withdraw", post(account::withdraw))
@@ -322,20 +301,13 @@ async fn build_api(
                 .route("/tickets/redeem", post(tickets::redeem_all_tickets))
                 .route("/tickets/statistics", get(tickets::show_ticket_statistics))
                 .route("/tickets/statistics", delete(tickets::reset_ticket_statistics))
-                .route("/messages", delete(messages::delete_messages))
-                .route("/messages", post(messages::send_message))
-                .route("/messages/pop", post(messages::pop))
-                .route("/messages/pop-all", post(messages::pop_all))
-                .route("/messages/peek", post(messages::peek))
-                .route("/messages/peek-all", post(messages::peek_all))
-                .route("/messages/size", get(messages::size))
                 .route("/network/price", get(network::price))
                 .route("/network/probability", get(network::probability))
                 .route("/node/version", get(node::version))
                 .route("/node/configuration", get(node::configuration))
                 .route("/node/info", get(node::info))
                 .route("/node/peers", get(node::peers))
-                .route("/node/entryNodes", get(node::entry_nodes))
+                .route("/node/entry-nodes", get(node::entry_nodes))
                 .route("/node/graph", get(node::channel_graph))
                 .route("/peers/{destination}/ping", post(peers::ping_peer))
                 .route("/session/websocket", get(session::websocket))
@@ -343,13 +315,13 @@ async fn build_api(
                 .route("/session/{protocol}", get(session::list_clients))
                 .route("/session/{protocol}/{ip}/{port}", delete(session::close_client))
                 .with_state(inner_state.clone().into())
-                .layer(middleware::from_fn_with_state(
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::authenticate,
+                    middleware::preconditions::authenticate,
                 ))
-                .layer(middleware::from_fn_with_state(
+                .layer(axum::middleware::from_fn_with_state(
                     inner_state.clone(),
-                    preconditions::cap_websockets,
+                    middleware::preconditions::cap_websockets,
                 ))
                 .layer(
                     ServiceBuilder::new()
@@ -361,7 +333,7 @@ async fn build_api(
                                 .allow_headers(Any)
                                 .max_age(std::time::Duration::from_secs(86400)),
                         )
-                        .layer(middleware::from_fn(prometheus::record))
+                        .layer(axum::middleware::from_fn(middleware::prometheus::record))
                         .layer(CompressionLayer::new())
                         .layer(ValidateRequestHeaderLayer::accept("application/json"))
                         .layer(SetSensitiveRequestHeadersLayer::new(once(AUTHORIZATION))),
@@ -386,9 +358,12 @@ fn option_checksum_address_serializer<S: serde::Serializer>(a: &Option<Address>,
     "status": "INVALID_INPUT",
     "error": "Invalid value passed in parameter 'XYZ'"
 }))]
+/// Standardized error response for the API
 pub(crate) struct ApiError {
+    #[schema(example = "INVALID_INPUT")]
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "Invalid value passed in parameter 'XYZ'")]
     pub error: Option<String>,
 }
 
@@ -398,8 +373,6 @@ pub(crate) struct ApiError {
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 enum ApiErrorStatus {
     InvalidInput,
-    /// An invalid application tag from the reserved range was provided.
-    InvalidApplicationTag,
     InvalidChannelId,
     PeerNotFound,
     ChannelNotFound,
@@ -408,9 +381,6 @@ enum ApiErrorStatus {
     NotEnoughAllowance,
     ChannelAlreadyOpen,
     ChannelNotOpen,
-    AliasNotFound,
-    AliasOrPeerIdAliasAlreadyExists,
-    DatabaseError,
     UnsupportedFeature,
     Timeout,
     PingError(String),
@@ -419,8 +389,6 @@ enum ApiErrorStatus {
     InvalidQuality,
     NotReady,
     ListenHostAlreadyUsed,
-    #[strum(serialize = "INVALID_PATH")]
-    InvalidPath(String),
     #[strum(serialize = "UNKNOWN_FAILURE")]
     UnknownFailure(String),
 }
@@ -472,10 +440,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::ApiError;
+    use axum::{http::StatusCode, response::IntoResponse};
 
-    use axum::http::StatusCode;
-    use axum::response::IntoResponse;
+    use super::ApiError;
 
     #[test]
     fn test_api_error_to_response() {

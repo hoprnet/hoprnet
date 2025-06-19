@@ -16,6 +16,7 @@ dependencies:
           - "Cargo.lock"
           - "**/Cargo.toml"
           - "vendor/**"
+          - "uv.lock"
 documentation:
   - changed-files:
       - any-glob-to-any-file:
@@ -28,51 +29,6 @@ smart-contracts:
   - changed-files:
       - any-glob-to-any-file:
           - "ethereum/contracts/**"
-crate:hopr-path:
-  - changed-files:
-      - any-glob-to-any-file: logic/path/**
-crate:hopr-strategy:
-  - changed-files:
-      - any-glob-to-any-file: logic/strategy/**
-crate:hopr-internal-types:
-  - changed-files:
-      - any-glob-to-any-file: common/internal-types/**
-crate:hopr-primitive-types:
-  - changed-files:
-      - any-glob-to-any-file: common/primitive-types/**
-crate:hopli:
-  - changed-files:
-      - any-glob-to-any-file: hopli/**
-crate:hopr-db-entity:
-  - changed-files:
-      - any-glob-to-any-file: db/entity/**
-crate:hopr-db-api:
-  - changed-files:
-      - any-glob-to-any-file: db/api/**
-crate:hopr-db-migration:
-  - changed-files:
-      - any-glob-to-any-file: db/migration/**
-crate:hopr-crypto-random:
-  - changed-files:
-      - any-glob-to-any-file: crypto/random/**
-crate:hopr-crypto-sphinx:
-  - changed-files:
-      - any-glob-to-any-file: crypto/sphinx/**
-crate:hopr-crypto-types:
-  - changed-files:
-      - any-glob-to-any-file: crypto/types/**
-crate:hopr-crypto-packet:
-  - changed-files:
-      - any-glob-to-any-file: crypto/packet/**
-crate:hopr-lib:
-  - changed-files:
-      - any-glob-to-any-file: hopr/hopr-lib/**
-crate:hopr-metrics:
-  - changed-files:
-      - any-glob-to-any-file: misc/metrics/**
-crate:hopr-platform:
-  - changed-files:
-      - any-glob-to-any-file: misc/platform/**
 crate:hopr-chain-actions:
   - changed-files:
       - any-glob-to-any-file: chain/actions/**
@@ -88,33 +44,97 @@ crate:hopr-chain-rpc:
 crate:hopr-chain-types:
   - changed-files:
       - any-glob-to-any-file: chain/types/**
+crate:hopr-internal-types:
+  - changed-files:
+      - any-glob-to-any-file: common/internal-types/**
+crate:hopr-primitive-types:
+  - changed-files:
+      - any-glob-to-any-file: common/primitive-types/**
+crate:hopr-crypto-packet:
+  - changed-files:
+      - any-glob-to-any-file: crypto/packet/**
+crate:hopr-crypto-random:
+  - changed-files:
+      - any-glob-to-any-file: crypto/random/**
+crate:hopr-crypto-sphinx:
+  - changed-files:
+      - any-glob-to-any-file: crypto/sphinx/**
+crate:hopr-crypto-types:
+  - changed-files:
+      - any-glob-to-any-file: crypto/types/**
+crate:hopr-db-entity:
+  - changed-files:
+      - any-glob-to-any-file: db/entity/**
+crate:hopr-db-api:
+  - changed-files:
+      - any-glob-to-any-file: db/api/**
+crate:hopr-db-migration:
+  - changed-files:
+      - any-glob-to-any-file: db/migration/**
+crate:hopr-db-sql:
+  - changed-files:
+      - any-glob-to-any-file: db/sql/**
 crate:hopr-bindings:
   - changed-files:
       - any-glob-to-any-file: ethereum/bindings/**
-crate:hopr-transport:
+crate:hopli:
   - changed-files:
-      - any-glob-to-any-file: transport/api/**
-crate:hopr-transport-network:
+      - any-glob-to-any-file: hopli/**
+crate:hopr-lib:
   - changed-files:
-      - any-glob-to-any-file: transport/network/**
-crate:hopr-transport-p2p:
-  - changed-files:
-      - any-glob-to-any-file: transport/p2p/**
-crate:hopr-transport-protocol:
-  - changed-files:
-      - any-glob-to-any-file: transport/protocol/**
+      - any-glob-to-any-file: hopr/hopr-lib/**
 crate:hoprd:
   - changed-files:
       - any-glob-to-any-file: hoprd/hoprd/**
-crate:hoprd-inbox:
-  - changed-files:
-      - any-glob-to-any-file: hoprd/inbox/**
 crate:hoprd-keypair:
   - changed-files:
       - any-glob-to-any-file: hoprd/keypair/**
 crate:hoprd-api:
   - changed-files:
       - any-glob-to-any-file: hoprd/rest-api/**
-crate:hopr-socks:
+crate:hopr-path:
   - changed-files:
-      - any-glob-to-any-file: hopr-socks/**
+      - any-glob-to-any-file: logic/path/**
+crate:hopr-strategy:
+  - changed-files:
+      - any-glob-to-any-file: logic/strategy/**
+crate:hopr-metrics:
+  - changed-files:
+      - any-glob-to-any-file: misc/metrics/**
+crate:hopr-platform:
+  - changed-files:
+      - any-glob-to-any-file: misc/platform/**
+crate:hopr-transport:
+  - changed-files:
+      - any-glob-to-any-file: transport/api/**
+crate:hopr-transport-bloom:
+  - changed-files:
+      - any-glob-to-any-file: transport/bloom/**
+crate:hopr-transport-identity:
+  - changed-files:
+      - any-glob-to-any-file: transport/identity/**
+crate:hopr-transport-mixer:
+  - changed-files:
+      - any-glob-to-any-file: transport/mixer/**
+crate:hopr-transport-network:
+  - changed-files:
+      - any-glob-to-any-file: transport/network/**
+crate:hopr-transport-p2p:
+  - changed-files:
+      - any-glob-to-any-file: transport/p2p/**
+crate:hopr-transport-packet:
+  - changed-files:
+      - any-glob-to-any-file: transport/packet/**
+crate:hopr-transport-probe:
+  - changed-files:
+      - any-glob-to-any-file: transport/probe/**
+crate:hopr-transport-protocol:
+  - changed-files:
+      - any-glob-to-any-file: transport/protocol/**
+crate:hopr-transport-session:
+  - changed-files:
+      - any-glob-to-any-file: transport/session/**
+crate:hopr-transport-ticket-aggregation:
+  - changed-files:
+      - any-glob-to-any-file: transport/ticket-aggregation/**
+

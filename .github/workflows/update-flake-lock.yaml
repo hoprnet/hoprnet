@@ -7,10 +7,10 @@ env:
 on:
   workflow_dispatch: # allows manual triggering
   schedule:
-    - cron: '0 0 * * 0' # runs weekly on Sunday at 00:00
+    - cron: "0 0 * * 0" # runs weekly on Sunday at 00:00
 
 permissions:
-  contents: read
+  contents: write
   issues: write
   pull-requests: write
 
@@ -19,14 +19,14 @@ jobs:
     runs-on: self-hosted-hoprnet-small
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@4d991eb9b905ef189e4c376166672c3f2f230481 # v2.11.0
+        uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0 # v2.12.0
         with:
           disable-sudo: false
           egress-policy: audit # TODO: change to 'egress-policy: block' after couple of runs
 
       - name: Install Nix
         if: env.needs_nix_setup == 'true'
-        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
+        uses: cachix/install-nix-action@17fe5fb4a23ad6cbbe47d6b3f359611ad276644c # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -39,7 +39,7 @@ jobs:
           USER: runner
 
       - name: Install NodeJS
-        uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
 
@@ -49,7 +49,7 @@ jobs:
           persist-credentials: false
 
       - name: Update flake.lock
-        uses: DeterminateSystems/update-flake-lock@a2bbe0274e3a0c4194390a1e445f734c597ebc37 # v24
+        uses: DeterminateSystems/update-flake-lock@428c2b58a4b7414dabd372acb6a03dba1084d3ab # v25
         id: update
         with:
           pr-title: "chore(nix): update flake.lock"
@@ -58,9 +58,10 @@ jobs:
             automated
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Enable Auto Merge
+      - name: Configure PR and mark as ready
         run: |
+          gh pr edit ${{ steps.update.outputs.pull-request-number }} --add-assignee "@copilot"
+          gh pr edit ${{ steps.update.outputs.pull-request-number }} --add-reviewer "hoprnet/hopr-development"
           gh pr ready ${{ steps.update.outputs.pull-request-number }}
-          gh pr merge ${{ steps.update.outputs.pull-request-number }} --auto --delete-branch --squash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

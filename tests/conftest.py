@@ -8,6 +8,7 @@ from subprocess import PIPE, STDOUT, CalledProcessError, Popen
 
 import pytest
 
+from .find_port import find_available_port_block
 from sdk.python import localcluster
 from sdk.python.localcluster.constants import PWD
 from sdk.python.localcluster.node import Node
@@ -76,34 +77,49 @@ def random_distinct_pairs_from(values: list, count: int):
 
 
 @pytest.fixture(scope="session")
-async def swarm7(request):
+async def base_port(request):
+    base_port_env = os.environ.get("HOPR_SMOKETEST_BASE_PORT")
+
+    if base_port_env is None:
+        base_port = find_available_port_block(3000, 4000, 30)
+    else:
+        base_port = int(base_port_env)
+
+    if base_port is None:
+        pytest.fail("No available base port found")
+    logging.info(f"Using base port: {base_port}")
+    yield base_port
+
+
+@pytest.fixture(scope="session")
+async def swarm7(request, base_port):
     params_path = PWD.joinpath("sdk/python/localcluster.params.yml")
-    cluster, anvil = await localcluster.bringup(params_path, test_mode=True, fully_connected=False, use_nat=True)
+    try:
+        cluster, anvil = await localcluster.bringup(
+            params_path, test_mode=True, fully_connected=False, use_nat=False, base_port=base_port
+        )
 
-    yield cluster.nodes
+        yield cluster.nodes
 
-    cluster.clean_up()
-    anvil.kill()
+        cluster.clean_up()
+        anvil.kill()
+    except RuntimeError:
+        pytest.fail("Failed to bring up the cluster")
 
 
 @pytest.fixture(scope="function")
 async def swarm7_reset(swarm7: dict[str, Node]):
     yield
 
-    logging.info("Resetting swarm7 nodes")
+    logging.debug("Resetting swarm7 nodes")
     try:
         await asyncio.gather(*[node.api.reset_tickets_statistics() for node in swarm7.values()])
     except Exception as e:
         logging.error(f"Error resetting tickets statistics in teardown: {e}")
 
-    try:
-        await asyncio.gather(*[node.api.messages_pop_all(None) for node in swarm7.values()])
-    except Exception as e:
-        logging.error(f"Error popping all messages in teardown: {e}")
-
 
 def to_ws_url(host, port, args: list[tuple[str, str]]):
-    return f"ws://{host}:{port}/api/v3/session/websocket?" + "&".join(f"{a[0]}={a[1]}" for a in args)
+    return f"ws://{host}:{port}/api/v4/session/websocket?" + "&".join(f"{a[0]}={a[1]}" for a in args)
 
 
 def run_hopli_cmd(cmd: list[str], custom_env):

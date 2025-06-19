@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-actions"
-version = "0.7.3"
+version = "0.8.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "High-level Core-Ethereum functions that translate to on-chain transactions"
@@ -13,11 +13,6 @@ crate-type = ["rlib"]
 
 [features]
 default = []
-runtime-async-std = [
-  "hopr-db-sql/runtime-async-std",
-  "hopr-async-runtime/runtime-async-std",
-  "hopr-chain-rpc/runtime-async-std",
-]
 runtime-tokio = [
   "hopr-db-sql/runtime-tokio",
   "hopr-async-runtime/runtime-tokio",
@@ -30,10 +25,14 @@ prometheus = [
 ]
 
 [dependencies]
+alloy = { workspace = true, default-features = false, features = [
+  "essentials",
+  "json-rpc",
+  "node-bindings",
+] }
 async-channel = { workspace = true }
 async-lock = { workspace = true }
 async-trait = { workspace = true }
-ethers = { workspace = true, default-features = false }
 futures = { workspace = true }
 futures-timer = { workspace = true }
 lazy_static = { workspace = true }
@@ -56,7 +55,9 @@ hopr-primitive-types = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
+tokio = { workspace = true }
+test-log = { workspace = true }
+
 hopr-crypto-random = { workspace = true }

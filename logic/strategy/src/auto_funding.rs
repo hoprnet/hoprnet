@@ -1,25 +1,23 @@
 //! ## Auto Funding Strategy
-//! This strategy listens for channel state change events to check whether a channel has dropped below `min_stake_threshold` HOPR.
-//! If this happens, the strategy issues a **fund channel** transaction to re-stake the channel with `funding_amount` HOPR.
+//! This strategy listens for channel state change events to check whether a channel has dropped below
+//! `min_stake_threshold` HOPR. If this happens, the strategy issues a **fund channel** transaction to re-stake the
+//! channel with `funding_amount` HOPR.
 //!
 //! For details on default parameters see [AutoFundingStrategyConfig].
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
 use std::fmt::{Debug, Display, Formatter};
+
+use async_trait::async_trait;
+use hopr_chain_actions::channels::ChannelActions;
+use hopr_internal_types::prelude::*;
+#[cfg(all(feature = "prometheus", not(test)))]
+use hopr_metrics::metrics::SimpleCounter;
+use hopr_primitive_types::prelude::*;
+use serde::{Deserialize, Serialize};
+use serde_with::{DisplayFromStr, serde_as};
 use tracing::info;
 use validator::Validate;
 
-use hopr_chain_actions::channels::ChannelActions;
-use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::*;
-
-use crate::errors::StrategyError::CriteriaNotSatisfied;
-use crate::strategy::SingularStrategy;
-use crate::Strategy;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::SimpleCounter;
+use crate::{Strategy, errors::StrategyError::CriteriaNotSatisfied, strategy::SingularStrategy};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -35,18 +33,18 @@ pub struct AutoFundingStrategyConfig {
     ///
     /// Default is 1 wxHOPR
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("1000000000000000000", BalanceType::HOPR))]
-    pub min_stake_threshold: Balance,
+    #[default(HoprBalance::new_base(1))]
+    pub min_stake_threshold: HoprBalance,
 
     /// Funding amount.
     ///
     /// Defaults to 10 wxHOPR.
     #[serde_as(as = "DisplayFromStr")]
-    #[default(Balance::new_from_str("10000000000000000000", BalanceType::HOPR))]
-    pub funding_amount: Balance,
+    #[default(HoprBalance::new_base(10))]
+    pub funding_amount: HoprBalance,
 }
 
-/// The `AutoFundingStrategy` automatically funds channel that
+/// The `AutoFundingStrategy` automatically funds a channel that
 /// dropped it's staked balance below the configured threshold.
 pub struct AutoFundingStrategy<A: ChannelActions> {
     hopr_chain_actions: A,
@@ -112,20 +110,24 @@ impl<A: ChannelActions + Send + Sync> SingularStrategy for AutoFundingStrategy<A
 
 #[cfg(test)]
 mod tests {
-    use crate::auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig};
-    use crate::strategy::SingularStrategy;
     use async_trait::async_trait;
-    use futures::{future::ok, FutureExt};
+    use futures::{FutureExt, future::ok};
     use hex_literal::hex;
-    use hopr_chain_actions::action_queue::{ActionConfirmation, PendingAction};
-    use hopr_chain_actions::channels::ChannelActions;
-    use hopr_chain_types::actions::Action;
-    use hopr_chain_types::chain_events::ChainEventType;
+    use hopr_chain_actions::{
+        action_queue::{ActionConfirmation, PendingAction},
+        channels::ChannelActions,
+    };
+    use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
     use hopr_crypto_random::random_bytes;
     use hopr_crypto_types::types::Hash;
     use hopr_internal_types::prelude::*;
     use hopr_primitive_types::prelude::*;
     use mockall::mock;
+
+    use crate::{
+        auto_funding::{AutoFundingStrategy, AutoFundingStrategyConfig},
+        strategy::SingularStrategy,
+    };
 
     lazy_static::lazy_static! {
         static ref ALICE: Address = hex!("18f8ae833c85c51fbeba29cef9fbfb53b3bad950").into();
@@ -138,8 +140,8 @@ mod tests {
         ChannelAct { }
         #[async_trait]
         impl ChannelActions for ChannelAct {
-            async fn open_channel(&self, destination: Address, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
-            async fn fund_channel(&self, channel_id: Hash, amount: Balance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn open_channel(&self, destination: Address, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
+            async fn fund_channel(&self, channel_id: Hash, amount: HoprBalance) -> hopr_chain_actions::errors::Result<PendingAction>;
             async fn close_channel(
                 &self,
                 counterparty: Address,
@@ -149,7 +151,7 @@ mod tests {
         }
     }
 
-    fn mock_action_confirmation(channel: ChannelEntry, balance: Balance) -> ActionConfirmation {
+    fn mock_action_confirmation(channel: ChannelEntry, balance: HoprBalance) -> ActionConfirmation {
         let random_hash = Hash::from(random_bytes::<{ Hash::SIZE }>());
         ActionConfirmation {
             tx_hash: random_hash,
@@ -158,15 +160,15 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn test_auto_funding_strategy() -> anyhow::Result<()> {
-        let stake_limit = Balance::new(7_u32, BalanceType::HOPR);
-        let fund_amount = Balance::new(5_u32, BalanceType::HOPR);
+        let stake_limit = HoprBalance::from(7_u32);
+        let fund_amount = HoprBalance::from(5_u32);
 
         let c1 = ChannelEntry::new(
             *ALICE,
             *BOB,
-            Balance::new(10_u32, BalanceType::HOPR),
+            10_u32.into(),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -175,7 +177,7 @@ mod tests {
         let c2 = ChannelEntry::new(
             *BOB,
             *CHRIS,
-            Balance::new(5_u32, BalanceType::HOPR),
+            5_u32.into(),
             0_u32.into(),
             ChannelStatus::Open,
             0_u32.into(),
@@ -184,18 +186,18 @@ mod tests {
         let c3 = ChannelEntry::new(
             *CHRIS,
             *DAVE,
-            Balance::new(5_u32, BalanceType::HOPR),
+            5_u32.into(),
             0_u32.into(),
             ChannelStatus::PendingToClose(std::time::SystemTime::now()),
             0_u32.into(),
         );
 
         let mut actions = MockChannelAct::new();
-        let fund_amount_c = fund_amount.clone();
+        let fund_amount_c = fund_amount;
         actions
             .expect_fund_channel()
             .times(1)
-            .withf(move |h, balance| c2.get_id().eq(h) && fund_amount_c.eq(&balance))
+            .withf(move |h, balance| c2.get_id().eq(h) && fund_amount_c.eq(balance))
             .return_once(move |_, _| Ok(ok(mock_action_confirmation(c2, fund_amount)).boxed()));
 
         let cfg = AutoFundingStrategyConfig {
@@ -208,7 +210,7 @@ mod tests {
             &c1,
             ChannelDirection::Outgoing,
             ChannelChange::CurrentBalance {
-                left: Balance::zero(BalanceType::HOPR),
+                left: HoprBalance::zero(),
                 right: c1.balance,
             },
         )
@@ -218,7 +220,7 @@ mod tests {
             &c2,
             ChannelDirection::Outgoing,
             ChannelChange::CurrentBalance {
-                left: Balance::zero(BalanceType::HOPR),
+                left: HoprBalance::zero(),
                 right: c2.balance,
             },
         )
@@ -228,7 +230,7 @@ mod tests {
             &c3,
             ChannelDirection::Outgoing,
             ChannelChange::CurrentBalance {
-                left: Balance::zero(BalanceType::HOPR),
+                left: HoprBalance::zero(),
                 right: c3.balance,
             },
         )

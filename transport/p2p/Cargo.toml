@@ -1,6 +1,6 @@
 [package]
 name = "hopr-transport-p2p"
-version = "0.6.0"
+version = "0.8.0"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 license = "GPL-3.0-only"
@@ -15,48 +15,45 @@ prometheus = [
   "dep:hopr-metrics",
   "hopr-transport-protocol/prometheus",
 ]
-runtime-async-std = [
-  "libp2p/async-std",
-  "hopr-transport-protocol/runtime-async-std",
+runtime-tokio = [
+  "libp2p/tokio",
+  "hopr-transport-protocol/runtime-tokio",
+  "hopr-transport-probe/runtime-tokio",
 ]
-runtime-tokio = ["libp2p/tokio", "hopr-transport-protocol/runtime-tokio"]
 
 [dependencies]
 async-trait = { workspace = true }
 futures = { workspace = true }
-futures-concurrency = { workspace = true }
 lazy_static = { workspace = true, optional = true }
 libp2p = { workspace = true, features = [
   "noise",
-  "request-response",
-  "cbor",
   "macros",
   "tcp",
+  "autonat",
   "quic",
   "dns",
   "yamux",
 ] }
 libp2p-stream = { workspace = true }
-moka = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
+rand = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-void = { workspace = true } # needed for Behavior implementations from libp2p
 
 hopr-internal-types = { workspace = true }
 hopr-metrics = { workspace = true, optional = true }
 hopr-transport-identity = { workspace = true }
-hopr-transport-network = { workspace = true }
 hopr-transport-protocol = { workspace = true }
 
 [dev-dependencies]
 anyhow = { workspace = true }
-async-std = { workspace = true }
 async-trait = { workspace = true }
 lazy_static = { workspace = true }
+more-asserts = { workspace = true }
 tracing-test = { workspace = true }
 tokio = { workspace = true }
+
 hopr-crypto-packet = { workspace = true }
 hopr-crypto-random = { workspace = true }
 hopr-crypto-types = { workspace = true }
 hopr-platform = { workspace = true }
+hopr-transport-probe = { workspace = true }
