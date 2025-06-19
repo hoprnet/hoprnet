@@ -24,17 +24,33 @@ run-smoke-test TEST:
     nix develop .#citest -c uv run --frozen -m pytest tests/test_{{TEST}}.py
 
 package-packager packager arch:
-    #! /usr/bin/env bash
+    #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
-    export RELEASE_VERSION=$(./scripts/get-current-version.sh)
-    export ARCH="{{arch}}"
+    RELEASE_VERSION=$(./scripts/get-current-version.sh)
+    ARCH="{{arch}}"
+    export RELEASE_VERSION ARCH
     envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
     mkdir -p dist/packages
-    nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-{{arch}}.{{packager}}"
+    nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-${ARCH}.{{packager}}"
 
 package arch:
-    #! /usr/bin/env bash
+    #!/usr/bin/env bash
     set -o errexit -o nounset -o pipefail
-    just package-packager deb {{arch}}
-    just package-packager rpm {{arch}}
-    just package-packager apk {{arch}}
+    case "{{arch}}" in
+        x86_64-linux)
+            architecture="amd64"
+            ;;
+        aarch64-linux)
+            architecture="arm64"
+            ;;
+        armv7l-linux)
+            architecture="armhf"
+            ;;
+        *)
+            echo "Unsupported architecture: {{arch}}"
+            exit 1
+            ;;
+    esac
+    just package-packager deb ${architecture}
+    just package-packager rpm ${architecture}
+    just package-packager apk ${architecture}
