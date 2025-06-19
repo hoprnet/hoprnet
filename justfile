@@ -26,8 +26,8 @@ run-smoke-test TEST:
 package-packager packager arch:
     #! /usr/bin/env bash
     set -o errexit -o nounset -o pipefail
-    RELEASE_VERSION=$(./scripts/get-current-version.sh)
-    ARCH="{{arch}}"
+    export RELEASE_VERSION=$(./scripts/get-current-version.sh)
+    export ARCH="{{arch}}"
     envsubst < ./deploy/nfpm/nfpm.yaml > ./deploy/nfpm/nfpm.generated.yaml
     mkdir -p dist/packages
     nfpm package --config deploy/nfpm/nfpm.generated.yaml --packager "{{packager}}" --target "dist/packages/hoprd-{{arch}}.{{packager}}"
