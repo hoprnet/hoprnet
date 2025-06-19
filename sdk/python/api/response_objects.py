@@ -55,7 +55,7 @@ class ApiMetricResponseObject(ApiResponseObject):
                 value = line.split(" ")[-1]
 
                 if len(labels) == 0:
-                    setattr(self, f.name, f.type(value))
+                    setattr(self, f.name, f.type(value) + getattr(self, f.name, 0))
                 else:
                     labels_values = {
                         pair.split("=")[0].strip('"'): pair.split("=")[1].strip('"')
