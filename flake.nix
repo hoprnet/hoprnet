@@ -8,7 +8,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay/master";
     crane.url = "github:ipetkov/crane/v0.20.1";
     # pin it to a version which we are compatible with
-    foundry.url = "github:shazow/foundry.nix/e50e7787af1b79b44680f309c94df4a71d529514";
+    foundry.url = "github:hoprnet/foundry.nix/tb/202505-add-xz";
     # use change to add solc 0.8.24
     solc.url = "github:hoprnet/solc.nix/tb/20240129-solc-0.8.24";
     pre-commit.url = "github:cachix/pre-commit-hooks.nix";
@@ -472,6 +472,7 @@
               jq
               lsof
               plutoSrc
+              python313
               runtimeShellPackage
               solcDefault
               time
@@ -609,6 +610,45 @@
             };
             tools = pkgs;
           };
+
+          check-bindings =
+            { pkgs, solcDefault, ... }:
+            pkgs.stdenv.mkDerivation {
+              pname = "check-bindings";
+              version = hoprdCrateInfo.version;
+
+              src = ./.;
+
+              buildInputs = with pkgs; [
+                diffutils
+                foundry-bin
+                solcDefault
+                just
+              ];
+
+              preConfigure = ''
+                mkdir -p ethereum/contracts
+                sed "s|# solc = .*|solc = \"${solcDefault}/bin/solc\"|g" \
+                  ${./ethereum/contracts/foundry.in.toml} > ./ethereum/contracts/foundry.toml
+              '';
+
+              buildPhase = ''
+                just generate-bindings
+              '';
+
+              checkPhase = ''
+                echo "Checking if generated bindings introduced changes..."
+                if [ -d "ethereum/bindings/src/reference" ]; then
+                    echo "Generated bindings are outdated. Please run the binding generation and commit the changes."
+                    exit 1
+                fi
+                echo "Bindings are up to date."
+              '';
+
+              # Disable the installPhase
+              installPhase = "mkdir -p $out";
+              doCheck = true;
+            };
           devShell = import ./nix/devShell.nix {
             inherit
               pkgs
@@ -770,11 +810,14 @@
             ];
             programs.rustfmt.enable = true;
             # using the official Nixpkgs formatting
-            # see  # https://github.com/NixOS/rfcs/blob/master/rfcs/0166-nix-formatting.md
+            # see https://github.com/NixOS/rfcs/blob/master/rfcs/0166-nix-formatting.md
             programs.nixfmt.enable = true;
             programs.taplo.enable = true;
             programs.ruff-format.enable = true;
 
+            settings.formatter.rustfmt = {
+              command = "${pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)}/bin/rustfmt";
+            };
             settings.formatter.solc = {
               command = "sh";
               options = [
@@ -803,7 +846,13 @@
             };
           };
 
-          checks = { inherit hoprd-clippy hopli-clippy; };
+          checks = {
+            inherit hoprd-clippy hopli-clippy;
+            check-bindings = check-bindings {
+              pkgs = pkgs;
+              solcDefault = solcDefault;
+            };
+          };
 
           apps = {
             inherit hoprd-docker-build-and-upload;

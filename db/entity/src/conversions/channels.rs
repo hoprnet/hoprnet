@@ -1,9 +1,11 @@
-use crate::channel;
-use crate::errors::DbEntityError;
-use hopr_internal_types::channels::ChannelStatus;
-use hopr_internal_types::prelude::ChannelEntry;
-use hopr_primitive_types::prelude::{BalanceType, IntoEndian, ToHex, U256};
+use hopr_internal_types::{channels::ChannelStatus, prelude::ChannelEntry};
+use hopr_primitive_types::{
+    balance::HoprBalance,
+    prelude::{IntoEndian, ToHex, U256},
+};
 use sea_orm::Set;
+
+use crate::{channel, errors::DbEntityError};
 
 /// Extension trait for updating [ChannelStatus] inside [channel::ActiveModel].
 /// This is needed as `status` maps to two model members.
@@ -47,7 +49,7 @@ impl TryFrom<&channel::Model> for ChannelEntry {
         Ok(ChannelEntry::new(
             value.source.parse()?,
             value.destination.parse()?,
-            BalanceType::HOPR.balance_bytes(&value.balance),
+            HoprBalance::from(U256::from_be_bytes(&value.balance)),
             U256::from_be_bytes(&value.ticket_index),
             status,
             U256::from_be_bytes(&value.epoch),

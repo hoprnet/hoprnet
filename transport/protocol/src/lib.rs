@@ -1,4 +1,5 @@
-//! Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic layers.
+//! Collection of objects and functionality allowing building of p2p or stream protocols for the higher business logic
+//! layers.
 //!
 //! ## Contents
 //!
@@ -21,27 +22,31 @@
 //! - `Reply(PeerId, std::result::Result<Ticket, String>, T)`,
 //! - `Send(PeerId, Vec<AcknowledgedTicket>, TicketAggregationFinalizer)`,
 //!
-//! where `U` is the type of an aggregated ticket extractable (`ResponseChannel<Result<Ticket, String>>`) and `T` represents a network negotiated identifier (`RequestId`).
+//! where `U` is the type of an aggregated ticket extractable (`ResponseChannel<Result<Ticket, String>>`) and `T`
+//! represents a network negotiated identifier (`RequestId`).
 //!
 //! In broader context the protocol flow is as follows:
 //!
 //! 1. requesting ticket aggregation
 //!
-//!    - the peer A desires to aggregate tickets, collects the tickets into a data collection and sends a request containing the collection to aggregate `Vec<AcknowledgedTicket>` to peer B using the `Send` mechanism
+//!    - the peer A desires to aggregate tickets, collects the tickets into a data collection and sends a request
+//!      containing the collection to aggregate `Vec<AcknowledgedTicket>` to peer B using the `Send` mechanism
 //!
 //! 2. responding to ticket aggregation
 //!
-//!    - peer B obtains the request from peer A, performs the ticket aggregation and returns a result of that operation in the form of `std::result::Result<Ticket, String>` using the `Reply` mechanism
+//!    - peer B obtains the request from peer A, performs the ticket aggregation and returns a result of that operation
+//!      in the form of `std::result::Result<Ticket, String>` using the `Reply` mechanism
 //!
 //! 3. accepting the aggregated ticket
 //!    - peer A receives the aggregated ticket using the `Receive` mechanism
 //!
 //! Furthermore, apart from the basic positive case scenario, standard mechanics of protocol communication apply:
 //!
-//! - the requesting side can time out, if the responding side takes too long to provide an aggregated ticket, in which case the ticket is not considered aggregated, even if eventually an aggregated ticket is delivered
-//! - the responder can fail to aggregate tickets in which case it replies with an error string describing the failure reason and it is the requester's responsibility to handle the negative case as well
+//! - the requesting side can time out, if the responding side takes too long to provide an aggregated ticket, in which
+//!   case the ticket is not considered aggregated, even if eventually an aggregated ticket is delivered
+//! - the responder can fail to aggregate tickets in which case it replies with an error string describing the failure
+//!   reason and it is the requester's responsibility to handle the negative case as well
 //!   - in the absence of response, the requester will time out
-//!
 
 /// Coder and decoder for the transport binary protocol layer
 mod codec;
@@ -51,8 +56,6 @@ pub mod config;
 /// Errors produced by the crate.
 pub mod errors;
 
-/// Bloom filter for the transport layer.
-pub mod bloom;
 // protocols
 /// `heartbeat` p2p protocol
 pub mod heartbeat;
@@ -63,26 +66,25 @@ pub mod processor;
 pub mod stream;
 
 pub mod timer;
-use hopr_crypto_types::types::OffchainPublicKey;
-use hopr_transport_identity::Multiaddr;
-pub use timer::execute_on_tick;
+use std::collections::HashMap;
 
 use futures::{SinkExt, StreamExt};
+use hopr_async_runtime::spawn_as_abortable;
+use hopr_crypto_types::types::OffchainPublicKey;
+use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
+use hopr_internal_types::{prelude::HoprPseudonym, protocol::Acknowledgement};
+use hopr_network_types::prelude::ResolvedTransportRouting;
+use hopr_transport_bloom::persistent::WrappedTagBloomFilter;
+use hopr_transport_identity::{Multiaddr, PeerId};
+use hopr_transport_packet::prelude::ApplicationData;
 use rust_stream_ext_concurrent::then_concurrent::StreamThenConcurrentExt;
-use std::collections::HashMap;
 use tracing::{error, trace, warn};
 
-use hopr_async_runtime::prelude::spawn;
-use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket};
-use hopr_internal_types::prelude::HoprPseudonym;
-use hopr_internal_types::protocol::{Acknowledgement, ApplicationData};
-use hopr_network_types::prelude::ResolvedTransportRouting;
-use hopr_transport_identity::PeerId;
-
-pub use processor::DEFAULT_PRICE_PER_PACKET;
-use processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+use crate::processor::{PacketSendFinalizer, PacketUnwrapping, PacketWrapping};
+pub use crate::{processor::DEFAULT_PRICE_PER_PACKET, timer::execute_on_tick};
 
 const HOPR_PACKET_SIZE: usize = hopr_crypto_packet::prelude::HoprPacket::SIZE;
+const SLOW_OP_MS: u128 = 150;
 
 pub type HoprBinaryCodec = crate::codec::FixedLengthCodec<HOPR_PACKET_SIZE>;
 pub const CURRENT_HOPR_MSG_PROTOCOL: &str = "/hopr/mix/1.0.0";
@@ -146,11 +148,11 @@ pub async fn run_msg_ack_protocol<Db>(
     api: (
         impl futures::Sink<(HoprPseudonym, ApplicationData)> + Send + Sync + 'static,
         impl futures::Stream<Item = (ApplicationData, ResolvedTransportRouting, PacketSendFinalizer)>
-            + Send
-            + Sync
-            + 'static,
+        + Send
+        + Sync
+        + 'static,
     ),
-) -> HashMap<ProtocolProcesses, hopr_async_runtime::prelude::JoinHandle<()>>
+) -> HashMap<ProtocolProcesses, hopr_async_runtime::AbortHandle>
 where
     Db: HoprDbProtocolOperations + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
@@ -171,11 +173,11 @@ where
     }
 
     let tbf = if let Some(bloom_filter_persistent_path) = bloom_filter_persistent_path {
-        let tbf = bloom::WrappedTagBloomFilter::new(bloom_filter_persistent_path);
+        let tbf = WrappedTagBloomFilter::new(bloom_filter_persistent_path);
         let tbf_2 = tbf.clone();
         processes.insert(
             ProtocolProcesses::BloomPersist,
-            spawn(Box::pin(execute_on_tick(
+            spawn_as_abortable(Box::pin(execute_on_tick(
                 std::time::Duration::from_secs(90),
                 move || {
                     let tbf_clone = tbf_2.clone();
@@ -187,7 +189,7 @@ where
         );
         tbf
     } else {
-        bloom::WrappedTagBloomFilter::new("no_tbf".into())
+        WrappedTagBloomFilter::new("no_tbf".into())
     };
 
     let msg_processor_read = processor::PacketProcessor::new(db.clone(), packet_cfg);
@@ -196,7 +198,7 @@ where
     let msg_to_send_tx = wire_msg.0.clone();
     processes.insert(
         ProtocolProcesses::MsgOut,
-        spawn(async move {
+        spawn_as_abortable(async move {
             let _neverending = api
                 .1
                 .then_concurrent(|(data, routing, finalizer)| {
@@ -233,7 +235,7 @@ where
     let me_for_recv = me.clone();
     processes.insert(
         ProtocolProcesses::MsgIn,
-        spawn(async move {
+        spawn_as_abortable(async move {
             let _neverending = wire_msg
                 .1
                 .then_concurrent(move |(peer, data)| {
@@ -243,7 +245,12 @@ where
                     let me = me.clone();
 
                     async move {
+                        let now = std::time::Instant::now();
                         let res = msg_processor.recv(&peer, data).await.map_err(move |e| (peer, e));
+                        let elapsed = now.elapsed();
+                        if elapsed.as_millis() > SLOW_OP_MS {
+                            tracing::warn!("msg_processor.recv took {}ms", elapsed.as_millis());
+                        }
                         if let Err((peer, e)) = &res {
                             #[cfg(all(feature = "prometheus", not(test)))]
                             if let hopr_crypto_packet::errors::PacketError::TicketValidation(_) = e {
@@ -267,6 +274,7 @@ where
                                 .to_send_no_ack(ack.as_ref().to_vec().into_boxed_slice(), peer)
                                 .await {
                                     Ok(ack_packet) => {
+                                        let now = std::time::Instant::now();
                                         msg_to_send_tx
                                             .send((
                                                 ack_packet.next_hop.into(),
@@ -276,6 +284,10 @@ where
                                             .unwrap_or_else(|_e| {
                                                 error!("Failed to forward an acknowledgement for a failed packet recv to the transport layer");
                                             });
+                                        let elapsed = now.elapsed();
+                                        if elapsed.as_millis() > SLOW_OP_MS {
+                                            tracing::warn!("msg_to_send_tx.send took {}ms", elapsed.as_millis());
+                                        }
                                     },
                                     Err(error) => tracing::error!(%error, "Failed to create random ack packet for a failed receive"),
                                 }

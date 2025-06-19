@@ -14,7 +14,7 @@ pub struct IndexerData {
     /// Channels smart contract domain separator
     pub channels_dst: Option<Hash>,
     /// Current ticket price
-    pub ticket_price: Option<Balance>,
+    pub ticket_price: Option<HoprBalance>,
     /// Minimum winning probability
     pub minimum_incoming_ticket_winning_prob: WinningProbability,
     /// Network registry state

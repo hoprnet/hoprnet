@@ -1,6 +1,8 @@
-use alloy::contract::Error as AlloyContractError;
-use alloy::providers::{MulticallError, PendingTransactionError};
-use alloy::transports::{RpcError as AlloyRpcError, TransportErrorKind};
+use alloy::{
+    contract::Error as AlloyContractError,
+    providers::{MulticallError, PendingTransactionError},
+    transports::{RpcError as AlloyRpcError, TransportErrorKind},
+};
 /// Errors produced by this crate and other error-related types.
 use thiserror::Error;
 
@@ -28,12 +30,14 @@ pub enum RpcError {
     #[error(transparent)]
     PendingTransactionError(#[from] PendingTransactionError),
 
-    // InterfaceError(String),
     #[error("filter does not contain any criteria")]
     FilterIsEmpty,
 
     #[error("transaction submission to the RPC provider timed out")]
     Timeout,
+
+    #[error("unknown error: {0}")]
+    Other(String),
 }
 
 pub type Result<T> = std::result::Result<T, RpcError>;

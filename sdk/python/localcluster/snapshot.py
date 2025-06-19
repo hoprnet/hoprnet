@@ -4,15 +4,6 @@ from pathlib import Path
 from .cluster import Cluster
 from .constants import ANVIL_FOLDER, ANVIL_FOLDER_NAME, NODE_NAME_PREFIX, logging
 
-EXPECTED_FILES_FOR_SNAPSHOT = [
-    "db/hopr_index.db",
-    "db/hopr_index.db-shm",
-    "db/hopr_index.db-wal",
-    "db/hopr_logs.db",
-    "db/hopr_logs.db-shm",
-    "db/hopr_logs.db-wal",
-]
-
 
 class Snapshot:
     def __init__(self, anvil_port: int, parent_dir: Path, cluster: Cluster):
@@ -41,12 +32,6 @@ class Snapshot:
         for i in range(self.cluster.size):
             source_dir: Path = self.parent_dir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
             target_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
-            db_target_dir = target_dir.joinpath("db/")
-
-            db_target_dir.mkdir(parents=True, exist_ok=True)
-
-            for file in EXPECTED_FILES_FOR_SNAPSHOT:
-                shutil.copy(source_dir.joinpath(file), db_target_dir)
 
             shutil.copy(source_dir.joinpath("./hoprd.id"), target_dir)
             shutil.copy(source_dir.joinpath("./.env"), target_dir)
@@ -54,18 +39,23 @@ class Snapshot:
     def reuse(self):
         logging.info("Re-using snapshot")
 
-        # remove all files and folder in self.dir which are not snapshot
-
+        # remove all files and folder in self.dir which are not snapshot and not
+        # logs
         for entry in self.parent_dir.glob("*"):
             if entry.is_dir():
-                if entry.name == f"snapshot-{self.anvil_port}":
-                    continue
-                shutil.rmtree(entry, ignore_errors=True)
-            else:
+                continue
+            elif not entry.name.endswith(".log") and not entry.name.endswith(".env"):
+                logging.debug(f"Removing file: {entry}")
                 entry.unlink(missing_ok=True)
 
         # copy snapshot files
         shutil.copytree(self.sdir, self.parent_dir, dirs_exist_ok=True)
+
+        # remove log files from snapshot dir
+        for entry in self.sdir.glob("*"):
+            if entry.name.endswith(".log"):
+                logging.debug(f"Removing log file from snapshot: {entry}")
+                entry.unlink(missing_ok=True)
 
     @property
     def usable(self):
@@ -78,7 +68,6 @@ class Snapshot:
 
         for i in range(self.cluster.size):
             node_dir = self.sdir.joinpath(f"{NODE_NAME_PREFIX}_{i+1}")
-            expected_files.extend([node_dir.joinpath(file) for file in EXPECTED_FILES_FOR_SNAPSHOT])
 
         for f in expected_files:
             if not f.exists():

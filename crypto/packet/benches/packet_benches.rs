@@ -1,5 +1,5 @@
 use bimap::BiHashMap;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use hopr_crypto_packet::prelude::*;
 use hopr_crypto_random::Randomizable;
 use hopr_crypto_types::prelude::{ChainKeypair, Hash, Keypair, OffchainKeypair, OffchainPublicKey};
@@ -17,13 +17,11 @@ pub fn packet_sending_bench(c: &mut Criterion) {
 
     let chain_key = ChainKeypair::random();
     let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
-    let path = (0..=3)
-        .map(|_| OffchainKeypair::random().public().clone())
-        .collect::<Vec<_>>();
+    let path = (0..=3).map(|_| *OffchainKeypair::random().public()).collect::<Vec<_>>();
     let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
         .iter()
         .enumerate()
-        .map(|(i, k)| (KeyIdent::from(i as u32), k.clone()))
+        .map(|(i, k)| (KeyIdent::from(i as u32), *k))
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
@@ -68,13 +66,11 @@ pub fn packet_precompute_1rp_bench(c: &mut Criterion) {
 
     let chain_key = ChainKeypair::random();
     let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
-    let path = (0..=3)
-        .map(|_| OffchainKeypair::random().public().clone())
-        .collect::<Vec<_>>();
+    let path = (0..=3).map(|_| *OffchainKeypair::random().public()).collect::<Vec<_>>();
     let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
         .iter()
         .enumerate()
-        .map(|(i, k)| (KeyIdent::from(i as u32), k.clone()))
+        .map(|(i, k)| (KeyIdent::from(i as u32), *k))
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
@@ -117,13 +113,11 @@ pub fn packet_precompute_2rp_bench(c: &mut Criterion) {
 
     let chain_key = ChainKeypair::random();
     let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
-    let path = (0..=3)
-        .map(|_| OffchainKeypair::random().public().clone())
-        .collect::<Vec<_>>();
+    let path = (0..=3).map(|_| *OffchainKeypair::random().public()).collect::<Vec<_>>();
     let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
         .iter()
         .enumerate()
-        .map(|(i, k)| (KeyIdent::from(i as u32), k.clone()))
+        .map(|(i, k)| (KeyIdent::from(i as u32), *k))
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
@@ -166,13 +160,11 @@ pub fn packet_sending_precomputed_bench(c: &mut Criterion) {
 
     let chain_key = ChainKeypair::random();
     let destination = Address::new(&hopr_crypto_random::random_bytes::<20>());
-    let path = (0..=3)
-        .map(|_| OffchainKeypair::random().public().clone())
-        .collect::<Vec<_>>();
+    let path = (0..=3).map(|_| *OffchainKeypair::random().public()).collect::<Vec<_>>();
     let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
         .iter()
         .enumerate()
-        .map(|(i, k)| (KeyIdent::from(i as u32), k.clone()))
+        .map(|(i, k)| (KeyIdent::from(i as u32), *k))
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
@@ -221,11 +213,11 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     let sender = OffchainKeypair::random();
     let relayer = OffchainKeypair::random();
     let recipient = OffchainKeypair::random();
-    let path = [relayer.public().clone(), recipient.public().clone()];
+    let path = [*relayer.public(), *recipient.public()];
     let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
         .iter()
         .enumerate()
-        .map(|(i, k)| (KeyIdent::from((i + 1) as u32), k.clone()))
+        .map(|(i, k)| (KeyIdent::from((i + 1) as u32), *k))
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
@@ -265,7 +257,7 @@ pub fn packet_forwarding_bench(c: &mut Criterion) {
     group.throughput(Throughput::BytesDecimal(msg.len() as u64));
     group.bench_function("any_hop", |b| {
         b.iter(|| {
-            HoprPacket::from_incoming(&packet, &relayer, sender.public().clone(), &mapper, |_| None).unwrap();
+            HoprPacket::from_incoming(&packet, &relayer, *sender.public(), &mapper, |_| None).unwrap();
         })
     });
 }
@@ -282,11 +274,11 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     let sender = OffchainKeypair::random();
     let relayer = OffchainKeypair::random();
     let recipient = OffchainKeypair::random();
-    let path = [relayer.public().clone(), recipient.public().clone()];
+    let path = [*relayer.public(), *recipient.public()];
     let mapper: bimap::BiMap<KeyIdent, OffchainPublicKey> = path
         .iter()
         .enumerate()
-        .map(|(i, k)| (KeyIdent::from(i as u32), k.clone()))
+        .map(|(i, k)| (KeyIdent::from(i as u32), *k))
         .collect::<BiHashMap<_, _>>();
     let pseudonym = HoprPseudonym::random();
 
@@ -321,8 +313,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     };
 
     // Relayer
-    let packet = match HoprPacket::from_incoming(&packet, &relayer, sender.public().clone(), &mapper, |_| None).unwrap()
-    {
+    let packet = match HoprPacket::from_incoming(&packet, &relayer, *sender.public(), &mapper, |_| None).unwrap() {
         HoprPacket::Forwarded(fwd) => {
             let mut ret = Vec::with_capacity(HoprPacket::SIZE);
             ret.extend_from_slice(fwd.outgoing.packet.as_ref());
@@ -338,7 +329,7 @@ pub fn packet_receiving_bench(c: &mut Criterion) {
     group.throughput(Throughput::BytesDecimal(msg.len() as u64));
     group.bench_function("any_hop", |b| {
         b.iter(|| {
-            HoprPacket::from_incoming(&packet, &recipient, relayer.public().clone(), &mapper, |_| None).unwrap();
+            HoprPacket::from_incoming(&packet, &recipient, *relayer.public(), &mapper, |_| None).unwrap();
         })
     });
 }

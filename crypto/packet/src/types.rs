@@ -1,10 +1,14 @@
-use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
-use hopr_crypto_sphinx::errors::SphinxError;
-use hopr_crypto_sphinx::prelude::{PaddedPayload, SphinxHeaderSpec, SphinxSuite, SURB};
+use std::marker::PhantomData;
+
+use hopr_crypto_sphinx::{
+    errors::SphinxError,
+    prelude::{PaddedPayload, SURB, SphinxHeaderSpec, SphinxSuite},
+};
 use hopr_crypto_types::prelude::Hash;
 use hopr_internal_types::prelude::HoprPseudonym;
 use hopr_primitive_types::prelude::{BytesRepresentable, GeneralError};
-use std::marker::PhantomData;
+
+use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, PAYLOAD_SIZE_INT};
 
 pub const SURB_ID_SIZE: usize = 8;
 
@@ -167,8 +171,6 @@ impl<S: SphinxSuite, H: SphinxHeaderSpec, const P: usize> From<PacketMessage<S, 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use anyhow::anyhow;
     use bimap::BiHashMap;
     use hex_literal::hex;
@@ -177,9 +179,12 @@ mod tests {
     use hopr_crypto_types::prelude::*;
     use hopr_primitive_types::prelude::*;
 
-    use crate::packet::HoprPacket;
-    use crate::por::{generate_proof_of_relay, SurbReceiverInfo};
-    use crate::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb};
+    use super::*;
+    use crate::{
+        HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb,
+        packet::HoprPacket,
+        por::{SurbReceiverInfo, generate_proof_of_relay},
+    };
 
     lazy_static::lazy_static! {
         static ref PEERS: [(ChainKeypair, OffchainKeypair); 4] = [
@@ -192,12 +197,12 @@ mod tests {
         static ref MAPPER: bimap::BiMap<KeyIdent, OffchainPublicKey> = PEERS
             .iter()
             .enumerate()
-            .map(|(i, (_, k))| (KeyIdent::from(i as u32), k.public().clone()))
+            .map(|(i, (_, k))| (KeyIdent::from(i as u32), *k.public()))
             .collect::<BiHashMap<_, _>>();
     }
 
     fn generate_surbs(count: usize) -> anyhow::Result<Vec<SURB<HoprSphinxSuite, HoprSphinxHeaderSpec>>> {
-        let path = PEERS.iter().map(|(_, k)| k.public().clone()).collect::<Vec<_>>();
+        let path = PEERS.iter().map(|(_, k)| *k.public()).collect::<Vec<_>>();
         let path_ids =
             <BiHashMap<_, _> as KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>>::map_keys_to_ids(&*MAPPER, &path)
                 .into_iter()
@@ -207,7 +212,6 @@ mod tests {
         let recv_data = HoprSenderId::new(&pseudonym);
 
         Ok((0..count)
-            .into_iter()
             .map(|_| {
                 let shared_keys = HoprSphinxSuite::new_shared_keys(&path)?;
                 let (por_strings, por_values) = generate_proof_of_relay(&shared_keys.secrets)

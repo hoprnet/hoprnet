@@ -145,12 +145,16 @@ Options:
           Set host IP to which the API server will bind [env: HOPRD_API_HOST=]
       --apiPort <PORT>
           Set port to which the API server will bind [env: HOPRD_API_PORT=]
+      --defaultSessionListenHost <DEFAULT_SESSION_LISTEN_HOST>
+          Default Session listening host for Session IP forwarding [env: HOPRD_DEFAULT_SESSION_LISTEN_HOST=]
       --apiToken <TOKEN>
           A REST API token and for user authentication [env: HOPRD_API_TOKEN=]
       --password <PASSWORD>
           A password to encrypt your keys [env: HOPRD_PASSWORD=]
-      --disableUnrealizedBalanceCheck...
-          Disables checking of unrealized balance before validating unacknowledged tickets. [env: HOPRD_DISABLE_UNREALIZED_BALANCE_CHECK=]
+      --noKeepLogs...
+          Disables keeping RPC logs in the logs database after they were processed. [env: HOPRD_INDEXER_DISABLE_KEEP_LOGS=]
+      --noFastSync...
+          Disables using fast sync at node start. [env: HOPRD_INDEXER_DISABLE_FAST_SYNC=]
       --maxBlockRange <MAX_BLOCK_RANGE>
           Maximum number of blocks that can be fetched in a batch request from the RPC provider. [env: HOPRD_MAX_BLOCK_RANGE=]
       --maxRequestsPerSec <MAX_RPC_REQUESTS_PER_SEC>
@@ -161,14 +165,8 @@ Options:
           initialize a database if it doesn't already exist [env: HOPRD_INIT=]
       --forceInit...
           initialize a database, even if it already exists [env: HOPRD_FORCE_INIT=]
-      --inbox-capacity <INBOX_CAPACITY>
-          Set maximum capacity of the HOPRd inbox [env: HOPRD_INBOX_CAPACITY=]
-      --heartbeatInterval <MILLISECONDS>
-          Interval in milliseconds in which the availability of other nodes get measured [env: HOPRD_HEARTBEAT_INTERVAL=]
-      --heartbeatThreshold <MILLISECONDS>
-          Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since [env: HOPRD_HEARTBEAT_THRESHOLD=]
-      --heartbeatVariance <MILLISECONDS>
-          Upper bound for variance applied to heartbeat interval in milliseconds [env: HOPRD_HEARTBEAT_VARIANCE=]
+      --probeRecheckThreshold <SECONDS>
+          Timeframe in seconds after which it is reasonable to recheck the nearest neighbor [env: HOPRD_PROBE_RECHECK_THRESHOLD=]
       --networkQualityThreshold <THRESHOLD>
           Minimum quality of a peer connection to be considered usable [env: HOPRD_NETWORK_QUALITY_THRESHOLD=]
       --configurationFilePath <CONFIG_FILE_PATH>
@@ -191,25 +189,24 @@ Options:
 
 On top of the default configuration options generated for the command line, the following environment variables can be used in order to tweak the node functionality:
 
+- `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
 - `HOPRD_LOG_FORMAT` - override for the default stdout log formatter (follows tracing formatting options)
 - `HOPRD_USE_OPENTELEMETRY` - enable the opentelemetry output for this node
 - `OTEL_SERVICE_NAME` - the name of this node for the opentelemetry service
 - `HOPR_INTERNAL_LIBP2P_MAX_CONCURRENTLY_DIALED_PEER_COUNT` - the maximum number of concurrently dialed peers in libp2p
 - `HOPR_INTERNAL_LIBP2P_MAX_NEGOTIATING_INBOUND_STREAM_COUNT` - the maximum number of negotiating inbound streams
-- `HOPR_INTERNAL_LIBP2P_MSG_ACK_MAX_TOTAL_STREAMS` - the maximum number of used outbound and inbound streams for the `msg` and `ack` protocols
 - `HOPR_INTERNAL_LIBP2P_SWARM_IDLE_TIMEOUT` - timeout for all idle libp2p swarm connections in seconds
 - `HOPR_INTERNAL_DB_PEERS_PERSISTENCE_AFTER_RESTART_IN_SECONDS` - cutoff duration from now to not retain the peers with older records in the peers database (e.g. after a restart)
 - `HOPR_INTERNAL_REST_API_MAX_CONCURRENT_WEBSOCKET_COUNT` - the maximum number of concurrent websocket opened through the REST API
 - `HOPR_INTERNAL_MIXER_CAPACITY` - capacity of the mixer buffer
 - `HOPR_INTERNAL_MIXER_MINIMUM_DELAY_IN_MS` - the minimum mixer delay in milliseconds
 - `HOPR_INTERNAL_MIXER_DELAY_RANGE_IN_MS` - the maximum range of the mixer delay from the minimum value in milliseconds
-- `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
-- `ENV_WORKER_THREADS` - the number of environment worker threads for the tokio executor
-- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
-- `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
 - `HOPR_BALANCER_PID_P_GAIN` - proportional (P) gain for the PID controller in SURB balancer (default: `0.6`)
 - `HOPR_BALANCER_PID_I_GAIN` - integral (I) gain for the PID controller in SURB balancer (default: `0.7`)
 - `HOPR_BALANCER_PID_D_GAIN` - derivative (D) gain for the PID controller in SURB balancer (default: `0.2`)
+- `HOPR_TEST_DISABLE_CHECKS` - the node is being run in test mode with some safety checks disabled (currently: minimum winning probability check)
+- `HOPRD_SESSION_PORT_RANGE` - allows restricting the port range (syntax: `start:end` inclusive) of Session listener automatic port selection (when port 0 is specified)
+- `HOPRD_NAT` - indicates whether the host is behind a NAT and sets transport-specific settings accordingly (default: `false`)
 
 ### Example execution
 
@@ -353,8 +350,8 @@ nix run .#lint
 # make kill-anvil
 # make clean
 
-# build deps and HOPRd code
-make -j deps && make -j build
+# build HOPRd code
+cargo build
 
 # starting network
 make run-anvil args="-p"
@@ -388,8 +385,8 @@ make run-hopr-admin &
 Running one node in test mode, with safe and module attached (in dufour network)
 
 ```bash
-# build deps and HOPRd code
-make -j deps && make -j build
+# HOPRd code
+cargo build
 
 # Fill out the `ethereum/contract/.env` from the `ethereum/contracts/example.env`
 #
@@ -449,22 +446,6 @@ When using the `nix` environment, the test environment preparation and activatio
 Tests are using the `pytest` infrastructure.
 
 #### Running Tests Locally
-
-##### Testing environment
-
-If not using `nix`, setup the `pytest` environment:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -r tests/requirements.txt
-```
-
-To deactivate the activated testing environment if no longer needed:
-
-```bash
-deactivate
-```
 
 ##### Test execution
 
@@ -530,7 +511,7 @@ Once an instrumented tokio is built into hoprd, the application can be instrumen
 
 ## Contact
 
-- [Twitter](https://twitter.com/hoprnet)
+- [X](https://x.com/hoprnet)
 - [Telegram](https://t.me/hoprnet)
 - [Medium](https://medium.com/hoprnet)
 - [Reddit](https://www.reddit.com/r/HOPR/)

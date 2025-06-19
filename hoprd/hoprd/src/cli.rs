@@ -1,9 +1,8 @@
-use clap::builder::ValueParser;
-use clap::{ArgAction, Parser};
-use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use hopr_lib::{looks_like_domain, HostConfig};
+use clap::{ArgAction, Parser, builder::ValueParser};
+use hopr_lib::{HostConfig, looks_like_domain};
+use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_API_HOST: &str = "localhost";
 pub const DEFAULT_API_PORT: u16 = 3001;
@@ -117,7 +116,7 @@ pub struct CliArgs {
     pub api_port: Option<u16>,
 
     #[arg(
-        long,
+        long = "defaultSessionListenHost",
         env = "HOPRD_DEFAULT_SESSION_LISTEN_HOST",
         help = "Default Session listening host for Session IP forwarding",
         value_parser = ValueParser::new(parse_host),
@@ -237,31 +236,13 @@ pub struct CliArgs {
     pub test_prefer_local_addresses: u8,
 
     #[arg(
-        long = "heartbeatInterval",
-        help = "Interval in milliseconds in which the availability of other nodes get measured",
-        value_name = "MILLISECONDS",
+        long = "probeRecheckThreshold",
+        help = "Timeframe in seconds after which it is reasonable to recheck the nearest neighbor",
+        value_name = "SECONDS",
         value_parser = clap::value_parser ! (u64),
-        env = "HOPRD_HEARTBEAT_INTERVAL",
+        env = "HOPRD_PROBE_RECHECK_THRESHOLD",
     )]
-    pub heartbeat_interval: Option<u64>,
-
-    #[arg(
-        long = "heartbeatThreshold",
-        help = "Timeframe in milliseconds after which a heartbeat to another peer is performed, if it hasn't been seen since",
-        value_name = "MILLISECONDS",
-        value_parser = clap::value_parser ! (u64),
-        env = "HOPRD_HEARTBEAT_THRESHOLD",
-    )]
-    pub heartbeat_threshold: Option<u64>,
-
-    #[arg(
-        long = "heartbeatVariance",
-        help = "Upper bound for variance applied to heartbeat interval in milliseconds",
-        value_name = "MILLISECONDS",
-        value_parser = clap::value_parser ! (u64),
-        env = "HOPRD_HEARTBEAT_VARIANCE"
-    )]
-    pub heartbeat_variance: Option<u64>,
+    pub probe_recheck_threshold: Option<u64>,
 
     #[arg(
         long = "networkQualityThreshold",

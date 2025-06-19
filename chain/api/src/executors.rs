@@ -1,20 +1,15 @@
-use alloy::providers::PendingTransaction;
-use alloy::rpc::types::TransactionRequest;
-use async_trait::async_trait;
-use futures::future::Either;
-use futures::{pin_mut, FutureExt};
-use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
-use std::time::Duration;
+use std::{marker::PhantomData, time::Duration};
 
+use alloy::{providers::PendingTransaction, rpc::types::TransactionRequest};
+use async_trait::async_trait;
+use futures::{FutureExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::sleep;
-use hopr_chain_actions::action_queue::TransactionExecutor;
-use hopr_chain_actions::payload::PayloadGenerator;
-use hopr_chain_rpc::errors::RpcError;
-use hopr_chain_rpc::HoprRpcOperations;
+use hopr_chain_actions::{action_queue::TransactionExecutor, payload::PayloadGenerator};
+use hopr_chain_rpc::{HoprRpcOperations, errors::RpcError};
 use hopr_crypto_types::types::Hash;
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use serde::{Deserialize, Serialize};
 
 /// Represents an abstract client that is capable of submitting
 /// an Ethereum transaction-like object to the blockchain.
@@ -36,10 +31,10 @@ pub trait EthereumClient<T: Into<TransactionRequest>> {
 pub struct RpcEthereumClientConfig {
     /// Maximum time to wait for the TX to get submitted.
     ///
-    /// This must be strictly greater than any timeouts in the underlying `HoprRpcOperations`
+    /// This should be strictly greater than any timeouts in the underlying `HoprRpcOperations`
     ///
-    /// Defaults to 30 seconds.
-    #[default(Duration::from_secs(30))]
+    /// Defaults to 5 seconds.
+    #[default(Duration::from_secs(5))]
     pub max_tx_submission_wait: Duration,
 }
 
@@ -129,7 +124,11 @@ where
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn fund_channel(&self, destination: Address, balance: Balance) -> hopr_chain_actions::errors::Result<Hash> {
+    async fn fund_channel(
+        &self,
+        destination: Address,
+        balance: HoprBalance,
+    ) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.fund_channel(destination, balance)?;
         Ok(self.client.post_transaction(payload).await?)
     }
@@ -149,7 +148,11 @@ where
         Ok(self.client.post_transaction(payload).await?)
     }
 
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> hopr_chain_actions::errors::Result<Hash> {
+    async fn withdraw<Cr: Currency + Send>(
+        &self,
+        recipient: Address,
+        amount: Balance<Cr>,
+    ) -> hopr_chain_actions::errors::Result<Hash> {
         let payload = self.payload_generator.transfer(recipient, amount)?;
 
         // Withdraw transaction is out-of-band from Indexer, so its confirmation

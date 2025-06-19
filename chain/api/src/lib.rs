@@ -4,37 +4,40 @@ pub mod config;
 pub mod errors;
 pub mod executors;
 
-use alloy::rpc::client::ClientBuilder;
-use alloy::rpc::types::TransactionRequest;
-use alloy::transports::http::{Http, ReqwestTransport};
-use alloy::transports::layers::RetryBackoffLayer;
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::{debug, error, info, warn};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use hopr_async_runtime::prelude::{sleep, spawn, JoinHandle};
-use hopr_chain_actions::action_queue::{ActionQueue, ActionQueueConfig};
-use hopr_chain_actions::action_state::IndexerActionTracker;
-use hopr_chain_actions::payload::SafePayloadGenerator;
-use hopr_chain_actions::ChainActions;
-use hopr_chain_indexer::{block::Indexer, handlers::ContractEventHandlers, IndexerConfig};
-use hopr_chain_rpc::client::DefaultRetryPolicy;
-use hopr_chain_rpc::rpc::{RpcOperations, RpcOperationsConfig};
-use hopr_chain_rpc::transport::ReqwestClient;
-use hopr_chain_rpc::HoprRpcOperations;
-pub use hopr_chain_types::chain_events::SignificantChainEvent;
-use hopr_chain_types::ContractAddresses;
-use hopr_crypto_types::prelude::*;
-use hopr_db_sql::HoprDbAllOperations;
-use hopr_internal_types::account::AccountEntry;
-pub use hopr_internal_types::channels::ChannelEntry;
-use hopr_internal_types::prelude::ChannelDirection;
-use hopr_internal_types::tickets::WinningProbability;
-use hopr_primitive_types::prelude::*;
-
+use alloy::{
+    rpc::{client::ClientBuilder, types::TransactionRequest},
+    transports::{
+        http::{Http, ReqwestTransport},
+        layers::RetryBackoffLayer,
+    },
+};
 use config::ChainNetworkConfig;
 use executors::{EthereumTransactionExecutor, RpcEthereumClient, RpcEthereumClientConfig};
+use futures::future::AbortHandle;
+use hopr_async_runtime::{prelude::sleep, spawn_as_abortable};
+use hopr_chain_actions::{
+    ChainActions,
+    action_queue::{ActionQueue, ActionQueueConfig},
+    action_state::IndexerActionTracker,
+    payload::SafePayloadGenerator,
+};
+use hopr_chain_indexer::{IndexerConfig, block::Indexer, handlers::ContractEventHandlers};
+use hopr_chain_rpc::{
+    HoprRpcOperations,
+    client::DefaultRetryPolicy,
+    rpc::{RpcOperations, RpcOperationsConfig},
+    transport::ReqwestClient,
+};
+use hopr_chain_types::ContractAddresses;
+pub use hopr_chain_types::chain_events::SignificantChainEvent;
+use hopr_crypto_types::prelude::*;
+use hopr_db_sql::HoprDbAllOperations;
+pub use hopr_internal_types::channels::ChannelEntry;
+use hopr_internal_types::{account::AccountEntry, prelude::ChannelDirection, tickets::WinningProbability};
+use hopr_primitive_types::prelude::*;
+use tracing::{debug, error, info, warn};
 
 use crate::errors::{HoprChainError, Result};
 
@@ -75,7 +78,7 @@ pub async fn can_register_with_safe<Rpc: HoprRpcOperations>(
 /// This is done by querying the RPC provider for balance with backoff until `max_delay` argument.
 pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     address: Address,
-    min_balance: Balance,
+    min_balance: XDaiBalance,
     max_delay: Duration,
     rpc: &Rpc,
 ) -> Result<()> {
@@ -83,7 +86,7 @@ pub async fn wait_for_funds<Rpc: HoprRpcOperations>(
     let mut current_delay = Duration::from_secs(2).min(max_delay);
 
     while current_delay <= max_delay {
-        match rpc.get_balance(address, min_balance.balance_type()).await {
+        match rpc.get_xdai_balance(address).await {
             Ok(current_balance) => {
                 info!(balance = %current_balance, "balance status");
                 if current_balance.ge(&min_balance) {
@@ -164,7 +167,8 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             rpc_http_config.max_requests_per_sec = Some(max_rpc_req); // override the default if set
         }
 
-        // TODO(#7140): replace this DefaultRetryPolicy with a custom one that computes backoff with the number of retries
+        // TODO(#7140): replace this DefaultRetryPolicy with a custom one that computes backoff with the number of
+        // retries
         let rpc_http_retry_policy = DefaultRetryPolicy::default();
 
         // TODO: extract this from the global config type
@@ -198,7 +202,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
 
         // Build RPC operations
         let rpc_operations =
-            RpcOperations::new(rpc_client, requestor, &me_onchain, rpc_cfg).expect("failed to initialize RPC");
+            RpcOperations::new(rpc_client, requestor, &me_onchain, rpc_cfg, None).expect("failed to initialize RPC");
 
         // Build the Ethereum Transaction Executor that uses RpcOperations as backend
         let ethereum_tx_executor = EthereumTransactionExecutor::new(
@@ -238,12 +242,12 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
     ///
     /// This method will spawn the [`HoprChainProcess::Indexer`] and [`HoprChainProcess::OutgoingOnchainActionQueue`]
     /// processes and return join handles to the calling function.
-    pub async fn start(&self) -> errors::Result<HashMap<HoprChainProcess, JoinHandle<()>>> {
-        let mut processes: HashMap<HoprChainProcess, JoinHandle<()>> = HashMap::new();
+    pub async fn start(&self) -> errors::Result<HashMap<HoprChainProcess, AbortHandle>> {
+        let mut processes: HashMap<HoprChainProcess, AbortHandle> = HashMap::new();
 
         processes.insert(
             HoprChainProcess::OutgoingOnchainActionQueue,
-            spawn(self.action_queue.clone().start()),
+            spawn_as_abortable(self.action_queue.clone().start()),
         );
         processes.insert(
             HoprChainProcess::Indexer,
@@ -254,6 +258,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
                     self.safe_address,
                     self.me_onchain.clone(),
                     self.db.clone(),
+                    self.rpc_operations.clone(),
                 ),
                 self.db.clone(),
                 self.indexer_cfg,
@@ -262,7 +267,6 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
             .start()
             .await?,
         );
-
         Ok(processes)
     }
 
@@ -303,11 +307,11 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.db.get_all_channels(None).await?)
     }
 
-    pub async fn ticket_price(&self) -> errors::Result<Option<U256>> {
-        Ok(self.db.get_indexer_data(None).await?.ticket_price.map(|b| b.amount()))
+    pub async fn ticket_price(&self) -> errors::Result<Option<HoprBalance>> {
+        Ok(self.db.get_indexer_data(None).await?.ticket_price)
     }
 
-    pub async fn safe_allowance(&self) -> errors::Result<Balance> {
+    pub async fn safe_allowance(&self) -> errors::Result<HoprBalance> {
         Ok(self.db.get_safe_hopr_allowance(None).await?)
     }
 
@@ -323,12 +327,69 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         &self.rpc_operations
     }
 
-    pub async fn get_balance(&self, balance_type: BalanceType) -> errors::Result<Balance> {
-        Ok(self.rpc_operations.get_balance(self.me_onchain(), balance_type).await?)
+    /// Retrieves the balance of the node's on-chain account for the specified currency.
+    ///
+    /// This method queries the on-chain balance of the node's account for the given currency.
+    /// It supports querying balances for XDai and WxHOPR currencies. If the currency is unsupported,
+    /// an error is returned.
+    ///
+    /// # Returns
+    /// * `Result<Balance<C>>` - The balance of the node's account for the specified currency, or an error if the query
+    ///   fails.
+    pub async fn get_balance<C: Currency + Send>(&self) -> errors::Result<Balance<C>> {
+        let bal = if C::is::<XDai>() {
+            self.rpc_operations
+                .get_xdai_balance(self.me_onchain())
+                .await?
+                .to_be_bytes()
+        } else if C::is::<WxHOPR>() {
+            self.rpc_operations
+                .get_hopr_balance(self.me_onchain())
+                .await?
+                .to_be_bytes()
+        } else {
+            return Err(HoprChainError::Api("unsupported currency".into()));
+        };
+
+        Ok(Balance::<C>::from(U256::from_be_bytes(bal)))
     }
 
-    pub async fn get_safe_balance(&self, safe_address: Address, balance_type: BalanceType) -> errors::Result<Balance> {
-        Ok(self.rpc_operations.get_balance(safe_address, balance_type).await?)
+    /// Retrieves the balance of the specified address for the given currency.
+    ///
+    /// This method queries the on-chain balance of the provided address for the specified currency.
+    /// It supports querying balances for XDai and WxHOPR currencies. If the currency is unsupported,
+    /// an error is returned.
+    ///
+    /// # Arguments
+    /// * `address` - The address whose balance is to be retrieved.
+    ///
+    /// # Returns
+    /// * `Result<Balance<C>>` - The balance of the specified address for the given currency, or an error if the query
+    ///   fails.
+    pub async fn get_safe_balance<C: Currency + Send>(&self, safe_address: Address) -> errors::Result<Balance<C>> {
+        let bal = if C::is::<XDai>() {
+            self.rpc_operations.get_xdai_balance(safe_address).await?.to_be_bytes()
+        } else if C::is::<WxHOPR>() {
+            self.rpc_operations.get_hopr_balance(safe_address).await?.to_be_bytes()
+        } else {
+            return Err(HoprChainError::Api("unsupported currency".into()));
+        };
+
+        Ok(Balance::<C>::from(U256::from_be_bytes(bal)))
+    }
+
+    /// Retrieves the HOPR token allowance granted by the safe address to the channels contract.
+    ///
+    /// This method queries the on-chain HOPR token contract to determine how many tokens
+    /// the safe address has approved the channels contract to spend on its behalf.
+    ///
+    /// # Returns
+    /// * `Result<HoprBalance>` - The current allowance amount, or an error if the query fails
+    pub async fn get_safe_hopr_allowance(&self) -> Result<HoprBalance> {
+        Ok(self
+            .rpc_operations
+            .get_hopr_allowance(self.safe_address, self.contract_addresses.channels)
+            .await?)
     }
 
     pub async fn get_channel_closure_notice_period(&self) -> errors::Result<Duration> {
@@ -343,7 +404,7 @@ impl<T: HoprDbAllOperations + Send + Sync + Clone + std::fmt::Debug + 'static> H
         Ok(self.rpc_operations.get_minimum_network_winning_probability().await?)
     }
 
-    pub async fn get_minimum_ticket_price(&self) -> errors::Result<Balance> {
+    pub async fn get_minimum_ticket_price(&self) -> errors::Result<HoprBalance> {
         Ok(self.rpc_operations.get_minimum_network_ticket_price().await?)
     }
 }

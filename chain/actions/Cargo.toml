@@ -1,6 +1,6 @@
 [package]
 name = "hopr-chain-actions"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["HOPR Association <tech@hoprnet.org>"]
 edition = "2021"
 description = "High-level Core-Ethereum functions that translate to on-chain transactions"
@@ -58,5 +58,6 @@ anyhow = { workspace = true }
 mockall = { workspace = true }
 hex-literal = { workspace = true }
 tokio = { workspace = true }
+test-log = { workspace = true }
 
 hopr-crypto-random = { workspace = true }

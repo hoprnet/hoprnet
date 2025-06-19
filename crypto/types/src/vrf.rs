@@ -1,14 +1,20 @@
 use hopr_crypto_random::random_bytes;
 use hopr_primitive_types::prelude::*;
-use k256::elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest};
-use k256::elliptic_curve::sec1::ToEncodedPoint;
-use k256::elliptic_curve::ProjectivePoint;
-use k256::{Scalar, Secp256k1};
+use k256::{
+    Scalar, Secp256k1,
+    elliptic_curve::{
+        ProjectivePoint,
+        hash2curve::{ExpandMsgXmd, GroupDigest},
+        sec1::ToEncodedPoint,
+    },
+};
 
-use crate::errors::{CryptoError::CalculationError, Result};
-use crate::keypairs::{ChainKeypair, Keypair};
-use crate::types::CurvePoint;
-use crate::utils::k256_scalar_from_bytes;
+use crate::{
+    errors::{CryptoError::CalculationError, Result},
+    keypairs::{ChainKeypair, Keypair},
+    types::CurvePoint,
+    utils::k256_scalar_from_bytes,
+};
 
 /// Bundles values given to the smart contract to prove that a ticket is a win.
 ///
@@ -36,8 +42,9 @@ impl serde::Serialize for VrfParameters {
 
 #[cfg(feature = "serde")]
 mod de {
-    use super::*;
     use serde::de;
+
+    use super::*;
 
     pub(super) struct VrfParametersVisitor {}
 
@@ -233,9 +240,10 @@ pub fn derive_vrf_parameters<T: AsRef<[u8]>>(
 
 #[cfg(test)]
 mod tests {
+    use hex_literal::hex;
+
     use super::*;
     use crate::types::Hash;
-    use hex_literal::hex;
 
     lazy_static::lazy_static! {
         static ref ALICE: ChainKeypair = ChainKeypair::from_secret(&hex!("e17fe86ce6e99f4806715b0c9412f8dad89334bf07f72d5834207a9d8f19d7f8")).expect("lazy static keypair should be valid");
@@ -251,15 +259,17 @@ mod tests {
 
     #[test]
     fn vrf_values_serialize_deserialize() -> anyhow::Result<()> {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref())?;
+        let vrf_values = derive_vrf_parameters(*TEST_MSG, &ALICE, Hash::default().as_ref())?;
 
         let deserialized = VrfParameters::try_from(ALICE_VRF_OUTPUT.as_ref())?;
 
         // check for regressions
         assert_eq!(vrf_values.V, deserialized.V);
-        assert!(deserialized
-            .verify(&*ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
-            .is_ok());
+        assert!(
+            deserialized
+                .verify(&ALICE_ADDR, &TEST_MSG, Hash::default().as_ref())
+                .is_ok()
+        );
 
         // PartialEq is intentionally not implemented for VrfParameters
         let vrf: [u8; VrfParameters::SIZE] = vrf_values.clone().into();
@@ -280,11 +290,13 @@ mod tests {
 
     #[test]
     fn vrf_values_crypto() -> anyhow::Result<()> {
-        let vrf_values = derive_vrf_parameters(&*TEST_MSG, &*ALICE, Hash::default().as_ref())?;
+        let vrf_values = derive_vrf_parameters(*TEST_MSG, &ALICE, Hash::default().as_ref())?;
 
-        assert!(vrf_values
-            .verify(&ALICE_ADDR, &*TEST_MSG, Hash::default().as_ref())
-            .is_ok());
+        assert!(
+            vrf_values
+                .verify(&ALICE_ADDR, &TEST_MSG, Hash::default().as_ref())
+                .is_ok()
+        );
 
         Ok(())
     }

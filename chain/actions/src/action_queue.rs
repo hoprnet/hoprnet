@@ -2,37 +2,37 @@
 //!
 //! The [ActionQueue] acts as a MPSC queue of [Actions](hopr_chain_types::actions::Action) which are executed one-by-one
 //! as they are being popped up from the queue by a runner task.
-use async_channel::{bounded, Receiver, Sender};
-use async_trait::async_trait;
-use futures::future::Either;
-use futures::{pin_mut, FutureExt, StreamExt};
-use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter};
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::time::Duration;
-use tracing::{debug, error, info, trace, warn};
+use std::{
+    fmt::{Display, Formatter},
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
+};
 
+use async_channel::{Receiver, Sender, bounded};
+use async_trait::async_trait;
+use futures::{FutureExt, StreamExt, future::Either, pin_mut};
 use hopr_async_runtime::prelude::spawn;
-use hopr_chain_types::actions::Action;
-use hopr_chain_types::chain_events::ChainEventType;
+use hopr_chain_types::{actions::Action, chain_events::ChainEventType};
 use hopr_crypto_types::types::Hash;
-use hopr_db_sql::api::tickets::HoprDbTicketOperations;
-use hopr_db_sql::info::HoprDbInfoOperations;
+use hopr_db_sql::{api::tickets::HoprDbTicketOperations, info::HoprDbInfoOperations};
 use hopr_internal_types::prelude::*;
 use hopr_primitive_types::prelude::*;
+use serde::{Deserialize, Serialize};
+use tracing::{debug, error, info, trace, warn};
 
-use crate::action_state::{ActionState, IndexerExpectation};
-use crate::errors::ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed};
-use crate::errors::Result;
-
-#[cfg(all(feature = "prometheus", not(test)))]
-use hopr_metrics::metrics::MultiCounter;
+use crate::{
+    action_state::{ActionState, IndexerExpectation},
+    errors::{
+        ChainActionsError::{ChannelAlreadyClosed, InvalidState, Timeout, TransactionSubmissionFailed},
+        Result,
+    },
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
-    static ref METRIC_COUNT_ACTIONS: MultiCounter = MultiCounter::new(
+    static ref METRIC_COUNT_ACTIONS: hopr_metrics::MultiCounter = hopr_metrics::MultiCounter::new(
         "hopr_chain_actions_count",
         "Number of different chain actions and their results",
         &["action", "result"]
@@ -51,7 +51,7 @@ pub trait TransactionExecutor {
 
     /// Executes channel funding transaction (or channel opening) to the given `destination` and stake.
     /// Channel funding and channel opening are both same transactions.
-    async fn fund_channel(&self, destination: Address, balance: Balance) -> Result<Hash>;
+    async fn fund_channel(&self, destination: Address, balance: HoprBalance) -> Result<Hash>;
 
     /// Initiates closure of an outgoing channel.
     async fn initiate_outgoing_channel_closure(&self, dst: Address) -> Result<Hash>;
@@ -65,7 +65,7 @@ pub trait TransactionExecutor {
     /// Performs withdrawal of a certain amount from an address.
     /// Note that this transaction is typically awaited via polling and is not tracked
     /// by the Indexer.
-    async fn withdraw(&self, recipient: Address, amount: Balance) -> Result<Hash>;
+    async fn withdraw<C: Currency + Send + 'static>(&self, recipient: Address, amount: Balance<C>) -> Result<Hash>;
 
     /// Announces the node on-chain given the `AnnouncementData`
     async fn announce(&self, data: AnnouncementData) -> Result<Hash>;
@@ -244,11 +244,19 @@ where
                 },
             },
 
+            // Withdrawals are not awaited via the Indexer, but polled for completion,
+            // so no indexer event stream expectation awaiting is needed.
+            // So return once the future completes
             Action::Withdraw(recipient, amount) => {
-                // Withdrawal is not awaited via the Indexer, but polled for completion,
-                // so no indexer event stream expectation awaiting is needed.
-                // So return once the future completes
                 debug!(%recipient, %amount, "withdrawing funds");
+                return Ok(ActionConfirmation {
+                    tx_hash: self.tx_exec.withdraw(recipient, amount).await?,
+                    event: None,
+                    action: action.clone(),
+                });
+            }
+            Action::WithdrawNative(recipient, amount) => {
+                debug!(%recipient, %amount, "withdrawing native funds");
                 return Ok(ActionConfirmation {
                     tx_hash: self.tx_exec.withdraw(recipient, amount).await?,
                     event: None,
@@ -276,7 +284,7 @@ where
         let tx_hash = expectation.tx_hash;
         debug!(?action, %tx_hash, "action submitted via tx, registering expectation");
 
-        // Register new expectation and await it with timeout
+        // Register a new expectation and await it with timeout
         let confirmation = self.action_state.register_expectation(expectation).await?.fuse();
         let timeout = futures_timer::Delay::new(self.cfg.max_action_confirmation_wait).fuse();
 

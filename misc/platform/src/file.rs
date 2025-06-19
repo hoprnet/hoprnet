@@ -1,9 +1,10 @@
 pub mod native {
-    use crate::error::{PlatformError, Result};
     use std::{
         fs,
         path::{Path, PathBuf},
     };
+
+    use crate::error::{PlatformError, Result};
 
     pub fn read_to_string(file_path: &str) -> Result<String> {
         fs::read_to_string(file_path).map_err(|e| {

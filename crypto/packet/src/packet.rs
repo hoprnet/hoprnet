@@ -1,16 +1,19 @@
+use std::fmt::{Display, Formatter};
+
 use hopr_crypto_sphinx::prelude::*;
 use hopr_crypto_types::prelude::*;
 use hopr_internal_types::prelude::*;
 use hopr_path::{NonEmptyPath, TransportPath};
 use hopr_primitive_types::prelude::*;
 
-use std::fmt::{Display, Formatter};
-
-use crate::errors::PacketError::{PacketConstructionError, PacketDecodingError};
-use crate::por::{derive_ack_key_share, generate_proof_of_relay, pre_verify, SurbReceiverInfo};
-use crate::types::{HoprPacketMessage, HoprSenderId, HoprSurbId};
 use crate::{
-    errors::Result, HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
+    HoprPseudonym, HoprReplyOpener, HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, PAYLOAD_SIZE_INT,
+    errors::{
+        PacketError::{PacketConstructionError, PacketDecodingError},
+        Result,
+    },
+    por::{SurbReceiverInfo, derive_ack_key_share, generate_proof_of_relay, pre_verify},
+    types::{HoprPacketMessage, HoprSenderId, HoprSurbId},
 };
 
 /// Represents an outgoing packet that has been only partially instantiated.
@@ -258,7 +261,8 @@ pub enum PacketRouting<P: NonEmptyPath<OffchainPublicKey> = TransportPath> {
     ForwardPath { forward_path: P, return_paths: Vec<P> },
     /// The packet is routed via an existing SURB that corresponds to a pseudonym.
     Surb(HoprSurbId, HoprSurb),
-    /// No acknowledgement packet: a special type of 0-hop packet that is not going to be acknowledged but can carry a payload.
+    /// No acknowledgement packet: a special type of 0-hop packet that is not going to be acknowledged but can carry a
+    /// payload.
     NoAck(OffchainPublicKey),
 }
 
@@ -288,14 +292,15 @@ fn create_surb_for_path<M: KeyIdMapper<HoprSphinxSuite, HoprSphinxHeaderSpec>, P
 }
 
 impl HoprPacket {
-    /// The size of the packet including header, padded payload, ticket, and ack challenge.
-    pub const SIZE: usize =
-        MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>::PACKET_LEN + Ticket::SIZE;
-
+    /// The maximum number of SURBs that fit into a packet that contains no message.
+    pub const MAX_SURBS_IN_PACKET: usize = HoprPacket::PAYLOAD_SIZE / HoprSurb::SIZE;
     /// Maximum message size when no SURBs are present in the packet.
     ///
     /// See [`HoprPacket::max_surbs_with_message`].
     pub const PAYLOAD_SIZE: usize = PAYLOAD_SIZE_INT - HoprPacketMessage::HEADER_LEN;
+    /// The size of the packet including header, padded payload, ticket, and ack challenge.
+    pub const SIZE: usize =
+        MetaPacket::<HoprSphinxSuite, HoprSphinxHeaderSpec, PAYLOAD_SIZE_INT>::PACKET_LEN + Ticket::SIZE;
 
     /// Constructs a new outgoing packet with the given path.
     ///
@@ -328,9 +333,6 @@ impl HoprPacket {
     pub const fn max_surbs_with_message(msg_len: usize) -> usize {
         HoprPacket::PAYLOAD_SIZE.saturating_sub(msg_len) / HoprSurb::SIZE
     }
-
-    /// The maximum number of SURBs that fit into a packet that contains no message.
-    pub const MAX_SURBS_IN_PACKET: usize = HoprPacket::PAYLOAD_SIZE / HoprSurb::SIZE;
 
     /// Calculates the maximum length of the message that can be carried by a packet
     /// with the given number of SURBs.
@@ -421,14 +423,14 @@ impl HoprPacket {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    use anyhow::{bail, Context};
+    use anyhow::{Context, bail};
     use bimap::BiHashMap;
     use hex_literal::hex;
     use hopr_crypto_random::Randomizable;
     use hopr_path::TransportPath;
     use parameterized::parameterized;
+
+    use super::*;
 
     lazy_static::lazy_static! {
         static ref PEERS: [(ChainKeypair, OffchainKeypair); 5] = [
@@ -442,7 +444,7 @@ mod tests {
         static ref MAPPER: bimap::BiMap<KeyIdent, OffchainPublicKey> = PEERS
             .iter()
             .enumerate()
-            .map(|(i, (_, k))| (KeyIdent::from(i as u32), k.public().clone()))
+            .map(|(i, (_, k))| (KeyIdent::from(i as u32), *k.public()))
             .collect::<BiHashMap<_, _>>();
     }
 
@@ -582,10 +584,10 @@ mod tests {
         assert!((0..=4).contains(&node_pos), "node position must be between 1 and 3");
 
         let prev_hop = match (node_pos, is_reply) {
-            (1, false) => PEERS[0].1.public().clone(),
-            (_, false) => PEERS[node_pos - 1].1.public().clone(),
-            (3, true) => PEERS[4].1.public().clone(),
-            (_, true) => PEERS[node_pos + 1].1.public().clone(),
+            (1, false) => *PEERS[0].1.public(),
+            (_, false) => *PEERS[node_pos - 1].1.public(),
+            (3, true) => *PEERS[4].1.public(),
+            (_, true) => *PEERS[node_pos + 1].1.public(),
         };
 
         let packet = HoprPacket::from_incoming(&packet.to_bytes(), &PEERS[node_pos].1, prev_hop, &*MAPPER, openers)

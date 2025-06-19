@@ -1,18 +1,27 @@
-use crate::errors::DbSqlError;
+use std::{
+    sync::{Arc, Mutex, atomic::AtomicU64},
+    time::Duration,
+};
+
 use dashmap::{DashMap, Entry};
-use hopr_crypto_packet::prelude::{HoprSenderId, HoprSurbId};
-use hopr_crypto_packet::{HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener};
+use hopr_crypto_packet::{
+    HoprSphinxHeaderSpec, HoprSphinxSuite, HoprSurb, ReplyOpener,
+    prelude::{HoprSenderId, HoprSurbId},
+};
 use hopr_crypto_types::prelude::*;
-use hopr_db_api::info::{IndexerData, SafeInfo};
-use hopr_db_api::prelude::DbError;
+use hopr_db_api::{
+    info::{IndexerData, SafeInfo},
+    prelude::DbError,
+};
 use hopr_internal_types::prelude::*;
-use hopr_primitive_types::prelude::{Address, Balance, KeyIdent, U256};
-use moka::future::Cache;
-use moka::Expiry;
+use hopr_primitive_types::{
+    balance::HoprBalance,
+    prelude::{Address, KeyIdent, U256},
+};
+use moka::{Expiry, future::Cache};
 use ringbuffer::{AllocRingBuffer, RingBuffer};
-use std::sync::atomic::AtomicU64;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
+
+use crate::errors::DbSqlError;
 
 /// Lists all singular data that can be cached and
 /// cannot be represented by a key. These values can be cached for the long term.
@@ -115,7 +124,7 @@ pub struct HoprDbCaches {
     pub(crate) ticket_index: Cache<Hash, Arc<AtomicU64>>,
     // key is (channel_id, channel_epoch) to ensure calculation of unrealized value does not
     // include tickets from other epochs
-    pub(crate) unrealized_value: Cache<(Hash, U256), Balance>,
+    pub(crate) unrealized_value: Cache<(Hash, U256), HoprBalance>,
     pub(crate) chain_to_offchain: Cache<Address, Option<OffchainPublicKey>>,
     pub(crate) offchain_to_chain: Cache<OffchainPublicKey, Option<Address>>,
     pub(crate) src_dst_to_channel: Cache<ChannelParties, Option<ChannelEntry>>,
@@ -212,32 +221,50 @@ impl CacheKeyMapper {
     /// is not consistent.
     pub fn update_key_id_binding(&self, account: &AccountEntry) -> Result<(), DbSqlError> {
         let id = account.key_id();
+        let key = account.public_key;
 
         // Lock entries in the maps to avoid concurrent modifications
         let id_entry = self.0.entry(id);
-        let key_entry = self.1.entry(account.public_key);
+        let key_entry = self.1.entry(key);
 
         match (id_entry, key_entry) {
             (Entry::Vacant(v_id), Entry::Vacant(v_key)) => {
-                v_id.insert(account.public_key);
-                v_key.insert(id);
-                tracing::debug!(%id, %account.public_key, "inserted key-id binding");
+                v_id.insert_entry(key);
+                v_key.insert_entry(id);
+                tracing::debug!(%id, %key, "inserted key-id binding");
                 Ok(())
             }
             (Entry::Occupied(v_id), Entry::Occupied(v_key)) => {
                 // Check if the existing binding is consistent with the new one.
                 if v_id.get() != v_key.key() {
                     Err(DbSqlError::LogicalError(format!(
-                        "attempt to insert key {} with key-id {id} already exists for the key {}",
+                        "attempt to insert key {key} with key-id {id}, but key-id already maps to key {} while {} is \
+                         expected",
+                        v_id.get(),
                         v_key.key(),
-                        v_id.get()
                     )))
                 } else {
                     Ok(())
                 }
             }
+            // This only happens on re-announcements:
+            // The re-announcement uses the same packet key and chain-key, but the block number (published at)
+            // is different, and therefore the id_entry will be vacant.
+            (Entry::Vacant(_), Entry::Occupied(v_key)) => {
+                tracing::debug!(
+                    "attempt to insert key {key} with key-id {id} failed because key is already set as {}",
+                    v_key.get()
+                );
+                Err(DbSqlError::LogicalError("inconsistent key-id binding".into()))
+            }
             // This should never happen.
-            _ => Err(DbSqlError::LogicalError("inconsistent key-id binding".into())),
+            (Entry::Occupied(v_id), Entry::Vacant(_)) => {
+                tracing::debug!(
+                    "attempt to insert key {key} with key-id {id} failed because key-id is already set as {}",
+                    v_id.get()
+                );
+                Err(DbSqlError::LogicalError("inconsistent key-id binding".into()))
+            }
         }
     }
 }

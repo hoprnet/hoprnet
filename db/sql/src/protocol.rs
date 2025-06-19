@@ -1,27 +1,27 @@
-use crate::channels::HoprDbChannelOperations;
-use crate::db::HoprDb;
-use crate::errors::DbSqlError;
-use crate::info::HoprDbInfoOperations;
-use crate::prelude::HoprDbTicketOperations;
+use std::ops::{Mul, Sub};
+
 use async_trait::async_trait;
 use hopr_crypto_packet::prelude::*;
-use hopr_crypto_types::crypto_traits::Randomizable;
-use hopr_crypto_types::prelude::*;
-use hopr_db_api::errors::Result;
-use hopr_db_api::prelude::DbError;
-use hopr_db_api::protocol::{HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement};
-use hopr_db_api::resolver::HoprDbResolverOperations;
+use hopr_crypto_types::{crypto_traits::Randomizable, prelude::*};
+use hopr_db_api::{
+    errors::Result,
+    prelude::DbError,
+    protocol::{HoprDbProtocolOperations, IncomingPacket, OutgoingPacket, ResolvedAcknowledgement},
+    resolver::HoprDbResolverOperations,
+};
 use hopr_internal_types::prelude::*;
-use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
-use hopr_parallelize::cpu::spawn_fifo_blocking;
-use hopr_path::errors::PathError;
-use hopr_path::{Path, PathAddressResolver, ValidatedPath};
-use hopr_primitive_types::prelude::*;
-use std::ops::{Mul, Sub};
-use tracing::{instrument, trace, warn};
-
 #[cfg(all(feature = "prometheus", not(test)))]
 use hopr_metrics::metrics::{MultiCounter, SimpleCounter};
+use hopr_network_types::prelude::{ResolvedTransportRouting, SurbMatcher};
+use hopr_parallelize::cpu::spawn_fifo_blocking;
+use hopr_path::{Path, PathAddressResolver, ValidatedPath, errors::PathError};
+use hopr_primitive_types::prelude::*;
+use tracing::{instrument, trace, warn};
+
+use crate::{
+    channels::HoprDbChannelOperations, db::HoprDb, errors::DbSqlError, info::HoprDbInfoOperations,
+    prelude::HoprDbTicketOperations,
+};
 
 #[cfg(all(feature = "prometheus", not(test)))]
 lazy_static::lazy_static! {
@@ -53,7 +53,7 @@ impl HoprDb {
         mut fwd: HoprForwardedPacket,
         me: &ChainKeypair,
         outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: Balance,
+        outgoing_ticket_price: HoprBalance,
     ) -> std::result::Result<HoprForwardedPacket, DbSqlError> {
         let previous_hop_addr = self.resolve_chain_key(&fwd.previous_hop).await?.ok_or_else(|| {
             DbSqlError::LogicalError(format!(
@@ -294,7 +294,7 @@ impl HoprDbProtocolOperations for HoprDb {
             .map(|data| data.minimum_incoming_ticket_winning_prob)?)
     }
 
-    async fn get_network_ticket_price(&self) -> Result<Balance> {
+    async fn get_network_ticket_price(&self) -> Result<HoprBalance> {
         Ok(self.get_indexer_data(None).await.and_then(|data| {
             data.ticket_price
                 .ok_or(DbSqlError::LogicalError("missing ticket price".into()))
@@ -383,7 +383,7 @@ impl HoprDbProtocolOperations for HoprDb {
         data: Box<[u8]>,
         routing: ResolvedTransportRouting,
         outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: Balance,
+        outgoing_ticket_price: HoprBalance,
     ) -> Result<OutgoingPacket> {
         // Get necessary packet routing values
         let (next_peer, num_hops, pseudonym, routing) = match routing {
@@ -500,7 +500,7 @@ impl HoprDbProtocolOperations for HoprDb {
         pkt_keypair: &OffchainKeypair,
         sender: OffchainPublicKey,
         outgoing_ticket_win_prob: WinningProbability,
-        outgoing_ticket_price: Balance,
+        outgoing_ticket_price: HoprBalance,
     ) -> Result<Option<IncomingPacket>> {
         let offchain_keypair = pkt_keypair.clone();
         let myself = self.clone();
@@ -606,10 +606,10 @@ impl HoprDb {
         destination: Address,
         current_path_pos: u8,
         winning_prob: WinningProbability,
-        ticket_price: Balance,
+        ticket_price: HoprBalance,
     ) -> crate::errors::Result<TicketBuilder> {
         // The next ticket is worth: price * remaining hop count / winning probability
-        let amount = Balance::new(
+        let amount = HoprBalance::from(
             ticket_price
                 .amount()
                 .mul(U256::from(current_path_pos - 1))
@@ -619,7 +619,6 @@ impl HoprDb {
                         "winning probability outside of the allowed interval (0.0, 1.0]: {e}"
                     ))
                 })?,
-            BalanceType::HOPR,
         );
 
         if channel.balance.lt(&amount) {

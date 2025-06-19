@@ -2,14 +2,7 @@ use std::time::Duration;
 
 use async_stream::stream;
 use async_trait::async_trait;
-use futures::{stream::BoxStream, TryStreamExt};
-use libp2p_identity::PeerId;
-use multiaddr::Multiaddr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
-use sea_query::{Condition, Expr, IntoCondition, Order};
-use sqlx::types::chrono::{self, DateTime, Utc};
-use tracing::{error, trace};
-
+use futures::{TryStreamExt, stream::BoxStream};
 use hopr_crypto_types::prelude::OffchainPublicKey;
 use hopr_db_api::{
     errors::Result,
@@ -17,6 +10,12 @@ use hopr_db_api::{
 };
 use hopr_db_entity::network_peer;
 use hopr_primitive_types::prelude::*;
+use libp2p_identity::PeerId;
+use multiaddr::Multiaddr;
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
+use sea_query::{Condition, Expr, IntoCondition, Order};
+use sqlx::types::chrono::{self, DateTime, Utc};
+use tracing::{error, trace};
 
 use crate::{db::HoprDb, prelude::DbSqlError};
 
@@ -326,13 +325,17 @@ impl TryFrom<hopr_db_entity::network_peer::Model> for WrappedPeerStatus {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{
+        ops::Add,
+        time::{Duration, SystemTime},
+    };
+
     use futures::StreamExt;
     use hopr_crypto_types::keypairs::{ChainKeypair, Keypair, OffchainKeypair};
     use libp2p_identity::PeerId;
     use multiaddr::Multiaddr;
-    use std::ops::Add;
-    use std::time::{Duration, SystemTime};
+
+    use super::*;
 
     #[tokio::test]
     async fn test_add_get() -> anyhow::Result<()> {
@@ -446,7 +449,7 @@ mod tests {
         peer_status.backoff = 2.0;
         peer_status.ignored = None;
         peer_status.peer_version = Some("1.2.3".into());
-        for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+        for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
         peer_status.quality = peer_status.quality as f32 as f64;
@@ -477,7 +480,7 @@ mod tests {
         peer_status.ignored = None;
         peer_status.peer_version = Some("1.2.3".into());
         peer_status.multiaddresses = vec![];
-        for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+        for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
 
@@ -541,7 +544,7 @@ mod tests {
                 peer_status.backoff = 1.0;
                 peer_status.ignored = None;
                 peer_status.peer_version = Some("1.2.3".into());
-                for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+                for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
                     peer_status.update_quality(i);
                 }
 
@@ -615,7 +618,7 @@ mod tests {
         peer_status.backoff = 1.0;
         peer_status.ignored = None;
         peer_status.peer_version = Some("1.2.3".into());
-        for i in [0.1_f64, 0.4_64, 0.6_f64].into_iter() {
+        for i in [0.1_f64, 0.4_f64, 0.6_f64].into_iter() {
             peer_status.update_quality(i);
         }
 

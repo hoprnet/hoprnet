@@ -5,17 +5,15 @@ use std::{
 
 use anyhow::Context;
 use futures::{
-    channel::mpsc::{Receiver, Sender},
     SinkExt, StreamExt,
+    channel::mpsc::{Receiver, Sender},
 };
-use lazy_static::lazy_static;
-use libp2p::{Multiaddr, PeerId};
-
 use hopr_crypto_types::{keypairs::Keypair, prelude::OffchainKeypair};
 use hopr_platform::time::native::current_time;
-use hopr_transport_network::{network::NetworkTriggeredEvent, ping::PingQueryReplier};
 use hopr_transport_p2p::HoprSwarm;
-use hopr_transport_protocol::{config::ProtocolConfig, PeerDiscovery};
+use hopr_transport_probe::ping::PingQueryReplier;
+use hopr_transport_protocol::PeerDiscovery;
+use lazy_static::lazy_static;
 
 pub fn random_free_local_ipv4_port() -> Option<u16> {
     let socket = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0);
@@ -28,8 +26,6 @@ pub fn random_free_local_ipv4_port() -> Option<u16> {
 pub(crate) struct Interface {
     pub me: PeerId,
     pub address: Multiaddr,
-    #[allow(dead_code)]
-    pub update_from_network: futures::channel::mpsc::Sender<NetworkTriggeredEvent>,
     pub update_from_announcements: futures::channel::mpsc::UnboundedSender<PeerDiscovery>,
     #[allow(dead_code)]
     pub send_heartbeat: futures::channel::mpsc::UnboundedSender<(PeerId, PingQueryReplier)>,
@@ -37,6 +33,7 @@ pub(crate) struct Interface {
     pub send_msg: Sender<(PeerId, Box<[u8]>)>,
     pub recv_msg: Receiver<(PeerId, Box<[u8]>)>,
 }
+#[allow(clippy::upper_case_acronyms)]
 pub(crate) enum Announcement {
     QUIC,
 }
@@ -49,9 +46,8 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     let identity: libp2p::identity::Keypair = (&random_keypair).into();
     let peer_id: PeerId = identity.public().into();
 
-    let (network_events_tx, network_events_rx) = futures::channel::mpsc::channel::<NetworkTriggeredEvent>(100);
     let (transport_updates_tx, transport_updates_rx) = futures::channel::mpsc::unbounded::<PeerDiscovery>();
-    let (heartbeat_requests_tx, heartbeat_requests_rx) =
+    let (heartbeat_requests_tx, _heartbeat_requests_rx) =
         futures::channel::mpsc::unbounded::<(PeerId, PingQueryReplier)>();
 
     let multiaddress = match announcement {
@@ -59,15 +55,7 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     };
     let multiaddress = Multiaddr::from_str(&multiaddress).context("failed to create a valid multiaddress")?;
 
-    let swarm = HoprSwarm::new(
-        identity,
-        network_events_rx,
-        transport_updates_rx,
-        heartbeat_requests_rx,
-        vec![multiaddress.clone()],
-        ProtocolConfig::default(),
-    )
-    .await;
+    let swarm = HoprSwarm::new(identity, transport_updates_rx, vec![multiaddress.clone()]).await;
 
     let msg_proto_control = swarm.build_protocol_control(hopr_transport_protocol::CURRENT_HOPR_MSG_PROTOCOL);
     let msg_codec = hopr_transport_protocol::HoprBinaryCodec {};
@@ -77,7 +65,6 @@ async fn build_p2p_swarm(announcement: Announcement) -> anyhow::Result<(Interfac
     let api = Interface {
         me: peer_id,
         address: multiaddress,
-        update_from_network: network_events_tx,
         update_from_announcements: transport_updates_tx,
         send_heartbeat: heartbeat_requests_tx,
         send_msg: wire_msg_tx,
@@ -123,13 +110,13 @@ impl Drop for SelfClosingJoinHandle {
     }
 }
 
+use hopr_crypto_packet::prelude::HoprPacket;
+use libp2p::{Multiaddr, PeerId};
 use more_asserts::assert_gt;
 use tokio::{
-    task::{spawn, JoinHandle},
+    task::{JoinHandle, spawn},
     time::{sleep, timeout},
 };
-
-use hopr_crypto_packet::prelude::HoprPacket;
 
 #[ignore]
 #[tokio::test]
@@ -137,8 +124,8 @@ async fn p2p_only_communication_quic() -> anyhow::Result<()> {
     let (mut api1, swarm1) = build_p2p_swarm(Announcement::QUIC).await?;
     let (api2, swarm2) = build_p2p_swarm(Announcement::QUIC).await?;
 
-    let _sjh1 = SelfClosingJoinHandle::new(swarm1.run("1.0.0".into()));
-    let _sjh2 = SelfClosingJoinHandle::new(swarm2.run("1.0.0".into()));
+    let _sjh1 = SelfClosingJoinHandle::new(swarm1.run());
+    let _sjh2 = SelfClosingJoinHandle::new(swarm2.run());
 
     // Announce nodes to each other
     api1.update_from_announcements

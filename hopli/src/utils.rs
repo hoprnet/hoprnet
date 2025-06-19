@@ -2,7 +2,7 @@
 use alloy::{
     contract::Error as ContractError,
     hex::FromHexError,
-    primitives::{keccak256, Address},
+    primitives::{Address, keccak256},
     providers::{MulticallError, PendingTransactionError},
 };
 use hoprd_keypair::errors::KeyPairError;

@@ -1,19 +1,19 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{Json, Path, State},
     http::status::StatusCode,
     response::IntoResponse,
 };
-use serde::Deserialize;
-use serde_with::{serde_as, DisplayFromStr};
-use std::sync::Arc;
-
 use hopr_crypto_types::types::Hash;
 use hopr_lib::{
+    HoprBalance, HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex,
     errors::{HoprLibError, HoprStatusError},
-    HoprTransportError, ProtocolError, Ticket, TicketStatistics, ToHex,
 };
+use serde::Deserialize;
+use serde_with::{DisplayFromStr, serde_as};
 
-use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
+use crate::{ApiError, ApiErrorStatus, BASE_PATH, InternalState};
 
 #[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
@@ -27,15 +27,25 @@ use crate::{ApiError, ApiErrorStatus, InternalState, BASE_PATH};
         "winProb": "1"
     }))]
 #[serde(rename_all = "camelCase")]
+/// Represents a ticket in a channel.
 pub(crate) struct ChannelTicket {
     #[serde_as(as = "DisplayFromStr")]
-    #[schema(value_type = String)]
+    #[schema(value_type = String, example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")]
     channel_id: Hash,
-    amount: String,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "1.0 wxHOPR")]
+    amount: HoprBalance,
+    #[schema(example = 0)]
     index: u64,
+    #[schema(example = 1)]
     index_offset: u32,
+    #[schema(example = "1")]
     win_prob: String,
+    #[schema(example = 1)]
     channel_epoch: u32,
+    #[schema(
+        example = "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891"
+    )]
     signature: String,
 }
 
@@ -43,7 +53,7 @@ impl From<Ticket> for ChannelTicket {
     fn from(value: Ticket) -> Self {
         Self {
             channel_id: value.channel_id,
-            amount: value.amount.amount().to_string(),
+            amount: value.amount,
             index: value.index,
             index_offset: value.index_offset,
             win_prob: value.win_prob().to_string(),
@@ -63,11 +73,22 @@ pub(crate) struct ChannelIdParams {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets"),
+        description = "Lists all tickets for the given channel ID.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.")
+            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         responses(
-            (status = 200, description = "Fetched all tickets for the given channel ID", body = [ChannelTicket]),
+            (status = 200, description = "Fetched all tickets for the given channel ID", body = [ChannelTicket], example = json!([
+                {
+                    "amount": "10 wxHOPR",
+                    "channelEpoch": 1,
+                    "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+                    "index": 0,
+                    "indexOffset": 1,
+                    "signature": "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891",
+                    "winProb": "1"
+                }
+            ])),
             (status = 400, description = "Invalid channel id.", body = ApiError),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
             (status = 404, description = "Channel not found.", body = ApiError),
@@ -100,49 +121,71 @@ pub(super) async fn show_channel_tickets(
 
 /// Endpoint is deprecated and will be removed in the future. Returns an empty array.
 #[utoipa::path(
-        get,
-        path = const_format::formatcp!("{BASE_PATH}/tickets"),
-        responses(
-            (status = 200, description = "Fetched all tickets in all the channels", body = [ChannelTicket]),
-            (status = 401, description = "Invalid authorization token.", body = ApiError),
-            (status = 422, description = "Unknown failure", body = ApiError)
-        ),
-        security(
-            ("api_token" = []),
-            ("bearer_token" = [])
-        ),
-        tag = "Tickets"
+    get,
+    path = const_format::formatcp!("{BASE_PATH}/tickets"),
+    description = "(deprecated) Returns an empty array.",
+    responses(
+        (status = 200, description = "Fetched all tickets in all the channels", body = [ChannelTicket], example = json!([
+        {
+            "amount": "10 wxHOPR",
+            "channelEpoch": 1,
+            "channelId": "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f",
+            "index": 0,
+            "indexOffset": 1,
+            "signature": "0xe445fcf4e90d25fe3c9199ccfaff85e23ecce8773304d85e7120f1f38787f2329822470487a37f1b5408c8c0b73e874ee9f7594a632713b6096e616857999891",
+            "winProb": "1"
+        }
+        ])),
+        (status = 401, description = "Invalid authorization token.", body = ApiError),
+        (status = 422, description = "Unknown failure", body = ApiError)
+    ),
+    security(
+        ("api_token" = []),
+        ("bearer_token" = [])
+    ),
+    tag = "Tickets"
     )]
 pub(super) async fn show_all_tickets() -> impl IntoResponse {
     let tickets: Vec<ChannelTicket> = vec![];
     (StatusCode::OK, Json(tickets)).into_response()
 }
 
+#[serde_as]
 #[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 #[schema(example = json!({
-        "winning_count": 0,
-        "neglectedValue": "0",
-        "redeemedValue": "1000000000000000000",
-        "rejectedValue": "0",
-        "unredeemedValue": "2000000000000000",
+        "winningCount": 0,
+        "neglectedValue": "0 wxHOPR",
+        "redeemedValue": "1000 wxHOPR",
+        "rejectedValue": "0 wxHOPR",
+        "unredeemedValue": "2000 wxHOPR",
     }))]
 #[serde(rename_all = "camelCase")]
+/// Received tickets statistics.
 pub(crate) struct NodeTicketStatisticsResponse {
+    #[schema(example = 0)]
     winning_count: u64,
-    unredeemed_value: String,
-    redeemed_value: String,
-    neglected_value: String,
-    rejected_value: String,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "20 wxHOPR")]
+    unredeemed_value: HoprBalance,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String,example = "100 wxHOPR")]
+    redeemed_value: HoprBalance,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String,example = "0 wxHOPR")]
+    neglected_value: HoprBalance,
+    #[serde_as(as = "DisplayFromStr")]
+    #[schema(value_type = String, example = "0 wHOPR")]
+    rejected_value: HoprBalance,
 }
 
 impl From<TicketStatistics> for NodeTicketStatisticsResponse {
     fn from(value: TicketStatistics) -> Self {
         Self {
             winning_count: value.winning_count as u64,
-            unredeemed_value: value.unredeemed_value.amount().to_string(),
-            redeemed_value: value.redeemed_value.amount().to_string(),
-            neglected_value: value.neglected_value.amount().to_string(),
-            rejected_value: value.rejected_value.amount().to_string(),
+            unredeemed_value: value.unredeemed_value,
+            redeemed_value: value.redeemed_value,
+            neglected_value: value.neglected_value,
+            rejected_value: value.rejected_value,
         }
     }
 }
@@ -151,6 +194,7 @@ impl From<TicketStatistics> for NodeTicketStatisticsResponse {
 #[utoipa::path(
         get,
         path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
+        description = "Returns current complete statistics on tickets.",
         responses(
             (status = 200, description = "Tickets statistics fetched successfully. Check schema for description of every field in the statistics.", body = NodeTicketStatisticsResponse),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -174,6 +218,7 @@ pub(super) async fn show_ticket_statistics(State(state): State<Arc<InternalState
 #[utoipa::path(
         delete,
         path = const_format::formatcp!("{BASE_PATH}/tickets/statistics"),
+        description = "Resets the ticket metrics.",
         responses(
             (status = 204, description = "Ticket statistics reset successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -200,6 +245,7 @@ pub(super) async fn reset_ticket_statistics(State(state): State<Arc<InternalStat
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/tickets/redeem"),
+        description = "Starts redeeming of all tickets in all channels.",
         responses(
             (status = 204, description = "Tickets redeemed successfully."),
             (status = 401, description = "Invalid authorization token.", body = ApiError),
@@ -216,7 +262,7 @@ pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) 
     let hopr = state.hopr.clone();
     match hopr.redeem_all_tickets(false).await {
         Ok(()) => (StatusCode::NO_CONTENT, "").into_response(),
-        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+        Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
             (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
         }
         Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -230,8 +276,9 @@ pub(super) async fn redeem_all_tickets(State(state): State<Arc<InternalState>>) 
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/redeem"),
+        description = "Starts redeeming all tickets in the given channel.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.")
+            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         responses(
             (status = 204, description = "Tickets redeemed successfully."),
@@ -257,7 +304,7 @@ pub(super) async fn redeem_tickets_in_channel(
         Ok(channel_id) => match hopr.redeem_tickets_in_channel(&channel_id, false).await {
             Ok(count) if count > 0 => (StatusCode::NO_CONTENT, "").into_response(),
             Ok(_) => (StatusCode::NOT_FOUND, ApiErrorStatus::ChannelNotFound).into_response(),
-            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(_, _))) => {
+            Err(HoprLibError::StatusError(HoprStatusError::NotThereYet(..))) => {
                 (StatusCode::PRECONDITION_FAILED, ApiErrorStatus::NotReady).into_response()
             }
             Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, ApiErrorStatus::from(e)).into_response(),
@@ -270,8 +317,9 @@ pub(super) async fn redeem_tickets_in_channel(
 #[utoipa::path(
         post,
         path = const_format::formatcp!("{BASE_PATH}/channels/{{channelId}}/tickets/aggregate"),
+        description = "Starts aggregation of tickets in the given channel.",
         params(
-            ("channelId" = String, Path, description = "ID of the channel.")
+            ("channelId" = String, Path, description = "ID of the channel.", example = "0x04efc1481d3f106b88527b3844ba40042b823218a9cd29d1aa11c2c2ef8f538f")
         ),
         responses(
             (status = 204, description = "Tickets successfully aggregated"),

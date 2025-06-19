@@ -31,9 +31,9 @@ class Cluster:
         index = 1
 
         for network_name, params in config["networks"].items():
-            for alias, node in params["nodes"].items():
+            for node in params["nodes"]:
                 self.nodes[str(index)] = Node.fromConfig(
-                    index, alias, node, config["defaults"], network_name, use_nat, exposed, base_port
+                    index, node, config["defaults"], network_name, use_nat, exposed, base_port
                 )
                 index += 1
 
@@ -46,11 +46,11 @@ class Cluster:
         for node in self.nodes.values():
             assert node.create_local_safe(self.anvil_config)
 
-    async def shared_bringup(self, skip_funding: bool = False):
+    async def shared_bringup(self, log_tag: str = ""):
         logging.info("Setting up nodes with protocol config files")
         for node in self.nodes.values():
             logging.debug(f"Setting up {node}")
-            node.setup(PASSWORD, self.protocol_config, PWD)
+            node.setup(PASSWORD, self.protocol_config, PWD, log_tag)
 
         # WAIT FOR NODES TO BE UP
         logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to start up")
@@ -64,10 +64,6 @@ class Cluster:
         if not all(nodes_readyness):
             logging.critical("Not all nodes are started, interrupting setup")
             raise RuntimeError
-
-        if not skip_funding:
-            self.fund_nodes()
-            return
 
         # WAIT FOR NODES TO BE UP
         logging.info(f"Waiting up to {GLOBAL_TIMEOUT}s for nodes to be ready")
@@ -84,7 +80,6 @@ class Cluster:
         logging.info("Retrieve nodes addresses and peer ids")
         for node in self.nodes.values():
             if addresses := await node.api.addresses():
-                node.peer_id = addresses.hopr
                 node.address = addresses.native
             else:
                 raise RuntimeError(f"Node {node} did not return addresses")
@@ -95,13 +90,77 @@ class Cluster:
 
         tasks = []
         for node in self.nodes.values():
-            required_peers = [n.peer_id for n in self.nodes.values() if n != node and n.network == node.network]
+            required_peers = [n.address for n in self.nodes.values() if n != node and n.network == node.network]
             tasks.append(asyncio.create_task(node.all_peers_connected(required_peers)))
 
         try:
             await asyncio.wait_for(asyncio.gather(*tasks), peer_connection_timeout)
         except asyncio.TimeoutError:
             raise RuntimeError("Not all nodes are connected to all peers, interrupting setup")
+
+    def enable_network_registry(self):
+        logging.info("Enabling network registry")
+        private_key = utils.load_private_key(self.anvil_config)
+
+        custom_env = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "MANAGER_PRIVATE_KEY": private_key,
+            "PATH": os.environ["PATH"],
+        }
+        run(
+            [
+                "hopli",
+                "network-registry",
+                "toggle",
+                "--network",
+                NETWORK,
+                "--contracts-root",
+                "./ethereum/contracts",
+                "--enable",
+                "--provider-url",
+                f"http://127.0.0.1:{self.base_port}",
+            ],
+            env=os.environ | custom_env,
+            check=True,
+            capture_output=True,
+            cwd=PWD,
+        )
+
+    def add_nodes_to_network_registry(self):
+        safe_addresses = ",".join(node.safe_address for node in self.nodes.values())
+        addresses = ",".join(node.address for node in self.nodes.values())
+        logging.info(f"Adding nodes {addresses} and safes {safe_addresses} to the network registry")
+
+        private_key = utils.load_private_key(self.anvil_config)
+
+        custom_env = {
+            "ETHERSCAN_API_KEY": "anykey",
+            "IDENTITY_PASSWORD": PASSWORD,
+            "MANAGER_PRIVATE_KEY": private_key,
+            "PATH": os.environ["PATH"],
+        }
+        run(
+            [
+                "hopli",
+                "network-registry",
+                "manager-register",
+                "--network",
+                NETWORK,
+                "--contracts-root",
+                "./ethereum/contracts",
+                "--node-address",
+                addresses,
+                "--safe-address",
+                safe_addresses,
+                "--provider-url",
+                f"http://127.0.0.1:{self.base_port}",
+            ],
+            env=os.environ | custom_env,
+            check=True,
+            capture_output=True,
+            cwd=PWD,
+        )
 
     def fund_nodes(self):
         logging.info("Funding nodes")
@@ -151,11 +210,6 @@ class Cluster:
             os.remove(f)
         logging.info(f"Removed '*.id' files in {MAIN_DIR} subfolders")
 
-        # Remove old logs
-        for f in MAIN_DIR.glob(f"{NODE_NAME_PREFIX}/*.log"):
-            os.remove(f)
-        logging.info(f"Removed '*.log' files in {MAIN_DIR} subfolders")
-
         # Copy new identity files
         for idx, node in enumerate(self.nodes.values(), start=1):
             shutil.copy(
@@ -173,22 +227,19 @@ class Cluster:
         for node in self.nodes.values():
             node.load_addresses()
 
+    def load_native_addresses(self):
+        for node in self.nodes.values():
+            node.load_native_address()
+
     def get_safe_and_module_addresses(self):
         for node in self.node.values():
             node.get_safe_and_module_addresses()
 
-    async def alias_peers(self):
-        logging.info("Aliasing every other node")
-        aliases_dict = {node.peer_id: node.alias for node in self.nodes.values()}
-
-        for node in self.nodes.values():
-            await node.alias_peers(aliases_dict)
-
     async def connect_peers(self):
         logging.info("Creating a channel to every other node")
-        peer_ids = [node.peer_id for node in self.nodes.values()]
+        addresses = [node.address for node in self.nodes.values()]
 
-        tasks = [node.connect_peers(peer_ids) for node in self.nodes.values()]
+        tasks = [node.connect_peers(addresses) for node in self.nodes.values()]
         await asyncio.gather(*tasks)
 
     async def links(self):

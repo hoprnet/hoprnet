@@ -1,21 +1,17 @@
-import logging
-
 import asyncio
-
-import pytest
 import random
 
-from sdk.python.api.hopr import HoprdAPI
+import pytest
+
 from sdk.python.localcluster.node import Node
 
 from .conftest import barebone_nodes
 from .utils import (
-    TICKET_AGGREGATION_THRESHOLD,
+    basic_send_and_receive_packets_over_single_route,
     check_all_tickets_redeemed,
     check_unredeemed_tickets_value,
-    get_ticket_price,
     create_bidirectional_channels_for_route,
-    basic_send_and_receive_packets_over_single_route,
+    get_ticket_price,
     make_routes,
 )
 

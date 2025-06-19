@@ -1,14 +1,12 @@
-use crate::initiation::StartErrorReason;
 use thiserror::Error;
+
+use crate::initiation::StartErrorReason;
 
 /// Enumeration of errors thrown from this library.
 #[derive(Error, Debug)]
 pub enum TransportSessionError {
     #[error("connection timed out")]
     Timeout,
-
-    #[error("application tag from disallowed range")]
-    Tag,
 
     #[error("incorrect data size")]
     PayloadSize,
@@ -35,6 +33,9 @@ pub enum TransportSessionError {
 
     #[error("received data for an unregistered session")]
     UnknownData,
+
+    #[error("session establishment protocol error: {0}")]
+    StartProtocolError(String),
 
     #[error(transparent)]
     Manager(#[from] SessionManagerError),

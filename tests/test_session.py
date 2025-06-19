@@ -11,7 +11,7 @@ import string
 import subprocess
 import threading
 import time
-from contextlib import AsyncExitStack, contextmanager
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from enum import Enum
 from functools import partial
@@ -26,19 +26,15 @@ from cryptography.x509.oid import NameOID
 
 from sdk.python.api.protocol import Protocol
 from sdk.python.api.request_objects import SessionCapabilitiesBody
-from sdk.python.api.response_objects import Session
-from sdk.python.localcluster.constants import MAIN_DIR, TICKET_PRICE_PER_HOP
+from sdk.python.localcluster.constants import MAIN_DIR
 from sdk.python.localcluster.node import Node
 
-from .conftest import barebone_nodes, random_distinct_pairs_from
+from .conftest import barebone_nodes
 from .utils import (
-    PARAMETERIZED_SAMPLE_SIZE,
-    create_channel,
-    shuffled,
-    create_bidirectional_channels_for_route,
-    get_ticket_price,
     HoprSession,
     basic_send_and_receive_packets_over_single_route,
+    create_bidirectional_channels_for_route,
+    get_ticket_price,
     make_routes,
 )
 
@@ -267,8 +263,8 @@ class TestSessionWithSwarm:
                     Protocol.TCP,
                     src=swarm7[route[0]],
                     dest=swarm7[route[-1]],
-                    fwd_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[1:-1]]},
-                    return_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[-2:0:-1]]},
+                    fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
+                    return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
                     capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
                     target_port=server.port,
                 ) as session:
@@ -319,8 +315,8 @@ class TestSessionWithSwarm:
             Protocol.UDP,
             src=swarm7[route[0]],
             dest=swarm7[route[-1]],
-            fwd_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[1:-1]]},
-            return_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[-2:0:-1]]},
+            fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
+            return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
             loopback=True,
             use_response_buffer=None,
         ) as session:
@@ -377,8 +373,8 @@ class TestSessionWithSwarm:
                     Protocol.TCP,
                     src=swarm7[route[0]],
                     dest=swarm7[route[-1]],
-                    fwd_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[1:-1]]},
-                    return_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[-2:0:-1]]},
+                    fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
+                    return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
                     capabilities=SessionCapabilitiesBody(retransmission=True, segmentation=True),
                     target_port=dst_sock_port,
                 ) as session:
@@ -410,8 +406,8 @@ class TestSessionWithSwarm:
                 Protocol.UDP,
                 src=swarm7[route[0]],
                 dest=swarm7[route[-1]],
-                fwd_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[1:-1]]},
-                return_path={"IntermediatePath": [swarm7[hop].peer_id for hop in route[-2:0:-1]]},
+                fwd_path={"IntermediatePath": [swarm7[hop].address for hop in route[1:-1]]},
+                return_path={"IntermediatePath": [swarm7[hop].address for hop in route[-2:0:-1]]},
                 capabilities=SessionCapabilitiesBody(segmentation=True),
                 use_response_buffer="5 MiB",
                 target_port=int(wireguard_tunnel_port),
